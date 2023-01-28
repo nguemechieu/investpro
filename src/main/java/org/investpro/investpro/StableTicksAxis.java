@@ -32,11 +32,10 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
 import javafx.util.Duration;
 import javafx.scene.chart.ValueAxis;
+import org.jetbrains.annotations.NotNull;
 
 public class StableTicksAxis extends ValueAxis<Number> {
-    /**
-     * Possible tick spacing at the 10^1 level. These numbers must be {@literal >= 1 and < 10}.
-     */
+
     private static final double[] dividers = new double[] {1.0, 2.5, 5.0};
 
     /**
@@ -54,7 +53,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private final WritableValue<Double> scaleValue = new WritableValue<>() {
         @Override
-        public Double getValue() {
+        public @NotNull Double getValue() {
             return getScale();
         }
 

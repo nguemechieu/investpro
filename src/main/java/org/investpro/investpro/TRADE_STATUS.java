@@ -1,9 +1,7 @@
 package org.investpro.investpro;
 
 public enum TRADE_STATUS {
-    /**
-     * The trade has been accepted
-     */
+
     INIT_FAILED(0),
     INIT_SUCCEEDED(1),
     CANCEL(2),

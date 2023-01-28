@@ -24,7 +24,7 @@ public class Main extends Application {
 
         GridPane  grid=new GridPane();
         grid.setPadding(new  Insets(9,10,10,10));
-        grid.setTranslateX(400);
+        grid.setTranslateX(500);
         grid.setTranslateY(200);
         grid.setGridLinesVisible(true);
         Label lblUsername=new Label("Username :");

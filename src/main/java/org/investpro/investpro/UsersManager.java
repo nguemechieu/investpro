@@ -8,7 +8,9 @@ import java.sql.SQLException;
 import java.util.Objects;
 
 
-record UsersManager()
+
+
+    public record UsersManager()
 {
       static User user;
  static DataSource   db;
