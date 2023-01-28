@@ -258,12 +258,10 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public boolean isLessThan(Money other) {
-        if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
+        if (other instanceof DefaultMoney money) {
             checkCurrenciesEqual(money);
             return this.amount().compareTo(money.amount) < 0;
-        } else if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        } else if (other instanceof FastMoney money) {
             return this.amount().compareTo(money.toBigDecimal()) < 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
@@ -367,7 +365,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
     public @NotNull String toString() {
         return switch (currency.getCurrencyType()) {
             case FIAT -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-            case CRYPTO, NULL, default -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+            case CRYPTO -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+            default -> DefaultMoneyFormatter.DEFAULT_DEFAULT_FORMATTER.format(this);
         };
     }
 }

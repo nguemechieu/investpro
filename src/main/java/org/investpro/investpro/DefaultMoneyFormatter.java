@@ -1,7 +1,5 @@
 package org.investpro.investpro;
 
-import static java.lang.Math.min;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -10,6 +8,8 @@ import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.Objects;
+
+import static java.lang.Math.min;
 
 
 public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
@@ -28,6 +28,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
             .forceDecimalPoint()
             .trimTrailingZerosAfterDecimalPoint()
             .build();
+    public static final DefaultMoneyFormatter DEFAULT_DEFAULT_FORMATTER = null;
 
     private final CurrencyStyle currencyStyle;
     private final CurrencyPosition currencyPosition;
