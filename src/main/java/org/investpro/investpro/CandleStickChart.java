@@ -1,31 +1,5 @@
 package org.investpro.investpro;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.investpro.investpro.CandleStickChartUtils.*;
-import static org.investpro.investpro.ChartColors.*;
-
-import java.net.URISyntaxException;
-import java.text.DecimalFormat;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.TreeMap;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -41,11 +15,7 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.*;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -55,10 +25,23 @@ import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontSmoothingType;
 import javafx.scene.text.TextAlignment;
-
 import javafx.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URISyntaxException;
+import java.text.DecimalFormat;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.investpro.investpro.CandleStickChartUtils.*;
+import static org.investpro.investpro.ChartColors.*;
 
 
 public class CandleStickChart extends Region {
@@ -229,11 +212,12 @@ public class CandleStickChart extends Region {
         ChangeListener<? super Boolean> gotFirstSizeChangeListener = new ChangeListener<>() {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
-                double numberOfVisibleWholeCandles = Math.floor(containerWidth.getValue().doubleValue() / candleWidth);
+                double numberOfVisibleWholeCandles = Math.floor(widthProperty().get() / candleWidth);
+
                 chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 60 + (candleWidth / 2);
-                chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 60 +
-                        (candleWidth / 2);
-                chartHeight = containerHeight.getValue().doubleValue();
+                //chartWidth = (Math.floor(widthProperty().get()/ candleWidth) * candleWidth) - 60 +
+                //          (candleWidth / 2);
+                chartHeight = heightProperty().get();
                 canvas = new Canvas(chartWidth - 100, chartHeight - 100);
                 StackPane chartStackPane = new StackPane(canvas, loadingIndicatorContainer);
                 chartStackPane.setTranslateX(64); // Only necessary when wrapped in StackPane...why?
@@ -307,7 +291,7 @@ public class CandleStickChart extends Region {
                             // Show the loading indicator and freeze the chart during the time that the new data is
                             // being paged in.
                             if (throwable != null) {
-                                logger.error("exception: ", throwable);
+                                Log.error("exception: \n" + throwable);
                             }
                             paging = true;
                             progressIndicator.setVisible(true);
@@ -333,7 +317,7 @@ public class CandleStickChart extends Region {
 
     /**
      * Sets the bounds of the x-axis either one full candle to the right or left, depending on the sign
-     * of deltaX. Currently the magnitude of deltaX does not matter (each call to this method only moves
+     * of deltaX. Currently, the magnitude of deltaX does not matter (each call to this method only moves
      * the duration of one full candle).
      *
      * @param deltaX set the bounds either one candle over to the right or left from the current position
@@ -359,8 +343,8 @@ public class CandleStickChart extends Region {
         if (!currZoomLevel.getExtremaForCandleRangeMap().containsKey((int) xAxis.getLowerBound())) {
             // TODO(mike): Does this *always* represent a coding error on our end or can this happen during
             // normal chart functioning, and could we handle it more gracefully?
-            logger.error("The extrema map did not contain extrema for x-value: " + (int) xAxis.getLowerBound());
-            logger.error("extrema map: " + new TreeMap<>(currZoomLevel.getExtremaForCandleRangeMap()));
+            Log.error("The extrema map did not contain extrema for x-value: " + (int) xAxis.getLowerBound());
+            Log.error("extrema map: " + new TreeMap<>(currZoomLevel.getExtremaForCandleRangeMap()));
         }
 
         // The y-axis and extra axis extrema are obtained using a key offset by minus one candle duration. This makes
@@ -370,8 +354,9 @@ public class CandleStickChart extends Region {
                 (int) xAxis.getLowerBound() - secondsPerCandle);
         // FIXME: Figure out why this is null
         if (extremaForRange == null) {
-            logger.error("extremaForRange was null!");
+            Log.error("extremaForRange was null!");
         }
+        assert extremaForRange != null;
         final Integer yAxisMax = extremaForRange.getValue().getMax();
         final Integer yAxisMin = extremaForRange.getValue().getMin();
         final double yAxisDelta = yAxisMax - yAxisMin;
@@ -441,7 +426,7 @@ public class CandleStickChart extends Region {
         extraAxis.layout();
         canvas.setLayoutX(left);
         canvas.setLayoutY(top);
-        logger.info("CandleStickChart.layoutChart end");
+        Log.info("CandleStickChart.layoutChart end");
     }
 
     /**
@@ -481,7 +466,7 @@ public class CandleStickChart extends Region {
                         (((int) currZoomLevel.getNumVisibleCandles()) * secondsPerCandle), true,
                 ((int) xAxis.getUpperBound() - secondsPerCandle) - (numCandlesToSkip * secondsPerCandle), true);
 
-        logger.info("Drawing " + candlesToDraw.size() + " candles.");
+        Log.info("Drawing " + candlesToDraw.size() + " candles.");
         if (chartOptions.isHorizontalGridLinesVisible()) {
             // Draw horizontal grid lines aligned with y-axis major tick marks
             for (Axis.TickMark<Number> tickMark : yAxis.getTickMarks()) {
@@ -719,7 +704,8 @@ public class CandleStickChart extends Region {
     void changeZoom(ZoomDirection zoomDirection) {
         final int multiplier = zoomDirection == ZoomDirection.IN ? -1 : 1;
         if (currZoomLevel == null) {
-            logger.error("currZoomLevel was null!");
+            Log.error("currZoomLevel was null!");
+            return;
         }
         int newCandleWidth = currZoomLevel.getCandleWidth() - multiplier;
         if (newCandleWidth <= 1) {
@@ -917,7 +903,7 @@ public class CandleStickChart extends Region {
 
             // Get rid of trades we already know about
             List<Trade> newTrades = liveTrades.stream().filter(trade -> trade.getTimestamp().getEpochSecond() >
-                    inProgressCandle.getCurrentTill()).collect(Collectors.toList());
+                    inProgressCandle.getCurrentTill()).toList();
 
             // Partition the trades between the current in-progress candle and the candle after that (which we may
             // have entered after last update).
@@ -981,17 +967,17 @@ public class CandleStickChart extends Region {
         @Override
         public void accept(List<CandleData> candleData) {
             if (Platform.isFxApplicationThread()) {
-                logger.error("candle data paging must not happen on FX thread!");
+                Log.error("candle data paging must not happen on FX thread!");
                 throw new IllegalStateException("candle data paging must not happen on FX thread!");
             }
 
             if (candleData.isEmpty()) {
-                logger.warn("candleData was empty");
+                Log.warn("candleData was empty");
                 return;
             }
 
             if (candleData.get(0).getOpenTime() >= candleData.get(1).getOpenTime()) {
-                logger.error("Paged candle data must be in ascending order by x-value");
+                Log.error("Paged candle data must be in ascending order by x-value");
                 throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
             }
 
@@ -1016,8 +1002,7 @@ public class CandleStickChart extends Region {
                     // catch the data up to within 9 seconds of current time (or in this case roughly within 0.25% of
                     // current time).
                     CompletableFuture<Optional<InProgressCandleData>> inProgressCandleDataOptionalFuture = exchange
-                            .fetchCandleDataForInProgressCandle(tradePair, Instant.ofEpochSecond(
-                                    candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle),
+                            .fetchCandleDataForInProgressCandle(tradePair,
                                     secondsIntoCurrentCandle, secondsPerCandle);
                     inProgressCandleDataOptionalFuture.whenComplete((inProgressCandleDataOptional, throwable) -> {
                         if (throwable == null) {
@@ -1063,8 +1048,8 @@ public class CandleStickChart extends Region {
                                         }
                                         Platform.runLater(() -> setInitialState(candleData));
                                     } else {
-                                        logger.error("error fetching recent trades until: " +
-                                                inProgressCandleData.currentTill(), exception);
+                                        Log.error("error fetching recent trades until: " +
+                                                inProgressCandleData.currentTill() + exception);
                                     }
                                 });
                             } else {
@@ -1076,7 +1061,7 @@ public class CandleStickChart extends Region {
                                 Platform.runLater(() -> setInitialState(candleData));
                             }
                         } else {
-                            logger.error("error fetching in-progress candle data: ", throwable);
+                            Log.error("error fetching in-progress candle data: \n" + throwable);
                         }
                     });
                 } else {

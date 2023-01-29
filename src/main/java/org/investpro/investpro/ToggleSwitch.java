@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2015, 2016 ControlsFX
  * All rights reserved.
- *
+ * <p>
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
  *     * Neither the name of ControlsFX, any associated website, nor the
  * names of its contributors may be used to endorse or promote products
  * derived from this software without specific prior written permission.
- *
+ * <p>
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -30,7 +30,6 @@ import javafx.beans.NamedArg;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
-import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.css.PseudoClass;
 import javafx.scene.control.Labeled;
@@ -130,19 +129,12 @@ public class ToggleSwitch extends Labeled {
 
     private final ReadOnlyStringWrapper turnOnText;
 
-    public final ReadOnlyStringProperty turnOnTextProperty() {
-        return turnOnText.getReadOnlyProperty();
-    }
 
     public final String getTurnOnText() {
         return turnOnText.get();
     }
 
     private final ReadOnlyStringWrapper turnOffText;
-
-    public final ReadOnlyStringProperty turnOffTextProperty() {
-        return turnOffText.getReadOnlyProperty();
-    }
 
     public final String getTurnOffText() {
         return turnOffText.get();
@@ -155,6 +147,6 @@ public class ToggleSwitch extends Labeled {
 
     @Override
     public String getUserAgentStylesheet() {
-        return Objects.requireNonNull(ToggleSwitch.class.getResource("/css/toggles witch.css")).toExternalForm();
+        return Objects.requireNonNull(Objects.requireNonNull(ToggleSwitch.class.getResource("/app.css")).toExternalForm());
     }
 }

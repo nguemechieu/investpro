@@ -1,19 +1,17 @@
 package org.investpro.investpro;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.ServiceLoader;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
-public abstract class Currency {
+
+public class Currency {
     private final CurrencyType currencyType;
     private final String fullDisplayName;
     private final String shortDisplayName;
@@ -203,7 +201,7 @@ public abstract class Currency {
             return false;
         }
 
-        if (!(object instanceof Currency)) {
+        if (!(object instanceof Currency other)) {
             return false;
         }
 
@@ -211,7 +209,6 @@ public abstract class Currency {
             return true;
         }
 
-        Currency other = (Currency) object;
         return currencyType == other.currencyType && code.equals(other.code);
     }
 

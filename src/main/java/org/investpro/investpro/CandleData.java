@@ -1,9 +1,11 @@
 package org.investpro.investpro;
 
+import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
+
 import java.util.Objects;
 
 
-public class CandleData {
+public class CandleData extends RecursiveTreeObject<CandleData> {
     private final double openPrice;
     private final double closePrice;
     private final double highPrice;

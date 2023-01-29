@@ -5,13 +5,87 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/1674996013386.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/1674996274998.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartExample.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CoinbaseWebSocketClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ENUM_EXCHANGE_LIST.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ExchangeImpl.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400JpgdpiLogo.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400JpgdpiLogoBW.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400JpgdpiLogoCropped.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400JpgdpiLogoCroppedBW.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400PngdpiLogo.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400PngdpiLogoBW.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400PngdpiLogoCropped.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/400PngdpiLogoCroppedBW.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/612399300.pdf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/7123025_logo_google_g_icon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/8377-ebay_102466 (1).png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/EPSLogo.eps" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/Facebook-PNG-Photos (1).png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/FacebookCover.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/FacebookProfile.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/FaviconLogo.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/FaviconLogo.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/InstagramProfilePhoto.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/LinkedinCover.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/LinkedinProfile.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/META-INF/MANIFEST.MF" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/MediumSquareLogo.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/MediumSquareLogoBWJpg.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/SVGLogo.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/SmallSquareLogoBWJpg.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/SmallSquareLogoJpg.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/TwitterHeader.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/TwitterProfile.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/Welcome.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/amazon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/credential/credentials.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/css/chart.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/css/glyph.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/css/popover.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/css/toggleswitch.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/font/fontawesome-webfont-5.0.7.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/font/typicons.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/images/screenshot.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/img/cog-solid.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/img/print-solid.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/img/search-minus-solid.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/img/search-plus-solid.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/paypal-logo-2.svg" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/module-info.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/module-info.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleData.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataPager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataPager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChart.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChart.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartContainer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartContainer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartToolbar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartToolbar.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Currency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Currency.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoney.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoney.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoneyFormatter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoneyFormatter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Exchange.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Exchange.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ExchangeWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ExchangeWebSocketClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/PopOver.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/PopOver.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/StableTicksAxis.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/StableTicksAxis.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ToggleSwitch.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ToggleSwitch.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/app.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/app.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Enum" />
+        <option value="Class" />
+      </list>
+    </option>
   </component>
   <component name="Git.Rebase.Settings">
     <option name="NEW_BASE" value="origin/master" />
@@ -24,9 +98,6 @@
       </GitPushTagMode>
     </option>
     <option name="SIGN_OFF_COMMIT" value="true" />
-  </component>
-  <component name="JpbToolWindowState">
-    <option name="isToolWindowVisible" value="false" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
@@ -42,26 +113,33 @@
     <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectId" id="2KwOY3cq4hJdLPxjtjgTM5Diq5r" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/nguem/.m2/repository/org/java-websocket/Java-WebSocket/1.5.1/Java-WebSocket-1.5.1.jar&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;SDKs&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.47816092&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;settings.sync&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_ADD_EXTERNAL_FILES": "true",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "last_opened_file_path": "C:/Users/nguem/IdeaProjects/investpro/src/main/java/org/investpro/investpro",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.47816092",
+    "settings.editor.selected.configurable": "com.maddyhome.idea.vim.ui.VimEmulationConfigurable"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
+    <key name="CreateClassDialog.RecentsKey">
+      <recent name="org.investpro.investpro" />
+    </key>
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\java\org\investpro\investpro" />
+      <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\resources" />
     </key>
     <key name="ExtractSuperBase.RECENT_KEYS">
       <recent name="org.investpro.investpro" />
@@ -169,7 +247,14 @@
       <option name="project" value="LOCAL" />
       <updated>1674947743115</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="runt">
+      <created>1674948525957</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1674948525957</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -186,6 +271,7 @@
   <component name="VcsManagerConfiguration">
     <option name="CODE_SMELLS_PROFILE" value="Project Default" />
     <option name="CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT" value="true" />
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <MESSAGE value="run" />
     <MESSAGE value="runtyfut" />
     <MESSAGE value="runt" />
@@ -197,16 +283,19 @@
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
-        <line-breakpoint enabled="true" type="java-method">
-          <url>file://$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoney.java</url>
-          <line>157</line>
-          <properties class="org.investpro.investpro.DefaultMoney" method="plus">
-            <option name="EMULATED" value="true" />
-            <option name="WATCH_EXIT" value="false" />
-          </properties>
-          <option name="timeStamp" value="4" />
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/org/investpro/investpro/Main.java</url>
+          <line>427</line>
+          <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>
+      <default-breakpoints>
+        <breakpoint type="python-exception">
+          <properties notifyOnTerminate="true" exception="BaseException">
+            <option name="notifyOnTerminate" value="true" />
+          </properties>
+        </breakpoint>
+      </default-breakpoints>
     </breakpoint-manager>
   </component>
 </project>

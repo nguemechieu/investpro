@@ -16,10 +16,6 @@
 
 package org.investpro.investpro;
 
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
-
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -30,19 +26,24 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.WritableValue;
 import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
-import javafx.util.Duration;
 import javafx.scene.chart.ValueAxis;
+import javafx.util.Duration;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
 
 public class StableTicksAxis extends ValueAxis<Number> {
 
-    private static final double[] dividers = new double[] {1.0, 2.5, 5.0};
+    private static final double[] dividers = new double[]{1.0, 2.5, 5.0};
 
     /**
      * How many negatives powers of ten we have in the powersOfTen array.
      */
     private static final int powersOfTenOffset = 7;
-    private static final double[] powersOfTen = new double[] {
+    private static final double[] powersOfTen = new double[]{
         0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1_000.0, 10_000.0, 100_000.0,
         1_000_000.0, 10_000_000.0, 100_000_000.0
     };
@@ -266,7 +267,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     static int lessThanBranchFree(int x, int y) {
         // The double negation is optimized away by normal Java, but is necessary for GWT
         // to make sure bit twiddling works as expected.
-        return ~~(x - y) >>> (Integer.SIZE - 1);
+        return (x - y) >>> (Integer.SIZE - 1);
     }
 
     private static final byte[] maxLog10ForLeadingZeros = {
@@ -316,7 +317,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(getLowerBound(), getUpperBound());
     }
 
-    private Range getRange(double minValue, double maxValue) {
+    private @NotNull Range getRange(double minValue, double maxValue) {
         double length = getLength();
         double delta = maxValue - minValue;
         double scale = calculateNewScale(length, minValue, maxValue);
@@ -364,7 +365,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         if (getSide().isHorizontal()) {
             return getWidth();
         } else {
-            return getHeight();
+            return getHeight() + 1;
         }
     }
 
@@ -375,32 +376,22 @@ public class StableTicksAxis extends ValueAxis<Number> {
                 labelSize = dim.getWidth();
             } else {
                 // TODO: May want to tweak this value so the axis labels are not so closely packed together.
-                labelSize = dim.getHeight();
+                labelSize = 5 + dim.getHeight();
             }
         }
 
         return labelSize;
     }
 
-    private static final class Range {
-        public final double low;
-        public final double high;
-        public final double tickSpacing;
-        public final double scale;
-
-        private Range(double low, double high, double tickSpacing, double scale) {
-            this.low = low;
-            this.high = high;
-            this.tickSpacing = tickSpacing;
-            this.scale = scale;
-        }
+    private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
             return high - low;
         }
 
+        @Contract(pure = true)
         @Override
-        public String toString() {
+        public @NotNull String toString() {
             return "Range{" +
                     "low=" + low +
                     ", high=" + high +

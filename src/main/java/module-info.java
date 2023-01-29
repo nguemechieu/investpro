@@ -16,7 +16,9 @@ module org.investpro.investpro {
     requires persistence.api;
     requires java.net.http;
 
-    requires  java.datatransfer;
+    requires java.datatransfer;
+    requires com.fasterxml.jackson.datatype.jsr310;
+    requires Java.WebSocket;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
 }

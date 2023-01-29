@@ -3,8 +3,8 @@ package org.investpro.investpro;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-
-
+import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,16 +23,18 @@ public abstract class ExchangeWebSocketClient implements WebSocket {
 
     private static final Logger logger = LoggerFactory.getLogger(ExchangeWebSocketClient.class);
 
-    protected ExchangeWebSocketClient(URI clientUri) {
+    protected ExchangeWebSocketClient(URI clientUri, Draft_6455 draft6455) {
 
         super();
-        urlData= String.valueOf(clientUri);
+        urlData = String.valueOf(clientUri);
         connectionEstablished = new SimpleBooleanProperty(false);
     }
 
     public CountDownLatch getInitializationLatch() {
         return webSocketInitializedLatch;
     }
+
+    public abstract void onMessage(String message);
 
     public abstract void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer);
 
@@ -54,9 +56,15 @@ public abstract class ExchangeWebSocketClient implements WebSocket {
 
 
     static String urlData;
+
     public URI getURI() throws URISyntaxException {
         URI uri = new URI(urlData);
         return uri;
 
     }
+
+
+    public abstract void onClose(int code, String reason, boolean remote);
+
+    public abstract void onOpen(ServerHandshake serverHandshake);
 }

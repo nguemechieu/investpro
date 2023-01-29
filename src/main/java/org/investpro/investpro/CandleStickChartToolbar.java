@@ -1,11 +1,6 @@
 package org.investpro.investpro;
 
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.IntegerProperty;
@@ -16,6 +11,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -24,10 +20,21 @@ import javafx.scene.control.Separator;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.Border;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 import static org.investpro.investpro.FXUtils.computeTextDimensions;
 
@@ -51,7 +58,7 @@ public class CandleStickChartToolbar extends Region {
         boolean passedWeekMonthBoundary = false;
         for (Integer granularity : granularities) {
             if (granularity < 3600) {
-                toolbarNodes.add(new ToolbarButton((granularity / 60) + "m", granularity));
+                toolbarNodes.add(Toolbard((granularity / 60) + "m", granularity));
             } else if (granularity < 86400) {
                 if (!passedMinuteHourBoundary) {
                     passedMinuteHourBoundary = true;
@@ -59,7 +66,7 @@ public class CandleStickChartToolbar extends Region {
                     minuteHourSeparator.setOpacity(0);
                     toolbarNodes.add(minuteHourSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 3600) + "h", granularity));
+                toolbarNodes.add(Toolbard((granularity / 3600) + "h", granularity));
             } else if (granularity < 604800) {
                 if (!passedHourDayBoundary) {
                     passedHourDayBoundary = true;
@@ -67,7 +74,7 @@ public class CandleStickChartToolbar extends Region {
                     hourDaySeparator.setOpacity(0);
                     toolbarNodes.add(hourDaySeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 86400) + "d", granularity));
+                toolbarNodes.add(Toolbard((granularity / 86400) + "d", granularity));
             } else if (granularity < 2592000) {
                 if (!passedDayWeekBoundary) {
                     passedDayWeekBoundary = true;
@@ -75,7 +82,7 @@ public class CandleStickChartToolbar extends Region {
                     dayWeekSeparator.setOpacity(0);
                     toolbarNodes.add(dayWeekSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 604800) + "w", granularity));
+                toolbarNodes.add(Toolbard((granularity / 604800) + "w", granularity));
             } else {
                 if (!passedWeekMonthBoundary) {
                     passedWeekMonthBoundary = true;
@@ -83,7 +90,7 @@ public class CandleStickChartToolbar extends Region {
                     weekMonthSeparator.setOpacity(0);
                     toolbarNodes.add(weekMonthSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 2592000) + "mo", granularity));
+                toolbarNodes.add(Toolbard((granularity / 2592000) + "mo", granularity));
             }
         }
 
@@ -120,7 +127,13 @@ public class CandleStickChartToolbar extends Region {
             toolbarNodes.add(toolbarButton);
         }
 
-        toolbar = new HBox();
+        Button screenShot = new Button("Screen Capture");
+
+
+        screenShot.setOnAction(action -> Screenshot.capture(new File("screenshot" + System.currentTimeMillis())));
+
+        toolbar = new HBox(screenShot);
+        toolbar.setAlignment(Pos.CENTER);
         toolbar.getChildren().addAll(toolbarNodes);
         toolbar.getStyleClass().add("candle-chart-toolbar");
 
@@ -139,13 +152,31 @@ public class CandleStickChartToolbar extends Region {
 
         gotFirstSize.addListener(gotFirstSizeChangeListener);
         getChildren().setAll(toolbar);
+
+    }
+
+    private @NotNull
+    static ToolbarButton Toolbard(String s, Integer granularity) {
+        ToolbarButton button = new ToolbarButton(s, granularity);
+        Color[] arrayColor = new Color[]{
+                Color.RED, Color.GREEN, Color.YELLOW, Color.LIGHTBLUE,
+                Color.GOLD, Color.CORAL, Color.LAVENDER
+        };
+        int i = 0;
+        i = (int) (Math.random() * arrayColor.length - 1);
+        Color xColor = arrayColor[i];
+        button.setBackground(Background.fill(xColor));
+        button.setOpacity(1);
+        button.setPadding(new Insets(10, 10, 10, 10));
+        button.setBorder(Border.stroke(xColor));
+        button.autosize();
+        return button;
     }
 
     void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(secondsPerCandle);
         for (Node childNode : toolbar.getChildren()) {
-            if (childNode instanceof ToolbarButton) {
-                ToolbarButton tool = (ToolbarButton) childNode;
+            if (childNode instanceof ToolbarButton tool) {
                 tool.setActive(secondsPerCandle.get() == tool.duration);
             }
         }
@@ -154,8 +185,7 @@ public class CandleStickChartToolbar extends Region {
     void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(secondsPerCandle);
         for (Node childNode : toolbar.getChildren()) {
-            if (childNode instanceof ToolbarButton) {
-                ToolbarButton tool = (ToolbarButton) childNode;
+            if (childNode instanceof ToolbarButton tool) {
                 if (tool.duration != -1) {
                     tool.setOnAction(event -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
@@ -166,7 +196,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    void setChartOptions(CandleStickChartOptions chartOptions) {
+    void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
 
@@ -195,43 +225,60 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    private class SizeChangeListener extends DelayedSizeChangeListener {
-        SizeChangeListener(BooleanProperty gotFirstSize, ObservableValue<Number> containerWidth,
-                           ObservableValue<Number> containerHeight) {
-            super(750, 300, gotFirstSize, containerWidth, containerHeight);
-        }
-
-        public void resize() {
-            Font textFont = Font.font(containerWidth.getValue().doubleValue() >= 900 ? 14 : 13 -
-                    (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
-            int topBottomPadding = Math.max(0, 4 - (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
-            int rightLeftPadding = Math.max(0, 8 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
-            Insets textLabelPadding = containerWidth.getValue().doubleValue() >= 900 ? new Insets(4, 8, 4, 8) :
-                    new Insets(topBottomPadding, rightLeftPadding, topBottomPadding, rightLeftPadding);
-            Font glyphFont = Font.font(containerWidth.getValue().doubleValue() >= 900 ? 22 :
-                    22 - (2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100)));
-            topBottomPadding = Math.max(0, 5 - (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
-            rightLeftPadding = Math.max(0, 10 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
-            Insets glyphLabelPadding = containerWidth.getValue().doubleValue() >= 900 ? new Insets(5, 10, 5, 10) :
-                    new Insets(topBottomPadding, rightLeftPadding, topBottomPadding, rightLeftPadding);
-            for (Node toolbarNode : toolbar.getChildren()) {
-                if (toolbarNode instanceof ToolbarButton) {
-                    ToolbarButton toolbarButton = (ToolbarButton) toolbarNode;
-                    if (toolbarButton.duration != -1) {
-                        toolbarButton.setStyle("-fx-font-size: " + textFont.getSize());
-                        toolbarButton.setPrefWidth(containerWidth.getValue().doubleValue() >= 900 ? -1 :
-                                computeTextDimensions(toolbarButton.textLabel, textFont).getWidth() + 15);
-                        toolbarButton.setPadding(textLabelPadding);
-                    } else {
-                        toolbarButton.graphicLabel.setFitHeight((int) glyphFont.getSize());
-                        toolbarButton.graphicLabel.setFitWidth((int) glyphFont.getSize());
-                        toolbarButton.setPadding(glyphLabelPadding);
-                    }
-                }
+    private static class ToolbarButton extends Button {
+        private final String textLabel;
+        private final ImageView graphicLabel;
+        private final Tool tool;
+        private final int duration;
+        private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
+        private final BooleanProperty active = new BooleanPropertyBase(false) {
+            public void invalidated() {
+                pseudoClassStateChanged(activeClass, get());
             }
 
-            functionOptionsSeparator.setPadding(new Insets(0, containerWidth.getValue().doubleValue() >= 900 ? 20 :
-                    20 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100), 0, 0));
+            @Override
+            public Object getBean() {
+                return ToolbarButton.this;
+            }
+
+            @Contract(pure = true)
+            @Override
+            public @NotNull String getName() {
+                return "active";
+            }
+        };
+
+        ToolbarButton(String textLabel, int duration) {
+            this(textLabel, null, null, duration);
+        }
+
+        ToolbarButton(Tool tool) {
+            this(null, tool, tool.img, -1);
+        }
+
+        private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
+            if (textLabel == null && img == null) {
+                throw new IllegalArgumentException("textLabel and img were both null");
+            }
+            this.textLabel = textLabel;
+            this.tool = tool;
+            this.duration = duration;
+            setText(textLabel == null ? "" : textLabel);
+            if (img != null) {
+                graphicLabel = new ImageView(new Image(Objects.requireNonNull(ToolbarButton.class.getResourceAsStream(img))));
+                setGraphic(graphicLabel);
+            } else {
+                graphicLabel = null;
+            }
+            setMinSize(5, 5);
+            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            textOverrunProperty().set(OverrunStyle.CLIP);
+            setEllipsisString("");
+            getStyleClass().add("candle-chart-toolbar-button");
+        }
+
+        public void setActive(boolean active) {
+            this.active.set(active);
         }
     }
 
@@ -257,60 +304,43 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    private static class ToolbarButton extends Button {
-        private final String textLabel;
-        private final ImageView graphicLabel;
-        private final Tool tool;
-        private final int duration;
-        private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
-
-        ToolbarButton(String textLabel, int duration) {
-            this(textLabel, null, null, duration);
+    private class SizeChangeListener extends DelayedSizeChangeListener {
+        SizeChangeListener(BooleanProperty gotFirstSize, ObservableValue<Number> containerWidth,
+                           ObservableValue<Number> containerHeight) {
+            super(750, 300, gotFirstSize, containerWidth, containerHeight);
         }
 
-        ToolbarButton(Tool tool) {
-            this(null, tool, tool.img, -1);
-        }
 
-        private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
-            if (textLabel == null && img == null) {
-                throw new IllegalArgumentException("textLabel and img were both null");
-            }
-            this.textLabel = textLabel;
-            this.tool = tool;
-            this.duration = duration;
-            setText(textLabel == null ? "" : textLabel);
-            if (img != null) {
-                graphicLabel = new ImageView(new Image(ToolbarButton.class.getResourceAsStream(img)));
-                setGraphic(graphicLabel);
-            } else {
-                graphicLabel = null;
-            }
-            setMinSize(5, 5);
-            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            textOverrunProperty().set(OverrunStyle.CLIP);
-            setEllipsisString("");
-            getStyleClass().add("candle-chart-toolbar-button");
-        }
-
-        private final BooleanProperty active = new BooleanPropertyBase(false) {
-            public void invalidated() {
-                pseudoClassStateChanged(activeClass, get());
-            }
-
-            @Override
-            public Object getBean() {
-                return ToolbarButton.this;
+        public void resize() {
+            Font textFont = Font.font(containerWidth.getValue().doubleValue() >= 900 ? 14 : 13 -
+                    (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
+            int topBottomPadding = Math.max(0, 4 - (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
+            int rightLeftPadding = Math.max(0, 8 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
+            Insets textLabelPadding = containerWidth.getValue().doubleValue() >= 900 ? new Insets(4, 8, 4, 8) :
+                    new Insets(topBottomPadding, rightLeftPadding, topBottomPadding, rightLeftPadding);
+            Font glyphFont = Font.font(containerWidth.getValue().doubleValue() >= 900 ? 22 :
+                    22 - (2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100)));
+            topBottomPadding = Math.max(0, 5 - (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
+            rightLeftPadding = Math.max(0, 10 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100));
+            Insets glyphLabelPadding = containerWidth.getValue().doubleValue() >= 900 ? new Insets(5, 10, 5, 10) :
+                    new Insets(topBottomPadding, rightLeftPadding, topBottomPadding, rightLeftPadding);
+            for (Node toolbarNode : toolbar.getChildren()) {
+                if (toolbarNode instanceof ToolbarButton toolbarButton) {
+                    if (toolbarButton.duration != -1) {
+                        toolbarButton.setStyle("-fx-font-size: " + textFont.getSize());
+                        toolbarButton.setPrefWidth(containerWidth.getValue().doubleValue() >= 900 ? -1 :
+                                computeTextDimensions(toolbarButton.textLabel, textFont).getWidth() + 15);
+                        toolbarButton.setPadding(textLabelPadding);
+                    } else {
+                        toolbarButton.graphicLabel.setFitHeight((int) glyphFont.getSize());
+                        toolbarButton.graphicLabel.setFitWidth((int) glyphFont.getSize());
+                        toolbarButton.setPadding(glyphLabelPadding);
+                    }
+                }
             }
 
-            @Override
-            public String getName() {
-                return "active";
-            }
-        };
-
-        public void setActive(boolean active) {
-            this.active.set(active);
+            functionOptionsSeparator.setPadding(new Insets(0, containerWidth.getValue().doubleValue() >= 900 ? 20 :
+                    20 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100), 0, 0));
         }
     }
 }
