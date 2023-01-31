@@ -5,6 +5,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * An abstract base class for {@code Exchange} implementations.
+ *
+ * @author Michael Ennen
+ */
 public abstract class Exchange {
     protected final ExchangeWebSocketClient webSocketClient;
 
@@ -33,17 +38,19 @@ public abstract class Exchange {
      */
     public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
 
-
+    /**
+     * Fetches completed candles (of smaller duration than the current {@code secondsPerCandle}) in the duration of
+     * the current live-syncing candle.
+     * <p>
+     * TThis method only needs to be implemented to support live syncing.
+     */
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-            TradePair tradePair, long secondsIntoCurrentCandle, int secondsPerCandle) {
-
-
+            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         throw new UnsupportedOperationException("Exchange: " + this + " does not support fetching candle data" +
                 " for in-progress candle");
-
-
     }
 
-    public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
+    public abstract boolean isInputClosed();
+
+    public abstract void abort();
 }

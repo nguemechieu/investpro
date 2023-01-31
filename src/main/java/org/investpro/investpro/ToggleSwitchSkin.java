@@ -26,24 +26,19 @@
  */
 package org.investpro.investpro;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import javafx.animation.Interpolator;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.DoubleProperty;
-import javafx.css.CssMetaData;
-import javafx.css.StyleConverter;
-import javafx.css.Styleable;
-import javafx.css.StyleableDoubleProperty;
-import javafx.css.StyleableProperty;
+import javafx.css.*;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.SkinBase;
 import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
-import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
     private final StackPane thumb;
@@ -97,11 +92,11 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         transition.play();
     }
 
-    private void updateLabel(@NotNull ToggleSwitch skinnable) {
+    private void updateLabel(ToggleSwitch skinnable) {
         label.setText(skinnable.isOn() ? skinnable.getTurnOnText() : skinnable.getTurnOffText());
     }
 
-    private void mousePressedOnToggleSwitch(@NotNull ToggleSwitch toggleSwitch) {
+    private void mousePressedOnToggleSwitch(ToggleSwitch toggleSwitch) {
         toggleSwitch.setSelected(!toggleSwitch.isOn());
     }
 
@@ -223,14 +218,14 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
     private static final CssMetaData<ToggleSwitch, Number> THUMB_MOVE_ANIMATION_TIME = new CssMetaData<>(
             "-thumb-move-animation-time", StyleConverter.getSizeConverter(), 300) {
         @Override
-        public boolean isSettable(@NotNull ToggleSwitch toggleSwitch) {
+        public boolean isSettable(ToggleSwitch toggleSwitch) {
             final ToggleSwitchSkin skin = (ToggleSwitchSkin) toggleSwitch.getSkin();
             return skin.thumbMoveAnimationTime == null ||
                     !skin.thumbMoveAnimationTime.isBound();
         }
 
         @Override
-        public StyleableProperty<Number> getStyleableProperty(@NotNull ToggleSwitch toggleSwitch) {
+        public StyleableProperty<Number> getStyleableProperty(ToggleSwitch toggleSwitch) {
             final ToggleSwitchSkin skin = (ToggleSwitchSkin) toggleSwitch.getSkin();
             return (StyleableProperty<Number>) skin.thumbMoveAnimationTimeProperty();
         }

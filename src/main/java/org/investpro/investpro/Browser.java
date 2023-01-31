@@ -2,11 +2,9 @@ package org.investpro.investpro;
 
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Worker;
-import javafx.fxml.FXML;
-import javafx.geometry.*;
+import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -14,56 +12,54 @@ import javafx.scene.layout.*;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebHistory;
 import javafx.scene.web.WebView;
-import javafx.stage.Stage;
 import netscape.javascript.JSObject;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
+
 import java.util.Objects;
 public   class Browser {
-    private final HBox toolBar;
-    static String[] imageFiles = new  String[]{
-                   "7123025_logo_google_g_icon.png",
-                  "8377-ebay_102466 (1).png",
-                    "amazon.png",
-                    "Facebook-PNG-Photos (1).png"};
+    static final String[] urls = new String[]{
+
+            "https://www.google.com/search?q",
+            "https://www.ebay.com",
+            "https://www.amazon.com",
+
+
+            "https://www.facebook.com"
+
+    };
+    static String[] imageFiles = new String[]{
+            "7123025_logo_google_g_icon.png",
+            "8377-ebay_102466 (1).png",
+            "amazon.png",
+            "Facebook-PNG-Photos (1).png"};
     String[] captions = new String[]{
             "Google",
             "Ebay",
             "Amazon",
             "Facebook"
     };
-    private static final String[] urls = new String[]{
-
-            "https://www.google.com/search?q",
-            "https://www.ebay.com",
-            "https://www.amazon.com" ,
-
-
-            "https://www.facebook.com"
-
-    };
-     ImageView selectedImage = new ImageView();
+    static ImageView selectedImage = new ImageView();
+    static WebView smallView = new WebView();
     final Hyperlink[] hpls = new Hyperlink[captions.length];
     final Image[] images = new Image[imageFiles.length];
-    @FXML
     static
     WebView webWiew = new WebView();
     static final WebEngine webEngine = webWiew.getEngine();
     final Button showPrevDoc = new Button("Toggle Previous Docs");
-    final WebView smallView = new WebView();
-    final ComboBox<String> comboBox = new ComboBox<>();
-    private boolean needDocumentationButton = false;
-    public Browser() {
+    HBox toolBar;
+    ComboBox<String> comboBox = new ComboBox<>();
+    boolean needDocumentationButton = false;
+
+    public Browser() throws Exception {
         //apply the styles
-        pane.getStyleClass().add("app.css");
+        //pane.getStyleClass().add("app.css");
         for (int i = 0; i < captions.length; i++) {
             // create hyperlinks
             Hyperlink hpl = hpls[i] = new Hyperlink(captions[i]);
-          //  Image image = images[i] = new Image(Objects.requireNonNull(getClass().getResourceAsStream(imageFiles[i])));
-           // hpl.setGraphic(new ImageView(image));
-           //  String url = urls[i];
+            //  Image image = images[i] = new Image(Objects.requireNonNull(getClass().getResourceAsStream(imageFiles[i])));
+            // hpl.setGraphic(new ImageView(image));
+            //  String url = urls[i];
 
 
              boolean addButton = (hpl.getText().equals("Documentation"));
@@ -97,7 +93,7 @@ public   class Browser {
         );
 
         //process history
-        final WebHistory history = webEngine.getHistory();
+        WebHistory history = webEngine.getHistory();
         history.getEntries().addListener((ListChangeListener<WebHistory.Entry>) c -> {
             c.next();
             for (WebHistory.Entry e : c.getRemoved()) {
@@ -127,48 +123,51 @@ public   class Browser {
                         win.setMember("app", new JavaApp());
                         win.setMember("showPrevDoc", showPrevDoc);
                         win.setMember("selectedImage", selectedImage);
-
                         if (needDocumentationButton) {
                             toolBar.getChildren().add(showPrevDoc);
                         }
                     }
-                }
-        );
+                });
 
-        // load the home page
+        // load the home pag
+        webEngine.load("https://www.google.com");
+
 
     }
 
-    StackPane  pane = new StackPane();
 
-    public void start(@NotNull Stage stage) throws Exception {
+    @Contract(" -> new")
+    public @NotNull Group start() throws Exception {
         webEngine.load("https://www.google.com/search?q");
         //add components
-        TabPane tabPane= new TabPane();
+        TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-
         DraggableTab tab0 = new DraggableTab("Home");
-
-        tab0.setContent(webWiew);
-        tab0.setText("Draggable");
-        tab0.setContent(smallView);
         tab0.setClosable(true);
         webEngine.load("https://www.google.com/search?q");
         tab0.setGraphic(new ImageView(selectedImage.getImage()));
         tab0.setDetachable(true);
-        tabPane.getTabs().add(tab0);
+
         Tab tab1 = new Tab("Google");
+        tabPane.getTabs().add(tab1);
+
         tab1.setText("Google");
         tab1.setClosable(true);
-        WebView webWiew1 =new WebView();
+        WebView webWiew1 = new WebView();
         webWiew1.getEngine().load("https://www.google.com/search?q");
         tab1.setContent(webWiew1);
         tab1.setGraphic(new ImageView(selectedImage.getImage()));
+        webWiew1.setPrefSize(1500, 780);
+
+
         Tab tab2 = new Tab();
         tab2.setText("Amazon");
         tab2.setClosable(true);
         WebView webWiew2 = new WebView();
         webWiew2.getEngine().load("https://www.amazon.com");
+        webWiew2.setPrefSize(1500, 780);
+
+
         tab2.setContent(webWiew2);
         webWiew1 = new WebView();
         webWiew1.getEngine().load("https://www.amazon.com/gp/search/search?q=amazon");
@@ -176,34 +175,24 @@ public   class Browser {
         tab2.setGraphic(new ImageView(selectedImage.getImage()));
         Tab tab3 = new Tab();
         tab3.setText("Ebay");
-        tab3.setClosable(true);
-        Spinner<News> spinner = new Spinner<>();
-
-        spinner.setEditable(true);
-        spinner.setMaxWidth(Double.MAX_VALUE);
-        spinner.setMinWidth(Double.MAX_VALUE);
-        spinner.setPrefWidth(Double.MAX_VALUE);
-        spinner.setCacheShape(true);
-        tab3.setContent(spinner);
         tab3.setGraphic(new ImageView(selectedImage.getImage()));
-        TabPane tab= new TabPane();
-        tab.getTabs().addAll(tab0, tab1, tab2, tab3);
-        pane.getChildren().addAll(tab);
-        pane.setMinSize(600,400);
-        pane.setPrefSize(1530, 780);
-        Group  group= new Group(pane);
-        Scene scene = new Scene(group);
-        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("app.css")).toExternalForm());
+        WebView web3 = new WebView();
+        web3.setPrefSize(1500, 780);
 
-        stage.setResizable(true);
-        stage.setIconified(true);
-        stage.getIcons().add(
-                new Image(Objects.requireNonNull(getClass().getResource("icon.png")).toExternalForm())
-        );
-        stage.setTitle("TradePro --->Browser "+ DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).format(LocalDateTime.now()));
-        stage.setScene(scene);
-        stage.show();
+
+        web3.getEngine().load("https://www.ebay.com");
+        VBox vb3 = new VBox(web3);
+        tab3.setContent(vb3);
+        tab3.setGraphic(new ImageView(selectedImage.getImage()));
+        TabPane tab = new TabPane();
+        tab.getTabs().addAll(tab0, tab1, tab2, tab3);
+        Pane pane = new Pane();
+        pane.getChildren().addAll(smallView, tab);
+        pane.setPrefSize(1530, 780);
+
+        return new Group(pane);
     }
+
 
     // JavaScript interface object
     public static class JavaApp {

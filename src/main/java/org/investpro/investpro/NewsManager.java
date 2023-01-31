@@ -1,5 +1,6 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -10,23 +11,32 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+
+import static java.lang.System.out;
 
 public class NewsManager {
 
-    private   static final String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=ba1e9c2806e91f73d88171c922cde6df";
-
+    private static final String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
+    static ArrayList<News> news;
+    static News news1 = new News(null, null, null, "", "", "");
     public NewsManager() {
-        load();
-    }
-   ArrayList<News> news ;
-    News news1 =   new News(null, null, null, "", "", "");
 
-    private void load()  {news=  new ArrayList<>();//
-            JSONArray jsonArray = Objects.requireNonNull(makeRequest(url));
+
+    }
+
+    public static List<News> getNewsList() {
+        return load();
+
+    }
+
+    private static ArrayList<News> load() {
+        news = new ArrayList<>();//
+        JSONArray jsonArray = Objects.requireNonNull(makeRequest(url));
         int length = jsonArray.length();
 
-        for (int i =0;i<length; i++){
+        for (int i = 0; i < length; i++) {
             JSONObject json = jsonArray.getJSONObject(i);
             String title = "hello";
             if (json.has("title")) {
@@ -54,7 +64,7 @@ public class NewsManager {
                 forecast = json.getString("forecast");
                 news1.setForecast(forecast);
             }
-            String previous= "";
+            String previous = "01";
             if (json.has("previous")) {
                 previous = json.getString("previous");
                 news1.setPrevious(previous);
@@ -63,19 +73,16 @@ public class NewsManager {
 
             assert date != null;
 
-
-
+            out.println("New" + news1);
 
 
         }
-
+        return news;
     }
 
 
-
-
     //makeRequest return JSONObject
-    private JSONArray makeRequest(String url) {
+    private static @Nullable JSONArray makeRequest(String url) {
         try {
             HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setDoOutput(true);
@@ -87,7 +94,7 @@ public class NewsManager {
             // connection.setRequestProperty("Authorization", "Bearer " + getToken());
             connection.connect();
             int responseCode = connection.getResponseCode();
-            System.out.printf("Response Code: %d%n", responseCode);
+            out.printf("Response Code: %d%n", responseCode);
             InputStream in = connection.getInputStream();
             BufferedReader reader = new BufferedReader(new InputStreamReader((in)));
             String inputLine;

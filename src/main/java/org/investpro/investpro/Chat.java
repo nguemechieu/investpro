@@ -1,5 +1,6 @@
 package org.investpro.investpro;
 
+
 public class Chat {
     public Chat m_new_one;
     public boolean done;

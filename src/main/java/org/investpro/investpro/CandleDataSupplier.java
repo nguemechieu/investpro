@@ -8,8 +8,10 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
-
-public class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
+/**
+ * @Noel Martial Nguemechieu
+ */
+public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     /**
      * The number of candles supplied per call to {@link #get()}.
      */
@@ -18,7 +20,8 @@ public class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     protected final TradePair tradePair;
     protected final IntegerProperty endTime;
 
-    private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
+    private static final Set<Integer> GRANULARITIES = Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400,
+            21600, 43200, 86400);
 
     public CandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
         Objects.requireNonNull(tradePair);
@@ -67,10 +70,5 @@ public class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     @Override
     public int hashCode() {
         return Objects.hash(numCandles, secondsPerCandle, tradePair, endTime);
-    }
-
-    @Override
-    public Future<List<CandleData>> get() {
-        return null;
     }
 }

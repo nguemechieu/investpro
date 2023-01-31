@@ -10,7 +10,18 @@
     -fx-user-select: none;
 
 }
+.Toolbar{
+-fx-border-radius:5px !important;
+-fx-background-color: BLACK;
+}
 
+.MenuBar{
+
+-fx-border-radius:3px !important;
+-fx-background-color: GOLD;
+
+-fx-text-stroke-width:2;
+}
 .text-field {
     -fx-background-color: #8cb8e5;
 }
@@ -74,25 +85,6 @@ AnchorPane {
     -fx-text-shadow: none;
 }
 
-
-.button {
-    -fx-background-color: rgb(141, 177, 225);
-    -fx-border-color: rgb(45, 176, 151);
-    -fx-text-fill-color: rgb(255, 255, 255);
-    -fx-text-stroke-color: rgb(82, 152, 206);
-    -fx-font-size: 90%;
-    -fx-animated: true;
-    -fx-page-information-alignment: bottom;
-
-    -fx-background-position: center;
-
-
-
-    -fx-alignment: center;
-    -fx-border-radius: 6%;
-    -fx-scale-shape: true;
-    -fx-focus-traversable: true;
-}
 .tab{
     -fx-background-color: rgb(82, 152, 206);
     -fx-border-color: rgb(45, 176, 151);

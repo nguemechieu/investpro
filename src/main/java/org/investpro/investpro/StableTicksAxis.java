@@ -28,15 +28,21 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
 import javafx.scene.chart.ValueAxis;
 import javafx.util.Duration;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
+ * makes the axis major tick marks (the labeled tick marks) have nice, rounded numbers.
+ *
+ * @author Jason Winnebeck
+ */
 public class StableTicksAxis extends ValueAxis<Number> {
-
+    /**
+     * Possible tick spacing at the 10^1 level. These numbers must be {@literal >= 1 and < 10}.
+     */
     private static final double[] dividers = new double[]{1.0, 2.5, 5.0};
 
     /**
@@ -44,8 +50,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
      */
     private static final int powersOfTenOffset = 7;
     private static final double[] powersOfTen = new double[]{
-        0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1_000.0, 10_000.0, 100_000.0,
-        1_000_000.0, 10_000_000.0, 100_000_000.0
+            0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1_000.0, 10_000.0, 100_000.0,
+            1_000_000.0, 10_000_000.0, 100_000_000.0
     };
 
     private static final int numMinorTicks = 3;
@@ -54,7 +60,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private final WritableValue<Double> scaleValue = new WritableValue<>() {
         @Override
-        public @NotNull Double getValue() {
+        public Double getValue() {
             return getScale();
         }
 
@@ -267,7 +273,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     static int lessThanBranchFree(int x, int y) {
         // The double negation is optimized away by normal Java, but is necessary for GWT
         // to make sure bit twiddling works as expected.
-        return (x - y) >>> (Integer.SIZE - 1);
+        return ~~(x - y) >>> (Integer.SIZE - 1);
     }
 
     private static final byte[] maxLog10ForLeadingZeros = {
@@ -317,7 +323,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(getLowerBound(), getUpperBound());
     }
 
-    private @NotNull Range getRange(double minValue, double maxValue) {
+    private Range getRange(double minValue, double maxValue) {
         double length = getLength();
         double delta = maxValue - minValue;
         double scale = calculateNewScale(length, minValue, maxValue);
@@ -365,7 +371,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         if (getSide().isHorizontal()) {
             return getWidth();
         } else {
-            return getHeight() + 1;
+            return getHeight();
         }
     }
 
@@ -376,22 +382,32 @@ public class StableTicksAxis extends ValueAxis<Number> {
                 labelSize = dim.getWidth();
             } else {
                 // TODO: May want to tweak this value so the axis labels are not so closely packed together.
-                labelSize = 5 + dim.getHeight();
+                labelSize = dim.getHeight();
             }
         }
 
         return labelSize;
     }
 
-    private record Range(double low, double high, double tickSpacing, double scale) {
+    private static final class Range {
+        public final double low;
+        public final double high;
+        public final double tickSpacing;
+        public final double scale;
+
+        private Range(double low, double high, double tickSpacing, double scale) {
+            this.low = low;
+            this.high = high;
+            this.tickSpacing = tickSpacing;
+            this.scale = scale;
+        }
 
         public double getDelta() {
             return high - low;
         }
 
-        @Contract(pure = true)
         @Override
-        public @NotNull String toString() {
+        public String toString() {
             return "Range{" +
                     "low=" + low +
                     ", high=" + high +

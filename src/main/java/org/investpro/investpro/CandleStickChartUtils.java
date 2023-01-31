@@ -1,13 +1,10 @@
 package org.investpro.investpro;
 
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 import javafx.util.Pair;
+import org.jetbrains.annotations.NotNull;
+
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 public final class CandleStickChartUtils {
     private static final int SECONDS_PER_MINUTE = 60;
@@ -194,10 +191,9 @@ public final class CandleStickChartUtils {
      * Returns the InstantAxisFormatter to use for the tick mark labels based on
      * the given range (upper bound - lower bound) of the x-axis. Work in progress.
      *
-     * @param rangeInSeconds
      * @return
      */
-    public static InstantAxisFormatter getXAxisFormatterForRange(final double rangeInSeconds) {
+    public static @NotNull InstantAxisFormatter getXAxisFormatterForRange(final double rangeInSeconds) {
         InstantAxisFormatter result;
 
         if (rangeInSeconds > SECONDS_PER_YEAR) {

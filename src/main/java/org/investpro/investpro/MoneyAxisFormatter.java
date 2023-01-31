@@ -1,9 +1,9 @@
 package org.investpro.investpro;
 
-import java.util.Objects;
-
 import javafx.util.StringConverter;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
 
 public class MoneyAxisFormatter extends StringConverter<Number> {
     private final FastMoneyFormatter format;
@@ -32,8 +32,10 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
     }
 
     @Override
-    public Number fromString(String string) {
-        // return format.parse(string).getNumber();
-        return 1;
+    public Number fromString(@NotNull String string) {
+
+        return string.length()
+                ;
+
     }
 }

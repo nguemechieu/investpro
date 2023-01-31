@@ -27,15 +27,6 @@
  */
 package org.investpro.investpro;
 
-import static java.lang.Double.MAX_VALUE;
-import static javafx.geometry.Pos.CENTER_LEFT;
-import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
-import static javafx.scene.paint.Color.YELLOW;
-import static org.investpro.investpro.PopOver.ArrowLocation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
@@ -50,17 +41,17 @@ import javafx.scene.control.Skin;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.HLineTo;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.LineTo;
-import javafx.scene.shape.MoveTo;
-import javafx.scene.shape.Path;
-import javafx.scene.shape.PathElement;
-import javafx.scene.shape.QuadCurveTo;
-import javafx.scene.shape.VLineTo;
+import javafx.scene.shape.*;
 import javafx.stage.Window;
-import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.lang.Double.MAX_VALUE;
+import static javafx.geometry.Pos.CENTER_LEFT;
+import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
+import static javafx.scene.paint.Color.YELLOW;
+import static org.investpro.investpro.PopOver.ArrowLocation.*;
 
 public class PopOverSkin implements Skin<PopOver> {
     private final Label title;
@@ -78,7 +69,7 @@ public class PopOverSkin implements Skin<PopOver> {
 
     private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
 
-    public PopOverSkin(final @NotNull PopOver popOver) {
+    public PopOverSkin(final PopOver popOver) {
         this.popOver = popOver;
         stackPane = popOver.getRoot();
         stackPane.setPickOnBounds(false);
@@ -263,7 +254,7 @@ public class PopOverSkin implements Skin<PopOver> {
     public void dispose() {
     }
 
-    private @NotNull Node createCloseIcon() {
+    private Node createCloseIcon() {
         Group group = new Group();
         group.getStyleClass().add("graphics"); //$NON-NLS-1$
 

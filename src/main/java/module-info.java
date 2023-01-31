@@ -19,6 +19,7 @@ module org.investpro.investpro {
     requires java.datatransfer;
     requires com.fasterxml.jackson.datatype.jsr310;
     requires Java.WebSocket;
+    requires org.controlsfx.controls;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
 }

@@ -5,6 +5,19 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Objects;
 
+/**
+ * A monetary amount - models some fixed amount in a given currency.
+ * The amount is internally represented using a long, thus this
+ * implementation should be favored when speed is more important
+ * than accuracy or precision.
+ * <p>
+ * Based heavily on: <a href="https://github.com/mikvor/money-conversion">mikvor/money-conversion</a>
+ * <p>
+ * It is important to note that when obtaining a FastMoney instance using
+ * one of the static {@code of(...)} methods, a DefaultMoney instance
+ * <em>can</em> be returned, because the construction of the FastMoney
+ * can fail.
+ */
 public final class FastMoney implements Money, Comparable<FastMoney> {
     private final long amount;
     private final int precision;
@@ -114,11 +127,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         }
         // ulp up
         final FastMoney up = fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
-        if (up != null) {
-            return up;
-        }
-
-        return null;
+        return up;
     }
 
     private static FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
@@ -172,12 +181,12 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Long amount() {
+    public Long getAmount() {
         return amount;
     }
 
     @Override
-    public Currency currency() {
+    public Currency getCurrency() {
         return currency;
     }
 
@@ -355,12 +364,10 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public boolean isLessThan(Money other) {
-        if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        if (other instanceof FastMoney money) {
             return compareTo(money) < 0;
-        } else if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
-            return toBigDecimal().compareTo(money.amount()) < 0;
+        } else if (other instanceof DefaultMoney money) {
+            return toBigDecimal().compareTo(money.getAmount()) < 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }
@@ -368,12 +375,10 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public boolean isGreaterThan(Money other) {
-        if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        if (other instanceof FastMoney money) {
             return compareTo(money) > 0;
-        } else if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
-            return toBigDecimal().compareTo(money.amount()) > 0;
+        } else if (other instanceof DefaultMoney money) {
+            return toBigDecimal().compareTo(money.getAmount()) > 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }
@@ -381,12 +386,10 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public boolean isGreaterThanOrEqualTo(Money other) {
-        if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        if (other instanceof FastMoney money) {
             return compareTo(money) >= 0;
-        } else if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
-            return toBigDecimal().compareTo(money.amount()) >= 0;
+        } else if (other instanceof DefaultMoney money) {
+            return toBigDecimal().compareTo(money.getAmount()) >= 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }

@@ -1,6 +1,5 @@
 package org.investpro.investpro;
 
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.IntegerProperty;
@@ -11,7 +10,6 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -20,17 +18,13 @@ import javafx.scene.control.Separator;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.Border;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +32,20 @@ import java.util.Set;
 
 import static org.investpro.investpro.FXUtils.computeTextDimensions;
 
+/**
+ * A resizable toolbar, placed at the top of a {@code CandleStickChart} and contained
+ * inside of a {@code CandleStickChartContainer}, that contains a series of labelled
+ * buttons that allow for controlling the chart paired with this toolbar. Some of the
+ * functions of the buttons are:
+ * <p>
+ * <uldvat</li>
+ * <li>Print the chart</li>
+ * <li>Configure the chart's options (via a PopOver triggered by a button)</li>
+ * </ul>
+ * <p>
+ * The toolbar buttons are labelled with either text (which is used for the duration buttons,
+ * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom in/out).
+ */
 public class CandleStickChartToolbar extends Region {
     private final HBox toolbar;
     private final PopOver optionsPopOver;
@@ -58,7 +66,7 @@ public class CandleStickChartToolbar extends Region {
         boolean passedWeekMonthBoundary = false;
         for (Integer granularity : granularities) {
             if (granularity < 3600) {
-                toolbarNodes.add(Toolbard((granularity / 60) + "m", granularity));
+                toolbarNodes.add(new ToolbarButton((granularity / 60) + "m", granularity));
             } else if (granularity < 86400) {
                 if (!passedMinuteHourBoundary) {
                     passedMinuteHourBoundary = true;
@@ -66,7 +74,7 @@ public class CandleStickChartToolbar extends Region {
                     minuteHourSeparator.setOpacity(0);
                     toolbarNodes.add(minuteHourSeparator);
                 }
-                toolbarNodes.add(Toolbard((granularity / 3600) + "h", granularity));
+                toolbarNodes.add(new ToolbarButton((granularity / 3600) + "h", granularity));
             } else if (granularity < 604800) {
                 if (!passedHourDayBoundary) {
                     passedHourDayBoundary = true;
@@ -74,7 +82,7 @@ public class CandleStickChartToolbar extends Region {
                     hourDaySeparator.setOpacity(0);
                     toolbarNodes.add(hourDaySeparator);
                 }
-                toolbarNodes.add(Toolbard((granularity / 86400) + "d", granularity));
+                toolbarNodes.add(new ToolbarButton((granularity / 86400) + "d", granularity));
             } else if (granularity < 2592000) {
                 if (!passedDayWeekBoundary) {
                     passedDayWeekBoundary = true;
@@ -82,7 +90,7 @@ public class CandleStickChartToolbar extends Region {
                     dayWeekSeparator.setOpacity(0);
                     toolbarNodes.add(dayWeekSeparator);
                 }
-                toolbarNodes.add(Toolbard((granularity / 604800) + "w", granularity));
+                toolbarNodes.add(new ToolbarButton((granularity / 604800) + "w", granularity));
             } else {
                 if (!passedWeekMonthBoundary) {
                     passedWeekMonthBoundary = true;
@@ -90,10 +98,9 @@ public class CandleStickChartToolbar extends Region {
                     weekMonthSeparator.setOpacity(0);
                     toolbarNodes.add(weekMonthSeparator);
                 }
-                toolbarNodes.add(Toolbard((granularity / 2592000) + "mo", granularity));
+                toolbarNodes.add(new ToolbarButton((granularity / 2592000) + "mo", granularity));
             }
         }
-
         Separator intervalZoomSeparator = new Separator();
         intervalZoomSeparator.setOpacity(0);
         toolbarNodes.add(intervalZoomSeparator);
@@ -127,13 +134,7 @@ public class CandleStickChartToolbar extends Region {
             toolbarNodes.add(toolbarButton);
         }
 
-        Button screenShot = new Button("Screen Capture");
-
-
-        screenShot.setOnAction(action -> Screenshot.capture(new File("screenshot" + System.currentTimeMillis())));
-
-        toolbar = new HBox(screenShot);
-        toolbar.setAlignment(Pos.CENTER);
+        toolbar = new HBox();
         toolbar.getChildren().addAll(toolbarNodes);
         toolbar.getStyleClass().add("candle-chart-toolbar");
 
@@ -152,25 +153,6 @@ public class CandleStickChartToolbar extends Region {
 
         gotFirstSize.addListener(gotFirstSizeChangeListener);
         getChildren().setAll(toolbar);
-
-    }
-
-    private @NotNull
-    static ToolbarButton Toolbard(String s, Integer granularity) {
-        ToolbarButton button = new ToolbarButton(s, granularity);
-        Color[] arrayColor = new Color[]{
-                Color.RED, Color.GREEN, Color.YELLOW, Color.LIGHTBLUE,
-                Color.GOLD, Color.CORAL, Color.LAVENDER
-        };
-        int i = 0;
-        i = (int) (Math.random() * arrayColor.length - 1);
-        Color xColor = arrayColor[i];
-        button.setBackground(Background.fill(xColor));
-        button.setOpacity(1);
-        button.setPadding(new Insets(10, 10, 10, 10));
-        button.setBorder(Border.stroke(xColor));
-        button.autosize();
-        return button;
     }
 
     void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
@@ -191,6 +173,8 @@ public class CandleStickChartToolbar extends Region {
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
                     tool.setOnAction(event -> candleStickChart.changeZoom(
                             tool.tool.getZoomDirection()));
+
+
                 }
             }
         }
@@ -203,6 +187,10 @@ public class CandleStickChartToolbar extends Region {
     enum Tool {
         ZOOM_IN("/img/search-plus-solid.png"),
         ZOOM_OUT("/img/search-minus-solid.png"),
+        SCREENSHOT("/img/Screen Shot.png"),
+        SEARCHTOOL("/img/search.png"),
+        SETTINGTOOL("/img/setting.png"),
+        PDF("/img/pdf.png"),
         PRINT("/img/print-solid.png"),
         OPTIONS("/img/cog-solid.png");
 
@@ -223,6 +211,7 @@ public class CandleStickChartToolbar extends Region {
 
             return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;
         }
+
     }
 
     private static class ToolbarButton extends Button {
@@ -282,34 +271,12 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    private class MouseExitedPopOverFilter implements EventHandler<MouseEvent> {
-        private final Scene scene;
-
-        MouseExitedPopOverFilter(Scene scene) {
-            this.scene = scene;
-        }
-
-        @Override
-        public void handle(MouseEvent event) {
-            // TODO Maybe we should add a small buffer space to the popover, like 10%
-            if (!(event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
-                    && event.getScreenX() >= optionsPopOver.getX()
-                    && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
-                    && event.getScreenY() >= optionsPopOver.getY())
-                    && !mouseInsideOptionsButton) {
-                optionsPopOver.hide(Duration.seconds(0.25));
-                scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
-                mouseExitedPopOverFilter = null;
-            }
-        }
-    }
-
     private class SizeChangeListener extends DelayedSizeChangeListener {
+
         SizeChangeListener(BooleanProperty gotFirstSize, ObservableValue<Number> containerWidth,
                            ObservableValue<Number> containerHeight) {
             super(750, 300, gotFirstSize, containerWidth, containerHeight);
         }
-
 
         public void resize() {
             Font textFont = Font.font(containerWidth.getValue().doubleValue() >= 900 ? 14 : 13 -
@@ -341,6 +308,28 @@ public class CandleStickChartToolbar extends Region {
 
             functionOptionsSeparator.setPadding(new Insets(0, containerWidth.getValue().doubleValue() >= 900 ? 20 :
                     20 - 2 * (int) ((1000 - containerWidth.getValue().doubleValue()) / 100), 0, 0));
+        }
+    }
+
+    private class MouseExitedPopOverFilter implements EventHandler<MouseEvent> {
+        private final Scene scene;
+
+        MouseExitedPopOverFilter(Scene scene) {
+            this.scene = scene;
+        }
+
+        @Override
+        public void handle(@NotNull MouseEvent event) {
+            // TODO Maybe we should add a small buffer space to the popover, like 10%
+            if (!(event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
+                    && event.getScreenX() >= optionsPopOver.getX()
+                    && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
+                    && event.getScreenY() >= optionsPopOver.getY())
+                    && !mouseInsideOptionsButton) {
+                optionsPopOver.hide(Duration.seconds(0.25));
+                scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
+                mouseExitedPopOverFilter = null;
+            }
         }
     }
 }

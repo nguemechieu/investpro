@@ -1,6 +1,5 @@
 package org.investpro.investpro;
 
-
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.layout.AnchorPane;
@@ -11,13 +10,13 @@ import javafx.util.Duration;
 import java.util.Objects;
 
 /**
- * A {@link javafx.scene.layout.Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
+ * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
  * The contained chart will display data for the given {@code tradePair}. The toolbar allows for changing
  * the duration in seconds of each candle as well as configuring the properties of the chart. When a new
  * duration is selected, this container automatically creates a new {@code CandleStickChart} and visually
  * transitions to it.
  *
- * @author Michael Ennen
+ * @author noel martial nguemechieu
  */
 public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
@@ -27,9 +26,6 @@ public class CandleStickChartContainer extends Region {
     private final SimpleIntegerProperty secondsPerCandle;
     private CandleStickChart candleStickChart;
 
-    /**
-     * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
-     */
     public CandleStickChartContainer(Exchange exchange, TradePair tradePair) {
         this(exchange, tradePair, false);
     }
@@ -60,12 +56,14 @@ public class CandleStickChartContainer extends Region {
         AnchorPane.setRightAnchor(candleChartContainer, 15.0);
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
+
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
         getChildren().setAll(containerRoot);
         // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
+
 
         secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
@@ -88,12 +86,14 @@ public class CandleStickChartContainer extends Region {
         CandleDataSupplier candleDataSupplier = new ReverseRawTradeDataProcessor(Paths.get("C:\\bitstampUSD.csv"),
                 secondsPerCandle.get(), TradePair.of(amountUnit, priceUnit));
         */
-        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
-                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair), tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+
+//        candleStickChart.setPrefSize(widthProperty().getValue(), heightProperty().getValue());;
     }
 
     private void animateInNewChart(CandleStickChart newChart) {
         Objects.requireNonNull(newChart, "newChart must not be null");
+
 
         if (candleStickChart != null) {
             FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(500), candleStickChart);

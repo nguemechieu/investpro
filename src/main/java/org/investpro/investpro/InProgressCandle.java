@@ -2,7 +2,9 @@ package org.investpro.investpro;
 
 import java.util.Objects;
 
-
+/**
+ * @author Michael Ennen
+ */
 public class InProgressCandle {
     private int openTime;
     private double openPrice;
@@ -13,6 +15,12 @@ public class InProgressCandle {
     private double volumeSoFar;
     private boolean visible; // is the in-progress candle currently visible on screen?
     private boolean placeHolder;
+
+    private int closeTime;
+
+    public int getCloseTime() {
+        return closeTime;
+    }
 
     /**
      * Creates a new (immutable) {@code CandleData} by copying the fields from this {@code InProgressCandle}.
@@ -126,5 +134,9 @@ public class InProgressCandle {
     public int hashCode() {
         return Objects.hash(openTime, openPrice, highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar,
                 visible, placeHolder);
+    }
+
+    public void setCloseTime(int closeTime) {
+        this.closeTime = closeTime;
     }
 }

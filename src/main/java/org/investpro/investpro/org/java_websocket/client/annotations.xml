@@ -1,5 +1,14 @@
 <root>
+    <item name='org.java_websocket.client.WebSocketClient WebSocketClient(java.net.URI)'>
+        <annotation name='org.jetbrains.annotations.Blocking'/>
+    </item>
     <item name='org.java_websocket.client.WebSocketClient WebSocketClient(java.net.URI, java.util.Map&lt;java.lang.String,java.lang.String&gt;)'>
+        <annotation name='org.jetbrains.annotations.Blocking'/>
+    </item>
+    <item name='org.java_websocket.client.WebSocketClient WebSocketClient(java.net.URI, org.java_websocket.drafts.Draft)'>
+        <annotation name='org.jetbrains.annotations.Blocking'/>
+    </item>
+    <item name='org.java_websocket.client.WebSocketClient void handleIOException(java.io.IOException)'>
         <annotation name='org.jetbrains.annotations.Blocking'/>
     </item>
 </root>

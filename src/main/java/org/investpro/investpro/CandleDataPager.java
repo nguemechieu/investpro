@@ -1,8 +1,6 @@
 package org.investpro.investpro;
 
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
@@ -11,10 +9,10 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 
+
 public class CandleDataPager {
     private final CandleDataSupplier candleDataSupplier;
     private final CandleDataPreProcessor candleDataPreProcessor;
-    private static final Logger logger = LoggerFactory.getLogger(CandleDataPager.class);
 
     public CandleDataPager(CandleStickChart candleStickChart, CandleDataSupplier candleDataSupplier) {
         Objects.requireNonNull(candleStickChart);
@@ -45,7 +43,7 @@ public class CandleDataPager {
             try {
                 candleData = futureCandleData.get();
             } catch (InterruptedException | ExecutionException ex) {
-                logger.error("exception during accepting futureCandleData: ", ex);
+                Log.error("exception during accepting futureCandleData: " + ex);
                 return;
             }
 

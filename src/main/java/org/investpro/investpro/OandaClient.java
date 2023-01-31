@@ -676,7 +676,7 @@ static ArrayList<String> instrumentsList = new ArrayList<>();
 
                                  volume);
 
-          array.add(i, Trade.candle);
+          array.add(i, (Mid) Trade.candle);
 
          }
          return array.get(index);

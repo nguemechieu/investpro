@@ -1,5 +1,6 @@
 package org.investpro.investpro;
 
+
 public enum Algorithm {
     SHA256,
     SCRYPT,

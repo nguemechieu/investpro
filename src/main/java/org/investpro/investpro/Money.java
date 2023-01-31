@@ -3,10 +3,11 @@ package org.investpro.investpro;
 import java.math.BigDecimal;
 import java.math.MathContext;
 
-public interface Money {
-    Number amount();
 
-    Currency currency();
+public interface Money {
+    Number getAmount();
+
+    Currency getCurrency();
 
     Money plus(Money summand);
 

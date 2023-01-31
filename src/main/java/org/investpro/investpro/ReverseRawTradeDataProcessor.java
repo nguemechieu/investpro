@@ -1,21 +1,18 @@
 package org.investpro.investpro;
 
+import javafx.beans.property.SimpleIntegerProperty;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import javafx.beans.property.SimpleIntegerProperty;
-
+/**
+ * @author Michael Ennen
+ */
 public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
     private final ReversedLinesFileReader fileReader;
     private int start;

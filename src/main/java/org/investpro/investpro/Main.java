@@ -3,6 +3,8 @@ package org.investpro.investpro;
 import com.jfoenix.controls.RecursiveTreeItem;
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import javafx.application.Application;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -10,24 +12,16 @@ import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
-import javafx.scene.web.WebView;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-import org.java_websocket.drafts.Draft_6455;
-import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.http.WebSocket;
-import java.nio.ByteBuffer;
 import java.util.Date;
-import java.util.concurrent.CompletableFuture;
+import java.util.Set;
+
 
 public class Main extends Application {
     private final String symbol = "BTC";
@@ -35,10 +29,7 @@ public class Main extends Application {
     private final Currency sym = new Currency(CurrencyType.FIAT, "USD", "USD", "USD", 12, symbol);
     private final String exchangeUrl = "wss://ws-feed.pro.coinbase.com";
 
-    @Override
-    public void start(@NotNull Stage stage) {
-        createLogin(stage);
-    }
+    private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
 
     private static @NotNull Pane panel() {
         Pane pane = new Pane();
@@ -47,7 +38,7 @@ public class Main extends Application {
 
 
         Menu[] menu = new Menu[]{
-                new Menu("Connect"),
+                new Menu("Connection"),
                 new Menu("File"),
                 new Menu("View"),
                 new Menu("Edit"),
@@ -127,6 +118,12 @@ public class Main extends Application {
         return pane;
     }
 
+    @Override
+    public void start(@NotNull Stage stage) {
+        createLogin(stage);
+
+    }
+
     public static void main(String[] args) {
         launch(Main.class, args);
     }
@@ -173,7 +170,7 @@ public class Main extends Application {
             stage.close();
             try {
                 createMainMenu();
-            } catch (URISyntaxException ex) {
+            } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
         });
@@ -215,7 +212,7 @@ public class Main extends Application {
             stage.close();
             try {
                 createMainMenu();
-            } catch (URISyntaxException ex) {
+            } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
         });
@@ -246,7 +243,7 @@ public class Main extends Application {
             stage.close();
             try {
                 createMainMenu();
-            } catch (URISyntaxException ex) {
+            } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
         });
@@ -263,7 +260,7 @@ public class Main extends Application {
         stage.show();
     }
 
-    private void createMainMenu() throws URISyntaxException {
+    private void createMainMenu() throws Exception {
 
         GridPane grid = new GridPane();
         Spinner<Double> spinner = new Spinner<>();
@@ -291,7 +288,7 @@ public class Main extends Application {
         Stage stage = new Stage();
 
         AnchorPane anchorpane = new AnchorPane();
-        anchorpane.getChildren().addAll(panel(), getCandleData(), getDepths(), grid, getCandleSticksChart());
+        anchorpane.getChildren().addAll(panel(), getCandleData(), getDepths(), getCandleSticksChart());
         Scene scene = new Scene(anchorpane, 1530, 780);
         scene.getStylesheets().add("/app.css");
         stage.setScene(scene);
@@ -340,8 +337,6 @@ public class Main extends Application {
         treeTable.getColumns().addAll(dateColumn, symbolColum, openColum, closeColum, highColum, lowColum, volColumn);
         treeTable.setTranslateY(25);
 
-        CandleData candleData = new CandleData(0, 0, 0, 0, 0, 0);
-
         ObservableList<CandleData> datas = FXCollections.observableArrayList();
         Callback<RecursiveTreeObject<CandleData>, ObservableList<CandleData>> calback
                 = RecursiveTreeObject::getChildren;
@@ -350,41 +345,52 @@ public class Main extends Application {
         );
 
         treeTable.setRoot(root);
-        treeTable.setPrefSize(300, 300);
+        treeTable.setPrefSize(200, 300);
         return treeTable;
     }
 
-    TabPane getTabPane() {
+    TabPane getTabPane() throws Exception {
         TabPane tabPane = new TabPane();
         tabPane.setVisible(true);
         tabPane.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);
         tabPane.setCache(true);
         DraggableTab[] tabs = new DraggableTab[]{
-                new DraggableTab("Account"),
+                new DraggableTab("Orders"),
                 new DraggableTab("Portfolio"),
+                new DraggableTab("Portfolio  Analysis"),
                 new DraggableTab("Market Analysis"),
-                new DraggableTab("Forex News"),
-                new DraggableTab("Mail")
-                , new DraggableTab("Signals")
-                , new DraggableTab("Telegram Bot")
+                new DraggableTab("Browser"),
+                new DraggableTab("Statistics ")
+                , new DraggableTab("Mails")
+                , new DraggableTab("News")
         };
         VBox[] vBox;
+        Browser.webWiew.setPrefSize(1530, 780);
+        Browser.webWiew.getEngine().load("https://www.google.com");
+        ListView<Order> orders = new ListView<>();
+        GridPane gridPane = new GridPane();
+        gridPane.setPrefSize(1500, 800);
+        gridPane.add(new Label("Account"), 0, 0);
 
-        WebView we = new WebView();
-        we.getEngine().load("https://www.google.com");
+        GridPane portFolio = new GridPane();
+        portFolio.add(new Label("Profit"), 1, 1);
 
         vBox = new VBox[]{
 
+                new VBox(orders),
+                new VBox(gridPane),
+                new VBox(portFolio),
                 new VBox(),
                 new VBox(),
                 new VBox(),
-                new VBox(),
-                new VBox(),
-                new VBox(we)
+                new VBox(new Browser().start()),
+                new VBox(getNews())
         };
+
+
         for (int i = 0; i < vBox.length; i++) {
 
-
+            vBox[i].setPrefSize(1500, 780);
             tabs[i].setContent(vBox[i]);
         }
 
@@ -394,15 +400,48 @@ public class Main extends Application {
         return tabPane;
     }
 
-    private @NotNull VBox getCandleSticksChart() throws URISyntaxException {
+    private @NotNull VBox getCandleSticksChart() throws Exception {
 
+
+        TabPane candleSticksChartTabPane = new TabPane();
+        DraggableTab[] candleStickChartTabs = new DraggableTab[]{
+                new DraggableTab("Oanda"),
+                new DraggableTab("Binance Us"),
+                new DraggableTab("Coinbase Pro"),
+                new DraggableTab("IG "),
+                new DraggableTab("Binance Com"),
+                new DraggableTab("Stock")
+        };
+
+
+        VBox[] vbox = new VBox[]{
+                new VBox(),
+                new VBox(),
+                new VBox(),
+                new VBox(),
+                new VBox(),
+                new VBox(),
+                new VBox(),
+                new VBox()
+        };
+        Color[] xColor = new Color[]{
+                Color.GREEN,
+                Color.YELLOW, Color.GOLD,
+                Color.BEIGE, Color.CORAL
+                , Color.WHITE
+        };
+        int ii;
+        ii = ((int) Math.random() * (xColor.length));
+
+        if (ii == xColor.length) {
+            ii = 0;
+        }
 
         Button[] buttons = new Button[]{
                 new Button("MARKET BUY"),
                 new Button("MARKET SELL"),
                 new Button("BUY LIMIT"),
                 new Button("SELL LIMIT"),
-                new Button("BUY STOP"),
                 new Button("SELL STOP"),
                 new Button("CLOSE ALL")
 
@@ -412,104 +451,92 @@ public class Main extends Application {
         ToolBar toolbarBuySell = new ToolBar(buttons);
 
 
+        ToolBar[] toolbar = new ToolBar[]{
+
+                toolbarBuySell,
+                new ToolBar(buttons),
+                new ToolBar(buttons), new ToolBar(buttons), new ToolBar(buttons), new ToolBar(buttons)
+                , new ToolBar(buttons), new ToolBar(buttons),
+                new ToolBar(buttons)
+
+        };
+
+        for (int i = 0; i < candleStickChartTabs.length; i++) {
+
+            vbox[i].setBackground(Background.fill(xColor[ii]));
+            vbox[i].setPrefSize(1530, 600);
+
+            toolbar[i].setTranslateY(500);
+            candleStickChartTabs[i].setContent(vbox[i]);
+        }
+
+        OandaCandleStick oandaCanleStickChart = new OandaCandleStick();
+
+        vbox[0].getChildren().add(oandaCanleStickChart.start());
+        BinanceUsCandleStick binanceUsCandleChart = new BinanceUsCandleStick();
+        vbox[1].getChildren().add(binanceUsCandleChart.start());
+        CoinbasePro coinbaseCandleChart = new CoinbasePro();
+        vbox[2].getChildren().add(coinbaseCandleChart.start());
+        BinanceUsCandleStick stockCandleChart = new BinanceUsCandleStick();
+        vbox[3].getChildren().add(stockCandleChart.start());
+        BinanceUsCandleStick marketCandleChart = new BinanceUsCandleStick();
+        vbox[4].getChildren().add(marketCandleChart.start());
+
+
+        candleSticksChartTabPane.getTabs().addAll(candleStickChartTabs);
         toolbarBuySell.setTranslateY(2);
         toolbarBuySell.setTranslateX(0);
-
-        TradePair tradePair = new TradePair(Currency.of("BTC"), Currency.of("USD"));
-
-        CandleStickChartExample chart = new CandleStickChartExample();
-
-
-        VBox vBox = new VBox(CandleStickChartExample.start(), toolbarBuySell, getTabPane());
+        candleSticksChartTabPane.setPrefSize(1200, 600);
+        VBox vBox = new VBox(candleSticksChartTabPane, getTabPane());
         vBox.setTranslateX(200);
         vBox.setTranslateY(50);
-        vBox.setPrefSize(1000, 750);
         return vBox;
     }
 
-    protected static class ConnectExchange extends ExchangeWebSocketClient {
-        protected ConnectExchange(URI clientUri) {
-            super(clientUri, new Draft_6455());
-        }
 
-        @Override
-        public void onMessage(String message) {
+    TreeTableView<News> getNews() throws IllegalArgumentException {
 
-        }
+        Callback<RecursiveTreeObject<News>, ObservableList<News>> callbacks = RecursiveTreeObject::getChildren;
+        ObservableList<News> data = FXCollections.observableArrayList();
+        data.addAll(NewsManager.getNewsList());
+        TreeTableView<News> treeTableNews = new TreeTableView<>();
 
-        @Override
-        public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+        TreeTableColumn<News, String> columnNewsDate = new TreeTableColumn<>("Date");
 
-        }
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> dateCellValueFactory
+                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getDate());
+        columnNewsDate.setCellValueFactory(dateCellValueFactory);
+        TreeTableColumn<News, String> columnNewsTitle = new TreeTableColumn<>("Title");
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> titleCellValueFactory
+                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getTitle());
+        columnNewsDate.setCellValueFactory(titleCellValueFactory);
+        TreeTableColumn<News, String> columnNewsCountry = new TreeTableColumn<>("Country");
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> countryCellValueFactory
+                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getCountry());
+        columnNewsDate.setCellValueFactory(countryCellValueFactory);
+        TreeTableColumn<News, String> columnNewsImpact = new TreeTableColumn<>("Impact");
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> impactCellValueFactory
+                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getImpact());
+        columnNewsDate.setCellValueFactory(impactCellValueFactory);
+        TreeTableColumn<News, String> columnNewsForecast = new TreeTableColumn<>("Forecast");
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> forecastCellValueFactory
+                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getForecast());
+        columnNewsDate.setCellValueFactory(forecastCellValueFactory);
+        TreeTableColumn<News, String> columnNewsPrevious = new TreeTableColumn<>("Previous");
 
-        @Override
-        public void stopStreamLiveTrades(TradePair tradePair) {
 
-        }
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> previousCellValueFactory
+                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getPrevious());
+        columnNewsDate.setCellValueFactory(previousCellValueFactory);
+        //Loading News from Forex factory url:https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823
 
-        @Override
-        public boolean supportsStreamingTrades(TradePair tradePair) {
-            return false;
-        }
 
-        @Override
-        public void onClose(int code, String reason, boolean remote) {
+        RecursiveTreeItem<News> root = new RecursiveTreeItem<>(data, callbacks);
 
-        }
 
-        @Override
-        public void onOpen(ServerHandshake serverHandshake) {
+        treeTableNews.getColumns().addAll(columnNewsDate, columnNewsTitle, columnNewsCountry, columnNewsImpact, columnNewsForecast, columnNewsPrevious);
 
-        }
 
-        @Override
-        public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<WebSocket> sendBinary(ByteBuffer data, boolean last) {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<WebSocket> sendPing(ByteBuffer message) {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<WebSocket> sendPong(ByteBuffer message) {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<WebSocket> sendClose(int statusCode, String reason) {
-            return null;
-        }
-
-        @Override
-        public void request(long n) {
-
-        }
-
-        @Override
-        public String getSubprotocol() {
-            return null;
-        }
-
-        @Override
-        public boolean isOutputClosed() {
-            return false;
-        }
-
-        @Override
-        public boolean isInputClosed() {
-            return false;
-        }
-
-        @Override
-        public void abort() {
-
-        }
+        return treeTableNews;
     }
 }

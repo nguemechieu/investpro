@@ -1,14 +1,12 @@
 package org.investpro.investpro;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Locale;
 
 public enum Side {
     BUY,
     SELL;
 
-    public static Side getSide(@NotNull String type) {
+    public static Side getSide(String type) {
         if (type.equalsIgnoreCase("BUY")) {
             return BUY;
         } else if (type.equalsIgnoreCase("SELL")) {

@@ -1,26 +1,28 @@
 package org.investpro.investpro;
 
-
+import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import org.json.JSONObject;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Objects;
 
-
+/**
+ * A Trade represents a completed order (then called a trade), which is an transaction where one
+ * party buys and the other one sells some amount of currency at a fixed price.
+ *
+ * @author Michael Ennen
+ */
 public class Trade {
-    public static ArrayList<SymbolData> arrayListSymbolsData2=new ArrayList<>();
-    public static ArrayList<SymbolData> arrayListSymbolsData=new ArrayList<>();
-    public static ArrayList<SymbolData> arrayListSymbolsData1=new ArrayList<>();
-    public static Mid candle=new Mid("BTCUSD", "BTC", ",", "","","",0);
-
+    public static RecursiveTreeObject<Mid> candle;
+    private int i;
+    private JSONObject trade;
     private TradePair tradePair;
-    private  Money price;
-    private  Money amount;
+    private Money price;
+    private Money amount;
     private Side transactionType;
     private long localTradeId;
-    private  Instant timestamp;
-    private  Money fee;
+    private Instant timestamp;
+    private Money fee;
 
     public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
                  long localTradeId, Instant timestamp, Money fee) {
@@ -51,6 +53,8 @@ public class Trade {
     }
 
     public Trade(int i, JSONObject trade) {
+        this.i = i;
+        this.trade = trade;
     }
 
     public TradePair getTradePair() {

@@ -1,10 +1,9 @@
 package org.investpro.investpro;
 
-
-import java.io.Serial;
-
+/**
+ * @author Michael Ennen
+ */
 public class CurrencyNotFoundException extends Throwable {
-    @Serial
     private static final long serialVersionUID = -5029723281334525952L;
 
     public CurrencyNotFoundException(CurrencyType type, String symbol) {

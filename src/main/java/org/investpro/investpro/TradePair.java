@@ -1,13 +1,10 @@
 package org.investpro.investpro;
 
-import java.util.Objects;
-
 import javafx.util.Pair;
-
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Objects;
 
 
 public class TradePair extends Pair<Currency, Currency> {
@@ -36,13 +33,12 @@ public class TradePair extends Pair<Currency, Currency> {
         return new TradePair(baseCurrency, counterCurrency);
     }
 
-    @Contract("_ -> new")
-    public static @NotNull TradePair of(@NotNull Pair<Currency, Currency> currencyPair) {
+    public static TradePair of(Pair<Currency, Currency> currencyPair) {
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
 
-    public static <T extends Currency, V extends Currency> @NotNull TradePair parse(
-            String tradePair, @NotNull String separator, Pair<Class<T>, Class<V>> pairType)
+    public static <T extends Currency, V extends Currency> TradePair parse(
+            String tradePair, String separator, Pair<Class<T>, Class<V>> pairType)
             throws CurrencyNotFoundException {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(pairType, "pairType must not be null");

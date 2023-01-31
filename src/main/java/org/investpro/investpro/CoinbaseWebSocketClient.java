@@ -10,8 +10,6 @@ import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -31,8 +29,8 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private static final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
     private final Set<TradePair> tradePairs;
+
 
     public CoinbaseWebSocketClient(Set<TradePair> tradePairs) {
         super(URI.create("wss://ws-feed.pro.coinbase.com"), new Draft_6455());
@@ -59,7 +57,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             tradePair = parseTradePair(messageJson);
         } catch (CurrencyNotFoundException exception) {
             Log.error("coinbase websocket client: could not initialize trade pair: " +
-                    messageJson.get("product_id").asText() + exception);
+                    messageJson.get("product_id").asText() + "\n" + exception);
         }
 
         Side side = messageJson.has("side") ? Side.getSide(messageJson.get("side").asText()) : null;
@@ -87,7 +85,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException {
+    private @NotNull TradePair parseTradePair(JsonNode messageJson) throws CurrencyNotFoundException {
         final String productId = messageJson.get("product_id").asText();
         final String[] products = productId.split("-");
         TradePair tradePair;
@@ -107,14 +105,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
         send(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
                 .put("product_id", tradePair.toString('-')).toPrettyString());
         liveTradeConsumers.put(tradePair, liveTradesConsumer);
-    }
-
-    private void send(String toPrettyString) {
-
     }
 
     @Override
@@ -125,16 +119,6 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     @Override
     public boolean supportsStreamingTrades(TradePair tradePair) {
         return tradePairs.contains(tradePair);
-    }
-
-    @Override
-    public void onClose(int code, String reason, boolean remote) {
-    }
-
-    @Override
-    public void onOpen(ServerHandshake serverHandshake) {
-
-
     }
 
     @Override
@@ -185,5 +169,13 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     @Override
     public void abort() {
 
+    }
+
+    @Override
+    public void onClose(int code, String reason, boolean remote) {
+    }
+
+    @Override
+    public void onOpen(ServerHandshake serverHandshake) {
     }
 }

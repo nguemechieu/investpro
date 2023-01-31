@@ -1,22 +1,15 @@
 package org.investpro.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.beans.property.IntegerProperty;
-import javafx.beans.property.SimpleIntegerProperty;
-import javafx.scene.Scene;
-
-import javafx.scene.layout.StackPane;
-import javafx.stage.Stage;
-import org.jetbrains.annotations.NotNull;
-
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import javafx.application.Platform;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 
 import java.io.IOException;
 import java.net.URI;
@@ -27,47 +20,29 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
-import static javafx.scene.layout.AnchorPane.*;
 
-/**
- * Example of how to use the CandleFX API to create a candle stick chart for the BTC/USD tradepair on Coinbase.
- */
-public class CandleStickChartExample extends Application {
+public class CoinbasePro {
     private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("BTC"), Currency.ofFiat("USD"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    @Override
-    public void start(@NotNull Stage primaryStage) {
+
+    public CandleStickChartContainer start() {
         Platform.setImplicitExit(false);
-        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: "+exception));
+        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: " + exception));
         CandleStickChartContainer candleStickChartContainer =
                 new CandleStickChartContainer(
                         new Coinbase(), BTC_USD, true);
 
 
-        candleStickChartContainer.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
-        Scene scene = new Scene(new StackPane(candleStickChartContainer), 1200, 800);
-        scene.getStylesheets().add(Objects.requireNonNull(CandleStickChartExample.class.getResource("/css/chart.css")).toExternalForm());
-        //scene.getStylesheets().add(CandleStickChartExample.class.getResource("/css/glyph.css").toExternalForm());
-        primaryStage.setTitle("Tick");
-        primaryStage.setScene(scene);
-        primaryStage.show();
+        candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        return candleStickChartContainer;
     }
 public static class Coinbase extends Exchange {
         Coinbase() {
@@ -150,6 +125,7 @@ public static class Coinbase extends Exchange {
                                             candle.get(2).asDouble(),  // high price
                                             candle.get(1).asDouble(),  // low price
                                             candle.get(0).asInt(),     // open time
+                                            // close time
                                             candle.get(5).asDouble()   // volume
                                     ));
                                 }

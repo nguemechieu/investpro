@@ -8,7 +8,20 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.util.Duration;
 
-
+/**
+ * A {@code ChangeListener<Number>} implementation that calls the abstract {@code resize()} method
+ * only after a delay has elapsed in which no further changes have occurred. If a change does occur
+ * then the delay is reset to zero. Two different delay lengths (in milliseconds) are supported, one
+ * for the first delay and then all subsequent delays. The {@code initialDelay} can be useful for
+ * resizing a Node the first time (say, on application start-up) which can be expected to take longer
+ * to settle to a fixed-point.
+ * <p>
+ * A {@code DelayedSizeChangeListener} is useful when used on a Node that has its'
+ * preferred size set to {@code Double.MAX_VALUE} and thus re-sizes with the application
+ * window. This way, as the Node's size passes through many intermediate values a
+ * aa resizing is not performed but only for the final "resting" window size. This is
+ * especially useful when resizing a is a computationally expensive operation.
+ */
 public abstract class DelayedSizeChangeListener implements ChangeListener<Number> {
     private final double subsequentDelay;
     private final BooleanProperty gotFirstSize;

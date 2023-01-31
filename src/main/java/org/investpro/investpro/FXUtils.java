@@ -10,7 +10,9 @@ import javafx.scene.text.TextBoundsType;
 import java.util.List;
 import java.util.Locale;
 
-
+/**
+ * Static utility methods that make working with JavaFX more pleasant.
+ */
 public class FXUtils {
     private static final String MONOSPACED_FONT = getMonospacedFontHelper();
     private static final String OS_NAME = System.getProperty("os.name").toLowerCase(Locale.US);
