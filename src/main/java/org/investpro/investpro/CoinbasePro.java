@@ -1,17 +1,22 @@
 package org.investpro.investpro;
 
-
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.scene.Scene;
+
+import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
+import org.jetbrains.annotations.NotNull;
+
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import javafx.beans.property.IntegerProperty;
-import javafx.beans.property.SimpleIntegerProperty;
-import javafx.scene.layout.AnchorPane;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.net.URI;
@@ -22,56 +27,139 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static javafx.scene.layout.AnchorPane.*;
 
 /**
  * Example of how to use the CandleFX API to create a candle stick chart for the BTC/USD tradepair on Coinbase.
  */
-public class CandleStickChartExample extends AnchorPane {
-
+public class CandleStickChartExample extends Application {
+    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("BTC"), Currency.ofFiat("USD"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
-            .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    private static final TradePair BTC_USD = new TradePair(Currency.of("BTC"), Currency.of("USD"));
-
-    public CandleStickChartExample() {
-    }
-
-    public static @NotNull CandleStickChartContainer start() {
-
-        // Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: "+exception));
+            .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    @Override
+    public void start(@NotNull Stage primaryStage) {
+        Platform.setImplicitExit(false);
+        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: "+exception));
         CandleStickChartContainer candleStickChartContainer =
-                new CandleStickChartContainer(new Coinbase(), BTC_USD, true);
+                new CandleStickChartContainer(
+                        new Coinbase(), BTC_USD, true);
 
-        candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        candleStickChartContainer.setPrefSize(1200, 450);
-        return candleStickChartContainer;
+
+        candleStickChartContainer.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
+        Scene scene = new Scene(new StackPane(candleStickChartContainer), 1200, 800);
+        scene.getStylesheets().add(Objects.requireNonNull(CandleStickChartExample.class.getResource("/css/chart.css")).toExternalForm());
+        //scene.getStylesheets().add(CandleStickChartExample.class.getResource("/css/glyph.css").toExternalForm());
+        primaryStage.setTitle("Tick");
+        primaryStage.setScene(scene);
+        primaryStage.show();
     }
-
-
-    public static class Coinbase extends Exchange {
-        private static final Set<TradePair> traePair = Set.of(
-
-
-                new TradePair(Currency.of("BTC"), Currency.of("USD"))
-
-        );
-        private static final ExchangeWebSocketClient webS = new
-                CoinbaseWebSocketClient(
-                traePair
-        );
-
+public static class Coinbase extends Exchange {
         Coinbase() {
-            super(webS); // This argument is for creating a WebSocket client for live trading data.
+            super(null); // This argument is for creating a WebSocket client for live trading data.
         }
 
         @Override
         public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
             return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair);
+        }
+
+        public static class CoinbaseCandleDataSupplier extends CandleDataSupplier {
+            private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+                    .registerModule(new JavaTimeModule())
+                    .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
+
+            CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+                super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+            }
+            private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
+
+            @Override
+            public Set<Integer> getSupportedGranularities() {
+                // https://docs.pro.coinbase.com/#get-historic-rates
+                return new TreeSet<>(GRANULARITIES);
+            }
+            @Override
+            public Future<List<CandleData>> get() {
+                if (endTime.get() == -1) {
+                    endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
+                }
+
+                String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                        .format(LocalDateTime.ofEpochSecond(endTime.get(), 0, ZoneOffset.UTC));
+
+                int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
+                String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                        .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
+
+                String uriStr = "https://api.pro.coinbase.com/" +
+                        "products/" + tradePair.toString('-') + "/candles" +
+                        "?granularity=" + secondsPerCandle +
+                        "&start=" + startDateString +
+                        "&end=" + endDateString;
+
+                if (startTime == EARLIEST_DATA) {
+                    // signal more data is false
+                    return CompletableFuture.completedFuture(Collections.emptyList());
+                }
+
+                return HttpClient.newHttpClient().sendAsync(
+                        HttpRequest.newBuilder()
+                                .uri(URI.create(uriStr))
+                                .GET().build(),
+                        HttpResponse.BodyHandlers.ofString())
+                        .thenApply(HttpResponse::body)
+                        .thenApply(response -> {
+                            Log.info(" Response: " + response);
+                            JsonNode res;
+                            try {
+                                res = OBJECT_MAPPER.readTree(response);
+                            } catch (JsonProcessingException ex) {
+                                throw new RuntimeException(ex);
+                            }
+
+                            if (!res.isEmpty()) {
+                                // Remove the current in-progress candle
+                                if (res.get(0).get(0).asInt() + secondsPerCandle > endTime.get()) {
+                                    ((ArrayNode) res).remove(0);
+                                }
+                                endTime.set(startTime);
+
+                                List<CandleData> candleData = new ArrayList<>();
+                                for (JsonNode candle : res) {
+                                    candleData.add(new CandleData(
+                                            candle.get(3).asDouble(),  // open price
+                                            candle.get(4).asDouble(),  // close price
+                                            candle.get(2).asDouble(),  // high price
+                                            candle.get(1).asDouble(),  // low price
+                                            candle.get(0).asInt(),     // open time
+                                            candle.get(5).asDouble()   // volume
+                                    ));
+                                }
+                                candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
+                                return candleData;
+                            } else {
+                                return Collections.emptyList();
+                            }
+                        });
+            }
         }
 
         /**
@@ -127,7 +215,7 @@ public class CandleStickChartExample extends AnchorPane {
 
                         if (!tradesResponse.isArray()) {
                             futureResult.completeExceptionally(new RuntimeException(
-                                    "coinbase trades response was not an array!"));
+                                    "Trades response was not an array!"));
                         }
                         if (tradesResponse.isEmpty()) {
                             futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
@@ -147,7 +235,7 @@ public class CandleStickChartExample extends AnchorPane {
                             }
                         }
                     } catch (IOException | InterruptedException ex) {
-                        Log.error("ex: " + ex);
+                        Log.error("ex: "+ ex);
                     }
                 }
             });
@@ -171,15 +259,15 @@ public class CandleStickChartExample extends AnchorPane {
             // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
             //  data for the current live syncing candle from the raw trades method.
             return HttpClient.newHttpClient().sendAsync(
-                            HttpRequest.newBuilder()
-                                    .uri(URI.create(String.format(
-                                            "https://api.pro.coinbase.com/products/%s/candles?granularity=%s&start=%s",
-                                            tradePair.toString('-'), actualGranularity, startDateString)))
-                                    .GET().build(),
-                            HttpResponse.BodyHandlers.ofString())
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(String.format(
+                                    "https://api.pro.coinbase.com/products/%s/candles?granularity=%s&start=%s",
+                                    tradePair.toString('-'), actualGranularity, startDateString)))
+                            .GET().build(),
+                    HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
                     .thenApply(response -> {
-                        Log.info("coinbase response: " + response);
+                        Log.info("Response: " + response);
                         JsonNode res;
                         try {
                             res = OBJECT_MAPPER.readTree(response);
@@ -238,100 +326,14 @@ public class CandleStickChartExample extends AnchorPane {
                     });
         }
 
-        public static class CoinbaseCandleDataSupplier extends CandleDataSupplier {
-            private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-                    .registerModule(new JavaTimeModule())
-                    .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-            private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
-            private int numCandles;
-            private int secondsPerCandle;
-            private TradePair tradePair;
-            private IntegerProperty endTime;
+        @Override
+        public boolean isInputClosed() {
+            return false;
+        }
 
-            CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-                super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
-            }
+        @Override
+        public void abort() {
 
-
-            public CoinbaseCandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
-                super(numCandles, secondsPerCandle, tradePair, endTime);
-                this.numCandles = numCandles;
-                this.secondsPerCandle = secondsPerCandle;
-                this.tradePair = tradePair;
-                this.endTime = endTime;
-            }
-
-            @Override
-            public Set<Integer> getSupportedGranularities() {
-                // https://docs.pro.coinbase.com/#get-historic-rates
-                return new TreeSet<>(Set.of(60, 5 * 60, 15 * 60, 30 * 60, 3600, 4 * 3600, 6 * 3600, 24 * 3600, 3600 * 24 * 7, 3600 * 27 * 7 * 2, 3600 * 27 * 7 * 4, 3600 * 24 * 7 * 4 * 12));
-            }
-
-            @Override
-            public Future<List<CandleData>> get() {
-                if (endTime.get() == -1) {
-                    endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
-                }
-
-                String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                        .format(LocalDateTime.ofEpochSecond(endTime.get(), 0, ZoneOffset.UTC));
-
-                int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
-                String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                        .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
-
-                String uriStr = "https://api.pro.coinbase.com/" +
-                        "products/" + tradePair.toString('-') + "/candles" +
-                        "?granularity=" + secondsPerCandle +
-                        "&start=" + startDateString +
-                        "&end=" + endDateString;
-
-                if (startTime == EARLIEST_DATA) {
-                    // signal more data is false
-                    return CompletableFuture.completedFuture(Collections.emptyList());
-                }
-
-                return HttpClient.newHttpClient().sendAsync(
-                                HttpRequest.newBuilder()
-                                        .uri(URI.create(uriStr))
-                                        .GET().build(),
-                                HttpResponse.BodyHandlers.ofString())
-                        .thenApply(HttpResponse::body)
-                        .thenApply(response -> {
-                            Log.info("coinbase response: " + response);
-                            JsonNode res;
-                            try {
-                                res = OBJECT_MAPPER.readTree(response);
-                            } catch (JsonProcessingException ex) {
-                                throw new RuntimeException(ex);
-                            }
-
-                            if (!res.isEmpty()) {
-                                // Remove the current in-progress candle
-                                if (res.get(0).get(0).asInt() + secondsPerCandle > endTime.get()) {
-                                    ((ArrayNode) res).remove(0);
-                                }
-                                endTime.set(startTime);
-
-                                List<CandleData> candleData = new ArrayList<>();
-                                for (JsonNode candle : res) {
-                                    candleData.add(new CandleData(
-                                            candle.get(3).asDouble(),  // open price
-                                            candle.get(4).asDouble(),  // close price
-                                            candle.get(2).asDouble(),  // high price
-                                            candle.get(1).asDouble(),  // low price
-                                            candle.get(0).asInt(),     // open time
-                                            candle.get(5).asDouble()   // volume
-                                    ));
-                                }
-                                candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
-                                return candleData;
-                            } else {
-                                return Collections.emptyList();
-                            }
-                        });
-            }
         }
     }
 }
