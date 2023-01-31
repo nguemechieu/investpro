@@ -32,6 +32,8 @@ import javafx.css.PseudoClass;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.Skin;
 
+import java.util.Objects;
+
 /**
  * A {@code ToggleSwitch} allows the user to toggle between two states, an "off"
  * state (where the thumb is to the left and the bar a neutral, gray color)
@@ -149,6 +151,6 @@ public class ToggleSwitch extends Labeled {
 
     @Override
     public String getUserAgentStylesheet() {
-        return ToggleSwitch.class.getResource("/css/toggleswitch.css").toExternalForm();
+        return Objects.requireNonNull(ToggleSwitch.class.getResource("/css/toggleswitch.css")).toExternalForm();
     }
 }

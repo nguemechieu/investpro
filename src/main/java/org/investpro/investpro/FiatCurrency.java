@@ -3,9 +3,7 @@ package org.investpro.investpro;
 import java.util.Locale;
 import java.util.Objects;
 
-/**
- * @author Michael Ennen
- */
+
 public class FiatCurrency extends Currency {
     private final Locale locale;
     private final String centralBank;

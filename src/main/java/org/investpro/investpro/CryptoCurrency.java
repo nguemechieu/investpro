@@ -4,9 +4,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Objects;
 
-/**
- * @author Michael Ennen
- */
+
 public class CryptoCurrency extends Currency {
     private final Algorithm algorithm;
     private final URI homeUrl;

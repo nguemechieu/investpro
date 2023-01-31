@@ -39,8 +39,9 @@ public class BinanceUsCandleStick {
         Platform.setImplicitExit(false);
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: " + exception));
 
-        // candleStickChartContainer.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
-        return new CandleStickChartContainer(new BinanceU(), BTC_USD, true);
+        CandleStickChartContainer candleStickChartContainer = new CandleStickChartContainer(new BinanceU(), BTC_USD, true);
+        candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        return candleStickChartContainer;
     }
 
     public static class BinanceU extends Exchange {
@@ -203,10 +204,11 @@ public class BinanceUsCandleStick {
                                 // sanity guard) TODO(mike): Consider making this a "break;" once we understand why
                                 //  Coinbase is  not respecting start/end times
 
-                                currentTill = currCandle.get(0).asInt();
-                                lastTradePrice = currCandle.get(4).asDouble();
-                                foundFirst = true;
+//                                currentTill = currCandle.get(0).asInt();
+//                                lastTradePrice = currCandle.get(4).asDouble();
+//                                foundFirst = true;
 
+                                continue;
 
                             } else {
                                 if (!foundFirst) {

@@ -18,6 +18,8 @@ import java.util.Objects;
  *
  * @author noel martial nguemechieu
  */
+
+
 public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
     private final CandleStickChartToolbar toolbar;
@@ -26,6 +28,9 @@ public class CandleStickChartContainer extends Region {
     private final SimpleIntegerProperty secondsPerCandle;
     private CandleStickChart candleStickChart;
 
+    /**
+     * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
+     */
     public CandleStickChartContainer(Exchange exchange, TradePair tradePair) {
         this(exchange, tradePair, false);
     }
@@ -56,14 +61,12 @@ public class CandleStickChartContainer extends Region {
         AnchorPane.setRightAnchor(candleChartContainer, 15.0);
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
-
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
         getChildren().setAll(containerRoot);
         // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
-
 
         secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
@@ -86,14 +89,12 @@ public class CandleStickChartContainer extends Region {
         CandleDataSupplier candleDataSupplier = new ReverseRawTradeDataProcessor(Paths.get("C:\\bitstampUSD.csv"),
                 secondsPerCandle.get(), TradePair.of(amountUnit, priceUnit));
         */
-        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair), tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
-
-//        candleStickChart.setPrefSize(widthProperty().getValue(), heightProperty().getValue());;
+        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
+                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
     private void animateInNewChart(CandleStickChart newChart) {
         Objects.requireNonNull(newChart, "newChart must not be null");
-
 
         if (candleStickChart != null) {
             FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(500), candleStickChart);

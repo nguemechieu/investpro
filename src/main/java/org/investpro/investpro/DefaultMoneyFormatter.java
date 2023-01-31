@@ -1,5 +1,7 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -11,9 +13,7 @@ import java.util.Objects;
 
 import static java.lang.Math.min;
 
-/**
- * @author Michael Ennen
- */
+
 public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
     public static final DefaultMoneyFormatter DEFAULT_FIAT_FORMATTER = new Builder()
             .withCurrencySymbol(CurrencyPosition.BEFORE_AMOUNT)
@@ -46,7 +46,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
     private final boolean displayAtLeastAllFractionalDigits;
     private final int fractionalDigitsCap;
 
-    private DefaultMoneyFormatter(Builder builder) {
+    private DefaultMoneyFormatter(@NotNull Builder builder) {
         currencyStyle = builder.useCurrencySymbol ? CurrencyStyle.SYMBOL : CurrencyStyle.CODE;
         currencyPosition = builder.currencyPosition;
         putSpaceBetweenCurrencyAndAmount = builder.putSpaceBetweenCurrencyAndAmount;
@@ -70,60 +70,57 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
 
     }
 
-    public String format(Money money) {
+    public @NotNull String format(Money money) {
         return format((DefaultMoney) money);
     }
 
-    public String format(DefaultMoney defaultMoney) {
+    public @NotNull String format(DefaultMoney defaultMoney) {
         Objects.requireNonNull(defaultMoney, "defaultMoney must not be null");
         String prefix = "";
         String decimalPointSeparator = "";
         String suffix = "";
 
         switch (currencyPosition) {
-            case BEFORE_AMOUNT:
-                prefix = defaultMoney.getCurrency().getCode();
-
-                if (currencyStyle == CurrencyStyle.SYMBOL && !defaultMoney.getCurrency().getSymbol().isEmpty()) {
-                    prefix = defaultMoney.getCurrency().getSymbol();
+            case BEFORE_AMOUNT -> {
+                prefix = defaultMoney.currency().getCode();
+                if (currencyStyle == CurrencyStyle.SYMBOL && !defaultMoney.currency().getSymbol().isEmpty()) {
+                    prefix = defaultMoney.currency().getSymbol();
                 }
-                break;
-            case AFTER_AMOUNT:
-                suffix = defaultMoney.getCurrency().getCode();
-
-                if (currencyStyle == CurrencyStyle.SYMBOL && !defaultMoney.getCurrency().getSymbol().isEmpty()) {
-                    suffix = defaultMoney.getCurrency().getSymbol();
+            }
+            case AFTER_AMOUNT -> {
+                suffix = defaultMoney.currency().getCode();
+                if (currencyStyle == CurrencyStyle.SYMBOL && !defaultMoney.currency().getSymbol().isEmpty()) {
+                    suffix = defaultMoney.currency().getSymbol();
                 }
-                break;
-            default:
-                throw new IllegalArgumentException("unknown currency position: " + currencyPosition);
+            }
+            default -> throw new IllegalArgumentException("unknown currency position: " + currencyPosition);
         }
 
         StringBuilder numberBeforeDecimalPointBuilder = new StringBuilder();
         StringBuilder numberAfterDecimalPointBuilder = new StringBuilder();
         // http://stackoverflow.com/questions/18828377/biginteger-count-the-number-of-decimal-digits-in-a-scalable-method
         int numDigitsBeforeDecimalPoint;
-        if (defaultMoney.getAmount().toBigInteger().compareTo(BigInteger.ZERO) > 0) {
-            numDigitsBeforeDecimalPoint = integerDigits(defaultMoney.getAmount());
+        if (defaultMoney.amount().toBigInteger().compareTo(BigInteger.ZERO) > 0) {
+            numDigitsBeforeDecimalPoint = integerDigits(defaultMoney.amount());
         } else {
             numDigitsBeforeDecimalPoint = 1;
         }
 
         numberBeforeDecimalPointBuilder.append("0".repeat(Math.max(0, numDigitsBeforeDecimalPoint)));
 
-        if (defaultMoney.getAmount().remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) == 0 &&
+        if (defaultMoney.amount().remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) == 0 &&
                 !displayAtLeastAllFractionalDigits) {
             // number has no fractional digits
             if (forceDecimalPoint) {
-                if (defaultMoney.getCurrency().getCurrencyType() == CurrencyType.FIAT) {
+                if (defaultMoney.currency().getCurrencyType() == CurrencyType.FIAT) {
                     if (locale == null) {
                         decimalPointSeparator = ".";
                     } else {
                         decimalPointSeparator = String.valueOf(decimalFormatSymbols.getMonetaryDecimalSeparator());
                     }
                     numberAfterDecimalPointBuilder.append("0".repeat(Math.max(0, (fractionalDigitsCap == -1 ?
-                            defaultMoney.getCurrency().getFractionalDigits() :
-                            min(defaultMoney.getCurrency().getFractionalDigits(), fractionalDigitsCap)))));
+                            defaultMoney.currency().getFractionalDigits() :
+                            min(defaultMoney.currency().getFractionalDigits(), fractionalDigitsCap)))));
                 } else {
                     if (fractionalDigitsCap == 0) {
                         decimalPointSeparator = "";
@@ -138,8 +135,8 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
                             numberAfterDecimalPointBuilder.append('0');
                         } else if (wholeNumberFractionalDigitAmount == WholeNumberFractionalDigitAmount.MAX) {
                             numberAfterDecimalPointBuilder.append("0".repeat(Math.max(0, (fractionalDigitsCap == -1 ?
-                                    defaultMoney.getCurrency().getFractionalDigits() :
-                                    min(defaultMoney.getCurrency().getFractionalDigits(), fractionalDigitsCap)))));
+                                    defaultMoney.currency().getFractionalDigits() :
+                                    min(defaultMoney.currency().getFractionalDigits(), fractionalDigitsCap)))));
                         }
                     }
                 }
@@ -159,17 +156,17 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
 
                 if (trimTrailingZerosAfterDecimalPoint) {
                     String trimmedNumber =
-                            defaultMoney.getAmount().toPlainString().replaceFirst("\\.0*$|(\\.\\d*?)0+$", "$1");
+                            defaultMoney.amount().toPlainString().replaceFirst("\\.0*$|(\\.\\d*?)0+$", "$1");
                     numDigitsAfterDecimalPoint = trimmedNumber.substring(trimmedNumber.indexOf(".")).length() - 1;
                 } else {
-                    numDigitsAfterDecimalPoint = Math.max(0, defaultMoney.getAmount().scale());
+                    numDigitsAfterDecimalPoint = Math.max(0, defaultMoney.amount().scale());
                 }
 
                 if (unlimitedFractionalDigits) {
                     numberAfterDecimalPointBuilder.append("0".repeat(Math.max(0, numDigitsAfterDecimalPoint)));
                 } else {
-                    int endIndex = displayAtLeastAllFractionalDigits ? defaultMoney.getCurrency().getFractionalDigits()
-                            : min(numDigitsAfterDecimalPoint, defaultMoney.getCurrency().getFractionalDigits());
+                    int endIndex = displayAtLeastAllFractionalDigits ? defaultMoney.currency().getFractionalDigits()
+                            : min(numDigitsAfterDecimalPoint, defaultMoney.currency().getFractionalDigits());
                     if (fractionalDigitsCap != -1) {
                         endIndex = min(fractionalDigitsCap, endIndex);
                     }
@@ -248,7 +245,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
             }
         }
 
-        return numberFormat.format(defaultMoney.getAmount());
+        return numberFormat.format(defaultMoney.amount());
     }
 
     private static int integerDigits(BigDecimal n) {
@@ -288,25 +285,22 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
         private boolean displayAtLeastAllFractionalDigits;
         private int fractionalDigitsCap = -1;
 
-        public Builder withDefaultsFor(CurrencyType currencyType) {
-            switch (currencyType) {
-                case CRYPTO:
-                    return withCurrencyCode(DEFAULT_CRYPTO_FORMATTER.currencyPosition)
-                            .useDigitGroupingSeparator(DEFAULT_CRYPTO_FORMATTER.useDigitGroupingSeparator)
-                            .useASpaceBetweenCurrencyAndAmount(
-                                    DEFAULT_CRYPTO_FORMATTER.putSpaceBetweenCurrencyAndAmount)
-                            .forceDecimalPoint()
-                            .trimTrailingZerosAfterDecimalPoint();
-                case FIAT:
-                    return withCurrencySymbol(DEFAULT_FIAT_FORMATTER.currencyPosition)
-                            .useDigitGroupingSeparator(DEFAULT_FIAT_FORMATTER.useDigitGroupingSeparator)
-                            .useASpaceBetweenCurrencyAndAmount(DEFAULT_FIAT_FORMATTER.putSpaceBetweenCurrencyAndAmount)
-                            .forceDecimalPoint(DEFAULT_FIAT_FORMATTER.wholeNumberFractionalDigitAmount)
-                            .displayAtLeastAllFractionalDigits(
-                                    DEFAULT_FIAT_FORMATTER.displayAtLeastAllFractionalDigits);
-                default:
-                    throw new IllegalArgumentException("unknown currency type: " + currencyType);
-            }
+        public Builder withDefaultsFor(@NotNull CurrencyType currencyType) {
+            return switch (currencyType) {
+                case CRYPTO -> withCurrencyCode(DEFAULT_CRYPTO_FORMATTER.currencyPosition)
+                        .useDigitGroupingSeparator(DEFAULT_CRYPTO_FORMATTER.useDigitGroupingSeparator)
+                        .useASpaceBetweenCurrencyAndAmount(
+                                DEFAULT_CRYPTO_FORMATTER.putSpaceBetweenCurrencyAndAmount)
+                        .forceDecimalPoint()
+                        .trimTrailingZerosAfterDecimalPoint();
+                case FIAT -> withCurrencySymbol(DEFAULT_FIAT_FORMATTER.currencyPosition)
+                        .useDigitGroupingSeparator(DEFAULT_FIAT_FORMATTER.useDigitGroupingSeparator)
+                        .useASpaceBetweenCurrencyAndAmount(DEFAULT_FIAT_FORMATTER.putSpaceBetweenCurrencyAndAmount)
+                        .forceDecimalPoint(DEFAULT_FIAT_FORMATTER.wholeNumberFractionalDigitAmount)
+                        .displayAtLeastAllFractionalDigits(
+                                DEFAULT_FIAT_FORMATTER.displayAtLeastAllFractionalDigits);
+                default -> throw new IllegalArgumentException("unknown currency type: " + currencyType);
+            };
         }
 
         public Builder withCurrencySymbol() {
@@ -422,7 +416,6 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
          * For example, if the currency is USD (which has two fractional digits) and the
          * number we are formatting is 566.3, then the number will be formatted to 566.30.
          *
-         * @param displayAtLeastAllFractionalDigits
          * @return
          */
         public Builder displayAtLeastAllFractionalDigits(boolean displayAtLeastAllFractionalDigits) {

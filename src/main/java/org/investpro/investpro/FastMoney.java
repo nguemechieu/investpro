@@ -1,5 +1,8 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
@@ -34,17 +37,18 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         this.currency = currency;
     }
 
-    public static Money of(long amount, final Currency currency) {
+    public static @NotNull Money of(long amount, final Currency currency) {
         Objects.requireNonNull(currency, "currency must not be null");
         return of(amount, currency, currency.getFractionalDigits());
     }
 
-    public static Money of(long amount, final Currency currency, int precision) {
+    @Contract("_, _, _ -> new")
+    public static @NotNull Money of(long amount, final Currency currency, int precision) {
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
-    public static Money of(final double amount, final Currency currency) {
+    public static @NotNull Money of(final double amount, final Currency currency) {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
     }
 
@@ -52,31 +56,34 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static Money ofFiat(long amount, final String currencyCode) {
+    public static @NotNull Money ofFiat(long amount, final String currencyCode) {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         return ofFiat(amount, currencyCode, Currency.ofFiat(currencyCode).getFractionalDigits());
     }
 
-    public static Money ofFiat(long amount, final String currencyCode, int precision) {
+    @Contract("_, _, _ -> new")
+    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         Currency currency = Currency.ofFiat(currencyCode);
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
-    public static Money ofFiat(final double amount, final String currencyCode) {
+    public static @NotNull Money ofFiat(final double amount, final String currencyCode) {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.FIAT);
     }
 
-    public static Money ofFiat(final double amount, final String currencyCode, int precision) {
+    public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) {
         return fromDouble(amount, precision, currencyCode, CurrencyType.FIAT);
     }
 
-    public static Money ofCrypto(long amount, final String currencyCode) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money ofCrypto(long amount, final String currencyCode) {
         return ofCrypto(amount, currencyCode, Currency.ofCrypto(currencyCode).getFractionalDigits());
     }
 
-    public static Money ofCrypto(long amount, final String currencyCode, int precision) {
+    @Contract("_, _, _ -> new")
+    public static @NotNull Money ofCrypto(long amount, final String currencyCode, int precision) {
         Currency currency = Currency.ofCrypto(currencyCode);
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
@@ -90,8 +97,8 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return fromDouble(amount, precision, currencyCode, CurrencyType.CRYPTO);
     }
 
-    private static Money fromDouble(final double value, final int precision, final String currencyCode,
-                                    final CurrencyType currencyType) {
+    private static @NotNull Money fromDouble(final double value, final int precision, final String currencyCode,
+                                             final CurrencyType currencyType) {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         Objects.requireNonNull(currencyType, "currencyType must not be null");
         Utils.checkPrecision(precision);
@@ -181,12 +188,12 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Long getAmount() {
+    public Long amount() {
         return amount;
     }
 
     @Override
-    public Currency getCurrency() {
+    public Currency currency() {
         return currency;
     }
 
@@ -367,7 +374,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (other instanceof FastMoney money) {
             return compareTo(money) < 0;
         } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.getAmount()) < 0;
+            return toBigDecimal().compareTo(money.amount()) < 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }
@@ -378,7 +385,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (other instanceof FastMoney money) {
             return compareTo(money) > 0;
         } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.getAmount()) > 0;
+            return toBigDecimal().compareTo(money.amount()) > 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }
@@ -389,7 +396,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (other instanceof FastMoney money) {
             return compareTo(money) >= 0;
         } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.getAmount()) >= 0;
+            return toBigDecimal().compareTo(money.amount()) >= 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }

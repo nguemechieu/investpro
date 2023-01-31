@@ -26,8 +26,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontSmoothingType;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.text.DecimalFormat;
 import java.time.Instant;
@@ -113,7 +111,6 @@ public class CandleStickChart extends Region {
     private volatile boolean paging;
 
     private static final DecimalFormat MARKER_FORMAT = new DecimalFormat("#.00");
-    private static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
 
     /**
      * Creates a new {@code CandleStickChart}. This constructor is package-private because it should only
@@ -362,7 +359,7 @@ public class CandleStickChart extends Region {
      * Sets the y-axis and extra axis bounds using only the x-axis lower bound.
      */
     private void setYAndExtraAxisBounds() {
-        logger.info("xAxis lower bound: " + (int) xAxis.getLowerBound());
+        Log.info("xAxis lower bound: " + (int) xAxis.getLowerBound());
         final double idealBufferSpaceMultiplier = 0.35;
         if (!currZoomLevel.getExtremaForCandleRangeMap().containsKey((int) xAxis.getLowerBound())) {
             // TODO(mike): Does this *always* represent a coding error on our end or can this happen during
@@ -392,7 +389,7 @@ public class CandleStickChart extends Region {
     }
 
     private void layoutChart() {
-        logger.info("CandleStickChart.layoutChart start");
+        Log.info("CandleStickChart.layoutChart start");
         extraAxisExtension.setStartX(chartWidth - 37.5);
         extraAxisExtension.setEndX(chartWidth - 37.5);
         extraAxisExtension.setStartY(0);
@@ -450,7 +447,7 @@ public class CandleStickChart extends Region {
         extraAxis.layout();
         canvas.setLayoutX(left);
         canvas.setLayoutY(top);
-        logger.info("CandleStickChart.layoutChart end");
+        Log.info("CandleStickChart.layoutChart end");
     }
 
     /**
@@ -490,7 +487,7 @@ public class CandleStickChart extends Region {
                         (((int) currZoomLevel.getNumVisibleCandles()) * secondsPerCandle), true,
                 ((int) xAxis.getUpperBound() - secondsPerCandle) - (numCandlesToSkip * secondsPerCandle), true);
 
-        logger.info("Drawing " + candlesToDraw.size() + " candles.");
+        Log.info("Drawing " + candlesToDraw.size() + " candles.");
         if (chartOptions.isHorizontalGridLinesVisible()) {
             // Draw horizontal grid lines aligned with y-axis major tick marks
             for (Axis.TickMark<Number> tickMark : yAxis.getTickMarks()) {
@@ -986,130 +983,7 @@ public class CandleStickChart extends Region {
         }
     }
 
-    private class CandlePageConsumer implements Consumer<List<CandleData>> {
-        @Override
-        public void accept(List<CandleData> candleData) {
-            if (Platform.isFxApplicationThread()) {
-                Log.error("candle data paging must not happen on FX thread!");
-                throw new IllegalStateException("candle data paging must not happen on FX thread!");
-            }
-
-            if (candleData.isEmpty()) {
-                Log.warn("candleData was empty");
-                return;
-            }
-
-            if (candleData.get(0).getOpenTime() >= candleData.get(1).getOpenTime()) {
-                Log.error("Paged candle data must be in ascending order by x-value");
-                throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
-            }
-
-            if (data.isEmpty()) {
-                if (liveSyncing) {
-                    if (inProgressCandle == null) {
-                        throw new RuntimeException("inProgressCandle was null in live syncing mode.");
-                    }
-                    // We obtained the first page of candle data which does *not* include the current in-progress
-                    // candle. Since we are live-syncing we need to fetch the data for what has occurred so far in
-                    // the current candle.
-                    long secondsIntoCurrentCandle = (Instant.now().toEpochMilli() / 1000L) -
-                            (candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle);
-                    inProgressCandle.setOpenTime(candleData.get(candleData.size() - 1).getOpenTime() +
-                            secondsPerCandle);
-
-                    // We first attempt to get caught up by simply requesting shorter duration candles. Say this chart
-                    // is displaying one hour per candle and secondsIntoCurrentCandle is 1800 (30 minutes). Then we
-                    // would request candles starting from when the current in-progress candle started but with
-                    // a supported duration closest to, but less than the current duration, 1800/200 (as 200 is the
-                    // limit of candles per page). This would give us 9 second candles that we can then sum. This will
-                    // catch the data up to within 9 seconds of current time (or in this case roughly within 0.25% of
-                    // current time).
-                    CompletableFuture<Optional<InProgressCandleData>> inProgressCandleDataOptionalFuture = exchange
-                            .fetchCandleDataForInProgressCandle(tradePair, Instant.ofEpochSecond(
-                                    candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle),
-                                    secondsIntoCurrentCandle, secondsPerCandle);
-                    inProgressCandleDataOptionalFuture.whenComplete((inProgressCandleDataOptional, throwable) -> {
-                        if (throwable == null) {
-                            if (inProgressCandleDataOptional.isPresent()) {
-                                InProgressCandleData inProgressCandleData = inProgressCandleDataOptional.get();
-
-                                // Our second attempt to get caught up requests all trades that have happened since
-                                // the time of the last sub-candle (the 9 seconds long candles from above). This will
-                                // get us caught up to the current time. The reason we don't use the more simple
-                                // approach of requesting all the trades that have happened in the current candle to
-                                // begin with is that this can take a prohibitively long time if the candle duration
-                                // is too large (some exchanges have multiple trades every second).
-                                int currentTill = (int) Instant.now().getEpochSecond();
-                                CompletableFuture<List<Trade>> tradesFuture = exchange.fetchRecentTradesUntil(
-                                        tradePair, Instant.ofEpochSecond(inProgressCandleData.currentTill()));
-
-                                tradesFuture.whenComplete((trades, exception) -> {
-                                    if (exception == null) {
-                                        inProgressCandle.setOpenPrice(inProgressCandleData.openPrice());
-                                        inProgressCandle.setCurrentTill(currentTill);
-
-                                        if (trades.isEmpty()) {
-                                            // No trading activity happened in addition to the sub-candles from above.
-                                            inProgressCandle.setHighPriceSoFar(
-                                                    inProgressCandleData.highPriceSoFar());
-                                            inProgressCandle.setLowPriceSoFar(inProgressCandleData.lowPriceSoFar());
-                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.volumeSoFar());
-                                            inProgressCandle.setLastPrice(inProgressCandleData.lastPrice());
-                                        } else {
-                                            // We need to factor in the trades that have happened after the
-                                            // "currentTill" time of the in-progress candle.
-                                            inProgressCandle.setHighPriceSoFar(Math.max(trades.stream().mapToDouble(
-                                                            trade -> trade.getPrice().toDouble()).max().getAsDouble(),
-                                                    inProgressCandleData.highPriceSoFar()));
-                                            inProgressCandle.setLowPriceSoFar(Math.max(trades.stream().mapToDouble(
-                                                            trade -> trade.getPrice().toDouble()).min().getAsDouble(),
-                                                    inProgressCandleData.lowPriceSoFar()));
-                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.volumeSoFar() +
-                                                    trades.stream().mapToDouble(
-                                                            trade -> trade.getAmount().toDouble()).sum());
-                                            inProgressCandle.setLastPrice(trades.get(trades.size() - 1).getPrice()
-                                                    .toDouble());
-                                        }
-                                        Platform.runLater(() -> setInitialState(candleData));
-                                    } else {
-                                        Log.error("error fetching recent trades until: " +
-                                                inProgressCandleData.currentTill() + "\n" + exception);
-                                    }
-                                });
-                            } else {
-                                // No trades have happened during the current candle so far.
-                                inProgressCandle.setIsPlaceholder(true);
-                                inProgressCandle.setVolumeSoFar(0);
-                                inProgressCandle.setCurrentTill((int) (secondsIntoCurrentCandle +
-                                        (candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle)));
-                                Platform.runLater(() -> setInitialState(candleData));
-                            }
-                        } else {
-                            Log.error("error fetching in-progress candle data: " + throwable);
-                        }
-                    });
-                } else {
-                    setInitialState(candleData);
-                }
-            } else {
-                int slidingWindowSize = (int) currZoomLevel.getNumVisibleCandles();
-
-                // In order to compute the y-axis extrema for the new data in the page, we have to include the
-                // first numVisibleCandles from the previous page (otherwise the sliding window will not be able
-                // to reach all the way).
-                Map<Integer, CandleData> extremaData = new TreeMap<>(data.subMap(currZoomLevel.getMinXValue(),
-                        currZoomLevel.getMinXValue() + (int) (currZoomLevel.getNumVisibleCandles() *
-                                secondsPerCandle)));
-                List<CandleData> newDataPlusOffset = new ArrayList<>(candleData);
-                newDataPlusOffset.addAll(extremaData.values());
-                putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(), newDataPlusOffset,
-                        slidingWindowSize);
-                data.putAll(candleData.stream().collect(Collectors.toMap(CandleData::getOpenTime,
-                        Function.identity())));
-                currZoomLevel.setMinXValue(candleData.get(0).getOpenTime());
-            }
-        }
-    }
+    public static Log logger;
 
     private void setInitialState(List<CandleData> candleData) {
         if (liveSyncing) {
@@ -1223,6 +1097,131 @@ public class CandleStickChart extends Region {
                 }
             }
             event.consume();
+        }
+    }
+
+    private class CandlePageConsumer implements Consumer<List<CandleData>> {
+        @Override
+        public void accept(List<CandleData> candleData) {
+            if (Platform.isFxApplicationThread()) {
+                Log.error("candle data paging must not happen on FX thread!");
+                throw new IllegalStateException("candle data paging must not happen on FX thread!");
+            }
+
+            if (candleData.isEmpty()) {
+                Log.warn("candleData was empty");
+                return;
+            }
+
+            if (candleData.get(0).getOpenTime() >= candleData.get(1).getOpenTime()) {
+                Log.error("Paged candle data must be in ascending order by x-value");
+                throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
+            }
+
+            if (data.isEmpty()) {
+                if (liveSyncing) {
+                    if (inProgressCandle == null) {
+                        throw new RuntimeException("inProgressCandle was null in live syncing mode.");
+                    }
+                    // We obtained the first page of candle data which does *not* include the current in-progress
+                    // candle. Since we are live-syncing we need to fetch the data for what has occurred so far in
+                    // the current candle.
+                    long secondsIntoCurrentCandle = (Instant.now().toEpochMilli() / 1000L) -
+                            (candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle);
+                    inProgressCandle.setOpenTime(candleData.get(candleData.size() - 1).getOpenTime() +
+                            secondsPerCandle);
+
+                    // We first attempt to get caught up by simply requesting shorter duration candles. Say this chart
+                    // is displaying one hour per candle and secondsIntoCurrentCandle is 1800 (30 minutes). Then we
+                    // would request candles starting from when the current in-progress candle started but with
+                    // a supported duration closest to, but less than the current duration, 1800/200 (as 200 is the
+                    // limit of candles per page). This would give us 9 second candles that we can then sum. This will
+                    // catch the data up to within 9 seconds of current time (or in this case roughly within 0.25% of
+                    // current time).
+                    CompletableFuture<Optional<InProgressCandleData>> inProgressCandleDataOptionalFuture = exchange
+                            .fetchCandleDataForInProgressCandle(tradePair, Instant.ofEpochSecond(
+                                            candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle),
+                                    secondsIntoCurrentCandle, secondsPerCandle);
+                    inProgressCandleDataOptionalFuture.whenComplete((inProgressCandleDataOptional, throwable) -> {
+                        if (throwable == null) {
+                            if (inProgressCandleDataOptional.isPresent()) {
+                                InProgressCandleData inProgressCandleData = inProgressCandleDataOptional.get();
+
+                                // Our second attempt to get caught up requests all trades that have happened since
+                                // the time of the last sub-candle (the 9 seconds long candles from above). This will
+                                // get us caught up to the current time. The reason we don't use the more simple
+                                // approach of requesting all the trades that have happened in the current candle to
+                                // begin with is that this can take a prohibitively long time if the candle duration
+                                // is too large (some exchanges have multiple trades every second).
+                                int currentTill = (int) Instant.now().getEpochSecond();
+                                CompletableFuture<List<Trade>> tradesFuture = exchange.fetchRecentTradesUntil(
+                                        tradePair, Instant.ofEpochSecond(inProgressCandleData.currentTill()));
+
+                                tradesFuture.whenComplete((trades, exception) -> {
+                                    if (exception == null) {
+                                        inProgressCandle.setOpenPrice(inProgressCandleData.openPrice());
+                                        inProgressCandle.setCurrentTill(currentTill);
+
+                                        if (trades.isEmpty()) {
+                                            // No trading activity happened in addition to the sub-candles from above.
+                                            inProgressCandle.setHighPriceSoFar(
+                                                    inProgressCandleData.highPriceSoFar());
+                                            inProgressCandle.setLowPriceSoFar(inProgressCandleData.lowPriceSoFar());
+                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.volumeSoFar());
+                                            inProgressCandle.setLastPrice(inProgressCandleData.lastPrice());
+                                        } else {
+                                            // We need to factor in the trades that have happened after the
+                                            // "currentTill" time of the in-progress candle.
+                                            inProgressCandle.setHighPriceSoFar(Math.max(trades.stream().mapToDouble(
+                                                            trade -> trade.getPrice().toDouble()).max().getAsDouble(),
+                                                    inProgressCandleData.highPriceSoFar()));
+                                            inProgressCandle.setLowPriceSoFar(Math.max(trades.stream().mapToDouble(
+                                                            trade -> trade.getPrice().toDouble()).min().getAsDouble(),
+                                                    inProgressCandleData.lowPriceSoFar()));
+                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.volumeSoFar() +
+                                                    trades.stream().mapToDouble(
+                                                            trade -> trade.getAmount().toDouble()).sum());
+                                            inProgressCandle.setLastPrice(trades.get(trades.size() - 1).getPrice()
+                                                    .toDouble());
+                                        }
+                                        Platform.runLater(() -> setInitialState(candleData));
+                                    } else {
+                                        Log.error("error fetching recent trades until: " +
+                                                inProgressCandleData.currentTill() + "\n" + exception);
+                                    }
+                                });
+                            } else {
+                                // No trades have happened during the current candle so far.
+                                inProgressCandle.setIsPlaceholder(true);
+                                inProgressCandle.setVolumeSoFar(0);
+                                inProgressCandle.setCurrentTill((int) (secondsIntoCurrentCandle +
+                                        (candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle)));
+                                Platform.runLater(() -> setInitialState(candleData));
+                            }
+                        } else {
+                            Log.error("error fetching in-progress candle data: " + throwable);
+                        }
+                    });
+                } else {
+                    setInitialState(candleData);
+                }
+            } else {
+                int slidingWindowSize = (int) currZoomLevel.getNumVisibleCandles();
+
+                // In order to compute the y-axis extrema for the new data in the page, we have to include the
+                // first numVisibleCandles from the previous page (otherwise the sliding window will not be able
+                // to reach all the way).
+                Map<Integer, CandleData> extremaData = new TreeMap<>(data.subMap(currZoomLevel.getMinXValue(),
+                        currZoomLevel.getMinXValue() + (int) (currZoomLevel.getNumVisibleCandles() *
+                                secondsPerCandle)));
+                List<CandleData> newDataPlusOffset = new ArrayList<>(candleData);
+                newDataPlusOffset.addAll(extremaData.values());
+                putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(), newDataPlusOffset,
+                        slidingWindowSize);
+                data.putAll(candleData.stream().collect(Collectors.toMap(CandleData::getOpenTime,
+                        Function.identity())));
+                currZoomLevel.setMinXValue(candleData.get(0).getOpenTime());
+            }
         }
     }
 }

@@ -3,19 +3,21 @@ package org.investpro.investpro;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 
+import static javafx.scene.paint.Color.rgb;
+
 /**
  * @author Nguemechieu Noel Martial
  */
 public final class ChartColors {
 
     //CandleSticks chart colors
-    public static final Paint BEAR_CANDLE_BORDER_COLOR = Color.BROWN;
-    public static final Paint BEAR_CANDLE_FILL_COLOR = Color.RED;
-    public static final Paint BULL_CANDLE_BORDER_COLOR = Color.GOLD;
-    public static final Paint BULL_CANDLE_FILL_COLOR = Color.GREEN;
-    public static final Paint PLACE_HOLDER_FILL_COLOR = Color.rgb(189, 189, 189, 0.7);
+    public static final Paint BEAR_CANDLE_BORDER_COLOR = Color.RED;
+    public static final Paint BEAR_CANDLE_FILL_COLOR = rgb(255, 34, 34, 1.00);
+    public static final Paint BULL_CANDLE_BORDER_COLOR = Color.GREEN;
+    public static final Paint BULL_CANDLE_FILL_COLOR = rgb(25, 225, 25, 1.00);
+    public static final Paint PLACE_HOLDER_FILL_COLOR = rgb(25, 25, 25, 0.70);
     public static final Paint PLACE_HOLDER_BORDER_COLOR = Color.GOLD;
-    public static final Paint AXIS_TICK_LABEL_COLOR = Color.rgb(204, 204, 197);
+    public static final Paint AXIS_TICK_LABEL_COLOR = rgb(204, 204, 197);
 
     private ChartColors() {
     }

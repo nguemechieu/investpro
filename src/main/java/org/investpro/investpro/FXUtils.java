@@ -6,6 +6,7 @@ import javafx.scene.Scene;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextBoundsType;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Locale;
@@ -22,7 +23,7 @@ public class FXUtils {
 
     private FXUtils() {}
 
-    private static String getMonospacedFontHelper() {
+    private static @NotNull String getMonospacedFontHelper() {
         String monospacedFont;
         List<String> families = Font.getFamilies();
         if (isWindows()) {

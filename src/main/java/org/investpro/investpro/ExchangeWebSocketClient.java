@@ -14,12 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
-/**
- * An abstract {@code WebSocketClient} implementation that encapsulates common functionality
- * needed by {@code Exchange} implementations to interface with Websocket APIs.
- *
- * @author Michael Ennen
- */
+
 public abstract class ExchangeWebSocketClient extends WebSocketClient {
     protected final BooleanProperty connectionEstablished;
     protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers = new ConcurrentHashMap<>();

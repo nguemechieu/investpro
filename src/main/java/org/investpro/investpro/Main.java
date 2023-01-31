@@ -12,7 +12,10 @@ import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -20,16 +23,9 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Date;
-import java.util.Set;
 
 
 public class Main extends Application {
-    private final String symbol = "BTC";
-
-    private final Currency sym = new Currency(CurrencyType.FIAT, "USD", "USD", "USD", 12, symbol);
-    private final String exchangeUrl = "wss://ws-feed.pro.coinbase.com";
-
-    private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
 
     private static @NotNull Pane panel() {
         Pane pane = new Pane();
@@ -287,6 +283,7 @@ public class Main extends Application {
         grid.setTranslateY(70);
         Stage stage = new Stage();
 
+
         AnchorPane anchorpane = new AnchorPane();
         anchorpane.getChildren().addAll(panel(), getCandleData(), getDepths(), getCandleSticksChart());
         Scene scene = new Scene(anchorpane, 1530, 780);
@@ -390,11 +387,11 @@ public class Main extends Application {
 
         for (int i = 0; i < vBox.length; i++) {
 
-            vBox[i].setPrefSize(1500, 780);
+            vBox[i].setPrefSize(1300, 800);
             tabs[i].setContent(vBox[i]);
         }
 
-        tabPane.setPrefSize(1000, 300);
+        tabPane.setPrefSize(1300, 400);
 
         tabPane.getTabs().addAll(tabs);
         return tabPane;
@@ -431,7 +428,7 @@ public class Main extends Application {
                 , Color.WHITE
         };
         int ii;
-        ii = ((int) Math.random() * (xColor.length));
+        ii = ((int) (Math.random() * (xColor.length)));
 
         if (ii == xColor.length) {
             ii = 0;
@@ -463,10 +460,9 @@ public class Main extends Application {
 
         for (int i = 0; i < candleStickChartTabs.length; i++) {
 
-            vbox[i].setBackground(Background.fill(xColor[ii]));
-            vbox[i].setPrefSize(1530, 600);
-
+            vbox[i].setPrefSize(1200, 800);
             toolbar[i].setTranslateY(500);
+            vbox[i].getChildren().addAll(toolbar[i]);
             candleStickChartTabs[i].setContent(vbox[i]);
         }
 
@@ -482,19 +478,21 @@ public class Main extends Application {
         BinanceUsCandleStick marketCandleChart = new BinanceUsCandleStick();
         vbox[4].getChildren().add(marketCandleChart.start());
 
-
         candleSticksChartTabPane.getTabs().addAll(candleStickChartTabs);
         toolbarBuySell.setTranslateY(2);
         toolbarBuySell.setTranslateX(0);
-        candleSticksChartTabPane.setPrefSize(1200, 600);
+        candleSticksChartTabPane.setPrefSize(1250, 700);
         VBox vBox = new VBox(candleSticksChartTabPane, getTabPane());
         vBox.setTranslateX(200);
-        vBox.setTranslateY(50);
+        vBox.setTranslateY(20);
+
+        vBox.setPrefSize(1250, 750);
         return vBox;
     }
 
 
     TreeTableView<News> getNews() throws IllegalArgumentException {
+
 
         Callback<RecursiveTreeObject<News>, ObservableList<News>> callbacks = RecursiveTreeObject::getChildren;
         ObservableList<News> data = FXCollections.observableArrayList();
