@@ -1,5 +1,8 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Objects;
 
 /**
@@ -7,27 +10,14 @@ import java.util.Objects;
  * implementation of equals(), returning true if equals() is true on each of the contained
  * objects.
  */
-public class SymmetricPair<F, S> {
-    private final F first;
-    private final S second;
-
+public record SymmetricPair<F, S>(F first, S second) {
     /**
      * Constructor for a Pair.
      *
      * @param first  the first object in the Pair
      * @param second the second object in the pair
      */
-    public SymmetricPair(F first, S second) {
-        this.first = first;
-        this.second = second;
-    }
-
-    public F getFirst() {
-        return first;
-    }
-
-    public S getSecond() {
-        return second;
+    public SymmetricPair {
     }
 
     /**
@@ -37,7 +27,8 @@ public class SymmetricPair<F, S> {
      * @param b the second object in the pair
      * @return a Pair that is templatized with the types of a and b
      */
-    public static <A, B> SymmetricPair<A, B> of(A a, B b) {
+    @Contract(value = "_, _ -> new", pure = true)
+    public static <A, B> @NotNull SymmetricPair<A, B> of(A a, B b) {
         return new SymmetricPair<>(a, b);
     }
 

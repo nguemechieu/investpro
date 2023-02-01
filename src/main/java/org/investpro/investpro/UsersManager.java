@@ -50,32 +50,31 @@ import java.util.Objects;
                  db.conn.close();
                  db.conn.setAutoCommit(true);
 
-             }
-             catch (SQLException e) {
+             } catch (SQLException e) {
                  e.printStackTrace();
              }
 
-     }}
-
-     public boolean VerifyUser( String username, String password )   {
-
-
-         if (!Objects.equals(username, "")&&!Objects.equals(password, "") ) {
-             if( db.findOne("Users", "username", username)){
-                 return db.findOne("Users", "password", password);
-             }
          }
-         return false;
-
      }
+
+    public boolean VerifyUser(String username, String password) {
+        if (!Objects.equals(username, "") && !Objects.equals(password, "")) {
+            if (db.findOne("users", "username", username)) {
+                return db.findOne("users", "password", password);
+            }
+        }
+        return false;
+
+    }
+
     static Alert alert = new Alert(Alert.AlertType.ERROR, "Please fill in all the fields");
 
 
     void CreateAccount(
-             @NotNull String username,
-             @NotNull String password,
-             @NotNull String email,
-             @NotNull String firstname,
+            @NotNull String username,
+            @NotNull String password,
+            @NotNull String email,
+            @NotNull String firstname,
              @NotNull String lastname,
              @NotNull String middlename,
              @NotNull String gender,
@@ -109,19 +108,19 @@ import java.util.Objects;
                     country,
                     zipCode);
             System.out.println(username + " " + password + " " + email + " " + firstname + " " + lastname + " " + middlename + " " + gender + " " + birthdate + " " + phone + " " + address + " " + city + " " + state + " " + country + " " + zipCode);
-            if (db.findOne("Users", "username", user.getUsername())) {
+            if (db.findOne("users", "username", user.getUsername())) {
                 System.out.println("Username already exists");
 
                 alert = new Alert(Alert.AlertType.INFORMATION, "Username already exists");
                 alert.showAndWait();
 
 
-            } else if (db.findOne("Users", "username", user.getUsername())) {
+            } else if (db.findOne("users", "username", user.getUsername())) {
                 System.out.println("Username already exists");
                 Alert alert = new Alert(Alert.AlertType.ERROR, "Username already exists");
                 alert.showAndWait();
 
-            } else if (db.findOne("Users", "password", user.getPassword())) {
+            } else if (db.findOne("users", "password", user.getPassword())) {
                 System.out.println("Password already exists");
                 alert.setContentText("Password already exists");
                 alert.showAndWait();

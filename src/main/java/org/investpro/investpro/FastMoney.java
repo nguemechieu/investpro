@@ -2,6 +2,7 @@ package org.investpro.investpro;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -48,11 +49,11 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return new FastMoney(amount, currency, precision);
     }
 
-    public static @NotNull Money of(final double amount, final Currency currency) {
+    public static @NotNull Money of(final double amount, final @NotNull Currency currency) {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static Money of(final double amount, final Currency currency, int precision) {
+    public static @NotNull Money of(final double amount, final Currency currency, int precision) {
         return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
     }
 
@@ -89,11 +90,11 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return new FastMoney(amount, currency, precision);
     }
 
-    public static Money ofCrypto(final double amount, final String currencyCode) {
+    public static @NotNull Money ofCrypto(final double amount, final String currencyCode) {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.CRYPTO);
     }
 
-    public static Money ofCrypto(final double amount, final String currencyCode, int precision) {
+    public static @NotNull Money ofCrypto(final double amount, final String currencyCode, int precision) {
         return fromDouble(amount, precision, currencyCode, CurrencyType.CRYPTO);
     }
 
@@ -137,7 +138,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return up;
     }
 
-    private static FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
+    private static @Nullable FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
         final double multiplied = value * Utils.MULTIPLIERS[precision];
         final long converted = (long) multiplied;
         if (multiplied == converted) { // here is an implicit conversion from long to double
@@ -147,7 +148,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return null;
     }
 
-    private static Money fromBigDecimal(final BigDecimal value, Currency currency) {
+    private static @NotNull Money fromBigDecimal(final @NotNull BigDecimal value, Currency currency) {
         final BigDecimal cleaned = value.stripTrailingZeros();
 
         // try to convert to double using a fixed precision = 3, which will cover most of currencies
@@ -201,7 +202,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return precision;
     }
 
-    private Money plus(FastMoney other) {
+    private Money plus(@NotNull FastMoney other) {
         long result;
         int precision = currency.fractionalDigits;
         int precisionOther = other.currency.fractionalDigits;
@@ -248,13 +249,15 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return plus(FastMoney.of(summand, currency).negate());
     }
 
+    @Contract(" -> new")
     @Override
-    public Money negate() {
+    public @NotNull Money negate() {
         return new FastMoney(-amount, currency);
     }
 
+    @Contract(" -> new")
     @Override
-    public Money abs() {
+    public @NotNull Money abs() {
         return new FastMoney(Math.abs(amount), currency);
     }
 
@@ -364,8 +367,9 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return ((double) amount) / Utils.MULTIPLIERS[precision];
     }
 
+    @Contract(pure = true)
     @Override
-    public BigDecimal toBigDecimal() {
+    public @NotNull BigDecimal toBigDecimal() {
         return BigDecimal.valueOf(amount, currency.fractionalDigits);
     }
 
@@ -479,7 +483,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public int compareTo(final FastMoney other) {
+    public int compareTo(final @NotNull FastMoney other) {
         if (precision == other.precision) {
             return compare(amount, other.amount);
         }

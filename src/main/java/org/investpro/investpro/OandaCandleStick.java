@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.application.Platform;
-import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 
 import java.io.IOException;
@@ -26,13 +25,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static org.investpro.investpro.OandaClient.accountID;
 
-/**
- * Example of how to use the CandleFX API to create a candle stick chart for the BTC/USD tradepair on Coinbase.
- */
 
 public class OandaCandleStick {
-    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("BTC"), Currency.ofFiat("USD"));
+    private static final TradePair BTC_USD = TradePair.of(Currency.ofFiat("EUR"), Currency.ofFiat("USD"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -41,31 +38,31 @@ public class OandaCandleStick {
     public CandleStickChartContainer start() {
         Platform.setImplicitExit(false);
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: " + exception));
-        CandleStickChartContainer candleStickChartContainer =
-                new CandleStickChartContainer(
-                        new Oanda(), BTC_USD, true);
-
-        return candleStickChartContainer
+        return new CandleStickChartContainer(
+                new Oanda(), BTC_USD, true)
 
                 ;
     }
 
     public static class Oanda extends Exchange {
-        Oanda() {
-            super(null); // This argument is for creating a WebSocket client for live trading data.
-        }
+        String api_key = "7e0018e5e2e0d287c854c5bd8a509712-2c4ed485f470ed2db68159fb308272a8";
+        private ExchangeWebSocketClient webSocket;
 
         @Override
         public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
             return new OandaCandleDataSupplier(secondsPerCandle, tradePair);
         }
 
+        Oanda() {
+            super(null);
+        }
         /**
          * Fetches the recent trades for the given trade pair from  {@code stopAt} till now (the current time).
          * <p>
          * This method only needs to be implemented to support live syncing.
          */
-        @Override
+
+
         public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
             Objects.requireNonNull(tradePair);
             Objects.requireNonNull(stopAt);
@@ -78,66 +75,46 @@ public class OandaCandleStick {
 
             // It is not easy to fetch trades concurrently because we need to get the "cb-after" header after each request.
             CompletableFuture.runAsync(() -> {
-                IntegerProperty afterCursor = new SimpleIntegerProperty(0);
+
                 List<Trade> tradesBeforeStopTime = new ArrayList<>();
 
-                // For Public Endpoints, our rate limit is 3 requests per second, up to 6 requests per second in
-                // burst.
-                // We will know if we get rate limited if we get a 429 response code.
-                // FIXME: We need to address this!
-                for (int i = 0; !futureResult.isDone(); i++) {
-                    String uriStr = "https://api.pro.coinbase.com/";
-                    uriStr += "products/" + tradePair.toString('-') + "/trades";
+                Trade response = null;
+                try {
+                    response = OandaClient.getTrade(BTC_USD.toString('_'));
+                } catch (OandaException e) {
+                    throw new RuntimeException(e);
+                }
+                JsonNode tradesResponse = null;
+                try {
+                    tradesResponse = OBJECT_MAPPER.readTree(String.valueOf(response));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
 
-                    if (i != 0) {
-                        uriStr += "?after=" + afterCursor.get();
-                    }
-
-                    try {
-                        HttpResponse<String> response = HttpClient.newHttpClient().send(
-                                HttpRequest.newBuilder()
-                                        .uri(URI.create(uriStr))
-                                        .GET().build(),
-                                HttpResponse.BodyHandlers.ofString());
-
-                        Log.info("response headers: " + response.headers());
-                        if (response.headers().firstValue("CB-AFTER").isEmpty()) {
-                            futureResult.completeExceptionally(new RuntimeException(
-                                    "coinbase trades response did not contain header \"cb-after\": " + response));
-                            return;
-                        }
-
-                        afterCursor.setValue(Integer.valueOf((response.headers().firstValue("CB-AFTER").get())));
-
-                        JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
-
-                        if (!tradesResponse.isArray()) {
-                            futureResult.completeExceptionally(new RuntimeException(
-                                    "Trades response was not an array!"));
-                        }
-                        if (tradesResponse.isEmpty()) {
-                            futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
+                if (!tradesResponse.isArray()) {
+                    futureResult.completeExceptionally(new RuntimeException(
+                            "Trades response was not an array!"));
+                }
+                if (tradesResponse.isEmpty()) {
+                    futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
+                } else {
+                    for (int j = 0; j < tradesResponse.size(); j++) {
+                        JsonNode trade = tradesResponse.get(j);
+                        Instant time = Instant.from(ISO_INSTANT.parse(trade.get("time").asText()));
+                        if (time.compareTo(stopAt) <= 0) {
+                            futureResult.complete(tradesBeforeStopTime);
+                            break;
                         } else {
-                            for (int j = 0; j < tradesResponse.size(); j++) {
-                                JsonNode trade = tradesResponse.get(j);
-                                Instant time = Instant.from(ISO_INSTANT.parse(trade.get("time").asText()));
-                                if (time.compareTo(stopAt) <= 0) {
-                                    futureResult.complete(tradesBeforeStopTime);
-                                    break;
-                                } else {
-                                    tradesBeforeStopTime.add(new Trade(tradePair,
-                                            DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
-                                            DefaultMoney.ofCrypto(trade.get("size").asText(), tradePair.getBaseCurrency()),
-                                            Side.getSide(trade.get("side").asText()), trade.get("trade_id").asLong(), time));
-                                }
-                            }
+                            tradesBeforeStopTime.add(new Trade(tradePair,
+                                    DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
+                                    DefaultMoney.ofCrypto(trade.get("size").asText(), tradePair.getBaseCurrency()),
+                                    Side.getSide(trade.get("side").asText()), trade.get("trade_id").asLong(), time));
+
                         }
-                    } catch (IOException | InterruptedException ex) {
-                        Log.error("ex: " + ex);
+
                     }
                 }
             });
-
             return futureResult;
         }
 
@@ -156,17 +133,23 @@ public class OandaCandleStick {
                     .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
             // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
             //  data for the current live syncing candle from the raw trades method.
+
+            //"https://api-fxtrade.oanda.com/v3/instruments/USD_JPY/candles?count=10&price=A&from=2016-01-01T00%3A00%3A00.000000000Z&granularity=D"
+
+            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(String.format(
+                            "https://api-fxtrade.oanda.com/v3/accounts/" + accountID + "/trades", actualGranularity, startDateString)))
+                    .GET().build();
+            request.headers().allValues("Authorization").add("Bearer " + api_key);
+
+
             return HttpClient.newHttpClient().sendAsync(
-                            HttpRequest.newBuilder()
-                                    .uri(URI.create(String.format(
-                                            "https://api.pro.coinbase.com/products/%s/candles?granularity=%s&start=%s",
-                                            tradePair.toString('-'), actualGranularity, startDateString)))
-                                    .GET().build(),
+                            request,
                             HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
                     .thenApply(response -> {
                         Log.info("Response: " + response);
                         JsonNode res;
+
                         try {
                             res = OBJECT_MAPPER.readTree(response);
                         } catch (JsonProcessingException ex) {
@@ -240,10 +223,10 @@ public class OandaCandleStick {
                     .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                     .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
-            private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
+            private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 2, 60 * 3, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 8, 3600 * 12, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
 
             OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-                super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+                super(300, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
             }
 
             @Override
@@ -264,9 +247,8 @@ public class OandaCandleStick {
                 int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
                 String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                         .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
-
-                String uriStr = "https://api.pro.coinbase.com/" +
-                        "products/" + tradePair.toString('-') + "/candles" +
+                String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') +
+                        "/candles?=count=" + 300 +
                         "?granularity=" + secondsPerCandle +
                         "&start=" + startDateString +
                         "&end=" + endDateString;
@@ -318,5 +300,8 @@ public class OandaCandleStick {
                         });
             }
         }
+
+
     }
 }
+

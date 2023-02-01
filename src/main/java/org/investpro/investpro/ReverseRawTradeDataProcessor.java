@@ -10,16 +10,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-/**
- * @author Michael Ennen
- */
 public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
     private final ReversedLinesFileReader fileReader;
     private int start;
 
     public ReverseRawTradeDataProcessor(Path rawTradeData, int secondsPerCandle, TradePair tradePair)
             throws IOException {
-        super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        super(300, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         fileReader = new ReversedLinesFileReader(rawTradeData, StandardCharsets.UTF_8);
     }
 
@@ -66,15 +63,16 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         double lastClose = -1;
         for (int i = 0; i < numCandles; i++) {
             int openTime = (start - secondsPerCandle) - (i * secondsPerCandle);
+            double volume = 0;
             if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
                 // no trades occurred during this candle
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, 0, 0, 0, true));
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume, 0, 0, true));
             } else {
                 double open = 0;
                 double high = -1;
                 double low = Double.MAX_VALUE;
                 double close = 0;
-                double volume = 0;
+
                 double priceTotal = 0;
                 double volumeWeightedPriceTotal = 0;
                 int tradeIndex = 0;
@@ -120,23 +118,10 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
     /**
      * Represents one line of the raw trade data. We use doubles because the results don't need to be
      * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
+     *
+     * @param timestamp 1315922016,5.800000000000,1.000000000000
      */
-    private static class Trade {
-        // 1315922016,5.800000000000,1.000000000000
-        private final int timestamp;
-        private final double price;
-        private final double amount;
-
-        Trade(int timestamp, double price, double amount) {
-            this.timestamp = timestamp;
-            this.price = price;
-            this.amount = amount;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(timestamp, price, amount);
-        }
+    private record Trade(int timestamp, double price, double amount) {
 
         @Override
         public boolean equals(Object object) {

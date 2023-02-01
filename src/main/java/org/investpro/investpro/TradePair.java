@@ -1,8 +1,6 @@
 package org.investpro.investpro;
 
 import javafx.util.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
@@ -10,7 +8,6 @@ import java.util.Objects;
 public class TradePair extends Pair<Currency, Currency> {
     private final Currency baseCurrency;
     private final Currency counterCurrency;
-    private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
 
     public TradePair(Currency baseCurrency, Currency counterCurrency) {
         super(baseCurrency, counterCurrency);
@@ -85,7 +82,7 @@ public class TradePair extends Pair<Currency, Currency> {
                     return new TradePair(Currency.ofFiat(split[0]), Currency.ofCrypto(split[1]));
                 }
             } else {
-                logger.error("bad value for second member of pairType - must be one of CryptoCurrency.class, " +
+                Log.error("bad value for second member of pairType - must be one of CryptoCurrency.class, " +
                         "FiatCurrency.class, or null but was: " + pairType.getValue());
                 throw new IllegalArgumentException("bad value for second member of pairType - must be one of " +
                         "CryptoCurrency.class, FiatCurrency.class, or null but was: " + pairType.getValue());
@@ -119,7 +116,7 @@ public class TradePair extends Pair<Currency, Currency> {
                     return new TradePair(Currency.ofCrypto(split[0]), Currency.ofCrypto(split[1]));
                 }
             } else {
-                logger.error("bad value for second member of pairType - must be one of CryptoCurrency.class, " +
+                Log.error("bad value for second member of pairType - must be one of CryptoCurrency.class, " +
                         "FiatCurrency.class, or null but was: " + pairType.getValue());
                 throw new IllegalArgumentException("bad value for second member of pairType - must be one of " +
                         "CryptoCurrency.class, FiatCurrency.class, or null but was: " + pairType.getValue());

@@ -3,11 +3,7 @@
  */
 package org.investpro.investpro;
 
-/**
- * The type of the notification to be shown.
- *
- * @author GOXR3PLUS
- */
+
 public enum NotificationType {
 
     /**

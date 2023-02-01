@@ -9,20 +9,20 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.Date;
+
+import static org.investpro.investpro.OandaClient.getTradeAbleInstruments;
 
 
 public class Main extends Application {
@@ -124,175 +124,184 @@ public class Main extends Application {
         launch(Main.class, args);
     }
 
-    private void createRegister(@NotNull ActionEvent e) {
+    static ArrayList<String> symb;
+    static Spinner<Double> spinner = new Spinner<>();
 
-        Node node = (Node) e.getSource();
-        Stage stage = (Stage) node.getScene().getWindow();
-        stage.close();
-        GridPane grid = new GridPane();
+    static {
+        try {
+            symb = getTradeAbleInstruments();
+        } catch (OandaException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public double amount;
+
+    private static @NotNull Node getAccountSummary() {
+        return new ListView<>(FXCollections.observableArrayList(
+                "Account" + OandaClient.getAccountID(), "Balance" +
+                        OandaClient.getAccount().getBalance(), "Open"));
+    }
+
+    private static @NotNull Node getAccountPerformance() {
+        VBox accountPerformance
+                = new VBox(10);
+        accountPerformance.setPadding(new Insets(10, 10, 10, 10));
+        accountPerformance.setSpacing(10);
+        accountPerformance.setAlignment(Pos.CENTER);
+        accountPerformance.setStyle("-fx-background-color: #32737e;");
+
+        GridPane grid_pane
+                = new GridPane();
+
+        grid_pane.setPadding(new Insets(10, 10, 10, 10));
+        grid_pane.setVgap(10);
+        grid_pane.getChildren().add(new Label("Account Performance"));
+
+        accountPerformance.getChildren().addAll(
+                new Label("Account Performance"),
+                grid_pane);
+        return accountPerformance;
+    }
+
+    private static @NotNull VBox getOandaRecommendation() {
+
+        VBox vbox = new VBox();
+        vbox.setSpacing(10);
+        vbox.setPadding(new Insets(10, 10, 10, 10));
+        vbox.setAlignment(Pos.CENTER);
+
+        vbox.getChildren().addAll(new TextArea(
+                """
+                        This is an example of an OANDA recommendation.
+                        You can find more information about the OANDA recommendation here: https://www.oanda.com/docs/recommendations
+                        """
+        ));
+        return vbox;
+    }
+
+    private static @NotNull VBox getTradeStatistics() throws OandaException {
+        VBox tradeStatistics = new VBox();
+        GridPane gridPane = new GridPane();
+        gridPane.setHgap(10);
+        gridPane.setVgap(10);
+        gridPane.setPadding(new Insets(10, 10, 10, 10));
+        gridPane.setAlignment(Pos.CENTER);
+        gridPane.setStyle("-fx-background-color: #0c4559;");
+        gridPane.add(new Label("Total Trades"), 0, 0);
+        TextField totalTrades = new TextField("");
+        totalTrades.setEditable(false);
+        totalTrades.setText(String.valueOf(OandaClient.getOpenTradesList().size()));
+        gridPane.add(totalTrades, 0, 1);
+        gridPane.add(new Label("Total Orders"), 0, 2);
+        TextField totalOrders = new TextField("");
+        totalOrders.setEditable(false);
+        totalOrders.setText(String.valueOf(OandaClient.getTradesList().size()));
+        gridPane.add(totalOrders, 0, 3);
 
 
-        grid.setTranslateX(500);
-        grid.setTranslateY(200);
-        Label lblusername = new Label("Username :");
-        grid.add(lblusername, 0, 0);
-        TextField textUsername = new TextField();
-        textUsername.setPromptText("Enter username");
-        grid.add(textUsername, 0, 1);
+        tradeStatistics.getChildren().addAll(gridPane);
+        return tradeStatistics;
+    }
 
-        PasswordField lblPassword = new PasswordField();
+    private static @NotNull Node getOandaPortFolio() throws OandaException {
+        VBox vBox = new VBox();
+        vBox.setSpacing(10);
+        vBox.setPadding(new Insets(10, 10, 10, 10));
+        vBox.setAlignment(Pos.CENTER);
+        vBox.setStyle("-fx-background-color: #2de87e;");
 
-        grid.add(lblPassword, 0, 2);
-        PasswordField passwordField = new PasswordField();
-        grid.add(passwordField, 2, 2);
-        Button btnSignIn = new Button("Go Back");
-        grid.add(btnSignIn, 0, 7);
-        btnSignIn.setOnAction(eb -> {
-            stage.close();
-            createLogin(stage);
-        });
-        Button lblRegister = new Button("Submit");
-        grid.add(lblRegister, 2, 7);
-        AnchorPane anchorPane = new AnchorPane(grid);
-        Scene scene = new Scene(anchorPane, 1530, 780);
-        scene.getStylesheets().add("app.css");
-        stage.setScene(scene);
-        stage.setTitle("InvestPro -->  Registration");
-        stage.setResizable(true);
-        stage.setIconified(true);
-        stage.show();
+        GridPane grid_pane = new GridPane();
+        grid_pane.setPadding(new Insets(10, 10, 10, 10));
+        grid_pane.setHgap(10);
+        grid_pane.setVgap(10);
+        grid_pane.setAlignment(Pos.CENTER);
+        grid_pane.setStyle("-fx-background-color: #2de87e;");
+        Root root = OandaClient.getAccountFullDetails();
+        grid_pane.add(new Label("Account Number"), 0, 0);
+        TextField accountID = new TextField(OandaClient.getAccountID());
+        accountID.setEditable(false);
+        grid_pane.add(accountID, 1, 0);
+        grid_pane.add(new Label("Balance"), 0, 1);
+        grid_pane.add(new TextField(String.valueOf(root.account.balance)), 1, 1);
+        grid_pane.add(new Label("Margin-Available"), 0, 2);
+        grid_pane.add(new TextField(String.valueOf(root.account.marginAvailable)), 1, 2);
+        grid_pane.add(new Label("Margin-Used"), 0, 3);
+        grid_pane.add(new TextField(String.valueOf(root.account.marginUsed)), 1, 3);
+        grid_pane.add(new Label("Margin-Rate"), 0, 4);
+        grid_pane.add(new TextField(String.valueOf(root.account.marginRate)
+        ), 1, 4);
+        grid_pane.add(new Label("Hedging "), 0, 5);
+        grid_pane.add(new TextField(String.valueOf(root.account.hedgingEnabled)),
+                1, 5);
+        grid_pane.add(new Label("Commission"), 0, 6);
+        grid_pane.add(new TextField(String.valueOf(root.account.commission))
+                , 1, 6);
+        grid_pane.add(new Label("unrealizedPL"), 0, 7);
+        grid_pane.add(new TextField(String.valueOf(root.account.unrealizedPL)),
+                1, 7);
+        grid_pane.add(new Label("resettablePL"), 0, 8);
+        grid_pane.add(new TextField(String.valueOf(root.account.resettablePL)),
+                1, 8);
+        grid_pane.add(new Label("Margin closeOut %"), 0, 9);
+        grid_pane.add(new TextField(String.valueOf(root.account.marginCloseoutPercent)),
 
-        lblRegister.setOnAction(er -> {
-            stage.close();
-            try {
-                createMainMenu();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        });
+                1, 9);
+        grid_pane.add(new Label("Open PositionCount"), 0, 10);
+        grid_pane.add(new TextField(String.valueOf(root.account.openPositionCount)),
+                1, 10);
+        grid_pane.add(new Label("PositionCount"), 0, 11);
+        grid_pane.add(new TextField(String.valueOf(root.account.positionCount)), 1, 11);
+        vBox.getChildren().addAll(grid_pane);
+        return vBox;
 
     }
 
-    private void createLogin(@NotNull Stage stage) {
-        AnchorPane anchorPane = new AnchorPane();
+    private static @NotNull HBox getOandaHelp() {
+        HBox helpBox = new HBox();
+        helpBox.setSpacing(10);
+        helpBox.setAlignment(Pos.CENTER);
+        helpBox.setPadding(new Insets(10, 10, 10, 10));
+        helpBox.getChildren().addAll(
+                new Label("Help"),
+                new Label("OANDA Trading Platform"),
+                new Label("Version 1.0.0"),
+                new Label("Copyright 2021 OANDA @CryptoInvestor"),
+                new Label("All Rights Reserved"),
 
-        GridPane grid = new GridPane();
-        grid.setPadding(new Insets(10, 10, 10, 10));
-        grid.setTranslateX(500);
-        grid.setTranslateY(200);
-
-        Label lblUsername = new Label("Username :");
-        TextField textField = new TextField("");
-        textField.setPromptText("Enter username");
-        Label lblPassword = new Label("Password :");
-        PasswordField passwordField = new PasswordField();
-        grid.add(lblUsername, 0, 0);
-        grid.add(textField, 1, 0);
-        grid.add(lblPassword, 0, 1);
-        grid.add(passwordField, 1, 1);
-        Button btnReg = new Button("Register");
-        grid.add(btnReg, 0, 7);
-        Button btnLgn = new Button("Login");
-        grid.add(btnLgn, 2, 7);
-        Hyperlink btnForget = new Hyperlink("Forgot Password");
-        grid.add(btnForget, 1, 12);
-        anchorPane.getChildren().add(grid);
-        Scene scene = new Scene(anchorPane, 1530, 780);
-
-        scene.getStylesheets().add("app.css");
-        stage.setTitle("InvestPro   " + new Date(System.currentTimeMillis()));
-        stage.setScene(scene);
-        stage.setResizable(true);
-        stage.setIconified(true);
-        btnLgn.setOnAction(e -> {
-            stage.close();
-            try {
-                createMainMenu();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        });
-        btnForget.setOnAction(this::createForgotPassword);
-        btnReg.setOnAction(this::createRegister);
-        stage.show();
+                new Label(""));
+        return helpBox;
     }
 
-    private void createForgotPassword(@NotNull ActionEvent e) {
-        Node node = (Node) e.getSource();
-        Stage stage = (Stage) node.getScene().getWindow();
-        stage.close();
-        stage.setTitle("Forgot Password " + new Date(System.currentTimeMillis()));
-        GridPane grid = new GridPane();
-        Label lblEmail = new Label("Email :");
-        grid.add(lblEmail, 0, 0);
-        TextField txtEmail = new TextField();
-        txtEmail.setPromptText("Please enter your email ");
-        grid.add(txtEmail, 1, 0);
-        Button btnGoback = new Button("GO BACK");
-        btnGoback.setOnAction(event -> {
-            stage.close();
-            createLogin(stage);
-        });
-        grid.add(btnGoback, 0, 9);
-        Button btnSubmit = new Button("SUBMIT");
-        btnSubmit.setOnAction(event -> {
-            stage.close();
-            try {
-                createMainMenu();
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        });
-        grid.add(btnSubmit, 3, 9);
-        grid.setTranslateX(499);
-        grid.setTranslateY(299);
-        AnchorPane anchorPane = new AnchorPane(grid);
-        Scene scene = new Scene(anchorPane, 1530, 780);
-        stage.setScene(scene);
-        scene.getStylesheets().add("app.css");
-        stage.setIconified(true);
-        stage.setResizable(true);
+    private static @NotNull VBox getOandaSignals() {
+        VBox
+                vbox = new VBox();
+        vbox.setSpacing(10);
+        vbox.setPadding(new Insets(10, 10, 10, 10));
+        vbox.setAlignment(Pos.CENTER);
+        vbox.setStyle("-fx-background-color: #000000;");
+        vbox.getChildren().addAll(new Label("Trade Signals"));
+        return vbox;
 
-        stage.show();
     }
 
-    private void createMainMenu() throws Exception {
+    private static @NotNull ListView<OandaOrder> getOandaOrdersHistory() throws OandaException {
+        ListView<OandaOrder> oandaOrdersHistory = new ListView<>();
+        oandaOrdersHistory.getItems().addAll(OandaClient.getOrdersHistory());
+        return oandaOrdersHistory;
+    }
 
-        GridPane grid = new GridPane();
-        Spinner<Double> spinner = new Spinner<>();
-        spinner.setPrefSize(50, 50);
-        spinner.setEditable(true);
-        ObservableList<Double> data = FXCollections.observableArrayList();
-
-        data.addAll((double) (1 / 100), (double) (1 / 200), (double) (1 / 300), (double) (1 / 400), (double) (1 / 500), (double) (1 / 600));
-
-        SpinnerValueFactory<Double> valueFactory = new SpinnerValueFactory.ListSpinnerValueFactory<>(data);
-        spinner.setValueFactory(valueFactory);
-        grid.add(spinner, 1, 1);
-        spinner.decrement(-1 / 100);
-        spinner.increment(1 / 100);
-        Button btnBuy = new Button("BUY");
-        grid.add(btnBuy, 0, 2);
-        Button btnSell = new Button("SELL");
-        grid.add(btnSell, 1, 2);
-        Label bidPrice = new Label("Bid :");
-        grid.add(bidPrice, 1, 2);
-        Label askPrice = new Label("Ask: ");
-        grid.add(askPrice, 3, 2);
-        grid.setTranslateX(300);
-        grid.setTranslateY(70);
-        Stage stage = new Stage();
-
-
-        AnchorPane anchorpane = new AnchorPane();
-        anchorpane.getChildren().addAll(panel(), getCandleData(), getDepths(), getCandleSticksChart());
-        Scene scene = new Scene(anchorpane, 1530, 780);
-        scene.getStylesheets().add("/app.css");
-        stage.setScene(scene);
-        stage.setTitle("InvestPro -->Dashboard   Welcome  " + new Date(System.currentTimeMillis()));
-        stage.setResizable(true);
-        stage.setIconified(true);
-        stage.show();
+    //Get Oanda forex orders
+    private static @NotNull VBox getOandaOrders() throws OandaException {
+        ListView<OandaOrder> or = new ListView<>(FXCollections.observableArrayList(OandaClient.getOrdersList()));
+        VBox vBox = new VBox();
+        vBox.setSpacing(10);
+        vBox.setPadding(new Insets(10, 10, 10, 10));
+        vBox.setAlignment(Pos.CENTER);
+        vBox.setStyle("-fx-background-color: #0c4559;");
+        vBox.getChildren().addAll(new Label("Current Orders"));
+        vBox.getChildren().addAll(or);
+        return vBox;
 
     }
 
@@ -346,58 +355,229 @@ public class Main extends Application {
         return treeTable;
     }
 
-    TabPane getTabPane() throws Exception {
-        TabPane tabPane = new TabPane();
-        tabPane.setVisible(true);
-        tabPane.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);
-        tabPane.setCache(true);
-        DraggableTab[] tabs = new DraggableTab[]{
-                new DraggableTab("Orders"),
-                new DraggableTab("Portfolio"),
-                new DraggableTab("Portfolio  Analysis"),
-                new DraggableTab("Market Analysis"),
-                new DraggableTab("Browser"),
-                new DraggableTab("Statistics ")
-                , new DraggableTab("Mails")
-                , new DraggableTab("News")
-        };
-        VBox[] vBox;
-        Browser.webWiew.setPrefSize(1530, 780);
-        Browser.webWiew.getEngine().load("https://www.google.com");
-        ListView<Order> orders = new ListView<>();
-        GridPane gridPane = new GridPane();
-        gridPane.setPrefSize(1500, 800);
-        gridPane.add(new Label("Account"), 0, 0);
+    private void createRegister(@NotNull ActionEvent e) {
 
-        GridPane portFolio = new GridPane();
-        portFolio.add(new Label("Profit"), 1, 1);
-
-        vBox = new VBox[]{
-
-                new VBox(orders),
-                new VBox(gridPane),
-                new VBox(portFolio),
-                new VBox(),
-                new VBox(),
-                new VBox(),
-                new VBox(new Browser().start()),
-                new VBox(getNews())
-        };
+        Node node = (Node) e.getSource();
+        Stage stage = (Stage) node.getScene().getWindow();
+        stage.close();
+        GridPane grid = new GridPane();
 
 
-        for (int i = 0; i < vBox.length; i++) {
+        grid.setTranslateX(500);
+        grid.setTranslateY(200);
+        Label lblusername = new Label("Username :");
+        grid.add(lblusername, 0, 0);
+        TextField textUsername = new TextField();
+        textUsername.setPromptText("Enter username");
+        grid.add(textUsername, 0, 1);
 
-            vBox[i].setPrefSize(1300, 800);
-            tabs[i].setContent(vBox[i]);
-        }
+        PasswordField lblPassword = new PasswordField();
 
-        tabPane.setPrefSize(1300, 400);
+        grid.add(lblPassword, 0, 2);
+        PasswordField passwordField = new PasswordField();
+        grid.add(passwordField, 2, 2);
+        Button btnSignIn = new Button("Go Back");
+        grid.add(btnSignIn, 0, 7);
+        btnSignIn.setOnAction(eb -> {
+            stage.close();
+            createLogin(stage);
+        });
+        Button lblRegister = new Button("Submit");
+        grid.add(lblRegister, 2, 7);
+        AnchorPane anchorPane = new AnchorPane(grid);
+        Scene scene = new Scene(anchorPane, 1530, 780);
+        scene.getStylesheets().add("app.css");
+        stage.setScene(scene);
+        stage.setTitle("InvestPro -->  Registration");
+        stage.setResizable(true);
+        stage.setIconified(true);
+        stage.show();
 
-        tabPane.getTabs().addAll(tabs);
-        return tabPane;
+        lblRegister.setOnAction(er -> {
+            stage.close();
+            try {
+                createMainMenu();
+            } catch (Exception | OandaException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+
     }
 
-    private @NotNull VBox getCandleSticksChart() throws Exception {
+    private void createLogin(@NotNull Stage stage) {
+        AnchorPane anchorPane = new AnchorPane();
+
+        GridPane grid = new GridPane();
+        grid.setPadding(new Insets(10, 10, 10, 10));
+        grid.setTranslateX(500);
+        grid.setTranslateY(200);
+
+        Label lblUsername = new Label("Username :");
+        TextField textField = new TextField("");
+        textField.setPromptText("Enter username");
+        Label lblPassword = new Label("Password :");
+        PasswordField passwordField = new PasswordField();
+        grid.add(lblUsername, 0, 0);
+        grid.add(textField, 1, 0);
+        grid.add(lblPassword, 0, 1);
+        grid.add(passwordField, 1, 1);
+        Button btnReg = new Button("Register");
+        grid.add(btnReg, 0, 7);
+        Button btnLgn = new Button("Login");
+        grid.add(btnLgn, 2, 7);
+        Hyperlink btnForget = new Hyperlink("Forgot Password");
+        grid.add(btnForget, 1, 12);
+        anchorPane.getChildren().add(grid);
+        Scene scene = new Scene(anchorPane, 1530, 780);
+
+        scene.getStylesheets().add("app.css");
+        stage.setTitle("InvestPro   " + new Date(System.currentTimeMillis()));
+        stage.setScene(scene);
+        stage.setResizable(true);
+        stage.setIconified(true);
+        btnLgn.setOnAction(e -> {
+            stage.close();
+            try {
+                createMainMenu();
+            } catch (Exception | OandaException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        btnForget.setOnAction(this::createForgotPassword);
+        btnReg.setOnAction(this::createRegister);
+        stage.show();
+    }
+
+    private void createForgotPassword(@NotNull ActionEvent e) {
+        Node node = (Node) e.getSource();
+        Stage stage = (Stage) node.getScene().getWindow();
+        stage.close();
+        stage.setTitle("Forgot Password " + new Date(System.currentTimeMillis()));
+        GridPane grid = new GridPane();
+        Label lblEmail = new Label("Email :");
+        grid.add(lblEmail, 0, 0);
+        TextField txtEmail = new TextField();
+        txtEmail.setPromptText("Please enter your email ");
+        grid.add(txtEmail, 1, 0);
+        Button btnGoback = new Button("GO BACK");
+        btnGoback.setOnAction(event -> {
+            stage.close();
+            createLogin(stage);
+        });
+        grid.add(btnGoback, 0, 9);
+        Button btnSubmit = new Button("SUBMIT");
+        btnSubmit.setOnAction(event -> {
+            stage.close();
+            try {
+                createMainMenu();
+            } catch (Exception | OandaException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        grid.add(btnSubmit, 3, 9);
+        grid.setTranslateX(499);
+        grid.setTranslateY(299);
+        AnchorPane anchorPane = new AnchorPane(grid);
+        Scene scene = new Scene(anchorPane, 1530, 780);
+        stage.setScene(scene);
+        scene.getStylesheets().add("app.css");
+        stage.setIconified(true);
+        stage.setResizable(true);
+
+        stage.show();
+    }
+
+    private void createMainMenu() throws Exception, OandaException {
+
+        GridPane grid = new GridPane();
+        Spinner<Double> spinner = new Spinner<>();
+        spinner.setPrefSize(50, 50);
+        spinner.setEditable(true);
+        ObservableList<Double> data = FXCollections.observableArrayList();
+
+        data.addAll((double) (1 / 100), (double) (1 / 200), (double) (1 / 300), (double) (1 / 400), (double) (1 / 500), (double) (1 / 600));
+
+        SpinnerValueFactory<Double> valueFactory = new SpinnerValueFactory.ListSpinnerValueFactory<>(data);
+        spinner.setValueFactory(valueFactory);
+        grid.add(spinner, 1, 1);
+        spinner.decrement(-1 / 100);
+        spinner.increment(1 / 100);
+        Button btnBuy = new Button("BUY");
+        grid.add(btnBuy, 0, 2);
+        Button btnSell = new Button("SELL");
+        grid.add(btnSell, 1, 2);
+        Label bidPrice = new Label("Bid :");
+        grid.add(bidPrice, 1, 2);
+        Label askPrice = new Label("Ask: ");
+        grid.add(askPrice, 3, 2);
+        grid.setTranslateX(300);
+        grid.setTranslateY(70);
+        Stage stage = new Stage();
+
+
+        AnchorPane anchorpane = new AnchorPane();
+        anchorpane.getChildren().addAll(panel(), getCandleData(), getDepths(), getCandleSticksChart());
+        Scene scene = new Scene(anchorpane, 1530, 780);
+        scene.getStylesheets().add("/app.css");
+        stage.setScene(scene);
+        stage.setTitle("InvestPro -->Dashboard   Welcome  " + new Date(System.currentTimeMillis()));
+        stage.setResizable(true);
+        stage.setIconified(true);
+        stage.show();
+
+    }
+
+    TabPane getTabPane() throws Exception, OandaException {
+
+
+        DraggableTab[] tabs
+
+                = new DraggableTab[]{
+                new DraggableTab("Orders Infos"),
+                new DraggableTab("Orders History"),
+                new DraggableTab("Account Details"),
+                new DraggableTab("Account Performance"),
+                new DraggableTab("Account Summary"),
+                new DraggableTab("Statistics"),
+                new DraggableTab("Mail"),
+                new DraggableTab("Trade Signals"),
+                new DraggableTab("Recommendation"),
+                new DraggableTab("Help")};
+
+        tabs[0].setContent(getOandaOrders());
+
+        tabs[1].setContent(getOandaOrdersHistory());
+        tabs[2].setContent(getOandaPortFolio());
+        tabs[3].setContent(getAccountPerformance());
+        tabs[4].setContent(getAccountSummary());
+        tabs[5].setContent(getTradeStatistics());
+        tabs[6].setContent(getTradeStatistics());
+        tabs[7].setContent(getOandaSignals());
+        tabs[8].setContent(getOandaRecommendation());
+        tabs[9].setContent(getOandaHelp());
+        TabPane orderTabPanes = new TabPane();
+        orderTabPanes.getTabs().addAll(tabs);
+
+
+        // timeFrameToolBar.getItems().addAll(timeFrameToolBarButtons)
+        // orderTabPanes.setRotateGraphic(true);
+
+        orderTabPanes.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);
+
+
+        SpinnerValueFactory<Double> spinnerValueFactory = new SpinnerValueFactory.DoubleSpinnerValueFactory(0.01,
+                60, 0.01);
+        spinner.setValueFactory(spinnerValueFactory);
+        HBox hbox = new HBox(spinner);
+
+        hbox.setSpacing(10);
+        hbox.setAlignment(Pos.CENTER);
+
+
+        return orderTabPanes;
+    }
+
+    private @NotNull VBox getCandleSticksChart() throws Exception, OandaException {
 
 
         TabPane candleSticksChartTabPane = new TabPane();
@@ -421,18 +601,7 @@ public class Main extends Application {
                 new VBox(),
                 new VBox()
         };
-        Color[] xColor = new Color[]{
-                Color.GREEN,
-                Color.YELLOW, Color.GOLD,
-                Color.BEIGE, Color.CORAL
-                , Color.WHITE
-        };
-        int ii;
-        ii = ((int) (Math.random() * (xColor.length)));
 
-        if (ii == xColor.length) {
-            ii = 0;
-        }
 
         Button[] buttons = new Button[]{
                 new Button("MARKET BUY"),
@@ -490,16 +659,11 @@ public class Main extends Application {
         return vBox;
     }
 
-
     TreeTableView<News> getNews() throws IllegalArgumentException {
 
-
-        Callback<RecursiveTreeObject<News>, ObservableList<News>> callbacks = RecursiveTreeObject::getChildren;
-        ObservableList<News> data = FXCollections.observableArrayList();
-        data.addAll(NewsManager.getNewsList());
         TreeTableView<News> treeTableNews = new TreeTableView<>();
-
         TreeTableColumn<News, String> columnNewsDate = new TreeTableColumn<>("Date");
+
 
         Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> dateCellValueFactory
                 = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getDate());
@@ -529,7 +693,13 @@ public class Main extends Application {
         //Loading News from Forex factory url:https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823
 
 
-        RecursiveTreeItem<News> root = new RecursiveTreeItem<>(data, callbacks);
+        ObservableList<News> data = FXCollections.observableArrayList();
+
+        for (int i = 0; i < NewsManager.getNewsList().size(); i++) {
+
+            data.add(i, NewsManager.getNewsList().get(i));
+        }
+        TreeItem<News> root = new RecursiveTreeItem<>(data, RecursiveTreeObject::getChildren);
 
 
         treeTableNews.getColumns().addAll(columnNewsDate, columnNewsTitle, columnNewsCountry, columnNewsImpact, columnNewsForecast, columnNewsPrevious);
@@ -537,4 +707,27 @@ public class Main extends Application {
 
         return treeTableNews;
     }
+
+    private @NotNull VBox getAccountDetails() {
+        VBox accountDetails = new VBox();
+        accountDetails.setSpacing(10);
+        accountDetails.setPadding(new Insets(10, 10, 10, 10));
+        accountDetails.setAlignment(Pos.CENTER);
+        accountDetails.getChildren().addAll(
+                new Label("Account Details"),
+                new Label("Name: " + OandaClient.getAccount().getName()),
+                new Label("Balance: " + OandaClient.getAccount().getBalance()),
+                new Label("Currency: " + OandaClient.getAccount().getCurrency()),
+                new Label("Account Type: " + OandaClient.getAccount().getAccountType()),
+                new Label("Account Status: " + OandaClient.getAccount().getAccountStatus()),
+                new Label("Trading Status: " + OandaClient.getAccount().getTradingStatus()),
+                new Label("Trading Mode: " + OandaClient.getAccount().getTradingMode()),
+                new Label("Trading Session: " + OandaClient.getAccount().getTradingSession()),
+                new Label("Trading Time: " + OandaClient.getAccount().getTradingTime()),
+                new Label("Trading Time Zone: " + OandaClient.getAccount().getTradingTimeZone()));
+
+
+        return accountDetails;
+    }
+
 }

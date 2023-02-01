@@ -1,14 +1,9 @@
 package org.investpro.investpro;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 
 public class Currency {
@@ -21,7 +16,6 @@ public class Currency {
     private static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
-    private static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
     static {
         // FIXME: Replace with ServiceLoaders
@@ -30,18 +24,18 @@ public class Currency {
         FiatCurrencyDataProvider fiatCurrencyDataProvider = new FiatCurrencyDataProvider();
         fiatCurrencyDataProvider.registerCurrencies();
 
-        /*
+
         ServiceLoader<CurrencyDataProvider> serviceLoader = ServiceLoader.load(CurrencyDataProvider.class);
-        logger.info("service loader: " + serviceLoader);
+        Log.info("service loader: " + serviceLoader);
         for (CurrencyDataProvider provider : serviceLoader) {
-            logger.info("calling provider.registerCurrencies()");
+            Log.info("calling provider.registerCurrencies()");
             try {
                 provider.registerCurrencies();
             } catch (Exception e) {
-                logger.error("could not register currencies: ", e);
+                Log.error("could not register currencies: " + e);
             }
         }
-         */
+
     }
 
     /**
@@ -51,11 +45,10 @@ public class Currency {
         this.currencyType = CurrencyType.NULL;
         this.fullDisplayName = "";
         this.shortDisplayName = "";
-        this.code = "XXX";
+        this.code = "ETH";
         this.fractionalDigits = 0;
         this.symbol = "";
     }
-
     /**
      * Protected constructor, called only by CurrencyDataProvider's.
      */
@@ -94,7 +87,7 @@ public class Currency {
         Objects.requireNonNull(code, "code must not be null");
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))
                 && CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
-            logger.error("ambiguous currency code: " + code);
+            Log.error("ambiguous currency code: " + code);
             throw new IllegalArgumentException("ambiguous currency code: " + code + " (code" +
                     " is used for multiple currency types); use ofCrypto(...) or ofFiat(...) instead");
         } else {
@@ -114,7 +107,7 @@ public class Currency {
      * @param code
      * @return
      */
-    public static FiatCurrency ofFiat(String code) {
+    public static FiatCurrency ofFiat(@NotNull String code) {
         if (code.equals("¤¤¤")) {
             return NULL_FIAT_CURRENCY;
         }
@@ -131,7 +124,7 @@ public class Currency {
      * @param code
      * @return
      */
-    public static CryptoCurrency ofCrypto(String code) {
+    public static CryptoCurrency ofCrypto(@NotNull String code) {
         if (code.equals("¤¤¤")) {
             return NULL_CRYPTO_CURRENCY;
         }
@@ -143,13 +136,13 @@ public class Currency {
     public static List<FiatCurrency> getFiatCurrencies() {
         return CURRENCIES.values().stream()
                 .filter(currency -> currency.getCurrencyType() == CurrencyType.FIAT)
-                .map(currency -> (FiatCurrency) currency).collect(Collectors.toUnmodifiableList());
+                .map(currency -> (FiatCurrency) currency).toList();
     }
 
     public static Currency lookupBySymbol(String symbol) {
         // FIXME: why fiat?
         return CURRENCIES.values().stream().filter(currency -> currency.getSymbol().equals(symbol))
-                .findAny().orElse(NULL_FIAT_CURRENCY);
+                .findAny().orElse(NULL_CRYPTO_CURRENCY);
     }
 
     public static FiatCurrency lookupFiatByCode(String code) {

@@ -43,6 +43,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.*;
 import javafx.stage.Window;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,7 +70,7 @@ public class PopOverSkin implements Skin<PopOver> {
 
     private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
 
-    public PopOverSkin(final PopOver popOver) {
+    public PopOverSkin(final @NotNull PopOver popOver) {
         this.popOver = popOver;
         stackPane = popOver.getRoot();
         stackPane.setPickOnBounds(false);
@@ -146,20 +147,12 @@ public class PopOverSkin implements Skin<PopOver> {
                         content.getStyleClass().add(DETACHED_STYLE_CLASS);
                         content.setTop(titlePane);
                         switch (getSkinnable().getArrowLocation()) {
-                            case LEFT_TOP:
-                            case LEFT_CENTER:
-                            case LEFT_BOTTOM:
-                                popOver.setAnchorX(
-                                        popOver.getAnchorX() + popOver.getArrowSize());
-                                break;
-                            case TOP_LEFT:
-                            case TOP_CENTER:
-                            case TOP_RIGHT:
-                                popOver.setAnchorY(
-                                        popOver.getAnchorY() + popOver.getArrowSize());
-                                break;
-                            default:
-                                break;
+                            case LEFT_TOP, LEFT_CENTER, LEFT_BOTTOM -> popOver.setAnchorX(
+                                    popOver.getAnchorX() + popOver.getArrowSize());
+                            case TOP_LEFT, TOP_CENTER, TOP_RIGHT -> popOver.setAnchorY(
+                                    popOver.getAnchorY() + popOver.getArrowSize());
+                            default -> {
+                            }
                         }
                     } else {
                         popOver.getStyleClass().remove(DETACHED_STYLE_CLASS);
@@ -254,7 +247,7 @@ public class PopOverSkin implements Skin<PopOver> {
     public void dispose() {
     }
 
-    private Node createCloseIcon() {
+    private @NotNull Node createCloseIcon() {
         Group group = new Group();
         group.getStyleClass().add("graphics"); //$NON-NLS-1$
 

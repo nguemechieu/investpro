@@ -6,7 +6,7 @@ import java.sql.*;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-
+public
 class DataSource implements javax.sql.DataSource {
 
     static String password="Bigboss307#";
@@ -288,6 +288,11 @@ class DataSource implements javax.sql.DataSource {
         return 0;
     }
 
+    @Override
+    public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+        return null;
+    }
+
     /**
      * Create a new {@code ConnectionBuilder} instance
      *
@@ -315,10 +320,7 @@ class DataSource implements javax.sql.DataSource {
      *                                         {@code java.util.logging}
      * @since 1.7
      */
-    @Override
-    public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        return null;
-    }
+
 
     /**
      * Creates a new {@code ShardingKeyBuilder} instance

@@ -28,6 +28,8 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
 import javafx.scene.chart.ValueAxis;
 import javafx.util.Duration;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -37,7 +39,6 @@ import java.util.List;
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
  * makes the axis major tick marks (the labeled tick marks) have nice, rounded numbers.
  *
- * @author Jason Winnebeck
  */
 public class StableTicksAxis extends ValueAxis<Number> {
     /**
@@ -60,7 +61,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private final WritableValue<Double> scaleValue = new WritableValue<>() {
         @Override
-        public Double getValue() {
+        public @NotNull Double getValue() {
             return getScale();
         }
 
@@ -382,32 +383,22 @@ public class StableTicksAxis extends ValueAxis<Number> {
                 labelSize = dim.getWidth();
             } else {
                 // TODO: May want to tweak this value so the axis labels are not so closely packed together.
-                labelSize = dim.getHeight();
+                labelSize = dim.getHeight() + 3;
             }
         }
 
         return labelSize;
     }
 
-    private static final class Range {
-        public final double low;
-        public final double high;
-        public final double tickSpacing;
-        public final double scale;
-
-        private Range(double low, double high, double tickSpacing, double scale) {
-            this.low = low;
-            this.high = high;
-            this.tickSpacing = tickSpacing;
-            this.scale = scale;
-        }
+    private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
             return high - low;
         }
 
+        @Contract(pure = true)
         @Override
-        public String toString() {
+        public @NotNull String toString() {
             return "Range{" +
                     "low=" + low +
                     ", high=" + high +

@@ -49,7 +49,6 @@ public class DraggableTab  extends Tab  {
         dragStage = new Stage();
         dragStage.initStyle(StageStyle.UNDECORATED);
         StackPane dragStagePane = new StackPane();
-        dragStagePane.setStyle("-fx-background-color:#DDDDDD;");
         Text dragText = new Text(text);
         StackPane.setAlignment(dragText, Pos.CENTER);
         dragStagePane.getChildren().add(dragText);

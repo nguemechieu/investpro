@@ -40,6 +40,7 @@ public class Account{
     public String guaranteedExecutionFees;
     public ArrayList<Object> orders;
     public String pl;
+    public long positionCount;
 
     public Account() {
     }

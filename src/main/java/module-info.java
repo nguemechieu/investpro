@@ -1,4 +1,5 @@
 module org.investpro.investpro {
+    uses org.investpro.investpro.CurrencyDataProvider;
     requires javafx.controls;
     requires javafx.fxml;
     requires org.jetbrains.annotations;

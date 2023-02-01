@@ -6,12 +6,7 @@ import org.json.JSONObject;
 import java.time.Instant;
 import java.util.Objects;
 
-/**
- * A Trade represents a completed order (then called a trade), which is an transaction where one
- * party buys and the other one sells some amount of currency at a fixed price.
- *
- * @author Michael Ennen
- */
+
 public class Trade {
     public static RecursiveTreeObject<Mid> candle;
     private int i;
@@ -119,5 +114,13 @@ public class Trade {
     @Override
     public int hashCode() {
         return Objects.hash(tradePair, price, amount, transactionType, localTradeId, timestamp);
+    }
+
+    public JSONObject getTrade() {
+        return trade;
+    }
+
+    public void setTrade(JSONObject trade) {
+        this.trade = trade;
     }
 }

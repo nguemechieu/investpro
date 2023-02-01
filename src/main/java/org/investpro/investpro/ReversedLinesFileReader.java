@@ -18,6 +18,8 @@
 
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -211,7 +213,7 @@ public class ReversedLinesFileReader implements Closeable {
          * @return the new FilePart or null
          * @throws IOException if there was a problem reading the file
          */
-        private FilePart rollOver() throws IOException {
+        private @Nullable FilePart rollOver() throws IOException {
 
             if (currentLastBytePos > -1) {
                 throw new IllegalStateException("Current currentLastCharPos unexpectedly positive... "

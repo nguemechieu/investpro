@@ -90,7 +90,7 @@ public class Position{
     }
 
     // @JsonProperty("short")
-    public Short myshort=new Short();
+    public Short myshort = new Short("", "", "", "", "", "", "");
     public String instrument;
     public String commission;
     public String pl;

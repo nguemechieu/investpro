@@ -1,8 +1,42 @@
 package org.investpro.investpro;
 
-public class OandaOrder {
+public class OandaOrder extends Order {
     private String id;
     private String status;
+
+    public OandaOrder() {
+
+    }
+
+    @Override
+    public String toString() {
+        return "OandaOrder{" +
+                "id='" + id + '\'' +
+                ", status='" + status + '\'' +
+                ", currency='" + currency + '\'' +
+                ", amount='" + amount + '\'' +
+                ", amountInCents='" + amountInCents + '\'' +
+                ", date='" + date + '\'' +
+                ", timestamp='" + timestamp + '\'' +
+                ", id=" + id +
+                ", order_type=" + order_type +
+                ", lotSize=" + lotSize +
+                ", price=" + price +
+                ", total=" + total +
+                ", remaining=" + remaining +
+                ", fee=" + fee +
+                ", currency='" + currency + '\'' +
+                ", created=" + created +
+                ", stopLoss=" + stopLoss +
+                ", takeProfit=" + takeProfit +
+                ", updated=" + updated +
+                ", closed=" + closed +
+                ", status='" + status + '\'' +
+                ", symbol='" + symbol + '\'' +
+                ", type='" + type + '\'' +
+                '}';
+    }
+
     private String currency;
     private String amount;
     private String amountInCents;

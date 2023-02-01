@@ -2,9 +2,7 @@ package org.investpro.investpro;
 
 import java.util.Objects;
 
-/**
- * @author Michael Ennen
- */
+
 public class InProgressCandle {
     private int openTime;
     private double openPrice;
