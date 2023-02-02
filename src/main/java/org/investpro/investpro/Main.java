@@ -20,6 +20,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -29,7 +30,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 
 import static java.lang.System.nanoTime;
 import static java.lang.System.out;
@@ -867,7 +871,7 @@ public class Main extends Application {
 
         grid_pane.setPadding(new Insets(10, 10, 10, 10));
         grid_pane.setVgap(10);
-        grid_pane.getChildren().add(new Label("Account Performance"));
+        grid_pane.getChildren().add(new Label("Performance"));
 
         accountPerformance.getChildren().addAll(
                 new Label("Account Performance"),
@@ -1030,7 +1034,7 @@ public class Main extends Application {
         );
 
         root.setExpanded(true);
-        Objects.requireNonNull(getOrderBook("EUR_USD"));
+
 
         treeTable.getColumns().addAll(symbolColumn, symbolBid, symbolAsk);
         treeTable.setRoot(root);
@@ -1075,12 +1079,8 @@ public class Main extends Application {
         Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> volumeColumnValue
                 = param -> new ReadOnlyStringWrapper(String.valueOf(param.getValue().getValue().getOpenPrice()));
         volColumn.setCellValueFactory(volumeColumnValue);
-
-
         treeTable.setTranslateY(25);
-
         ObservableList<CandleData> datas = FXCollections.observableArrayList();
-
         datas.addAll(OandaClient.getForexCandles());
         Callback<RecursiveTreeObject<CandleData>, ObservableList<CandleData>> calback
                 = RecursiveTreeObject::getChildren;
@@ -1093,7 +1093,7 @@ public class Main extends Application {
         treeTable.setRoot(root);
         treeTable.getColumns().addAll(dateColumn, openColum, closeColum, highColum, lowColum, volColumn);
 
-
+        treeTable.setTranslateY(500);
         treeTable.setPrefSize(200, 300);
         return treeTable;
     }
@@ -1401,6 +1401,7 @@ public class Main extends Application {
         columnNewsForecast.setText("Forecast");
         TreeTableColumn<News, String> columnNewsPrevious = new TreeTableColumn<>();
         columnNewsPrevious.setText("Previous");
+        treeTableNews.setBackground(Background.fill(Color.BLACK));
 
         //Loading News from Forex factory url:https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823
         ObservableList<News> dat = FXCollections.observableArrayList();
@@ -1446,7 +1447,7 @@ public class Main extends Application {
         accountDetails.setPadding(new Insets(10, 10, 10, 10));
         accountDetails.setAlignment(Pos.CENTER);
         accountDetails.getChildren().addAll(
-                new Label("___________________Account Details_____________________"),
+                new Label("___________________ Account Details _____________________"),
                 new Label("Date :" + new Date(System.currentTimeMillis())),
                 new Label("Name: " + OandaClient.root.account.alias),
                 new Label("Balance: " + OandaClient.root.account.balance),

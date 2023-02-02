@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import javafx.animation.Animation;
 import javafx.event.ActionEvent;
 import javafx.stage.Stage;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -1083,9 +1086,10 @@ import java.util.Objects;
 
         private static String chatId = "-1001648392740";
 
-        public String getToken() {
+        public static String getToken() {
             return token;
         }
+
         public void setToken(String token1) {
             token = token1;
         }
@@ -1094,7 +1098,7 @@ import java.util.Objects;
             return chatId;
         }
 
-        public void setChatId(String chatId) {
+        public static void setChatId(String chatId) {
             TelegramClient.chatId = chatId;
         }
 
@@ -1569,9 +1573,85 @@ import java.util.Objects;
 
         static String type;//": "channel"
 
+        public static String getMe() {
+            StringBuilder response = new StringBuilder();
+            JSONObject jsonResponse = new JSONObject();
+            try {
+                URL obj = new URL("https://api.telegram.org/bot" + getToken() + "/getMe");
+                HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+                con.setRequestMethod("GET");
+                // con.setRequestProperty("Authorization", "Bearer " + getToken());
+                con.setRequestProperty("Content-Type", "application/json");
+                con.setRequestProperty("Accept", "application/json");
+                con.setDoOutput(true);
+                con.setDoInput(true);
+                con.connect();
+                BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+                String inputLine;
+
+                while ((inputLine = in.readLine()) != null) {
+
+                    response.append(inputLine);
+                }
+                System.out.println(response);
+                jsonResponse= new JSONObject(response.toString());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
 
-        private String getCreateKeyBoard() {
+            if (jsonResponse.has("ok") &&jsonResponse.getBoolean("ok")
+                    && jsonResponse.has("result")) {
+                JSONObject result = jsonResponse.getJSONObject("result");
+
+                if (result.has("first_name") && result.has("last_name"))
+                    firstName = result.getString("first_name");
+                if (result.has("username"))
+                    username = result.getString("username");
+                if (result.has("language_code"))
+                    languageCode = result.getString("language_code");
+                if (result.has("phone_number"))
+                    phoneNumber = result.getString("phone_number");
+                if (result.has("photo"))
+                    photo = result.getString("photo");
+                if (result.has("description"))
+                    description = result.getString("description");
+                if (result.has("can_invite_users"))
+                    canInviteUsers = result.getBoolean("can_invite_users");
+                if (result.has("can_change_info"))
+                    canChangeInfo = result.getBoolean("can_change_info");
+                if (result.has("can_post_messages"))
+                    canPostMessages = result.getBoolean("can_post_messages");
+                if (result.has("can_edit_messages"))
+                    canEditMessages = result.getBoolean("can_edit_messages");
+                if (result.has("can_delete_messages"))
+                    lastName = result.getString("last_name");
+                if (result.has("chat")) {
+                    canDeleteMessages = result.getBoolean("can_delete_messages");}
+                if (result.has("lastName"))
+                    setLastName( result.getString("last_name"));
+                if (result.has("is_bot"))
+                    setIsBot( result.getBoolean("is_bot"));
+                if (result.has("can_join_groups"))
+                    canJoinGroups = result.getBoolean("can_join_groups");
+                if (result.has("can_read_all_group_messages"))
+                    canReadAllGroupMessages = result.getBoolean("can_read_all_group_messages");
+                if (result.has("username"))
+                    setUsername( username = result.getString("username"));
+                if (result.has("chat_id"))
+                    setChatId(  result.getString("chat_id"));
+                if (result.has("method"))
+                    method = result.getString("method");
+                if (result.has("ok"))
+                    ok = result.getBoolean("ok");
+                if (result.has("supports_inline_queries"))
+                    supportsInlineQueries = result.getBoolean("supports_inline_queries");System.out.println(jsonResponse);}
+            return lastName;
+        }
+
+        @Contract(pure = true)
+        private @NotNull String getCreateKeyBoard() {
 
 
 //enum KEYS_TRADE    (m_lang==LANGUAGE_EN)?"[[\"/BUY\"],[\"/SELL\"],[\"/BUYLIMIT\"],[\"/SELLIMIT\"],[\"/BUYSTOP\"],[\"/SELLSTOP\"]":"[[\"Информация\"],[\"Котировки\"],[\"Графики\"]]"
@@ -1584,17 +1664,6 @@ import java.util.Objects;
             return "[[" + "EMOJI_TOP" + ",\"M1\",\"M5\",\"M15\"],[\"" + "EMOJI_BACK" + "\",\"M30\",\"H1\",\"H4\"],[\" \",\"D1\",\"W1\",\"MN1\"]]";
 
 
-        }
-
-        private String getMessageId() {
-
-            if (message_thread_id == null)
-                return null;
-
-            if (message_thread_id.equals(""))
-                return null;
-
-            return message_thread_id;
         }
 
 
@@ -1690,80 +1759,16 @@ import java.util.Objects;
                     '}';
         }
 
-        int getMe() {
-            StringBuilder  response = new StringBuilder(); JSONObject jsonResponse = new JSONObject();
-            try {
-                URL obj = new URL("https://api.telegram.org/bot" + getToken()+"/getMe");
-                HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-                con.setRequestMethod("GET");
-                // con.setRequestProperty("Authorization", "Bearer " + getToken());
-                con.setRequestProperty("Content-Type", "application/json");
-                con.setRequestProperty("Accept", "application/json");
-                con.setDoOutput(true);
-                con.setDoInput(true);
-                con.connect();
-                BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-                String inputLine;
+        @Contract(pure = true)
+        private @Nullable String getMessageId() {
 
-                while ((inputLine = in.readLine()) != null) {
+            if (message_thread_id == null)
+                return null;
 
-                    response.append(inputLine);
-                }
-                System.out.println(response);
-                jsonResponse= new JSONObject(response.toString());
+            if (message_thread_id.equals(""))
+                return null;
 
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-
-            if (jsonResponse.has("ok") &&jsonResponse.getBoolean("ok")
-                    && jsonResponse.has("result")) {
-                JSONObject result = jsonResponse.getJSONObject("result");
-
-                if (result.has("first_name") && result.has("last_name"))
-                    firstName = result.getString("first_name");
-                if (result.has("username"))
-                    username = result.getString("username");
-                if (result.has("language_code"))
-                    languageCode = result.getString("language_code");
-                if (result.has("phone_number"))
-                    phoneNumber = result.getString("phone_number");
-                if (result.has("photo"))
-                    photo = result.getString("photo");
-                if (result.has("description"))
-                    description = result.getString("description");
-                if (result.has("can_invite_users"))
-                    canInviteUsers = result.getBoolean("can_invite_users");
-                if (result.has("can_change_info"))
-                    canChangeInfo = result.getBoolean("can_change_info");
-                if (result.has("can_post_messages"))
-                    canPostMessages = result.getBoolean("can_post_messages");
-                if (result.has("can_edit_messages"))
-                    canEditMessages = result.getBoolean("can_edit_messages");
-                if (result.has("can_delete_messages"))
-                    lastName = result.getString("last_name");
-                if (result.has("chat")) {
-                    canDeleteMessages = result.getBoolean("can_delete_messages");}
-                if (result.has("lastName"))
-                    setLastName( result.getString("last_name"));
-                if (result.has("is_bot"))
-                    setIsBot( result.getBoolean("is_bot"));
-                if (result.has("can_join_groups"))
-                    canJoinGroups = result.getBoolean("can_join_groups");
-                if (result.has("can_read_all_group_messages"))
-                    canReadAllGroupMessages = result.getBoolean("can_read_all_group_messages");
-                if (result.has("username"))
-                    setUsername( username = result.getString("username"));
-                if (result.has("chat_id"))
-                    setChatId(  result.getString("chat_id"));
-                if (result.has("method"))
-                    method = result.getString("method");
-                if (result.has("ok"))
-                    ok = result.getBoolean("ok");
-                if (result.has("supports_inline_queries"))
-                    supportsInlineQueries = result.getBoolean("supports_inline_queries");System.out.println(jsonResponse);}
-            return 0;
+            return message_thread_id;
         }
 
         void logOut() throws IOException {

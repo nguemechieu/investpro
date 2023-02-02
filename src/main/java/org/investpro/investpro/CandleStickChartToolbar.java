@@ -18,13 +18,21 @@ import javafx.scene.control.Separator;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Background;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -58,6 +66,18 @@ public class CandleStickChartToolbar extends Region {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         Objects.requireNonNull(granularities);
+        Paint[] xColor = new Color[]{
+                Color.RED,
+                Color.WHITE,
+                Color.GOLD,
+                Color.GREEN,
+                Color.BROWN,
+                Color.CORAL,
+                Color.LAVENDER
+
+        };
+
+        int i = (int) (Math.random() * xColor.length - 1);
 
         List<Node> toolbarNodes = new ArrayList<>((2 * granularities.size()) + Tool.values().length + 1);
         boolean passedMinuteHourBoundary = false;
@@ -66,7 +86,11 @@ public class CandleStickChartToolbar extends Region {
         boolean passedWeekMonthBoundary = false;
         for (Integer granularity : granularities) {
             if (granularity < 3600) {
-                toolbarNodes.add(new ToolbarButton((granularity / 60) + "m", granularity));
+                ToolbarButton toolbar0 = new ToolbarButton((granularity / 60) + "m", granularity);
+                toolbar0.setBackground(Background.fill(xColor[(int) (Math.random() * xColor.length - 1)]));
+                toolbarNodes.add(toolbar0);
+
+
             } else if (granularity < 86400) {
                 if (!passedMinuteHourBoundary) {
                     passedMinuteHourBoundary = true;
@@ -74,7 +98,9 @@ public class CandleStickChartToolbar extends Region {
                     minuteHourSeparator.setOpacity(0);
                     toolbarNodes.add(minuteHourSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 3600) + "h", granularity));
+                ToolbarButton toolbar1 = new ToolbarButton((granularity / 3600) + "h", granularity);
+                toolbar1.setBackground(Background.fill(xColor[(int) (Math.random() * xColor.length - 1)]));
+                toolbarNodes.add(toolbar1);
             } else if (granularity < 604800) {
                 if (!passedHourDayBoundary) {
                     passedHourDayBoundary = true;
@@ -90,7 +116,9 @@ public class CandleStickChartToolbar extends Region {
                     dayWeekSeparator.setOpacity(0);
                     toolbarNodes.add(dayWeekSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 604800) + "w", granularity));
+                ToolbarButton toolbar3 = new ToolbarButton((granularity / 604800) + "w", granularity);
+                toolbar3.setBackground(Background.fill(xColor[(int) (Math.random() * xColor.length - 1)]));
+                toolbarNodes.add(toolbar3);
             } else {
                 if (!passedWeekMonthBoundary) {
                     passedWeekMonthBoundary = true;
@@ -98,7 +126,11 @@ public class CandleStickChartToolbar extends Region {
                     weekMonthSeparator.setOpacity(0);
                     toolbarNodes.add(weekMonthSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton((granularity / 2592000) + "mo", granularity));
+                ToolbarButton toolbar9 = new ToolbarButton((granularity / 2592000) + "mo", granularity);
+
+                toolbar9.setBackground(Background.fill(xColor[(int) (Math.random() * xColor.length - 1)]));
+
+                toolbarNodes.add(toolbar9);
             }
         }
         Separator intervalZoomSeparator = new Separator();
@@ -164,7 +196,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
+    void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) throws URISyntaxException, IOException {
         Objects.requireNonNull(secondsPerCandle);
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
@@ -175,7 +207,41 @@ public class CandleStickChartToolbar extends Region {
                             tool.tool.getZoomDirection()));
 
 
+                } else if (tool.tool != null && tool.tool.isScreenShot()) {
+
+                    tool.setOnAction(e -> Screenshot.capture(new File(System.getProperty("user.home") + "/Documents/screenshot" + System.currentTimeMillis() + ".png")));
+                } else if (tool.tool != null && tool.tool.isSearch()) {
+
+                    tool.setOnAction(r -> {
+                        try {
+                            Desktop.getDesktop().browse(new URI("https://www.google.com/"));
+                        } catch (IOException | URISyntaxException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+
+                } else if (tool.tool != null && tool.tool.isPrint()) {
+                    tool.setOnAction(t ->
+                    {
+                        try {
+                            Desktop.getDesktop().mail();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                } else if (tool.tool != null && tool.tool.isPDF()) {
+
+                    tool.setOnAction(ee -> {
+
+                        try {
+                            Desktop.getDesktop().print(new File(new URI(System.getProperty("user.dir") + "/resources/images/screenshot")));
+                        } catch (IOException | URISyntaxException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 }
+
+
             }
         }
     }
@@ -189,7 +255,7 @@ public class CandleStickChartToolbar extends Region {
         ZOOM_OUT("/img/search-minus-solid.png"),
         SCREENSHOT("/img/Screen Shot.png"),
         SEARCHTOOL("/img/search.png"),
-        SETTINGTOOL("/img/setting.png"),
+
         PDF("/img/pdf.png"),
         PRINT("/img/print-solid.png"),
         OPTIONS("/img/cog-solid.png");
@@ -212,7 +278,25 @@ public class CandleStickChartToolbar extends Region {
             return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;
         }
 
+        boolean isScreenShot() {
+
+
+            return this == SCREENSHOT;
+        }
+
+        boolean isPrint() {
+            return this == PRINT;
+        }
+
+        boolean isSearch() {
+            return this == SEARCHTOOL;
+        }
+
+        public boolean isPDF() {
+            return this == PDF;
+        }
     }
+
 
     private static class ToolbarButton extends Button {
         private final String textLabel;
@@ -244,6 +328,7 @@ public class CandleStickChartToolbar extends Region {
         ToolbarButton(Tool tool) {
             this(null, tool, tool.img, -1);
         }
+
 
         private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
             if (textLabel == null && img == null) {

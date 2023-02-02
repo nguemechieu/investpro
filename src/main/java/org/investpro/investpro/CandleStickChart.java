@@ -19,12 +19,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Spinner;
 import javafx.scene.input.*;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontSmoothingType;
@@ -172,17 +170,17 @@ public class CandleStickChart extends Region {
         xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern("H':'mm")));
         yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
         extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getBaseCurrency()));
-        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 14);
+        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 20);
         yAxis.setTickLabelFont(axisFont);
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
         Label symbolLabel = new Label();
-        symbolLabel.setText(tradePair.toString());
+        symbolLabel.setText(tradePair + "  " + Currency.of(tradePair.toString().substring(0, 3)));
         GridPane grid = new GridPane();
         grid.setTranslateX(100);
-        grid.setTranslateY(100);
+        grid.setTranslateY(70);
 
-        Spinner<Double> spinner = new Spinner<>(0.01, 100000.9, 0, 0.01);
+        Spinner<Double> spinner = new Spinner<>(0.01, 1000000.9, 0, 0.01);
         spinner.decrement(1);
         spinner.decrement(-1);
         spinner.setEditable(true);
@@ -196,11 +194,11 @@ public class CandleStickChart extends Region {
         grid.add(btnSell, 3, 2);
         grid.add(new Label("ASK :"), 2, 2);
 
-        grid.setPrefSize(100, 100);
+        grid.setPrefSize(90, 100);
 
 
-        VBox loadingIndicatorContainer = new VBox(progressIndicator, grid, symbolLabel);
-        progressIndicator.setPrefSize(50, 50);
+        VBox loadingIndicatorContainer = new VBox(progressIndicator);
+        progressIndicator.setPrefSize(25, 25);
         loadingIndicatorContainer.setFillWidth(true);
         loadingIndicatorContainer.setSpacing(10);
         loadingIndicatorContainer.setTranslateX(0);
@@ -271,9 +269,34 @@ public class CandleStickChart extends Region {
                 chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 60 +
                         (candleWidth / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
-                canvas = new Canvas(chartWidth - 100, chartHeight - 10);
-                StackPane chartStackPane = new StackPane(canvas, loadingIndicatorContainer);
-                chartStackPane.setTranslateX(64); // Only necessary when wrapped in StackPane...why?
+                canvas = new Canvas(chartWidth - 10, chartHeight - 10);
+
+                Label infosNews = new Label("Infos :");
+
+                btnBuy.setBackground(Background.fill(Color.GREEN));
+                btnSell.setBackground(Background.fill(Color.RED));
+                btnBuy.setBorder(Border.stroke(Color.GOLD));
+                loadingIndicatorContainer.setTranslateX(650);
+                loadingIndicatorContainer.setTranslateY(250);
+                symbolLabel.setTranslateY(200);
+                symbolLabel.setTranslateX(600);
+                symbolLabel.setFont(Font.font(100));
+
+                Label telegramLabel = new Label("Bot :" + TelegramClient.getUsername());
+                telegramLabel.setTranslateX(1200);
+                telegramLabel.setTranslateY(20);
+                Circle isConnected = new Circle(5, Color.WHITE);
+                if (TelegramClient.getUsername() != null) {
+                    isConnected.setFill(Color.GREEN);
+                    telegramLabel.setText("Bot : Connected");
+                }
+                isConnected.setTranslateX(1310);
+                isConnected.setTranslateY(10);
+                Pane chartStackPane = new Pane(canvas, grid, symbolLabel, telegramLabel, infosNews, isConnected, loadingIndicatorContainer);
+                chartStackPane.setTranslateX(20); // Only necessary when wrapped in StackPane...why?
+                grid.setPrefSize(300, 200);
+                grid.setTranslateX(50);
+                grid.setTranslateY(10);
 
 
                 getChildren().add(0, chartStackPane);

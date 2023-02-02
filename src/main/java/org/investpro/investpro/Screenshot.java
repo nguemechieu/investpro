@@ -1,48 +1,43 @@
 package org.investpro.investpro;
 
-
 import javafx.scene.control.Alert;
-import javafx.scene.image.Image;
-
-import javafx.embed.swing.SwingFXUtils;
-import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-
 import java.io.File;
 import java.io.IOException;
 
-
 public class Screenshot {
 
-     static void capture(@NotNull File file1) {//Capturing screen image
+    static void capture(File file1) {//Capturing screen image
 
-            System.out.println("Capturing screenshot...");
+        System.out.println("Capturing screenshot...");
+        Alert alertAlert = new Alert(Alert.AlertType.INFORMATION);
 
+        alertAlert.setTitle("Screenshot");
+        alertAlert.setHeaderText(null);
+        alertAlert.setContentText("Capturing Screenshot...");
 
-            try {
-                BufferedImage image = SwingFXUtils.fromFXImage(new Image(
-                        new File(file1.getAbsolutePath() + ".png").toURI().toURL().openStream()
-                ), null);
-                image.flush();
-                ImageIO.write(image, "png", new File(file1.getAbsolutePath() + ".png"));
-                System.out.println("Screenshot saved to " + file1.getAbsolutePath() + ".png");
+        alertAlert.showAndWait();
+        Alert alert = new Alert(Alert.AlertType.ERROR);
 
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Screenshot saved to " + file1.getAbsolutePath() + ".png");
-                alert.setHeaderText("Screenshot saved to " + file1.getAbsolutePath() + ".png");
-                alert.setContentText("Screenshot saved to " + file1.getAbsolutePath() + ".png");
-                alert.showAndWait();
+        try {
+            Thread.sleep(500);
 
+            Robot r = new Robot();
 
-
-
-
+            // Used to get ScreenSize and capture image
+            Rectangle capture = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+            BufferedImage Image = r.createScreenCapture(capture);
+            ImageIO.write(Image, "png", file1);
+            System.out.println("Screenshot saved");
+            alert.setTitle("Screenshot");
+            alert.setContentText("Screenshot saved to directory  " + file1.getAbsolutePath());
+            alert.showAndWait();
+            //Display Screenshot
+        } catch (InterruptedException | IOException | AWTException e) {
+            throw new RuntimeException(e);
         }
-                catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-
-}}
+    }
+}

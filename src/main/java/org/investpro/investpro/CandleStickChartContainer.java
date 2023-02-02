@@ -7,6 +7,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Objects;
 
 /**
@@ -31,11 +33,11 @@ public class CandleStickChartContainer extends Region {
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
      */
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair) {
-        this(exchange, tradePair, false);
+    public CandleStickChartContainer(Exchange exchange, TradePair tradePair) throws URISyntaxException, IOException {
+        this(exchange, tradePair, true);
     }
 
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
+    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) throws URISyntaxException, IOException {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         this.exchange = exchange;
@@ -71,7 +73,11 @@ public class CandleStickChartContainer extends Region {
         secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
                 createNewChart(newDurationValue.intValue(), liveSyncing);
-                toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
+                try {
+                    toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
+                } catch (URISyntaxException | IOException e) {
+                    throw new RuntimeException(e);
+                }
                 toolbar.setChartOptions(candleStickChart.getChartOptions());
                 toolbar.setActiveToolbarButton(secondsPerCandle);
                 animateInNewChart(candleStickChart);
