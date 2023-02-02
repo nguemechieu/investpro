@@ -5,8 +5,8 @@ import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import java.util.HashMap;
 
 public class News extends RecursiveTreeObject<News> {
-    private  String title;// title of the news
-    private  String country;// country of the news
+    private String title;// title of the newsdhb/k;lojoj
+    private String country;// country of the news
     private  String description;// description of the news
     private  String impact;// impact of the news
     private String date;// date of the news

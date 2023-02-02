@@ -48,22 +48,22 @@ public class CandleStickChartContainer extends Region {
                 candleDataSupplier.getSupportedGranularities());
         VBox toolbarContainer = new VBox(toolbar);
         toolbarContainer.setPrefWidth(Double.MAX_VALUE);
-        toolbarContainer.setPrefHeight(50);
+        toolbarContainer.setPrefHeight(20);
         toolbarContainer.prefWidthProperty().bind(prefWidthProperty());
         AnchorPane.setTopAnchor(toolbarContainer, 10.0);
         AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
         AnchorPane.setRightAnchor(toolbarContainer, 0.0);
 
+
         candleChartContainer = new VBox();
-        candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
         AnchorPane.setRightAnchor(candleChartContainer, 15.0);
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
-        containerRoot.prefHeightProperty().bind(prefHeightProperty());
-        containerRoot.prefWidthProperty().bind(prefWidthProperty());
+        containerRoot.setPrefSize(getLayoutBounds().getWidth(), getLayoutBounds().getHeight());
         getChildren().setAll(containerRoot);
         // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -78,7 +78,7 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        //secondsPerCandle.set(300);
+        secondsPerCandle.set(300);
     }
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) {
@@ -113,7 +113,7 @@ public class CandleStickChartContainer extends Region {
         } else {
             candleStickChart = newChart;
             candleChartContainer.getChildren().setAll(newChart);
-            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(500), candleStickChart);
+            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(600), candleStickChart);
             fadeTransitionIn.setFromValue(0.0);
             fadeTransitionIn.setToValue(1.0);
             fadeTransitionIn.play();

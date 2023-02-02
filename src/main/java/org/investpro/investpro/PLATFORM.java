@@ -6,14 +6,14 @@ public enum PLATFORM {
     MAC("Mac"),
     WINDOWS("Windows"),
     OTHER("Other"),
-    BINANCE_US("BinanceUs"),
-    BINANCE_EU("BinanceEu"),
+    BINANCE_US("Binance Us"),
+    BINANCE_EU("Binance Eu"),
     BINANCE_WORLD("BinanceWorld"),
     COINBASE_PRO("CoinbasePro"),
     OANDA("Oanda"),
     BITFINEX("Bitfinex"), BINANCE_CN(
             "BinanceCn"
-    );
+    ), Ally_Invest("Ally Invest"), AMERICAN_TRADE("AMERI TRADE "), BINANCE_COM("BINANCE COM");
     private String value;
 
     PLATFORM(String value) {

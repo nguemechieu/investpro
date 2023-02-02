@@ -1,6 +1,5 @@
 package org.investpro.investpro;
 
-import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import org.json.JSONObject;
 
 import java.time.Instant;
@@ -8,7 +7,7 @@ import java.util.Objects;
 
 
 public class Trade {
-    public static RecursiveTreeObject<Mid> candle;
+    public static CandleData candle;
     private int i;
     private JSONObject trade;
     private TradePair tradePair;

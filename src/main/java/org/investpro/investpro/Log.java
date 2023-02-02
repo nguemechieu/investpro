@@ -13,9 +13,6 @@ public class Log {
     public static void warn(String message) {
         System.err.println(message);
     }
-    public static void debug(String message) {
-        System.err.println(message);
-    }
 
     public Log() {
 

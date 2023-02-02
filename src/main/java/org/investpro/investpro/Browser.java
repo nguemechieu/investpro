@@ -5,7 +5,10 @@ import javafx.concurrent.Worker;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.TabPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
@@ -51,7 +54,7 @@ public   class Browser {
     ComboBox<String> comboBox = new ComboBox<>();
     boolean needDocumentationButton = false;
 
-    public Browser() throws Exception {
+    public Browser() {
         //apply the styles
         //pane.getStyleClass().add("app.css");
         for (int i = 0; i < captions.length; i++) {
@@ -68,7 +71,7 @@ public   class Browser {
                 webEngine.load(Objects.requireNonNull(getClass().getResourceAsStream(imageFiles[1])).toString());});
         }
 
-        comboBox.setPrefWidth(70);
+
         // create the toolbar
         toolBar = new HBox();
         toolBar.setAlignment(Pos.CENTER);
@@ -81,7 +84,6 @@ public   class Browser {
         showPrevDoc.setOnAction(t -> webEngine.executeScript("toggleDisplay('PrevRel')"));
 
         smallView.setPrefSize(120, 80);
-
         //handle popup windows
         webEngine.setCreatePopupHandler(
                 config -> {
@@ -138,20 +140,12 @@ public   class Browser {
 
     @Contract(" -> new")
     public @NotNull Group start() throws Exception {
-        webEngine.load("https://www.google.com/search?q");
-        //add components
-        TabPane tabPane = new TabPane();
-        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        DraggableTab tab0 = new DraggableTab("Home");
-        tab0.setClosable(true);
-        webEngine.load("https://www.google.com/search?q");
-        tab0.setGraphic(new ImageView(selectedImage.getImage()));
-        tab0.setDetachable(true);
 
-        Tab tab1 = new Tab("Google");
+        DraggableTab tab1 = new DraggableTab("Google");
+        TabPane tabPane = new TabPane();
         tabPane.getTabs().add(tab1);
 
-        tab1.setText("Google");
+
         tab1.setClosable(true);
         WebView webWiew1 = new WebView();
         webWiew1.getEngine().load("https://www.google.com/search?q");
@@ -160,8 +154,7 @@ public   class Browser {
         webWiew1.setPrefSize(1500, 780);
 
 
-        Tab tab2 = new Tab();
-        tab2.setText("Amazon");
+        DraggableTab tab2 = new DraggableTab("Amazon");
         tab2.setClosable(true);
         WebView webWiew2 = new WebView();
         webWiew2.getEngine().load("https://www.amazon.com");
@@ -173,7 +166,7 @@ public   class Browser {
         webWiew1.getEngine().load("https://www.amazon.com/gp/search/search?q=amazon");
         tab2.setContent(webWiew1);
         tab2.setGraphic(new ImageView(selectedImage.getImage()));
-        Tab tab3 = new Tab();
+        DraggableTab tab3 = new DraggableTab("EBAY");
         tab3.setText("Ebay");
         tab3.setGraphic(new ImageView(selectedImage.getImage()));
         WebView web3 = new WebView();
@@ -185,7 +178,7 @@ public   class Browser {
         tab3.setContent(vb3);
         tab3.setGraphic(new ImageView(selectedImage.getImage()));
         TabPane tab = new TabPane();
-        tab.getTabs().addAll(tab0, tab1, tab2, tab3);
+        tab.getTabs().addAll(tab1, tab2, tab3);
         Pane pane = new Pane();
         pane.getChildren().addAll(smallView, tab);
         pane.setPrefSize(1530, 780);

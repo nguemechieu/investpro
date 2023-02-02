@@ -12,6 +12,7 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -46,6 +47,9 @@ public class OandaClient {
         return getOrdersList();
 
     }
+
+    static ArrayList<CandleData> array = new ArrayList<CandleData>();
+    String accountInstrument;
 
 
     // Trade Endpoints
@@ -138,8 +142,9 @@ public class OandaClient {
         }
     }
 
-
-    private String accountInstrument;
+    public static void setApi_Key(String apiKey) {
+        api_key = apiKey;
+    }
 
 //
 //            GET	/v3/accounts/{accountID}
@@ -218,6 +223,13 @@ public class OandaClient {
         return instrumentsList;
 
     }
+
+    public static void createMarketOrder(String symbo, String type, String side, int amount) throws OandaException {
+        createOrder(symbo, amount, type, side);
+    }
+
+
+//            GET	/v3/accounts/{accountID}/changes
 
     static Root getAccountFullDetails() throws OandaException {
         root = new Root();
@@ -437,26 +449,21 @@ public class OandaClient {
                           positionObj.unrealizedPL=
                                   String.valueOf(position.getDouble("unrealizedPL"));
 
-                          if (position.has("long")) {
+                   if (position.has("long")) {
 
 
-                              JSONObject
-                                      longObj =
-                                      position.getJSONObject("long");
+                       positionObj.mylong = Long.getLong(String.valueOf(position.getJSONObject("long")));
 
-                              if (
-                                      longObj!= null) {
-
-                              }
-                          }else if (position.has("short")) {
+                   } else if (position.has("short")) {//TODO upddate myshort and mylong
 
 
-                              JSONObject longObj = position.getJSONObject("short");
+                       JSONObject longObj = position.getJSONObject("short");
 
-                              if (longObj!= null) {
 
-                                  if (
-                                          longObj.has("dividendAdjustment")) {
+                       if (longObj != null) {
+
+                           if (
+                                   longObj.has("dividendAdjustment")) {
                                       positionObj.myshort.dividendAdjustment=
                                               String.valueOf(longObj.getDouble("dividendAdjustment"));
                                   }
@@ -528,10 +535,7 @@ public class OandaClient {
 
    }
 
-
-//            GET	/v3/accounts/{accountID}/changes
-
-    private static @Nullable Mid getCandle(String accountInstrument, int index) throws OandaException, InterruptedException {
+    private static @Nullable CandleData getCandle(String accountInstrument, int index) throws OandaException {
 
 
         String path = "/v3/instruments/" + accountInstrument + "/candles";
@@ -542,29 +546,32 @@ public class OandaClient {
             for (int i = 0; i < candles.length(); i++) {
                 JSONObject jsonObject = candles.getJSONObject(i).getJSONObject("mid");
                 String time = candles.getJSONObject(i).getString("time");
+
+
                 int volume = candles.getJSONObject(i).getInt("volume");
                 System.out.println("Candle " + Trade.candle);
-                Trade.candle = new Mid(accountInstrument,
-                        time,
-                        jsonObject.getString("o"),
-                        jsonObject.getString("c"),
+                Trade.candle = new CandleData(
 
-                        jsonObject.getString("h"),
-                        jsonObject.getString("l"),
+                        Double.parseDouble(jsonObject.getString("o")),
+                        Double.parseDouble(jsonObject.getString("c")),
 
-                                 volume);
+                        Double.parseDouble(jsonObject.getString("h")),
+                        Double.parseDouble(jsonObject.getString("l")),
 
-          array.add(i, (Mid) Trade.candle);
+                        DateToInt(time),
+                        Double.parseDouble(String.valueOf(volume)));
 
-         }
-         return array.get(index);
-     } else {
+                array.add(i, Trade.candle);
 
-         System.out.println("Instrument " + instrument + " does not have candles");
-     }
+            }
+            return array.get(index);
+        } else {
 
-     return null;
- }
+            Log.info("Instrument " + instrument + " does not have candles");
+        }
+
+        return null;
+    }
 //    Endpoint used to poll an Account for its current state and changes since a specified TransactionID.
 
     private static @NotNull JSONObject makeRequest(String method, String path) throws OandaException {
@@ -640,14 +647,10 @@ public class OandaClient {
 //    GET	/v3/accounts/{accountID}/pricing
 //    Get pricing information for a specified list of Instruments within an Account.
 
+    private static int DateToInt(String time) {
+        return (int) Date.from(Instant.parse(time)).getTime();
 
-    double getPricing() throws OandaException {
-        String path = "/v3/accounts/" + accountID + "/pricing?instruments=EUR_USD%2CUSD_CAD";
 
-        JSONObject playload = makeRequest2("https://api-fxtrade.oanda.com","GET", path);
-        System.out.println(playload);
-      //  playload.getJSONObject("instruments");
-     return 0;
     }
 //
 //    GET	/v3/accounts/{accountID}/pricing/stream
@@ -711,16 +714,15 @@ public class OandaClient {
 //    GET	/v3/instruments/{instrument}/positionBook
 //    Fetch a position book for an instrument.
 
-    OrderBook getOrderBook(String instrument) throws OandaException {
+    public static @Nullable OrderBook getOrderBook(String instrument) throws OandaException {
         String path = "/v3/instruments/" + instrument + "/orderBook";
         JSONObject playload = makeRequest("GET", path);
         if (
                 playload.has("orderBook")) {
 
-            return new OrderBook().setBuckets((Collection<?>) playload.getJSONObject("orderBook").getJSONArray("buckets"));
+            return new OrderBook().setBuckets(playload.getJSONObject("orderBook").getJSONArray("buckets").toList());
 
-        }
-        else
+        } else
             System.out.println(
                     "Instrument " + instrument + " does not have orderBook");
 
@@ -735,27 +737,81 @@ public class OandaClient {
 //    GET	/v3/accounts/{accountID}/positions
 //    List all Positions for an Account. The Positions returned are for every instrument that has had a position during the lifetime of an  Account.
 
-     List<Object> getAllPositions() throws OandaException {
-         String path = "/v3/accounts/" + getAccountID() + "/positions";
+    public static ArrayList<CandleData> getForexCandles() throws OandaException, InterruptedException {
 
-         JSONObject accountConfiguration = makeRequest("GET", path);
-         System.out.println(accountConfiguration);
-         return accountConfiguration.getJSONArray("positions").toList();
-     }
+
+        System.out.println("instruments list" + instrumentsList);
+        for (int i = 0; i < instrumentsList.size(); i++) {
+            //Get all forex symbols candles
+            array.add(i, getCandle((instrumentsList.get(i)).replace("/", "_"), i));
+        }
+        return array;
+
+    }
+
+    public static String createOrder(String symbol, double quantity, String price, String side) throws OandaException {
+        //todo create order update
+        String path = "/v3/accounts/" + accountID + "/orders";
+        JSONObject payload = makeRequest("POST", path);
+        payload.put("symbol", symbol);
+        payload.put("quantity", quantity);
+        payload.put("price", price);
+        payload.put("side", side);
+
+        if (
+                payload.getJSONObject("data") != null &&
+                payload.getJSONObject("data").get("orderId")!= null &&
+                payload.getJSONObject("data").get("orderId")!= null
+        ){
+            return payload.getJSONObject("data").get("orderId").toString();
+        }
+        return null;
+    }
+//            GET	/v3/accounts/{accountID}/positions/{instrument}
+//    Get the details of a single Instrument’s Position in an Account. The Position may by open or not.
+
+    double getPricing(String accountInstrument) throws OandaException {
+        String path = "/v3/accounts/" + accountID + "/pricing?instruments=" + accountInstrument;
+
+        JSONObject playload = makeRequest2("https://api-fxtrade.oanda.com", "GET", path);
+        System.out.println(playload);
+        //  playload.getJSONObject("instruments");
+        return 0;
+    }
 //
+//            PUT	/v3/accounts/{accountID}/positions/{instrument}/close
+
+    List<Object> getAllPositions() throws OandaException {
+        String path = "/v3/accounts/" + getAccountID() + "/positions";
+
+        JSONObject accountConfiguration = makeRequest("GET", path);
+        System.out.println(accountConfiguration);
+        return accountConfiguration.getJSONArray("positions").toList();
+    }
+//    Closeout the open Position for a specific instrument in an Account.
+    /*
+     * Create a new Oanda account
+     * <p>
+     *     This method
+     *     above
+     *     creates
+     *     a new O
+     * */
+
+    //
 //    GET	/v3/accounts/{accountID}/openPositions
 //    List all open Positions for an Account. An open Position is a Position in an Account that currently has a Trade opened for it.
-         List<Position> getAllOpenPositions() throws OandaException {
-             String path = "/v3/accounts/" + getAccountID() + "/positions";
+    public List<Position> getAllOpenPositions() throws OandaException {
+        String path = "/v3/accounts/" + getAccountID() + "/positions";
 
-             JSONObject accountPositions = makeRequest("GET", path);
+        JSONObject accountPositions = makeRequest("GET", path);
 
 
-             ArrayList<Position> p = new ArrayList<>();
-             if (accountPositions.has("positions")) {
-                 JSONArray positions = accountPositions.getJSONArray("positions");
-                 for (int i = 0; i < positions.length(); i++) {
-                     JSONObject position = positions.getJSONObject(i);
+        ArrayList<Position> p = new ArrayList<>();
+        if (accountPositions.has("positions")) {
+            JSONArray positions = accountPositions.getJSONArray("positions");
+            for (int i = 0; i < positions.length(); i++) {
+                JSONObject position = positions.getJSONObject(i);
                      System.out.println("Position " + position);
                      if (position.has("instrument")) {
                          System.out.println("Instrument " + position.getString("instrument"));
@@ -776,7 +832,7 @@ public class OandaClient {
                      }
 
                      Position posi = new Position();
-                 
+
 
                      p.add(i, posi);
                  }
@@ -793,57 +849,6 @@ public class OandaClient {
 
 
     }
-//            GET	/v3/accounts/{accountID}/positions/{instrument}
-//    Get the details of a single Instrument’s Position in an Account. The Position may by open or not.
-
-    String getPositionDetails(String accountInstrument) throws OandaException {
-        String path = "/v3/accounts/" + getAccountID() + "/positions/" + accountInstrument;
-        JSONObject playload = makeRequest("GET", path);
-        System.out.println(playload);
-        return playload.toString();
-
-    }
-//
-//            PUT	/v3/accounts/{accountID}/positions/{instrument}/close
-
-    String closeAccountPositions(String accountInstrument) throws OandaException {
-
-        String path = "/v3/accounts/" + getAccountID() + "/positions/"+accountInstrument+"/close";
-        JSONObject accountPositions = makeRequest("GET", path);
-        System.out.println(accountPositions);
-        return accountPositions.toString();
-    }
-//    Closeout the open Position for a specific instrument in an Account.
-    /*
-     * Create a new Oanda account
-     * <p>
-     *     This method
-     *     above
-     *     creates
-     *     a new O
-     * */
-
-    PositionBook getPositionBook(String instrument) throws OandaException {
-        String path = "/v3/instruments/" + instrument + "/positionBook";
-        JSONObject playload = makeRequest("GET", path);
-        if (
-                playload.has("positionBook")) {
-            return new PositionBook().setBuckets((Collection<?>) playload.getJSONObject("positionBook").
-                    getJSONArray("buckets"));
-            }
-
-        else {
-            System.out.println(
-                    "Instrument " + instrument + " does not have positionBook");
-
-            alert.setContentText(
-                    "Instrument " + instrument + " does not have positionBook"
-
-            );
-
-            alert.showAndWait();
-        }
-        return null;}
 
      public static String getApi_key() {
          return api_key;
@@ -893,41 +898,41 @@ public class OandaClient {
 
     }
 
-    String getAccountSummary() throws OandaException {
-        String path = "/v3/accounts/" + getAccountID() + "/summary";
-
+    public String getPositionDetails(String accountInstrument) throws OandaException {
+        String path = "/v3/accounts/" + getAccountID() + "/positions/" + accountInstrument;
         JSONObject playload = makeRequest("GET", path);
         System.out.println(playload);
         return playload.toString();
 
-
     }
 
-    void getAccountChanges() throws OandaException {
-        String path = "/v3/accounts/" + accountID + "/changes";
+    public String closeAccountPositions(String accountInstrument) throws OandaException {
 
+        String path = "/v3/accounts/" + getAccountID() + "/positions/" + accountInstrument + "/close";
+        JSONObject accountPositions = makeRequest("GET", path);
+        System.out.println(accountPositions);
+        return accountPositions.toString();
+    }
+
+    public PositionBook getPositionBook(String instrument) throws OandaException {
+        String path = "/v3/instruments/" + instrument + "/positionBook";
         JSONObject playload = makeRequest("GET", path);
-        System.out.println(playload);
-        playload.toString();
+        if (
+                playload.has("positionBook")) {
+            return new PositionBook().setBuckets((Collection<?>) playload.getJSONObject("positionBook").
+                    getJSONArray("buckets"));
+        } else {
+            System.out.println(
+                    "Instrument " + instrument + " does not have positionBook");
 
+            alert.setContentText(
+                    "Instrument " + instrument + " does not have positionBook"
 
-    }
+            );
 
-    Mid getLatestCandle(String accountInstrument) throws OandaException {
-        String path = "/v3/accounts/" + accountID + "/candles/latest";
-
-        JSONObject playload = makeRequest("GET", path);
-        System.out.println(playload);
-        playload.getJSONObject("candles");
-        return new Mid(
-                accountInstrument,
-                playload.getJSONObject("candles").getString("time"),
-                playload.getJSONObject("candles").getString("o"),
-                playload.getJSONObject("candles").getString("h"),
-                playload.getJSONObject("candles").getString("l"),
-                playload.getJSONObject("candles").getString("c"),
-                Integer.parseInt(playload.getJSONObject("candles").getString("volume")));
-    }
+            alert.showAndWait();
+        }
+        return null;}
 
     private @NotNull JSONObject makeRequest2(String host, String method, String path) throws OandaException {
         OandaClient.host = host;
@@ -988,21 +993,25 @@ public class OandaClient {
 
         }}
 
-    String
-    getWithdrawalAddress(String currency) throws OandaException{
+    public String getAccountSummary() throws OandaException {
+        String path = "/v3/accounts/" + getAccountID() + "/summary";
 
-        String path =  "/v3/accounts/" + accountID + "/withdrawal_address";
-        JSONObject payload = makeRequest("GET",path);
-        return payload.getJSONObject("data").get(currency).toString();
+        JSONObject playload = makeRequest("GET", path);
+        System.out.println(playload);
+        return playload.toString();
+
+
     }
 
-    String
-    getDepositHistory(String currency) throws OandaException{
+    public void getAccountChanges() throws OandaException {
+        String path = "/v3/accounts/" + accountID + "/changes";
 
-        String path =  "/v3/accounts/" + accountID + "/deposit_history";
-        JSONObject payload = makeRequest("GET",path);
-        return payload.getJSONObject("data").get(currency).toString();
- }
+        JSONObject playload = makeRequest("GET", path);
+        System.out.println(playload);
+        playload.toString();
+
+
+    }
 
  String
     getWithdrawalHistory(String currency) throws OandaException{
@@ -1034,26 +1043,38 @@ public class OandaClient {
 //    GET	/v3/accounts/{accountID}/pricing/stream
 //    Get a stream of Account Prices starting from when the request is made. This pricing stream does not include every single price created for the Account, but instead will provide at most 4 prices per second (every 250 milliseconds) for each instrument being requested. If more than one price is created for an instrument during the 250 millisecond window, only the price in effect at the end of the window is sent. This means that during periods of rapid price movement, subscribers to this stream will not be sent every price. Pricing windows for different connections to the price stream are not all aligned in the same way (i.e. they are not all aligned to the top of the second). This means that during periods of rapid price movement, different subscribers may observe different prices depending on their alignment.
 
-    String
+    public CandleData getLatestCandle(String accountInstrument) throws OandaException {
+        String path = "/v3/accounts/" + accountID + "/candles/latest";
+
+        JSONObject playload = makeRequest("GET", path);
+        System.out.println(playload);
+        playload.getJSONObject("candles");
+        return new CandleData(
 
 
-    getDepositAddress(String currency) throws OandaException {
+                Double.parseDouble(playload.getJSONObject("candles").getString("o")),
 
-        String path = "/v3/accounts/" + accountID + "/deposit_address";
+                Double.parseDouble(playload.getJSONObject("candles").getString("c")),
+                Double.parseDouble(playload.getJSONObject("candles").getString("h")),
+                Double.parseDouble(playload.getJSONObject("candles").getString("l")),
+                Integer.parseInt(playload.getJSONObject("candles").getString("time")),
+                Double.parseDouble(playload.getJSONObject("candles").getString("volume")));
+    }
+
+    public String
+    getWithdrawalAddress(String currency) throws OandaException {
+
+        String path = "/v3/accounts/" + accountID + "/withdrawal_address";
         JSONObject payload = makeRequest("GET", path);
         return payload.getJSONObject("data").get(currency).toString();
     }
-    static ArrayList<Mid> array = new ArrayList<>();
-    public static ArrayList<Mid> getForexCandles() throws OandaException, InterruptedException {
 
+    public String
+    getDepositHistory(String currency) throws OandaException {
 
-       System.out.println("instruments list"+ instrumentsList);
-        for (int i = 0; i< instrumentsList.size(); i++) {
-            //Get all forex symbols candles
-            array.add(i,getCandle((instrumentsList.get(i)).replace("/","_"),i));
-        }
-        return array;
-
+        String path = "/v3/accounts/" + accountID + "/deposit_history";
+        JSONObject payload = makeRequest("GET", path);
+        return payload.getJSONObject("data").get(currency).toString();
     }
 
 //
@@ -1063,24 +1084,14 @@ public class OandaClient {
 //    POST	/v3/accounts/{accountID}/orders
 //    Create an Order for an Account
 
+    public String
 
-    public String createOrder(String symbol, double quantity, double price, String side) throws OandaException{
-        //todo create order update
-        String path =  "/v3/accounts/" + accountID + "/orders";
-        JSONObject payload = makeRequest("POST",path);
-        payload.put("symbol", symbol);
-        payload.put("quantity", quantity);
-        payload.put("price", price);
-        payload.put("side", side);
 
-        if (
-                payload.getJSONObject("data")!= null &&
-                payload.getJSONObject("data").get("orderId")!= null &&
-                payload.getJSONObject("data").get("orderId")!= null
-        ){
-            return payload.getJSONObject("data").get("orderId").toString();
-        }
-        return null;
+    getDepositAddress(String currency) throws OandaException {
+
+        String path = "/v3/accounts/" + accountID + "/deposit_address";
+        JSONObject payload = makeRequest("GET", path);
+        return payload.getJSONObject("data").get(currency).toString();
     }
 //
 //    GET	/v3/accounts/{accountID}/orders

@@ -21,6 +21,7 @@ module org.investpro.investpro {
     requires com.fasterxml.jackson.datatype.jsr310;
     requires Java.WebSocket;
     requires org.controlsfx.controls;
+    requires mysql.connector.j;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
 }

@@ -66,7 +66,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
             double volume = 0;
             if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
                 // no trades occurred during this candle
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume, 0, 0, true));
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume));
             } else {
                 double open = 0;
                 double high = -1;
@@ -104,7 +104,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                 double volumeWeightedAveragePrice = volumeWeightedPriceTotal / volume;
 
                 CandleData datum = new CandleData(open, close, Math.max(open, high), Math.min(open, low), openTime,
-                        volume, averagePrice, volumeWeightedAveragePrice, false);
+                        volume);
                 candleData.add(datum);
             }
         }

@@ -6,24 +6,21 @@ import java.util.Objects;
 
 
 public class CandleData extends RecursiveTreeObject<CandleData> {
+    private final int openTime;
     public int closeTime;
-    private double openPrice;
-    private double closePrice;
-    private double highPrice;
-    private double lowPrice;
-    private int openTime;
-    private double volume;
-    private final double averagePrice;
-    private final double volumeWeightedAveragePrice;
-    private final boolean placeHolder;
+    private final double openPrice;
+    private final double closePrice;
+    private final double highPrice;
+    private final double lowPrice;
+    private final double volume;
+    private final double averagePrice = 0;
+    private double volumeWeightedAveragePrice;
+    private boolean placeHolder;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
                       double volume) {
-        this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
-                volume * ((highPrice + lowPrice) / 2), false);
 
 
-        this.closeTime = closeTime;
         this.openTime = openTime;
         this.openPrice = openPrice;
         this.closePrice = closePrice;
@@ -35,19 +32,6 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
 
     }
 
-    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
-                      double volume, double averagePrice, double volumeWeightedAveragePrice, boolean placeHolder) {
-        this.openPrice = openPrice;
-        this.closePrice = closePrice;
-        this.highPrice = highPrice;
-        this.lowPrice = lowPrice;
-        this.openTime = openTime;
-        this.volume = volume;
-        this.averagePrice = averagePrice;
-        this.volumeWeightedAveragePrice = volumeWeightedAveragePrice;
-        this.placeHolder = placeHolder;
-
-    }
 
     public int getCloseTime() {
         return closeTime;
@@ -74,6 +58,7 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
     }
 
     public int getOpenTime() {
+
         return openTime;
     }
 
@@ -109,7 +94,7 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
                 closePrice == other.closePrice &&
                 highPrice == other.highPrice &&
                 lowPrice == other.lowPrice &&
-                openTime == other.openTime &&
+                Objects.equals(openTime, other.openTime) &&
                 volume == other.volume &&
                 averagePrice == other.averagePrice &&
                 volumeWeightedAveragePrice == other.volumeWeightedAveragePrice &&
@@ -128,4 +113,6 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
                         "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
                 openTime, volume, placeHolder);
     }
+
+
 }

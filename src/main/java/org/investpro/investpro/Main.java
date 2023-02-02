@@ -9,106 +9,820 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.print.PageOrientation;
+import javafx.print.Paper;
+import javafx.print.Printer;
+import javafx.scene.Group;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Callback;
+import javafx.util.Duration;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Date;
+import java.io.File;
+import java.net.URISyntaxException;
+import java.util.*;
 
-import static org.investpro.investpro.OandaClient.getTradeAbleInstruments;
+import static java.lang.System.nanoTime;
+import static java.lang.System.out;
+import static org.investpro.investpro.OandaClient.*;
+import static org.investpro.investpro.PLATFORM.COINBASE_PRO;
 
 
 public class Main extends Application {
 
-    private static @NotNull Pane panel() {
+    public static final int TRADING_SCREEN_WIDTH = 1530;
+    public static final int TRADING_SCREEN_HEIGHT = 780;
+    public static final int TRADING_SCREEN_MINIMUM_HEIGHT = 500;
+    public static final int TRADING_SCREEN_MINIMUM_WIDTH = 500;
+    public static final int TRADING_SCREEN_MAXIMUM_WIDTH = (int) Screen.getPrimary().getBounds().getWidth();
+    public static final int TRADING_SCREEN_MAXIMUM_HEIGHT = (int) Screen.getPrimary().getBounds().getHeight();
+    static Alert alert;
+
+    private static @NotNull Pane panel() throws URISyntaxException {
         Pane pane = new Pane();
 
-        MenuBar menuBar = new MenuBar();
+//Create menu
+        MenuBar menubar = new MenuBar();
+        List<Menu> menuElements =
+                Arrays.asList(
+                        new Menu("File"),
+                        new Menu("View"),
+                        new Menu("Tools"),
+                        new Menu("Charts"),
+                        new Menu("Insert"),
+                        new Menu("Window"),
+                        new Menu("Settings")
+                        , new Menu("Browser"),
+                        new Menu("Help"),
+                        new Menu("Languages"),
+                        new Menu("About")
 
 
-        Menu[] menu = new Menu[]{
-                new Menu("Connection"),
-                new Menu("File"),
-                new Menu("View"),
-                new Menu("Edit"),
-                new Menu("Insert"),
-                new Menu("Window"),
-                new Menu("Charts"),
+                );
+
+
+//Adding languages
+        Menu menuLanguage = new Menu("Languages");
+        menuLanguage.getItems().addAll(
+                Arrays.asList(
+                        new MenuItem("English"),
+                        new MenuItem("French"),
+                        new MenuItem("German"),
+                        new MenuItem("Italian"),
+                        new MenuItem("Japanese"),
+                        new MenuItem("Spanish"),
+                        new MenuItem("Portuguese"),
+                        new MenuItem("Russian"),
+                        new MenuItem("Korean"),
+                        new MenuItem("Chinese"),
+                        new MenuItem("Vietnamese"),
+                        new MenuItem("Arabic"),
+                        new MenuItem("Armenian"),
+                        new MenuItem("Hindi"),
+                        new MenuItem("Thai"),
+                        new MenuItem("Turkish")
+                )
+        );
+        menuElements.get(9).getItems().addAll(menuLanguage);
+
+//Adding menu items
+        menuElements.get(0).getItems().addAll(
+                new MenuItem("Sign in"),
+                new MenuItem("Profile"),
+                new MenuItem("Open Data Folder"),
+                new MenuItem("Save"),
+                new MenuItem("Save As"),
+                new MenuItem("Print "),
+                new MenuItem("Print Preview"));
+
+        //Controlling menu events
+
+
+        menuElements.get(0).getItems().get(0).setOnAction(e -> {
+            Label usernameLabel = new Label("Username ");
+            TextField usernameTexfield = new TextField();
+            usernameTexfield.setPromptText("Enter username");
+            Label passwordLabel = new Label("Password ");
+            TextField passwordTexfield = new TextField(" ");
+            passwordTexfield.setPromptText("Enter password");
+            GridPane gridPane = new GridPane();
+            gridPane.setHgap(10);
+            gridPane.setVgap(10);
+            gridPane.setTranslateX(200);
+            gridPane.setTranslateY(50);
+            gridPane.setPadding(new Insets(10, 10, 10, 10));
+            gridPane.add(usernameLabel, 0, 0);
+            gridPane.add(usernameTexfield, 1, 0);
+            gridPane.add(passwordLabel, 0, 1);
+            gridPane.add(passwordTexfield, 1, 1);
+            gridPane.add(new Label("API KEY"), 0, 2);
+            TextField apiKeyLabel = new TextField("");
+            apiKeyLabel.setPromptText(
+                    "Enter API KEY"
+            );
+            gridPane.add(apiKeyLabel, 1, 2);
+            gridPane.add(new Label("API SECRET"), 0, 3);
+            TextField apiSecretLabel = new TextField("");
+            apiSecretLabel.setPromptText("Enter api secret or leave it empty");
+            gridPane.add(apiSecretLabel, 1, 3);
+            gridPane.add(new Label("Account ID"), 0, 4);
+            TextField accountIdLabel = new TextField("");
+            accountIdLabel.setPromptText("Enter account id ");
+            gridPane.add(accountIdLabel, 1, 4);
+            Button signInButton = new Button("Sign In");
+            PLATFORM platform = COINBASE_PRO;
+            signInButton.setOnAction(rr -> {
+
+                String username = usernameTexfield.getText();
+                String password = passwordTexfield.getText();
+
+                if (username.equals("") || password.equals("")) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter username and password");
+
+                    alert.showAndWait();
+                } else {
+                    try {
+                        String apiKey = apiKeyLabel.getText();
+                        String apiSecret = apiSecretLabel.getText();
+                        String accountId = accountIdLabel.getText();
+                        if (apiKey.equals("") || apiSecret.equals("") || accountId.equals("")) {
+                            Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter api key," +
+                                    "");
+                            alert.showAndWait();
+                        } else {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Connect...");
+                            alert.setContentText("Connecting to " + (platform) + " ...");
+                            OandaClient.setApi_Key(apiKey);
+                            OandaClient.accountID = (accountId);
+                            switch (platform) {
+                                case BINANCE_US:
+                                    alert.showAndWait();
+
+                                case Ally_Invest:
+                                    alert.showAndWait();
+
+                                case COINBASE_PRO:
+                                    alert.showAndWait();
+                                case BINANCE_COM:
+                                    alert.showAndWait();
+                                default:
+                                    alert.setContentText("Unsupported Broker ...");
+
+                            }
+                        }
+
+
+                    } catch (Exception r) {
+                        Alert alert = new Alert(Alert.AlertType.ERROR, r.getMessage());
+                        alert.showAndWait();
+
+                    }
+
+                }
+            });
+            HBox hbox = new HBox();
+            signInButton.setTranslateX(
+                    gridPane.getTranslateX() + gridPane.getWidth() / 2 - signInButton.getWidth() / 2
+            );
+            signInButton.setTranslateY(
+                    400
+            );
+            hbox.getChildren().addAll(gridPane, signInButton);
+
+            VBox vbox = new VBox();
+            vbox.setPadding(new Insets(10, 10, 10, 10));
+            vbox.setSpacing(10);
+            vbox.getChildren().addAll(hbox);
+
+            Stage s = new Stage();
+            ObservableList<PLATFORM> observableValue = FXCollections.observableArrayList();
+
+            observableValue.addAll(PLATFORM.values());
+            ComboBox<PLATFORM> comboBox = new ComboBox<>(
+                    observableValue
+
+            );
+
+            comboBox.setTranslateX(20);
+            comboBox.setTranslateY(50);
+            comboBox.setPromptText("Select Exchange");
+            comboBox.setOnAction(selectEvent -> {
+                platform.setValue(comboBox.getValue().getValue());
+            });
+            StackPane pane0 = new StackPane(hbox, comboBox);
+
+            Scene scene = new Scene(pane0, 800, 600);
+            scene.getStylesheets().add("app.css");
+            s.setScene(scene);
+            s.setTitle("Exchange -->Login");
+
+            s.show();
+        });
+
+        menuElements.get(0).getItems().get(1).setOnAction(e -> {
+
+            MenuItem item = (MenuItem) e.getSource();
+            out.println(item.getText());
+            Stage s = new Stage();
+            VBox vbox = new VBox();
+
+            Parent stackPane = new StackPane(vbox);
+            s.setScene(new Scene(stackPane, 800, 600));
+            s.setTitle("Profile");
+            s.setResizable(true);
+            s.show();
+
+        });
+        menuElements.get(0).getItems().get(2).setOnAction(e -> {
+
+            FileChoosers fileChoosers = new FileChoosers();
+            try {
+                fileChoosers.start();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+
+        });
+
+
+        //Print preview
+        menuElements.get(0).getItems().get(3).setOnAction(e -> {
+            MenuItem item = (MenuItem) e.getSource();
+            out.println(item.getText());
+
+            Printer.getDefaultPrinter().createPageLayout(
+                    Paper.A4,
+                    PageOrientation.PORTRAIT,
+                    10,
+                    10,
+                    20,
+                    10
+            );
+
+            Printer.getDefaultPrinter().getPrinterAttributes().getDefaultPageOrientation();
+
+
+        });
+        menuElements.get(0).getItems().get(4).setOnAction(e -> {
+            MenuItem item = (MenuItem) e.getSource();
+            out.println(item.getText());
+
+            Printer.getDefaultPrinter().createPageLayout(
+                    Paper.A4,
+                    PageOrientation.LANDSCAPE,
+                    10,
+                    10,
+                    20,
+                    20);
+        });
+
+
+        menuElements.get(1).getItems().addAll(
                 new Menu("Settings"),
-                new Menu("Languages"),
-                new Menu("Browser"),
-                new Menu("About")
-        };
+                new Menu("Navigate"),
+                new MenuItem("Infos"),
+                new Menu("Telegram "));
+
+        menuElements.get(2).getItems().addAll(
+                new Menu("Toolbar"),
+                new Menu("Status Bar"),
+                new Menu("Chart Bar"),
+                new Menu("Symbols"),
+                new Menu("Market Watch"),
+                new Menu("Navigator"),
+                new MenuItem("Terminal"),
+                new MenuItem("Strategy Tester"),
+                new MenuItem("FullScreen"));
+        menuElements.get(2).getItems().get(4).setOnAction(//Display Market Symbols
+                e -> {
+
+                    StackPane stackPane = new StackPane();
+                    VBox vbox = new VBox();
+                    vbox.setPadding(new Insets(10, 10, 10, 10));
+                    vbox.setSpacing(10);
+                    vbox.setAlignment(Pos.CENTER);
+
+                    ListView<String> symListView = new ListView<>();
+                    try {
+                        symListView.getItems().addAll(getTradeAbleInstruments());
+                    } catch (OandaException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    vbox.getChildren().add(symListView);
+                    stackPane.getChildren().add(vbox);
+
+                    Stage s = new Stage();
+                    s.setScene(new Scene(stackPane, 800, 600));
+                    s.setTitle("Market Symbol");
+                    s.setResizable(true);
+                    s.show();
+                }
+        );
+        menuElements.get(2).getItems().get(5).setOnAction(
+                e -> {
+                    Stage s = new Stage();
+                    VBox vBox = new VBox();
+                    Parent stackPane = new StackPane(vBox);
+                    s.setScene(new Scene(stackPane, 800, 600));
+                    s.setTitle("Market Watch");
+                    s.setResizable(true);
+                    s.show();
+                }
+        );
+        menuElements.get(2).getItems().get(7).setOnAction(
+                e -> {
+                    Stage s = new Stage();
+
+                    s.setTitle("Terminal");
+                    s.setResizable(true);
+                    s.show();
+                }
+        );
+        menuElements.get(2).getItems().get(8).setOnAction(event -> {
+                    Stage s = new Stage();
+                    VBox vBox = new VBox();
+                    vBox.setSpacing(10);
+                    vBox.setPadding(new Insets(10, 10, 10, 10));
+                    vBox.setAlignment(Pos.CENTER);
+                    vBox.getChildren().add(new Label("Hello World now you can test your trade strategy!"));
+                    Parent stackPane = new StackPane(vBox);
+                    s.setScene(new Scene(stackPane, 800, 600));
+                    s.setTitle("Strategy Tester");
+                    s.setResizable(true);
+                    s.show();
+                }
+        );
+        menuElements.get(2).getItems().get(8).setOnAction(e -> {
+            //Resizing Main Window
+            Stage s = new Stage();
+            VBox vBox = new VBox();
+            vBox.setSpacing(10);
+            vBox.setPadding(new Insets(10, 10, 10, 10));
+            vBox.setAlignment(Pos.CENTER);
+            vBox.getChildren().add(new Label("Hello World now you can test your trade strategy" + ""));
+            Parent stackPane = new StackPane(vBox);
+            s.setScene(new Scene(stackPane, 800, 600));
+            s.setTitle("Strategy Tester");
+            s.setResizable(true);
+            s.show();
+
+        });
 
 
-        menu[0].setVisible(true);
+        menuElements.get(3).getItems().addAll(
+                new MenuItem("Indicators"),
+                new MenuItem("Lines"),
+                new MenuItem("Channels"),
+                new MenuItem("Gain"),
+                new MenuItem("Fibonacci"),
+                new MenuItem("Shape"),
+                new MenuItem("Arrows"),
+                new MenuItem("Andrew 's Pitchfork "),
+                new MenuItem("Circle lines"));
+        menuElements.get(3).getItems().get(1).setOnAction(e -> {
+            Stage s = new Stage();
+            VBox vBox = new VBox();
+            vBox.setSpacing(10);
+            vBox.setPadding(new Insets(10, 10, 10, 10));
+            vBox.setAlignment(Pos.CENTER);
+            vBox.getChildren().add(new Label("Hello World now you can test your trade strategy" +
+                    ""));
+            Parent stackPane = new StackPane(vBox);
+            s.setScene(new Scene(stackPane, 800, 600));
+            s.setTitle("Indicator");
+            s.setResizable(true);
+            s.show();
 
-        MenuItem[] menuItem0 = new MenuItem[]{
+        });
+        menuElements.get(3).getItems().get(1).setOnAction(e -> {
 
-                new MenuItem("BINANCE US"),
-                new MenuItem("COINBASE PRO"),
-                new MenuItem("OANDA"),
-                new MenuItem("BINANCE COM"),
-                new MenuItem("IG "),
-                new MenuItem("TD AMERITRADE")
-        };
-        menu[0].getItems().addAll(menuItem0);
-
-
-        menu[1].setVisible(true);
-        MenuItem[] menuItem1 = new MenuItem[]{
-
-                new MenuItem("open file"),
-                new MenuItem("save settings"),
-                new MenuItem("save as"),
-                new MenuItem("print preview"),
-                new MenuItem("Print to PDF")
+        });
+        menuElements.get(3).getItems().get(2).setOnAction(e -> {
+        });
+        menuElements.get(3).getItems().get(3).setOnAction(e -> {
+        });
+        menuElements.get(3).getItems().get(4).setOnAction(e -> {
+        });
+        menuElements.get(3).getItems().get(5).setOnAction(e -> {
+        });
+        menuElements.get(3).getItems().get(6).setOnAction(e -> {
+        });
+        menuElements.get(3).getItems().get(7).setOnAction(e -> {
+        });
+        menuElements.get(3).getItems().get(8).setOnAction(e -> {
+        });
 
 
-        };
-        menu[1].getItems().addAll(
-                menuItem1
+        menuElements.get(4).getItems().addAll(
+                new MenuItem("Objects"),
+                new MenuItem("BarChart"),
+                new MenuItem("CandleStick"),
+                new MenuItem("Lines' Chart"),
+                new MenuItem("ForeGround"),
+                new MenuItem("Background"),
+                new MenuItem("TimesFrame"),
+                new MenuItem("Templates"),
+                new MenuItem("Refresh"),
+                new MenuItem("Grid"),
+                new MenuItem("Volume"),
+                new MenuItem("Auto Scroll"),
+                new MenuItem("Chart Shift"),
+                new MenuItem("Zoom In"),
+                new MenuItem("Zoom Out"),
+                new MenuItem("Properties"));
+        menuElements.get(4).getItems().get(0).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(1).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(2).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(3).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(4).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(5).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(6).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(7).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(8).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(9).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(10).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(11).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(12).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(13).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(14).setOnAction(e -> {
+        });
+        menuElements.get(4).getItems().get(15).setOnAction(e -> {
+        });
+
+
+        menuElements.get(5).getItems().addAll(
+                new MenuItem("New Order"),
+                new MenuItem("Global variables"),
+                new MenuItem("History Center"),
+                new MenuItem("Options")
         );
 
-        menu[2].setVisible(true);
 
-        menu[3].setVisible(true);
-        menu[4].setVisible(true);
-        menu[5].setVisible(true);
-        menu[6].setVisible(true);
-        menu[7].setVisible(true);
+        menuElements.get(5).getItems().get(0).setOnAction(e -> {
 
-        //Languages list settings
-        menu[8].setVisible(true);
+            VBox vbox = new VBox();
+
+            Button btnBuy = new Button("Buy Order");
+
+            Button btnSell = new Button("Sell Order");
+            Spinner<Double> spinner1 = new Spinner<>();
+            spinner1.setPromptText("Lot size: " + 0.01);
+
+            ObservableList<Double> obList = FXCollections.observableArrayList();
+
+            obList.addAll(0.01, 0.02, 0.03, 0.04, 0.05, 0.06);
+
+            SpinnerValueFactory<Double> valueFactory = new SpinnerValueFactory.ListSpinnerValueFactory<>(obList);
+            spinner1.setInitialDelay(Duration.ONE);
+            spinner1.setValueFactory(valueFactory);
+            spinner1.decrement(-1);
+            spinner1.increment(1);
+            ComboBox<String> combo_box = new ComboBox<>();
+            try {
+                combo_box.getItems().addAll(OandaClient.getTradeAbleInstruments());
+            } catch (OandaException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            btnSell.setTranslateX(190);
+            btnSell.setTranslateY(50);
+            btnBuy.setTranslateX(90);
+            btnBuy.setTranslateY(50);
+            combo_box.setTranslateX(90);
+            combo_box.setTranslateY(60);
+            spinner1.setTranslateX(200);
+            spinner1.setTranslateY(150);
+
+            vbox.getChildren().addAll(
+                    btnBuy, btnSell, spinner1, combo_box
+            );
+            StackPane pane1 = new StackPane();
+            pane1.getChildren().addAll(vbox);
+            Scene sceneScene = new Scene(pane1, 800, 600);
+            Stage stage = new Stage();
+            stage.setScene(sceneScene);
+            stage.setTitle("New Order");
+            stage.show();
+
+        });
 
 
-        MenuItem[] menuLanguages = new MenuItem[]{
-                new MenuItem("ENGLISH"),
-                new MenuItem("FRENCH"),
-                new MenuItem("CHINESE"),
-                new MenuItem("JAPANESE"),
-                new MenuItem("GERMAN")
+        //Global variables
 
-        };
+        menuElements.get(5).getItems().get(1).setOnAction(e -> {
 
-        menu[8].getItems().addAll(menuLanguages);
+            VBox vbox = new VBox();
+
+            ListView<SymbolData> tickListView = new ListView<>();
+
+            vbox.getChildren().addAll(tickListView);
+            StackPane pane3 = new StackPane();
+            pane3.getChildren().addAll(vbox);
+            Scene sceneScene = new Scene(pane3, 800, 600);
+            Stage stage = new Stage();
+            stage.setScene(sceneScene);
+            stage.setTitle("Global Variables");
+            stage.show();
+
+        });
+
+        menuElements.get(5).getItems().get(2).setOnAction(e -> {
+
+            VBox vbox = new VBox();
+            StackPane pane6 = new StackPane();
+            pane6.getChildren().addAll(vbox);
+            Scene sceneScene = new Scene(pane6, 800, 600);
+            Stage stage = new Stage();
+            stage.setScene(sceneScene);
+            stage.setTitle("History Center");
+            stage.show();
+
+        });
 
 
-        menu[9].setVisible(true);
+        menuElements.get(5).getItems().get(3).setOnAction(e -> {
+            VBox vbox = new VBox();
+            StackPane pane7 = new StackPane();
+            pane7.getChildren().addAll(vbox);
+            Scene sceneScene = new Scene(pane7, 800, 600);
+            Stage stage = new Stage();
+            stage.setScene(sceneScene);
+            stage.setTitle("Options");
+            stage.show();
+
+        });
 
 
-        menu[10].setVisible(true);
+        menuElements.get(6).getItems().addAll(
+                new MenuItem("New Window"),
+                new MenuItem("Title Window"),
+                new MenuItem("Cascade Window"));
+
+        menuElements.get(6).getItems().get(0).setOnAction(e ->
+        {
+            Scene scene = new Scene(new Group(new StackPane()));
+
+            StackPane stackPane = new StackPane();
+            scene.setRoot(stackPane);
+            Stage s = new Stage();
+            s.setTitle("New Window");
+            s.setScene(scene);
+            s.show();
+        });
+        menuElements.get(6).getItems().get(1).setOnAction(e -> {
+            StackPane stackPane = new StackPane();
+            Scene scene = new Scene(stackPane);
+            Stage s = new Stage();
+            s.setTitle("Title Window");
+            s.setScene(scene);
+            s.show();
+        });
+
+        menuElements.get(6).getItems().get(2).setOnAction(e -> new CascadeWindow(800, 680));
 
 
-        menuBar.getMenus().addAll(menu);
-        pane.getChildren().addAll(menuBar);
+        menuElements.get(7).getItems().addAll(//Browser
+                new MenuItem("Browser"),
+                new MenuItem("Online search"),
+                new MenuItem("About"));
+        menuElements.get(7).getItems().get(0).setOnAction(e -> {
+            Browser browser = null;
+            try {
+                browser = new Browser();
+                browser.start();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+
+
+        });
+        menuElements.get(7).getItems().get(1).setOnAction(e -> {
+            //TODO Online search
+
+
+        });
+        menuElements.get(7).getItems().get(2).setOnAction(e -> {
+            //TODO MODIFY TEXT
+
+            Stage stage = new Stage();
+            VBox vBox = new VBox();
+            GridPane grid_pane = new GridPane();
+            grid_pane.setHgap(10);
+            grid_pane.setVgap(10);
+            grid_pane.setPadding(new Insets(10, 10, 10, 10));
+            grid_pane.setAlignment(Pos.CENTER);
+            grid_pane.add(new Label("About"), 0, 0);
+            vBox.getChildren().add(new Label("InvestPro " + new Date()));
+
+            stage.setScene(new Scene(new Group(new StackPane(vBox))));
+            stage.show();
+        });
+
+
+        // instrumentsList.get(i).replace("/", "_");
+
+
+        pane.setPadding(new Insets(10, 10, 10, 10));
+
+        ToolBar toolBar1 = new ToolBar();
+        toolBar1.setTranslateY(430);
+        toolBar1.setTranslateX(200);
+        toolBar1.setPrefSize(
+                1000,
+                50
+        );
+        toolBar1.setOrientation(
+                Orientation.HORIZONTAL
+        );
+        Button[] buttons = new Button[10];
+        for (int i = 0; i < 10; i++) {
+            buttons[i] = new Button("BUY");
+        }
+        buttons[0].setText("BUY");
+        //buttons[0] action
+        buttons[0].setOnAction(
+                event -> {//Open Market Buy Orders
+                    try {
+                        TextField amountField = new TextField("amount");
+                        int amount = Integer.parseInt(amountField.getText());
+                        if (amount > 0) {
+
+
+                            // TextField priceField = new TextField("price");
+                            String symbol9 = instrumentsList.get(Integer.parseInt(amountField.getText())).replace("/", "_");
+
+
+                            String side =
+                                    "BUY";
+                            String type =
+                                    "MARKET";
+                            double price = 1.45;
+                            OandaClient.createOrder(symbol9, amount, type, side);
+                        }
+                    } catch (Exception e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("Market Buy Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    } catch (OandaException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+
+        buttons[1].setText("SELL");
+        //buttons[1] action
+        buttons[1].setOnAction(
+                event -> {//Open Market Sell Orders
+                    try {
+                        TextField amountField = new TextField("amount");
+                        int amount = Integer.parseInt(amountField.getText());
+
+                        if (amount > 0) {
+                            out.println(amount);
+                            TextField priceField = new TextField("price");
+                            String symbo =
+                                    instrumentsList.get(Integer.parseInt(amountField.getText())).replace("/", "_");
+                            String side =
+                                    "SELL";
+                            String type =
+                                    "MARKET";
+                            OandaClient.createMarketOrder(symbo, type, side, amount);
+                        }
+                    } catch (Exception | OandaException e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("Market Sell Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    }
+                });
+        buttons[2].setText("SELL-STOP");
+        //buttons[2] action
+        buttons[2].setOnAction(
+                event -> {//Open Market Sell Stop Orders
+                    try {
+                        TextField amountField = new TextField("amount");
+                        int amount = Integer.parseInt(amountField.getText());
+                        if (amount > 0) {
+                            out.println(amount);
+                        }
+                    } catch (Exception e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("Market Sell Stop Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    }
+                });
+        buttons[3].setText("BUY-STOP");
+        //buttons[3] action
+        buttons[3].setOnAction(
+                event -> {//Open Market Buy Stop Orders
+                    try {
+                        TextField amountField = new TextField("amount");
+                        int amount = Integer.parseInt(amountField.getText());
+                        if (amount > 0) {
+                            out.println(amount);
+
+
+                        }
+                    } catch (Exception e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("Market Buy Stop Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    }
+                });
+
+        buttons[4].setText("SELL-LIMIT");
+        //buttons[4] action
+        buttons[4].setOnAction(
+                event -> {//Open Market Sell Limit Orders
+                    try {
+                        TextField amountField = new TextField("amount");
+                        int amount = Integer.parseInt(amountField.getText());
+                        if (amount > 0) {
+                            out.println(amount);
+                            TextField
+                                    priceField = new TextField("price");
+                            double price = Integer.parseInt(priceField.getText());
+                        }
+
+                    } catch (Exception e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("Market Sell Limit Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    }
+                });
+        buttons[5].setText("BUY-LIMIT");
+        //buttons[5] action
+        buttons[5].setOnAction(
+                event -> {//Open Market Buy Limit Orders
+                    try {
+                        TextField amountField = new TextField("amount");
+                        int amount = Integer.parseInt(amountField.getText());
+                        if (amount > 0) {
+                            out.println(amount);
+                        }
+                    } catch (Exception e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("Market Buy Limit Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    }
+                });
+
+        buttons[6].setText("Screen Shot");
+        //buttons[6] action
+        buttons[6].setOnAction(
+                event -> {//Open ScreenShot Orders
+                    try {
+                        File file = new File(
+                                System.getProperty("user.dir") +
+                                        "/resources/images/screenshot" + nanoTime() + ".png"
+                        );
+                        Screenshot.capture(file);
+                    } catch (Exception e) {
+                        out.println(e.getMessage());
+                        alert.setTitle("ScreenShot Error");
+                        alert.setHeaderText("Error");
+                        alert.setContentText(e.getMessage());
+                        alert.showAndWait();
+                    }
+                });
+
+        menubar.getMenus().addAll(menuElements);
+        pane.getChildren().addAll(menubar);
 
 
         return pane;
@@ -125,7 +839,6 @@ public class Main extends Application {
     }
 
     static ArrayList<String> symb;
-    static Spinner<Double> spinner = new Spinner<>();
 
     static {
         try {
@@ -149,10 +862,8 @@ public class Main extends Application {
         accountPerformance.setPadding(new Insets(10, 10, 10, 10));
         accountPerformance.setSpacing(10);
         accountPerformance.setAlignment(Pos.CENTER);
-        accountPerformance.setStyle("-fx-background-color: #32737e;");
 
-        GridPane grid_pane
-                = new GridPane();
+        GridPane grid_pane = new GridPane();
 
         grid_pane.setPadding(new Insets(10, 10, 10, 10));
         grid_pane.setVgap(10);
@@ -187,18 +898,18 @@ public class Main extends Application {
         gridPane.setVgap(10);
         gridPane.setPadding(new Insets(10, 10, 10, 10));
         gridPane.setAlignment(Pos.CENTER);
-        gridPane.setStyle("-fx-background-color: #0c4559;");
+
         gridPane.add(new Label("Total Trades"), 0, 0);
         TextField totalTrades = new TextField("");
         totalTrades.setEditable(false);
         totalTrades.setText(String.valueOf(OandaClient.getOpenTradesList().size()));
-        gridPane.add(totalTrades, 0, 1);
+        gridPane.add(totalTrades, 1, 0);
         gridPane.add(new Label("Total Orders"), 0, 2);
         TextField totalOrders = new TextField("");
         totalOrders.setEditable(false);
-        totalOrders.setText(String.valueOf(OandaClient.getTradesList().size()));
-        gridPane.add(totalOrders, 0, 3);
-
+        totalOrders.setText(String.valueOf(OandaClient.getOrdersList().size()));
+        Log.info("Order " + OandaClient.getOrdersList());
+        gridPane.add(totalOrders, 1, 2);
 
         tradeStatistics.getChildren().addAll(gridPane);
         return tradeStatistics;
@@ -209,8 +920,6 @@ public class Main extends Application {
         vBox.setSpacing(10);
         vBox.setPadding(new Insets(10, 10, 10, 10));
         vBox.setAlignment(Pos.CENTER);
-        vBox.setStyle("-fx-background-color: #2de87e;");
-
         GridPane grid_pane = new GridPane();
         grid_pane.setPadding(new Insets(10, 10, 10, 10));
         grid_pane.setHgap(10);
@@ -222,35 +931,34 @@ public class Main extends Application {
         TextField accountID = new TextField(OandaClient.getAccountID());
         accountID.setEditable(false);
         grid_pane.add(accountID, 1, 0);
-        grid_pane.add(new Label("Balance"), 0, 1);
-        grid_pane.add(new TextField(String.valueOf(root.account.balance)), 1, 1);
-        grid_pane.add(new Label("Margin-Available"), 0, 2);
-        grid_pane.add(new TextField(String.valueOf(root.account.marginAvailable)), 1, 2);
-        grid_pane.add(new Label("Margin-Used"), 0, 3);
-        grid_pane.add(new TextField(String.valueOf(root.account.marginUsed)), 1, 3);
+        grid_pane.add(new Label("Balance"), 1, 2);
+        grid_pane.add(new TextField(String.valueOf(root.account.balance)), 2, 2);
+        grid_pane.add(new Label("Margin-Available"), 3, 2);
+        grid_pane.add(new TextField(String.valueOf(root.account.marginAvailable)), 3, 2);
+        grid_pane.add(new Label("Commission"), 4, 2);
+        grid_pane.add(new TextField(String.valueOf(root.account.commission)), 5, 2);
         grid_pane.add(new Label("Margin-Rate"), 0, 4);
         grid_pane.add(new TextField(String.valueOf(root.account.marginRate)
         ), 1, 4);
         grid_pane.add(new Label("Hedging "), 0, 5);
         grid_pane.add(new TextField(String.valueOf(root.account.hedgingEnabled)),
                 1, 5);
-        grid_pane.add(new Label("Commission"), 0, 6);
-        grid_pane.add(new TextField(String.valueOf(root.account.commission))
+        grid_pane.add(new Label("Financing"), 0, 6);
+        grid_pane.add(new TextField(String.valueOf(root.account.financing))
                 , 1, 6);
         grid_pane.add(new Label("unrealizedPL"), 0, 7);
-        grid_pane.add(new TextField(String.valueOf(root.account.unrealizedPL)),
-                1, 7);
-        grid_pane.add(new Label("resettablePL"), 0, 8);
+        grid_pane.add(new TextField(String.valueOf(root.account.unrealizedPL)), 1, 7);
+        grid_pane.add(new Label("resettablePL"), 2, 7);
         grid_pane.add(new TextField(String.valueOf(root.account.resettablePL)),
-                1, 8);
-        grid_pane.add(new Label("Margin closeOut %"), 0, 9);
+                3, 7);
+        grid_pane.add(new Label("Margin closeOut %"), 3, 7);
         grid_pane.add(new TextField(String.valueOf(root.account.marginCloseoutPercent)),
 
-                1, 9);
+                3, 7);
         grid_pane.add(new Label("Open PositionCount"), 0, 10);
         grid_pane.add(new TextField(String.valueOf(root.account.openPositionCount)),
                 1, 10);
-        grid_pane.add(new Label("PositionCount"), 0, 11);
+        grid_pane.add(new Label("Position - Count"), 0, 11);
         grid_pane.add(new TextField(String.valueOf(root.account.positionCount)), 1, 11);
         vBox.getChildren().addAll(grid_pane);
         return vBox;
@@ -280,7 +988,7 @@ public class Main extends Application {
         vbox.setPadding(new Insets(10, 10, 10, 10));
         vbox.setAlignment(Pos.CENTER);
         vbox.setStyle("-fx-background-color: #000000;");
-        vbox.getChildren().addAll(new Label("Trade Signals"));
+        vbox.getChildren().addAll(new Label("Trade Signal"));
         return vbox;
 
     }
@@ -294,18 +1002,18 @@ public class Main extends Application {
     //Get Oanda forex orders
     private static @NotNull VBox getOandaOrders() throws OandaException {
         ListView<OandaOrder> or = new ListView<>(FXCollections.observableArrayList(OandaClient.getOrdersList()));
-        VBox vBox = new VBox();
+        VBox vBox = new VBox(or);
         vBox.setSpacing(10);
         vBox.setPadding(new Insets(10, 10, 10, 10));
         vBox.setAlignment(Pos.CENTER);
-        vBox.setStyle("-fx-background-color: #0c4559;");
+
         vBox.getChildren().addAll(new Label("Current Orders"));
-        vBox.getChildren().addAll(or);
+
         return vBox;
 
     }
 
-    private @NotNull TreeTableView<SymbolData> getDepths() {
+    private @NotNull TreeTableView<SymbolData> getDepths() throws OandaException {
         TreeTableView<SymbolData> treeTable = new TreeTableView<>();
         TreeTableColumn<SymbolData, String> symbolColumn = new TreeTableColumn<>();
         symbolColumn.setText("SYMBOL");
@@ -321,6 +1029,8 @@ public class Main extends Application {
                 datas, calback
         );
 
+        root.setExpanded(true);
+        Objects.requireNonNull(getOrderBook("EUR_USD"));
 
         treeTable.getColumns().addAll(symbolColumn, symbolBid, symbolAsk);
         treeTable.setRoot(root);
@@ -329,28 +1039,61 @@ public class Main extends Application {
     }
 
     @Contract(pure = true)
-    private @NotNull TreeTableView<CandleData> getCandleData() {
+    private @NotNull TreeTableView<CandleData> getCandleData() throws OandaException, InterruptedException {
         TreeTableView<CandleData> treeTable = new TreeTableView<>();
         TreeTableColumn<CandleData, String> dateColumn = new TreeTableColumn<>("Date");
-        TreeTableColumn<CandleData, Double> symbolColum = new TreeTableColumn<>("Symbol");
-        TreeTableColumn<CandleData, Double> openColum = new TreeTableColumn<>("Open");
-        TreeTableColumn<CandleData, Double> closeColum = new TreeTableColumn<>("Close");
-        TreeTableColumn<CandleData, Double> highColum = new TreeTableColumn<>("High");
-        TreeTableColumn<CandleData, Double> lowColum = new TreeTableColumn<>("Low");
-        TreeTableColumn<CandleData, Long> volColumn = new TreeTableColumn<>("Volume");
+        Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> dateColumnValue
+                = param -> new ReadOnlyStringWrapper(String.valueOf(new Date(param.getValue().getValue().getOpenTime())));
+        dateColumn.setCellValueFactory(dateColumnValue);
+
+        TreeTableColumn<CandleData, String> openColum = new TreeTableColumn<>("Open");
+        Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> openColumnValue
+                = param -> new ReadOnlyStringWrapper(String.valueOf(param.getValue().getValue().getOpenPrice()));
+        openColum.setCellValueFactory(openColumnValue);
 
 
-        treeTable.getColumns().addAll(dateColumn, symbolColum, openColum, closeColum, highColum, lowColum, volColumn);
+        TreeTableColumn<CandleData, String> closeColum = new TreeTableColumn<>("Close");
+        Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> closeColumnValue
+                = param -> new ReadOnlyStringWrapper(String.valueOf(param.getValue().getValue().getClosePrice()));
+        closeColum.setCellValueFactory(closeColumnValue);
+
+
+        TreeTableColumn<CandleData, String> highColum = new TreeTableColumn<>("High");
+        Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> highColumnValue
+                = param -> new ReadOnlyStringWrapper(String.valueOf(param.getValue().getValue().getHighPrice()));
+        highColum.setCellValueFactory(highColumnValue);
+
+
+        TreeTableColumn<CandleData, String> lowColum = new TreeTableColumn<>("Low");
+
+        Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> lowColumnValue
+                = param -> new ReadOnlyStringWrapper(String.valueOf(param.getValue().getValue().getLowPrice()));
+        lowColum.setCellValueFactory(lowColumnValue);
+
+
+        TreeTableColumn<CandleData, String> volColumn = new TreeTableColumn<>("Volume");
+        Callback<TreeTableColumn.CellDataFeatures<CandleData, String>, ObservableValue<String>> volumeColumnValue
+                = param -> new ReadOnlyStringWrapper(String.valueOf(param.getValue().getValue().getOpenPrice()));
+        volColumn.setCellValueFactory(volumeColumnValue);
+
+
         treeTable.setTranslateY(25);
 
         ObservableList<CandleData> datas = FXCollections.observableArrayList();
+
+        datas.addAll(OandaClient.getForexCandles());
         Callback<RecursiveTreeObject<CandleData>, ObservableList<CandleData>> calback
                 = RecursiveTreeObject::getChildren;
-        RecursiveTreeItem<CandleData> root = new RecursiveTreeItem<>(
-                datas, calback
-        );
+        RecursiveTreeItem<CandleData> root = new RecursiveTreeItem<>(datas, calback);
+
+        root.setValue(datas.get(6));
+        root.setExpanded(true);
+        treeTable.setVisible(true);
 
         treeTable.setRoot(root);
+        treeTable.getColumns().addAll(dateColumn, openColum, closeColum, highColum, lowColum, volColumn);
+
+
         treeTable.setPrefSize(200, 300);
         return treeTable;
     }
@@ -411,7 +1154,7 @@ public class Main extends Application {
         grid.setPadding(new Insets(10, 10, 10, 10));
         grid.setTranslateX(500);
         grid.setTranslateY(200);
-
+        grid.setPrefSize(500, 500);
         Label lblUsername = new Label("Username :");
         TextField textField = new TextField("");
         textField.setPromptText("Enter username");
@@ -419,8 +1162,8 @@ public class Main extends Application {
         PasswordField passwordField = new PasswordField();
         grid.add(lblUsername, 0, 0);
         grid.add(textField, 1, 0);
-        grid.add(lblPassword, 0, 1);
-        grid.add(passwordField, 1, 1);
+        grid.add(lblPassword, 0, 3);
+        grid.add(passwordField, 1, 3);
         Button btnReg = new Button("Register");
         grid.add(btnReg, 0, 7);
         Button btnLgn = new Button("Login");
@@ -428,7 +1171,7 @@ public class Main extends Application {
         Hyperlink btnForget = new Hyperlink("Forgot Password");
         grid.add(btnForget, 1, 12);
         anchorPane.getChildren().add(grid);
-        Scene scene = new Scene(anchorPane, 1530, 780);
+        Scene scene = new Scene(anchorPane, TRADING_SCREEN_WIDTH, TRADING_SCREEN_HEIGHT);
 
         scene.getStylesheets().add("app.css");
         stage.setTitle("InvestPro   " + new Date(System.currentTimeMillis()));
@@ -480,7 +1223,7 @@ public class Main extends Application {
         AnchorPane anchorPane = new AnchorPane(grid);
         Scene scene = new Scene(anchorPane, 1530, 780);
         stage.setScene(scene);
-        scene.getStylesheets().add("app.css");
+        scene.getStylesheets().add("/app.css");
         stage.setIconified(true);
         stage.setResizable(true);
 
@@ -516,64 +1259,53 @@ public class Main extends Application {
 
 
         AnchorPane anchorpane = new AnchorPane();
-        anchorpane.getChildren().addAll(panel(), getCandleData(), getDepths(), getCandleSticksChart());
-        Scene scene = new Scene(anchorpane, 1530, 780);
+        anchorpane.getChildren().addAll(panel(), grid, getCandleSticksChart());
+        Scene scene = new Scene(anchorpane, TRADING_SCREEN_WIDTH, TRADING_SCREEN_HEIGHT);
         scene.getStylesheets().add("/app.css");
         stage.setScene(scene);
-        stage.setTitle("InvestPro -->Dashboard   Welcome  " + new Date(System.currentTimeMillis()));
+        stage.setTitle("InvestPro -->Welcome  " + new Date(System.currentTimeMillis()));
         stage.setResizable(true);
         stage.setIconified(true);
         stage.show();
 
     }
 
-    TabPane getTabPane() throws Exception, OandaException {
+    TabPane getTabPane() throws OandaException {
 
 
         DraggableTab[] tabs
 
                 = new DraggableTab[]{
-                new DraggableTab("Orders Infos"),
+                new DraggableTab("Live Orders "),
                 new DraggableTab("Orders History"),
-                new DraggableTab("Account Details"),
+                new DraggableTab("Account "),
                 new DraggableTab("Account Performance"),
-                new DraggableTab("Account Summary"),
+                new DraggableTab("Account Details"),
                 new DraggableTab("Statistics"),
-                new DraggableTab("Mail"),
+                new DraggableTab("News Report"),
                 new DraggableTab("Trade Signals"),
                 new DraggableTab("Recommendation"),
-                new DraggableTab("Help")};
+                new DraggableTab("Navigation")};
 
         tabs[0].setContent(getOandaOrders());
 
-        tabs[1].setContent(getOandaOrdersHistory());
+        ListView<OandaOrder> listOfOrders = new ListView<>();
+        listOfOrders.getItems().addAll(getOrdersList());
+        tabs[1].setContent(listOfOrders);
         tabs[2].setContent(getOandaPortFolio());
         tabs[3].setContent(getAccountPerformance());
-        tabs[4].setContent(getAccountSummary());
+        tabs[4].setContent(getAccountDetails());
         tabs[5].setContent(getTradeStatistics());
-        tabs[6].setContent(getTradeStatistics());
+        tabs[6].setContent(getNews());
         tabs[7].setContent(getOandaSignals());
         tabs[8].setContent(getOandaRecommendation());
-        tabs[9].setContent(getOandaHelp());
+
         TabPane orderTabPanes = new TabPane();
         orderTabPanes.getTabs().addAll(tabs);
 
 
-        // timeFrameToolBar.getItems().addAll(timeFrameToolBarButtons)
-        // orderTabPanes.setRotateGraphic(true);
-
+        orderTabPanes.setRotateGraphic(true);
         orderTabPanes.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);
-
-
-        SpinnerValueFactory<Double> spinnerValueFactory = new SpinnerValueFactory.DoubleSpinnerValueFactory(0.01,
-                60, 0.01);
-        spinner.setValueFactory(spinnerValueFactory);
-        HBox hbox = new HBox(spinner);
-
-        hbox.setSpacing(10);
-        hbox.setAlignment(Pos.CENTER);
-
-
         return orderTabPanes;
     }
 
@@ -582,12 +1314,12 @@ public class Main extends Application {
 
         TabPane candleSticksChartTabPane = new TabPane();
         DraggableTab[] candleStickChartTabs = new DraggableTab[]{
-                new DraggableTab("Oanda"),
+                new DraggableTab("Oanda Com"),
                 new DraggableTab("Binance Us"),
                 new DraggableTab("Coinbase Pro"),
-                new DraggableTab("IG "),
-                new DraggableTab("Binance Com"),
-                new DraggableTab("Stock")
+                new DraggableTab("Stock"),
+                new DraggableTab("Browser"),
+                new DraggableTab("Account Info")
         };
 
 
@@ -596,8 +1328,8 @@ public class Main extends Application {
                 new VBox(),
                 new VBox(),
                 new VBox(),
-                new VBox(),
-                new VBox(),
+                new VBox(new Browser().start()),
+                new VBox(getTabPane()),
                 new VBox(),
                 new VBox()
         };
@@ -617,21 +1349,13 @@ public class Main extends Application {
         ToolBar toolbarBuySell = new ToolBar(buttons);
 
 
-        ToolBar[] toolbar = new ToolBar[]{
 
-                toolbarBuySell,
-                new ToolBar(buttons),
-                new ToolBar(buttons), new ToolBar(buttons), new ToolBar(buttons), new ToolBar(buttons)
-                , new ToolBar(buttons), new ToolBar(buttons),
-                new ToolBar(buttons)
-
-        };
 
         for (int i = 0; i < candleStickChartTabs.length; i++) {
 
-            vbox[i].setPrefSize(1200, 800);
-            toolbar[i].setTranslateY(500);
-            vbox[i].getChildren().addAll(toolbar[i]);
+            vbox[i].setPrefSize(1530, 800);
+            //toolbar[i].setTranslateY(600);
+            //  vbox[i].getChildren().add(toolbar[i]);
             candleStickChartTabs[i].setContent(vbox[i]);
         }
 
@@ -644,65 +1368,73 @@ public class Main extends Application {
         vbox[2].getChildren().add(coinbaseCandleChart.start());
         BinanceUsCandleStick stockCandleChart = new BinanceUsCandleStick();
         vbox[3].getChildren().add(stockCandleChart.start());
-        BinanceUsCandleStick marketCandleChart = new BinanceUsCandleStick();
-        vbox[4].getChildren().add(marketCandleChart.start());
+
 
         candleSticksChartTabPane.getTabs().addAll(candleStickChartTabs);
         toolbarBuySell.setTranslateY(2);
         toolbarBuySell.setTranslateX(0);
-        candleSticksChartTabPane.setPrefSize(1250, 700);
-        VBox vBox = new VBox(candleSticksChartTabPane, getTabPane());
-        vBox.setTranslateX(200);
-        vBox.setTranslateY(20);
 
-        vBox.setPrefSize(1250, 750);
+
+        candleSticksChartTabPane.setPrefSize(1530, 800);
+        VBox vBox = new VBox(candleSticksChartTabPane);
+
+        vBox.setTranslateY(22);
+
+        vBox.setPrefSize(1530, 730);
         return vBox;
     }
 
     TreeTableView<News> getNews() throws IllegalArgumentException {
 
         TreeTableView<News> treeTableNews = new TreeTableView<>();
-        TreeTableColumn<News, String> columnNewsDate = new TreeTableColumn<>("Date");
 
 
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> dateCellValueFactory
-                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getDate());
-        columnNewsDate.setCellValueFactory(dateCellValueFactory);
-        TreeTableColumn<News, String> columnNewsTitle = new TreeTableColumn<>("Title");
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> titleCellValueFactory
-                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getTitle());
-        columnNewsDate.setCellValueFactory(titleCellValueFactory);
-        TreeTableColumn<News, String> columnNewsCountry = new TreeTableColumn<>("Country");
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> countryCellValueFactory
-                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getCountry());
-        columnNewsDate.setCellValueFactory(countryCellValueFactory);
-        TreeTableColumn<News, String> columnNewsImpact = new TreeTableColumn<>("Impact");
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> impactCellValueFactory
-                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getImpact());
-        columnNewsDate.setCellValueFactory(impactCellValueFactory);
-        TreeTableColumn<News, String> columnNewsForecast = new TreeTableColumn<>("Forecast");
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> forecastCellValueFactory
-                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getForecast());
-        columnNewsDate.setCellValueFactory(forecastCellValueFactory);
-        TreeTableColumn<News, String> columnNewsPrevious = new TreeTableColumn<>("Previous");
+        TreeTableColumn<News, String> columnNewsDate = new TreeTableColumn<>();
+        columnNewsDate.setText("Date");
+        TreeTableColumn<News, String> columnNewsTitle = new TreeTableColumn<>();
+        columnNewsTitle.setText("Title");
+        TreeTableColumn<News, String> columnNewsCountry = new TreeTableColumn<>();
+        columnNewsCountry.setText("Country");
+        TreeTableColumn<News, String> columnNewsImpact = new TreeTableColumn<>();
+        columnNewsImpact.setText("Impact");
+        TreeTableColumn<News, String> columnNewsForecast = new TreeTableColumn<>();
+        columnNewsForecast.setText("Forecast");
+        TreeTableColumn<News, String> columnNewsPrevious = new TreeTableColumn<>();
+        columnNewsPrevious.setText("Previous");
 
-
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> previousCellValueFactory
-                = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getPrevious());
-        columnNewsDate.setCellValueFactory(previousCellValueFactory);
         //Loading News from Forex factory url:https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823
-
-
-        ObservableList<News> data = FXCollections.observableArrayList();
-
-        for (int i = 0; i < NewsManager.getNewsList().size(); i++) {
-
-            data.add(i, NewsManager.getNewsList().get(i));
-        }
-        TreeItem<News> root = new RecursiveTreeItem<>(data, RecursiveTreeObject::getChildren);
-
-
+        ObservableList<News> dat = FXCollections.observableArrayList();
+        dat.addAll(NewsManager.getNewsList());
+        Callback<RecursiveTreeObject<News>, ObservableList<News>> callback
+                = RecursiveTreeObject::getChildren;
+        RecursiveTreeItem<News> root = new RecursiveTreeItem<>(dat, callback);
         treeTableNews.getColumns().addAll(columnNewsDate, columnNewsTitle, columnNewsCountry, columnNewsImpact, columnNewsForecast, columnNewsPrevious);
+        //treeItemDate.getChildren().setAll(root);
+        root.setValue(NewsManager.getNewsList().get(6));
+
+
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsDateValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getDate());
+        columnNewsDate.setCellValueFactory(columnNewsDateValue);
+
+
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsTitleValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getTitle());
+        columnNewsTitle.setCellValueFactory(columnNewsTitleValue);
+
+
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsCountryValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getCountry());
+        columnNewsCountry.setCellValueFactory(columnNewsCountryValue);
+
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsImpactValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getImpact());
+        columnNewsImpact.setCellValueFactory(columnNewsImpactValue);
+
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsForecastValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getForecast());
+        columnNewsForecast.setCellValueFactory(columnNewsForecastValue);
+
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsPreviousValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getPrevious());
+        columnNewsPrevious.setCellValueFactory(columnNewsPreviousValue);
+
+        root.setExpanded(true);
+        treeTableNews.setRoot(root);
 
 
         return treeTableNews;
@@ -714,18 +1446,13 @@ public class Main extends Application {
         accountDetails.setPadding(new Insets(10, 10, 10, 10));
         accountDetails.setAlignment(Pos.CENTER);
         accountDetails.getChildren().addAll(
-                new Label("Account Details"),
-                new Label("Name: " + OandaClient.getAccount().getName()),
-                new Label("Balance: " + OandaClient.getAccount().getBalance()),
-                new Label("Currency: " + OandaClient.getAccount().getCurrency()),
-                new Label("Account Type: " + OandaClient.getAccount().getAccountType()),
-                new Label("Account Status: " + OandaClient.getAccount().getAccountStatus()),
-                new Label("Trading Status: " + OandaClient.getAccount().getTradingStatus()),
-                new Label("Trading Mode: " + OandaClient.getAccount().getTradingMode()),
-                new Label("Trading Session: " + OandaClient.getAccount().getTradingSession()),
-                new Label("Trading Time: " + OandaClient.getAccount().getTradingTime()),
-                new Label("Trading Time Zone: " + OandaClient.getAccount().getTradingTimeZone()));
-
+                new Label("___________________Account Details_____________________"),
+                new Label("Date :" + new Date(System.currentTimeMillis())),
+                new Label("Name: " + OandaClient.root.account.alias),
+                new Label("Balance: " + OandaClient.root.account.balance),
+                new Label("Currency: " + OandaClient.root.account.currency),
+                new Label("CreateTime: " + OandaClient.root.account.createdTime),
+                new Label("Margin Available: " + OandaClient.root.account.marginAvailable));
 
         return accountDetails;
     }
