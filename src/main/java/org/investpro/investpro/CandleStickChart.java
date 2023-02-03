@@ -7,7 +7,6 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
 import javafx.event.EventHandler;
-import javafx.geometry.NodeOrientation;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.geometry.VPos;
@@ -16,10 +15,12 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
 import javafx.scene.control.*;
+import javafx.scene.effect.BlendMode;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontSmoothingType;
@@ -264,13 +265,16 @@ public class CandleStickChart extends Region {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
                 double numberOfVisibleWholeCandles = Math.floor(containerWidth.getValue().doubleValue() / candleWidth);
-                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 60 + (candleWidth / 2);
+                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 70 + (float) (candleWidth / 2);
                 chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 60 +
-                        (candleWidth / 2);
+                        (float) (candleWidth / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
-                canvas = new Canvas(chartWidth - 60, chartHeight - 10);
-                canvas.setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
-                Label infosNews = new Label("Infos :");
+                canvas = new Canvas(chartWidth - 70, chartHeight - 10);
+
+
+                canvas.applyCss();
+                canvas.getGraphicsContext2D().setFont(Font.font("Helvetica", 78));
+                // Label infosNews = new Label("Infos :");
 
                 btnBuy.setBackground(Background.fill(Color.GREEN));
 
@@ -299,7 +303,7 @@ public class CandleStickChart extends Region {
                 Label telegramLabel = new Label();
 
                 telegramLabel.setTranslateY(0);
-                RadioButton isConnected = new RadioButton();
+                Circle isConnected = new Circle(5);
 
                 TelegramClient telegramClient;
                 try {
@@ -309,22 +313,22 @@ public class CandleStickChart extends Region {
                     throw new RuntimeException(e);
                 }
                 if (telegramClient.getFirst_name() != null) {
-                    isConnected.setBackground(Background.fill(Color.GREEN));
+                    isConnected.setBlendMode(BlendMode.COLOR_BURN);
+                    isConnected.setFill(Color.GREEN);
                     isConnected.setTranslateX(1300);
                     isConnected.setTranslateY(10);
 
 
                 }
 
-                telegramLabel.setText("Bot :" + telegramClient.getUsername());
-                isConnected.setTranslateX(1400);
+                telegramLabel.setText(" Bot :" + telegramClient.getUsername());
+                isConnected.setTranslateX(1300);
 
 
                 isConnected.setTranslateY(10);
                 VBox vb = new VBox(canvas);
                 GridPane gridPaneOrderBook = new GridPane();
                 gridPaneOrderBook.setTranslateY(400);
-
                 gridPaneOrderBook.setVisible(true);
                 gridPaneOrderBook.add(new Label("Order Book"), 0, 0);
                 gridPaneOrderBook.add(new Label("BID"), 1, 1);
@@ -338,7 +342,7 @@ public class CandleStickChart extends Region {
 
                 AnchorPane chartStackPane = new AnchorPane(vb, symbolLabel, grid, isConnected, telegramLabel, loadingIndicatorContainer, vb2, vb3, vb4);
                 chartStackPane.setTranslateX(20); // Only necessary when wrapped in StackPane...why?
-                chartStackPane.setPrefSize(1500, 730);
+                chartStackPane.setPrefSize(1300, 730);
 
                 grid.setPrefSize(240, 200);
                 grid.setTranslateX(100);

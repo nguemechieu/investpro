@@ -30,6 +30,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -1124,6 +1125,7 @@ public class Main extends Application {
         grid.add(passwordField, 2, 2);
         Button btnSignIn = new Button("Go Back");
         grid.add(btnSignIn, 0, 7);
+
         btnSignIn.setOnAction(eb -> {
             stage.close();
             stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
@@ -1136,12 +1138,12 @@ public class Main extends Application {
         Button lblRegister = new Button("Submit");
         grid.add(lblRegister, 2, 7);
         AnchorPane anchorPane = new AnchorPane(grid);
+
         Scene scene = new Scene(anchorPane, 1530, 780);
         scene.getStylesheets().add("app.css");
         stage.setScene(scene);
         stage.setTitle("InvestPro -->  Registration");
-        stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
-
+        stage.getIcons().add(new Image("logo.png"));
         stage.setResizable(true);
         stage.setIconified(true);
         stage.show();
@@ -1174,17 +1176,18 @@ public class Main extends Application {
         grid.add(textField, 1, 0);
         grid.add(lblPassword, 0, 3);
         grid.add(passwordField, 1, 3);
+        grid.setVgap(30);
         Button btnReg = new Button("Register");
-        grid.add(btnReg, 0, 7);
+        grid.add(btnReg, 0, 5);
         Button btnLgn = new Button("Login");
-        grid.add(btnLgn, 2, 7);
+        grid.add(btnLgn, 2, 5);
         Hyperlink btnForget = new Hyperlink("Forgot Password");
-        grid.add(btnForget, 1, 12);
+        grid.add(btnForget, 1, 9);
         anchorPane.getChildren().add(grid);
         Scene scene = new Scene(anchorPane, TRADING_SCREEN_WIDTH, TRADING_SCREEN_HEIGHT);
 
         scene.getStylesheets().add("app.css");
-        stage.setTitle("InvestPro   " + new Date(System.currentTimeMillis()));
+        stage.setTitle("InvestPro    " + new Date(System.currentTimeMillis()));
         stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
 
         stage.setScene(scene);
@@ -1218,10 +1221,11 @@ public class Main extends Application {
         stage.setTitle("Forgot Password " + new Date(System.currentTimeMillis()));
         GridPane grid = new GridPane();
         Label lblEmail = new Label("Email :");
-        grid.add(lblEmail, 0, 0);
+        grid.setVgap(17);
+        grid.add(lblEmail, 5, 0);
         TextField txtEmail = new TextField();
         txtEmail.setPromptText("Please enter your email ");
-        grid.add(txtEmail, 1, 0);
+        grid.add(txtEmail, 5, 0);
         Button btnGoback = new Button("GO BACK");
         btnGoback.setOnAction(event -> {
             stage.close();  //stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
@@ -1237,8 +1241,8 @@ public class Main extends Application {
                 throw new RuntimeException(ex);
             }
         });
-        grid.add(btnGoback, 0, 9);
-        Button btnSubmit = new Button("SUBMIT");
+        grid.add(btnGoback, 4, 6);
+        Button btnSubmit = new Button("Submit");
         btnSubmit.setOnAction(event -> {
             stage.close();
             try {
@@ -1247,9 +1251,9 @@ public class Main extends Application {
                 throw new RuntimeException(ex);
             }
         });
-        grid.add(btnSubmit, 3, 9);
-        grid.setTranslateX(499);
-        grid.setTranslateY(299);
+        grid.add(btnSubmit, 6, 6);
+        grid.setTranslateX(400);
+        grid.setTranslateY(300);
         AnchorPane anchorPane = new AnchorPane(grid);
         Scene scene = new Scene(anchorPane, 1530, 780);
         stage.setScene(scene);
@@ -1304,7 +1308,7 @@ public class Main extends Application {
 
     }
 
-    TabPane getTabPane() throws OandaException {
+    TabPane getTabPane() throws OandaException, IOException {
 
 
         DraggableTab[] tabs
@@ -1319,7 +1323,12 @@ public class Main extends Application {
                 new DraggableTab("News Report"),
                 new DraggableTab("Trade Signals"),
                 new DraggableTab("Recommendation"),
-                new DraggableTab("Navigation")};
+                new DraggableTab("Navigation"),
+                new DraggableTab("Oanda Wallet"),
+                new DraggableTab("Binance Us Wallet"),
+                new DraggableTab("Coinbase Pro Wallet")
+                , new DraggableTab("Coinbase Wallet")
+        };
 
         tabs[0].setContent(getOandaOrders());
 
@@ -1333,6 +1342,10 @@ public class Main extends Application {
         tabs[6].setContent(getNews());
         tabs[7].setContent(getOandaSignals());
         tabs[8].setContent(getOandaRecommendation());
+        tabs[9].setContent(getOandaWallet());
+        tabs[10].setContent(getBinanceUsWallet());
+        tabs[11].setContent(getCoinbaseProWallet()
+        );
 
         TabPane orderTabPanes = new TabPane();
         orderTabPanes.getTabs().addAll(tabs);
@@ -1341,6 +1354,23 @@ public class Main extends Application {
         orderTabPanes.setRotateGraphic(true);
         orderTabPanes.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);
         return orderTabPanes;
+    }
+
+    @Contract(" -> new")
+    private @NotNull Node getBinanceUsWallet() {
+
+        return new VBox();
+    }
+
+    @Contract(" -> new")
+    private @NotNull Node getCoinbaseProWallet() {
+
+        return new VBox();
+    }
+
+    @Contract(" -> new")
+    private @NotNull Node getOandaWallet() {
+        return new VBox();
     }
 
     private @NotNull VBox getCandleSticksChart() throws Exception, OandaException {
@@ -1364,6 +1394,9 @@ public class Main extends Application {
                 new VBox(),
                 new VBox(new Browser().start()),
                 new VBox(getTabPane()),
+                new VBox(),
+                new VBox(),
+                new VBox(),
                 new VBox(),
                 new VBox()
         };
@@ -1473,7 +1506,8 @@ public class Main extends Application {
         return treeTableNews;
     }
 
-    private @NotNull VBox getAccountDetails() {
+    private @NotNull VBox getAccountDetails() throws IOException {
+
         VBox accountDetails = new VBox();
         accountDetails.setSpacing(10);
         accountDetails.setPadding(new Insets(10, 10, 10, 10));
@@ -1485,8 +1519,8 @@ public class Main extends Application {
                 new Label("Balance: " + OandaClient.root.account.balance),
                 new Label("Currency: " + OandaClient.root.account.currency),
                 new Label("CreateTime: " + OandaClient.root.account.createdTime),
-                new Label("Margin Available: " + OandaClient.root.account.marginAvailable));
-
+                new Label("Margin Available: " + OandaClient.root.account.marginAvailable),
+                new Label("________________________________________"));
         return accountDetails;
     }
 

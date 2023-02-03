@@ -31,7 +31,7 @@ import static java.lang.System.out;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 public class BinanceUsCandleStick {
-    TradePair BTC_USD = TradePair.of(Currency.ofCrypto("LTC"), Currency.ofCrypto("BTC"));
+    TradePair BTC_USD = TradePair.of(Currency.ofCrypto("BTC"), Currency.ofCrypto("USD"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)

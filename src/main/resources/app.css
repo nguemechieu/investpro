@@ -72,7 +72,7 @@ AnchorPane {
     -fx-prefHeight: 780.0;
     -fx-prefWidth: 1530.0;
     -fx-border-radius: 3;
-
+-fx-background-image : url("Invest.png");
     -fx-font-size:90%;
     -fx-focus-traversable:true;
     -fx-alignment: center;
