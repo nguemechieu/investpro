@@ -280,14 +280,14 @@ public class CandleStickChart extends Region {
 
                 btnSell.setOnAction(e -> {
                     try {
-                        CreateOrder("MARKET", "SELL", spinner.getValue(), PLATFORM.valueOf(exchange.toString()));
+                        CreateOrder("SELL", spinner.getValue(), PLATFORM.valueOf(exchange.toString()));
                     } catch (OandaException ex) {
                         throw new RuntimeException(ex);
                     }
                 });
                 btnBuy.setOnAction(e -> {
                     try {
-                        CreateOrder("MARKET", "BUY", spinner.getValue(), PLATFORM.valueOf(exchange.toString()));
+                        CreateOrder("BUY", spinner.getValue(), PLATFORM.valueOf(exchange.toString()));
                     } catch (OandaException ex) {
                         throw new RuntimeException(ex);
                     }
@@ -374,17 +374,17 @@ public class CandleStickChart extends Region {
         chartOptions.alignOpenCloseProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
     }
 
-    private void CreateOrder(String type0, String side, double size, @NotNull PLATFORM exchangeName) throws OandaException {
+    private void CreateOrder(String side, double size, @NotNull PLATFORM exchangeName) throws OandaException {
 
         switch (exchangeName) {
 
             case COINBASE_PRO -> {
-                CoinbasePro.createMarketOrder(tradePair.toString('_'), type0, side, size);
+                CoinbasePro.createMarketOrder(tradePair.toString('_'), "MARKET", side, size);
             }
             case BINANCE_US -> {
-                BinanceUs.createMarketOrder(tradePair, type0, side, size);
+                BinanceUs.createMarketOrder(tradePair, "MARKET", side, size);
             }
-            case OANDA -> OandaClient.createMarketOrder(tradePair.toString('_'), type0, side, (int) size);
+            case OANDA -> OandaClient.createMarketOrder(tradePair.toString('_'), "MARKET", side, (int) size);
 
         }
 
