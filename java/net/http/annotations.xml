@@ -1,0 +1,12 @@
+<root>
+    <item name='java.net.http.HttpRequest boolean equals(java.lang.Object)'>
+        <annotation name='org.jetbrains.annotations.Blocking'/>
+    </item>
+    <item name='java.net.http.HttpRequest.BodyPublishers java.net.http.HttpRequest.BodyPublisher concat(java.net.http.HttpRequest.BodyPublisher...)'>
+        <annotation name='org.jetbrains.annotations.NotNull'/>
+        <annotation name='org.jetbrains.annotations.Contract'>
+            <val name="value" val="&quot;_-&gt;new&quot;"/>
+            <val name="pure" val="true"/>
+        </annotation>
+    </item>
+</root>

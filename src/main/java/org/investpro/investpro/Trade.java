@@ -8,7 +8,6 @@ import java.util.Objects;
 
 public class Trade {
     public static CandleData candle;
-    private int i;
     private JSONObject trade;
     private TradePair tradePair;
     private Money price;
@@ -47,7 +46,6 @@ public class Trade {
     }
 
     public Trade(int i, JSONObject trade) {
-        this.i = i;
         this.trade = trade;
     }
 

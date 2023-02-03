@@ -31,7 +31,7 @@ public class BinanceUsWebSocketClient extends ExchangeWebSocketClient {
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private final Set<TradePair> tradePairs;
+    Set<TradePair> tradePairs;
 
 
     public BinanceUsWebSocketClient(Set<TradePair> tradePairs) {

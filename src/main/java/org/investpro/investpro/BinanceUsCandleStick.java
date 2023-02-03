@@ -11,6 +11,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import org.investpro.investpro.BinanceUs.BinanceUs;
 
 import java.io.IOException;
 import java.net.URI;
@@ -30,7 +31,7 @@ import static java.lang.System.out;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 public class BinanceUsCandleStick {
-    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("BTC"), Currency.ofFiat("USD"));
+    TradePair BTC_USD = TradePair.of(Currency.ofCrypto("LTC"), Currency.ofCrypto("BTC"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -45,7 +46,9 @@ public class BinanceUsCandleStick {
         return candleStickChartContainer;
     }
 
-    public static class BinanceU extends Exchange {
+    public static class BinanceU extends Exchange {   // private static final URI urO=URI.create("wss://stream.binance.us:9443");
+
+
         private static String x;
         private static String str;
 
@@ -84,29 +87,28 @@ public class BinanceUsCandleStick {
                 // We will know if we get rate limited if we get a 429 response code.
                 // FIXME: We need to address this!
                 for (int i = 0; !futureResult.isDone(); i++) {
-                    String uriStr = "https://api.binance.us//api/v3/trade/?symbol=" + String.valueOf(tradePair).replace("/", "");
-                    double size = 0.04;
-                    uriStr += "trade/?symbol=" + String.valueOf(tradePair).replace("/", "") + "&amount=" + size;
+                    String uriStr = "https://api.binance.us/api/v3/trades?symbol=" + String.valueOf(tradePair).replace("/", "");
 
                     if (i != 0) {
                         uriStr += "?after=" + afterCursor.get();
                     }
 
                     try {
+                        HttpRequest.Builder req = HttpRequest.newBuilder();
+                        req.header("Accept", "application/json");
+                        req.header("Authorization", BinanceUs.getApiKey());
                         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                                HttpRequest.newBuilder()
-                                        .uri(URI.create(uriStr))
-                                        .GET().build(),
+                                req.build(),
                                 HttpResponse.BodyHandlers.ofString());
 
                         Log.info("response headers: " + response.headers());
-                        if (response.headers().firstValue("CB-AFTER").isEmpty()) {
+                        if (response.headers().firstValue("cb-after").isEmpty()) {
                             futureResult.completeExceptionally(new RuntimeException(
                                     "Binance Us trades response did not contain header \"cb-after\": " + response));
                             return;
                         }
 
-                        afterCursor.setValue(Integer.valueOf((response.headers().firstValue("CB-AFTER").get())));
+                        afterCursor.setValue(Integer.valueOf((response.headers().firstValue(" cb-after").get())));
 
                         JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
 
@@ -157,20 +159,20 @@ public class BinanceUsCandleStick {
         @Override
         public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
                 TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-                    currentCandleStartedAt, ZoneOffset.UTC));
-            long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
+            //  String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+            //        currentCandleStartedAt, ZoneOffset.UTC));
+            //  long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
             // Get the closest supported granularity to the ideal granularity.
-            int actualGranularity = getCandleDataSupplier(secondsPerCandle, tradePair).getSupportedGranularities().stream()
-                    .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
-                    .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
+            //  int actualGranularity = getCandleDataSupplier(secondsPerCandle, tradePair).getSupportedGranularities().stream()
+            //     .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
+            //   .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
             // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
             //  data for the current live syncing candle from the raw trades method.
             String timeFrame = x + str;
             return HttpClient.newHttpClient().sendAsync(
+
                             HttpRequest.newBuilder()
-                                    .uri(URI.create(String.format("https://api.binance.us/api/v3/klines/?symbol=?" + String.valueOf(tradePair).replace("/", "") + "&interval=" + timeFrame,
-                                            actualGranularity, startDateString)))
+                                    .uri(URI.create("https://api.binance.us/api/v3/klines?symbol=" + String.valueOf(tradePair).replace("/", "") + "&interval=" + timeFrame))
                                     .GET().build(),
                             HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
@@ -205,9 +207,9 @@ public class BinanceUsCandleStick {
                                 // sanity guard) TODO(mike): Consider making this a "break;" once we understand why
                                 //  Coinbase is  not respecting start/end times
 
-//                                currentTill = currCandle.get(0).asInt();
-//                                lastTradePrice = currCandle.get(4).asDouble();
-//                                foundFirst = true;
+                                currentTill = currCandle.get(0).asInt();
+                                lastTradePrice = currCandle.get(4).asDouble();
+                                foundFirst = true;
 
                                 continue;
 
@@ -282,10 +284,10 @@ public class BinanceUsCandleStick {
                 String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                         .format(LocalDateTime.ofEpochSecond(startTime[0], 0, ZoneOffset.UTC));
 
-
+//
                 Log.info("Start date: " + startDateString)
-
-                ;
+                ;//
+//                ;
                 Log.info("End date: " + endDateString);
 
                 Log.info("TradePair " + String.valueOf(tradePair
@@ -338,26 +340,26 @@ public class BinanceUsCandleStick {
 
                             if (!res.isEmpty()) {
                                 // Remove the current in-progress candle
-                                if (res.get(0).get(0).asInt() + secondsPerCandle > endTime.get()) {
+                                if (res.get(0).asInt() + secondsPerCandle > endTime.get()) {
                                     ((ArrayNode) res).remove(0);
                                 }
 
 
-                                List<CandleData> candleData = new ArrayList<>();
+                                ArrayList<CandleData> candleData = new ArrayList<>();
 
                                 for (JsonNode candle : res) {
-                                    startTime[0] = candle.get(0).get(0).asInt();
-                                    candleData.add(new CandleData(
-                                            candle.get(1).asDouble(),  // open price
-                                            candle.get(4).asDouble(),  // close price
-                                            candle.get(2).asDouble(),  // high price
-                                            candle.get(3).asDouble(),  // low price
-                                            candle.get(0).asInt(),     // open time
-                                            candle.get(5).asDouble()   // volume
-                                    ));
-                                    int closingtime = res.get(6).get(6).asInt();
-                                    endTime.set(closingtime);
-                                    Log.info("candle : Open time" + new Date(candle.get(0).asLong()) + "close time" + new Date(closingtime) + "\n" + "candle:" + candleData);
+
+                                    candleData.add(
+                                            new CandleData(candle.get(1).asDouble(),  // open price
+                                                    candle.get(4).asDouble(),  // close price
+                                                    candle.get(2).asDouble(),  // high price
+                                                    candle.get(3).asDouble(),  // low price
+                                                    candle.get(0).asInt(),     // open time
+                                                    candle.get(5).asDouble())   // volume
+                                    );
+
+                                    endTime.set(candle.get(0).asInt());
+                                    Log.info("candle : Open time" + new Date(candleData.get(0).getOpenTime()) + "close time" + new Date(candle.get(0).asInt()) + "\n" + "candle:" + candleData);
                                 }
 
 
@@ -366,6 +368,7 @@ public class BinanceUsCandleStick {
                             } else {
                                 return Collections.emptyList();
                             }
+
                         });
             }
         }

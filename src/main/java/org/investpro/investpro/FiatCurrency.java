@@ -5,11 +5,12 @@ import java.util.Objects;
 
 
 public class FiatCurrency extends Currency {
-    private final Locale locale;
-    private final String centralBank;
-    private final int numericCode;
+    Locale locale;
+    String centralBank;
+    int numericCode;
 
     protected FiatCurrency() {
+        // super(null,null,"","",0,"");
         locale = Locale.US;
         centralBank = "";
         numericCode = -1;

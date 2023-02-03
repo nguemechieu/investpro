@@ -3,14 +3,7 @@ package org.investpro.investpro;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Provides data for fiat currencies (actual paper money currencies provided by
- * various state governments) that we support. Each currency has a corresponding
- * image in {@literal /img/fiat/xxx.png} where xxx is the ISO-4217 currency code.
- *
- * @author Michael Ennen
- * @see <a href="http://en.wikipedia.org/wiki/ISO_4217">ISO-4217 Currency Codes</a>
- */
+
 public class FiatCurrencyDataProvider extends CurrencyDataProvider {
 
     public FiatCurrencyDataProvider() {}

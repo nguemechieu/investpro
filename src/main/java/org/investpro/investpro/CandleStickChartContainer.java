@@ -65,7 +65,7 @@ public class CandleStickChartContainer extends Region {
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
-        containerRoot.setPrefSize(getLayoutBounds().getWidth(), getLayoutBounds().getHeight());
+       // containerRoot.setPrefSize(getLayoutBounds().getWidth(), getLayoutBounds().getHeight());
         getChildren().setAll(containerRoot);
         // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -84,7 +84,7 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        secondsPerCandle.set(300);
+        //secondsPerCandle.set(300);
     }
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) {
@@ -95,6 +95,8 @@ public class CandleStickChartContainer extends Region {
         CandleDataSupplier candleDataSupplier = new ReverseRawTradeDataProcessor(Paths.get("C:\\bitstampUSD.csv"),
                 secondsPerCandle.get(), TradePair.of(amountUnit, priceUnit));
         */
+
+
         candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
                 tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
@@ -103,13 +105,13 @@ public class CandleStickChartContainer extends Region {
         Objects.requireNonNull(newChart, "newChart must not be null");
 
         if (candleStickChart != null) {
-            FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(500), candleStickChart);
+            FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(300), candleStickChart);
             fadeTransitionOut.setFromValue(1.0);
             fadeTransitionOut.setToValue(0.0);
             fadeTransitionOut.setOnFinished(event -> {
                 candleStickChart = newChart;
                 candleChartContainer.getChildren().setAll(newChart);
-                FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(500), candleStickChart);
+                FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(300), candleStickChart);
                 fadeTransitionIn.setFromValue(0.0);
                 fadeTransitionIn.setToValue(1.0);
                 fadeTransitionIn.play();
@@ -119,7 +121,7 @@ public class CandleStickChartContainer extends Region {
         } else {
             candleStickChart = newChart;
             candleChartContainer.getChildren().setAll(newChart);
-            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(600), candleStickChart);
+            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(300), candleStickChart);
             fadeTransitionIn.setFromValue(0.0);
             fadeTransitionIn.setToValue(1.0);
             fadeTransitionIn.play();

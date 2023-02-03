@@ -20,7 +20,7 @@ public class Screenshot {
         alertAlert.setContentText("Capturing Screenshot...");
 
         alertAlert.showAndWait();
-        Alert alert = new Alert(Alert.AlertType.ERROR);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
 
         try {
             Thread.sleep(500);

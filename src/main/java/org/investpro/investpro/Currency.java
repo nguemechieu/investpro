@@ -17,6 +17,19 @@ public class Currency {
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
 
+
+    public Currency() {
+
+
+        currencyType = NULL_CRYPTO_CURRENCY.getCurrencyType();
+        fullDisplayName = "";
+        shortDisplayName = "";
+        code = "";
+        fractionalDigits = 0;
+        symbol = "";
+
+    }
+
     static {
         // FIXME: Replace with ServiceLoaders
         CryptoCurrencyDataProvider cryptoCurrencyDataProvider = new CryptoCurrencyDataProvider();
@@ -41,14 +54,7 @@ public class Currency {
     /**
      * Private constructor used only for the {@code NULL_CURRENCY}.
      */
-    protected Currency() {
-        this.currencyType = CurrencyType.NULL;
-        this.fullDisplayName = "";
-        this.shortDisplayName = "";
-        this.code = "ETH";
-        this.fractionalDigits = 0;
-        this.symbol = "";
-    }
+
     /**
      * Protected constructor, called only by CurrencyDataProvider's.
      */
@@ -145,13 +151,13 @@ public class Currency {
                 .findAny().orElse(NULL_CRYPTO_CURRENCY);
     }
 
-    public static FiatCurrency lookupFiatByCode(String code) {
+    public FiatCurrency lookupFiatByCode(String code) {
         return (FiatCurrency) CURRENCIES.values().stream()
                 .filter(currency -> currency.currencyType == CurrencyType.FIAT && currency.code.equals(code))
                 .findAny().orElse(NULL_FIAT_CURRENCY);
     }
 
-    public static FiatCurrency lookupLocalFiatCurrency() {
+    public FiatCurrency lookupLocalFiatCurrency() {
         return (FiatCurrency) CURRENCIES.values().stream()
                 .filter(currency -> currency.currencyType == CurrencyType.FIAT)
                 .findAny().orElse(NULL_FIAT_CURRENCY);

@@ -1,11 +1,11 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
-import org.slf4j.LoggerFactory;
 
 public class LogOnExceptionThreadFactory implements ThreadFactory {
     private final AtomicInteger threadIndex = new AtomicInteger(1);
@@ -29,7 +29,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
     }
 
     @Override
-    public Thread newThread(Runnable runnable) {
+    public Thread newThread(@NotNull Runnable runnable) {
         Objects.requireNonNull(runnable, "runnable must not be null");
         String threadName = threadNamePrefix + "-Thread-" + threadIndex.getAndIncrement();
 
@@ -38,7 +38,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
             thread.setPriority(threadPriority);
         }
 
-        thread.setUncaughtExceptionHandler((t, e) -> LoggerFactory.getLogger(t.getName()).error(e.getMessage(), e));
+        thread.setUncaughtExceptionHandler((t, e) -> Log.error(t.getName() + (e.getMessage() + e)));
 
         return thread;
     }

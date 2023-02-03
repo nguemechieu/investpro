@@ -36,13 +36,12 @@ import java.util.Objects;
  */
 public class ReversedLinesFileReader implements Closeable {
 
-    private final int blockSize;
-    private final Charset encoding;
+    int blockSize;
+    Charset encoding;
+    RandomAccessFile randomAccessFile;
 
-    private final RandomAccessFile randomAccessFile;
-
-    private final long totalByteLength;
-    private final long totalBlockCount;
+    long totalByteLength;
+    long totalBlockCount;
 
     private final byte[][] newLineSequences;
     private final int avoidNewlineSplitBufferSize;

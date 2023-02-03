@@ -85,7 +85,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
-    private @NotNull TradePair parseTradePair(JsonNode messageJson) throws CurrencyNotFoundException {
+    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException {
         final String productId = messageJson.get("product_id").asText();
         final String[] products = productId.split("-");
         TradePair tradePair;
@@ -93,7 +93,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
         } else {
             // products[0] == "ETH"
-            if (products[1].equalsIgnoreCase("usd")) {
+            if (products[1].equalsIgnoreCase("USD")) {
                 tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
             } else {
                 // productId == "ETH-BTC"
@@ -105,7 +105,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
         send(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
                 .put("product_id", tradePair.toString('-')).toPrettyString());
         liveTradeConsumers.put(tradePair, liveTradesConsumer);

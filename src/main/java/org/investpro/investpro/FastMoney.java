@@ -134,8 +134,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
             return down;
         }
         // ulp up
-        final FastMoney up = fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
-        return up;
+        return fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
     }
 
     private static @Nullable FastMoney fromDouble0(final double value, final int precision, final Currency currency) {

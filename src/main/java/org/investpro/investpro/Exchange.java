@@ -1,5 +1,7 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +42,7 @@ public abstract class Exchange {
      * TThis method only needs to be implemented to support live syncing.
      */
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) throws OandaException, InterruptedException {
         throw new UnsupportedOperationException("Exchange: " + this + " does not support fetching candle data" +
                 " for in-progress candle");
     }
@@ -48,4 +50,19 @@ public abstract class Exchange {
     public abstract boolean isInputClosed();
 
     public abstract void abort();
+
+
+    public RootBidAsk getBidAsk(@NotNull TradePair tradePair) {
+        RootBidAsk bidAsk = new RootBidAsk();
+
+
+        bidAsk.instrument = tradePair.toString('_');
+        Ask ask = new Ask();
+
+        bidAsk.asks.add(ask);
+        Bid bid = new Bid();
+        bidAsk.bids.add(bid);
+
+        return bidAsk;
+    }
 }

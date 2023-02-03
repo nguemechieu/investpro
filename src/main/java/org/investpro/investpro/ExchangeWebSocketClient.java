@@ -3,7 +3,6 @@ package org.investpro.investpro;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft;
 
 import java.net.URI;
@@ -15,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 
-public abstract class ExchangeWebSocketClient extends WebSocketClient {
+public abstract class ExchangeWebSocketClient extends org.java_websocket.client.WebSocketClient {
     protected final BooleanProperty connectionEstablished;
     protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers = new ConcurrentHashMap<>();
     protected final CountDownLatch webSocketInitializedLatch = new CountDownLatch(1);

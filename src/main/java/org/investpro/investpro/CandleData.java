@@ -2,6 +2,7 @@ package org.investpro.investpro;
 
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 
+import java.util.Date;
 import java.util.Objects;
 
 
@@ -109,9 +110,10 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
 
     @Override
     public String toString() {
-        return String.format("CandleData [openPrice = %f, closePrice = %f, highPrice = %f, lowPrice = %f, " +
-                        "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
-                openTime, volume, placeHolder);
+
+        return String.format("Open = %f, Close= %f, High= %f, Low = %f, " +
+                        "OpenTime = %s, Volume = %f", openPrice, closePrice, highPrice, lowPrice,
+                new Date(openTime), volume);
     }
 
 

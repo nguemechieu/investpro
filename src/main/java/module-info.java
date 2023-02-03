@@ -9,7 +9,7 @@ module org.investpro.investpro {
     requires org.json;
     requires jdk.jsobject;
     requires java.logging;
-    requires org.slf4j;
+
     requires com.fasterxml.jackson.databind;
     requires java.desktop;
     requires javafx.swing;

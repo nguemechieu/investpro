@@ -19,6 +19,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Screen;
@@ -29,6 +30,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -227,6 +229,7 @@ public class Main extends Application {
 
             Scene scene = new Scene(pane0, 800, 600);
             scene.getStylesheets().add("app.css");
+
             s.setScene(scene);
             s.setTitle("Exchange -->Login");
 
@@ -833,7 +836,7 @@ public class Main extends Application {
     }
 
     @Override
-    public void start(@NotNull Stage stage) {
+    public void start(@NotNull Stage stage) throws URISyntaxException {
         createLogin(stage);
 
     }
@@ -1081,7 +1084,7 @@ public class Main extends Application {
         volColumn.setCellValueFactory(volumeColumnValue);
         treeTable.setTranslateY(25);
         ObservableList<CandleData> datas = FXCollections.observableArrayList();
-        datas.addAll(OandaClient.getForexCandles());
+        datas.addAll(OandaClient.getForexCandles("EUR_USD"));
         Callback<RecursiveTreeObject<CandleData>, ObservableList<CandleData>> calback
                 = RecursiveTreeObject::getChildren;
         RecursiveTreeItem<CandleData> root = new RecursiveTreeItem<>(datas, calback);
@@ -1123,7 +1126,12 @@ public class Main extends Application {
         grid.add(btnSignIn, 0, 7);
         btnSignIn.setOnAction(eb -> {
             stage.close();
-            createLogin(stage);
+            stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
+            try {
+                createLogin(stage);
+            } catch (URISyntaxException ex) {
+                throw new RuntimeException(ex);
+            }
         });
         Button lblRegister = new Button("Submit");
         grid.add(lblRegister, 2, 7);
@@ -1132,6 +1140,8 @@ public class Main extends Application {
         scene.getStylesheets().add("app.css");
         stage.setScene(scene);
         stage.setTitle("InvestPro -->  Registration");
+        stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
+
         stage.setResizable(true);
         stage.setIconified(true);
         stage.show();
@@ -1147,7 +1157,7 @@ public class Main extends Application {
 
     }
 
-    private void createLogin(@NotNull Stage stage) {
+    private void createLogin(@NotNull Stage stage) throws URISyntaxException {
         AnchorPane anchorPane = new AnchorPane();
 
         GridPane grid = new GridPane();
@@ -1175,9 +1185,13 @@ public class Main extends Application {
 
         scene.getStylesheets().add("app.css");
         stage.setTitle("InvestPro   " + new Date(System.currentTimeMillis()));
+        stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
+
         stage.setScene(scene);
         stage.setResizable(true);
         stage.setIconified(true);
+        // stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
+
         btnLgn.setOnAction(e -> {
             stage.close();
             try {
@@ -1186,12 +1200,18 @@ public class Main extends Application {
                 throw new RuntimeException(ex);
             }
         });
-        btnForget.setOnAction(this::createForgotPassword);
+        btnForget.setOnAction(e -> {
+            try {
+                createForgotPassword(e);
+            } catch (URISyntaxException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
         btnReg.setOnAction(this::createRegister);
         stage.show();
     }
 
-    private void createForgotPassword(@NotNull ActionEvent e) {
+    private void createForgotPassword(@NotNull ActionEvent e) throws URISyntaxException {
         Node node = (Node) e.getSource();
         Stage stage = (Stage) node.getScene().getWindow();
         stage.close();
@@ -1204,8 +1224,18 @@ public class Main extends Application {
         grid.add(txtEmail, 1, 0);
         Button btnGoback = new Button("GO BACK");
         btnGoback.setOnAction(event -> {
-            stage.close();
-            createLogin(stage);
+            stage.close();  //stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
+            try {
+                stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
+            } catch (URISyntaxException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            try {
+                createLogin(stage);
+            } catch (URISyntaxException ex) {
+                throw new RuntimeException(ex);
+            }
         });
         grid.add(btnGoback, 0, 9);
         Button btnSubmit = new Button("SUBMIT");
@@ -1223,6 +1253,8 @@ public class Main extends Application {
         AnchorPane anchorPane = new AnchorPane(grid);
         Scene scene = new Scene(anchorPane, 1530, 780);
         stage.setScene(scene);
+        stage.getIcons().add(new Image("logo.png"));//new Image(String.valueOf(new URI("images/Screenshot 2023-02-03 153858.png"))));
+
         scene.getStylesheets().add("/app.css");
         stage.setIconified(true);
         stage.setResizable(true);
@@ -1266,6 +1298,8 @@ public class Main extends Application {
         stage.setTitle("InvestPro -->Welcome  " + new Date(System.currentTimeMillis()));
         stage.setResizable(true);
         stage.setIconified(true);
+        stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
+
         stage.show();
 
     }
@@ -1436,8 +1470,6 @@ public class Main extends Application {
 
         root.setExpanded(true);
         treeTableNews.setRoot(root);
-
-
         return treeTableNews;
     }
 

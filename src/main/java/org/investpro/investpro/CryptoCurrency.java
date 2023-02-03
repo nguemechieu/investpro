@@ -6,20 +6,21 @@ import java.util.Objects;
 
 
 public class CryptoCurrency extends Currency {
-    private final Algorithm algorithm;
-    private final URI homeUrl;
-    private final URI walletUrl;
+    Algorithm algorithm;
+    URI homeUrl;
+    URI walletUrl;
     /**
      * Time that the genesis block was created.
      */
-    private final Instant genesisTime;
+    Instant genesisTime;
     /**
      * After how many blocks is difficulty recalculated.
      */
-    private final int difficultyRetarget;
-    private final String maxCoinsIssued;
+    int difficultyRetarget;
+    String maxCoinsIssued;
 
     protected CryptoCurrency() {
+        super(CurrencyType.CRYPTO, "", "", "", 0, "");
         algorithm = Algorithm.NULL;
         homeUrl = null;
         walletUrl = null;

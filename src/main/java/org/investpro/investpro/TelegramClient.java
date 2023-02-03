@@ -24,13 +24,12 @@ import java.util.Objects;
 
 
     //  makeRequest("https://api.telegram.org/bot" + token + "/setWebhook");
-    public class TelegramClient{
-        public TelegramClient(
-                final String token){
-            TelegramClient.token = token;
-        }
-
-        public static final ArrayList<Chat> ArrayListChat =new ArrayList<>();
+    public class TelegramClient {
+        public static final ArrayList<Chat> ArrayListChat = new ArrayList<>();
+        String reply_markup = "";
+        String chat_title = "";
+        String chat_type = "";
+        String chat_username = "";
         static  boolean disable_content_type_detection = false;
 
         public String getBalance() {
@@ -51,54 +50,11 @@ import java.util.Objects;
                             "?chat_id=" + getChatId() +
                             "&disable_content_type_detection=" + disable_content_type_detection;
         }
-
-        public enum KeyboardButtonType {
-            UP(0),
-            DOWN(1),
-            LEFT(2),
-            RIGHT(3),BUTTON_TYPE_SINGLE_LINE(4),
-            Start(5),
-            BACK(6),
-            Stop(7),
-            Trade(8),
-            Order(9),
-            Exchange(10),
-            CloseOrder(11),
-            CancelOrder(12),
-            CancelAll(13),Delete(14),
-            Balance(15),SendMoney(16), BUTTON_TYPE_EXIT(100), BUTTON_TYPE_MENU(17);
-
-
-            public final ArrayList <SymbolData>arrayListSymbolsData=new ArrayList<>();
-            public JsonNode arrayListSymbolsData2;
-
-            KeyboardButtonType(int i) {
-            }
-
-            public void setLimit(int i) {
-            }
-
-            public void setInterval(int period) {
-            }
-
-            public void setPeriod(int period) {
-            }
-
-            public void setLang(String en) {
-            }
-
-            public void setOffset(int i) {
-            }
-
-            public void Oninit() {
-            }
-
-            public void OnTick() {
-            }
-
-            public void CloseAll() {
-            }
-        }
+        private String from_first_name;
+        private String from_id;
+        private String token;
+        private String chat_photo_file_id = "";
+        private String username;
         private static final KeyboardButton [] keyboard =new KeyboardButton[]{
                 new KeyboardButton("1", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
                 new KeyboardButton("2", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
@@ -112,7 +68,7 @@ import java.util.Objects;
                 new KeyboardButton("0", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE)
         };
 
-        private static String token = "";
+
         private static int length = 9;
 
         public static int getLength() {
@@ -178,72 +134,131 @@ import java.util.Objects;
             return chat_last_name;
         }
 
-        public static void setChat_last_name(String chat_last_name) {
+        public TelegramClient(
+                String token) throws IOException {
+            this.token = token;
+            getMe();
+
+
+        }
+
+        public static void setDate(String date) {
+            TelegramClient.date = date;
+        }
+
+        public static void setMessage_id(String message_id) {
+            TelegramClient.message_id = message_id;
+        }
+
+        public static void setText(String text) {
+            TelegramClient.text = text;
+        }
+
+        private static void setLocation(String locationString) {
+            if (locationString != null && !locationString.isEmpty()) {
+                location = locationString;
+            }
+        }
+
+        //makeRequest return JSONObject
+        private static JSONObject makeRequest(String url, String method) throws IOException {
+            HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
+            conn.setRequestMethod(method);
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+            conn.setUseCaches(false);
+            conn.setAllowUserInteraction(false);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("charset", "utf-8");
+            conn.setRequestProperty("Accept-Charset", "utf-8");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
+            //  conn.setRequestProperty("Authorization","Bearer "+getToken());// "2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
+            conn.setRequestProperty("Connection", "Keep-Alive");
+            conn.setRequestProperty("Accept", "*/*");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("Pragma", "no-cache");
+            conn.setRequestProperty("Cache-Control", "no-cache");
+            //conn.setRequestProperty("Accept-Language", "en-US,en;q=0" + ";q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6");
+//conn.setRequestProperty("Host", "https://api.telegram.org");
+//        conn.setRequestProperty("Origin", "https://api.telegram.org");
+//       conn.setRequestProperty("Sec-Fetch-Mode", "cors");
+            //conn.setRequestProperty("Sec-Fetch-Site", "same-origin");
+            //conn.setRequestProperty("Sec-Fetch-User", "?1");
+            conn.setRequestProperty("Upgrade-Insecure-Requests", "1");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
+            conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+            conn.connect();
+            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            String inputLine;
+            StringBuilder response = new StringBuilder();
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+            System.out.println(response);
+            return new JSONObject(response.toString());
+        }
+
+        public static @NotNull List<String> getCommands() {
+            List<String> commands = new ArrayList<>();
+            commands.add("/Accounts");
+            commands.add("/Charts");
+            commands.add("/Chats");
+            commands.add("/Trade");
+            commands.add("/Screenshot");
+            commands.add("/Settings");
+            commands.add("/History");
+            commands.add("/Help");
+            commands.add("/invite");
+            commands.add("/leave");
+            commands.add("/lock");
+            commands.add("/login");
+            commands.add("/logout");
+            commands.add("/me");
+            commands.add("/start");
+            commands.add("/stop");
+            return
+                    commands;
+        }
+
+        public String getFrom_first_name() {
+            return from_first_name;
+        }
+
+        public void setFrom_first_name(String from_first_name) {
+            this.from_first_name = from_first_name;
+        }
+
+        public String getFrom_id() {
+            return from_id;
+        }
+
+        public void setFrom_id(String from_id) {
+            this.from_id = from_id;
+        }
+
+        public void setChat_last_name(String chat_last_name) {
             TelegramClient.chat_last_name = chat_last_name;
         }
 
-        public static String getChat_first_name() {
+        public String getChat_first_name() {
             return chat_first_name;
-        }
-
-        public static void setChat_first_name(String chat_first_name) {
-            TelegramClient.chat_first_name = chat_first_name;
-        }
-
-        public static String getReply_markup() {
-            return reply_markup;
-        }
-
-        public static void setReply_markup(String reply_markup) {
-            TelegramClient.reply_markup = reply_markup;
-        }
-
-        public static String getChat_photo_file_id() {
-            return chat_photo_file_id;
-        }
-
-        public static void setChat_photo_file_id(String chat_photo_file_id) {
-            TelegramClient.chat_photo_file_id = chat_photo_file_id;
-        }
-
-        public static String getChat_title() {
-            return chat_title;
-        }
-
-        public static void setChat_title(String chat_title) {
-            TelegramClient.chat_title = chat_title;
-        }
-
-        public static String getChat_type() {
-            return chat_type;
-        }
-
-        public static void setChat_type(String chat_type) {
-            TelegramClient.chat_type = chat_type;
-        }
-
-        public static String getChat_username() {
-            return chat_username;
-        }
-
-        public static void setChat_username(String chat_username) {
-            TelegramClient.chat_username = chat_username;
         }
 
         public static UPDATE_MODE getUpdateMode() {
             return updateMode;
         }
 
-        public static void setUpdateMode(UPDATE_MODE updateMode) {
-            TelegramClient.updateMode = updateMode;
+        public void setChat_first_name(String chat_first_name) {
+            TelegramClient.chat_first_name = chat_first_name;
         }
 
-        public static String getLanguage() {
-            return language;
+        public String getReply_markup() {
+            return reply_markup;
         }
 
-        public static void setLanguage(String language) {
-            TelegramClient.language = language;
+        public void setReply_markup(String reply_markup) {
+            this.reply_markup = reply_markup;
         }
 
         public static String getLocation() {
@@ -254,28 +269,28 @@ import java.util.Objects;
             return last_name;
         }
 
-        public static void setLast_name(String last_name) {
-            TelegramClient.last_name = last_name;
+        public String getChat_photo_file_id() {
+            return chat_photo_file_id;
         }
 
-        public static String getFirst_name() {
-            return first_name;
+        public void setChat_photo_file_id(String chat_photo_file_id) {
+            this.chat_photo_file_id = chat_photo_file_id;
         }
 
-        public static void setFirst_name(String first_name) {
-            TelegramClient.first_name = first_name;
+        public String getChat_title() {
+            return chat_title;
         }
 
-        public static String getMessage() {
-            return message;
+        public void setChat_title(String chat_title) {
+            this.chat_title = chat_title;
         }
 
-        public static void setMessage(String message) {
-            TelegramClient.message = message;
+        public String getChat_type() {
+            return chat_type;
         }
 
-        public static void setEntities(Entities entities) {
-            TelegramClient.entities = entities;
+        public void setChat_type(String chat_type) {
+            this.chat_type = chat_type;
         }
 
         public static String getChat_id() {
@@ -290,18 +305,33 @@ import java.util.Objects;
             return game;
         }
 
-        public static void setGame(Game game) {
-            TelegramClient.game = game;
+        public String getChat_username() {
+            return chat_username;
         }
 
         private static String chat_last_name = "";
         private static String chat_photo_file_unique_id = "";
         private static String chat_first_name = "";
-        private static String reply_markup = "";
-        private static String chat_photo_file_id = "";
-        private static String chat_title = "";
-        private static String chat_type = "";
-        private static String chat_username = "";
+
+        public void setChat_username(String chat_username) {
+            this.chat_username = chat_username;
+        }
+
+        public void setUpdateMode(UPDATE_MODE updateMode) {
+            TelegramClient.updateMode = updateMode;
+        }
+
+        public String getLanguage() {
+            return language;
+        }
+
+        public void setLanguage(String language) {
+            TelegramClient.language = language;
+        }
+
+        public void setLast_name(String last_name) {
+            TelegramClient.last_name = last_name;
+        }
         static UPDATE_MODE updateMode = UPDATE_MODE.UPDATE_NORMAL;
         static String language = "en-US";
         static String location = "";
@@ -341,7 +371,10 @@ import java.util.Objects;
         private static String animation;
         private static boolean canDeleteMessages;
         private static String firstName;
-        private static String username = "bigbossmanager";
+
+        public String getFirst_name() {
+            return first_name;
+        }
         private static String phoneNumber;
         private static String languageCode;
         private static String description;
@@ -431,8 +464,8 @@ import java.util.Objects;
             return date;
         }
 
-        public void setDate(String date) {
-            TelegramClient.date = date;
+        public void setFirst_name(String first_name) {
+            TelegramClient.first_name = first_name;
         }
 
         public String getAuthor_signature() {
@@ -447,16 +480,16 @@ import java.util.Objects;
             return message_id;
         }
 
-        public void setMessage_id(String message_id) {
-            TelegramClient.message_id = message_id;
+        public String getMessage() {
+            return message;
         }
 
         public String getText() {
             return text;
         }
 
-        public void setText(String text) {
-            TelegramClient.text = text;
+        public void setMessage(String message) {
+            TelegramClient.message = message;
         }
 
         public boolean isOk() {
@@ -491,13 +524,23 @@ import java.util.Objects;
             TelegramClient.channelName = channelName;
         }
 
+        public void setEntities(Entities entities) {
+            TelegramClient.entities = entities;
+        }
 
-        void getUpdates() throws IOException {
+        public void setGame(Game game) {
+            TelegramClient.game = game;
+        }
+
+
+        private static String chatId = "-1001648392740";
+
+        public void getUpdates() throws IOException {
 
             String url = "https://api.telegram.org/bot" + getToken() + "/getUpdates" +
                     "?&offset=" + offset +//\tInteger\tOptional\tIdentifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates. By default, updates starting with the earliest unconfirmed update are returned. An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id. The negative offset can be specified to retrieve updates starting from -offset update from the end of the updates queue. All previous updates will forgotten.\n" +
-                    "&limit=" + 1+//\tInteger\tOptional\tLimits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.\n" +
-                    "&timeout=" +0 +//\tInteger\tOptional\tTimeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.\n" +
+                    "&limit=" + 1 +//\tInteger\tOptional\tLimits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.\n" +
+                    "&timeout=" + 0 +//\tInteger\tOptional\tTimeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.\n" +
                     "&allowed_updates=" + true;//\tBoolean\tOptional;
             JSONArray jsonResponse1 = makeRequest(url, "GET").getJSONArray("result");
             for (int i = 0; i < jsonResponse1.length(); i++) {
@@ -620,19 +663,19 @@ import java.util.Objects;
                             if (message.has("from")) {
                                 JSONObject from = message.getJSONObject("from");
                                 if (from.has("id")) {
-                                    String from_id = String.valueOf(from.getInt("id"));
+                                    from_id = String.valueOf(from.getInt("id"));
                                 }
                                 if (from.has("is_bot")) {
-                                    boolean from_is_bot = from.getBoolean("is_bot");
+                                    is_bot = from.getBoolean("is_bot");
                                 }
                                 if (from.has("first_name")) {
-                                    String from_first_name = from.getString("first_name");
+                                    from_first_name = from.getString("first_name");
                                 }
                                 if (from.has("last_name")) {
-                                    String from_last_name = from.getString("last_name");
+                                    last_name = from.getString("last_name");
                                 }
                                 if (from.has("username")) {
-                                    String from_username = from.getString("username");
+                                    username = from.getString("username");
                                 }
                                 if (from.has("photo")) {
                                     JSONObject photo = from.getJSONObject("photo");
@@ -648,7 +691,7 @@ import java.util.Objects;
                             if (message.has("chat_id")) {
                                 JSONObject chat_id = message.getJSONObject("chat_id");
                                 if (chat_id.has("id")) {
-                                    String chat_id_id = String.valueOf(chat_id.getInt("id"));
+                                    setChat_id(String.valueOf(chat_id.getInt("id")));
 
                                 }
                             }
@@ -806,13 +849,13 @@ import java.util.Objects;
                             for (i = 0; i < inlineMessageEntities.length(); i++) {
                                 JSONObject entity = inlineMessageEntities.getJSONObject(i);
                                 if (entity.has("type")) {
-                                    String type = entity.getString("type");
+                                    type = entity.getString("type");
                                 }
                                 if (entity.has("offset")) {
-                                    int offset = entity.getInt("offset");
+                                    offset = entity.getInt("offset");
                                 }
                                 if (entity.has("length")) {
-                                    int length = entity.getInt("length");
+                                    length = entity.getInt("length");
                                 }
                             }
                         }
@@ -830,13 +873,13 @@ import java.util.Objects;
                             for (i = 0; i < chosenInlineMessageEntities.length(); i++) {
                                 JSONObject entity = chosenInlineMessageEntities.getJSONObject(i);
                                 if (entity.has("type")) {
-                                    String type = entity.getString("type");
+                                    type = entity.getString("type");
                                 }
                                 if (entity.has("offset")) {
-                                    int offset = entity.getInt("offset");
+                                    offset = entity.getInt("offset");
                                 }
                                 if (entity.has("length")) {
-                                    int length = entity.getInt("length");
+                                    length = entity.getInt("length");
                                 }
                             }
                         }
@@ -1077,19 +1120,6 @@ import java.util.Objects;
             }
         }
 
-        private void setLocation(String locationString) {
-            if (locationString != null && !locationString.isEmpty()) {
-                location = locationString;
-            }
-        }
-
-
-        private static String chatId = "-1001648392740";
-
-        public static String getToken() {
-            return token;
-        }
-
         public void setToken(String token1) {
             token = token1;
         }
@@ -1245,32 +1275,32 @@ import java.util.Objects;
             return firstName;
         }
 
-        public static void setFirstName(String firstName) {
+        public String getToken() {
+            return token;
+        }
+
+        public void setFirstName(String firstName) {
             TelegramClient.firstName = firstName;
         }
 
-        public static String getUsername() {
+        public String getUsername() {
             return username;
         }
 
-        public static void setUsername(String username) {
-            TelegramClient.username = username;
+        public void setUsername(String username) {
+            this.username = username;
         }
 
-        public static String getPhoneNumber() {
+        public String getPhoneNumber() {
             return phoneNumber;
         }
 
-        public static void setPhoneNumber(String phoneNumber) {
+        public void setPhoneNumber(String phoneNumber) {
             TelegramClient.phoneNumber = phoneNumber;
         }
 
-        public static String getLanguageCode() {
+        public String getLanguageCode() {
             return languageCode;
-        }
-
-        public static void setLanguageCode(String languageCode) {
-            TelegramClient.languageCode = languageCode;
         }
 
         public static String getDescription() {
@@ -1441,48 +1471,8 @@ import java.util.Objects;
 
         }
 
-
-
-
-
-
-        //makeRequest return JSONObject
-        private JSONObject makeRequest(String url, String method) throws IOException {
-            HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
-            conn.setRequestMethod(method);
-            conn.setDoOutput(true);
-            conn.setDoInput(true);
-            conn.setUseCaches(false);
-            conn.setAllowUserInteraction(false);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("charset", "utf-8");
-            conn.setRequestProperty("Accept-Charset", "utf-8");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-            //  conn.setRequestProperty("Authorization","Bearer "+getToken());// "2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
-            conn.setRequestProperty("Connection", "Keep-Alive");
-            conn.setRequestProperty("Accept", "*/*");
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("Pragma", "no-cache");
-            conn.setRequestProperty("Cache-Control", "no-cache");
-            //conn.setRequestProperty("Accept-Language", "en-US,en;q=0" + ";q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6");
-//conn.setRequestProperty("Host", "https://api.telegram.org");
-//        conn.setRequestProperty("Origin", "https://api.telegram.org");
-//       conn.setRequestProperty("Sec-Fetch-Mode", "cors");
-            //conn.setRequestProperty("Sec-Fetch-Site", "same-origin");
-            //conn.setRequestProperty("Sec-Fetch-User", "?1");
-            conn.setRequestProperty("Upgrade-Insecure-Requests", "1");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-            conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
-            conn.connect();
-            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            System.out.println(response);
-            return new JSONObject(response.toString());
+        public void setLanguageCode(String languageCode) {
+            TelegramClient.languageCode = languageCode;
         }
 
 
@@ -1573,7 +1563,7 @@ import java.util.Objects;
 
         static String type;//": "channel"
 
-        public static String getMe() {
+        public String getMe() {
             StringBuilder response = new StringBuilder();
             JSONObject jsonResponse = new JSONObject();
             try {
@@ -2102,41 +2092,41 @@ import java.util.Objects;
             );
         }
 
-        void getUserProfilePhotos() throws IOException {
+        public void getUserProfilePhotos() throws IOException {
             setMethod("GET");
             makeRequest(
                     "https://api.telegram.org/bot" + getToken()
-                            + "/getUserProfilePhotos","POST"
+                            + "/getUserProfilePhotos", "POST"
             );
         }
 
-        void getFile() throws IOException {
+        public void getFile() throws IOException {
             setMethod("GET");
             makeRequest(
                     "https://api.telegram.org/bot" + getToken()
-                            + "/getFile","POST");
+                            + "/getFile", "POST");
         }
 
-        void banChatMember() throws IOException {
+        public void banChatMember() throws IOException {
             setMethod("POST");
             makeRequest(
                     "https://api.telegram.org/bot" + getToken()
-                            + "/banChatMember","POST"
+                            + "/banChatMember", "POST"
             );
         }
 
-        void unbanChatMember() throws IOException {
+        public void unbanChatMember() throws IOException {
             setMethod("POST");
             makeRequest(
                     "https://api.telegram.org/bot" + getToken()
-                            + "/unbanChatMember","POST");
+                            + "/unbanChatMember", "POST");
         }
 
-        void restrictChatMember() throws IOException {
+        public void restrictChatMember() throws IOException {
             setMethod("POST");
             makeRequest(
                     "https://api.telegram.org/bot" + getToken()
-                            + "/restrictChatMember","POST"
+                            + "/restrictChatMember", "POST"
             );
         }
 
@@ -2155,11 +2145,11 @@ import java.util.Objects;
             );
         }
 
-        void banChatSenderChat() throws IOException {
+        public void banChatSenderChat() throws IOException {
             setMethod("POST");
             makeRequest(
                     "https://api.telegram.org/bot" + getToken() + "/"
-                            + "/banChatSenderChat","POST"
+                            + "/banChatSenderChat", "POST"
             );
         }
 
@@ -2343,26 +2333,52 @@ import java.util.Objects;
             );
         }
 
-        static List<String> getCommands() {
-            List<String> commands = new ArrayList<>();
-            commands.add("/Accounts");
-            commands.add("/Charts");
-            commands.add("/Chats");
-            commands.add("/Trade");
-            commands.add("/Screenshot");
-            commands.add("/Settings");
-            commands.add("/History");
-            commands.add("/Help");
-            commands.add("/invite");
-            commands.add("/leave");
-            commands.add("/lock");
-            commands.add("/login");
-            commands.add("/logout");
-            commands.add("/me");
-            commands.add("/start");
-            commands.add("/stop");
-            return
-                    commands;
+        public enum KeyboardButtonType {
+            UP(0),
+            DOWN(1),
+            LEFT(2),
+            RIGHT(3), BUTTON_TYPE_SINGLE_LINE(4),
+            Start(5),
+            BACK(6),
+            Stop(7),
+            Trade(8),
+            Order(9),
+            Exchange(10),
+            CloseOrder(11),
+            CancelOrder(12),
+            CancelAll(13),Delete(14),
+            Balance(15),SendMoney(16), BUTTON_TYPE_EXIT(100), BUTTON_TYPE_MENU(17);
+
+
+            public final ArrayList <SymbolData>arrayListSymbolsData=new ArrayList<>();
+            public JsonNode arrayListSymbolsData2;
+
+            KeyboardButtonType(int i) {
+            }
+
+            public void setLimit(int i) {
+            }
+
+            public void setInterval(int period) {
+            }
+
+            public void setPeriod(int period) {
+            }
+
+            public void setLang(String en) {
+            }
+
+            public void setOffset(int i) {
+            }
+
+            public void Oninit() {
+            }
+
+            public void OnTick() {
+            }
+
+            public void CloseAll() {
+            }
         }
 
 

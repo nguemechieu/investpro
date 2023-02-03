@@ -26,13 +26,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static org.investpro.investpro.DataSource.url;
 
 public class CoinbasePro {
-    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("ETH"), Currency.ofFiat("USD"));
+    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("XLM"), Currency.ofFiat("USD"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    public static void createMarketOrder(String toString, String type0, String side, double size) {
+
+    }
+
 
     public CandleStickChartContainer start() throws URISyntaxException, IOException {
         Platform.setImplicitExit(false);
@@ -45,7 +51,11 @@ public class CoinbasePro {
         candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return candleStickChartContainer;
     }
-public static class Coinbase extends Exchange {
+
+    public static class Coinbase extends Exchange {
+        private static final String API_KEY0 = "39ed6c9ec56976ad7fcab4323ac60dac";
+        private static final String PASSPHRASE = "w73hzit0cgl";
+
         Coinbase() {
             super(null); // This argument is for creating a WebSocket client for live trading data.
         }
@@ -173,10 +183,28 @@ public static class Coinbase extends Exchange {
                     }
 
                     try {
+                        HttpRequest.Builder req = HttpRequest.newBuilder();
+                        req.header("Content-Type", "application/json");
+                        req.header("Accept", "application/json");
+                        req.header("Accept-Encoding", "UTF-8");
+                        // req.header("Authorization", "Bearer " + );
+
+
+                        //   conn.setRequestProperty("charset", "utf-8");
+                        // conn.setRequestProperty("Accept-Charset", "utf-8");
+                        req.header("User-Agent", "Mozilla/5.0 (Windows NT 10)");
+                        req.header("CB-ACCESS-KEY", API_KEY0);//	API key as a string
+                        String timestamp = new Date().toString();
+
+                        req.header("CB-ACCESS-SIGN", timestamp + "POST" + url);
+                        //"base64-encoded signature (see Signing a Message)");
+                        req.header("CB-ACCESS-TIMESTAMP", new Date().toString());//	Timestamp for your request
+                        req.header("CB-ACCESS-PASSPHRASE", PASSPHRASE);//Passphrase you specified when creating the API key
+                        req.header("Connection", "Keep-Alive");
+
+
                         HttpResponse<String> response = HttpClient.newHttpClient().send(
-                                HttpRequest.newBuilder()
-                                        .uri(URI.create(uriStr))
-                                        .GET().build(),
+                                req.build(),
                                 HttpResponse.BodyHandlers.ofString());
 
                         Log.info("response headers: " + response.headers());

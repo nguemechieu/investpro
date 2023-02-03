@@ -3,8 +3,6 @@ package org.investpro.investpro;
 import java.util.Date;
 
 public class Order {
-
-
     String timestamp;
      Long id;
      TRADE_ORDER_TYPE order_type;

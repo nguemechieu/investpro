@@ -1,5 +1,8 @@
 package org.investpro.investpro.BinanceUs;
 
+import org.investpro.investpro.TradePair;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -93,8 +96,12 @@ public class BinanceUs {
         return true;
     }
 
+    public static void createMarketOrder(TradePair tradePair, String type, String side, double size) {
+    }
+
     //makeRequest return JSONObject
-    private JSONObject makeRequest(String url, String method) throws IOException {
+    @Contract("_, _ -> new")
+    private @NotNull JSONObject makeRequest(String url, String method) throws IOException {
         HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
         conn.setRequestMethod(method);
         conn.setDoOutput(true);
@@ -104,7 +111,7 @@ public class BinanceUs {
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Accept", "html/text");
-           conn.setRequestProperty("charset", "utf-8");
+        conn.setRequestProperty("charset", "utf-8");
         conn.setRequestProperty("Accept-Charset", "utf-8");
         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
         conn.setRequestProperty("CB-ACCESS-KEY",API_PUBLIC_KEY);//	API key as a string

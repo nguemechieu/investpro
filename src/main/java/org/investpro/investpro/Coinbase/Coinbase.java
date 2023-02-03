@@ -11,11 +11,11 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.Date;
 
-public  class Coinbase {
+public class Coinbase {
 
-    String PASSPHRASE="w73hzit0cgl";
-    String API_SECRET="FEXDflwq+XnAU2Oussbk1FOK7YM6b9A4qWbCw0TWSj0xUBCwtZ2V0MVaJIGSjWWtp9PjmR/XMQoH9IZ9GTCaKQ==";
-    String API_KEY0="39ed6c9ec56976ad7fcab4323ac60dac";
+    protected String PASSPHRASE = "w73hzit0cgl";
+    protected String API_SECRET = "FEXDflwq+XnAU2Oussbk1FOK7YM6b9A4qWbCw0TWSj0xUBCwtZ2V0MVaJIGSjWWtp9PjmR/XMQoH9IZ9GTCaKQ==";
+    protected String API_KEY0 = "39ed6c9ec56976ad7fcab4323ac60dac";
     public static final String API_URL = "https://api.coinbase.com/v2/exchange-rates?currency=BTC";
     public static final String API_VERSION = "v2";
     public static final String API_USER_AGENT = "coinbase-java/" + Coinbase.API_VERSION;
@@ -58,16 +58,16 @@ public  class Coinbase {
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Accept", "html/text");
-     //   conn.setRequestProperty("charset", "utf-8");
-       // conn.setRequestProperty("Accept-Charset", "utf-8");
+        //   conn.setRequestProperty("charset", "utf-8");
+        // conn.setRequestProperty("Accept-Charset", "utf-8");
         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-        conn.setRequestProperty("CB-ACCESS-KEY",API_KEY0);//	API key as a string
-        String timestamp=new Date().toString();
-        String body = null;
-        conn.setRequestProperty( "CB-ACCESS-SIGN"	,timestamp + method + url + body );
-               //"base64-encoded signature (see Signing a Message)");
-     conn.setRequestProperty(   "CB-ACCESS-TIMESTAMP",  new Date().toString());//	Timestamp for your request
-      conn.setRequestProperty(  "CB-ACCESS-PASSPHRASE",	PASSPHRASE);//Passphrase you specified when creating the API key
+        conn.setRequestProperty("CB-ACCESS-KEY", API_KEY0);//	API key as a string
+        String timestamp = new Date().toString();
+
+        conn.setRequestProperty("CB-ACCESS-SIGN", timestamp + method + url);
+        //"base64-encoded signature (see Signing a Message)");
+        conn.setRequestProperty("CB-ACCESS-TIMESTAMP", new Date().toString());//	Timestamp for your request
+        conn.setRequestProperty("CB-ACCESS-PASSPHRASE", PASSPHRASE);//Passphrase you specified when creating the API key
         conn.setRequestProperty("Connection", "Keep-Alive");
         conn.setRequestProperty("Accept", "*/*");
         conn.setRequestProperty("Pragma", "no-cache");

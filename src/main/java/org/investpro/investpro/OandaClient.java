@@ -17,9 +17,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
-public class OandaClient {
+public class OandaClient extends Exchange {
     private static final Accounts accounts = new Accounts();
+
     static String accountID = "001-001-2783446-006";
     static Instrument instrument = new Instrument();
     static Root root;
@@ -34,6 +36,7 @@ public class OandaClient {
     private OandaTransaction oandaTransaction;
 
     public OandaClient(String host, String api_key, String accountID) {
+        super(null);
 
         OandaClient.host = host;
 
@@ -647,7 +650,7 @@ public class OandaClient {
 //    GET	/v3/accounts/{accountID}/pricing
 //    Get pricing information for a specified list of Instruments within an Account.
 
-    private static int DateToInt(String time) {
+    static int DateToInt(String time) {
         return (int) Date.from(Instant.parse(time)).getTime();
 
 
@@ -728,7 +731,10 @@ public class OandaClient {
 
         return null;
     }
-//
+
+    //String urls = String.format("https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') + "/candles?count=10&price=A&from=" + startDateString + "&granularity=" + actualGranularity);
+    // static String api_key = "7e0018e5e2e0d287c854c5bd8a509712-2c4ed485f470ed2db68159fb308272a8";
+
 //
 //    Position Endpoints
 //
@@ -737,19 +743,19 @@ public class OandaClient {
 //    GET	/v3/accounts/{accountID}/positions
 //    List all Positions for an Account. The Positions returned are for every instrument that has had a position during the lifetime of an  Account.
 
-    public static ArrayList<CandleData> getForexCandles() throws OandaException, InterruptedException {
+    public static ArrayList<CandleData> getForexCandles(String string) throws OandaException, InterruptedException {
 
 
         System.out.println("instruments list" + instrumentsList);
         for (int i = 0; i < instrumentsList.size(); i++) {
             //Get all forex symbols candles
-            array.add(i, getCandle((instrumentsList.get(i)).replace("/", "_"), i));
+            array.add(getCandle((string), i));
         }
         return array;
 
     }
 
-    public static String createOrder(String symbol, double quantity, String price, String side) throws OandaException {
+    public static @Nullable String createOrder(String symbol, double quantity, String price, String side) throws OandaException {
         //todo create order update
         String path = "/v3/accounts/" + accountID + "/orders";
         JSONObject payload = makeRequest("POST", path);
@@ -1265,8 +1271,6 @@ public class OandaClient {
 
             for (int i = 0; i < payload.getJSONArray("transactions").length(); i++
             ) {
-                OandaTransaction oandaTransaction = null;
-                oandaTransaction = new OandaTransaction();
             }
         }
         return null;
@@ -1293,6 +1297,26 @@ public class OandaClient {
             }
         }
         return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return null;
+    }
+
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public boolean isInputClosed() {
+        return false;
+    }
+
+    @Override
+    public void abort() {
+
     }
 
 //            Note: This endpoint is served by the streaming URLs.

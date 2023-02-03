@@ -43,6 +43,7 @@ public class OandaOrder extends Order {
     private String date;
 
     public OandaOrder(String toString, String toString1, String toString2, String toString3) {
+
     }
 
     public String getCurrency() {
