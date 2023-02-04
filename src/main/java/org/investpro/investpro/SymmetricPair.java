@@ -61,8 +61,9 @@ public record SymmetricPair<F, S>(F first, S second) {
         return (first == null ? 0 : first.hashCode()) ^ (second == null ? 0 : second.hashCode());
     }
 
+    @Contract(pure = true)
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         return "SymmetricPair [" + first + ", " + second + "]";
     }
 

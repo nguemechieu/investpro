@@ -2,6 +2,7 @@ package org.investpro.investpro;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.logging.Logger;
 
 public class Log {
     public static void info(String message) {
@@ -30,14 +31,17 @@ public class Log {
 
     public static void write(String file, String reader) throws IOException {
 
-       try {
+        try {
 
 
-        FileWriter writer = new FileWriter(reader);
-        writer.write(file);}
-       catch (Exception e) {
-           e.printStackTrace();
-       }
+            FileWriter writer = new FileWriter(reader);
+            writer.write(file);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
+    public static void error(int tag, String s) {
+        Logger.getLogger(s, String.valueOf(tag));
+    }
 }

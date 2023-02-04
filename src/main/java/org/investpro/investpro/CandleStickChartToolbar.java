@@ -88,6 +88,7 @@ public class CandleStickChartToolbar extends Region {
             if (granularity < 3600) {
                 ToolbarButton toolbar0 = new ToolbarButton((granularity / 60) + "m", granularity);
                 toolbar0.setBackground(Background.fill(xColor[(int) (Math.random() * xColor.length - 1)]));
+                toolbar0.setPadding(new Insets(10, 10, 10, 10));
                 toolbarNodes.add(toolbar0);
 
 
@@ -220,25 +221,6 @@ public class CandleStickChartToolbar extends Region {
                         }
                     });
 
-                } else if (tool.tool != null && tool.tool.isPrint()) {
-                    tool.setOnAction(t ->
-                    {
-                        try {
-                            Desktop.getDesktop().mail();
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-                } else if (tool.tool != null && tool.tool.isPDF()) {
-
-                    tool.setOnAction(ee -> {
-
-                        try {
-                            Desktop.getDesktop().print(new File(new URI(System.getProperty("user.dir") + "/resources/images/screenshot")));
-                        } catch (IOException | URISyntaxException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
                 }
 
 
@@ -255,9 +237,6 @@ public class CandleStickChartToolbar extends Region {
         ZOOM_OUT("/img/search-minus-solid.png"),
         SCREENSHOT("/img/Screen Shot.png"),
         SEARCHTOOL("/img/search.png"),
-
-        PDF("/img/pdf.png"),
-        PRINT("/img/print-solid.png"),
         OPTIONS("/img/cog-solid.png");
 
         private final String img;
@@ -284,17 +263,12 @@ public class CandleStickChartToolbar extends Region {
             return this == SCREENSHOT;
         }
 
-        boolean isPrint() {
-            return this == PRINT;
-        }
 
         boolean isSearch() {
             return this == SEARCHTOOL;
         }
 
-        public boolean isPDF() {
-            return this == PDF;
-        }
+
     }
 
 

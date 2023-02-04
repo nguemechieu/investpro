@@ -3,6 +3,7 @@ package org.investpro.investpro;
 import com.fasterxml.jackson.databind.JsonNode;
 import javafx.animation.Animation;
 import javafx.event.ActionEvent;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -17,40 +18,49 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.nio.file.Path;
+import java.text.ParseException;
+import java.util.*;
+
+import static java.lang.System.out;
 
 
-    //  makeRequest("https://api.telegram.org/bot" + token + "/setWebhook");
-    public class TelegramClient {
-        public static final ArrayList<Chat> ArrayListChat = new ArrayList<>();
-        String reply_markup = "";
-        String chat_title = "";
-        String chat_type = "";
-        String chat_username = "";
-        static  boolean disable_content_type_detection = false;
+//  makeRequest("https://api.telegram.org/bot" + token + "/setWebhook");
+public class TelegramClient {
 
-        public String getBalance() {
 
-            return
-                    "https://api.telegram.org/bot" +getToken()+
-                            "/getChat" +
-                            "?chat_id=" + getChatId() +
-                            "&disable_content_type_detection=" + disable_content_type_detection;
-
-        }
-
-        public String getSymbol() {
-
-            return
-                    "https://api.telegram.org/bot" +
-                            "/getChat" +
-                            "?chat_id=" + getChatId() +
-                            "&disable_content_type_detection=" + disable_content_type_detection;
-        }
-        private String from_first_name;
+    public static final ArrayList<Chat> ArrayListChat = new ArrayList<>();
+    public static int offset = 0;
+    static boolean disable_content_type_detection = false;
+    static int limit = 10;
+    static int page = 1;
+    //chat_id	//Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+    // message_thread_id;//	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+    // text	String	Yes	Text of the message to be sent, 1-4096 characters after entities parsing
+    //parse_mode	String	Optional	Mode for parsing entities in the message text. See formatting options for more details.
+    // entities	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode
+    static boolean disable_web_page_preview;//	Boolean	Optional	Disables link previews for links in this message
+    //disable_notification	Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
+    static boolean protect_content;    //Boolean	Optional	Protects the contents of the sent message from forwarding and savingString reply_to_message_id	;//Integer	Optional	If the message is a reply, ID of the original message
+    static boolean allow_sending_without_reply;//	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
+    // reply_markup
+    static String channel_Id;
+    static Entities entities = new Entities();
+    static String message_thread_id;    //Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+    static String Optional;////Photo caption (may also be used when resending photos by file_id), 0-1024 characters after entities parsing
+    static String parse_mode = "None";//String	Optional	Mode for parsing entities in the photo caption. See formatting options for more details.
+    static String caption_entities;//	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in the caption, which can be specified instead of parse_mode
+    static String disable_notification;    //Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
+    static String id;
+    static String title;//": "TradeExpert",
+    static String type;//": "channel"
+    static Game game;
+    private static String entity_type = "";
+    private static String inline_keyboard_text = "";
+    private static boolean is_restricted = false;
+    private static boolean is_bot = false;
+    private static String chatId = "-1001648392740";
+    public int MinAfter, LastUpd, Upd;
         private String from_id;
         private String token;
         private String chat_photo_file_id = "";
@@ -86,27 +96,15 @@ import java.util.Objects;
         public static void setEntity_type(String entity_type) {
             TelegramClient.entity_type = entity_type;
         }
-
-        public static int getOffset() {
-            return offset;
-        }
-
-        public static void setOffset(int offset) {
-            TelegramClient.offset = offset;
-        }
-
-        private static String entity_type = "";
-        private static int offset = 0;
-
-
-        static int limit = 10;
-        static int page = 1;
-        private static boolean is_restricted = false;
-        private static boolean is_bot = false;
-
-        public static boolean isIs_restricted() {
-            return is_restricted;
-        }
+    protected String host = "https://api.telegram.org";
+    protected Path path;
+    String reply_markup = "";
+    String chat_title = "";
+    String chat_type = "";
+    String chat_username = "";
+    int Now;
+    int BeforeNewsStop = 30;
+    int AfterNewsStop = 60;
 
         public static void setIs_restricted(boolean is_restricted) {
             TelegramClient.is_restricted = is_restricted;
@@ -115,111 +113,27 @@ import java.util.Objects;
         public static boolean isIs_bot() {
             return is_bot;
         }
+    boolean FirstAlert, SecondAlert;
+    boolean sendnews = true;
+    private boolean Signal;
+    private boolean Vhigh;
+    private boolean Vmedium, Vlow;
+    private boolean Next;
+    private boolean NewsFilter;
+    private boolean trade;
+    private String from_first_name;
+    private String infoberita;
+    private String judulnews;
+    private boolean DrawLines;
 
-        public static void setIs_bot(boolean is_bot) {
-            TelegramClient.is_bot = is_bot;
-        }
+    public TelegramClient(String token) throws IOException, InterruptedException, TelegramApiException {
 
-        public static String getInline_keyboard_text() {
-            return inline_keyboard_text;
-        }
-
-        public static void setInline_keyboard_text(String inline_keyboard_text) {
-            TelegramClient.inline_keyboard_text = inline_keyboard_text;
-        }
-
-        private static String inline_keyboard_text = "";
-
-        public static String getChat_last_name() {
-            return chat_last_name;
-        }
-
-        public TelegramClient(
-                String token) throws IOException {
-            this.token = token;
-            getMe();
+        if (token == null) throw new TelegramApiException("Telegram token can't be  null ");
+        this.token = token;
+        run();
 
 
-        }
-
-        public static void setDate(String date) {
-            TelegramClient.date = date;
-        }
-
-        public static void setMessage_id(String message_id) {
-            TelegramClient.message_id = message_id;
-        }
-
-        public static void setText(String text) {
-            TelegramClient.text = text;
-        }
-
-        private static void setLocation(String locationString) {
-            if (locationString != null && !locationString.isEmpty()) {
-                location = locationString;
-            }
-        }
-
-        //makeRequest return JSONObject
-        private static JSONObject makeRequest(String url, String method) throws IOException {
-            HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
-            conn.setRequestMethod(method);
-            conn.setDoOutput(true);
-            conn.setDoInput(true);
-            conn.setUseCaches(false);
-            conn.setAllowUserInteraction(false);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("charset", "utf-8");
-            conn.setRequestProperty("Accept-Charset", "utf-8");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-            //  conn.setRequestProperty("Authorization","Bearer "+getToken());// "2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
-            conn.setRequestProperty("Connection", "Keep-Alive");
-            conn.setRequestProperty("Accept", "*/*");
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("Pragma", "no-cache");
-            conn.setRequestProperty("Cache-Control", "no-cache");
-            //conn.setRequestProperty("Accept-Language", "en-US,en;q=0" + ";q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6");
-//conn.setRequestProperty("Host", "https://api.telegram.org");
-//        conn.setRequestProperty("Origin", "https://api.telegram.org");
-//       conn.setRequestProperty("Sec-Fetch-Mode", "cors");
-            //conn.setRequestProperty("Sec-Fetch-Site", "same-origin");
-            //conn.setRequestProperty("Sec-Fetch-User", "?1");
-            conn.setRequestProperty("Upgrade-Insecure-Requests", "1");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-            conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
-            conn.connect();
-            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            System.out.println(response);
-            return new JSONObject(response.toString());
-        }
-
-        public static @NotNull List<String> getCommands() {
-            List<String> commands = new ArrayList<>();
-            commands.add("/Accounts");
-            commands.add("/Charts");
-            commands.add("/Chats");
-            commands.add("/Trade");
-            commands.add("/Screenshot");
-            commands.add("/Settings");
-            commands.add("/History");
-            commands.add("/Help");
-            commands.add("/invite");
-            commands.add("/leave");
-            commands.add("/lock");
-            commands.add("/login");
-            commands.add("/logout");
-            commands.add("/me");
-            commands.add("/start");
-            commands.add("/stop");
-            return
-                    commands;
-        }
+    }
 
         public String getFrom_first_name() {
             return from_first_name;
@@ -528,956 +442,483 @@ import java.util.Objects;
             TelegramClient.entities = entities;
         }
 
-        public void setGame(Game game) {
-            TelegramClient.game = game;
+    public static int getOffset() {
+        return offset;
+    }
+
+    public static void setOffset(int offset) {
+        TelegramClient.offset = offset;
+    }
+
+    public static boolean isIs_restricted() {
+        return is_restricted;
+    }
+
+    public static void setIs_bot(boolean is_bot) {
+        TelegramClient.is_bot = is_bot;
+    }
+
+    public static String getInline_keyboard_text() {
+        return inline_keyboard_text;
+    }
+
+    public static void setInline_keyboard_text(String inline_keyboard_text) {
+        TelegramClient.inline_keyboard_text = inline_keyboard_text;
+    }
+
+    public static String getChat_last_name() {
+        return chat_last_name;
+    }
+
+    public static void setDate(String date) {
+        TelegramClient.date = date;
+    }
+
+    //makeRequest return JSONObject
+    @Contract("_, _ -> new")
+    private static @NotNull JSONObject makeRequest(String url, String method) throws IOException {
+        HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
+        conn.setRequestMethod(method);
+        conn.setDoOutput(true);
+        conn.setDoInput(true);
+        conn.setUseCaches(false);
+        conn.setAllowUserInteraction(false);
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("charset", "utf-8");
+        conn.setRequestProperty("Accept-Charset", "utf-8");
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
+        //  conn.setRequestProperty("Authorization","Bearer "+getToken());// "2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
+        conn.setRequestProperty("Connection", "Keep-Alive");
+        conn.setRequestProperty("Accept", "*/*");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("Pragma", "no-cache");
+        conn.setRequestProperty("Cache-Control", "no-cache");
+        //conn.setRequestProperty("Accept-Language", "en-US,en;q=0" + ";q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6");
+//conn.setRequestProperty("Host", "https://api.telegram.org");
+//        conn.setRequestProperty("Origin", "https://api.telegram.org");
+//       conn.setRequestProperty("Sec-Fetch-Mode", "cors");
+            //conn.setRequestProperty("Sec-Fetch-Site", "same-origin");
+            //conn.setRequestProperty("Sec-Fetch-User", "?1");
+        conn.setRequestProperty("Upgrade-Insecure-Requests", "1");
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
+        conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+        conn.connect();
+        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        String inputLine;
+        StringBuilder response = new StringBuilder();
+        while ((inputLine = in.readLine()) != null) {
+            response.append(inputLine);
+        }
+        in.close();
+        out.println(response);
+        return new JSONObject(response.toString());
+    }
+
+    public static void setMessage_id(String message_id) {
+        TelegramClient.message_id = message_id;
+    }
+
+    public static void setText(String text) {
+        TelegramClient.text = text;
+    }
+
+    private static void setLocation(String locationString) {
+        if (locationString != null && !locationString.isEmpty()) {
+            location = locationString;
+        }
+    }
+
+    public static @NotNull List<String> getCommands() {
+        List<String> commands = new ArrayList<>();
+        commands.add("/Accounts");
+        commands.add("/Charts");
+        commands.add("/Chats");
+        commands.add("/Trade");
+        commands.add("/Screenshot");
+        commands.add("/Settings");
+        commands.add("/History");
+            commands.add("/Help");
+            commands.add("/invite");
+            commands.add("/leave");
+            commands.add("/lock");
+            commands.add("/login");
+            commands.add("/logout");
+            commands.add("/me");
+            commands.add("/start");
+            commands.add("/stop");
+            return
+                    commands;
         }
 
+    public static void setInline_message_id(String inline_message_id) {
+        TelegramClient.inline_message_id = inline_message_id;
+    }
 
-        private static String chatId = "-1001648392740";
+    public static boolean isSupportsInlineQueries() {
+        return supportsInlineQueries;
+    }
 
-        public void getUpdates() throws IOException {
+    public static void setSupportsInlineQueries(boolean supportsInlineQueries) {
+        TelegramClient.supportsInlineQueries = supportsInlineQueries;
+    }
 
-            String url = "https://api.telegram.org/bot" + getToken() + "/getUpdates" +
-                    "?&offset=" + offset +//\tInteger\tOptional\tIdentifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates. By default, updates starting with the earliest unconfirmed update are returned. An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id. The negative offset can be specified to retrieve updates starting from -offset update from the end of the updates queue. All previous updates will forgotten.\n" +
-                    "&limit=" + 1 +//\tInteger\tOptional\tLimits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.\n" +
-                    "&timeout=" + 0 +//\tInteger\tOptional\tTimeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.\n" +
-                    "&allowed_updates=" + true;//\tBoolean\tOptional;
-            JSONArray jsonResponse1 = makeRequest(url, "GET").getJSONArray("result");
-            for (int i = 0; i < jsonResponse1.length(); i++) {
-                JSONObject jsonResponse = jsonResponse1.getJSONObject(i);
+    public static boolean isCanReadAllGroupMessages() {
+        return canReadAllGroupMessages;
+    }
 
-                System.out.println("TELEGRAM update  " + jsonResponse);
-                if (jsonResponse.has("update_id")) {
-                    update_id = String.valueOf(jsonResponse.getLong("update_id"));
-                    System.out.println(jsonResponse1);
-                }
-                if (jsonResponse.has("result")) {
-                    result = jsonResponse.getString("result");
-                    ok = result.equals("ok");
+    public static void setCanReadAllGroupMessages(boolean canReadAllGroupMessages) {
+        TelegramClient.canReadAllGroupMessages = canReadAllGroupMessages;
+    }
 
-                    System.out.println("result "+jsonResponse);
-                }
+    public static boolean isIsBot() {
+        return isBot;
+    }
 
+    public static void setIsBot(boolean isBot) {
+        TelegramClient.isBot = isBot;
+    }
 
-                if (jsonResponse.has("result")) {
-                    JSONArray results = jsonResponse.getJSONArray("result");
-                    for (i = 0; i < results.length(); i++) {
-                        JSONObject result = results.getJSONObject(i);
-                        if (result.has("ok")) {
-                            ok = result.getBoolean("ok");
-                        }
-                        if (result.has("error")) {
-                            String error = result.getString("error");
-                            System.out.println("ERROR :" + error);
-                        }
-                        if (result.has("update_id")) {
-                            update_id = String.valueOf(result.getInt("update_id"));
-                        }
+    public static boolean isCanJoinGroups() {
+        return canJoinGroups;
+    }
 
-                        if (result.has("entities")) {
-                            JSONArray entities = result.getJSONArray("entities");
-                            for (int j = 0; j < entities.length(); j++) {
-                                JSONObject entity = entities.getJSONObject(j);
-                                if (entity.has("offset")) {
-                                    offset = entity.getInt("offset");
-                                }
-                                if (entity.has("length")) {
-                                    length = entity.getInt("length");
-                                }
-                                if (entity.has("type")) {
-                                    entity_type = entity.getString("type");
-                                }
-                            }
-                        }
-                        if (result.has("message")) {
+    public static void setCanJoinGroups(boolean canJoinGroups) {
+        TelegramClient.canJoinGroups = canJoinGroups;
+    }
 
-                            JSONObject message = result.getJSONObject("message");
-                            if (message.has("text")) {
-                                text = message.getString("text");
-                            }
-                            if (message.has("date")) {
-                                date = String.valueOf(message.getLong("date"));
-                            }
-                            if (message.has("chat")) {
-                                JSONObject chat = message.getJSONObject("chat");
-                                if (chat.has("id")) {
-                                    int   chat_id = Integer.parseInt(String.valueOf(chat.getInt("id")));
+    public static void setFile(File file) {
+        TelegramClient.file = file;
+    }
 
+    public static String getAnimation() {
+        return animation;
+    }
 
-                                    if (chat.has("type")) {
-                                        chat_type = chat.getString("type");
-                                    }
-                                    if (chat.has("title")) {
-                                        chat_title = chat.getString("title");
-                                    }
-                                    if (chat.has("username")) {
-                                        chat_username = chat.getString("username");
-                                    }
-                                    if (chat.has("first_name")) {
-                                        chat_first_name = chat.getString("first_name");
-                                    }
-                                    if (chat.has("last_name")) {
-                                        chat_last_name = chat.getString("last_name");
-                                    }
-                                    if (chat.has("photo")) {
-                                        JSONObject photo = chat.getJSONObject("photo");
-                                        if (photo.has("file_id")) {
-                                            chat_photo_file_id = String.valueOf(photo.getInt("file_id"));
-                                        }
-                                        if (photo.has("file_unique_id")) {
-                                            chat_photo_file_unique_id = String.valueOf(photo.getInt("file_unique_id"));
-                                        }
-                                    }
-                                    if (chat.has("video")) {
-                                        JSONObject video = chat.getJSONObject("video");
-                                    }
-                                    if (chat.has("voice")) {
-                                        JSONObject voice = chat.getJSONObject("voice");
-                                    }
-                                    if (chat.has("caption")) {
-                                        JSONObject caption = chat.getJSONObject("caption");
-                                    }
-                                    if (chat.has("new_chat_members")) {
-                                        JSONArray new_chat_members = chat.getJSONArray("new_chat_members");
-                                    }
-                                    if (chat.has("left_chat_member")) {
-                                        String left_chat_member = String.valueOf(chat.getJSONObject("left_chat_member"));
-                                    }
-                                    if (chat.has("text")) {
-                                        text = String.valueOf(chat.getJSONObject("text"));
-                                    }
-                                    if (chat.has("message")) {
-                                        JSONObject chatMessage = chat.getJSONObject("message");
-                                    }
-                                    ArrayListChat.add(i,
-                                            new Chat(    chat_id,
-                                                    chat_type,
-                                                    chat_title,
-                                                    text,
-                                                    chat_first_name,
-                                                    chat_last_name,
-                                                    chat_username
-                                            ));
+    public static void setAnimation(String animation) {
+        TelegramClient.animation = animation;
+    }
 
-                                }}
-                            if (message.has("from")) {
-                                JSONObject from = message.getJSONObject("from");
-                                if (from.has("id")) {
-                                    from_id = String.valueOf(from.getInt("id"));
-                                }
-                                if (from.has("is_bot")) {
-                                    is_bot = from.getBoolean("is_bot");
-                                }
-                                if (from.has("first_name")) {
-                                    from_first_name = from.getString("first_name");
-                                }
-                                if (from.has("last_name")) {
-                                    last_name = from.getString("last_name");
-                                }
-                                if (from.has("username")) {
-                                    username = from.getString("username");
-                                }
-                                if (from.has("photo")) {
-                                    JSONObject photo = from.getJSONObject("photo");
-                                    if (photo.has("file_id")) {
-                                        String from_photo_file_id = String.valueOf(photo.getInt("file_id"));
-                                    }
-                                    if (photo.has("file_unique_id")) {
-                                        String from_photo_file_unique_id = String.valueOf(photo.getInt("file_unique_id"));
-                                        System.out.println(from_photo_file_unique_id);
-                                    }
-                                }
-                            }
-                            if (message.has("chat_id")) {
-                                JSONObject chat_id = message.getJSONObject("chat_id");
-                                if (chat_id.has("id")) {
-                                    setChat_id(String.valueOf(chat_id.getInt("id")));
+    public static boolean isCanDeleteMessages() {
+        return canDeleteMessages;
+    }
 
-                                }
-                            }
-                            if (message.has("reply_to_message")) {
-                                JSONObject reply_to_message = message.getJSONObject("reply_to_message");
-                                if (reply_to_message.has("message_id")) {
-                                    reply_to_message_id = String.valueOf(reply_to_message.getInt("message_id"));
-                                }
-                            }
-                            if (message.has("reply_markup")) {
-                                JSONObject reply_markup = message.getJSONObject("reply_markup");
-                                if (reply_markup.has("inline_keyboard")) {
-                                    JSONArray inline_keyboard = reply_markup.getJSONArray("inline_keyboard");
-                                    for (int j = 0; j < inline_keyboard.length(); j++) {
-                                        JSONObject inline_keyboard_item = inline_keyboard.getJSONObject(j);
-                                        if (inline_keyboard_item.has("text")) {
-                                            inline_keyboard_text = inline_keyboard_item.getString("text");
-                                        }
-                                    }
-                                }
-                            }
-                            if (message.has("input_message_content")) {
-                                JSONObject input_message_content = message.getJSONObject("input_message_content");
-                                if (input_message_content.has("message_text")) {
-                                    String input_message_content_text = input_message_content.getString("message_text");
-                                }
-                            }
-                            if (message.has("input_message_entities")) {
-                                JSONObject input_message_entities = message.getJSONObject("input_message_entities");
-                            }
-                            if (message.has("inline_query")) {
-                                JSONObject inline_query = message.getJSONObject("inline_query");
-                                if (inline_query.has("id")) {
-                                    String inline_query_id = String.valueOf(inline_query.getInt("id"));
-                                }
-                            }
-                            if (message.has("chosen_inline_result")) {
+    public static void setCanDeleteMessages(boolean canDeleteMessages) {
+        TelegramClient.canDeleteMessages = canDeleteMessages;
+    }
 
-                                JSONObject chosen_inline_result = message.getJSONObject("chosen_inline_result");
-                                if (chosen_inline_result.has("result_text")) {
-                                    String chosen_inline_result_text = chosen_inline_result.getString("result_text");
+    public static String getFirstName() {
+        return firstName;
+    }
 
-                                }
-                            }
-                            if (message.has("callback_query")) {
-                                JSONObject callback_query = message.getJSONObject("callback_query");
-                                if (callback_query.has("id")) {
-                                    String callback_query_id = String.valueOf(callback_query.getInt("id"));
-                                }
-                            }
-                            if (message.has("shipping_query")) {
-                                JSONObject shipping_query = message.getJSONObject("shipping_query");
-                            }
-                            if (message.has("pre_checkout_query")) {
-                                JSONObject pre_checkout_query = message.getJSONObject("pre_checkout_query");
-                                if (pre_checkout_query.has("pre_checkout_query_id")) {
-                                    String pre_checkout_query_id = String.valueOf(pre_checkout_query.
-                                            getInt("pre_checkout_query_id"));
-                                }
-                            }
-                            if (message.has("poll_answer_query")) {
-                                JSONObject poll_answer_query = message.getJSONObject("poll_answer_query");
-                                if (poll_answer_query.has("poll_answer_query_id")) {
-                                    String poll_answer_query_id = String.valueOf(poll_answer_query.
-                                            getInt("poll_answer_query_id"));
-                                }
-                            }
-                            if (message.has("my_chat_member")) {
-                                JSONObject my_chat_member = message.getJSONObject("my_chat_member");
-                                if (my_chat_member.has("user")) {
-                                    JSONObject user = my_chat_member.getJSONObject("user");
-                                    if (user.has("id")) {
-                                        String user_id = String.valueOf(user.getInt("id"));
-                                    }
-                                    if (user.has("is_bot")) {
-                                        is_bot = user.getBoolean("is_bot");
-                                    }
-                                    if (user.has("is_restricted")) {
-                                        is_restricted = user.getBoolean("is_restricted");
-                                    }
-                                    if (user.has("date_first_contacted")) {
-                                        JSONObject date_first_contacted = user.getJSONObject("date_first_contacted");
-                                        if (date_first_contacted.has("date")) {
-                                            String date = String.valueOf(date_first_contacted.getInt("date"));
-                                            if (date.length() == 10) {
-                                                String date_first_contacted_time = date;
-                                                date_first_contacted_time = date_first_contacted_time.replace
-                                                        ("T", " ");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            if (message.has("chat_member")) {
-                                JSONObject chat_member = message.getJSONObject("chat_member");
-                                if (chat_member.has("user")) {
-                                    JSONObject user = chat_member.getJSONObject("user");
-                                    if (user.has("id")) {
-                                        String user_id = String.valueOf(user.getInt("id"));
-                                    }
-                                }
-                            }
-                            if (message.has("chat_join_request")) {
-                                JSONObject chat_join_request = message.getJSONObject("chat_join_request");
-                                if (chat_join_request.has("user")) {
-                                    JSONObject user = chat_join_request.getJSONObject("user");
-                                    if (user.has("id")) {
-                                        String user_id = String.valueOf(user.getInt("id"));
-                                    }
-                                    if (user.has("is_bot")) {
-                                        is_bot = user.getBoolean("is_bot");
-                                    }
-                                }
-                            }
-                            if (message.has("chat_join_accept")) {
-                                JSONObject chat_join_accept = message.getJSONObject("chat_join_accept");
-                            }
-                            if (message.has("chat_leave_request")) {
-                                JSONObject chat_leave_request = message.getJSONObject("chat_leave_request");
-                            }
-                            if (message.has("chat_leave_accept")) {
-                                JSONObject chat_leave_accept = message.getJSONObject("chat_leave_accept");
-                            }
-                            if (message.has("chat_member_left_channel")) {
-                                JSONObject chat_member_left_channel = message.getJSONObject("chat_member_left_channel");
-                            }
-                            if (message.has("inline_query_result")) {
-                                JSONObject inline_query_result = message.getJSONObject("inline_query_result");
-                                if (inline_query_result.has("id")) {
-                                    String inline_query_id = String.valueOf(inline_query_result.getInt("id"));
-                                }
-                            }
-                            if (message.has("chosen_inline_result")) {
-                                JSONObject chosen_inline_result = message.getJSONObject("chosen_inline_result");
-                            }
-                            if (message.has("callback_query_result")) {
-                                JSONObject callback_query_result = message.getJSONObject("callback_query_result");
-                            }
+    public void setFirstName(String firstName) {
+        TelegramClient.firstName = firstName;
+    }
 
-                        }
-                        if (result.has("chat_id")) {
-                            chatId = String.valueOf(result.getInt("chat_id"));
-                        }
-                        if (result.has("edited_message")) {
-                            String editedMessage = result.getString("edited_message");
-                        }
-                        if (result.has("inline_message_id")) {
-                            int inlineMessageID = result.getInt("inline_message_id");
-                        }
-                        if (result.has("inline_message_text")) {
-                            String inlineMessageText = result.getString("inline_message_text");
-                        }
-                        if (result.has("inline_message_entities")) {
-                            JSONArray inlineMessageEntities = result.getJSONArray("inline_message_entities");
-                            for (i = 0; i < inlineMessageEntities.length(); i++) {
-                                JSONObject entity = inlineMessageEntities.getJSONObject(i);
-                                if (entity.has("type")) {
-                                    type = entity.getString("type");
-                                }
-                                if (entity.has("offset")) {
-                                    offset = entity.getInt("offset");
-                                }
-                                if (entity.has("length")) {
-                                    length = entity.getInt("length");
-                                }
-                            }
-                        }
-                        if (result.has("chosen_inline_message_entity")) {
-                            int chosenInlineMessageEntity = result.getInt("chosen_inline_message_entity");
-                        }
-                        if (result.has("chosen_inline_message_offset")) {
-                            int chosenInlineMessageOffset = result.getInt("chosen_inline_message_offset");
-                        }
-                        if (result.has("chosen_inline_message_length")) {
-                            int chosenInlineMessageLength = result.getInt("chosen_inline_message_length");
-                        }
-                        if (result.has("chosen_inline_message_entities")) {
-                            JSONArray chosenInlineMessageEntities = result.getJSONArray("chosen_inline_message_entities");
-                            for (i = 0; i < chosenInlineMessageEntities.length(); i++) {
-                                JSONObject entity = chosenInlineMessageEntities.getJSONObject(i);
-                                if (entity.has("type")) {
-                                    type = entity.getString("type");
-                                }
-                                if (entity.has("offset")) {
-                                    offset = entity.getInt("offset");
-                                }
-                                if (entity.has("length")) {
-                                    length = entity.getInt("length");
-                                }
-                            }
-                        }
-                        if (result.has("chosen_inline_message_entity_offset")) {
-                            int chosenInlineMessageEntityOffset = result.getInt("chosen_inline_message_entity_offset");
-                        }
-                        if (result.has("chosen_inline_message_entity_length")) {
-                            int chosenInlineMessageEntityLength = result.getInt("chosen_inline_message_entity_length");
-                        }
-                        if (result.has("sender_chat")) {
-                            senderChat.setType(result.getString("type"));
-                            senderChat.setId(result.getString("id"));
-                            senderChat.setName(result.getString("first_name"));
-                            senderChat.setUsername(result.getString("username"));
-                            senderChat.setPhoto(result.getString("photo"));
-                        }
-                        if (result.has("chat")) {
+    public static String getDescription() {
+        return description;
+    }
 
-                            JSONObject chat = result.getJSONObject("chat");
-                            if (chat.has("id")) {
-                                chatId = chat.getString("id");
-                            }
-                            if (chat.has("type")) {
-                                String chatType = chat.getString("type");
-                                if (chatType.equals("private")) {
-                                    boolean isPrivate = true;
-                                    if (chat.has("title")) {
+    public static void setDescription(String description) {
+        TelegramClient.description = description;
+    }
 
-                                        if (chat.has("username")) {
-                                            username = chat.getString("username");
-                                        }
-                                        if (chat.has("first_name")) {
-                                            first_name = chat.getString("first_name");
-                                        }
-                                        if (chat.has("last_name")) {
-                                            last_name = chat.getString("last_name");
-                                        }
-                                    }
-                                }
+    public static boolean isCanInviteUsers() {
+        return canInviteUsers;
+    }
 
-                            }
-                            if (chat.has("title")) {
-                                String chatTitle = chat.getString("title");
-                                chatTitle = chatTitle.substring(0, Math.min(chatTitle.length(), 50));
-                            }
-                            if (chat.has("username")) {
-                                String chatUsername = chat.getString("username");
+    public static void setCanInviteUsers(boolean canInviteUsers) {
+        TelegramClient.canInviteUsers = canInviteUsers;
+    }
 
-                                if (chatUsername.contains("@")) {
-                                    chatUsername = chatUsername.substring(0, chatUsername.indexOf("@"));
+    public static boolean isCanPostMessages() {
+        return canPostMessages;
+    }
 
-                                    System.out.println(chatUsername);
+    public static void setCanPostMessages(boolean canPostMessages) {
+        TelegramClient.canPostMessages = canPostMessages;
+    }
 
-                                }
-                            }
-                            if (chat.has("first_name")) {
-                                String chatFirstName = chat.getString("first_name");
-                                chatFirstName = chatFirstName.substring(0, Math.min(chatFirstName.length(), 50));
+    public static boolean isCanEditMessages() {
+        return canEditMessages;
+    }
 
-                                System.out.println(chatFirstName);
-                            }
-                            if (chat.has("last_name")) {
-                                String chatLastName = chat.getString("last_name");
-                                System.out.println(chatLastName);
-                            }
-                            if (chat.has("photo")) {
-                                String chatPhoto = chat.getString("photo");
+    public static void setCanEditMessages(boolean canEditMessages) {
+        TelegramClient.canEditMessages = canEditMessages;
+    }
 
-                            }
-                            if (chat.has("bio")) {
-                                String chatBio = chat.getString("bio");
-                            }
-                            if (chat.has("description")) {
-                                String chatDescription = chat.getString("description");
-                            }
-                            if (chat.has("invite_link")) {
-                                String chatInviteLink = chat.getString("invite_link");
+    public static boolean isCanChangeInfo() {
+        return canChangeInfo;
+    }
 
-                                System.out.println(chatInviteLink);
-                            }
-                            if (chat.has("invite_link_pretext")) {
-                                String chatInviteLinkPretext = chat.getString("invite_link_pretext");
-                                System.out.println(chatInviteLinkPretext);
-                            }
+    public static void setCanChangeInfo(boolean canChangeInfo) {
+        TelegramClient.canChangeInfo = canChangeInfo;
+    }
 
-                        }
+    public static String getLastName() {
+        return lastName;
+    }
 
-                        if (result.has("date")) {
+    public static void setLastName(String lastName) {
+        TelegramClient.lastName = lastName;
+    }
 
-                            JSONObject date = result.getJSONObject("date");
-                            if (date.has("date")) {
-                                String dateString = date.getString("date");
-                                dateString = dateString.substring(0, Math.min(dateString.length(), 10));
-                                System.out.println(dateString);
-                                setDate(dateString);
-                            }
-                        }
+    public static String getPhoto() {
+        return photo;
+    }
 
-                        if (result.has("location")) {
+    public static void setPhoto(String photo) {
+        TelegramClient.photo = photo;
+    }
 
-                            JSONObject location = result.getJSONObject("location");
-                            if (location.has("location")) {
-                                String locationString = location.getString("location");
-                                System.out.println(locationString);
-                                setLocation(locationString);
-                            }
-                        }
+    public static String getCaption() {
+        return caption;
+    }
 
-                        if (result.has("duration")) {
+    public static void setCaption(String caption) {
+        TelegramClient.caption = caption;
+    }
 
-                            JSONObject duration = result.getJSONObject("duration");
-                            if (duration.has("duration")) {
-                                String durationString = duration.getString("duration");
+    public static boolean isDisable_web_page_preview() {
+        return disable_web_page_preview;
+    }
 
-                                System.out.println(durationString);
-                            }
-                        }
+    public static void setDisable_web_page_preview(boolean disable_web_page_preview) {
+        TelegramClient.disable_web_page_preview = disable_web_page_preview;
+    }
 
-                        if (result.has("sender_chat")) {
+    public static boolean isProtect_content() {
+        return protect_content;
+    }
 
-                            JSONObject senderChat = result.getJSONObject("sender_chat");
-                            if (senderChat.has("sender_chat")) {
-                                String senderChatString = senderChat.getString("sender_chat");
+    public static void setProtect_content(boolean protect_content) {
+        TelegramClient.protect_content = protect_content;
+    }
 
-                            }
-                        }
+    public static boolean isAllow_sending_without_reply() {
+        return allow_sending_without_reply;
+    }
+
+    public static void setAllow_sending_without_reply(boolean allow_sending_without_reply) {
+        TelegramClient.allow_sending_without_reply = allow_sending_without_reply;
+    }
+
+    public static String getChannel_Id() {
+        return channel_Id;
+    }
+
+    public static void setChannel_Id(String channel_Id) {
+        TelegramClient.channel_Id = channel_Id;
+    }
+
+    public static String getMessage_thread_id() {
+        return message_thread_id;
+    }
+
+    public static void setMessage_thread_id(String message_thread_id) {
+        TelegramClient.message_thread_id = message_thread_id;
+    }
+
+    public static String getOptional() {
+        return Optional;
+    }
+
+    public static void setOptional(String optional) {
+        Optional = optional;
+    }
+
+    public static String getParse_mode() {
+        return parse_mode;
+    }
+
+    public static void setParse_mode(String parse_mode) {
+        TelegramClient.parse_mode = parse_mode;
+    }
+
+    public static String getCaption_entities() {
+        return caption_entities;
+    }
+
+    public static void setCaption_entities(String caption_entities) {
+        TelegramClient.caption_entities = caption_entities;
+    }
+
+    public static String getDisable_notification() {
+        return disable_notification;
+    }
+
+    public static void setDisable_notification(String disable_notification) {
+        TelegramClient.disable_notification = disable_notification;
+    }
+
+    public static String getId() {
+        return id;
+    }
+
+    public static void setId(String id) {
+        TelegramClient.id = id;
+    }
+
+    public static String getTitle() {
+        return title;
+    }
+
+    public static void setTitle(String title) {
+        TelegramClient.title = title;
+    }
+
+    public static String getType() {
+        return type;
+    }
+
+    public static void setType(String type) {
+        TelegramClient.type = type;
+    }
+
+    public static Entities getEntities() {
+        return entities;
 
 
-                        if (jsonResponse.has("update_id")) {
-                            setUpdate_id(jsonResponse.getString("update_id"));
-                        }
-                        if (jsonResponse.has("message")) {
-                            message = jsonResponse.getString("message");
-                        }
-                        JSONArray jsonObject = new JSONArray(jsonResponse.getJSONArray("result"));
-                        for (i = 0; i < jsonObject.length(); i++) {
-                            JSONObject jsonObject1 = jsonObject.getJSONObject(i);
-                            if (jsonObject1.has("update")) {
-                                JSONObject jsonObject2 = jsonObject1.getJSONObject("update");
-                                if (jsonObject2.has("message_id")) {
-                                    setMessage_id(jsonObject2.getString("message_id"));
-                                    if (jsonObject2.has("date")) {
-                                        setDate(String.valueOf(jsonObject2.getString("date")));
-                                    }
-                                }
-                                if (jsonObject2.has("from")) {
-                                    username = jsonObject2.getString("from");
-                                    if (jsonObject2.has("date")) {
-                                        date = jsonObject2.getString("date");
-                                    }
-                                }
-                            }
-                            if (jsonObject1.has("text")) {
-                                setText(jsonObject1.getString("text"));
-                            }
-                            if (jsonObject1.has("inline_message_id")) {
-                                setInline_message_id(jsonObject1.getString("inline_message_id"));
+    }
 
-                            }
-                            if (jsonObject1.has("chat_id")) {
-                                setChatId(String.valueOf(jsonObject1.getInt("chat_id")));
-                            }
-                            if (jsonObject1.has("reply_to_message_id")) {
-                                reply_to_message_id = jsonObject1.getString("reply_to_message_id");
-                            }
-                            if (jsonObject1.has("inline_query_id")) {
-                                inline_query_id = jsonObject1.getString("inline_query_id");
-                            }
-                            if (jsonObject1.has("from")) {
-                                username = jsonObject1.getString("from");
-                                if (jsonObject1.has("date")) {
-                                    date = jsonObject1.getString("date");
-                                }
-                            }
-                            if (jsonObject1.has("message_id")) {
-                                message_id = jsonObject1.getString("message_id");
-                                if (jsonObject1.has("date")) {
-                                    date = jsonObject1.getString("date");
-                                }
-                            }
-                            if (jsonObject1.has("forward_from_chat")) {
-                                forward_from_chat = jsonObject1.getString("forward_from_chat");
-                                if (jsonObject1.has("id")) {
-                                    id = String.valueOf(jsonObject1.getLong("id"));
+    public String getSymbol() {
 
-                                }
-                                if (jsonObject1.has("title")) {
-                                    title = jsonObject1.getString("title");
-                                }
-                                if (jsonObject1.has("type")) {
-                                    type = jsonObject1.getString("type");
-                                }
-                                if (jsonObject1.has("from")) {
-                                    username = jsonObject1.getString("from");
-                                    if (jsonObject1.has("date")) {
-                                        date = jsonObject1.getString("date");
-                                    }
-                                }
-                                if (jsonObject1.has("forward_from_message_id")) {
-                                    forward_from_message_id = jsonObject1.getString("forward_from_message_id");
-                                }
+        return
+                "https://api.telegram.org/bot" +
+                        "/getChat" +
+                        "?chat_id=" + getChatId() +
+                        "&disable_content_type_detection=" + disable_content_type_detection;
+    }
 
-                            }
-                            if (jsonObject1.has("chat")) {
-                                chat = new Chat(
-                                        String.valueOf(jsonObject1.getInt("chat_id")),
-                                        String.valueOf(jsonObject1.getInt("title")),
-                                        String.valueOf(jsonObject1.getInt("type")),
-                                        String.valueOf(jsonObject1.getInt("username"))
+    public String getBalance() {
 
-                                );
-                            }
-                            if (jsonObject1.has("sender_chat")) {
-                                senderChat = new Chat(
-                                        String.valueOf(jsonObject1.getInt("sender_chat_id")),
-                                        String.valueOf(jsonObject1.getInt("title")),
-                                        String.valueOf(jsonObject1.getInt("type")),
-                                        String.valueOf(jsonObject1.getInt("username")));
+        return
+                "https://api.telegram.org/bot" + getToken() +
+                        "/getChat" +
+                        "?chat_id=" + getChatId() +
+                        "&disable_content_type_detection=" + disable_content_type_detection;
 
-                            }
-                            if (jsonObject1.has("game")) {
-                                TelegramClient.game = new Game(
-                                        String.valueOf(jsonObject1.getInt("game_short_name")),
-                                        String.valueOf(jsonObject1.getInt("short_name")),
-                                        String.valueOf(jsonObject1.getInt("game_id")),
-                                        String.valueOf(jsonObject1.getInt("creator_user_id")),
-                                        String.valueOf(jsonObject1.getInt("creator_user_name")),
+    }
 
-                                        String.valueOf(jsonObject1.getInt("game_short_code")));
+    public void setGame(Game game) {
+        TelegramClient.game = game;
+    }
 
-                            }
-                        }
-                    }
-                    System.out.println("Updated successfully");
-                    return;
-                }
-                System.out.println("Something went wrong while updating the bot");
-            }
-        }
+    void run() throws IOException, InterruptedException {
+        getMe();//initialize the chat client
+        Thread.sleep(200);
+        getUpdates();// update the chat client
 
-        public void setToken(String token1) {
-            token = token1;
-        }
+    }
 
-        public String getChatId() {
-            return chatId;
-        }
+    public String getChatId() {
+        return chatId;
+    }
 
-        public static void setChatId(String chatId) {
-            TelegramClient.chatId = chatId;
-        }
+    public static void setChatId(String chatId) {
+        TelegramClient.chatId = chatId;
+    }
+
+    //+------------------------------------------------------------------+
+    String ReplyKeyboardHide() {
+        return ("{\"hide_keyboard\": false}");
+    }
+
+    //+------------------------------------------------------------------+
+    String ForceReply() {
 
 
-        //chat_id	//Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
-        // message_thread_id;//	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
-        // text	String	Yes	Text of the message to be sent, 1-4096 characters after entities parsing
-        //parse_mode	String	Optional	Mode for parsing entities in the message text. See formatting options for more details.
-        // entities	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode
-        static boolean disable_web_page_preview;//	Boolean	Optional	Disables link previews for links in this message
-        //disable_notification	Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
-        static boolean protect_content;    //Boolean	Optional	Protects the contents of the sent message from forwarding and savingString reply_to_message_id	;//Integer	Optional	If the message is a reply, ID of the original message
-        static boolean allow_sending_without_reply;//	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
-        // reply_markup
-        static String channel_Id;
+        // ForceReply
+        //  Upon receiving a message with this object, Telegram clients will display a reply interface to the user (act as if the user has selected the bot's message and tapped 'Reply'). This can be extremely useful if you want to create user-friendly step-by-step interfaces without having to sacrifice privacy mode.
 
+        //Field	Type	Description
+        //force_reply	,//True	Shows reply interface to the user, as if they manually selected the bot's message and tapped 'Reply'
+        // input_field_placeholder	,//String	Optional. The placeholder to be shown in the input field when the reply is active; 1-64 characters
+        // selective	;//Boolean	Optional. Use this parameter if you want to force reply from specific users
+        return (
+                "&force_reply=" + false + "&input_field_placeholder=" +
+                        0 + "&selective=" + false);
+    }
 
-        //+------------------------------------------------------------------+
-        String ReplyKeyboardHide() {
-            return ("{\"hide_keyboard\": false}");
-        }
-
-        //+------------------------------------------------------------------+
-        String ForceReply() {
-
-
-            // ForceReply
-            //  Upon receiving a message with this object, Telegram clients will display a reply interface to the user (act as if the user has selected the bot's message and tapped 'Reply'). This can be extremely useful if you want to create user-friendly step-by-step interfaces without having to sacrifice privacy mode.
-
-            //Field	Type	Description
-            //force_reply	,//True	Shows reply interface to the user, as if they manually selected the bot's message and tapped 'Reply'
-            // input_field_placeholder	,//String	Optional. The placeholder to be shown in the input field when the reply is active; 1-64 characters
-            // selective	;//Boolean	Optional. Use this parameter if you want to force reply from specific users
-            return(
-                    "&force_reply="+false +"&input_field_placeholder="+
-                            0+ "&selective="+ false);
-        }
-
-
-        public void sendMessage(String text) throws IOException {
+    public void sendMessage(String text) throws IOException {
 // String data = "key=" + API_KEY + "&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
-            boolean one_time_keyboard = false;
-            String input_field_placeholder = "";
-            boolean selective = false;//"&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
-            String params =//"as_HTML="+true + "silently="+true;
-                    "&parse_mode=Markdown"
-                            + "&disable_notification=" + disable_notification
-                            + "&protect_content=" + protect_content
-                            + "&allow_sending_without_reply=" + allow_sending_without_reply
-                            + "&channel_id=" + getChannel_Id()
-                            + "&reply_markup=" + ReplyKeyboardMarkup()
-                            + "&force_reply=" + ForceReply()
-                            + "&reply_to_message_id=" + getReplyToMessageId()
-                            + "&one_time_keyboard=" + one_time_keyboard
-                            + "&input_field_placeholder=" + input_field_placeholder
-                            + "&selective=" + selective;
-
-            sendChatAction(ENUM_CHAT_ACTION.typing);
-            makeRequest("https://api.telegram.org/bot"+getToken()+"/sendMessage?chat_id=" +getChatId()+ "&text="+text+params
-
-                    , "POST");
-
-
-        }
-
-
-
-
-        private String ReplyKeyboardMarkup() {
-
-
-            reply_markup = Arrays.toString(keyboard) +	//Array of KeyboardButton	Array of button rows, each represented by an Array of KeyboardButton objects
-                    "&resize_keyboard="+	false+//Boolean	Optional. Requests clients to resize the keyboard vertically for optimal fit (e.g., make the keyboard smaller if there are just two rows of buttons). Defaults to false, in which case the custom keyboard is always of the same height as the app's standard keyboard.
-                    "&one_time_keyboard="+false+//	Boolean	Optional. Requests clients to hide the keyboard as soon as it's been used. The keyboard will still be available, but clients will automatically display the usual letter-keyboard in the chat - the user can press a special button in the input field to see the custom keyboard again. Defaults to false.
-                    "&input_field_placeholder="+""+	//String	Optional. The placeholder to be shown in the input field when the keyboard is active; 1-64 characters
-                    "&selective="+	false;////Boolean	Optional. Use this parameter if you want to show the keyboard to specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
-            //       Example: A user requests to change the bots' language, bot replies to the request with a keyboard to select the new language. Other users in the group don't see the keyboard.
-            return "&reply_markup=" + reply_markup;
-        }
-
-        private String getReplyToMessageId() {
-            return reply_to_message_id;
-        }
-
-        static Entities entities = new Entities();
-
-        public static void setInline_message_id(String inline_message_id) {
-            TelegramClient.inline_message_id = inline_message_id;
-        }
-
-        public static boolean isSupportsInlineQueries() {
-            return supportsInlineQueries;
-        }
-
-        public static void setSupportsInlineQueries(boolean supportsInlineQueries) {
-            TelegramClient.supportsInlineQueries = supportsInlineQueries;
-        }
-
-        public static boolean isCanReadAllGroupMessages() {
-            return canReadAllGroupMessages;
-        }
-
-        public static void setCanReadAllGroupMessages(boolean canReadAllGroupMessages) {
-            TelegramClient.canReadAllGroupMessages = canReadAllGroupMessages;
-        }
-
-        public static boolean isIsBot() {
-            return isBot;
-        }
-
-        public static void setIsBot(boolean isBot) {
-            TelegramClient.isBot = isBot;
-        }
-
-        public static boolean isCanJoinGroups() {
-            return canJoinGroups;
-        }
-
-        public static void setCanJoinGroups(boolean canJoinGroups) {
-            TelegramClient.canJoinGroups = canJoinGroups;
-        }
-
-        public static void setFile(File file) {
-            TelegramClient.file = file;
-        }
-
-        public static String getAnimation() {
-            return animation;
-        }
-
-        public static void setAnimation(String animation) {
-            TelegramClient.animation = animation;
-        }
-
-        public static boolean isCanDeleteMessages() {
-            return canDeleteMessages;
-        }
-
-        public static void setCanDeleteMessages(boolean canDeleteMessages) {
-            TelegramClient.canDeleteMessages = canDeleteMessages;
-        }
-
-        public static String getFirstName() {
-            return firstName;
-        }
-
-        public String getToken() {
-            return token;
-        }
-
-        public void setFirstName(String firstName) {
-            TelegramClient.firstName = firstName;
-        }
-
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
-
-        public String getPhoneNumber() {
-            return phoneNumber;
-        }
-
-        public void setPhoneNumber(String phoneNumber) {
-            TelegramClient.phoneNumber = phoneNumber;
-        }
-
-        public String getLanguageCode() {
-            return languageCode;
-        }
-
-        public static String getDescription() {
-            return description;
-        }
-
-        public static void setDescription(String description) {
-            TelegramClient.description = description;
-        }
-
-        public static boolean isCanInviteUsers() {
-            return canInviteUsers;
-        }
-
-        public static void setCanInviteUsers(boolean canInviteUsers) {
-            TelegramClient.canInviteUsers = canInviteUsers;
-        }
-
-        public static boolean isCanPostMessages() {
-            return canPostMessages;
-        }
-
-        public static void setCanPostMessages(boolean canPostMessages) {
-            TelegramClient.canPostMessages = canPostMessages;
-        }
-
-        public static boolean isCanEditMessages() {
-            return canEditMessages;
-        }
-
-        public static void setCanEditMessages(boolean canEditMessages) {
-            TelegramClient.canEditMessages = canEditMessages;
-        }
-
-        public static boolean isCanChangeInfo() {
-            return canChangeInfo;
-        }
-
-        public static void setCanChangeInfo(boolean canChangeInfo) {
-            TelegramClient.canChangeInfo = canChangeInfo;
-        }
-
-        public static String getLastName() {
-            return lastName;
-        }
-
-        public static void setLastName(String lastName) {
-            TelegramClient.lastName = lastName;
-        }
-
-        public static String getPhoto() {
-            return photo;
-        }
-
-        public static void setPhoto(String photo) {
-            TelegramClient.photo = photo;
-        }
-
-        public static String getCaption() {
-            return caption;
-        }
-
-        public static void setCaption(String caption) {
-            TelegramClient.caption = caption;
-        }
-
-        public static boolean isDisable_web_page_preview() {
-            return disable_web_page_preview;
-        }
-
-        public static void setDisable_web_page_preview(boolean disable_web_page_preview) {
-            TelegramClient.disable_web_page_preview = disable_web_page_preview;
-        }
-
-        public static boolean isProtect_content() {
-            return protect_content;
-        }
-
-        public static void setProtect_content(boolean protect_content) {
-            TelegramClient.protect_content = protect_content;
-        }
-
-        public static boolean isAllow_sending_without_reply() {
-            return allow_sending_without_reply;
-        }
-
-        public static void setAllow_sending_without_reply(boolean allow_sending_without_reply) {
-            TelegramClient.allow_sending_without_reply = allow_sending_without_reply;
-        }
-
-        public static String getChannel_Id() {
-            return channel_Id;
-        }
-
-        public static void setChannel_Id(String channel_Id) {
-            TelegramClient.channel_Id = channel_Id;
-        }
-
-
-        public static String getMessage_thread_id() {
-            return message_thread_id;
-        }
-
-        public static void setMessage_thread_id(String message_thread_id) {
-            TelegramClient.message_thread_id = message_thread_id;
-        }
-
-        public static String getOptional() {
-            return Optional;
-        }
-
-        public static void setOptional(String optional) {
-            Optional = optional;
-        }
-
-        public static String getParse_mode() {
-            return parse_mode;
-        }
-
-        public static void setParse_mode(String parse_mode) {
-            TelegramClient.parse_mode = parse_mode;
-        }
-
-        public static String getCaption_entities() {
-            return caption_entities;
-        }
-
-        public static void setCaption_entities(String caption_entities) {
-            TelegramClient.caption_entities = caption_entities;
-        }
-
-        public static String getDisable_notification() {
-            return disable_notification;
-        }
-
-        public static void setDisable_notification(String disable_notification) {
-            TelegramClient.disable_notification = disable_notification;
-        }
-
-        public static String getId() {
-            return id;
-        }
-
-        public static void setId(String id) {
-            TelegramClient.id = id;
-        }
-
-        public static String getTitle() {
-            return title;
-        }
-
-        public static void setTitle(String title) {
-            TelegramClient.title = title;
-        }
-
-        public static String getType() {
-            return type;
-        }
-
-        public static void setType(String type) {
-            TelegramClient.type = type;
-        }
-
-
-        public static Entities getEntities() {
-            return entities;
-
-
-        }
-
-        public void setLanguageCode(String languageCode) {
-            TelegramClient.languageCode = languageCode;
-        }
-
-
-
-        void sendGame(String chat_id, String game_short_name) throws IOException {
+        boolean one_time_keyboard = false;
+        String input_field_placeholder = "";
+        boolean selective = false;//"&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
+        String params =//"as_HTML="+true + "silently="+true;
+                "&parse_mode=Markdown"
+                        + "&disable_notification=" + disable_notification
+                        + "&protect_content=" + protect_content
+                        + "&allow_sending_without_reply=" + allow_sending_without_reply
+                        + "&channel_id=" + getChannel_Id()
+                        + "&reply_markup=" + ReplyKeyboardMarkup()
+                        + "&force_reply=" + ForceReply()
+                        + "&reply_to_message_id=" + getReplyToMessageId()
+                        + "&one_time_keyboard=" + one_time_keyboard
+                        + "&input_field_placeholder=" + input_field_placeholder
+                        + "&selective=" + selective;
+
+        sendChatAction(ENUM_CHAT_ACTION.typing);
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/sendMessage?chat_id=" + getChatId() + "&text=" + text + params
+
+                , "POST");
+
+
+    }
+
+    private String ReplyKeyboardMarkup() {
+
+
+        reply_markup = Arrays.toString(keyboard) +    //Array of KeyboardButton	Array of button rows, each represented by an Array of KeyboardButton objects
+                "&resize_keyboard=" + false +//Boolean	Optional. Requests clients to resize the keyboard vertically for optimal fit (e.g., make the keyboard smaller if there are just two rows of buttons). Defaults to false, in which case the custom keyboard is always of the same height as the app's standard keyboard.
+                "&one_time_keyboard=" + false +//	Boolean	Optional. Requests clients to hide the keyboard as soon as it's been used. The keyboard will still be available, but clients will automatically display the usual letter-keyboard in the chat - the user can press a special button in the input field to see the custom keyboard again. Defaults to false.
+                "&input_field_placeholder=" + "" +    //String	Optional. The placeholder to be shown in the input field when the keyboard is active; 1-64 characters
+                "&selective=" + false;////Boolean	Optional. Use this parameter if you want to show the keyboard to specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
+        //       Example: A user requests to change the bots' language, bot replies to the request with a keyboard to select the new language. Other users in the group don't see the keyboard.
+        return "&reply_markup=" + reply_markup;
+    }
+
+    private String getReplyToMessageId() {
+        return reply_to_message_id;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token1) {
+        token = token1;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        TelegramClient.phoneNumber = phoneNumber;
+    }
+// sender_chat": {
+//    "id": -1001659738763,
+//    "title": "TradeExpert",
+//            "username": "tradeexpert_infos",
+//            "type": "channel"
+
+    public String getLanguageCode() {
+        return languageCode;
+    }
+
+    public void setLanguageCode(String languageCode) {
+        TelegramClient.languageCode = languageCode;
+    }
+
+    void sendGame(String chat_id, String game_short_name) throws IOException {
 //    Use this method to send a game. On success, the sent Message is returned.
 //
 //    Parameter	Type	Required	Description
@@ -1491,49 +932,42 @@ import java.util.Objects;
 //    reply_markup	InlineKeyboardMarkup	Optional	A JSON-serialized object for an inline keyboard. If empty, one 'Play game_title' button will be shown. If not empty, the first button must launch the game.
 
 
+        makeRequest(
+                "https://api.telegram.org/bot" + token + "/sendGame" +
+                        "?chat_id=" + chat_id +
+                        "&message_thread_id=" + message_thread_id +
+                        "&game_short_name=" + game_short_name +
+                        "&disable_notification=" + disable_notification +
+                        "&protect_content=" + protect_content +
+                        "&reply_to_message_id=" + reply_to_message_id +
+                        "&allow_sending_without_reply=" + allow_sending_without_reply +
+                        "&reply_markup=" + reply_markup, "POST");
+    }
+
+    //sendPhoto to Telegram
+    public void sendPhoto(File file) {
+        try {
+            ActionEvent event = (ActionEvent) Stage.getWindows();
+
+            Screenshot.capture(file);
+
+
             makeRequest(
-                    "https://api.telegram.org/bot" + token + "/sendGame" +
-                            "?chat_id=" + chat_id +
-                            "&message_thread_id=" + message_thread_id +
-                            "&game_short_name=" + game_short_name +
-                            "&disable_notification=" + disable_notification +
-                            "&protect_content=" + protect_content +
-                            "&reply_to_message_id=" + reply_to_message_id +
-                            "&allow_sending_without_reply=" + allow_sending_without_reply +
-                            "&reply_markup=" + reply_markup,"POST");
-        }
-
-        static String message_thread_id;    //Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
-
-        static String Optional;////Photo caption (may also be used when resending photos by file_id), 0-1024 characters after entities parsing
-        static String parse_mode = "None";//String	Optional	Mode for parsing entities in the photo caption. See formatting options for more details.
-        static String caption_entities;//	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in the caption, which can be specified instead of parse_mode
-        static String disable_notification;    //Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
-
-        //sendPhoto to Telegram
-        public void sendPhoto(File file) {
-            try {
-                ActionEvent event= (ActionEvent) Stage.getWindows();
-
-                Screenshot.capture(file);
-
-
-                makeRequest(
-                        "https://api.telegram.org/bot" + token
-                                + "/sendPhoto"
-                                + "?chat_id=" + getChatId() +
-                                // "&message_thread_id" +getMessage_thread_id() +
-                                "&photo=" +  file.toURI()
-                        //  "&caption=" + getCaption()+
-                        //"&parse_mode=" + getParse_mode() +
-                        // "&caption_entities=" + getCaption_entities()
-                        // "&disable_notification=" + getDisable_notification() +
-                        //"&protect_content=" + protect_content +
-                        //    "&reply_to_message_id=" + getReply_to_message_id()+
-                        //"&allow_sending_without_reply=" + allow_sending_without_reply
-                        //    + "&reply_markup=" + reply_markup
-                        ,"POST"
-                );
+                    "https://api.telegram.org/bot" + token
+                            + "/sendPhoto"
+                            + "?chat_id=" + getChatId() +
+                            // "&message_thread_id" +getMessage_thread_id() +
+                            "&photo=" + file.toURI()
+                    //  "&caption=" + getCaption()+
+                    //"&parse_mode=" + getParse_mode() +
+                    // "&caption_entities=" + getCaption_entities()
+                    // "&disable_notification=" + getDisable_notification() +
+                    //"&protect_content=" + protect_content +
+                    //    "&reply_to_message_id=" + getReply_to_message_id()+
+                    //"&allow_sending_without_reply=" + allow_sending_without_reply
+                    //    + "&reply_markup=" + reply_markup
+                    , "POST"
+            );
 
 //
 //            chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
@@ -1548,97 +982,10 @@ import java.util.Objects;
 //            allow_sending_without_reply	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
 //            reply_markup
 
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-// sender_chat": {
-//    "id": -1001659738763,
-//    "title": "TradeExpert",
-//            "username": "tradeexpert_infos",
-//            "type": "channel"
-
-        static String id;
-        static String title;//": "TradeExpert",
-
-        static String type;//": "channel"
-
-        public String getMe() {
-            StringBuilder response = new StringBuilder();
-            JSONObject jsonResponse = new JSONObject();
-            try {
-                URL obj = new URL("https://api.telegram.org/bot" + getToken() + "/getMe");
-                HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-                con.setRequestMethod("GET");
-                // con.setRequestProperty("Authorization", "Bearer " + getToken());
-                con.setRequestProperty("Content-Type", "application/json");
-                con.setRequestProperty("Accept", "application/json");
-                con.setDoOutput(true);
-                con.setDoInput(true);
-                con.connect();
-                BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-                String inputLine;
-
-                while ((inputLine = in.readLine()) != null) {
-
-                    response.append(inputLine);
-                }
-                System.out.println(response);
-                jsonResponse= new JSONObject(response.toString());
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-
-            if (jsonResponse.has("ok") &&jsonResponse.getBoolean("ok")
-                    && jsonResponse.has("result")) {
-                JSONObject result = jsonResponse.getJSONObject("result");
-
-                if (result.has("first_name") && result.has("last_name"))
-                    firstName = result.getString("first_name");
-                if (result.has("username"))
-                    username = result.getString("username");
-                if (result.has("language_code"))
-                    languageCode = result.getString("language_code");
-                if (result.has("phone_number"))
-                    phoneNumber = result.getString("phone_number");
-                if (result.has("photo"))
-                    photo = result.getString("photo");
-                if (result.has("description"))
-                    description = result.getString("description");
-                if (result.has("can_invite_users"))
-                    canInviteUsers = result.getBoolean("can_invite_users");
-                if (result.has("can_change_info"))
-                    canChangeInfo = result.getBoolean("can_change_info");
-                if (result.has("can_post_messages"))
-                    canPostMessages = result.getBoolean("can_post_messages");
-                if (result.has("can_edit_messages"))
-                    canEditMessages = result.getBoolean("can_edit_messages");
-                if (result.has("can_delete_messages"))
-                    lastName = result.getString("last_name");
-                if (result.has("chat")) {
-                    canDeleteMessages = result.getBoolean("can_delete_messages");}
-                if (result.has("lastName"))
-                    setLastName( result.getString("last_name"));
-                if (result.has("is_bot"))
-                    setIsBot( result.getBoolean("is_bot"));
-                if (result.has("can_join_groups"))
-                    canJoinGroups = result.getBoolean("can_join_groups");
-                if (result.has("can_read_all_group_messages"))
-                    canReadAllGroupMessages = result.getBoolean("can_read_all_group_messages");
-                if (result.has("username"))
-                    setUsername( username = result.getString("username"));
-                if (result.has("chat_id"))
-                    setChatId(  result.getString("chat_id"));
-                if (result.has("method"))
-                    method = result.getString("method");
-                if (result.has("ok"))
-                    ok = result.getBoolean("ok");
-                if (result.has("supports_inline_queries"))
-                    supportsInlineQueries = result.getBoolean("supports_inline_queries");System.out.println(jsonResponse);}
-            return lastName;
-        }
+    }
 
         @Contract(pure = true)
         private @NotNull String getCreateKeyBoard() {
@@ -2316,82 +1663,875 @@ import java.util.Objects;
             );
         }
 
-        //
-        void getChat() throws IOException {
-            setMethod("POST");
-            makeRequest(
-                    "https://api.telegram.org/bot" + getToken()
-                            + "/getChat","POST"
-            );
+    public void getUpdates() throws IOException {
+
+        String url = "https://api.telegram.org/bot" + getToken() + "/getUpdates" +
+                "?&offset=" + offset +//\tInteger\tOptional\tIdentifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates. By default, updates starting with the earliest unconfirmed update are returned. An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id. The negative offset can be specified to retrieve updates starting from -offset update from the end of the updates queue. All previous updates will forgotten.\n" +
+                "&limit=" + 1 +//\tInteger\tOptional\tLimits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.\n" +
+                "&timeout=" + 0 +//\tInteger\tOptional\tTimeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.\n" +
+                "&allowed_updates=" + true;//\tBoolean\tOptional;
+        JSONArray jsonResponse1 = makeRequest(url, "GET").getJSONArray("result");
+        for (int i = 0; i < jsonResponse1.length(); i++) {
+                JSONObject jsonResponse = jsonResponse1.getJSONObject(i);
+
+            out.println("TELEGRAM update  " + jsonResponse);
+                if (jsonResponse.has("update_id")) {
+                    update_id = String.valueOf(jsonResponse.getLong("update_id"));
+                    out.println(jsonResponse1);
+                }
+                if (jsonResponse.has("result")) {
+                    result = jsonResponse.getString("result");
+                    ok = result.equals("ok");
+
+                    out.println("result " + jsonResponse);
+                }
+
+
+                if (jsonResponse.has("result")) {
+                    JSONArray results = jsonResponse.getJSONArray("result");
+                    for (i = 0; i < results.length(); i++) {
+                        JSONObject result = results.getJSONObject(i);
+                        if (result.has("ok")) {
+                            ok = result.getBoolean("ok");
+                        }
+                        if (result.has("error")) {
+                            String error = result.getString("error");
+                            out.println("ERROR :" + error);
+                        }
+                        if (result.has("update_id")) {
+                            update_id = String.valueOf(result.getInt("update_id"));
+                        }
+
+                        if (result.has("entities")) {
+                            JSONArray entities = result.getJSONArray("entities");
+                            for (int j = 0; j < entities.length(); j++) {
+                                JSONObject entity = entities.getJSONObject(j);
+                                if (entity.has("offset")) {
+                                    offset = entity.getInt("offset");
+                                }
+                                if (entity.has("length")) {
+                                    length = entity.getInt("length");
+                                }
+                                if (entity.has("type")) {
+                                    entity_type = entity.getString("type");
+                                }
+                            }
+                        }
+                        if (result.has("message")) {
+
+                            JSONObject message = result.getJSONObject("message");
+                            if (message.has("text")) {
+                                text = message.getString("text");
+                            }
+                            if (message.has("date")) {
+                                date = String.valueOf(message.getLong("date"));
+                            }
+                            if (message.has("chat")) {
+                                JSONObject chat = message.getJSONObject("chat");
+                                if (chat.has("id")) {
+                                    int   chat_id = Integer.parseInt(String.valueOf(chat.getInt("id")));
+
+
+                                    if (chat.has("type")) {
+                                        chat_type = chat.getString("type");
+                                    }
+                                    if (chat.has("title")) {
+                                        chat_title = chat.getString("title");
+                                    }
+                                    if (chat.has("username")) {
+                                        chat_username = chat.getString("username");
+                                    }
+                                    if (chat.has("first_name")) {
+                                        chat_first_name = chat.getString("first_name");
+                                    }
+                                    if (chat.has("last_name")) {
+                                        chat_last_name = chat.getString("last_name");
+                                    }
+                                    if (chat.has("photo")) {
+                                        JSONObject photo = chat.getJSONObject("photo");
+                                        if (photo.has("file_id")) {
+                                            chat_photo_file_id = String.valueOf(photo.getInt("file_id"));
+                                        }
+                                        if (photo.has("file_unique_id")) {
+                                            chat_photo_file_unique_id = String.valueOf(photo.getInt("file_unique_id"));
+                                        }
+                                    }
+                                    if (chat.has("video")) {
+                                        JSONObject video = chat.getJSONObject("video");
+                                    }
+                                    if (chat.has("voice")) {
+                                        JSONObject voice = chat.getJSONObject("voice");
+                                    }
+                                    if (chat.has("caption")) {
+                                        JSONObject caption = chat.getJSONObject("caption");
+                                    }
+                                    if (chat.has("new_chat_members")) {
+                                        JSONArray new_chat_members = chat.getJSONArray("new_chat_members");
+                                    }
+                                    if (chat.has("left_chat_member")) {
+                                        String left_chat_member = String.valueOf(chat.getJSONObject("left_chat_member"));
+                                    }
+                                    if (chat.has("text")) {
+                                        text = String.valueOf(chat.getJSONObject("text"));
+                                    }
+                                    if (chat.has("message")) {
+                                        JSONObject chatMessage = chat.getJSONObject("message");
+                                    }
+                                    ArrayListChat.add(i,
+                                            new Chat(    chat_id,
+                                                    chat_type,
+                                                    chat_title,
+                                                    text,
+                                                    chat_first_name,
+                                                    chat_last_name,
+                                                    chat_username
+                                            ));
+
+                                }}
+                            if (message.has("from")) {
+                                JSONObject from = message.getJSONObject("from");
+                                if (from.has("id")) {
+                                    from_id = String.valueOf(from.getInt("id"));
+                                }
+                                if (from.has("is_bot")) {
+                                    is_bot = from.getBoolean("is_bot");
+                                }
+                                if (from.has("first_name")) {
+                                    from_first_name = from.getString("first_name");
+                                }
+                                if (from.has("last_name")) {
+                                    last_name = from.getString("last_name");
+                                }
+                                if (from.has("username")) {
+                                    username = from.getString("username");
+                                }
+                                if (from.has("photo")) {
+                                    JSONObject photo = from.getJSONObject("photo");
+                                    if (photo.has("file_id")) {
+                                        String from_photo_file_id = String.valueOf(photo.getInt("file_id"));
+                                    }
+                                    if (photo.has("file_unique_id")) {
+                                        String from_photo_file_unique_id = String.valueOf(photo.getInt("file_unique_id"));
+                                        out.println(from_photo_file_unique_id);
+                                    }
+                                }
+                            }
+                            if (message.has("chat_id")) {
+                                JSONObject chat_id = message.getJSONObject("chat_id");
+                                if (chat_id.has("id")) {
+                                    setChat_id(String.valueOf(chat_id.getInt("id")));
+
+                                }
+                            }
+                            if (message.has("reply_to_message")) {
+                                JSONObject reply_to_message = message.getJSONObject("reply_to_message");
+                                if (reply_to_message.has("message_id")) {
+                                    reply_to_message_id = String.valueOf(reply_to_message.getInt("message_id"));
+                                }
+                            }
+                            if (message.has("reply_markup")) {
+                                JSONObject reply_markup = message.getJSONObject("reply_markup");
+                                if (reply_markup.has("inline_keyboard")) {
+                                    JSONArray inline_keyboard = reply_markup.getJSONArray("inline_keyboard");
+                                    for (int j = 0; j < inline_keyboard.length(); j++) {
+                                        JSONObject inline_keyboard_item = inline_keyboard.getJSONObject(j);
+                                        if (inline_keyboard_item.has("text")) {
+                                            inline_keyboard_text = inline_keyboard_item.getString("text");
+                                        }
+                                    }
+                                }
+                            }
+                            if (message.has("input_message_content")) {
+                                JSONObject input_message_content = message.getJSONObject("input_message_content");
+                                if (input_message_content.has("message_text")) {
+                                    String input_message_content_text = input_message_content.getString("message_text");
+                                }
+                            }
+                            if (message.has("input_message_entities")) {
+                                JSONObject input_message_entities = message.getJSONObject("input_message_entities");
+                            }
+                            if (message.has("inline_query")) {
+                                JSONObject inline_query = message.getJSONObject("inline_query");
+                                if (inline_query.has("id")) {
+                                    String inline_query_id = String.valueOf(inline_query.getInt("id"));
+                                }
+                            }
+                            if (message.has("chosen_inline_result")) {
+
+                                JSONObject chosen_inline_result = message.getJSONObject("chosen_inline_result");
+                                if (chosen_inline_result.has("result_text")) {
+                                    String chosen_inline_result_text = chosen_inline_result.getString("result_text");
+
+                                }
+                            }
+                            if (message.has("callback_query")) {
+                                JSONObject callback_query = message.getJSONObject("callback_query");
+                                if (callback_query.has("id")) {
+                                    String callback_query_id = String.valueOf(callback_query.getInt("id"));
+                                }
+                            }
+                            if (message.has("shipping_query")) {
+                                JSONObject shipping_query = message.getJSONObject("shipping_query");
+                            }
+                            if (message.has("pre_checkout_query")) {
+                                JSONObject pre_checkout_query = message.getJSONObject("pre_checkout_query");
+                                if (pre_checkout_query.has("pre_checkout_query_id")) {
+                                    String pre_checkout_query_id = String.valueOf(pre_checkout_query.
+                                            getInt("pre_checkout_query_id"));
+                                }
+                            }
+                            if (message.has("poll_answer_query")) {
+                                JSONObject poll_answer_query = message.getJSONObject("poll_answer_query");
+                                if (poll_answer_query.has("poll_answer_query_id")) {
+                                    String poll_answer_query_id = String.valueOf(poll_answer_query.
+                                            getInt("poll_answer_query_id"));
+                                }
+                            }
+                            if (message.has("my_chat_member")) {
+                                JSONObject my_chat_member = message.getJSONObject("my_chat_member");
+                                if (my_chat_member.has("user")) {
+                                    JSONObject user = my_chat_member.getJSONObject("user");
+                                    if (user.has("id")) {
+                                        String user_id = String.valueOf(user.getInt("id"));
+                                    }
+                                    if (user.has("is_bot")) {
+                                        is_bot = user.getBoolean("is_bot");
+                                    }
+                                    if (user.has("is_restricted")) {
+                                        is_restricted = user.getBoolean("is_restricted");
+                                    }
+                                    if (user.has("date_first_contacted")) {
+                                        JSONObject date_first_contacted = user.getJSONObject("date_first_contacted");
+                                        if (date_first_contacted.has("date")) {
+                                            String date = String.valueOf(date_first_contacted.getInt("date"));
+                                            if (date.length() == 10) {
+                                                String date_first_contacted_time = date;
+                                                date_first_contacted_time = date_first_contacted_time.replace
+                                                        ("T", " ");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (message.has("chat_member")) {
+                                JSONObject chat_member = message.getJSONObject("chat_member");
+                                if (chat_member.has("user")) {
+                                    JSONObject user = chat_member.getJSONObject("user");
+                                    if (user.has("id")) {
+                                        String user_id = String.valueOf(user.getInt("id"));
+                                    }
+                                }
+                            }
+                            if (message.has("chat_join_request")) {
+                                JSONObject chat_join_request = message.getJSONObject("chat_join_request");
+                                if (chat_join_request.has("user")) {
+                                    JSONObject user = chat_join_request.getJSONObject("user");
+                                    if (user.has("id")) {
+                                        String user_id = String.valueOf(user.getInt("id"));
+                                    }
+                                    if (user.has("is_bot")) {
+                                        is_bot = user.getBoolean("is_bot");
+                                    }
+                                }
+                            }
+                            if (message.has("chat_join_accept")) {
+                                JSONObject chat_join_accept = message.getJSONObject("chat_join_accept");
+                            }
+                            if (message.has("chat_leave_request")) {
+                                JSONObject chat_leave_request = message.getJSONObject("chat_leave_request");
+                            }
+                            if (message.has("chat_leave_accept")) {
+                                JSONObject chat_leave_accept = message.getJSONObject("chat_leave_accept");
+                            }
+                            if (message.has("chat_member_left_channel")) {
+                                JSONObject chat_member_left_channel = message.getJSONObject("chat_member_left_channel");
+                            }
+                            if (message.has("inline_query_result")) {
+                                JSONObject inline_query_result = message.getJSONObject("inline_query_result");
+                                if (inline_query_result.has("id")) {
+                                    String inline_query_id = String.valueOf(inline_query_result.getInt("id"));
+                                }
+                            }
+                            if (message.has("chosen_inline_result")) {
+                                JSONObject chosen_inline_result = message.getJSONObject("chosen_inline_result");
+                            }
+                            if (message.has("callback_query_result")) {
+                                JSONObject callback_query_result = message.getJSONObject("callback_query_result");
+                            }
+
+                        }
+                        if (result.has("chat_id")) {
+                            chatId = String.valueOf(result.getInt("chat_id"));
+                        }
+                        if (result.has("edited_message")) {
+                            String editedMessage = result.getString("edited_message");
+                        }
+                        if (result.has("inline_message_id")) {
+                            int inlineMessageID = result.getInt("inline_message_id");
+                        }
+                        if (result.has("inline_message_text")) {
+                            String inlineMessageText = result.getString("inline_message_text");
+                        }
+                        if (result.has("inline_message_entities")) {
+                            JSONArray inlineMessageEntities = result.getJSONArray("inline_message_entities");
+                            for (i = 0; i < inlineMessageEntities.length(); i++) {
+                                JSONObject entity = inlineMessageEntities.getJSONObject(i);
+                                if (entity.has("type")) {
+                                    type = entity.getString("type");
+                                }
+                                if (entity.has("offset")) {
+                                    offset = entity.getInt("offset");
+                                }
+                                if (entity.has("length")) {
+                                    length = entity.getInt("length");
+                                }
+                            }
+                        }
+                        if (result.has("chosen_inline_message_entity")) {
+                            int chosenInlineMessageEntity = result.getInt("chosen_inline_message_entity");
+                        }
+                        if (result.has("chosen_inline_message_offset")) {
+                            int chosenInlineMessageOffset = result.getInt("chosen_inline_message_offset");
+                        }
+                        if (result.has("chosen_inline_message_length")) {
+                            int chosenInlineMessageLength = result.getInt("chosen_inline_message_length");
+                        }
+                        if (result.has("chosen_inline_message_entities")) {
+                            JSONArray chosenInlineMessageEntities = result.getJSONArray("chosen_inline_message_entities");
+                            for (i = 0; i < chosenInlineMessageEntities.length(); i++) {
+                                JSONObject entity = chosenInlineMessageEntities.getJSONObject(i);
+                                if (entity.has("type")) {
+                                    type = entity.getString("type");
+                                }
+                                if (entity.has("offset")) {
+                                    offset = entity.getInt("offset");
+                                }
+                                if (entity.has("length")) {
+                                    length = entity.getInt("length");
+                                }
+                            }
+                        }
+                        if (result.has("chosen_inline_message_entity_offset")) {
+                            int chosenInlineMessageEntityOffset = result.getInt("chosen_inline_message_entity_offset");
+                        }
+                        if (result.has("chosen_inline_message_entity_length")) {
+                            int chosenInlineMessageEntityLength = result.getInt("chosen_inline_message_entity_length");
+                        }
+                        if (result.has("sender_chat")) {
+                            senderChat.setType(result.getString("type"));
+                            senderChat.setId(result.getString("id"));
+                            senderChat.setName(result.getString("first_name"));
+                            senderChat.setUsername(result.getString("username"));
+                            senderChat.setPhoto(result.getString("photo"));
+                        }
+                        if (result.has("chat")) {
+
+                            JSONObject chat = result.getJSONObject("chat");
+                            if (chat.has("id")) {
+                                chatId = chat.getString("id");
+                            }
+                            if (chat.has("type")) {
+                                String chatType = chat.getString("type");
+                                if (chatType.equals("private")) {
+                                    boolean isPrivate = true;
+                                    if (chat.has("title")) {
+
+                                        if (chat.has("username")) {
+                                            username = chat.getString("username");
+                                        }
+                                        if (chat.has("first_name")) {
+                                            first_name = chat.getString("first_name");
+                                        }
+                                        if (chat.has("last_name")) {
+                                            last_name = chat.getString("last_name");
+                                        }
+                                    }
+                                }
+
+                            }
+                            if (chat.has("title")) {
+                                String chatTitle = chat.getString("title");
+                                chatTitle = chatTitle.substring(0, Math.min(chatTitle.length(), 50));
+                            }
+                            if (chat.has("username")) {
+                                String chatUsername = chat.getString("username");
+
+                                if (chatUsername.contains("@")) {
+                                    chatUsername = chatUsername.substring(0, chatUsername.indexOf("@"));
+
+                                    out.println(chatUsername);
+
+                                }
+                            }
+                            if (chat.has("first_name")) {
+                                String chatFirstName = chat.getString("first_name");
+                                chatFirstName = chatFirstName.substring(0, Math.min(chatFirstName.length(), 50));
+
+                                out.println(chatFirstName);
+                            }
+                            if (chat.has("last_name")) {
+                                String chatLastName = chat.getString("last_name");
+                                out.println(chatLastName);
+                            }
+                            if (chat.has("photo")) {
+                                String chatPhoto = chat.getString("photo");
+
+                            }
+                            if (chat.has("bio")) {
+                                String chatBio = chat.getString("bio");
+                            }
+                            if (chat.has("description")) {
+                                String chatDescription = chat.getString("description");
+                            }
+                            if (chat.has("invite_link")) {
+                                String chatInviteLink = chat.getString("invite_link");
+
+                                out.println(chatInviteLink);
+                            }
+                            if (chat.has("invite_link_pretext")) {
+                                String chatInviteLinkPretext = chat.getString("invite_link_pretext");
+                                out.println(chatInviteLinkPretext);
+                            }
+
+                        }
+
+                        if (result.has("date")) {
+
+                            JSONObject date = result.getJSONObject("date");
+                            if (date.has("date")) {
+                                String dateString = date.getString("date");
+                                dateString = dateString.substring(0, Math.min(dateString.length(), 10));
+                                out.println(dateString);
+                                setDate(dateString);
+                            }
+                        }
+
+                        if (result.has("location")) {
+
+                            JSONObject location = result.getJSONObject("location");
+                            if (location.has("location")) {
+                                String locationString = location.getString("location");
+                                out.println(locationString);
+                                setLocation(locationString);
+                            }
+                        }
+
+                        if (result.has("duration")) {
+
+                            JSONObject duration = result.getJSONObject("duration");
+                            if (duration.has("duration")) {
+                                String durationString = duration.getString("duration");
+
+                                out.println(durationString);
+                            }
+                        }
+
+                        if (result.has("sender_chat")) {
+
+                            JSONObject senderChat = result.getJSONObject("sender_chat");
+                            if (senderChat.has("sender_chat")) {
+                                String senderChatString = senderChat.getString("sender_chat");
+
+                            }
+                        }
+
+
+                        if (jsonResponse.has("update_id")) {
+                            setUpdate_id(jsonResponse.getString("update_id"));
+                        }
+                        if (jsonResponse.has("message")) {
+                            message = jsonResponse.getString("message");
+                        }
+                        JSONArray jsonObject = new JSONArray(jsonResponse.getJSONArray("result"));
+                        for (i = 0; i < jsonObject.length(); i++) {
+                            JSONObject jsonObject1 = jsonObject.getJSONObject(i);
+                            if (jsonObject1.has("update")) {
+                                JSONObject jsonObject2 = jsonObject1.getJSONObject("update");
+                                if (jsonObject2.has("message_id")) {
+                                    setMessage_id(jsonObject2.getString("message_id"));
+                                    if (jsonObject2.has("date")) {
+                                        setDate(String.valueOf(jsonObject2.getString("date")));
+                                    }
+                                }
+                                if (jsonObject2.has("from")) {
+                                    username = jsonObject2.getString("from");
+                                    if (jsonObject2.has("date")) {
+                                        date = jsonObject2.getString("date");
+                                    }
+                                }
+                            }
+                            if (jsonObject1.has("text")) {
+                                setText(jsonObject1.getString("text"));
+                            }
+                            if (jsonObject1.has("inline_message_id")) {
+                                setInline_message_id(jsonObject1.getString("inline_message_id"));
+
+                            }
+                            if (jsonObject1.has("chat_id")) {
+                                setChatId(String.valueOf(jsonObject1.getInt("chat_id")));
+                            }
+                            if (jsonObject1.has("reply_to_message_id")) {
+                                reply_to_message_id = jsonObject1.getString("reply_to_message_id");
+                            }
+                            if (jsonObject1.has("inline_query_id")) {
+                                inline_query_id = jsonObject1.getString("inline_query_id");
+                            }
+                            if (jsonObject1.has("from")) {
+                                username = jsonObject1.getString("from");
+                                if (jsonObject1.has("date")) {
+                                    date = jsonObject1.getString("date");
+                                }
+                            }
+                            if (jsonObject1.has("message_id")) {
+                                message_id = jsonObject1.getString("message_id");
+                                if (jsonObject1.has("date")) {
+                                    date = jsonObject1.getString("date");
+                                }
+                            }
+                            if (jsonObject1.has("forward_from_chat")) {
+                                forward_from_chat = jsonObject1.getString("forward_from_chat");
+                                if (jsonObject1.has("id")) {
+                                    id = String.valueOf(jsonObject1.getLong("id"));
+
+                                }
+                                if (jsonObject1.has("title")) {
+                                    title = jsonObject1.getString("title");
+                                }
+                                if (jsonObject1.has("type")) {
+                                    type = jsonObject1.getString("type");
+                                }
+                                if (jsonObject1.has("from")) {
+                                    username = jsonObject1.getString("from");
+                                    if (jsonObject1.has("date")) {
+                                        date = jsonObject1.getString("date");
+                                    }
+                                }
+                                if (jsonObject1.has("forward_from_message_id")) {
+                                    forward_from_message_id = jsonObject1.getString("forward_from_message_id");
+                                }
+
+                            }
+                            if (jsonObject1.has("chat")) {
+                                chat = new Chat(
+                                        String.valueOf(jsonObject1.getInt("chat_id")),
+                                        String.valueOf(jsonObject1.getInt("title")),
+                                        String.valueOf(jsonObject1.getInt("type")),
+                                        String.valueOf(jsonObject1.getInt("username"))
+
+                                );
+                            }
+                            if (jsonObject1.has("sender_chat")) {
+                                senderChat = new Chat(
+                                        String.valueOf(jsonObject1.getInt("sender_chat_id")),
+                                        String.valueOf(jsonObject1.getInt("title")),
+                                        String.valueOf(jsonObject1.getInt("type")),
+                                        String.valueOf(jsonObject1.getInt("username")));
+
+                            }
+                            if (jsonObject1.has("game")) {
+                                TelegramClient.game = new Game(
+                                        String.valueOf(jsonObject1.getInt("game_short_name")),
+                                        String.valueOf(jsonObject1.getInt("short_name")),
+                                        String.valueOf(jsonObject1.getInt("game_id")),
+                                        String.valueOf(jsonObject1.getInt("creator_user_id")),
+                                        String.valueOf(jsonObject1.getInt("creator_user_name")),
+
+                                        String.valueOf(jsonObject1.getInt("game_short_code")));
+
+                            }
+                        }
+                    }
+                    out.println("Updated successfully");
+                    return;
+                }
+            out.println("Something went wrong while updating the bot");
+        }
         }
 
-        void getChatAdministrators() throws IOException {
-            setMethod("POST");
-            makeRequest(
-                    "https://api.telegram.org/bot" + getToken()
-                            + "/getChatAdministrators","POST"
-            );
-        }
+    //
+    void getChat() throws IOException {
+        setMethod("POST");
+        makeRequest(
+                "https://api.telegram.org/bot" + getToken()
+                        + "/getChat", "POST"
+        );
+    }
 
-        public enum KeyboardButtonType {
-            UP(0),
-            DOWN(1),
-            LEFT(2),
-            RIGHT(3), BUTTON_TYPE_SINGLE_LINE(4),
-            Start(5),
-            BACK(6),
-            Stop(7),
-            Trade(8),
-            Order(9),
-            Exchange(10),
-            CloseOrder(11),
-            CancelOrder(12),
-            CancelAll(13),Delete(14),
-            Balance(15),SendMoney(16), BUTTON_TYPE_EXIT(100), BUTTON_TYPE_MENU(17);
+    public String getMe() {
+        StringBuilder response = new StringBuilder();
+        JSONObject jsonResponse = new JSONObject();
+        try {
+            URL obj = new URL("https://api.telegram.org/bot" + getToken() + "/getMe");
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            con.setRequestMethod("GET");
+            // con.setRequestProperty("Authorization", "Bearer " + getToken());
+            con.setRequestProperty("Content-Type", "application/json");
+            con.setRequestProperty("Accept", "application/json");
+            con.setDoOutput(true);
+            con.setDoInput(true);
+            con.connect();
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            String inputLine;
 
+            while ((inputLine = in.readLine()) != null) {
 
-            public final ArrayList <SymbolData>arrayListSymbolsData=new ArrayList<>();
-            public JsonNode arrayListSymbolsData2;
-
-            KeyboardButtonType(int i) {
+                response.append(inputLine);
             }
+            out.println(response);
+            jsonResponse = new JSONObject(response.toString());
 
-            public void setLimit(int i) {
-            }
-
-            public void setInterval(int period) {
-            }
-
-            public void setPeriod(int period) {
-            }
-
-            public void setLang(String en) {
-            }
-
-            public void setOffset(int i) {
-            }
-
-            public void Oninit() {
-            }
-
-            public void OnTick() {
-            }
-
-            public void CloseAll() {
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
 
-        void sendMoney() {
-        }
+        if (jsonResponse.has("ok") && jsonResponse.getBoolean("ok")
+                && jsonResponse.has("result")) {
+            JSONObject result = jsonResponse.getJSONObject("result");
 
-        void getChatMemberCount() throws IOException {
-            setMethod("POST");
-            makeRequest(
-                    "https://api.telegram.org/bot" + getToken()
-                            + "/getChatMemberCount","POST"
-            );
+            if (result.has("first_name") && result.has("last_name"))
+                firstName = result.getString("first_name");
+            if (result.has("username"))
+                username = result.getString("username");
+            if (result.has("language_code"))
+                languageCode = result.getString("language_code");
+            if (result.has("phone_number"))
+                phoneNumber = result.getString("phone_number");
+            if (result.has("photo"))
+                photo = result.getString("photo");
+            if (result.has("description"))
+                description = result.getString("description");
+            if (result.has("can_invite_users"))
+                canInviteUsers = result.getBoolean("can_invite_users");
+            if (result.has("can_change_info"))
+                canChangeInfo = result.getBoolean("can_change_info");
+            if (result.has("can_post_messages"))
+                canPostMessages = result.getBoolean("can_post_messages");
+            if (result.has("can_edit_messages"))
+                canEditMessages = result.getBoolean("can_edit_messages");
+            if (result.has("can_delete_messages"))
+                lastName = result.getString("last_name");
+            if (result.has("chat")) {
+                canDeleteMessages = result.getBoolean("can_delete_messages");
+            }
+            if (result.has("lastName"))
+                setLastName(result.getString("last_name"));
+            if (result.has("is_bot"))
+                setIsBot(result.getBoolean("is_bot"));
+            if (result.has("can_join_groups"))
+                canJoinGroups = result.getBoolean("can_join_groups");
+            if (result.has("can_read_all_group_messages"))
+                canReadAllGroupMessages = result.getBoolean("can_read_all_group_messages");
+            if (result.has("username"))
+                setUsername(username = result.getString("username"));
+            if (result.has("chat_id"))
+                setChatId(result.getString("chat_id"));
+            if (result.has("method"))
+                method = result.getString("method");
+            if (result.has("ok"))
+                ok = result.getBoolean("ok");
+            if (result.has("supports_inline_queries"))
+                supportsInlineQueries = result.getBoolean("supports_inline_queries");
+            out.println(jsonResponse);
         }
+        return lastName;
+    }
+
+    void getChatAdministrators() throws IOException {
+        setMethod("POST");
+        makeRequest(
+                "https://api.telegram.org/bot" + getToken()
+                        + "/getChatAdministrators", "POST"
+        );
+    }
+
+    boolean newsTrade() throws IOException, ParseException//RETURN TRUE IF TRADE IS ALLOWED
+    {
+
+        offset = gmtoffset();
+        double CheckNews = 0;
+        if (MinAfter > 0) {
+
+            if (new Date().getTime() - LastUpd >= Upd) {
+                out.println("News Loading...");
+
+                LastUpd = (int) new Date().getTime();
+
+
+                sendMessage("News Loading ...");
+
+            }
+            int NomNews = NewsManager.getNewsList().size();
+
+            WindowRedraw();
+            //---Draw a line on the chart news--------------------------------------------
+            News[] mynews =
+                    NewsManager.getNewsList().toArray(new News[0]);
+            if (DrawLines) {
+                for (int i = NomNews - 1; i > 0; i--) {
+
+                    String Name = (mynews[i].getMinutes() + "_" + mynews[i].getImpact() + "_" + mynews[i].getTitle());
+
+                    if (TimeNewsFunck(i) < new Date().getTime() && Next)
+                        continue;
+
+                    Color clrf = new Color(255, 67, 23, 45);
+                    if (Vhigh && StringFind(mynews[i].getTitle(), judulnews))
+                        clrf = Color.RED;
+
+                    if (Vhigh && Objects.equals(mynews[i].getImpact(), "High"))
+                        clrf = Color.RED;
+                    if (Vmedium && Objects.equals(mynews[i].getImpact(), "Medium"))
+                        clrf = Color.YELLOW;
+                    if (Vlow && Objects.equals(mynews[i].getImpact(), "Low"))
+                        clrf = Color.GREEN;
+
+                    if (clrf == Color.WHITE)
+                        continue;
+
+                    if (!Objects.equals(mynews[i].getTitle(), "")) {
+//                            ObjectCreate(0,Name,OBJ_VLINE,0,TimeNewsFunck(i),Bid);
+//                            ObjectSet(Name,OBJPROP_COLOR,clrf);
+//                            ObjectSet(Name,OBJPROP_STYLE,Style);
+//                            ObjectSetInteger(0,Name,OBJPROP_BACK,true);
+                    }
+                }
+            }
+            //---------------event Processing------------------------------------
+            int i;
+            CheckNews = 0;
+            int power = 0;
+
+            for (i = 0; i < NomNews; i++) {
+                String google_urlx = "https://www.forexfactory.com/calendar?day";
+
+
+                if (Vhigh && String.valueOf(judulnews).equals(mynews[i].getTitle()))
+                    power = 1;
+
+                if (Vhigh && Objects.equals(mynews[i].getImpact(), "high"))
+                    power = 1;
+                if (Vmedium && Objects.equals(mynews[i].getImpact(), "medium"))
+                    power = 2;
+                if (Vlow && Objects.equals(mynews[i].getImpact(), "low"))
+                    power = 3;
+                if (power == 0) {
+                    continue;
+                }
+                String jamberita;
+                if (new Date().getTime() + BeforeNewsStop > TimeNewsFunck(i) && new Date().getTime() - 60L * AfterNewsStop < TimeNewsFunck(i) && mynews[i].getTitle() != "") {
+                    jamberita = "==>Within " + mynews[i].getMinutes() + " minutes\n" + mynews[i].toString();
+
+                    CheckNews = 1;
+                    String ms = message = mynews[i].toString();//get message data with format
+
+                    sendAlert(jamberita + " " + ms);
+
+                } else {
+                    CheckNews = 0;
+
+                }
+                if ((CheckNews == 1 && i != Now && Signal) || (CheckNews == 1 && i != Now && sendnews)) {
+
+                    message = mynews[i].toString();
+                    sendMessage(message);
+
+                    Now = i;
+
+
+                }
+                if (CheckNews > 0 && NewsFilter)
+                    trade = false;
+                if (CheckNews > 0) {
+
+                    if (!StopTarget() && NewsFilter) {
+                        infoberita = " we are in the framework of the news\nAttention!! News Time \n!";
+
+
+                        /////  We are doing here if we are in the framework of the news
+
+                        boolean b = mynews[i].getMinutes() == AfterNewsStop - 1 && FirstAlert && i == Now && sendnews;
+                        if (b) ;
+                        {
+
+
+                            sendMessage("-->>First Alert\n " + message);
+
+
+                        }
+                        //--- second alert
+                        if (mynews[i].getMinutes() == BeforeNewsStop - 1 && SecondAlert && i == Now && sendnews) {
+                            sendMessage(">>Second Alert\n " + message);
+                            SecondAlert = true;
+
+                        }
+
+
+                    }
+                } else {
+
+                    if (NewsFilter)
+                        trade = true;
+                    // We are out of scope of the news release (No News)
+                    if (!StopTarget() && mynews[i].getMinutes() == BeforeNewsStop && SecondAlert && (CheckNews == 1 && i == Now && sendnews)) {
+                        jamberita = " We are out of scope of the news release\n (No News)\n";
+
+                        infoberita = "Waiting......";
+
+                        sendMessage(jamberita + infoberita);
+
+
+                    }
+
+                }
+
+
+            }
+
+            return trade;
+        }
+        return trade;
+    }
+
+    private int gmtoffset() {
+        return offset;
+    }
+
+    private void WindowRedraw() {
+    }
+
+    private long TimeNewsFunck(int i) throws ParseException {
+        return NewsManager.getNewsList().get(i).getDate().getTime();
+    }
+
+    @Contract(pure = true)
+    private boolean StringFind(@NotNull String title, String judulnews) {
+        return title.contains(judulnews);
+    }
+
+    private boolean StopTarget() {
+        return false;
+    }
+
+    public void getTradeNews() {
+
+
+    }
+
+    public void sendAlert(String alert) throws IOException {
+        makeRequest(
+                "https://api.telegram.org/bot" + getToken() + "/sendMessage?chat_id=" + getChatId() +
+                        "&text=" + alert +
+
+                        "&parse_mode=" + "MarkDown" +
+                        "&disable_web_page_preview=" + false +
+                        "&disable_notification=" + false, "POST"
+
+        );
+    }
+
+    void sendMoney() {
+    }
 
         void getChatMember() throws IOException {
             setMethod("POST");
@@ -2499,6 +2639,14 @@ import java.util.Objects;
             return getCreateKeyBoard();
         }
 
+    void getChatMemberCount() throws IOException {
+        setMethod("POST");
+        makeRequest(
+                "https://api.telegram.org/bot" + getToken()
+                            + "/getChatMemberCount","POST"
+            );
+        }
+
         void sendInvoice(String chat_id,String title, String description, String suggested_tip_amount, String max_tip_amount, String provider_data, String start_parameter, String photo_url, String photo_size, String photo_width, String photo_height, String need_name, String need_phone_number, String need_shipping_address, String is_flexible, String send_phone_number_to_provider, String send_email_to_provider, String need_email, String playload, String provider_token, String currency_code, String prices, String payload, String reply_markup) throws IOException {
             // Use this method to send invoices. On success, sent Message is returned.
 
@@ -2566,71 +2714,86 @@ import java.util.Objects;
                             "&protect_content=" + protect_content +
                             "&reply_to_message_id=" + reply_to_message_id +
                             "&allow_sending_without_reply=" + allow_sending_without_reply +
-                            "&reply_markup=" + reply_markup,"POST");
+                            "&reply_markup=" + reply_markup, "POST");
 
 
         }
 
-        static Game game;
+    public String Token(String telegramApiKey) {
+        //  "2032573404:AAGImbZXeATS-XMutlqlJC8hgOP1BMlrcKM";
 
+        return telegramApiKey;
+    }
 
-        public void sendAlert(String alert) throws IOException {
-            makeRequest(
-                    "https://api.telegram.org/bot" + getToken() + "/sendMessage?chat_id=" + getChatId()+
-                            "&text=" +  alert+
+    public void ChartColorSet() {
+        //Chart color
 
-                            "&parse_mode=" + "MarkDown"+
-                            "&disable_web_page_preview=" +false+
-                            "&disable_notification=" +false,"POST"
+        //Set chart color
 
-            );
+    }
+
+    public void Templates(String template) throws IOException {
+        String name = "template";
+
+    }
+
+    public void UserNameFilter(String userName) {
+        if (Objects.equals(getUsername(), userName)) {
+            out.println("User ok" + userName);
+        } else {
+            out.println("User not ok" + userName);
         }
 
 
+    }
 
-//    public String Token(String  telegramApiKey) {
-//        //  "2032573404:AAGImbZXeATS-XMutlqlJC8hgOP1BMlrcKM";
-//
-//        return  telegramApiKey;}
-
-        public void ChartColorSet() {
-            //Chart color
-
-
-
-
-
-
-
-
-
-
-
+    public enum KeyboardButtonType {
+        UP(0),
+        DOWN(1),
+        LEFT(2),
+        RIGHT(3), BUTTON_TYPE_SINGLE_LINE(4),
+        Start(5),
+        BACK(6),
+        Stop(7),
+        Trade(8),
+        Order(9),
+        Exchange(10),
+        CloseOrder(11),
+        CancelOrder(12),
+        CancelAll(13), Delete(14),
+        Balance(15), SendMoney(16), BUTTON_TYPE_EXIT(100), BUTTON_TYPE_MENU(17);
 
 
+        public final ArrayList<SymbolData> arrayListSymbolsData = new ArrayList<>();
+        public JsonNode arrayListSymbolsData2;
 
-
-
-
-            //Set chart color
-
+        KeyboardButtonType(int i) {
         }
 
-        public void Templates(String template) throws IOException {
-            String name="template"
-                    ;
-
+        public void setLimit(int i) {
         }
 
-        public void UserNameFilter(String userName) {
-            if (Objects.equals(getUsername(), userName)){
-                System.out.println("User ok"+ userName);
-            }else {
-                System.out.println("User not ok"+ userName);
-            }
-
-
+        public void setInterval(int period) {
         }
+
+        public void setPeriod(int period) {
+        }
+
+        public void setLang(String en) {
+        }
+
+        public void setOffset(int i) {
+        }
+
+        public void Oninit() {
+        }
+
+        public void OnTick() {
+        }
+
+        public void CloseAll() {
+        }
+    }
 
 
         public void Language(String inpLanguage) {

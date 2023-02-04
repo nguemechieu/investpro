@@ -1,9 +1,12 @@
 package org.investpro.investpro;
 
-import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 
 public class Currency {
@@ -17,19 +20,6 @@ public class Currency {
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
 
-
-    public Currency() {
-
-
-        currencyType = NULL_CRYPTO_CURRENCY.getCurrencyType();
-        fullDisplayName = "";
-        shortDisplayName = "";
-        code = "";
-        fractionalDigits = 0;
-        symbol = "";
-
-    }
-
     static {
         // FIXME: Replace with ServiceLoaders
         CryptoCurrencyDataProvider cryptoCurrencyDataProvider = new CryptoCurrencyDataProvider();
@@ -37,23 +27,31 @@ public class Currency {
         FiatCurrencyDataProvider fiatCurrencyDataProvider = new FiatCurrencyDataProvider();
         fiatCurrencyDataProvider.registerCurrencies();
 
-
+        /*
         ServiceLoader<CurrencyDataProvider> serviceLoader = ServiceLoader.load(CurrencyDataProvider.class);
-        Log.info("service loader: " + serviceLoader);
+        logger.info("service loader: " + serviceLoader);
         for (CurrencyDataProvider provider : serviceLoader) {
-            Log.info("calling provider.registerCurrencies()");
+            logger.info("calling provider.registerCurrencies()");
             try {
                 provider.registerCurrencies();
             } catch (Exception e) {
-                Log.error("could not register currencies: " + e);
+                logger.error("could not register currencies: ", e);
             }
         }
-
+         */
     }
 
     /**
      * Private constructor used only for the {@code NULL_CURRENCY}.
      */
+    protected Currency() {
+        this.currencyType = CurrencyType.NULL;
+        this.fullDisplayName = "";
+        this.shortDisplayName = "";
+        this.code = "XXX";
+        this.fractionalDigits = 0;
+        this.symbol = "";
+    }
 
     /**
      * Protected constructor, called only by CurrencyDataProvider's.
@@ -113,7 +111,7 @@ public class Currency {
      * @param code
      * @return
      */
-    public static FiatCurrency ofFiat(@NotNull String code) {
+    public static FiatCurrency ofFiat(String code) {
         if (code.equals("¤¤¤")) {
             return NULL_FIAT_CURRENCY;
         }
@@ -130,7 +128,7 @@ public class Currency {
      * @param code
      * @return
      */
-    public static CryptoCurrency ofCrypto(@NotNull String code) {
+    public static CryptoCurrency ofCrypto(String code) {
         if (code.equals("¤¤¤")) {
             return NULL_CRYPTO_CURRENCY;
         }
@@ -142,22 +140,22 @@ public class Currency {
     public static List<FiatCurrency> getFiatCurrencies() {
         return CURRENCIES.values().stream()
                 .filter(currency -> currency.getCurrencyType() == CurrencyType.FIAT)
-                .map(currency -> (FiatCurrency) currency).toList();
+                .map(currency -> (FiatCurrency) currency).collect(Collectors.toUnmodifiableList());
     }
 
     public static Currency lookupBySymbol(String symbol) {
         // FIXME: why fiat?
         return CURRENCIES.values().stream().filter(currency -> currency.getSymbol().equals(symbol))
-                .findAny().orElse(NULL_CRYPTO_CURRENCY);
+                .findAny().orElse(NULL_FIAT_CURRENCY);
     }
 
-    public FiatCurrency lookupFiatByCode(String code) {
+    public static FiatCurrency lookupFiatByCode(String code) {
         return (FiatCurrency) CURRENCIES.values().stream()
                 .filter(currency -> currency.currencyType == CurrencyType.FIAT && currency.code.equals(code))
                 .findAny().orElse(NULL_FIAT_CURRENCY);
     }
 
-    public FiatCurrency lookupLocalFiatCurrency() {
+    public static FiatCurrency lookupLocalFiatCurrency() {
         return (FiatCurrency) CURRENCIES.values().stream()
                 .filter(currency -> currency.currencyType == CurrencyType.FIAT)
                 .findAny().orElse(NULL_FIAT_CURRENCY);

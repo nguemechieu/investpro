@@ -1,14 +1,18 @@
 package org.investpro.investpro;
 
-public class TelegramApiException extends Throwable {
-    private final int code;
 
-    public TelegramApiException(String description, int code) {
-        super(description);
-        this.code = code;
+public class TelegramApiException extends Throwable {
+
+
+    private final Object exception;
+
+    public TelegramApiException(Object exception) {
+
+        this.exception = exception;
+        Log.error((String) exception);
     }
 
-    public int getCode() {
-        return code;
+    public Object getException() {
+        return exception;
     }
 }

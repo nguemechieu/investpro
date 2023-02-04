@@ -308,8 +308,12 @@ public class CandleStickChart extends Region {
                 TelegramClient telegramClient;
                 try {
                     telegramClient = new TelegramClient("2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
-                    telegramClient.sendAlert("Connected");
-                } catch (IOException e) {
+                    telegramClient.sendAlert("SmartBot Connected..");
+                    //telegramClient.getTradeNews();
+                    telegramClient.getTradeNews();
+
+
+                } catch (IOException | TelegramApiException | InterruptedException e) {
                     throw new RuntimeException(e);
                 }
                 if (telegramClient.getFirst_name() != null) {

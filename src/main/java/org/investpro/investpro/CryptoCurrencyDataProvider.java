@@ -4,13 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
-
     public CryptoCurrencyDataProvider() {}
-
     @Override
     protected void registerCurrencies() {
-
-
         // crypto_coins.json is encoded in UTF-8 (for symbols)
         /**    Json cryptoCoinsJson = Json.read(Files.readString(Paths.get(
          CryptoCurrencyDataProvider.class.getResource("/crypto_coins.json").toURI())));

@@ -1,5 +1,6 @@
 package org.investpro.investpro;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -10,7 +11,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Objects;
 
 import static java.lang.System.out;
@@ -19,18 +23,18 @@ public class NewsManager {
 
     private static final String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
     static ArrayList<News> news;
-    static News news1 = new News(null, null, null, "", "", "");
+    static News news1 = new News(null, null, null, null, "", "");
     public NewsManager() {
 
 
     }
 
-    public static ArrayList<org.investpro.investpro.News> getNewsList() {
+    public static ArrayList<org.investpro.investpro.News> getNewsList() throws ParseException {
         return load();
 
     }
 
-    private static ArrayList<News> load() {
+    private static ArrayList<News> load() throws ParseException {
         news = new ArrayList<>();//
         JSONArray jsonArray = Objects.requireNonNull(makeRequest(url));
         int length = jsonArray.length();
@@ -56,7 +60,9 @@ public class NewsManager {
             String date=null;
             if (json.has("date")) {
                 date = json.getString("date");
-                news1.setDate(date);
+
+                news1.setOffset(date.codePointCount(16, 19));
+                news1.setDate(StringToDate(date));
             }
             String forecast= "";
             if (json.has("forecast")) {
@@ -68,15 +74,25 @@ public class NewsManager {
                 previous = json.getString("previous");
                 news1.setPrevious(previous);
             }
-            news.add(i, new News(title, country, impact, date, forecast, previous));
-
             assert date != null;
+
+            news.add(i, new News(title, country, impact, StringToDate(date), forecast, previous));
 
             out.println("New" + news1);
 
 
         }
         return news;
+    }
+
+    @Contract("null -> fail")
+    public static Date StringToDate(String str) throws ParseException {//TODO implement date
+        if (str == null) throw new IllegalArgumentException("Invalid date string");
+
+
+        //ZonedDateTime.from(DateTimeFormatter.ofPattern( "yyyy-MM-dd'T'HH:mm:ss").parse(str.substring(0, 19)));
+        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+                .parse(str);
     }
 
 

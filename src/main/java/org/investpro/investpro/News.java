@@ -2,21 +2,23 @@ package org.investpro.investpro;
 
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 
+import java.util.Date;
 import java.util.HashMap;
 
 public class News extends RecursiveTreeObject<News> {
     private String title;// title of the newsdhb/k;lojoj
     private String country;// country of the news
-    private  String description;// description of the news
-    private  String impact;// impact of the news
-    private String date;// date of the news
-
-    private  String forecast;// forecast of the news
+    int hours;
+    int secondes;
+    private String description;// description of the news
+    private String impact;// impact of the news
     private String previous;// previous forecast of the news
-    private int hours;
-    private int secondes;
+    private Date date;// date of the news
+    private String forecast;// forecast of the news
+    private int minutes;
+    private int offset;
 
-    public News(String title, String country, String impact, String date, String forecast, String previous) {
+    public News(String title, String country, String impact, Date date, String forecast, String previous) {
         this.title = title;
         this.country = country;
         this.impact = impact;
@@ -234,11 +236,11 @@ public class News extends RecursiveTreeObject<News> {
         this.impact = impact;
     }
 
-    public String getDate() {
+    public Date getDate() {
         return date;
     }
 
-    public void setDate(String date) {
+    public void setDate(Date date) {
         this.date = date;
     }
 
@@ -274,5 +276,21 @@ public class News extends RecursiveTreeObject<News> {
 
     public int getSecondes() {
         return secondes;
+    }
+
+    public int getMinutes() {
+        return minutes;
+    }
+
+    public void setMinutes(int minutes) {
+        this.minutes = minutes;
+    }
+
+    public int getOffset() {
+        return offset;
+    }
+
+    public void setOffset(int codePointCount) {
+        this.offset = codePointCount;
     }
 }

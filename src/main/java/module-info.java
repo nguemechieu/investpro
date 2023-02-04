@@ -22,6 +22,7 @@ module org.investpro.investpro {
     requires Java.WebSocket;
     requires org.controlsfx.controls;
     requires mysql.connector.j;
+    requires jdk.hotspot.agent;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
 }

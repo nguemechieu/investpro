@@ -4,6 +4,7 @@ import com.jfoenix.controls.RecursiveTreeItem;
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import javafx.application.Application;
 import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -33,10 +34,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.text.ParseException;
+import java.util.*;
 
 import static java.lang.System.nanoTime;
 import static java.lang.System.out;
@@ -1128,7 +1127,7 @@ public class Main extends Application {
 
         btnSignIn.setOnAction(eb -> {
             stage.close();
-            stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
+            stage.getIcons().add(new Image("logo.png"));
             try {
                 createLogin(stage);
             } catch (URISyntaxException ex) {
@@ -1308,7 +1307,7 @@ public class Main extends Application {
 
     }
 
-    TabPane getTabPane() throws OandaException, IOException {
+    TabPane getTabPane() throws OandaException, IOException, ParseException {
 
 
         DraggableTab[] tabs
@@ -1343,9 +1342,9 @@ public class Main extends Application {
         tabs[7].setContent(getOandaSignals());
         tabs[8].setContent(getOandaRecommendation());
         tabs[9].setContent(getOandaWallet());
-        tabs[10].setContent(getBinanceUsWallet());
-        tabs[11].setContent(getCoinbaseProWallet()
-        );
+        tabs[10].setContent(getCoinbaseProWallet());
+        tabs[11].setContent(getBinanceUSProWallet());
+
 
         TabPane orderTabPanes = new TabPane();
         orderTabPanes.getTabs().addAll(tabs);
@@ -1357,15 +1356,55 @@ public class Main extends Application {
     }
 
     @Contract(" -> new")
+    private @NotNull Node getCoinbaseProWallet() {
+        return new VBox();
+    }
+
+    @Contract(" -> new")
     private @NotNull Node getBinanceUsWallet() {
 
         return new VBox();
     }
 
-    @Contract(" -> new")
-    private @NotNull Node getCoinbaseProWallet() {
+    void coinbaseWalletManager(ActionEvent actionEvent) {
 
-        return new VBox();
+
+        withdrawCoinbase();
+
+        sendMoney();
+
+    }
+
+    private void depositCoinbase() {
+    }
+
+    private void withdrawCoinbase() {
+    }
+
+    private void sendMoney() {
+    }
+
+    @Contract(" -> new")
+    private @NotNull Node getBinanceUSProWallet() {//Implement this method to get the coinbase transaction
+
+
+        Button b = new Button("Deposit");
+        Button c = new Button("Withdraw");
+        Button d = new Button("SendMoney");
+
+        b.setOnAction(e -> depositCoinbase());
+        c.setOnAction(e -> withdrawCoinbase());
+        d.setOnAction(e -> sendMoney());
+
+        GridPane grid = new GridPane();
+
+        grid.setPadding(new Insets(10, 10, 10, 10));
+        grid.add(new Label("--------Binance Us Wallet ------- "), 0, 0);
+        grid.add(new Label(""), 1, 1);
+        ListView<Objects> listV = new ListView<>();
+        grid.add(listV, 3, 3);
+        Node separator = new Separator();
+        return new VBox(grid, separator, b, c, d);
     }
 
     @Contract(" -> new")
@@ -1451,7 +1490,7 @@ public class Main extends Application {
         return vBox;
     }
 
-    TreeTableView<News> getNews() throws IllegalArgumentException {
+    TreeTableView<News> getNews() throws IllegalArgumentException, ParseException {
 
         TreeTableView<News> treeTableNews = new TreeTableView<>();
 
@@ -1481,7 +1520,8 @@ public class Main extends Application {
         root.setValue(NewsManager.getNewsList().get(6));
 
 
-        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsDateValue = param -> new ReadOnlyStringWrapper(param.getValue().getValue().getDate());
+        Callback<TreeTableColumn.CellDataFeatures<News, String>, ObservableValue<String>> columnNewsDateValue = param -> new SimpleObjectProperty<>(
+                param.getValue().getValue().getDate()).asString();
         columnNewsDate.setCellValueFactory(columnNewsDateValue);
 
 
