@@ -1468,11 +1468,11 @@ public class Main extends Application {
         OandaCandleStick oandaCanleStickChart = new OandaCandleStick();
 
         vbox[0].getChildren().add(oandaCanleStickChart.start());
-        BinanceUsCandleStick binanceUsCandleChart = new BinanceUsCandleStick();
+        BinanceUS binanceUsCandleChart = new BinanceUS();
         vbox[1].getChildren().add(binanceUsCandleChart.start());
         CoinbasePro coinbaseCandleChart = new CoinbasePro();
         vbox[2].getChildren().add(coinbaseCandleChart.start());
-        BinanceUsCandleStick stockCandleChart = new BinanceUsCandleStick();
+        OandaCandleStick stockCandleChart = new OandaCandleStick();
         vbox[3].getChildren().add(stockCandleChart.start());
 
 

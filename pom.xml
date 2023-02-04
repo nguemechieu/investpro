@@ -124,6 +124,11 @@
             <artifactId>mysql-connector-j</artifactId>
             <version>8.0.32</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.ferstl</groupId>
+            <artifactId>depgraph-maven-plugin</artifactId>
+            <version>4.0.2</version>
+        </dependency>
 
 
     </dependencies>

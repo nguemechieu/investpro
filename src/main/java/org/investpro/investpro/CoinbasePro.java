@@ -29,7 +29,7 @@ import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 import static org.investpro.investpro.DataSource.url;
 
 public class CoinbasePro {
-    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("XLM"), Currency.ofFiat("USD"));
+    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("BTC"), Currency.ofFiat("USD"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)

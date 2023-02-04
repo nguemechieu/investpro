@@ -10,7 +10,7 @@ public class FiatCurrency extends Currency {
     int numericCode;
 
     protected FiatCurrency() {
-        // super(null,null,"","",0,"");
+         super(CurrencyType.FIAT, "", "", "", 0, "");
         locale = Locale.US;
         centralBank = "";
         numericCode = -1;
