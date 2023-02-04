@@ -3,6 +3,7 @@ package org.investpro.investpro;
 import com.jfoenix.controls.RecursiveTreeItem;
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
@@ -835,14 +836,18 @@ public class Main extends Application {
         return pane;
     }
 
-    @Override
-    public void start(@NotNull Stage stage) throws URISyntaxException {
-        createLogin(stage);
+    public static void main(String[] args) {
 
+
+        launch(Main.class, args);
     }
 
-    public static void main(String[] args) {
-        launch(Main.class, args);
+    @Override
+    public void start(@NotNull Stage stage) throws URISyntaxException {
+
+
+        createLogin(stage);
+
     }
 
     static ArrayList<String> symb;
@@ -1127,7 +1132,7 @@ public class Main extends Application {
 
         btnSignIn.setOnAction(eb -> {
             stage.close();
-            stage.getIcons().add(new Image("logo.png"));
+            stage.getIcons().add(new Image("Invest.png"));
             try {
                 createLogin(stage);
             } catch (URISyntaxException ex) {
@@ -1142,7 +1147,7 @@ public class Main extends Application {
         scene.getStylesheets().add("app.css");
         stage.setScene(scene);
         stage.setTitle("InvestPro -->  Registration");
-        stage.getIcons().add(new Image("logo.png"));
+        stage.getIcons().add(new Image("Invest.png"));
         stage.setResizable(true);
         stage.setIconified(true);
         stage.show();
@@ -1187,7 +1192,7 @@ public class Main extends Application {
 
         scene.getStylesheets().add("app.css");
         stage.setTitle("InvestPro    " + new Date(System.currentTimeMillis()));
-        stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
+        stage.getIcons().add(new Image(String.valueOf(new URI("Invest.png"))));
 
         stage.setScene(scene);
         stage.setResizable(true);
@@ -1229,7 +1234,7 @@ public class Main extends Application {
         btnGoback.setOnAction(event -> {
             stage.close();  //stage.getIcons().add(new Image("images/Screenshot 2023-02-03 153858.png"));
             try {
-                stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
+                stage.getIcons().add(new Image(String.valueOf(new URI("Invest.png"))));
             } catch (URISyntaxException ex) {
                 throw new RuntimeException(ex);
             }
@@ -1256,7 +1261,7 @@ public class Main extends Application {
         AnchorPane anchorPane = new AnchorPane(grid);
         Scene scene = new Scene(anchorPane, 1530, 780);
         stage.setScene(scene);
-        stage.getIcons().add(new Image("logo.png"));//new Image(String.valueOf(new URI("images/Screenshot 2023-02-03 153858.png"))));
+        stage.getIcons().add(new Image("Invest.png"));//new Image(String.valueOf(new URI("images/Screenshot 2023-02-03 153858.png"))));
 
         scene.getStylesheets().add("/app.css");
         stage.setIconified(true);
@@ -1266,6 +1271,8 @@ public class Main extends Application {
     }
 
     private void createMainMenu() throws Exception, OandaException {
+        Platform.setImplicitExit(false);
+        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: " + exception));
 
         GridPane grid = new GridPane();
         Spinner<Double> spinner = new Spinner<>();
@@ -1301,7 +1308,7 @@ public class Main extends Application {
         stage.setTitle("InvestPro -->Welcome  " + new Date(System.currentTimeMillis()));
         stage.setResizable(true);
         stage.setIconified(true);
-        stage.getIcons().add(new Image(String.valueOf(new URI("logo.png"))));
+        stage.getIcons().add(new Image(String.valueOf(new URI("Invest.png"))));
 
         stage.show();
 

@@ -21,24 +21,24 @@ public class Currency {
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
 
     static {
-        // FIXME: Replace with ServiceLoaders
+        //  FIXME: Replace with ServiceLoaders
         CryptoCurrencyDataProvider cryptoCurrencyDataProvider = new CryptoCurrencyDataProvider();
         cryptoCurrencyDataProvider.registerCurrencies();
         FiatCurrencyDataProvider fiatCurrencyDataProvider = new FiatCurrencyDataProvider();
         fiatCurrencyDataProvider.registerCurrencies();
 
-        /*
-        ServiceLoader<CurrencyDataProvider> serviceLoader = ServiceLoader.load(CurrencyDataProvider.class);
-        logger.info("service loader: " + serviceLoader);
-        for (CurrencyDataProvider provider : serviceLoader) {
-            logger.info("calling provider.registerCurrencies()");
-            try {
-                provider.registerCurrencies();
-            } catch (Exception e) {
-                logger.error("could not register currencies: ", e);
-            }
-        }
-         */
+//
+//        ServiceLoader<CurrencyDataProvider> serviceLoader = ServiceLoader.load(CurrencyDataProvider.class);
+//        Log.info("service loader: " + serviceLoader);
+//        for (CurrencyDataProvider provider : serviceLoader) {
+//            Log.info("calling provider.registerCurrencies()");
+//            try {
+//                provider.registerCurrencies();
+//            } catch (Exception e) {
+//                Log.error(TAG,"could not register currencies: "+ e);
+//            }
+//        }
+
     }
 
     /**

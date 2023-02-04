@@ -65,7 +65,7 @@ public class CandleStickChartContainer extends Region {
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
-       // containerRoot.setPrefSize(getLayoutBounds().getWidth(), getLayoutBounds().getHeight());
+        containerRoot.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
         getChildren().setAll(containerRoot);
         // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -121,7 +121,7 @@ public class CandleStickChartContainer extends Region {
         } else {
             candleStickChart = newChart;
             candleChartContainer.getChildren().setAll(newChart);
-            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(300), candleStickChart);
+            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(400), candleStickChart);
             fadeTransitionIn.setFromValue(0.0);
             fadeTransitionIn.setToValue(1.0);
             fadeTransitionIn.play();

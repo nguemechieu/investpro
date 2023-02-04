@@ -1,13 +1,13 @@
 package org.investpro.investpro;
 
+import javafx.util.StringConverter;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-
-import javafx.util.StringConverter;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 
 
 public class InstantAxisFormatter extends StringConverter<Number> {

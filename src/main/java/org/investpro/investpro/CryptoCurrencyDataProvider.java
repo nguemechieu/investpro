@@ -57,6 +57,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
                     "21000000"
             ));
 
+
         Currency.registerCurrencies(coinsToRegister);
     }
 }

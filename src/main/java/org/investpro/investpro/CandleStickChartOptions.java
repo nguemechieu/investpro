@@ -18,7 +18,6 @@ import java.util.Objects;
  */
 public class CandleStickChartOptions {
     private final VBox optionsPane;
-
     public CandleStickChartOptions() {
         optionsPane = new VBox();
         GridPane optionsGrid = new GridPane();

@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import org.investpro.investpro.BinanceUs.BinanceUs;
@@ -38,8 +37,6 @@ public class BinanceUS {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public CandleStickChartContainer start() throws URISyntaxException, IOException {
-        Platform.setImplicitExit(false);
-        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: " + exception));
 
         CandleStickChartContainer candleStickChartContainer = new CandleStickChartContainer(new BinanceU(), BTC_USD, true);
         candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);

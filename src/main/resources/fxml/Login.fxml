@@ -5,7 +5,6 @@
 <?import com.jfoenix.controls.JFXTextField?>
 <?import javafx.scene.effect.DropShadow?>
 <?import javafx.scene.layout.Pane?>
-
 <Pane fx:id="loginPane" prefHeight="400.0" prefWidth="400.0" style="-fx-background-color: #ffffff;" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controllers.LoginController">
    <children>
       <JFXTextField fx:id="user" focusColor="#3c7cea" labelFloat="true" layoutX="69.0" layoutY="87.0" minHeight="50.0" minWidth="250.0" opacity="0.7" promptText="User name" style="-fx-background-radius: 10;" />

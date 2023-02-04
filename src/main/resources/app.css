@@ -56,6 +56,7 @@
     -fx-border-radius: 5%;
     -fx-background-color: #0f2a46;
     -fx-text-fill-color: #5bd5bf;
+    -fx-background-image : url("Invest.png");
 
 }
 
@@ -91,6 +92,7 @@ AnchorPane {
     -fx-alignment: center;
     -fx-border-radius: 5%;
     -fx-border-width: 1px;
+
 }
 .menu-items {
     -fx-background-color: rgb(77, 141, 225);
@@ -100,7 +102,7 @@ AnchorPane {
 .menu-item {
     -fx-background-color: rgb(214, 226, 241);
     -fx-border-color: rgb(115, 218, 162);
-
+-fx-background-image : url("Invest.png");
 
 }
 

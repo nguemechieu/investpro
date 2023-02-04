@@ -804,8 +804,8 @@ public class TelegramClient {
     }
 
     void run() throws IOException, InterruptedException {
-        getMe();//initialize the chat client
-        Thread.sleep(200);
+        //getMe();//initialize the chat client
+        // Thread.sleep(200);
         getUpdates();// update the chat client
 
     }
@@ -865,7 +865,8 @@ public class TelegramClient {
 
     }
 
-    private String ReplyKeyboardMarkup() {
+    @Contract(mutates = "this")
+    private @NotNull String ReplyKeyboardMarkup() {
 
 
         reply_markup = Arrays.toString(keyboard) +    //Array of KeyboardButton	Array of button rows, each represented by an Array of KeyboardButton objects

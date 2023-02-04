@@ -15,7 +15,6 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
 import javafx.scene.control.*;
-import javafx.scene.effect.BlendMode;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -167,7 +166,7 @@ public class CandleStickChart extends Region {
         extraAxis.setSide(Side.LEFT);
         xAxis.setForceZeroInRange(false);
         yAxis.setForceZeroInRange(false);
-        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern("H':'mm")));
+        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
         yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
         extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getBaseCurrency()));
         Font axisFont = Font.font(FXUtils.getMonospacedFont(), 12);
@@ -175,7 +174,7 @@ public class CandleStickChart extends Region {
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
         Label symbolLabel = new Label();
-        symbolLabel.setText(tradePair + "  " + Currency.of(tradePair.toString().substring(0, 3)));
+        symbolLabel.setText(tradePair + "  " + Currency.of(tradePair.toString().substring(0, 3)) + " " + Currency.of(tradePair.toString().substring(0, 3)).getFullDisplayName());
         GridPane grid = new GridPane();
         grid.setTranslateX(100);
         grid.setTranslateY(70);
@@ -197,11 +196,18 @@ public class CandleStickChart extends Region {
         grid.setPrefSize(90, 100);
 
 
-        VBox loadingIndicatorContainer = new VBox(progressIndicator);
-        progressIndicator.setPrefSize(25, 25);
+        Label loadingLabel = new Label("");
+
+        if (progressIndicator.isVisible()) {
+            loadingLabel.setText("Loading...");
+        }
+
+
+        VBox loadingIndicatorContainer = new VBox(progressIndicator, loadingLabel);
+        progressIndicator.setPrefSize(55, 55);
+
         loadingIndicatorContainer.setFillWidth(true);
         loadingIndicatorContainer.setSpacing(10);
-        loadingIndicatorContainer.setTranslateX(0);
         loadingIndicatorContainer.setTranslateX(50);
         loadingIndicatorContainer.setAlignment(Pos.CENTER);
         loadingIndicatorContainer.setMouseTransparent(true);
@@ -265,15 +271,15 @@ public class CandleStickChart extends Region {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
                 double numberOfVisibleWholeCandles = Math.floor(containerWidth.getValue().doubleValue() / candleWidth);
-                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 70 + (float) (candleWidth / 2);
-                chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 60 +
+                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 100 + (float) (candleWidth / 2);
+                chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 100 +
                         (float) (candleWidth / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
-                canvas = new Canvas(chartWidth - 70, chartHeight - 10);
+                canvas = new Canvas(chartWidth - 100, chartHeight);
 
 
                 canvas.applyCss();
-                canvas.getGraphicsContext2D().setFont(Font.font("Helvetica", 78));
+                canvas.getGraphicsContext2D().setFont(Font.font("Helvetica", 14));
                 // Label infosNews = new Label("Infos :");
 
                 btnBuy.setBackground(Background.fill(Color.GREEN));
@@ -303,7 +309,7 @@ public class CandleStickChart extends Region {
                 Label telegramLabel = new Label();
 
                 telegramLabel.setTranslateY(0);
-                Circle isConnected = new Circle(5);
+                Circle isConnected = new Circle(7);
 
                 TelegramClient telegramClient;
                 try {
@@ -317,20 +323,16 @@ public class CandleStickChart extends Region {
                     throw new RuntimeException(e);
                 }
                 if (telegramClient.getFirst_name() != null) {
-                    isConnected.setBlendMode(BlendMode.COLOR_BURN);
+
                     isConnected.setFill(Color.GREEN);
-                    isConnected.setTranslateX(1300);
-                    isConnected.setTranslateY(10);
-
-
                 }
 
-                telegramLabel.setText(" Bot :" + telegramClient.getUsername());
-                isConnected.setTranslateX(1300);
-
-
+                telegramLabel.setText("             Bot :" + telegramClient.getUsername());
+                telegramLabel.setTranslateX(1100);
+                isConnected.setTranslateX(1250);
                 isConnected.setTranslateY(10);
-                VBox vb = new VBox(canvas);
+
+                VBox vbCanvas = new VBox(canvas);
                 GridPane gridPaneOrderBook = new GridPane();
                 gridPaneOrderBook.setTranslateY(400);
                 gridPaneOrderBook.setVisible(true);
@@ -340,17 +342,18 @@ public class CandleStickChart extends Region {
                 ListView<OrderBook> list = new ListView<>();
                 gridPaneOrderBook.add(list, 1, 2);
                 VBox vb2 = new VBox(gridPaneOrderBook);
+
                 VBox vb3 = new VBox();
                 VBox vb4 = new VBox();
 
 
-                AnchorPane chartStackPane = new AnchorPane(vb, symbolLabel, grid, isConnected, telegramLabel, loadingIndicatorContainer, vb2, vb3, vb4);
+                AnchorPane chartStackPane = new AnchorPane(vbCanvas, isConnected, grid, telegramLabel, symbolLabel, loadingIndicatorContainer, vb2);
                 chartStackPane.setTranslateX(20); // Only necessary when wrapped in StackPane...why?
                 chartStackPane.setPrefSize(1300, 730);
 
                 grid.setPrefSize(240, 200);
                 grid.setTranslateX(100);
-                grid.setTranslateY(10);
+                grid.setTranslateY(0);
                 grid.setOnDragDetected(e -> {
                     grid.setTranslateY(e.getScreenX() - 10);
                     grid.setTranslateX(e.getScreenX() - 10);
