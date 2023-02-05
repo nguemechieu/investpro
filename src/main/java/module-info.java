@@ -23,6 +23,7 @@ module org.investpro.investpro {
     requires org.controlsfx.controls;
     requires mysql.connector.j;
     requires jdk.hotspot.agent;
+    requires testcontainers;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
 }
