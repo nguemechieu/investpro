@@ -122,7 +122,6 @@ public class TelegramClient {
     private boolean NewsFilter;
     private boolean trade;
     private String from_first_name;
-    private String infoberita;
     private String judulnews;
     private boolean DrawLines;
 
@@ -130,7 +129,7 @@ public class TelegramClient {
 
         if (token == null) throw new TelegramApiException("Telegram token can't be  null ");
         this.token = token;
-        run();
+
 
 
     }
@@ -804,8 +803,8 @@ public class TelegramClient {
     }
 
     void run() throws IOException, InterruptedException {
-        //getMe();//initialize the chat client
-        // Thread.sleep(200);
+        getMe();//initialize the chat client
+        Thread.sleep(200);
         getUpdates();// update the chat client
 
     }
@@ -1181,9 +1180,8 @@ public class TelegramClient {
         }
 
 
-
-        void sendDocument(File document) throws IOException {
-            sendChatAction(ENUM_CHAT_ACTION.upload_document);
+    void sendDocument(@NotNull File document) throws IOException {
+        sendChatAction(ENUM_CHAT_ACTION.upload_document);
 //       chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
 //       message_thread_id	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
 //       document	InputFile or String	Yes	File to send. Pass a file_id as String to send a file that exists on the Telegram servers (recommended), pass an HTTP URL as a String for Telegram to get a file from the Internet, or upload a new one using multipart/form-data. More information on Sending Files »
@@ -1212,24 +1210,22 @@ public class TelegramClient {
                             "&disable_notification=" + disable_notification +
                             "&protect_content=" + protect_content +
                             "&reply_to_message_id=" + reply_to_message_id +
-                            "&allow_sending_without_reply=" + allow_sending_without_reply+
+                            "&allow_sending_without_reply=" + allow_sending_without_reply +
                             "&reply_markup=" + reply_markup
                     , "POST"
             );
-        }
+    }
 
 
+    @Contract(pure = true)
+    private @NotNull String StringConcatenate(String msg1, String s1, String nl1) {
+        return
+                msg1 + s1 + nl1;
+    }
 
 
-
-        private String StringConcatenate(String msg1, String s1, String nl1) {
-            return
-                    msg1 + s1 + nl1;
-        }
-
-
-        void sendVideo(File file, String reply_markup) throws IOException {
-            sendChatAction(ENUM_CHAT_ACTION.record_video);
+    void sendVideo(@NotNull File file, String reply_markup) throws IOException {
+        sendChatAction(ENUM_CHAT_ACTION.record_video);
 //
 //              Parameter	Type	Required	Description
 //              chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
@@ -2372,7 +2368,7 @@ public class TelegramClient {
                 for (int i = NomNews - 1; i > 0; i--) {
 
                     String Name = (mynews[i].getMinutes() + "_" + mynews[i].getImpact() + "_" + mynews[i].getTitle());
-
+                    sendAlert(Name);
                     if (TimeNewsFunck(i) < new Date().getTime() && Next)
                         continue;
 
@@ -2400,7 +2396,6 @@ public class TelegramClient {
             }
             //---------------event Processing------------------------------------
             int i;
-            CheckNews = 0;
             int power = 0;
 
             for (i = 0; i < NomNews; i++) {
@@ -2443,6 +2438,7 @@ public class TelegramClient {
                 }
                 if (CheckNews > 0 && NewsFilter)
                     trade = false;
+                String infoberita;
                 if (CheckNews > 0) {
 
                     if (!StopTarget() && NewsFilter) {
@@ -2451,11 +2447,8 @@ public class TelegramClient {
 
                         /////  We are doing here if we are in the framework of the news
 
-                        boolean b = mynews[i].getMinutes() == AfterNewsStop - 1 && FirstAlert && i == Now && sendnews;
-                        if (b) ;
-                        {
-
-
+                        sendAlert(infoberita);
+                        if (mynews[i].getMinutes() == AfterNewsStop - 1 && FirstAlert && i == Now && sendnews) {
                             sendMessage("-->>First Alert\n " + message);
 
 
@@ -2474,7 +2467,7 @@ public class TelegramClient {
                     if (NewsFilter)
                         trade = true;
                     // We are out of scope of the news release (No News)
-                    if (!StopTarget() && mynews[i].getMinutes() == BeforeNewsStop && SecondAlert && (CheckNews == 1 && i == Now && sendnews)) {
+                    if ((CheckNews == 1 && i == Now && sendnews)) {
                         jamberita = " We are out of scope of the news release\n (No News)\n";
 
                         infoberita = "Waiting......";
@@ -2506,17 +2499,19 @@ public class TelegramClient {
     }
 
     @Contract(pure = true)
-    private boolean StringFind(@NotNull String title, String judulnews) {
+    boolean StringFind(@NotNull String title, String judulnews) {
         return title.contains(judulnews);
     }
 
-    private boolean StopTarget() {
-        return false;
+    boolean StopTarget() {
+        return true;
     }
 
-    public void getTradeNews() {
+    public void getTradeNews() throws IOException, ParseException {
 
-
+        if (newsTrade()) {
+            sendAlert("Trade is allowed No news ");
+        }
     }
 
     public void sendAlert(String alert) throws IOException {
@@ -2767,6 +2762,7 @@ public class TelegramClient {
 
         public final ArrayList<SymbolData> arrayListSymbolsData = new ArrayList<>();
         public JsonNode arrayListSymbolsData2;
+        private int period;
 
         KeyboardButtonType(int i) {
         }
@@ -2775,6 +2771,7 @@ public class TelegramClient {
         }
 
         public void setInterval(int period) {
+            this.period = period;
         }
 
         public void setPeriod(int period) {
@@ -2793,6 +2790,10 @@ public class TelegramClient {
         }
 
         public void CloseAll() {
+        }
+
+        public int getPeriod() {
+            return period;
         }
     }
 

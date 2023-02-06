@@ -4,9 +4,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
-    public CryptoCurrencyDataProvider() {}
+
+
+    public CryptoCurrencyDataProvider() {
+    }
+
     @Override
     protected void registerCurrencies() {
+        List<Currency> coinsToRegister = new ArrayList<>();
+        coinsToRegister.add(new CryptoCurrency(
+                "Bitcoin",
+                "Bitcoin",
+                "BTC",
+                8,
+                "Ƀ",
+                CryptoCurrencyAlgorithms.getAlgorithm("SHA256"),
+                "https://bitcoin.org",
+                "https://bitcoin.org/en/download",
+                1231006505,
+                2010,
+                "21000000"
+        ));
+
+
+        Currency.registerCurrencies(coinsToRegister);
         // crypto_coins.json is encoded in UTF-8 (for symbols)
         /**    Json cryptoCoinsJson = Json.read(Files.readString(Paths.get(
          CryptoCurrencyDataProvider.class.getResource("/crypto_coins.json").toURI())));
@@ -42,23 +63,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
          coinInfo.get("maxCoinsIssued").asString()
          ));
          **/
-        List<Currency> coinsToRegister = new ArrayList<>();
-            coinsToRegister.add(new CryptoCurrency(
-                    "Bitcoin",
-                    "Bitcoin",
-                    "BTC",
-                    8,
-                    "Ƀ",
-                    CryptoCurrencyAlgorithms.getAlgorithm("SHA256"),
-                    "https://bitcoin.org",
-                    "https://bitcoin.org/en/download",
-                    1231006505,
-                    2010,
-                    "21000000"
-            ));
 
-
-        Currency.registerCurrencies(coinsToRegister);
     }
 }
 

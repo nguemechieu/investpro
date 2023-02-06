@@ -30,6 +30,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -174,10 +175,12 @@ public class CandleStickChart extends Region {
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
         Label symbolLabel = new Label();
-        symbolLabel.setText(tradePair + "  " + Currency.of(tradePair.toString().substring(0, 3)) + " " + Currency.of(tradePair.toString().substring(0, 3)).getFullDisplayName());
+        symbolLabel.setText(tradePair + "  " + Currency.of(tradePair.toString().substring(0, 3)) + " " + Currency.of(tradePair.toString().substring(0, 3)).getSymbol());
         GridPane grid = new GridPane();
         grid.setTranslateX(100);
         grid.setTranslateY(70);
+
+        grid.setVgap(10);
 
         Spinner<Double> spinner = new Spinner<>(0.01, 1000000.9, 0, 0.01);
         spinner.decrement(1);
@@ -314,20 +317,29 @@ public class CandleStickChart extends Region {
                 TelegramClient telegramClient;
                 try {
                     telegramClient = new TelegramClient("2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
-                    telegramClient.sendAlert("SmartBot Connected..");
+                    telegramClient.run();
+                    // telegramClient.sendAlert("Connected...");
+                    //   telegramClient.pinChatMessage();
                     //telegramClient.getTradeNews();
                     telegramClient.getTradeNews();
 
 
-                } catch (IOException | TelegramApiException | InterruptedException e) {
+                } catch (IOException | TelegramApiException | InterruptedException | ParseException e) {
                     throw new RuntimeException(e);
                 }
-                if (telegramClient.getFirst_name() != null) {
+                if (!telegramClient.getUsername().equals("")) {
 
                     isConnected.setFill(Color.GREEN);
                 }
 
-                telegramLabel.setText("             Bot :" + telegramClient.getUsername());
+                telegramLabel.setText("             Bot :" + telegramClient.getUsername() + " " + TelegramClient.getLast_name());
+
+
+                try {
+                    telegramClient.getTradeNews();
+                } catch (IOException | ParseException e) {
+                    throw new RuntimeException(e);
+                }
                 telegramLabel.setTranslateX(1100);
                 isConnected.setTranslateX(1250);
                 isConnected.setTranslateY(10);
@@ -340,14 +352,14 @@ public class CandleStickChart extends Region {
                 gridPaneOrderBook.add(new Label("BID"), 1, 1);
                 gridPaneOrderBook.add(new Label("ASK"), 2, 1);
                 ListView<OrderBook> list = new ListView<>();
-                gridPaneOrderBook.add(list, 1, 2);
-                VBox vb2 = new VBox(gridPaneOrderBook);
+                // gridPaneOrderBook.add(list, 1, 2);
+                // VBox vb2 = new VBox(gridPaneOrderBook);
 
                 VBox vb3 = new VBox();
                 VBox vb4 = new VBox();
 
 
-                AnchorPane chartStackPane = new AnchorPane(vbCanvas, isConnected, grid, telegramLabel, symbolLabel, loadingIndicatorContainer, vb2);
+                AnchorPane chartStackPane = new AnchorPane(vbCanvas, isConnected, grid, telegramLabel, symbolLabel, loadingIndicatorContainer);
                 chartStackPane.setTranslateX(20); // Only necessary when wrapped in StackPane...why?
                 chartStackPane.setPrefSize(1300, 730);
 
@@ -726,7 +738,7 @@ public class CandleStickChart extends Region {
                 graphicsContext.setStroke(candleBorderColor);
                 graphicsContext.setLineWidth(3);
                 graphicsContext.stroke();
-                // graphicsContext.beginPath(); // TODO(mike): Delete this line?
+                graphicsContext.beginPath(); // TODO(mike): Delete this line?
                 // Draw high line (skip draw if the open (or close) is the same as the high.
                 boolean drawHighLine = true;
                 if (openAboveClose) {

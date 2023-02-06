@@ -11,7 +11,7 @@ import static javafx.scene.paint.Color.rgb;
 public final class ChartColors {
 
     //CandleSticks chart colors
-    public static final Paint BEAR_CANDLE_BORDER_COLOR = rgb(25, 34, 34, 1.00);
+    public static final Paint BEAR_CANDLE_BORDER_COLOR = Color.RED;
     public static final Paint BEAR_CANDLE_FILL_COLOR = rgb(255, 28, 34, 1.00);
     public static final Paint BULL_CANDLE_BORDER_COLOR = Color.GREEN;
     public static final Paint BULL_CANDLE_FILL_COLOR = rgb(29, 255, 34, 1.00);

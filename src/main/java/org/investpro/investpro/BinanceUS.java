@@ -156,15 +156,15 @@ public class BinanceUS {
         @Override
         public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
                 TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-            //  String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-            //        currentCandleStartedAt, ZoneOffset.UTC));
-            //  long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
-            // Get the closest supported granularity to the ideal granularity.
-            //  int actualGranularity = getCandleDataSupplier(secondsPerCandle, tradePair).getSupportedGranularities().stream()
-            //     .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
-            //   .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
+            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+                    currentCandleStartedAt, ZoneOffset.UTC));
+            long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
+            //  Get the closest supported granularity to the ideal granularity.
+            int actualGranularity = getCandleDataSupplier(secondsPerCandle, tradePair).getSupportedGranularities().stream()
+                    .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
+                    .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
             // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
-            //  data for the current live syncing candle from the raw trades method.
+//            //  data for the current live syncing candle from the raw trades method.
             String timeFrame = x + str;
             return HttpClient.newHttpClient().sendAsync(
 
@@ -310,9 +310,7 @@ public class BinanceUS {
                 String timeFrame = x + str;
                 out.println("timeframe: " + timeFrame);
                 String uriStr = "https://api.binance.us/api/v3/klines?symbol=" +
-                        String.valueOf(tradePair
-                        ).replace("/", "") +
-                        "&interval=" + timeFrame;
+                        String.valueOf(tradePair).replace("/", "") + "&interval=" + timeFrame;
 
 
                 if (startTime[0] == EARLIEST_DATA) {
