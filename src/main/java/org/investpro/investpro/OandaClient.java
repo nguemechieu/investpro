@@ -1,10 +1,8 @@
 package org.investpro.investpro;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -29,6 +27,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -52,10 +51,6 @@ public class OandaClient extends Exchange {
     Alert alert = new Alert(Alert.AlertType.WARNING, "Test Alert");
     private OandaTransaction oandaTransaction;
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public OandaClient(String host, String api_key, String accountID) {
         super(null);
@@ -1432,8 +1427,6 @@ public class OandaClient extends Exchange {
                 .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
-        String actualGranularity = "D";
-
 
         public OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
             super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
@@ -1510,139 +1503,81 @@ public class OandaClient extends Exchange {
                     .thenApply(response -> {
                         Log.info("Oanda us Response: " + response);
 
-
-                        try {
-
-
-                            //              res = OBJECT_MAPPER.readTree(response);
+                        double volume, o = 0, c = 0, h = 0, l = 0;
 
 
-                            JsonNode node = OBJECT_MAPPER.readTree(response);
-                            // JsonNode nameNode = node.get("time");
-                            String name = String.valueOf(node);
-                            System.out.println("time " + name);
-                            JsonNode ageNode = node.get("volume");
+//
+                        if (!response.isEmpty()) {
+                            GregorianCalendar d;
 
-                            System.out.println("volume " + node.get("volume"));
-                            JsonNode array = node.get("candles");
+                            JSONObject cand0 = new JSONObject(response);
+                            for (int i = 0; i < cand0.length(); i++) {
+
+                                // Remove the current in-progress candl
+                                //
+                                JSONObject cand = (JSONObject) cand0.getJSONArray("candles").get(i);
+
+                                if (cand.has("candles")) {
 
 
-                            JsonNode res = array.get(1);
+                                    JSONArray candles = cand.getJSONArray("candles");
 
 
-                            if (!res.isEmpty()) {
-                                // Remove the current in-progress candle
-                                if (res.get(1).get(1).asInt() + secondsPerCandle > endTime.get()) {
-                                    ((ArrayNode) res).remove(0);
+                                    String time;
+
+                                    time = candles.getJSONObject(i).get("time").toString();
+                                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+
+                                    d = GregorianCalendar.from(ZonedDateTime.parse(time));
+
+                                    endTime.set((int) d.getTime().getTime());
+
+                                    //       JSONObject json = new JSONObject(response);
+
+
+                                    volume = Double.parseDouble(candles.getJSONObject(i).get("volume").toString());
+
+                                    if (candles.getJSONObject(i).has("bid")) {
+
+                                        JSONObject bid = candles.getJSONObject(i).getJSONObject("bid");
+
+                                        if (bid.has("o")) {
+
+                                            o = bid.getDouble("o");
+                                        }
+                                        if (bid.has("c")) {
+                                            c = bid.getDouble("c");
+                                        }
+                                        if (bid.has("h")) {
+                                            h = bid.getDouble("h");
+                                        }
+                                        if (bid.has("l")) {
+                                            l = bid.getDouble("l");
+                                        }
+//
+
+                                        List<CandleData> candleData = new ArrayList<>();
+
+                                        candleData.add(new CandleData(o, c, h, l, (int) d.getTime().getTime(), volume));
+//
+//
+                                        out.println("My candle data =>" + candleData);
+
+
+                                        return candleData;
+
+                                    }
                                 }
-                                endTime.set(startTime[0]);
-                                List<CandleData> candleData = new ArrayList<>();
-                                for (JsonNode candle : res) {
-                                    candleData.add(new CandleData(
-                                            candle.get(3).asDouble(),  // open price
-                                            candle.get(4).asDouble(),  // close price
-                                            candle.get(2).asDouble(),  // high price
-                                            candle.get(1).asDouble(),  // low price
-                                            candle.get(0).asInt(),     // open time
-                                            candle.get(5).asDouble()   // volume
-                                    ));
-                                }
-
-                                //   out.println("test  " + res.get(2).asText());
-
-
-                                double volume, o = 0, c = 0, h = 0, l = 0;
-
-//                        endTime.set(startTime[0]);
-//                        //JSONObject cand=new JSONObject(response);
-//
-//                                     if (!res.isEmpty()) {
-//                                       GregorianCalendar d = null;
-////                                         for (int i = 0; i < cand.length(); i++) {
-////
-////                                             // Remove the current in-progress candle
-////
-////                                             if (cand.has("candles")) {
-////
-////
-////                                                 JSONArray candles = cand.getJSONArray("candles");
-////
-////
-////                                                 String time;
-////
-////                                                 time = candles.getJSONObject(i).get("time").toString();
-////                                                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-////
-////
-////                                                 d = GregorianCalendar.from(ZonedDateTime.parse(time));
-//
-//
-////                                                 if (d.getTime().getTime() + secondsPerCandle > endTime.get()) {
-////                                                     ((ArrayNode) res).remove(0);
-////                                                 }
-////
-////                                                 //       JSONObject json = new JSONObject(response);
-////
-////
-////                                                 volume = Double.parseDouble(candles.getJSONObject(i).get("volume").toString());
-////
-////                                                 if (candles.getJSONObject(i).has("bid")) {
-////
-////                                                     JSONObject bid = candles.getJSONObject(i).getJSONObject("bid");
-////
-////                                                     if (bid.has("o")) {
-////
-////                                                         o = bid.getDouble("o");
-////                                                     }
-//                                                     if (bid.has("c")) {
-//                                                         c = bid.getDouble("c");
-//                                                     }
-//                                                     if (bid.has("h")) {
-//                                                         h = bid.getDouble("h");
-//                                                     }
-//                                                     if (bid.has("l")) {
-//                                                         l = bid.getDouble("l");
-//                                                     }
-//
-//                                                     candleData = new ArrayList<>();
-//
-//
-//                                                     candleData.add(new CandleData(o, c, h, l, (int) d.getTime().getTime(), volume));
-//
-//
-//                                                     out.println("My candle data =>" + candleData);
-//
-//
-//                                                 }
-//
-////                                                    new CandleData(0,)
-////
-////                                                    res.get(1).asDouble(),  // open price
-////                                                            res.get(2).asDouble(),  // close price
-////                                                            res.get(3).asDouble(),  // high price
-////                                                            res.get(4).asDouble(),  // low price
-////                                                            (int) res.get(1).asDouble(),     // open time
-////                                                            res.get(5).asDouble())   // volume
-//
-//
-//                                             }
-//                                         }
-
-                                candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
-                                return candleData;
-
                             }
-                        } catch (Exception e) {
-                            e.printStackTrace();
+                        } else {
+                            return Collections.emptyList();
                         }
-                        return Collections.emptyList();
+                        return null;
                     });
         }
-
-
     }
 }
-
 
 //
 //S5	5 second candlesticks, minute alignment
