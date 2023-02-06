@@ -1,15 +1,16 @@
 package org.investpro.investpro;
 
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 
-public class Currency {
+public class Currency implements Comparable<java.util.Currency> {
     private final CurrencyType currencyType;
     private final String fullDisplayName;
     private final String shortDisplayName;
@@ -89,11 +90,18 @@ public class Currency {
 
     public static Currency of(String code) {
         Objects.requireNonNull(code, "code must not be null");
-        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))
-                && CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
-            Log.error("ambiguous currency code: " + code);
-            throw new IllegalArgumentException("ambiguous currency code: " + code + " (code" +
-                    " is used for multiple currency types); use ofCrypto(...) or ofFiat(...) instead");
+        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))) {
+            if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
+                Log.error("ambiguous currency code: " + code);
+                throw new IllegalArgumentException("ambiguous currency code: " + code + " (code" +
+                        " is used for multiple currency types); use ofCrypto(...) or ofFiat(...) instead");
+            } else {
+                if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
+                    return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
+                } else {
+                    return CURRENCIES.getOrDefault(SymmetricPair.of(code, CurrencyType.FIAT), NULL_CRYPTO_CURRENCY);
+                }
+            }
         } else {
             if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
                 return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
@@ -107,11 +115,8 @@ public class Currency {
      * Get the fiat currency that has a currency code equal to the
      * given {@code}. Using {@literal "¤¤¤"} as the currency code
      * returns {@literal NULL_FIAT_CURRENCY}.
-     *
-     * @param code
-     * @return
      */
-    public static FiatCurrency ofFiat(String code) {
+    public static FiatCurrency ofFiat(@NotNull String code) {
         if (code.equals("¤¤¤")) {
             return NULL_FIAT_CURRENCY;
         }
@@ -125,10 +130,8 @@ public class Currency {
      * given {@code}. Using {@literal "¤¤¤"} as the currency code
      * returns {@literal NULL_CRYPTO_CURRENCY}.
      *
-     * @param code
-     * @return
      */
-    public static CryptoCurrency ofCrypto(String code) {
+    public static CryptoCurrency ofCrypto(@NotNull String code) {
         if (code.equals("¤¤¤")) {
             return NULL_CRYPTO_CURRENCY;
         }
@@ -140,7 +143,7 @@ public class Currency {
     public static List<FiatCurrency> getFiatCurrencies() {
         return CURRENCIES.values().stream()
                 .filter(currency -> currency.getCurrencyType() == CurrencyType.FIAT)
-                .map(currency -> (FiatCurrency) currency).collect(Collectors.toUnmodifiableList());
+                .map(currency -> (FiatCurrency) currency).toList();
     }
 
     public static Currency lookupBySymbol(String symbol) {
@@ -178,7 +181,9 @@ public class Currency {
     }
 
     public int getFractionalDigits() {
-        return this.fractionalDigits;
+
+
+        return fractionalDigits;
     }
 
     public String getSymbol() {
@@ -189,8 +194,6 @@ public class Currency {
      * The finality of {@code equals(...)} ensures that the equality
      * contract for subclasses must be based on currency type and code alone.
      *
-     * @param object
-     * @return
      */
     @Override
     public final boolean equals(Object object) {
@@ -231,7 +234,17 @@ public class Currency {
         return String.format("%s (%s)", fullDisplayName, code);
     }
 
-    private static class NullCryptoCurrency extends CryptoCurrency {}
 
-    private static class NullFiatCurrency extends FiatCurrency {}
+    @Override
+    public int compareTo(@NotNull java.util.Currency o) {
+
+
+        return 0;
+    }
+
+    private static class NullCryptoCurrency extends CryptoCurrency {
+    }
+
+    private static class NullFiatCurrency extends FiatCurrency {
+    }
 }

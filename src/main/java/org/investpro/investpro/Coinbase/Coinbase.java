@@ -12,6 +12,8 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import org.investpro.investpro.*;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -344,7 +346,8 @@ public class Coinbase extends Exchange {
 
 
     //makeRequest return JSONObject
-    private JSONObject makeRequest(String url, String method) throws IOException {
+    @Contract("_, _ -> new")
+    private @NotNull JSONObject makeRequest(String url, String method) throws IOException {
         HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
         conn.setRequestMethod(method);
         conn.setDoOutput(true);

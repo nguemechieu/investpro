@@ -6,16 +6,15 @@ import java.sql.*;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-public
-class DataSource implements javax.sql.DataSource {
+public class DataSource implements javax.sql.DataSource {
 
-    static String password="Bigboss307#";
-     static String root="root";
-     static String dbName="tradeexpert";
-    static String url= "jdbc:mysql://localhost:3306/"+dbName;
-   Connection conn= createConnection();
+    static String password = "Bigboss307#";
+    static String root = "root";
+    static String dbName = "tradeexpert";
+    static String url = "jdbc:mysql://localhost:3306/" + dbName;
+
     public Connection createConnection() {
-         conn = null;
+        conn = null;
         try {
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
@@ -41,7 +40,9 @@ class DataSource implements javax.sql.DataSource {
             ex.printStackTrace();
         }
         return conn;
-    }
+    }    Connection conn = createConnection();
+
+
 
     public DataSource() throws SQLException {
 

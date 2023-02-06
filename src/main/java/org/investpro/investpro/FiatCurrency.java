@@ -11,7 +11,7 @@ public class FiatCurrency extends Currency {
 
     protected FiatCurrency() {
          super(CurrencyType.FIAT, "", "", "", 0, "");
-        locale = Locale.US;
+        locale = Locale.forLanguageTag(String.valueOf(Locale.getDefault().getDisplayLanguage()));
         centralBank = "";
         numericCode = -1;
     }
@@ -33,7 +33,4 @@ public class FiatCurrency extends Currency {
         this.numericCode = numericCode;
     }
 
-    public Locale getLocale() {
-        return locale;
-    }
 }

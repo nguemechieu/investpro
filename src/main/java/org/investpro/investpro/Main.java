@@ -54,7 +54,7 @@ public class Main extends Application {
     public static final int TRADING_SCREEN_MAXIMUM_HEIGHT = (int) Screen.getPrimary().getBounds().getHeight();
     static Alert alert;
 
-    private static @NotNull Pane panel() throws URISyntaxException {
+    private static @NotNull Pane panel() {
         Pane pane = new Pane();
 
 //Create menu
@@ -1472,14 +1472,14 @@ public class Main extends Application {
             candleStickChartTabs[i].setContent(vbox[i]);
         }
 
-        OandaCandleStick oandaCanleStickChart = new OandaCandleStick();
+        Oanda oandaCanleStickChart = new Oanda();
 
         vbox[0].getChildren().add(oandaCanleStickChart.start());
         BinanceUS binanceUsCandleChart = new BinanceUS();
         vbox[1].getChildren().add(binanceUsCandleChart.start());
         CoinbasePro coinbaseCandleChart = new CoinbasePro();
         vbox[2].getChildren().add(coinbaseCandleChart.start());
-        OandaCandleStick stockCandleChart = new OandaCandleStick();
+        Oanda stockCandleChart = new Oanda();
         vbox[3].getChildren().add(stockCandleChart.start());
 
 

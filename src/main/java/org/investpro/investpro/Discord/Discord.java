@@ -4,7 +4,7 @@ package org.investpro.investpro.Discord;
 import org.investpro.investpro.Chat;
 import org.investpro.investpro.Coinbase.Coinbase;
 
-class Discord {
+public class Discord {
     private String apiUrl;
     private String apiVersion;
     private String clientSecret;

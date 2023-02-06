@@ -44,4 +44,8 @@ public class Log {
     public static void error(int tag, String s) {
         Logger.getLogger(s, String.valueOf(tag));
     }
+
+    public static void e(int tag, String noCoinInfoAvailable) {
+        Logger.getLogger(noCoinInfoAvailable, String.valueOf(tag));
+    }
 }

@@ -1,6 +1,8 @@
 package org.investpro.investpro;
 
 import javafx.util.Pair;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
@@ -22,7 +24,8 @@ public class TradePair extends Pair<Currency, Currency> {
         this.counterCurrency = Currency.of(counterCurrency);
     }
 
-    public static TradePair of(String baseCurrencyCode, String counterCurrencyCode) {
+    @Contract("_, _ -> new")
+    public static @NotNull TradePair of(String baseCurrencyCode, String counterCurrencyCode) {
         return new TradePair(baseCurrencyCode, counterCurrencyCode);
     }
 

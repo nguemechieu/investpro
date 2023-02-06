@@ -4,7 +4,7 @@ import javafx.application.Platform;
 import org.investpro.investpro.Coinbase.Coinbase;
 
 public class CoinbasePro {
-    private static final TradePair BTC_USD = TradePair.of(Currency.ofCrypto("LTC"), Currency.ofFiat("USD"));
+    TradePair BTC_USD = TradePair.of(Currency.of("BTC"), Currency.of("USD"));
 
     public static void createMarketOrder(String toString, String type0, String side, double size) {
 

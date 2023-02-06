@@ -55,8 +55,11 @@ import static javafx.scene.paint.Color.YELLOW;
 import static org.investpro.investpro.PopOver.ArrowLocation.*;
 
 public class PopOverSkin implements Skin<PopOver> {
-    private final Label title;
-    private final Label closeIcon;
+    Label title;
+    /**
+     *
+     */
+    Label closeIcon;
     private final Path path;
     private final Path clip;
     private final BorderPane content;

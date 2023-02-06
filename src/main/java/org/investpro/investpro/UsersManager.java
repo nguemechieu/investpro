@@ -19,7 +19,7 @@ import java.util.Objects;
         try {
 
             db = new DataSource();
-            db.setUrl("jdbc:mysql://localhost:3306/tradeexpert");
+            db.setUrl("jdbc:mysql://localhost:3306/db");
             db.setUser("root");
             db.setPassword("Bigboss307#");
 
