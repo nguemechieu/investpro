@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.Date;
 
 public class Oanda {
-    private static final TradePair BTC_USD = TradePair.of(Currency.of("EUR"), Currency.of("USD"));
+    private static final TradePair BTC_USD = TradePair.of(Currency.of("EUR"), Currency.of("JPY"));
     String name;
 
     public CandleStickChartContainer start() throws URISyntaxException, IOException {
