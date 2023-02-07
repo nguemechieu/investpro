@@ -344,8 +344,6 @@ public class CandleStickChart extends Region {
                 gridPaneOrderBook.add(new Label("BID"), 1, 1);
                 gridPaneOrderBook.add(new Label("ASK"), 2, 1);
                 ListView<OrderBook> list = new ListView<>();
-                // gridPaneOrderBook.add(list, 1, 2);
-                // VBox vb2 = new VBox(gridPaneOrderBook);
 
                 VBox vb3 = new VBox();
                 VBox vb4 = new VBox();
@@ -983,7 +981,7 @@ public class CandleStickChart extends Region {
         Line line = new Line();
         line.setStartY(chartHeight);
         line.setStartX(chartWidth);
-        if (news.getImpact() == "high") {
+        if (Objects.equals(news.getImpact(), "high")) {
 
         }
         if (Objects.equals(news.getImpact(), "low")) {

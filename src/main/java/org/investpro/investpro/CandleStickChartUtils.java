@@ -55,10 +55,10 @@ public final class CandleStickChartUtils {
                     "candleData (" + candleData.size() + ")");
         }
 
-        final Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
 
         for (int i = 0; i < windowSize; i++) {
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=

@@ -26,6 +26,7 @@ module org.investpro.investpro {
     requires mysql.connector.j;
     requires jdk.hotspot.agent;
     requires testcontainers;
+    requires java.rmi;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
 }

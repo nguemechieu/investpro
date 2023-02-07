@@ -540,7 +540,7 @@ public class Binance {
                                             candle.get(5).asDouble())   // volume
                                     );
                                     endTime.set(candle.get(0).asInt());
-                                    Log.info("Candle D" + candleData);
+                                    Log.info("Candle D binance " + candleData);
                                 }
                                 candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                                 return candleData;

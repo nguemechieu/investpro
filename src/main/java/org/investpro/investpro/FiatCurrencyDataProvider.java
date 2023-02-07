@@ -2,6 +2,7 @@ package org.investpro.investpro;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 
 
 public class FiatCurrencyDataProvider extends CurrencyDataProvider {
@@ -10,7 +11,7 @@ public class FiatCurrencyDataProvider extends CurrencyDataProvider {
     }
 
     @Override
-    protected void registerCurrencies() {
+    protected CompletableFuture<List<Currency>> registerCurrencies() {
 
 
 //
@@ -296,5 +297,6 @@ public class FiatCurrencyDataProvider extends CurrencyDataProvider {
                 new FiatCurrency("South African rand", "Rand", "ZAR", 2, "R", Locale.of("en", "ZA"),
                         "South African Reserve Bank", 710)
         ));
+        return null;
     }
 }
