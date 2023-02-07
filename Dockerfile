@@ -6,7 +6,7 @@ WORKDIR /investpro
 
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
-RUN chmod a+x /usr/local/apache-maven/apache-maven-3.1.1/bin/mvn
+RUN chmod a+x /bin/mvn
 RUN ./mvnw dependency:resolve
 
 COPY src ./src
