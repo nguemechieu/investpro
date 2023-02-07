@@ -107,7 +107,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
                         List<Currency> coinsToRegister = new ArrayList<>();
 
 
-                        coinsToRegister.add(new CryptoCurrency(
+                        coinsToRegister.add(i, new CryptoCurrency(
                                 name, symbol,
                                 id,
                                 Integer.parseInt(maxPrecision), id
