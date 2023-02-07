@@ -17,28 +17,30 @@ public class TradePair extends Pair<Currency, Currency> {
         this.counterCurrency = counterCurrency;
     }
 
-    public TradePair(String baseCurrency, String counterCurrency) {
-        super(Currency.of(baseCurrency), Currency.of(counterCurrency));
+//    public TradePair(String baseCurrency, String counterCurrency) {
+//        super(Currency.of(baseCurrency), Currency.of(counterCurrency));
+//
+//        this.baseCurrency = Currency.of(baseCurrency);
+//        this.counterCurrency = Currency.of(counterCurrency);
+//    }
 
-        this.baseCurrency = Currency.of(baseCurrency);
-        this.counterCurrency = Currency.of(counterCurrency);
-    }
+//    @Contract("_, _ -> new")
+//    public static @NotNull TradePair of(String baseCurrencyCode, String counterCurrencyCode) {
+//        return new TradePair(baseCurrencyCode, counterCurrencyCode);
+//    }
 
     @Contract("_, _ -> new")
-    public static @NotNull TradePair of(String baseCurrencyCode, String counterCurrencyCode) {
-        return new TradePair(baseCurrencyCode, counterCurrencyCode);
-    }
-
-    public static TradePair of(Currency baseCurrency, Currency counterCurrency) {
+    public static @NotNull TradePair of(Currency baseCurrency, Currency counterCurrency) {
         return new TradePair(baseCurrency, counterCurrency);
     }
 
-    public static TradePair of(Pair<Currency, Currency> currencyPair) {
-        return new TradePair(currencyPair.getKey(), currencyPair.getValue());
-    }
+//    @Contract("_ -> new")
+//    public static @NotNull TradePair of(@NotNull Pair<Currency, Currency> currencyPair) {
+//        return new TradePair(currencyPair.getKey(), currencyPair.getValue());
+//    }
 
-    public static <T extends Currency, V extends Currency> TradePair parse(
-            String tradePair, String separator, Pair<Class<T>, Class<V>> pairType)
+    public static <T extends Currency, V extends Currency> @NotNull TradePair parse(
+            TradePair tradePair, @NotNull String separator, Pair<Class<T>, Class<V>> pairType)
             throws CurrencyNotFoundException {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(pairType, "pairType must not be null");
@@ -46,15 +48,15 @@ public class TradePair extends Pair<Currency, Currency> {
 
         String[] split;
 
-        if (separator.equals("")) {
-            // We don't know where to split so try the most logical thing (after 3 characters). We could
-            // extend this by checking that the substring is indeed a real currency and if not try 4
-            // characters.
-            split = new String[]{tradePair.substring(0, 3), tradePair.substring(3)};
 
-        } else {
-            split = tradePair.split(separator);
-        }
+        // We don't know where to split so try the most logical thing (after 3 characters). We could
+        // extend this by checking that the substring is indeed a real currency and if not try 4
+        // characters.
+        split = new String[]{tradePair.baseCurrency.code, tradePair.counterCurrency.code};
+
+
+        //split = tradePair.baseCurrency+separator+tradePair.counterCurrency;
+
 
         if (pairType.getKey().equals(FiatCurrency.class)) {
             // tradePair must be (fiat, something)
@@ -156,5 +158,10 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public String getFullDisplayString() {
         return baseCurrency.getFullDisplayName() + " - " + counterCurrency.getFullDisplayName();
+    }
+
+    public String[] split(String s) {
+
+        return new String[]{s};
     }
 }

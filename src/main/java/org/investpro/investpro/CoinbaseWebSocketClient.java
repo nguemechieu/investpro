@@ -85,7 +85,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException {
-        final String productId = messageJson.get("product_id").asText();
+        final TradePair productId = TradePair.of(Currency.of(messageJson.get("product_id").asText()), Currency.of("USD"));
         final String[] products = productId.split("-");
         TradePair tradePair;
         if (products[0].equalsIgnoreCase("BTC")) {

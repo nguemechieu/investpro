@@ -1,14 +1,21 @@
-# Investpro
+# InvestPro ![InvestPro, Inc](src/main/resources/logo.png)
 
-Professional Investment
-and utilities software
+![Latest release](https://img.shields.io/badge/release-1.0.1-blu)
+![Build Status](https://github.com/nguemechieu/investpro/blob/master/wiki/images/gitter.svg)
+[![GitHub license](https://github.com/nguemechieu/investpro/blob/master/wiki/license_apache.svg)](https://github.com/PaladinCloud/CE/blob/master/LICENSE)
+![Coverages](https://github.com/nguemechieu/investpro/coverages.png)
 
-Website: https://www.investpro.io
-License: MIT License
+Description
 
-Author: Nguemechieu Noel Martial
+        Invespro is a  professional investment and utility software
 
-Date created : 2022-12-23 at 10: 34 pm
+Website: https://www.investpro.io)
+
+      License: Apache License
+
+      Author: Nguemechieu Noel Martial
+
+      Date created : 2022-12-23
 
 Supported Features :
 
@@ -18,24 +25,44 @@ Supported Features :
 - TELEGRAM BOT
 - FOREX NEWS FACTORY
 - MINI WEB BROWSER
-- SCREEN SHOTS
+- SCREENSHOT
 - PORTFOLIO MANAGEMENT
-- ALERTS ...............................
+- Trade Alert
+- Trade Signal
 
-OPERATING Systems:
+################################    
+OPERATING SYSTEMS
+################################
 
 - WINDOWS
 - LINUX
 
-Virtual environment :
+################################
+Virtual environment
+################################
 
-- Docker
+# Docker
 
-Setup with the following command:
+Configuration
 
-- For docker: { "docker pull" : "investpro " && docker exec investpro " }
+Docker configuration file for the project
 
-At this point you have successfully installed
+# Commands :
+
+To pull the docker image from the repository
+
+      docker pull investpro
+
+To run the project with docker
+
+      docker run  investpro
+
+At this point you have successfully installed the Docker image and now
+you can use the application
 
 We will keep updating the environment and provisioning the provision
-with new updates 
+with new updates and improvements
+
+################################################################
+Copyright InvestPro 2023
+################################################################

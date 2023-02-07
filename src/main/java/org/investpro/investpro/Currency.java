@@ -50,7 +50,7 @@ public class Currency implements Comparable<java.util.Currency> {
         this.currencyType = CurrencyType.NULL;
         this.fullDisplayName = "";
         this.shortDisplayName = "";
-        this.code = "XXX";
+        this.code = "";
         this.fractionalDigits = 0;
         this.symbol = "";
     }

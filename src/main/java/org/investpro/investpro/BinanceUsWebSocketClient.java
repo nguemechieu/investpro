@@ -88,7 +88,8 @@ public class BinanceUsWebSocketClient extends ExchangeWebSocketClient {
     }
 
     private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException {
-        final String productId = messageJson.get("s").asText();
+        final TradePair productId = TradePair.of(Currency.of(messageJson.get("s").asText()), Currency.of("USD"));
+
         final String[] products = productId.split("-");
         TradePair tradePair;
         if (products[0].equalsIgnoreCase("BTC")) {
