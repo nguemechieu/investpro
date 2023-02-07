@@ -6,7 +6,8 @@ import java.util.Locale;
 
 public class FiatCurrencyDataProvider extends CurrencyDataProvider {
 
-    public FiatCurrencyDataProvider() {}
+    public FiatCurrencyDataProvider() {
+    }
 
     @Override
     protected void registerCurrencies() {

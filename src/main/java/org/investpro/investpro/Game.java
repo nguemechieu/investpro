@@ -3,7 +3,21 @@ package org.investpro.investpro;
 public class Game {
     private String type;
     private String title;
-    private  String description;
+    private String description;
+    private String text;
+    private String text_entities;
+    private String animation;
+
+    public Game(String type, String title, String description, String text, String text_entities, String animation) {
+        this.type = type;
+        this.title = title;
+        this.description = description;
+        this.text = text;
+        this.text_entities = text_entities;
+        this.animation = animation;
+
+
+    }
 
     public String getType() {
         return type;
@@ -49,14 +63,6 @@ public class Game {
         return animation;
     }
 
-    public void setAnimation(String animation) {
-        this.animation = animation;
-    }
-
-    private  String text;
-    private  String text_entities;
-    private  String animation;
-
 //    This object represents a game. Use BotFather to create and edit games, their short names will act as unique identifiers.
 //
 //    Field	Type	Description
@@ -67,16 +73,8 @@ public class Game {
 //    text_entities	Array of MessageEntity	Optional. Special entities that appear in text, such as usernames, URLs, bot commands, etc.
 //    animation	Animation	Optional. Animation that will be displayed in the game message in chats. Upload via BotFather
 
-    public Game(String type, String title,String description, String text , String text_entities, String animation) {
-        this.type = type;
-        this.title = title;
-        this.description = description;
-        this.text = text;
-        this.text_entities = text_entities;
+    public void setAnimation(String animation) {
         this.animation = animation;
-
-
-
     }
 
 }

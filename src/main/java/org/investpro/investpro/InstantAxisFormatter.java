@@ -13,13 +13,13 @@ import java.time.format.DateTimeFormatter;
 public class InstantAxisFormatter extends StringConverter<Number> {
     private final DateTimeFormatter dateTimeFormat;
 
+    public InstantAxisFormatter(DateTimeFormatter format) {
+        dateTimeFormat = format == null ? DateTimeFormatter.ISO_LOCAL_DATE_TIME : format;
+    }
+
     @Contract("_ -> new")
     public static @NotNull InstantAxisFormatter of(DateTimeFormatter format) {
         return new InstantAxisFormatter(format);
-    }
-
-    public InstantAxisFormatter(DateTimeFormatter format) {
-        dateTimeFormat = format == null ? DateTimeFormatter.ISO_LOCAL_DATE_TIME : format;
     }
 
     @Override

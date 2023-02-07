@@ -57,9 +57,9 @@ import static org.investpro.investpro.FXUtils.computeTextDimensions;
 public class CandleStickChartToolbar extends Region {
     private final HBox toolbar;
     private final PopOver optionsPopOver;
+    private final Separator functionOptionsSeparator;
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
-    private final Separator functionOptionsSeparator;
 
     CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                             Set<Integer> granularities) {

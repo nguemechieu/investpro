@@ -36,17 +36,14 @@ import java.util.Objects;
  */
 public class ReversedLinesFileReader implements Closeable {
 
-    int blockSize;
-    Charset encoding;
-    RandomAccessFile randomAccessFile;
-
-    long totalByteLength;
-    long totalBlockCount;
-
     private final byte[][] newLineSequences;
     private final int avoidNewlineSplitBufferSize;
     private final int byteDecrement;
-
+    int blockSize;
+    Charset encoding;
+    RandomAccessFile randomAccessFile;
+    long totalByteLength;
+    long totalBlockCount;
     private FilePart currentFilePart;
 
     private boolean trailingNewlineOfFileSkipped = false;
@@ -55,7 +52,7 @@ public class ReversedLinesFileReader implements Closeable {
      * Creates a ReversedLinesFileReader with default block size of 4KB and the
      * specified encoding.
      *
-     * @param file the file to be read
+     * @param file    the file to be read
      * @param charset the encoding to use
      * @throws IOException if an I/O error occurs
      * @since 2.5
@@ -67,10 +64,10 @@ public class ReversedLinesFileReader implements Closeable {
     /**
      * Creates a ReversedLinesFileReader with the given block size and charset.
      *
-     * @param file the file to be read
+     * @param file      the file to be read
      * @param blockSize size of the internal buffer (for ideal performance this should
-     * match with the block size of the underlying file system).
-     * @param charset the charset of the file
+     *                  match with the block size of the underlying file system).
+     * @param charset   the charset of the file
      * @throws IOException if an I/O error occurs
      * @since 2.3
      */
@@ -110,7 +107,7 @@ public class ReversedLinesFileReader implements Closeable {
         }
 
         // NOTE: The new line sequences are matched in the order given, so it is important that \r\n is BEFORE \n
-        newLineSequences = new byte[][] {"\r\n".getBytes(charset), "\n".getBytes(charset), "\r".getBytes(charset)};
+        newLineSequences = new byte[][]{"\r\n".getBytes(charset), "\n".getBytes(charset), "\r".getBytes(charset)};
 
         avoidNewlineSplitBufferSize = newLineSequences[0].length;
 
@@ -179,8 +176,8 @@ public class ReversedLinesFileReader implements Closeable {
         /**
          * ctor
          *
-         * @param no the part number
-         * @param length its length
+         * @param no                     the part number
+         * @param length                 its length
          * @param leftOverOfLastFilePart remainder
          * @throws IOException if there is a problem reading the file
          */
@@ -310,7 +307,7 @@ public class ReversedLinesFileReader implements Closeable {
          * Finds the new-line sequence and return its length.
          *
          * @param data buffer to scan
-         * @param i start offset in buffer
+         * @param i    start offset in buffer
          * @return length of newline sequence or 0 if none found
          */
         private int getNewLineMatchByteCount(final byte[] data, final int i) {

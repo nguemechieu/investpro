@@ -13,6 +13,10 @@ public class DataSource implements javax.sql.DataSource {
     static String dbName = "tradeexpert";
     static String url = "jdbc:mysql://localhost:3306/" + dbName;
 
+    public DataSource() throws SQLException {
+
+    }
+
     public Connection createConnection() {
         conn = null;
         try {
@@ -27,12 +31,12 @@ public class DataSource implements javax.sql.DataSource {
             Properties props = new Properties();
             props.put("user", root);
             props.put("password", password);
-            conn =DriverManager.getConnection(url, props);
+            conn = DriverManager.getConnection(url, props);
 
             if (conn != null) {
 
                 System.out.println("Successfully connected to MySQL database ");
-           return conn;
+                return conn;
             }
 
         } catch (SQLException ex) {
@@ -42,12 +46,6 @@ public class DataSource implements javax.sql.DataSource {
         return conn;
     }    Connection conn = createConnection();
 
-
-
-    public DataSource() throws SQLException {
-
-    }
-
     /**
      * Close the database connection.
      */
@@ -56,10 +54,7 @@ public class DataSource implements javax.sql.DataSource {
         // TODO Auto-generated method stub
 
 
-
     }
-
-
 
     public boolean findOne(String table, String column, Object value) {
         try {
@@ -71,16 +66,13 @@ public class DataSource implements javax.sql.DataSource {
             return rs.next();
 
 
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
 
-    }
+        }
 
     }
-
-
 
     public boolean findAll(String table, String column) {
         try {
@@ -97,7 +89,6 @@ public class DataSource implements javax.sql.DataSource {
         }
     }
 
-
     public boolean insert(String table, String column, Object value) {
         try {
             System.out.println("Inserting into " + table + "." + column);
@@ -107,16 +98,13 @@ public class DataSource implements javax.sql.DataSource {
             return true;
 
 
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
 
         }
 
     }
-
-
 
     public boolean update(String table, String column, Object value) {
         try {
@@ -128,8 +116,7 @@ public class DataSource implements javax.sql.DataSource {
             ps.setString(1, value.toString());
             ps.executeUpdate();
             return true;
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -145,14 +132,12 @@ public class DataSource implements javax.sql.DataSource {
             return true;
 
 
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
 
-        return false;
-    }}
-
-
+            return false;
+        }
+    }
 
     public boolean create(String username, String password, String email, String firstName, String lastName,
                           String phone, String middleName, String country, String city, String state, String address, String zip) throws SQLException, ClassNotFoundException, InstantiationException, IllegalAccessException {
@@ -188,16 +173,14 @@ public class DataSource implements javax.sql.DataSource {
             System.out.println("Successfully created User " + username);
 
             return true;
-        }
-        else {
+        } else {
 
             return false;
         }
     }
 
-
     public void setUser(String root) {
-       DataSource. root =root;
+        DataSource.root = root;
     }
 
     public void setPassword(String password) {
@@ -207,7 +190,6 @@ public class DataSource implements javax.sql.DataSource {
     public void setUrl(String url) {
         DataSource.url = url;
     }
-
 
     /**
      * <p>Attempts to establish a connection with the data source that
@@ -270,6 +252,16 @@ public class DataSource implements javax.sql.DataSource {
     /**
      * {@inheritDoc}
      *
+     * @since 1.4
+     */
+    @Override
+    public int getLoginTimeout() throws SQLException {
+        return 0;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
      * @param seconds
      * @since 1.4
      */
@@ -277,16 +269,6 @@ public class DataSource implements javax.sql.DataSource {
     public void setLoginTimeout(int seconds) throws SQLException {
 
 
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @since 1.4
-     */
-    @Override
-    public int getLoginTimeout() throws SQLException {
-        return 0;
     }
 
     @Override
@@ -310,20 +292,6 @@ public class DataSource implements javax.sql.DataSource {
     }
 
     /**
-     * Return the parent Logger of all the Loggers used by this data source. This
-     * should be the Logger farthest from the root Logger that is
-     * still an ancestor of all of the Loggers used by this data source. Configuring
-     * this Logger will affect all of the log messages generated by the data source.
-     * In the worst case, this may be the root Logger.
-     *
-     * @return the parent Logger for this data source
-     * @throws SQLFeatureNotSupportedException if the data source does not use
-     *                                         {@code java.util.logging}
-     * @since 1.7
-     */
-
-
-    /**
      * Creates a new {@code ShardingKeyBuilder} instance
      *
      * @return The ShardingKeyBuilder instance that was created
@@ -338,6 +306,19 @@ public class DataSource implements javax.sql.DataSource {
         return
                 null;
     }
+
+    /**
+     * Return the parent Logger of all the Loggers used by this data source. This
+     * should be the Logger farthest from the root Logger that is
+     * still an ancestor of all of the Loggers used by this data source. Configuring
+     * this Logger will affect all of the log messages generated by the data source.
+     * In the worst case, this may be the root Logger.
+     *
+     * @return the parent Logger for this data source
+     * @throws SQLFeatureNotSupportedException if the data source does not use
+     *                                         {@code java.util.logging}
+     * @since 1.7
+     */
 
     /**
      * Returns an object that implements the given interface to allow access to
@@ -380,4 +361,6 @@ public class DataSource implements javax.sql.DataSource {
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
         return false;
     }
+
+
 }

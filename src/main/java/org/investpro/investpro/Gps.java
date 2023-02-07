@@ -3,6 +3,7 @@ package org.investpro.investpro;
 
 public class Gps {
     Geocode geocode;
+
     public Gps(String url) {
         geocode = new Geocode(url);
     }

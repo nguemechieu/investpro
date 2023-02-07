@@ -11,19 +11,6 @@ import java.util.Date;
 public class Oanda {
     private static final TradePair BTC_USD = TradePair.of(Currency.of("EUR"), Currency.of("JPY"));
     String name;
-
-    public CandleStickChartContainer start() throws URISyntaxException, IOException {
-        Platform.setImplicitExit(false);
-        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: \n" + exception));
-        CandleStickChartContainer candleStickChartContainer =
-                new CandleStickChartContainer(new OandaClient("https://api-fxtrade.oanda.com/", OandaClient.getApi_key(), OandaClient.getAccountID()), BTC_USD, true);
-        AnchorPane.setTopAnchor(candleStickChartContainer, 30.0);
-        AnchorPane.setLeftAnchor(candleStickChartContainer, 30.0);
-        AnchorPane.setRightAnchor(candleStickChartContainer, 30.0);
-        AnchorPane.setBottomAnchor(candleStickChartContainer, 30.0);
-        candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        return candleStickChartContainer;
-    }
     String email;
     String password;
     long lastTransactionID;
@@ -49,6 +36,7 @@ public class Oanda {
     boolean hedgingEnabled;
     int resettablePLTime;
     ArrayList<Trade> trades;
+
     public Oanda() {
 
     }
@@ -59,6 +47,18 @@ public class Oanda {
         this.password = password;
     }
 
+    public CandleStickChartContainer start() throws URISyntaxException, IOException {
+        Platform.setImplicitExit(false);
+        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: \n" + exception));
+        CandleStickChartContainer candleStickChartContainer =
+                new CandleStickChartContainer(new OandaClient("https://api-fxtrade.oanda.com/", OandaClient.getApi_key(), OandaClient.getAccountID()), BTC_USD, true);
+        AnchorPane.setTopAnchor(candleStickChartContainer, 30.0);
+        AnchorPane.setLeftAnchor(candleStickChartContainer, 30.0);
+        AnchorPane.setRightAnchor(candleStickChartContainer, 30.0);
+        AnchorPane.setBottomAnchor(candleStickChartContainer, 30.0);
+        candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        return candleStickChartContainer;
+    }
 
     public String getPassword() {
         return password;

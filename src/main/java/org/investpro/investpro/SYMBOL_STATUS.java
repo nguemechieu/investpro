@@ -3,9 +3,9 @@ package org.investpro.investpro;
 public enum SYMBOL_STATUS {
     PRE_TRADING,
     TRADING,
-            POST_TRADING,
+    POST_TRADING,
     END_OF_DAY,
-            HALT,
+    HALT,
     AUCTION_MATCH
 
 }

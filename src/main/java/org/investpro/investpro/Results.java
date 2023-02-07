@@ -248,7 +248,6 @@ public class Results {
     }
 
 
-
     public String getPlace_id() {
         return place_id;
     }

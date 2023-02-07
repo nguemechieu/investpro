@@ -11,7 +11,7 @@ public enum SYMBOL_MODE {
     }
 
 
-
     public int getI() {
         return i;
-    }}
+    }
+}

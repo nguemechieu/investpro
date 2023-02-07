@@ -1,18 +1,18 @@
 /**
  * Copyright (c) 2015, 2016 ControlsFX
  * All rights reserved.
- *
+ * <p>
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
+ * * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
+ * * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- *     * Neither the name of ControlsFX, any associated website, nor the
+ * * Neither the name of ControlsFX, any associated website, nor the
  * names of its contributors may be used to endorse or promote products
  * derived from this software without specific prior written permission.
- *
+ * <p>
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -50,14 +50,15 @@ import java.util.Objects;
  * When the switch is toggled, the thumb slides to the left or right.
  */
 public class ToggleSwitch extends Labeled {
+    private static final String DEFAULT_STYLE_CLASS = "toggle-switch";
+    private static final PseudoClass PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected");
+    final BooleanProperty turnOnTextLonger;
     /**
      * Indicates whether this ToggleSwitch is selected.
      */
     private final ReadOnlyBooleanWrapper selected;
-    final BooleanProperty turnOnTextLonger;
-
-    private static final String DEFAULT_STYLE_CLASS = "toggle-switch";
-    private static final PseudoClass PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected");
+    private final ReadOnlyStringWrapper turnOnText;
+    private final ReadOnlyStringWrapper turnOffText;
 
     /**
      * Creates a toggle switch with the default Strings of
@@ -124,8 +125,6 @@ public class ToggleSwitch extends Labeled {
         this.selected.set(selected);
     }
 
-    private final ReadOnlyStringWrapper turnOnText;
-
     public final ReadOnlyStringProperty turnOnTextProperty() {
         return turnOnText.getReadOnlyProperty();
     }
@@ -133,8 +132,6 @@ public class ToggleSwitch extends Labeled {
     public final String getTurnOnText() {
         return turnOnText.get();
     }
-
-    private final ReadOnlyStringWrapper turnOffText;
 
     public final ReadOnlyStringProperty turnOffTextProperty() {
         return turnOffText.getReadOnlyProperty();

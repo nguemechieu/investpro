@@ -5,8 +5,10 @@ public class Chat {
     public Chat m_new_one;
     public boolean done;
     public String message_text;
-    String  chat_id;
+    String chat_id;
     String title;
+    String type;
+    String username;
     private String photo;
     private String description;
 
@@ -18,6 +20,13 @@ public class Chat {
         this.photo = chat_first_name + " " + chat_last_name +
                 " <" + chat_username + ">";
 
+    }
+
+    public Chat(String chat_id, String title, String type, String username) {
+        this.chat_id = chat_id;
+        this.title = title;
+        this.type = type;
+        this.username = username;
     }
 
     public String getChat_id() {
@@ -64,30 +73,20 @@ public class Chat {
         this.username = username;
     }
 
-    public Chat(String chat_id, String title, String type, String username) {
-        this.chat_id = chat_id;
-        this.title = title;
-        this.type = type;
-        this.username = username;
-    }
-
-    String type;
-    String username ;
-
-    public void setDescription(String description) {
-        this.description = description;
+    public String getPhoto() {
+        return photo;
     }
 
     public void setPhoto(String photo) {
         this.photo = photo;
     }
 
-    public String getPhoto() {
-        return photo;
-    }
-
     public String getDescription() {
         return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public void setName(String first_name) {

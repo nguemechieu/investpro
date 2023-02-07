@@ -2,7 +2,7 @@ package org.investpro.investpro;
 
 import java.util.ArrayList;
 
-public class Account{
+public class Account {
     public int createdByUserID;
     //@JsonProperty("NAV")
     public String nAV;

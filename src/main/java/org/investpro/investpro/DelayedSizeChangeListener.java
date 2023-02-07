@@ -23,11 +23,11 @@ import javafx.util.Duration;
  * especially useful when resizing a is a computationally expensive operation.
  */
 public abstract class DelayedSizeChangeListener implements ChangeListener<Number> {
+    protected final ObservableValue<Number> containerWidth;
+    protected final ObservableValue<Number> containerHeight;
     private final double subsequentDelay;
     private final BooleanProperty gotFirstSize;
     private final Timeline timeline;
-    protected final ObservableValue<Number> containerWidth;
-    protected final ObservableValue<Number> containerHeight;
 
     public DelayedSizeChangeListener(double initialDelay, double subsequentDelay, BooleanProperty gotFirstSize,
                                      ObservableValue<Number> containerWidth, ObservableValue<Number> containerHeight) {

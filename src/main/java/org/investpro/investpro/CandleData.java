@@ -8,13 +8,13 @@ import java.util.Objects;
 
 public class CandleData extends RecursiveTreeObject<CandleData> {
     private final int openTime;
-    public int closeTime;
     private final double openPrice;
     private final double closePrice;
     private final double highPrice;
     private final double lowPrice;
     private final double volume;
     private final double averagePrice = 0;
+    public int closeTime;
     private double volumeWeightedAveragePrice;
     private boolean placeHolder;
 
@@ -91,15 +91,7 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
 
         CandleData other = (CandleData) object;
 
-        return openPrice == other.openPrice &&
-                closePrice == other.closePrice &&
-                highPrice == other.highPrice &&
-                lowPrice == other.lowPrice &&
-                Objects.equals(openTime, other.openTime) &&
-                volume == other.volume &&
-                averagePrice == other.averagePrice &&
-                volumeWeightedAveragePrice == other.volumeWeightedAveragePrice &&
-                placeHolder == other.placeHolder;
+        return openPrice == other.openPrice && closePrice == other.closePrice && highPrice == other.highPrice && lowPrice == other.lowPrice && Objects.equals(openTime, other.openTime) && volume == other.volume && volumeWeightedAveragePrice == other.volumeWeightedAveragePrice && placeHolder == other.placeHolder;
     }
 
     @Override

@@ -5,7 +5,7 @@ import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 
 import java.util.HashMap;
 
-public class SymbolData extends RecursiveTreeObject <SymbolData>{
+public class SymbolData extends RecursiveTreeObject<SymbolData> {
     String symbol;
     String bid;
     String ask;
@@ -16,6 +16,13 @@ public class SymbolData extends RecursiveTreeObject <SymbolData>{
         this.ask = ask;
     }
 
+    /**
+     * Constructs a new object.
+     */
+    public SymbolData() {
+        super();
+    }
+
     @Override
     public String toString() {
         return "SymbolData{" +
@@ -23,13 +30,6 @@ public class SymbolData extends RecursiveTreeObject <SymbolData>{
                 ", bid='" + bid + '\'' +
                 ", ask='" + ask + '\'' +
                 '}';
-    }
-
-    /**
-     * Constructs a new object.
-     */
-    public SymbolData() {
-        super();
     }
 
     /**

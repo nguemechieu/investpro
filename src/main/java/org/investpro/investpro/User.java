@@ -11,71 +11,33 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 import java.io.Serializable;
 import java.util.Locale;
+
 @Entity
 @Table(name = "users")
-public class User implements Serializable{
-    public static final  long serialVersionUID=1L;
-
-    public User() {
-    }
-
-    public String getBirthdate() {
-        return birthdate;
-    }
-
-    public void setBirthdate(String birthdate) {
-        this.birthdate = birthdate;
-    }
-
-    @Column (name = "birthdate")
-   private String birthdate;
-
-
-
-    public User(String username, String password, String email, String firstname, String lastname, String middlename, String gender, String birthdate, String phone, String address, String city, String state, String country, String zipCode)
-    {
-
-        this.username = username;
-        this.password = password;
-
-        this.email = email;
-        this.firstname = firstname;
-        this.lastname = lastname;
-        this.middlename = middlename;
-        this.gender = gender;
-        this.birthdate = birthdate;
-        this.phone = phone;
-        this.address = address;
-        this.city = city;
-        this.state = state;
-        this.country = country;
-        this.zip = zipCode;
-        this.createdAt = String.valueOf(Locale.getDefault());
-
-        this.updatedAt = String.valueOf(Locale.getDefault());
-
-    }
+public class User implements Serializable {
+    public static final long serialVersionUID = 1L;
+    @Column(name = "birthdate")
+    private String birthdate;
     @Id
-    @Column(name = "id", unique = true,nullable = false)
+    @Column(name = "id", unique = true, nullable = false)
     private int Id;
-    @Column(name = "username",nullable = false,unique = true)
+    @Column(name = "username", nullable = false, unique = true)
     private String username;
-    @Column(name = "gender",nullable = false)
+    @Column(name = "gender", nullable = false)
     private String gender;
-    @Column(name = "password",nullable = false,unique = true)
+    @Column(name = "password", nullable = false, unique = true)
     private String password;
-    @Column(name = "email",unique = true,nullable = false)
+    @Column(name = "email", unique = true, nullable = false)
     private String email;
-    @Column(name = "phone",nullable = false,unique = true)
+    @Column(name = "phone", nullable = false, unique = true)
     private String phone;
-
-    @Column(name = "firstname",nullable = false,unique = true)
-    private  String firstname;
-    @Column(name="lastname",nullable = false,unique = true)
-    private  String lastname;
+    @Column(name = "firstname", nullable = false, unique = true)
+    private String firstname;
+    @Column(name = "lastname", nullable = false, unique = true)
+    private String lastname;
     @Column(name = "middlename")
-    private  String middlename;
-    @Column(name = "address",unique = true,nullable = false)
+    private String middlename;
+    @Column(name = "address", unique = true, nullable = false)
     private String address;
     @Column(name = "city")
     private String city;
@@ -99,6 +61,41 @@ public class User implements Serializable{
     private String passwordResetToken;
     @Column(name = "password_reset_sent_at")
     private String passwordResetSentAt;
+
+    public User() {
+    }
+
+    public User(String username, String password, String email, String firstname, String lastname, String middlename, String gender, String birthdate, String phone, String address, String city, String state, String country, String zipCode) {
+
+        this.username = username;
+        this.password = password;
+
+        this.email = email;
+        this.firstname = firstname;
+        this.lastname = lastname;
+        this.middlename = middlename;
+        this.gender = gender;
+        this.birthdate = birthdate;
+        this.phone = phone;
+        this.address = address;
+        this.city = city;
+        this.state = state;
+        this.country = country;
+        this.zip = zipCode;
+        this.createdAt = String.valueOf(Locale.getDefault());
+
+        this.updatedAt = String.valueOf(Locale.getDefault());
+
+    }
+
+    public String getBirthdate() {
+        return birthdate;
+    }
+
+    public void setBirthdate(String birthdate) {
+        this.birthdate = birthdate;
+    }
+
     @Override
     public int hashCode() {
         return super.hashCode();
@@ -308,11 +305,6 @@ public class User implements Serializable{
     public void setPasswordResetSentAt(String passwordResetSentAt) {
         this.passwordResetSentAt = passwordResetSentAt;
     }
-
-
-
-
-
 
 
 }

@@ -5,7 +5,6 @@ public enum TELEGRAM_API_INFOS {
     TELEGRAM_API_KEY("2032573404:AAGImbZXeATS-XMutlqlJC8hgOP1BMlrcKM");
 
 
-
     TELEGRAM_API_INFOS(String s) {
     }
 

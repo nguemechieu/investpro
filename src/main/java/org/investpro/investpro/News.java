@@ -6,10 +6,10 @@ import java.util.Date;
 import java.util.HashMap;
 
 public class News extends RecursiveTreeObject<News> {
-    private String title;// title of the newsdhb/k;lojoj
-    private String country;// country of the news
     int hours;
     int secondes;
+    private String title;// title of the newsdhb/k;lojoj
+    private String country;// country of the news
     private String description;// description of the news
     private String impact;// impact of the news
     private String previous;// previous forecast of the news
@@ -28,15 +28,19 @@ public class News extends RecursiveTreeObject<News> {
 
     }
 
-    public String getTitle() {
-        return title;
-    }
-
     /**
      * Constructs a new object.
      */
     public News() {
         super();
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     /**
@@ -202,14 +206,10 @@ public class News extends RecursiveTreeObject<News> {
     public String toString() {
         return
                 getTitle() + " " + getCountry() +
-                " impact " + getImpact() +
-                " date " + getDate() +
-                " forecast " + getForecast() +
-                " previous " + getPrevious() ;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
+                        " impact " + getImpact() +
+                        " date " + getDate() +
+                        " forecast " + getForecast() +
+                        " previous " + getPrevious();
     }
 
     public String getCountry() {
@@ -253,7 +253,6 @@ public class News extends RecursiveTreeObject<News> {
     }
 
 
-
     public String getPrevious() {
         return previous;
     }
@@ -262,20 +261,20 @@ public class News extends RecursiveTreeObject<News> {
         this.previous = previous;
     }
 
-    public void setHours(int hour) {
-        this.hours = hour;
-    }
-
     public int getHours() {
         return hours;
     }
 
-    public void setSecondes(int seconde) {
-        this.secondes = seconde;
+    public void setHours(int hour) {
+        this.hours = hour;
     }
 
     public int getSecondes() {
         return secondes;
+    }
+
+    public void setSecondes(int seconde) {
+        this.secondes = seconde;
     }
 
     public int getMinutes() {

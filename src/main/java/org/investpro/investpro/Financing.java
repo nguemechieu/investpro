@@ -2,7 +2,7 @@ package org.investpro.investpro;
 
 import java.util.ArrayList;
 
-public class Financing{
+public class Financing {
     public String shortRate;
     public String longRate;
     public ArrayList<FinancingDaysOfWeek> financingDaysOfWeek;

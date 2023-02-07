@@ -12,7 +12,9 @@ import java.util.Arrays;
 
 public class SFileChooser {
 
-    /** The file chooser. */
+    /**
+     * The file chooser.
+     */
     private final FileChooser fileChooser = new FileChooser();
 
     /**

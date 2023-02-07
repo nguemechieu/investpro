@@ -53,7 +53,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static @NotNull Money of(final double amount, final Currency currency, int precision) {
+    public static @NotNull Money of(final double amount, final @NotNull Currency currency, int precision) {
         return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
     }
 
@@ -149,7 +149,6 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     private static @NotNull Money fromBigDecimal(final @NotNull BigDecimal value, Currency currency) {
         final BigDecimal cleaned = value.stripTrailingZeros();
-
         // try to convert to double using a fixed precision = 3, which will cover most of currencies
         // it is required to get rid of rounding issues
         final double dbl = value.doubleValue();
@@ -185,6 +184,10 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         }
 
         return new FastMoney(amount, currency, 0);
+    }
+
+    private static int compare(final long x, final long y) {
+        return Long.compare(x, y);
     }
 
     @Override
@@ -475,10 +478,6 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     @Override
     public String toString() {
         return new FastMoneyFormatter().format(this);
-    }
-
-    private static int compare(final long x, final long y) {
-        return Long.compare(x, y);
     }
 
     @Override

@@ -4,7 +4,7 @@ public class MYLONG {
     public double dividendAdjustment;
     public double pl;
     public int units;
-    public  double unrealizedPL,resettablePL,guaranteedExecutionFees,financing;
+    public double unrealizedPL, resettablePL, guaranteedExecutionFees, financing;
 
     public MYLONG() {
     }

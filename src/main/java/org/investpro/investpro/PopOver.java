@@ -1,4 +1,4 @@
-//CHECKSTYLE:OFF
+package org.investpro.investpro;//CHECKSTYLE:OFF
 /*
  * Copyright (c) 2013 - 2015 ControlsFX
  * All rights reserved.
@@ -26,7 +26,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.investpro.investpro;
 
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
@@ -80,7 +79,7 @@ public class PopOver extends PopupControl {
         getStyleClass().add(DEFAULT_STYLE_CLASS);
 
         getRoot().getStylesheets().add(
-                PopOver.class.getResource("/css/popover.css").toExternalForm()); //$NON-NLS-1$
+                requireNonNull(PopOver.class.getResource("/css/popover.css")).toExternalForm()); //$NON-NLS-1$
 
         setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
         setOnHiding(evt -> setDetached(false));

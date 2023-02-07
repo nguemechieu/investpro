@@ -70,6 +70,27 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
 
     }
 
+    private static int integerDigits(BigDecimal n) {
+        Objects.requireNonNull(n);
+        return n.signum() == 0 ? 1 : n.precision() - n.scale();
+    }
+
+    private static String addDigitGroupingSeparator(String number, char groupingSeparator, int groupAmount) {
+        Objects.requireNonNull(number);
+        StringBuilder groupSeparatedStringBuilder = new StringBuilder();
+        int digitCount = 0;
+        for (int i = number.length() - 1; i >= 0; i--) {
+            groupSeparatedStringBuilder.append(number.charAt(i));
+            digitCount++;
+            if (digitCount == groupAmount && !(i == number.length() - 1)) {
+                groupSeparatedStringBuilder.append(groupingSeparator);
+                digitCount = 0;
+            }
+        }
+
+        return groupSeparatedStringBuilder.reverse().toString();
+    }
+
     public @NotNull String format(Money money) {
         return format((DefaultMoney) money);
     }
@@ -248,25 +269,12 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
         return numberFormat.format(defaultMoney.amount());
     }
 
-    private static int integerDigits(BigDecimal n) {
-        Objects.requireNonNull(n);
-        return n.signum() == 0 ? 1 : n.precision() - n.scale();
+    public CurrencyStyle getCurrencyStyle() {
+        return currencyStyle;
     }
 
-    private static String addDigitGroupingSeparator(String number, char groupingSeparator, int groupAmount) {
-        Objects.requireNonNull(number);
-        StringBuilder groupSeparatedStringBuilder = new StringBuilder();
-        int digitCount = 0;
-        for (int i = number.length() - 1; i >= 0; i--) {
-            groupSeparatedStringBuilder.append(number.charAt(i));
-            digitCount++;
-            if (digitCount == groupAmount && !(i == number.length() - 1)) {
-                groupSeparatedStringBuilder.append(groupingSeparator);
-                digitCount = 0;
-            }
-        }
-
-        return groupSeparatedStringBuilder.reverse().toString();
+    public CurrencyPosition getCurrencyPosition() {
+        return currencyPosition;
     }
 
     public static class Builder {
@@ -387,7 +395,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
          * By default, this is set to {@code RoundingMode.HALF_EVEN}.
          *
          * @param roundingMode the {@code RoundingMode} used to format the
-         * DefaultMoney
+         *                     DefaultMoney
          * @return the Builder instance
          */
         public Builder withRounding(RoundingMode roundingMode) {
@@ -433,13 +441,5 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
 
             return new DefaultMoneyFormatter(this);
         }
-    }
-
-    public CurrencyStyle getCurrencyStyle() {
-        return currencyStyle;
-    }
-
-    public CurrencyPosition getCurrencyPosition() {
-        return currencyPosition;
     }
 }

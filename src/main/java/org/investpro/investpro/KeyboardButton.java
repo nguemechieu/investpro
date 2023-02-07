@@ -7,18 +7,24 @@ public class KeyboardButton {
 //    request_location	Boolean	Optional. If True, the user's current location will be sent when the button is pressed. Available in private chats only.
 //    request_poll	KeyboardButtonPollType	Optional. If specified, the user will be asked to create a poll and send it to the bot when the button is pressed. Available in private chats only.
 //    web_app	WebAppInfo
+    private String text;
+    private boolean request_contact;
+    private boolean request_location;
+
+    public KeyboardButton(String start, TelegramClient.KeyboardButtonType buttonTypeSingleLine) {
+        this.text = start;
+        this.request_contact = false;
+        this.request_location = false;
+        Object request_poll = null;
+    }
 
     @Override
     public String toString() {
         return
                 "text='" + text + '\'' +
-                ", request_contact=" + request_contact +
-                ", request_location=" + request_location ;
+                        ", request_contact=" + request_contact +
+                        ", request_location=" + request_location;
     }
-
-    private String text;
-    private boolean request_contact;
-    private boolean request_location;
 
     public String getText() {
         return text;
@@ -42,13 +48,6 @@ public class KeyboardButton {
 
     public void setRequest_location(boolean request_location) {
         this.request_location = request_location;
-    }
-
-    public KeyboardButton(String start, TelegramClient.KeyboardButtonType buttonTypeSingleLine) {
-        this.text = start;
-        this.request_contact = false;
-        this.request_location = false;
-        Object request_poll = null;
     }
 
 }

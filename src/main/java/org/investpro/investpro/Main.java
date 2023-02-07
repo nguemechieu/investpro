@@ -48,11 +48,20 @@ public class Main extends Application {
 
     public static final int TRADING_SCREEN_WIDTH = 1530;
     public static final int TRADING_SCREEN_HEIGHT = 780;
-    public static final int TRADING_SCREEN_MINIMUM_HEIGHT = 500;
-    public static final int TRADING_SCREEN_MINIMUM_WIDTH = 500;
     public static final int TRADING_SCREEN_MAXIMUM_WIDTH = (int) Screen.getPrimary().getBounds().getWidth();
     public static final int TRADING_SCREEN_MAXIMUM_HEIGHT = (int) Screen.getPrimary().getBounds().getHeight();
     static Alert alert;
+    static ArrayList<String> symb;
+
+    static {
+        try {
+            symb = getTradeAbleInstruments();
+        } catch (OandaException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public double amount;
 
     private static @NotNull Pane panel() {
         Pane pane = new Pane();
@@ -842,26 +851,6 @@ public class Main extends Application {
         launch(Main.class, args);
     }
 
-    @Override
-    public void start(@NotNull Stage stage) throws URISyntaxException {
-
-
-        createLogin(stage);
-
-    }
-
-    static ArrayList<String> symb;
-
-    static {
-        try {
-            symb = getTradeAbleInstruments();
-        } catch (OandaException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public double amount;
-
     private static @NotNull Node getAccountSummary() {
         return new ListView<>(FXCollections.observableArrayList(
                 "Account" + OandaClient.getAccountID(), "Balance" +
@@ -1022,6 +1011,14 @@ public class Main extends Application {
         vBox.getChildren().addAll(new Label("Current Orders"));
 
         return vBox;
+
+    }
+
+    @Override
+    public void start(@NotNull Stage stage) throws URISyntaxException {
+
+
+        createLogin(stage);
 
     }
 
@@ -1315,8 +1312,6 @@ public class Main extends Application {
     }
 
     TabPane getTabPane() throws OandaException, IOException, ParseException {
-
-
         DraggableTab[] tabs
 
                 = new DraggableTab[]{
@@ -1462,8 +1457,6 @@ public class Main extends Application {
         ToolBar toolbarBuySell = new ToolBar(buttons);
 
 
-
-
         for (int i = 0; i < candleStickChartTabs.length; i++) {
 
             vbox[i].setPrefSize(1530, 800);
@@ -1475,7 +1468,7 @@ public class Main extends Application {
         Oanda oandaCanleStickChart = new Oanda();
 
         vbox[0].getChildren().add(oandaCanleStickChart.start());
-        BinanceUS binanceUsCandleChart = new BinanceUS();
+        Binance binanceUsCandleChart = new Binance();
         vbox[1].getChildren().add(binanceUsCandleChart.start());
         CoinbasePro coinbaseCandleChart = new CoinbasePro();
         vbox[2].getChildren().add(coinbaseCandleChart.start());
@@ -1500,8 +1493,6 @@ public class Main extends Application {
     TreeTableView<News> getNews() throws IllegalArgumentException, ParseException {
 
         TreeTableView<News> treeTableNews = new TreeTableView<>();
-
-
         TreeTableColumn<News, String> columnNewsDate = new TreeTableColumn<>();
         columnNewsDate.setText("Date");
         TreeTableColumn<News, String> columnNewsTitle = new TreeTableColumn<>();

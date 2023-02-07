@@ -47,10 +47,11 @@ public class OandaClient extends Exchange {
 //    Get the list of tradeable instruments for the given Account. The list of tradeable instruments is dependent on the regulatory division that the Account is located in, thus should be the same for all Accounts owned by a single user.
     static ArrayList<String> instrumentsList = new ArrayList<>();
     static String host = "https://api-fxtrade.oanda.com";
+    static ArrayList<CandleData> array = new ArrayList<CandleData>();
     private static String api_key = "928727bf9a4211c110e00a5ac5689563-d07389a5e8c5ea4abf67d923007b25bc";
     Alert alert = new Alert(Alert.AlertType.WARNING, "Test Alert");
+    String accountInstrument;
     private OandaTransaction oandaTransaction;
-
 
     public OandaClient(String host, String api_key, String accountID) {
         super(null);
@@ -68,9 +69,6 @@ public class OandaClient extends Exchange {
 
     }
 
-    static ArrayList<CandleData> array = new ArrayList<CandleData>();
-    String accountInstrument;
-
 
     // Trade Endpoints
 
@@ -79,96 +77,35 @@ public class OandaClient extends Exchange {
 //    GET	/v3/accounts/{accountID}/trades
 //    Get a list of Trades for an Account
 
-    public List<Trade> getTrades() throws OandaException {
-
-        String path = "/v3/accounts/" + accountID + "/trades";
-        JSONObject jsonObject11= makeRequest("GET",path);
-        JSONArray jsonArray = jsonObject11.getJSONArray("trades");
-
-        List<Trade> trades = new ArrayList<>();
-
-        for(int i=0;i<jsonArray.length();i++){
-            JSONObject trade = jsonArray.getJSONObject(i);
-            trades.add(new Trade(i,trade));
-
-            System.out.println("trade -->"+trades.get(i));
-
-        }
-
-        return trades;
+    @Contract(pure = true)
+    public static @NotNull Collection<Trade> getTradesList() {
+        return new ArrayList<>();
     }
 //
 //    GET	/v3/accounts/{accountID}/openTrades
 //    Get the list of open Trades for an Account
 
-    @Contract(pure = true)
-    public static @NotNull Collection<Trade> getTradesList() {
+    @Contract(value = " -> new", pure = true)
+    public static @NotNull Collection<Object> getOpenTradesList() {
         return new ArrayList<>();
     }
 //
 //    GET	/v3/accounts/{accountID}/trades/{tradeSpecifier}
 //    Get the details of a specific Trade in an Account
 
-    @Contract(value = " -> new", pure = true)
-    public static @NotNull Collection<Object> getOpenTradesList() {
-        return new ArrayList<>();
+    public static Accounts getAccount() {
+        return accounts;
     }
 
 //    PUT	/v3/accounts/{accountID}/trades/{tradeSpecifier}/close
 //    Close (partially or fully) a specific open Trade in an Account
 
-    public static Accounts getAccount() {
-        return accounts;
+    public static void setApi_Key(String apiKey) {
+        api_key = apiKey;
     }
 //
 //    PUT	/v3/accounts/{accountID}/trades/{tradeSpecifier}/clientExtensions
 //    Update the Client Extensions for a Trade. Do not add, update, or delete the Client Extensions if your account is associated with MT4.
-
-    public void updateTradeClientExtensions(String tradeSpecifier) throws OandaException {
-
-        String path = "/v3/accounts/" + accountID + "/trades/" + tradeSpecifier + "/clientExtensions";
-
-        JSONObject jsonObject= makeRequest("PUT",path);
-
-        if (
-                jsonObject.has("clientExtensions")
-        ){
-            JSONArray jsonArray = jsonObject.getJSONArray("clientExtensions");
-            if (jsonArray.length() > 0) {
-                JSONObject trade = jsonArray.getJSONObject(0);
-                System.out.println(trade);
-            }
-        }
-    }
-//
-//    PUT	/v3/accounts/{accountID}/trades/{tradeSpecifier}/orders
-//    Create, replace and cancel a Trade’s dependent Orders (Take Profit, Stop Loss and Trailing Stop Loss) through the Trade itself
-
-    public void createTradeOrders(String tradeSpecifier) throws OandaException {
-
-        String path = "/v3/accounts/" + accountID + "/trades/" + tradeSpecifier + "/orders";
-
-        JSONObject jsonObject= makeRequest("PUT",path);
-
-        if (
-                jsonObject.has("orders")
-        ){
-            JSONArray jsonArray = jsonObject.getJSONArray("orders");
-            if (jsonArray.length() > 0) {
-                JSONObject trade = jsonArray.getJSONObject(0);
-                System.out.println(trade);
-            }
-
-        }
-    }
-
-    public static void setApi_Key(String apiKey) {
-        api_key = apiKey;
-    }
-
-//
-//            GET	/v3/accounts/{accountID}
-//    Get the full details for a single Account that a client has access to. Full pending Order, open Trade and open Position representations are provided.
 
     public static @Nullable Trade getTrade(String tradeSpecifier) throws OandaException {
 
@@ -191,34 +128,8 @@ public class OandaClient extends Exchange {
 
     }
 //
-//    GET	/v3/accounts/{accountID}/summary
-//    Get a summary for a single Account that a client has access to.
-
-    //    Account Endpoints
-//
-//
-//
-//    GET	/v3/accounts
-//    Get a list of all Accounts authorized for the provided token.
-    ArrayList<Accounts> getTokenAuthorizedList() throws OandaException {
-        String path = "/v3/accounts";
-
-        JSONObject playload = makeRequest("GET", path);
-
-        JSONArray accounts = playload.getJSONArray("accounts");
-        ArrayList<Accounts> account_ids = new ArrayList<>();
-        for (int i = 0; i < accounts.length(); i++) {
-            JSONObject account = accounts.getJSONObject(i);
-
-            Account accountObj = new Account();
-
-            System.out.println(accountObj);
-
-        }
-        return account_ids;
-
-
-    }
+//    PUT	/v3/accounts/{accountID}/trades/{tradeSpecifier}/orders
+//    Create, replace and cancel a Trade’s dependent Orders (Take Profit, Stop Loss and Trailing Stop Loss) through the Trade itself
 
     static ArrayList<String> getTradeAbleInstruments() throws OandaException {
 
@@ -248,8 +159,9 @@ public class OandaClient extends Exchange {
         createOrder(symbo, amount, type, side);
     }
 
-
-//            GET	/v3/accounts/{accountID}/changes
+//
+//            GET	/v3/accounts/{accountID}
+//    Get the full details for a single Account that a client has access to. Full pending Order, open Trade and open Position representations are provided.
 
     static Root getAccountFullDetails() throws OandaException {
         root = new Root();
@@ -265,295 +177,286 @@ public class OandaClient extends Exchange {
          * {"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.8250","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"},"instrument":"GBP_SGD","commission":"0.0000","pl":"-0.8250","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.8250","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.8250"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-4.5789","guaranteedExecutionFees":"0.0000","financing":"-0.0682","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.1570","guaranteedExecutionFees":"0.0000","financing":"-0.0687","units":"0","pl":"-0.1570"},"instrument":"GBP_CHF","commission":"0.0000","pl":"-4.5789","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-4.4219","guaranteedExecutionFees":"0.0000","financing":"0.0005","units":"0","pl":"-4.4219"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-9.3425","guaranteedExecutionFees":"0.0000","financing":"-0.0696","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.4019","guaranteedExecutionFees":"0.0000","financing":"-0.0653","units":"0","pl":"0.4019"},"instrument":"GBP_JPY","commission":"0.0000","pl":"-9.3425","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-9.7444","guaranteedExecutionFees":"0.0000","financing":"-0.0043","units":"0","pl":"-9.7444"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.2934","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.2934","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.2934"},"instrument":"GBP_NZD","commission":"0.1500","pl":"-0.2934","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.7998","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.2639","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.2639"},"instrument":"GBP_PLN","commission":"0.0000","pl":"-0.7998","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.5359","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.5359"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0588","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0168","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.0168"},"instrument":"GBP_ZAR","commission":"0.0000","pl":"-0.0588","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0420","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.0420"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-68.3675","guaranteedExecutionFees":"0.0000","financing":"-0.4409","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-46.2640","guaranteedExecutionFees":"0.0000","financing":"-0.1092","units":"0","pl":"-46.2640"},"instrument":"AUD_USD","commission":"0.0000","pl":"-68.3675","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-22.1035","guaranteedExecutionFees":"0.0000","financing":"-0.3317","units":"0","pl":"-22.1035"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-18.0252","guaranteedExecutionFees":"0.0000","financing":"-0.0411","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-16.6204","guaranteedExecutionFees":"0.0000","financing":"-0.0072","units":"0","pl":"-16.6204"},"instrument":"AUD_CAD","commission":"0.0000","pl":"-18.0252","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-1.4048","guaranteedExecutionFees":"0.0000","financing":"-0.0339","units":"0","pl":"-1.4048"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.6495","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.6495","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-2.6495"},"instrument":"AUD_SGD","commission":"0.0000","pl":"-2.6495","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-8.2180","guaranteedExecutionFees":"0.0000","financing":"-0.0008","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.2083","guaranteedExecutionFees":"0.0000","financing":"-0.0090","units":"0","pl":"0.2083"},"instrument":"AUD_CHF","commission":"0.0000","pl":"-8.2180","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-8.4263","guaranteedExecutionFees":"0.0000","financing":"0.0082","units":"0","pl":"-8.4263"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-11.5033","guaranteedExecutionFees":"0.0000","financing":"-0.7496","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-9.0972","guaranteedExecutionFees":"0.0000","financing":"-0.6077","units":"0","pl":"-9.0972"},"instrument":"AUD_JPY","commission":"0.0000","pl":"-11.5033","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.4061","guaranteedExecutionFees":"0.0000","financing":"-0.1419","units":"0","pl":"-2.4061"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-17.4180","guaranteedExecutionFees":"0.0000","financing":"-0.0608","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-11.3032","guaranteedExecutionFees":"0.0000","financing":"-0.0377","units":"0","pl":"-11.3032"},"instrument":"AUD_NZD","commission":"0.0000","pl":"-17.4180","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-6.1148","guaranteedExecutionFees":"0.0000","financing":"-0.0231","units":"0","pl":"-6.1148"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.1069","guaranteedExecutionFees":"0.0000","financing":"-0.0008","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.1069","guaranteedExecutionFees":"0.0000","financing":"-0.0008","units":"0","pl":"-0.1069"},"instrument":"AUD_HKD","commission":"0.0000","pl":"-0.1069","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.2722","guaranteedExecutionFees":"0.0000","financing":"-0.0006","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.2758","guaranteedExecutionFees":"0.0000","financing":"-0.0006","units":"0","pl":"-0.2758"},"instrument":"CAD_SGD","commission":"0.0000","pl":"-0.2722","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0036","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0036"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-5.5937","guaranteedExecutionFees":"0.0000","financing":"-0.0086","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.8108","guaranteedExecutionFees":"0.0000","financing":"-0.0095","units":"0","pl":"-2.8108"},"instrument":"CAD_CHF","commission":"0.0000","pl":"-5.5937","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.7829","guaranteedExecutionFees":"0.0000","financing":"0.0009","units":"0","pl":"-2.7829"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-6.6766","guaranteedExecutionFees":"0.0000","financing":"-0.0047","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-4.1264","guaranteedExecutionFees":"0.0000","financing":"-0.0157","units":"0","pl":"-4.1264"},"instrument":"CAD_JPY","commission":"0.0000","pl":"-6.6766","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.5502","guaranteedExecutionFees":"0.0000","financing":"0.0110","units":"0","pl":"-2.5502"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.9540","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.9540","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-0.9540"},"instrument":"CAD_HKD","commission":"0.0000","pl":"-0.9540","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-1.8765","guaranteedExecutionFees":"0.0000","financing":"-0.0040","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-1.8765","guaranteedExecutionFees":"0.0000","financing":"-0.0040","units":"0","pl":"-1.8765"},"instrument":"SGD_CHF","commission":"0.0000","pl":"-1.8765","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-11.2861","guaranteedExecutionFees":"0.0000","financing":"-0.0318","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.4127","guaranteedExecutionFees":"0.0000","financing":"-0.0052","units":"0","pl":"0.4127"},"instrument":"SGD_JPY","commission":"0.0000","pl":"-11.2861","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-11.6988","guaranteedExecutionFees":"0.0000","financing":"-0.0266","units":"0","pl":"-11.6988"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0281","guaranteedExecutionFees":"0.0000","financing":"-0.0001","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0281","guaranteedExecutionFees":"0.0000","financing":"-0.0001","units":"0","pl":"0.0281"},"instrument":"CHF_JPY","commission":"0.0000","pl":"0.0281","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0021","guaranteedExecutionFees":"0.0000","financing":"-0.0002","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"},"instrument":"CHF_ZAR","commission":"0.0000","pl":"-0.0021","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0021","guaranteedExecutionFees":"0.0000","financing":"-0.0002","units":"0","pl":"-0.0021"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-68.7120","guaranteedExecutionFees":"0.0000","financing":"-1.2905","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-35.2630","guaranteedExecutionFees":"0.0000","financing":"-0.7206","units":"0","pl":"-35.2630"},"instrument":"NZD_USD","commission":"0.0000","pl":"-68.7120","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-33.4490","guaranteedExecutionFees":"0.0000","financing":"-0.5699","units":"0","pl":"-33.4490"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-3.8232","guaranteedExecutionFees":"0.0000","financing":"-0.2521","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"3.8895","guaranteedExecutionFees":"0.0000","financing":"-0.1901","units":"0","pl":"3.8895"},"instrument":"NZD_CAD","commission":"0.0000","pl":"-3.8232","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-7.7127","guaranteedExecutionFees":"0.0000","financing":"-0.0620","units":"0","pl":"-7.7127"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-6.3953","guaranteedExecutionFees":"0.0000","financing":"0.0120","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.4028","guaranteedExecutionFees":"0.0000","financing":"-0.0003","units":"0","pl":"-0.4028"},"instrument":"NZD_CHF","commission":"0.0000","pl":"-6.3953","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-5.9925","guaranteedExecutionFees":"0.0000","financing":"0.0123","units":"0","pl":"-5.9925"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-1.6892","guaranteedExecutionFees":"0.0000","financing":"0.0016","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.3974","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.3974"},"instrument":"NZD_JPY","commission":"0.0000","pl":"-1.6892","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-2.0866","guaranteedExecutionFees":"0.0000","financing":"0.0016","units":"0","pl":"-2.0866"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0283","guaranteedExecutionFees":"0.0000","financing":"-0.0001","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-0.0515","guaranteedExecutionFees":"0.0000","financing":"-0.0001","units":"0","pl":"-0.0515"},"instrument":"NZD_HKD","commission":"0.0000","pl":"-0.0283","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0232","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0232"}},{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-1.1650","guaranteedExecutionFees":"0.0000","financing":"0.0000","short":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"0.0000","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"0.0000"},"instrument":"TRY_JPY","commission":"0.0000","pl":"-1.1650","long":{"dividendAdjustment":"0.0000","unrealizedPL":"0.0000","resettablePL":"-1.1650","guaranteedExecutionFees":"0.0000","financing":"0.0000","units":"0","pl":"-1.1650"}}],"marginAvailable":"3.0537","dividendAdjustment":"0","marginCloseoutPositionValue":"0.0000","marginCloseoutMarginUsed":"0.0000","unrealizedPL":"0.0000","marginCloseoutNAV":"3.0537","guaranteedStopLossOrderMode":"DISABLED","marginUsed":"0.0000","guaranteedExecutionFees":"0.0000",
          * "orders":[],"pl":"-764.0716"}}*/
 
-       String path = "/v3/accounts/" + accountID;
-       JSONObject playload = makeRequest("GET", path);
+        String path = "/v3/accounts/" + accountID;
+        JSONObject playload = makeRequest("GET", path);
 
-       if (playload.has("lastTransactionID")) {
-           root.lastTransactionID=
-                   playload.getString("lastTransactionID");
-       }
-       if (playload.has("lastTransactionTime")) {
-           root.lastTransactionTime=
-                   playload.getString("lastTransactionTime");
-       }
-       if (playload.has("account")) {
+        if (playload.has("lastTransactionID")) {
+            root.lastTransactionID =
+                    playload.getString("lastTransactionID");
+        }
+        if (playload.has("lastTransactionTime")) {
+            root.lastTransactionTime =
+                    playload.getString("lastTransactionTime");
+        }
+        if (playload.has("account")) {
 
-           if (
-                   playload.getJSONObject("account").has("createdByUserID")
-           ) {
-               root.account.createdByUserID=playload.getJSONObject("account").getInt("createdByUserID");
+            if (
+                    playload.getJSONObject("account").has("createdByUserID")
+            ) {
+                root.account.createdByUserID = playload.getJSONObject("account").getInt("createdByUserID");
 
-           }
-           if (
-                   playload.getJSONObject("account").has("NAV")){
+            }
+            if (
+                    playload.getJSONObject("account").has("NAV")) {
 
-               root.account.nAV=
-                       playload.getJSONObject("account").getString("NAV");
-           }
-           if (
-                   playload.getJSONObject("account").has("marginCloseoutUnrealizedPL")){
+                root.account.nAV =
+                        playload.getJSONObject("account").getString("NAV");
+            }
+            if (
+                    playload.getJSONObject("account").has("marginCloseoutUnrealizedPL")) {
 
-               root.account.marginCloseoutUnrealizedPL=
-                       playload.getJSONObject("account").getString("marginCloseoutUnrealizedPL");
-           }
+                root.account.marginCloseoutUnrealizedPL =
+                        playload.getJSONObject("account").getString("marginCloseoutUnrealizedPL");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("marginCallMarginUsed")) {
+            if (
+                    playload.getJSONObject("account").has("marginCallMarginUsed")) {
 
-               root.account.marginCallMarginUsed=
-                       playload.getJSONObject("account").getString("marginCallMarginUsed");
-           }
+                root.account.marginCallMarginUsed =
+                        playload.getJSONObject("account").getString("marginCallMarginUsed");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("openPositionCount")) {
+            if (
+                    playload.getJSONObject("account").has("openPositionCount")) {
 
-               root.account.openPositionCount=
-                       playload.getJSONObject("account").getInt("openPositionCount");
-           }
+                root.account.openPositionCount =
+                        playload.getJSONObject("account").getInt("openPositionCount");
+            }
 
 
-           if (
-                   playload.getJSONObject("account").has("withdrawalLimit")) {
+            if (
+                    playload.getJSONObject("account").has("withdrawalLimit")) {
 
-               root.account.withdrawalLimit= String.valueOf(playload.getJSONObject("account").getDouble("withdrawalLimit"));
-           }
+                root.account.withdrawalLimit = String.valueOf(playload.getJSONObject("account").getDouble("withdrawalLimit"));
+            }
 
-           if (
-                   playload.getJSONObject("account").has("positionValue")) {
+            if (
+                    playload.getJSONObject("account").has("positionValue")) {
 
-               root.account.positionValue=
-                       String.valueOf(playload.getJSONObject("account").getDouble("positionValue"));
-           }
+                root.account.positionValue =
+                        String.valueOf(playload.getJSONObject("account").getDouble("positionValue"));
+            }
 
 
-           if (
-                   playload.getJSONObject("account").has("marginRate")) {
+            if (
+                    playload.getJSONObject("account").has("marginRate")) {
 
-               root.account.marginRate=
-                       playload.getJSONObject("account").getDouble("marginRate");
-           }
+                root.account.marginRate =
+                        playload.getJSONObject("account").getDouble("marginRate");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("marginCallPercent")) {
-               root.account.marginCallPercent= String.valueOf(playload.getJSONObject("account").getDouble("marginCallPercent"));
-           }
+            if (
+                    playload.getJSONObject("account").has("marginCallPercent")) {
+                root.account.marginCallPercent = String.valueOf(playload.getJSONObject("account").getDouble("marginCallPercent"));
+            }
 
-           if (
-                   playload.getJSONObject("account").has("balance")) {
+            if (
+                    playload.getJSONObject("account").has("balance")) {
 
-               root.account.balance=
-                       playload.getJSONObject("account").getDouble("balance");
-           }
+                root.account.balance =
+                        playload.getJSONObject("account").getDouble("balance");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("resettablePL")) {
+            if (
+                    playload.getJSONObject("account").has("resettablePL")) {
 
-               root.account.resettablePL=
-                       playload.getJSONObject("account").getDouble("resettablePL");
-           }
+                root.account.resettablePL =
+                        playload.getJSONObject("account").getDouble("resettablePL");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("financing")) {
+            if (
+                    playload.getJSONObject("account").has("financing")) {
 
 
-               root.account.financing=
-                       playload.getJSONObject("account").getDouble("financing");
-           }
+                root.account.financing =
+                        playload.getJSONObject("account").getDouble("financing");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("createdTime")) {
+            if (
+                    playload.getJSONObject("account").has("createdTime")) {
 
-               root.account.createdTime=
-                       playload.getJSONObject("account").getString("createdTime");
-           }
+                root.account.createdTime =
+                        playload.getJSONObject("account").getString("createdTime");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("alias")) {
+            if (
+                    playload.getJSONObject("account").has("alias")) {
 
-               root.account.alias=
-                       playload.getJSONObject("account").getString("alias");
-           }
+                root.account.alias =
+                        playload.getJSONObject("account").getString("alias");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("currency")) {
+            if (
+                    playload.getJSONObject("account").has("currency")) {
 
-               root.account.currency=
-                       playload.getJSONObject("account").getString("currency");
-           }
+                root.account.currency =
+                        playload.getJSONObject("account").getString("currency");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("commission")) {
+            if (
+                    playload.getJSONObject("account").has("commission")) {
 
-               root.account.commission= playload.getJSONObject("account").getDouble("commission");
+                root.account.commission = playload.getJSONObject("account").getDouble("commission");
 
-           }
-           if (
-                   playload.getJSONObject("account").has("marginCloseoutPercent")) {
+            }
+            if (
+                    playload.getJSONObject("account").has("marginCloseoutPercent")) {
 
-               root.account.marginCloseoutPercent=
-                       playload.getJSONObject("account").getDouble("marginCloseoutPercent");
+                root.account.marginCloseoutPercent =
+                        playload.getJSONObject("account").getDouble("marginCloseoutPercent");
 
 
-           }
-           if (
-                   playload.getJSONObject("account").has("id")) {
+            }
+            if (
+                    playload.getJSONObject("account").has("id")) {
 
-               root.account.id=
-                       playload.getJSONObject("account").getString("id");
+                root.account.id =
+                        playload.getJSONObject("account").getString("id");
 
-           }
+            }
 
 
-           if (
-                   playload.getJSONObject("account").has("openTradeCount")) {
+            if (
+                    playload.getJSONObject("account").has("openTradeCount")) {
 
-               root.account.openTradeCount=
-                       playload.getJSONObject("account").getInt("openTradeCount");
-           }
+                root.account.openTradeCount =
+                        playload.getJSONObject("account").getInt("openTradeCount");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("pendingOrderCount")) {
+            if (
+                    playload.getJSONObject("account").has("pendingOrderCount")) {
 
-               root.account.pendingOrderCount=
-                       playload.getJSONObject("account").getInt("pendingOrderCount");
-           }
-           if (
-                   playload.getJSONObject("account").has("hedgingEnabled")) {
+                root.account.pendingOrderCount =
+                        playload.getJSONObject("account").getInt("pendingOrderCount");
+            }
+            if (
+                    playload.getJSONObject("account").has("hedgingEnabled")) {
 
-               root.account.hedgingEnabled=
-                       playload.getJSONObject("account").getBoolean("hedgingEnabled");
-           }
+                root.account.hedgingEnabled =
+                        playload.getJSONObject("account").getBoolean("hedgingEnabled");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("resettablePLTime")) {
+            if (
+                    playload.getJSONObject("account").has("resettablePLTime")) {
 
-               root.account.resettablePLTime=
+                root.account.resettablePLTime =
 
-                       playload.getJSONObject("account").getString("resettablePLTime");
-           }
+                        playload.getJSONObject("account").getString("resettablePLTime");
+            }
 
-           if (
-                   playload.getJSONObject("account").has("pendingOrderCount")) {
+            if (
+                    playload.getJSONObject("account").has("pendingOrderCount")) {
 
-               root.account.pendingOrderCount=
-                       playload.getJSONObject("account").getInt("pendingOrderCount");
-           }
+                root.account.pendingOrderCount =
+                        playload.getJSONObject("account").getInt("pendingOrderCount");
+            }
 
 
+            if (playload.getJSONObject("account").has("positions")) {
+                for (
+                        Object o :
+                        playload.getJSONObject("account").getJSONArray("positions")) {
 
-           if (playload.getJSONObject("account").has("positions")) {
-               for (
-                       Object o :
-                       playload.getJSONObject("account").getJSONArray("positions")) {
+                    JSONObject position = (JSONObject) o;
+                    positionObj = new Position();
+                    positionObj.commission = String.valueOf(position.getDouble("commission"));
+                    positionObj.dividendAdjustment =
+                            String.valueOf(position.getDouble("dividendAdjustment"));
 
-                          JSONObject position = (JSONObject) o;
-                          positionObj = new Position();
-                          positionObj.commission = String.valueOf(position.getDouble("commission"));
-                          positionObj.dividendAdjustment=
-                                  String.valueOf(position.getDouble("dividendAdjustment"));
+                    positionObj.guaranteedExecutionFees =
+                            String.valueOf(position.getDouble("guaranteedExecutionFees"));
 
-                          positionObj.guaranteedExecutionFees=
-                                  String.valueOf(position.getDouble("guaranteedExecutionFees"));
+                    positionObj.pl = String.valueOf(position.getDouble("pl"));
 
-                          positionObj.pl= String.valueOf(position.getDouble("pl"));
+                    positionObj.instrument =
+                            position.getString("instrument");
 
-                          positionObj.instrument=
-                                  position.getString("instrument");
+                    positionObj.financing =
+                            position.getString("financing");
 
-                          positionObj.financing=
-                                  position.getString("financing");
+                    positionObj.resettablePL =
+                            String.valueOf(position.getDouble("resettablePL"));
 
-                          positionObj.resettablePL=
-                                  String.valueOf(position.getDouble("resettablePL"));
+                    positionObj.unrealizedPL =
+                            String.valueOf(position.getDouble("unrealizedPL"));
 
-                          positionObj.unrealizedPL=
-                                  String.valueOf(position.getDouble("unrealizedPL"));
+                    if (position.has("long")) {
 
-                   if (position.has("long")) {
 
+                        positionObj.mylong = Long.getLong(String.valueOf(position.getJSONObject("long")));
 
-                       positionObj.mylong = Long.getLong(String.valueOf(position.getJSONObject("long")));
+                    } else if (position.has("short")) {//TODO upddate myshort and mylong
 
-                   } else if (position.has("short")) {//TODO upddate myshort and mylong
 
+                        JSONObject longObj = position.getJSONObject("short");
 
-                       JSONObject longObj = position.getJSONObject("short");
 
+                        if (longObj != null) {
 
-                       if (longObj != null) {
+                            if (
+                                    longObj.has("dividendAdjustment")) {
+                                positionObj.myshort.dividendAdjustment =
+                                        String.valueOf(longObj.getDouble("dividendAdjustment"));
+                            }
 
-                           if (
-                                   longObj.has("dividendAdjustment")) {
-                                      positionObj.myshort.dividendAdjustment=
-                                              String.valueOf(longObj.getDouble("dividendAdjustment"));
-                                  }
+                            if (
+                                    longObj.has("unrealizedPL")) {
 
-                                  if (
-                                          longObj.has("unrealizedPL")) {
+                                positionObj.myshort.unrealizedPL =
+                                        String.valueOf(longObj.getDouble("unrealizedPL"));
+                            }
 
-                                      positionObj.myshort.unrealizedPL=
-                                              String.valueOf(longObj.getDouble("unrealizedPL"));
-                                  }
+                            if (
+                                    longObj.has("resettablePL")) {
 
-                                  if (
-                                          longObj.has("resettablePL")) {
+                                positionObj.myshort.resettablePL =
+                                        String.valueOf(longObj.getDouble("resettablePL"));
+                            }
+                            if (
+                                    longObj.has("guaranteedExecutionFees")) {
 
-                                      positionObj.myshort.resettablePL=
-                                              String.valueOf(longObj.getDouble("resettablePL"));
-                                  }
-                                  if (
-                                          longObj.has("guaranteedExecutionFees")) {
+                                positionObj.myshort.guaranteedExecutionFees =
+                                        String.valueOf(longObj.getDouble("guaranteedExecutionFees"));
+                            }
 
-                                      positionObj.myshort.guaranteedExecutionFees=
-                                              String.valueOf(longObj.getDouble("guaranteedExecutionFees"));
-                                  }
+                            if (
+                                    longObj.has("pl")) {
 
-                                  if (
-                                          longObj.has("pl")) {
+                                positionObj.myshort.pl =
+                                        String.valueOf(longObj.getDouble("pl"));
+                            }
 
-                                      positionObj.myshort.pl=
-                                              String.valueOf(longObj.getDouble("pl"));
-                                  }
+                            if (
+                                    longObj.has("units")) {
 
-                                  if (
-                                          longObj.has("units")) {
+                                positionObj.myshort.units =
+                                        String.valueOf(longObj.getInt("units"));
 
-                                      positionObj.myshort.units=
-                                              String.valueOf(longObj.getInt("units"));
+                            }
+                            if (
+                                    longObj.has("financing")) {
 
-                                  }
-                                  if (
-                                          longObj.has("financing")) {
+                                positionObj.myshort.financing =
+                                        String.valueOf(longObj.getDouble("financing"));
+                            }
 
-                                      positionObj.myshort.financing=
-                                              String.valueOf(longObj.getDouble("financing"));
-                                  }
+                        }
 
-                              }
 
+                    }
+                }
 
 
+            }
 
 
+        }
+        return root;
 
-
-
-
-
-                          }
-               }
-
-
-
-
-
-           }
-
-
-       }
-       return root;
-
-   }
+    }
+//
+//    GET	/v3/accounts/{accountID}/summary
+//    Get a summary for a single Account that a client has access to.
 
     private static @Nullable CandleData getCandle(String accountInstrument, int index) throws OandaException {
 
@@ -592,7 +495,6 @@ public class OandaClient extends Exchange {
 
         return null;
     }
-//    Endpoint used to poll an Account for its current state and changes since a specified TransactionID.
 
     private static @NotNull JSONObject makeRequest(String method, String path) throws OandaException {
 
@@ -615,11 +517,11 @@ public class OandaClient extends Exchange {
             int response = connection.getResponseCode();
 
             if (response == 200) {
-         InputStream in = connection.getInputStream();
-         payload = new JSONObject(new JSONTokener(new InputStreamReader(in)));
-         in.close();
-         System.out.println(payload);
-         return payload;
+                InputStream in = connection.getInputStream();
+                payload = new JSONObject(new JSONTokener(new InputStreamReader(in)));
+                in.close();
+                System.out.println(payload);
+                return payload;
             } else {
                 throw new OandaException(connection.getResponseMessage() + "  | " + connection.getResponseCode());
             }
@@ -629,14 +531,6 @@ public class OandaClient extends Exchange {
 
         }
     }
-
-//
-//    Pricing Endpoints
-//
-//
-//
-//    GET	/v3/accounts/{accountID}/candles/latest
-//    Get dancing bears and most recently completed candles within an Account for specified combinations of instrument, granularity, and price component.
 
     public static @NotNull ArrayList<OandaOrder> getOrdersList() throws OandaException {
         ArrayList<OandaOrder> oandaOrders = new ArrayList<>();
@@ -660,86 +554,19 @@ public class OandaClient extends Exchange {
 
     }
 
+
+//            GET	/v3/accounts/{accountID}/changes
+
     public static String getAccountID() {
         return accountID;
     }
-//
-//    GET	/v3/accounts/{accountID}/pricing
-//    Get pricing information for a specified list of Instruments within an Account.
 
     static int DateToInt(String time) {
         return (int) Date.from(Instant.parse(time)).getTime();
 
 
     }
-//
-//    GET	/v3/accounts/{accountID}/pricing/stream
-//    Get a stream of Account Prices starting from when the request is made. This pricing stream does not include every single price created for the Account, but instead will provide at most 4 prices per second (every 250 milliseconds) for each instrument being requested. If more than one price is created for an instrument during the 250 millisecond window, only the price in effect at the end of the window is sent. This means that during periods of rapid price movement, subscribers to this stream will not be sent every price. Pricing windows for different connections to the price stream are not all aligned in the same way (i.e. they are not all aligned to the top of the second). This means that during periods of rapid price movement, different subscribers may observe different prices depending on their alignment.
-
-
-    double getPricingStream() throws OandaException {
-        String path = "/v3/accounts/" + accountID + "/pricing/stream";
-
-        JSONObject playload = makeRequest("GET", path);
-        System.out.println(playload);
-        playload.getJSONObject("instruments");
-        return 0;
-    }
-//    Note: This endpoint is served by the streaming URLs.
-
-
-//    Instrument Endpoints
-//
-//
-//
-//    GET	/v3/instruments/{instrument}/candles
-//    Fetch candlestick data for an instrument.
-
-    String patchAccountConfiguration() throws OandaException {
-        String path = "/v3/accounts/" + getAccountID() + "/configuration";
-
-        JSONObject accountConfiguration = makeRequest("GET", path);
-        System.out.println(accountConfiguration);
-        return accountConfiguration.toString();
-
-
-    }
-
-    private Date StringToDate(@NotNull String time) throws ParseException {
-        // "2017-05-05T21:00:00.000000000Z
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                .parse(time.replace("0000000Z", ""));
-
-    }
-
-//
-//    GET	/v3/instruments/{instrument}/orderBook
-//    Fetch an order book for an instrument.
-
-    public List<Trade> getOpenTrades() throws OandaException {
-
-        String path = "/v3/accounts/" + accountID + "/openTrades";
-
-        JSONObject jsonObject = makeRequest("GET", path);
-
-        JSONArray jsonArray = jsonObject.getJSONArray("trades");
-
-        List<Trade> trades = new ArrayList<>();
-
-        for(int i=0;i<jsonArray.length();i++){
-
-
-            JSONObject trade = jsonArray.getJSONObject(i);
-            trades.add(new Trade(i,trade));
-
-            System.out.println("trade -->" + trades.get(i));
-        }
-
-        return trades;
-    }
-
-//    GET	/v3/instruments/{instrument}/positionBook
-//    Fetch a position book for an instrument.
+//    Endpoint used to poll an Account for its current state and changes since a specified TransactionID.
 
     public static @Nullable OrderBook getOrderBook(String instrument) throws OandaException {
         String path = "/v3/instruments/" + instrument + "/orderBook";
@@ -756,16 +583,13 @@ public class OandaClient extends Exchange {
         return null;
     }
 
-    //String urls = String.format("https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') + "/candles?count=10&price=A&from=" + startDateString + "&granularity=" + actualGranularity);
-    // static String api_key = "7e0018e5e2e0d287c854c5bd8a509712-2c4ed485f470ed2db68159fb308272a8";
-
 //
-//    Position Endpoints
+//    Pricing Endpoints
 //
 //
 //
-//    GET	/v3/accounts/{accountID}/positions
-//    List all Positions for an Account. The Positions returned are for every instrument that has had a position during the lifetime of an  Account.
+//    GET	/v3/accounts/{accountID}/candles/latest
+//    Get dancing bears and most recently completed candles within an Account for specified combinations of instrument, granularity, and price component.
 
     public static ArrayList<CandleData> getForexCandles(String string) throws OandaException, InterruptedException {
 
@@ -790,33 +614,168 @@ public class OandaClient extends Exchange {
 
         if (
                 payload.getJSONObject("data") != null &&
-                payload.getJSONObject("data").get("orderId")!= null &&
-                payload.getJSONObject("data").get("orderId")!= null
-        ){
+                        payload.getJSONObject("data").get("orderId") != null &&
+                        payload.getJSONObject("data").get("orderId") != null
+        ) {
             return payload.getJSONObject("data").get("orderId").toString();
         }
         return null;
     }
+//
+//    GET	/v3/accounts/{accountID}/pricing
+//    Get pricing information for a specified list of Instruments within an Account.
+
+    public static String getApi_key() {
+        return api_key;
+    }
+//
+//    GET	/v3/accounts/{accountID}/pricing/stream
+//    Get a stream of Account Prices starting from when the request is made. This pricing stream does not include every single price created for the Account, but instead will provide at most 4 prices per second (every 250 milliseconds) for each instrument being requested. If more than one price is created for an instrument during the 250 millisecond window, only the price in effect at the end of the window is sent. This means that during periods of rapid price movement, subscribers to this stream will not be sent every price. Pricing windows for different connections to the price stream are not all aligned in the same way (i.e. they are not all aligned to the top of the second). This means that during periods of rapid price movement, different subscribers may observe different prices depending on their alignment.
+
+    public static String getHost() {
+        return host;
+    }
+//    Note: This endpoint is served by the streaming URLs.
+
+
+//    Instrument Endpoints
+//
+//
+//
+//    GET	/v3/instruments/{instrument}/candles
+//    Fetch candlestick data for an instrument.
+
+    public static ArrayList<String> getForexSymbols() throws OandaException {
+        return getTradeAbleInstruments();
+
+    }
+
+    public List<Trade> getTrades() throws OandaException {
+
+        String path = "/v3/accounts/" + accountID + "/trades";
+        JSONObject jsonObject11 = makeRequest("GET", path);
+        JSONArray jsonArray = jsonObject11.getJSONArray("trades");
+
+        List<Trade> trades = new ArrayList<>();
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject trade = jsonArray.getJSONObject(i);
+            trades.add(new Trade(i, trade));
+
+            System.out.println("trade -->" + trades.get(i));
+
+        }
+
+        return trades;
+    }
+
+//
+//    GET	/v3/instruments/{instrument}/orderBook
+//    Fetch an order book for an instrument.
+
+    public void updateTradeClientExtensions(String tradeSpecifier) throws OandaException {
+
+        String path = "/v3/accounts/" + accountID + "/trades/" + tradeSpecifier + "/clientExtensions";
+
+        JSONObject jsonObject = makeRequest("PUT", path);
+
+        if (
+                jsonObject.has("clientExtensions")
+        ) {
+            JSONArray jsonArray = jsonObject.getJSONArray("clientExtensions");
+            if (jsonArray.length() > 0) {
+                JSONObject trade = jsonArray.getJSONObject(0);
+                System.out.println(trade);
+            }
+        }
+    }
+
+//    GET	/v3/instruments/{instrument}/positionBook
+//    Fetch a position book for an instrument.
+
+    public void createTradeOrders(String tradeSpecifier) throws OandaException {
+
+        String path = "/v3/accounts/" + accountID + "/trades/" + tradeSpecifier + "/orders";
+
+        JSONObject jsonObject = makeRequest("PUT", path);
+
+        if (
+                jsonObject.has("orders")
+        ) {
+            JSONArray jsonArray = jsonObject.getJSONArray("orders");
+            if (jsonArray.length() > 0) {
+                JSONObject trade = jsonArray.getJSONObject(0);
+                System.out.println(trade);
+            }
+
+        }
+    }
+
+    //String urls = String.format("https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') + "/candles?count=10&price=A&from=" + startDateString + "&granularity=" + actualGranularity);
+    // static String api_key = "7e0018e5e2e0d287c854c5bd8a509712-2c4ed485f470ed2db68159fb308272a8";
+
+//
+//    Position Endpoints
+//
+//
+//
+//    GET	/v3/accounts/{accountID}/positions
+//    List all Positions for an Account. The Positions returned are for every instrument that has had a position during the lifetime of an  Account.
+
+    //    Account Endpoints
+//
+//
+//
+//    GET	/v3/accounts
+//    Get a list of all Accounts authorized for the provided token.
+    ArrayList<Accounts> getTokenAuthorizedList() throws OandaException {
+        String path = "/v3/accounts";
+
+        JSONObject playload = makeRequest("GET", path);
+
+        JSONArray accounts = playload.getJSONArray("accounts");
+        ArrayList<Accounts> account_ids = new ArrayList<>();
+        for (int i = 0; i < accounts.length(); i++) {
+            JSONObject account = accounts.getJSONObject(i);
+
+            Account accountObj = new Account();
+
+            System.out.println(accountObj);
+
+        }
+        return account_ids;
+
+
+    }
+
+    double getPricingStream() throws OandaException {
+        String path = "/v3/accounts/" + accountID + "/pricing/stream";
+
+        JSONObject playload = makeRequest("GET", path);
+        System.out.println(playload);
+        playload.getJSONObject("instruments");
+        return 0;
+    }
 //            GET	/v3/accounts/{accountID}/positions/{instrument}
 //    Get the details of a single Instrument’s Position in an Account. The Position may by open or not.
 
-    double getPricing(String accountInstrument) throws OandaException {
-        String path = "/v3/accounts/" + accountID + "/pricing?instruments=" + accountInstrument;
+    String patchAccountConfiguration() throws OandaException {
+        String path = "/v3/accounts/" + getAccountID() + "/configuration";
 
-        JSONObject playload = makeRequest2("GET", path);
-        System.out.println(playload);
-        //  playload.getJSONObject("instruments");
-        return 0;
+        JSONObject accountConfiguration = makeRequest("GET", path);
+        System.out.println(accountConfiguration);
+        return accountConfiguration.toString();
+
+
     }
 //
 //            PUT	/v3/accounts/{accountID}/positions/{instrument}/close
 
-    List<Object> getAllPositions() throws OandaException {
-        String path = "/v3/accounts/" + getAccountID() + "/positions";
+    private Date StringToDate(@NotNull String time) throws ParseException {
+        // "2017-05-05T21:00:00.000000000Z
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                .parse(time.replace("0000000Z", ""));
 
-        JSONObject accountConfiguration = makeRequest("GET", path);
-        System.out.println(accountConfiguration);
-        return accountConfiguration.getJSONArray("positions").toList();
     }
 //    Closeout the open Position for a specific instrument in an Account.
     /*
@@ -827,6 +786,45 @@ public class OandaClient extends Exchange {
      *     creates
      *     a new O
      * */
+
+    public List<Trade> getOpenTrades() throws OandaException {
+
+        String path = "/v3/accounts/" + accountID + "/openTrades";
+
+        JSONObject jsonObject = makeRequest("GET", path);
+
+        JSONArray jsonArray = jsonObject.getJSONArray("trades");
+
+        List<Trade> trades = new ArrayList<>();
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+
+
+            JSONObject trade = jsonArray.getJSONObject(i);
+            trades.add(new Trade(i, trade));
+
+            System.out.println("trade -->" + trades.get(i));
+        }
+
+        return trades;
+    }
+
+    double getPricing(String accountInstrument) throws OandaException {
+        String path = "/v3/accounts/" + accountID + "/pricing?instruments=" + accountInstrument;
+
+        JSONObject playload = makeRequest2("GET", path);
+        System.out.println(playload);
+        //  playload.getJSONObject("instruments");
+        return 0;
+    }
+
+    List<Object> getAllPositions() throws OandaException {
+        String path = "/v3/accounts/" + getAccountID() + "/positions";
+
+        JSONObject accountConfiguration = makeRequest("GET", path);
+        System.out.println(accountConfiguration);
+        return accountConfiguration.getJSONArray("positions").toList();
+    }
 
     //
 //    GET	/v3/accounts/{accountID}/openPositions
@@ -842,72 +840,60 @@ public class OandaClient extends Exchange {
             JSONArray positions = accountPositions.getJSONArray("positions");
             for (int i = 0; i < positions.length(); i++) {
                 JSONObject position = positions.getJSONObject(i);
-                     System.out.println("Position " + position);
-                     if (position.has("instrument")) {
-                         System.out.println("Instrument " + position.getString("instrument"));
-                         p.add(new Position().setInstrument(position.getString("instrument")));
-                     }
-                     if (
-                             position.has("pl")) {
+                System.out.println("Position " + position);
+                if (position.has("instrument")) {
+                    System.out.println("Instrument " + position.getString("instrument"));
+                    p.add(new Position().setInstrument(position.getString("instrument")));
+                }
+                if (
+                        position.has("pl")) {
 
-                         p.add(new Position().setPl(position.getString("pl")));
-                         System.out.println("Position " + position.getString("pl"));
-                     }
+                    p.add(new Position().setPl(position.getString("pl")));
+                    System.out.println("Position " + position.getString("pl"));
+                }
 
-                     if (
-                             position.has("commission"))
-                     {
-                         System.out.println("Commission " + position.getString("commission"));
-                         p.add(new Position().setCommission(position.getString("commission")));
-                     }
+                if (
+                        position.has("commission")) {
+                    System.out.println("Commission " + position.getString("commission"));
+                    p.add(new Position().setCommission(position.getString("commission")));
+                }
 
-                     Position posi = new Position();
-
-
-                     p.add(i, posi);
-                 }
+                Position posi = new Position();
 
 
+                p.add(i, posi);
+            }
 
 
-
-             }else {
-                     System.out.println("Account " + getAccountID() + " does not have positions");
-             return  null;
-                  }
-               return p;
+        } else {
+            System.out.println("Account " + getAccountID() + " does not have positions");
+            return null;
+        }
+        return p;
 
 
     }
 
-     public static String getApi_key() {
-         return api_key;
-     }
+    public JSONObject get(String path) throws OandaException {
 
-     public static String getHost() {
-         return host;
-     }
+        return makeRequest("GET", path);
 
-     public JSONObject get(String path) throws OandaException{
+    }
 
-    return makeRequest("GET", path);
+    public JSONObject post(String path) throws OandaException {
 
-     }
-
-     public JSONObject post(String path) throws OandaException{
-
-    return makeRequest("POST", path);
-   }
+        return makeRequest("POST", path);
+    }
 
     public JSONObject put(String path) throws OandaException {
 
         return makeRequest("PUT", path);
     }
 
-   public JSONObject delete(String path) throws OandaException{
+    public JSONObject delete(String path) throws OandaException {
 
-    return makeRequest("DELETE", path);
-   }
+        return makeRequest("DELETE", path);
+    }
 
     public void closeTrade(String tradeSpecifier) throws OandaException {
 
@@ -917,7 +903,7 @@ public class OandaClient extends Exchange {
 
         if (
                 jsonObject.has("trades")
-        ){
+        ) {
             JSONArray jsonArray = jsonObject.getJSONArray("trades");
             if (jsonArray.length() > 0) {
                 JSONObject trade = jsonArray.getJSONObject(0);
@@ -983,12 +969,12 @@ public class OandaClient extends Exchange {
                     "Content-Encoding",
                     "gzip"
             );
-            connection.setRequestProperty("Transfer-Encoding" ,"chunked");
+            connection.setRequestProperty("Transfer-Encoding", "chunked");
 
-            connection.setRequestProperty("Access-Control-Allow-Origin","*");
-            connection.setRequestProperty("Access-Control-Allow-Methods","PUT, PATCH, POST, GET, OPTIONS, DELETE");
-            connection.setRequestProperty("Access-Control-Allow-Headers","Origin, X-Requested-");
-            connection.setRequestProperty("Connection","keep-alive");
+            connection.setRequestProperty("Access-Control-Allow-Origin", "*");
+            connection.setRequestProperty("Access-Control-Allow-Methods", "PUT, PATCH, POST, GET, OPTIONS, DELETE");
+            connection.setRequestProperty("Access-Control-Allow-Headers", "Origin, X-Requested-");
+            connection.setRequestProperty("Connection", "keep-alive");
             connection.setRequestMethod(method);
 
             connection.setDoOutput(true);
@@ -996,33 +982,33 @@ public class OandaClient extends Exchange {
             connection.setDoInput(true);
             connection.connect();
 
-            int   response= connection.getResponseCode();
+            int response = connection.getResponseCode();
 
-            if(response == 200){
+            if (response == 200) {
                 InputStream in = connection.getInputStream();
                 payload = new JSONObject(new JSONTokener(new InputStreamReader(in)));
                 in.close();
                 System.out.println(payload);
                 return payload;
-            }
-            else{
+            } else {
                 alert.setTitle("NETWORK ERROR");
                 alert.setContentText(
 
-                                connection.getResponseCode()
+                        connection.getResponseCode()
 
-                        + " "
-                        + connection.getResponseMessage()
+                                + " "
+                                + connection.getResponseMessage()
                 );
                 alert.setAlertType(Alert.AlertType.INFORMATION);
                 alert.showAndWait();
-                throw new OandaException(connection.getResponseMessage()+"  | " + connection.getResponseCode());
+                throw new OandaException(connection.getResponseMessage() + "  | " + connection.getResponseCode());
             }
 
-        } catch (Exception e){
+        } catch (Exception e) {
             throw new OandaException("Error making request: " + e.getMessage());
 
-        }}
+        }
+    }
 
     public String getAccountSummary() throws OandaException {
         String path = "/v3/accounts/" + getAccountID() + "/summary";
@@ -1044,27 +1030,21 @@ public class OandaClient extends Exchange {
 
     }
 
- String
-    getWithdrawalHistory(String currency) throws OandaException{
+    String
+    getWithdrawalHistory(String currency) throws OandaException {
 
-        String path =  "/v3/accounts/" + accountID + "/withdrawal_history";
-        JSONObject payload = makeRequest("GET",path);
+        String path = "/v3/accounts/" + accountID + "/withdrawal_history";
+        JSONObject payload = makeRequest("GET", path);
         return payload.getJSONObject("data").get(currency).toString();
- }
-
+    }
 
     public String getAccountInstrument() {
         return accountInstrument;
     }
 
-    public static ArrayList<String> getForexSymbols() throws OandaException {
-      return   getTradeAbleInstruments();
-
-    }
-
     public ArrayList<Double> getForexBidData() throws OandaException {
 
-        String path =  "/v3/accounts/" + accountID + "/forex_bid";
+        String path = "/v3/accounts/" + accountID + "/forex_bid";
         //JSONObject payload = makeRequest("GET",path);
         return null;
     }
@@ -1149,8 +1129,8 @@ public class OandaClient extends Exchange {
         String path = "/v3/accounts/" + accountID + "/pendingOrders";
         JSONObject payload = makeRequest("GET", path);
         System.out.println(payload);
-        for (int i = 0; i < payload.getJSONArray("orders").length(); i++){
-            OandaOrder oandaOrder=null;
+        for (int i = 0; i < payload.getJSONArray("orders").length(); i++) {
+            OandaOrder oandaOrder = null;
             oandaOrder.setOrderId(payload.getJSONArray("orders").getJSONObject(i).
                     get("orderId").toString());
 
@@ -1159,14 +1139,15 @@ public class OandaClient extends Exchange {
         }
         return oandaOrders;
     }
-//    GET	/v3/accounts/{accountID}/orders/{orderSpecifier}
+
+    //    GET	/v3/accounts/{accountID}/orders/{orderSpecifier}
 //    Get details for a single Order in an Account
     public OandaOrder getOrderDetails(String orderSpecifier) throws OandaException {
         String path = "/v3/accounts/" + accountID + "/orders/" + orderSpecifier;
         JSONObject payload = makeRequest("GET", path);
         if (
-                payload.getJSONObject("orders")!= null &&
-                payload.getJSONObject("orders").get("orderId")!= null
+                payload.getJSONObject("orders") != null &&
+                        payload.getJSONObject("orders").get("orderId") != null
         ) {
             return new OandaOrder(
                     payload.getJSONObject("orders").get("orderId").toString(),
@@ -1277,9 +1258,9 @@ public class OandaClient extends Exchange {
         System.out.println("order " + payload);
 
         if (
-                payload.getJSONObject("orders")!= null){
+                payload.getJSONObject("orders") != null) {
 
-            for (int i = 0; i < payload.getJSONArray("orders").length(); i++){
+            for (int i = 0; i < payload.getJSONArray("orders").length(); i++) {
                 OandaOrder oandaOrder = null;
                 oandaOrder.setOrderId(payload.getJSONArray("orders").getJSONObject(i).get("orderId"));
 
@@ -1298,9 +1279,9 @@ public class OandaClient extends Exchange {
         System.out.println("order " + payload);
 
         if (
-                payload.getJSONObject("orders")!= null){
+                payload.getJSONObject("orders") != null) {
 
-            for (int i = 0; i < payload.getJSONArray("orders").length(); i++){
+            for (int i = 0; i < payload.getJSONArray("orders").length(); i++) {
                 OandaOrder oandaOrder = null;
                 oandaOrder.setOrderId(payload.getJSONArray("orders").getJSONObject(i).
                         get("orderId").toString());
@@ -1323,17 +1304,16 @@ public class OandaClient extends Exchange {
         String path = "/v3/accounts/" + accountID + "/transactions";
         JSONObject payload = makeRequest("GET", path);
         if (
-                payload.getJSONObject("transactions")!= null &&
-                        payload.getJSONObject("transactions").getJSONObject("transactions")!= null
-        ){
+                payload.getJSONObject("transactions") != null &&
+                        payload.getJSONObject("transactions").getJSONObject("transactions") != null
+        ) {
 
             for (int i = 0; i < payload.getJSONArray("transactions").length();
-                    ) {
+            ) {
 
                 oandaTransaction = new OandaTransaction();
                 oandaTransaction.setTransactionId(payload.getJSONArray("transactions").getJSONObject(i).
                         get("transactionId").toString());
-
 
 
             }
@@ -1349,9 +1329,9 @@ public class OandaClient extends Exchange {
         String path = "/v3/accounts/" + accountID + "/transactions/" + transactionID;
         JSONObject payload = makeRequest("GET", path);
         if (
-                payload.getJSONObject("transaction")!= null &&
-                        payload.getJSONObject("transaction").getJSONObject("transaction")!= null
-        ){
+                payload.getJSONObject("transaction") != null &&
+                        payload.getJSONObject("transaction").getJSONObject("transaction") != null
+        ) {
 
             for (int i = 0; i < payload.getJSONArray("transaction").length(); i++) {
                 OandaTransaction oandaTransaction = new OandaTransaction();
@@ -1359,7 +1339,8 @@ public class OandaClient extends Exchange {
             }
 
         }
-        return null;}
+        return null;
+    }
 //
 //    GET	/v3/accounts/{accountID}/transactions/idrange
 //    Get a range of Transactions for an Account based on the Transaction IDs.
@@ -1369,15 +1350,15 @@ public class OandaClient extends Exchange {
         String path = "/v3/accounts/" + accountID + "/transactions/idrange";
         JSONObject payload = makeRequest("GET", path);
         if (
-                payload.getJSONObject("transactions")!= null &&
-                        payload.getJSONObject("transactions").getJSONObject("transactions")!= null) {
+                payload.getJSONObject("transactions") != null &&
+                        payload.getJSONObject("transactions").getJSONObject("transactions") != null) {
 
             for (int i = 0; i < payload.getJSONArray("transactions").length(); i++
             ) {
             }
         }
         return null;
-        }
+    }
     //            GET	/v3/accounts/{accountID}/transactions/sinceid
 //    Get a range of Transactions for an Account starting at (but not including) a provided Transaction ID.
 //
@@ -1389,8 +1370,8 @@ public class OandaClient extends Exchange {
         String path = "/v3/accounts/" + accountID + "/transactions/stream";
         JSONObject payload = makeRequest("GET", path);
         if (
-                payload.getJSONObject("transactions")!= null &&
-                        payload.getJSONObject("transactions").getJSONObject("transactions")!= null) {
+                payload.getJSONObject("transactions") != null &&
+                        payload.getJSONObject("transactions").getJSONObject("transactions") != null) {
 
             for (int i = 0; i < payload.getJSONArray("transactions").length(); i++) {
                 OandaTransaction oandaTransaction = null;

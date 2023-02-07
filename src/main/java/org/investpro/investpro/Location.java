@@ -4,7 +4,7 @@ public class Location {
     private String lon;
     private String lat;
 
-    public Location(String lon,String lat) {
+    public Location(String lon, String lat) {
         this.lon = lon;
         this.lat = lat;
     }

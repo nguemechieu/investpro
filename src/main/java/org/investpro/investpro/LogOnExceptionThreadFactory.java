@@ -17,7 +17,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
      * exception handler that logs uncaught exceptions.
      *
      * @param threadNamePrefix the prefix of the thread name that will
-     * show up in logs, etc.
+     *                         show up in logs, etc.
      */
     public LogOnExceptionThreadFactory(String threadNamePrefix) {
         this(threadNamePrefix, Thread.NORM_PRIORITY);

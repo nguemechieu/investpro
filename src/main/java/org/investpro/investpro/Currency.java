@@ -11,15 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 public class Currency implements Comparable<java.util.Currency> {
-    private final CurrencyType currencyType;
-    private final String fullDisplayName;
-    private final String shortDisplayName;
-    protected final String code;
-    protected final int fractionalDigits;
-    protected final String symbol;
-    private static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
+    private static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
 
     static {
         //  FIXME: Replace with ServiceLoaders
@@ -41,6 +35,13 @@ public class Currency implements Comparable<java.util.Currency> {
 //        }
 
     }
+
+    protected final String code;
+    protected final int fractionalDigits;
+    protected final String symbol;
+    private final CurrencyType currencyType;
+    private final String fullDisplayName;
+    private final String shortDisplayName;
 
     /**
      * Private constructor used only for the {@code NULL_CURRENCY}.
@@ -129,7 +130,6 @@ public class Currency implements Comparable<java.util.Currency> {
      * Get the crypto currency that has a currency code equal to the
      * given {@code}. Using {@literal "¤¤¤"} as the currency code
      * returns {@literal NULL_CRYPTO_CURRENCY}.
-     *
      */
     public static CryptoCurrency ofCrypto(@NotNull String code) {
         if (code.equals("¤¤¤")) {
@@ -193,7 +193,6 @@ public class Currency implements Comparable<java.util.Currency> {
     /**
      * The finality of {@code equals(...)} ensures that the equality
      * contract for subclasses must be based on currency type and code alone.
-     *
      */
     @Override
     public final boolean equals(Object object) {

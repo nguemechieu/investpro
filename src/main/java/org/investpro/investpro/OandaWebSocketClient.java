@@ -32,6 +32,7 @@ public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
         super(URI.create("wss://api-fxtrade.oanda.com"), new Draft_6455());
         Objects.requireNonNull(tradePairs);
     }
+
     @Override
     public void onMessage(String message) {
         JsonNode messageJson;
@@ -106,7 +107,6 @@ public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
                 .put("instrument", tradePair.toString('_')).toPrettyString());
         liveTradeConsumers.put(tradePair, liveTradesConsumer);
     }
-
 
 
 }

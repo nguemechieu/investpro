@@ -8,12 +8,13 @@ import java.util.Objects;
 public final class CryptoCurrencyAlgorithms {
     private static final Map<String, Algorithm> ALGORITHM_MAP = new HashMap<>();
 
-    private CryptoCurrencyAlgorithms() {}
-
     static {
         for (Algorithm algorithm : Algorithm.values()) {
             ALGORITHM_MAP.put(algorithm.toString(), algorithm);
         }
+    }
+
+    private CryptoCurrencyAlgorithms() {
     }
 
     public static Algorithm getAlgorithm(String algorithm) {

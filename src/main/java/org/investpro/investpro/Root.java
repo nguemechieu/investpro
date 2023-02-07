@@ -1,8 +1,8 @@
 package org.investpro.investpro;
 
-public class Root{
+public class Root {
     public String lastTransactionID;
-    public Account account=new Account();
+    public Account account = new Account();
     public String lastTransactionTime;
 
     public Root() {

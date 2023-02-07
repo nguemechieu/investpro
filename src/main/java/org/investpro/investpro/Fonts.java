@@ -30,21 +30,26 @@ public class Fonts {
 
     static {
         try {
-            robotoLightName  = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Light.ttf"), 10).getName();
+            robotoLightName = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Light.ttf"), 10).getName();
             robotoMediumName = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Medium.ttf"), 10).getName();
         } catch (Exception exception) {
 
 
             Log.error(String.valueOf(exception));
         }
-        ROBOTO_LIGHT_NAME  = robotoLightName;
+        ROBOTO_LIGHT_NAME = robotoLightName;
         ROBOTO_MEDIUM_NAME = robotoMediumName;
     }
 
 
     // ******************** Methods *******************************************
     @Contract("_ -> new")
-    public static @NotNull Font robotoLight(final double SIZE) { return new Font(ROBOTO_LIGHT_NAME, SIZE); }
+    public static @NotNull Font robotoLight(final double SIZE) {
+        return new Font(ROBOTO_LIGHT_NAME, SIZE);
+    }
+
     @Contract("_ -> new")
-    public static @NotNull Font robotoMedium(final double SIZE) { return new Font(ROBOTO_MEDIUM_NAME, SIZE); }
+    public static @NotNull Font robotoMedium(final double SIZE) {
+        return new Font(ROBOTO_MEDIUM_NAME, SIZE);
+    }
 }

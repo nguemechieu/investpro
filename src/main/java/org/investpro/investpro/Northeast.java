@@ -1,10 +1,13 @@
 package org.investpro.investpro;
+
 public class Northeast {
     String lat;
     String lon;
+
     public String getLat() {
         return lat;
     }
+
     public void setLat(String lat) {
         this.lat = lat;
     }

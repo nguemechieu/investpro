@@ -1,6 +1,6 @@
 package org.investpro.investpro;
 
-public class FinancingDaysOfWeek{
+public class FinancingDaysOfWeek {
     public String dayOfWeek;
     public int daysCharged;
 

@@ -10,7 +10,7 @@ public class FiatCurrency extends Currency {
     int numericCode;
 
     protected FiatCurrency() {
-         super(CurrencyType.FIAT, "", "", "", 0, "");
+        super(CurrencyType.FIAT, "", "", "", 0, "");
         locale = Locale.forLanguageTag(String.valueOf(Locale.getDefault().getDisplayLanguage()));
         centralBank = "";
         numericCode = -1;

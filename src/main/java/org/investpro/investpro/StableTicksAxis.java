@@ -38,7 +38,6 @@ import java.util.List;
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
  * makes the axis major tick marks (the labeled tick marks) have nice, rounded numbers.
- *
  */
 public class StableTicksAxis extends ValueAxis<Number> {
     /**
@@ -56,9 +55,16 @@ public class StableTicksAxis extends ValueAxis<Number> {
     };
 
     private static final int numMinorTicks = 3;
-
+    private static final byte[] maxLog10ForLeadingZeros = {
+            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
+    };
+    private static final int[] powersOf10 = {
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
+    };
+    private static final int[] halfPowersOf10 = {
+            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
+    };
     private final Timeline animationTimeline = new Timeline();
-
     private final WritableValue<Double> scaleValue = new WritableValue<>() {
         @Override
         public @NotNull Double getValue() {
@@ -70,19 +76,15 @@ public class StableTicksAxis extends ValueAxis<Number> {
             setScale(value);
         }
     };
-
-    private List<Number> minorTicks;
-
     /**
      * Amount of padding to add on the each end of the axis when auto ranging.
      */
     private final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
-
     /**
      * If true, when auto-ranging, force 0 to be the min or max end of the range.
      */
     private final BooleanProperty forceZeroInRange = new SimpleBooleanProperty(true);
-
+    private List<Number> minorTicks;
     private double labelSize = -1;
 
     public StableTicksAxis() {
@@ -90,91 +92,6 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     public StableTicksAxis(double lowerBound, double upperBound) {
         super(lowerBound, upperBound);
-    }
-
-    /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
-     */
-    public double getAutoRangePadding() {
-        return autoRangePadding.get();
-    }
-
-    /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
-     */
-    public DoubleProperty autoRangePaddingProperty() {
-        return autoRangePadding;
-    }
-
-    /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
-     */
-    public void setAutoRangePadding(double autoRangePadding) {
-        this.autoRangePadding.set(autoRangePadding);
-    }
-
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public boolean isForceZeroInRange() {
-        return forceZeroInRange.get();
-    }
-
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public BooleanProperty forceZeroInRangeProperty() {
-        return forceZeroInRange;
-    }
-
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public void setForceZeroInRange(boolean forceZeroInRange) {
-        this.forceZeroInRange.set(forceZeroInRange);
-    }
-
-    @Override
-    protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
-        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
-        // these values. 1e-300 was chosen arbitrarily.
-        if (Math.abs(minValue - maxValue) < 1e-300) {
-            // Normally this is the case for all points with the same value
-            minValue = minValue - 1;
-            maxValue = maxValue + 1;
-        } else {
-            // Add padding
-            double delta = maxValue - minValue;
-            double paddedMin = minValue - delta * autoRangePadding.get();
-            // If we've crossed the 0 line, clamp to 0.
-            // noinspection FloatingPointEquality
-            if (Math.signum(paddedMin) != Math.signum(minValue)) {
-                paddedMin = 0.0;
-            }
-
-            double paddedMax = maxValue + delta * autoRangePadding.get();
-            // If we've crossed the 0 line, clamp to 0.
-            // noinspection FloatingPointEquality
-            if (Math.signum(paddedMax) != Math.signum(maxValue)) {
-                paddedMax = 0.0;
-            }
-
-            minValue = paddedMin;
-            maxValue = paddedMax;
-        }
-
-        // Handle forcing zero into the range
-        if (forceZeroInRange.get()) {
-            if (minValue < 0 && maxValue < 0) {
-                maxValue = 0;
-                minValue -= -minValue * autoRangePadding.get();
-            } else if (minValue > 0 && maxValue > 0) {
-                minValue = 0;
-                maxValue += maxValue * autoRangePadding.get();
-            }
-        }
-
-        return getRange(minValue, maxValue);
     }
 
     private static double calculateTickSpacing(double delta, int maxTicks) {
@@ -277,17 +194,90 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return ~~(x - y) >>> (Integer.SIZE - 1);
     }
 
-    private static final byte[] maxLog10ForLeadingZeros = {
-        9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
-    };
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public double getAutoRangePadding() {
+        return autoRangePadding.get();
+    }
 
-    private static final int[] powersOf10 = {
-        1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
-    };
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public void setAutoRangePadding(double autoRangePadding) {
+        this.autoRangePadding.set(autoRangePadding);
+    }
 
-    private static final int[] halfPowersOf10 = {
-        3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
-    };
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public DoubleProperty autoRangePaddingProperty() {
+        return autoRangePadding;
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public boolean isForceZeroInRange() {
+        return forceZeroInRange.get();
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public void setForceZeroInRange(boolean forceZeroInRange) {
+        this.forceZeroInRange.set(forceZeroInRange);
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public BooleanProperty forceZeroInRangeProperty() {
+        return forceZeroInRange;
+    }
+
+    @Override
+    protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
+        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
+        // these values. 1e-300 was chosen arbitrarily.
+        if (Math.abs(minValue - maxValue) < 1e-300) {
+            // Normally this is the case for all points with the same value
+            minValue = minValue - 1;
+            maxValue = maxValue + 1;
+        } else {
+            // Add padding
+            double delta = maxValue - minValue;
+            double paddedMin = minValue - delta * autoRangePadding.get();
+            // If we've crossed the 0 line, clamp to 0.
+            // noinspection FloatingPointEquality
+            if (Math.signum(paddedMin) != Math.signum(minValue)) {
+                paddedMin = 0.0;
+            }
+
+            double paddedMax = maxValue + delta * autoRangePadding.get();
+            // If we've crossed the 0 line, clamp to 0.
+            // noinspection FloatingPointEquality
+            if (Math.signum(paddedMax) != Math.signum(maxValue)) {
+                paddedMax = 0.0;
+            }
+
+            minValue = paddedMin;
+            maxValue = paddedMax;
+        }
+
+        // Handle forcing zero into the range
+        if (forceZeroInRange.get()) {
+            if (minValue < 0 && maxValue < 0) {
+                maxValue = 0;
+                minValue -= -minValue * autoRangePadding.get();
+            } else if (minValue > 0 && maxValue > 0) {
+                minValue = 0;
+                maxValue += maxValue * autoRangePadding.get();
+            }
+        }
+
+        return getRange(minValue, maxValue);
+    }
 
     @Override
     protected List<Number> calculateMinorTickMarks() {

@@ -2,8 +2,10 @@ package org.investpro.investpro;
 
 
 public class Viewport {
-   Northeast northeast;Southwest southwest;
-   public Viewport(Northeast northeast, Southwest southwest) {
+    Northeast northeast;
+    Southwest southwest;
+
+    public Viewport(Northeast northeast, Southwest southwest) {
         this.northeast = northeast;
         System.out.println(northeast);
         this.southwest = southwest;

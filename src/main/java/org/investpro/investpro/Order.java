@@ -4,17 +4,52 @@ import java.util.Date;
 
 public class Order {
     String timestamp;
-     Long id;
-     TRADE_ORDER_TYPE order_type;
-     double lotSize;
-     double price;
-     double total;
-     double remaining;
-     double fee;
-     String currency;
-     Date created;
-double stopLoss;
-double takeProfit;
+    Long id;
+    TRADE_ORDER_TYPE order_type;
+    double lotSize;
+    double price;
+    double total;
+    double remaining;
+    double fee;
+    String currency;
+    Date created;
+    double stopLoss;
+    double takeProfit;
+    Date updated;
+    Date closed;
+    String status;
+    String symbol;
+    String type;
+
+    public Order() {
+        this.created = new Date();
+        this.order_type = TRADE_ORDER_TYPE.NONE;
+        this.lotSize = 0.0;
+        this.price = 0.0;
+        this.total = 0.0;
+        this.remaining = 0.0;
+        this.fee = 0.0;
+        this.currency = "USD";
+    }
+
+    public Order(String timestamp, Long id, TRADE_ORDER_TYPE order_type, double lotSize, double price, double total, double remaining, double fee, String currency, Date created, Date updated, Date closed, String status, String symbol, String type) {
+        this();
+        this.timestamp = timestamp;
+        this.id = id;
+        this.order_type = order_type;
+        this.lotSize = lotSize;
+        this.price = price;
+        this.total = total;
+        this.remaining = remaining;
+        this.fee = fee;
+        this.currency = currency;
+        this.created = created;
+        this.updated = updated;
+        this.closed = closed;
+        this.status = status;
+        this.symbol = symbol;
+        this.type = type;
+    }
 
     public double getStopLoss() {
         return stopLoss;
@@ -35,49 +70,19 @@ double takeProfit;
     @Override
     public String toString() {
         return
-                       id +
-                ", order_type=" + order_type +
-                ", lotSize=" + lotSize +
-                             ", symbol='" + symbol +currency+ '\'' + ", price=" + price +
-                             ", stopLoss=" + stopLoss +
-                             ", takeProfit=" + takeProfit +
-                               ", status='" + status + '\'' +
-                ", fee=" + fee +
+                id +
+                        ", order_type=" + order_type +
+                        ", lotSize=" + lotSize +
+                        ", symbol='" + symbol + currency + '\'' + ", price=" + price +
+                        ", stopLoss=" + stopLoss +
+                        ", takeProfit=" + takeProfit +
+                        ", status='" + status + '\'' +
+                        ", fee=" + fee +
 
-                ", created=" + created +
-                ", updated=" + updated +
+                        ", created=" + created +
+                        ", updated=" + updated +
 
-                ", type='" + type + '\'' ;
-    }
-
-    public Order() {
-        this.created = new Date();
-        this.order_type = TRADE_ORDER_TYPE.NONE;
-        this.lotSize = 0.0;
-        this.price = 0.0;
-        this.total = 0.0;
-        this.remaining = 0.0;
-        this.fee = 0.0;
-        this.currency = "USD";
-    }
-
-    public Order(String timestamp, Long id, TRADE_ORDER_TYPE order_type, double lotSize, double price, double total, double remaining, double fee, String currency, Date created, Date updated, Date closed, String status, String symbol, String type) {
-       this();
-        this.timestamp = timestamp;
-        this.id = id;
-        this.order_type = order_type;
-        this.lotSize = lotSize;
-        this.price = price;
-        this.total = total;
-        this.remaining = remaining;
-        this.fee = fee;
-        this.currency = currency;
-        this.created = created;
-        this.updated = updated;
-        this.closed = closed;
-        this.status = status;
-        this.symbol = symbol;
-        this.type = type;
+                        ", type='" + type + '\'';
     }
 
     public String getTimestamp() {
@@ -199,11 +204,5 @@ double takeProfit;
     public void setType(String type) {
         this.type = type;
     }
-
-    Date updated;
-     Date closed;
-     String status;
-     String symbol;
-     String type;
 
 }

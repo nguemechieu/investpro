@@ -3,8 +3,16 @@ package org.investpro.investpro;
 public class OandaOrder extends Order {
     private String id;
     private String status;
+    private String currency;
+    private String amount;
+    private String amountInCents;
+    private String date;
 
     public OandaOrder() {
+
+    }
+
+    public OandaOrder(String toString, String toString1, String toString2, String toString3) {
 
     }
 
@@ -35,15 +43,6 @@ public class OandaOrder extends Order {
                 ", symbol='" + symbol + '\'' +
                 ", type='" + type + '\'' +
                 '}';
-    }
-
-    private String currency;
-    private String amount;
-    private String amountInCents;
-    private String date;
-
-    public OandaOrder(String toString, String toString1, String toString2, String toString3) {
-
     }
 
     public String getCurrency() {
@@ -81,21 +80,25 @@ public class OandaOrder extends Order {
     public String getId() {
         return id;
     }
+
     public void setId(String id) {
         this.id = id;
-        if (id!= null) {
+        if (id != null) {
             this.status = "open";
             this.currency = "USD";
             this.amount = "0.00";
             this.amountInCents = "0.00";
             this.date = new java.util.Date().toString();
-        }}
-    
+        }
+    }
+
     public String getStatus() {
         return status;
     }
+
     public void setStatus(String status) {
-        this.status = status;}
+        this.status = status;
+    }
 
     public void setOrderId(Object o) {
     }

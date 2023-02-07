@@ -14,7 +14,8 @@ public final class CandleStickChartUtils {
     private static final int SECONDS_PER_MONTH = 30 * SECONDS_PER_WEEK;
     private static final int SECONDS_PER_YEAR = 12 * SECONDS_PER_MONTH;
 
-    private CandleStickChartUtils() {}
+    private CandleStickChartUtils() {
+    }
 
     /**
      * Adds the sliding-window extrema (which maps candle x-values to a pair of extrema for volume and high-low
@@ -34,10 +35,10 @@ public final class CandleStickChartUtils {
      * <p>The extrema are calculated using the "Sliding Window Maximum" algorithm adapted to get both the maximum
      * and minimum for both the volume and high/low candle prices.
      *
-     * @param extrema the map to put the calculated extrema in to
+     * @param extrema    the map to put the calculated extrema in to
      * @param candleData the candle data to extract the extrema from
      * @param windowSize the sliding window size (which corresponds to the number of visible candles for the
-     * current zoom level)
+     *                   current zoom level)
      * @see <a href="http://articles.leetcode.com/2011/01/sliding-window-maximum.html">
      * Sliding Window Maximum</a>
      */

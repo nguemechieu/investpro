@@ -5,6 +5,9 @@ public class Short {
     public String unrealizedPL;
     public String resettablePL;
     public String guaranteedExecutionFees;
+    public String financing;
+    public String units;
+    public String pl;
 
     public Short(String dividendAdjustment, String unrealizedPL, String resettablePL, String guaranteedExecutionFees, String financing, String units, String pl) {
         this.dividendAdjustment = dividendAdjustment;
@@ -15,8 +18,6 @@ public class Short {
         this.units = units;
         this.pl = pl;
     }
-
-    public String financing;
 
     public String getDividendAdjustment() {
         return dividendAdjustment;
@@ -73,7 +74,4 @@ public class Short {
     public void setPl(String pl) {
         this.pl = pl;
     }
-
-    public String units;
-    public String pl;
 }

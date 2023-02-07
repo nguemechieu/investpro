@@ -50,7 +50,7 @@ public class TradePair extends Pair<Currency, Currency> {
             // We don't know where to split so try the most logical thing (after 3 characters). We could
             // extend this by checking that the substring is indeed a real currency and if not try 4
             // characters.
-            split = new String[] {tradePair.substring(0, 3), tradePair.substring(3)};
+            split = new String[]{tradePair.substring(0, 3), tradePair.substring(3)};
 
         } else {
             split = tradePair.split(separator);

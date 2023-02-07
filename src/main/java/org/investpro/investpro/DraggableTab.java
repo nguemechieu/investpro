@@ -24,13 +24,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashSet;
 import java.util.Set;
 
-public class DraggableTab  extends Tab  {
+public class DraggableTab extends Tab {
 
     private static final Set<TabPane> tabPanes = new HashSet<>();
-    private final Label nameLabel;
     private static final Stage markerStage;
-    private final Stage dragStage;
-    private boolean detachable;
 
     static {
         markerStage = new Stage();
@@ -40,6 +37,10 @@ public class DraggableTab  extends Tab  {
         markerStack.getChildren().add(dummy);
         markerStage.setScene(new Scene(markerStack));
     }
+
+    private final Label nameLabel;
+    private final Stage dragStage;
+    private boolean detachable;
 
 
     public DraggableTab(String text) {

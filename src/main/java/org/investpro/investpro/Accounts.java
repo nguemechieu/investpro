@@ -1,9 +1,9 @@
 package org.investpro.investpro;
 
 public class Accounts {
+    double balance;
     private String tags;
     private String name;
-    double balance;
     private String currency;
     private String accountType;
     private String accountStatus;
@@ -11,7 +11,7 @@ public class Accounts {
     private String tradingTime;
     private String tradingMode;
     private String tradingStatus;
-
+    private String tradingSession;
 
     public Accounts() {
         super();
@@ -38,8 +38,6 @@ public class Accounts {
             this.tags = "";
         } else this.tags = this.tags + "," + name;
     }
-
-    private String tradingSession;
 
     public double getBalance() {
         return balance;

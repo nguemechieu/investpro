@@ -12,6 +12,7 @@ import java.util.Date;
 
 import static java.lang.StrictMath.pow;
 import static java.lang.StrictMath.sqrt;
+
 public
 class Geocode {
     String address;
@@ -61,8 +62,13 @@ class Geocode {
     private String region;
     private String countryCode;
     private String types;
+    private String place_id;
+    private String long_name;
 
-
+    public Geocode(String url) {
+        this.url = url;
+        runGps();
+    }
 
     public String getHeading() {
         return heading;
@@ -91,11 +97,11 @@ class Geocode {
     @Override
     public String toString() {
         return
-                "status: " + getStatus() + " "+
-                getFormatted_address()+
-                ", lat='" + lat + '\'' +
-                ", lng='" + lng + '\'' +
-                        ", Speed= ''"+ getSpeed();
+                "status: " + getStatus() + " " +
+                        getFormatted_address() +
+                        ", lat='" + lat + '\'' +
+                        ", lng='" + lng + '\'' +
+                        ", Speed= ''" + getSpeed();
     }
 
     public String getAdministrativeAreaLevel2() {
@@ -210,10 +216,6 @@ class Geocode {
         this.locationType = locationType;
     }
 
-    public void setViewport(String viewport) {
-        this.viewport = viewport;
-    }
-
     public String getStreet() {
         return street;
     }
@@ -258,22 +260,16 @@ class Geocode {
         return place_id;
     }
 
-    private String place_id;
+    private void setPlace_id(String place_id) {
+        this.place_id = place_id;
+    }
 
     public String getLong_name() {
         return long_name;
     }
 
-    private String long_name;
-
-    public Geocode(String url) {
-        this.url = url;
-        runGps();
-    }
-
-
-    public void setTypes(String types) {
-        this.types = types;
+    private void setLong_name(String long_name) {
+        this.long_name = long_name;
     }
 
 
@@ -303,21 +299,25 @@ class Geocode {
 
             HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
 
-status=GPS_STATUS.DISCONNECTED;
+            status = GPS_STATUS.DISCONNECTED;
             if (response.statusCode() == 200) {
                 status = GPS_STATUS.CONNECTED;
                 network_response = NETWORK_RESPONSE.SERVER_OK;
                 System.out.println(network_response);
 
                 JSONObject json = new JSONObject(response);
-                try {status=GPS_STATUS.IN_PROGRESS;
+                try {
+                    status = GPS_STATUS.IN_PROGRESS;
                     json = new JSONObject(response.body());
-                    if (json.has("place_id")) {setPlace_id(json.getString("place_id"));
+                    if (json.has("place_id")) {
+                        setPlace_id(json.getString("place_id"));
                     }
                     if (json.has("long_name")) {
                         setLong_name(json.getString("long_name"));
                     }
-                    if (json.has("types")) {setTypes(json.getString("types"));}
+                    if (json.has("types")) {
+                        setTypes(json.getString("types"));
+                    }
                     if (json.has("location")) {
                         setLocation(json.getString("location"));
                     }
@@ -327,25 +327,25 @@ status=GPS_STATUS.DISCONNECTED;
                             JSONObject result = results.getJSONObject(i);
 
                             if (result.has("location")) {
-                                setLocation( result.getString("location"));
+                                setLocation(result.getString("location"));
                             }
                             if (result.has("geometry")) {
                                 JSONObject geometry = result.getJSONObject("geometry");
                                 if (geometry.has("location")) {
                                     JSONObject location = geometry.getJSONObject("location");
                                     if (location.has("lat")) {
-                                        latitude= location.getDouble("lat");
+                                        latitude = location.getDouble("lat");
                                         setLat(String.valueOf(latitude));
                                     }
                                     if (location.has("lng")) {
-                                        longitude= location.getDouble("lng");
+                                        longitude = location.getDouble("lng");
                                         setLng(String.valueOf(longitude));
                                     }
                                 }
-status= GPS_STATUS.READY;
+                                status = GPS_STATUS.READY;
                             }
                             if (result.has("formatted_address")) {
-                                setFormattedAddress( result.getString("formatted_address"));
+                                setFormattedAddress(result.getString("formatted_address"));
 
                                 System.out.println(formatted_address);
                                 break;
@@ -354,32 +354,17 @@ status= GPS_STATUS.READY;
                         }
 
                     }
-                }
-                catch (JSONException e) {
+                } catch (JSONException e) {
                     status = GPS_STATUS.NETWORK_ERROR;
                     e.printStackTrace();
                 }
 
 
-
-
-
-            }else {
+            } else {
 
                 status = GPS_STATUS.DISCONNECTED;
                 System.out.println(network_response);
             }
-
-
-
-
-
-
-
-
-
-
-
 
 
         } catch (Exception e) {
@@ -392,36 +377,9 @@ status= GPS_STATUS.READY;
         status = GPS_STATUS.READY;
     }
 
-    private void setPlace_id(String place_id) {
-        this.place_id = place_id;
-    }
-
-    private void setShort_name(String short_name) {
-        this.short_name = short_name;
-    }
-
-    private void setLong_name(String long_name) {
-        this.long_name = long_name;
-    }
-
     private void setBounds(double southwest, double northeast, double southeast, double northeast1) {
         this.southwest = String.valueOf(southwest);
         this.northeast = String.valueOf(northeast);
-    }
-
-    private void setViewport(JSONObject jsonObject) {
-        if (jsonObject.has("viewport")) {
-            JSONObject viewport = jsonObject.getJSONObject("viewport");
-            if (viewport.has("lat")) {
-                latitude = Double.parseDouble(viewport.get("lat").toString());
-            }
-            if (viewport.has("lng")) {
-                longitude = Double.parseDouble(viewport.get("lng").toString());
-                if (viewport.has("zoom")) {
-                    String zoom = viewport.get("zoom").toString();
-                }
-            }
-        }
     }
 
     private void setAdministrativeAreaLevel(JSONObject administrative_area_level_) {
@@ -437,7 +395,6 @@ status= GPS_STATUS.READY;
             e.printStackTrace();
         }
     }
-
 
     private void setBounds(String bounds) {
         JSONObject json = new JSONObject(bounds);
@@ -465,7 +422,6 @@ status= GPS_STATUS.READY;
     private void setFormattedAddress(String formatted_address) {
         this.formatted_address = formatted_address;
     }
-
 
     public String getStreet_number() {
         return street_number;
@@ -597,7 +553,6 @@ status= GPS_STATUS.READY;
         return "Good";
     }
 
-
     double getLatitude() {
         return this.latitude;
 
@@ -629,6 +584,25 @@ status= GPS_STATUS.READY;
 
     public String getViewport() {
         return viewport;
+    }
+
+    public void setViewport(String viewport) {
+        this.viewport = viewport;
+    }
+
+    private void setViewport(JSONObject jsonObject) {
+        if (jsonObject.has("viewport")) {
+            JSONObject viewport = jsonObject.getJSONObject("viewport");
+            if (viewport.has("lat")) {
+                latitude = Double.parseDouble(viewport.get("lat").toString());
+            }
+            if (viewport.has("lng")) {
+                longitude = Double.parseDouble(viewport.get("lng").toString());
+                if (viewport.has("zoom")) {
+                    String zoom = viewport.get("zoom").toString();
+                }
+            }
+        }
     }
 
     private void setViewport(String s, String string, String viewport) {
@@ -667,8 +641,6 @@ status= GPS_STATUS.READY;
         this.compound_code = compound_code;
     }
 
- 
-
     public String getUrl() {
         return url;
     }
@@ -681,7 +653,15 @@ status= GPS_STATUS.READY;
         return short_name;
     }
 
+    private void setShort_name(String short_name) {
+        this.short_name = short_name;
+    }
+
     public String getTypes() {
         return types;
+    }
+
+    public void setTypes(String types) {
+        this.types = types;
     }
 }

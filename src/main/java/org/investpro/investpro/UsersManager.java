@@ -8,12 +8,10 @@ import java.sql.SQLException;
 import java.util.Objects;
 
 
-
-
-    public record UsersManager()
-{
-      static User user;
- static DataSource   db;
+public record UsersManager() {
+    static User user;
+    static DataSource db;
+    static Alert alert = new Alert(Alert.AlertType.ERROR, "Please fill in all the fields");
 
     static {
         try {
@@ -29,33 +27,31 @@ import java.util.Objects;
         }
     }
 
-
-
     public User getUser() {
-         return user;
-     }
+        return user;
+    }
 
-     public void setUser(User user) {
-         UsersManager.user = user;
-     }
+    public void setUser(User user) {
+        UsersManager.user = user;
+    }
 
-     public void RememberUser( boolean text) {
+    public void RememberUser(boolean text) {
 
 
-         if (text) {
-             try {
+        if (text) {
+            try {
 
-                 db.conn.setAutoCommit(false);
-                 db.conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                 db.conn.close();
-                 db.conn.setAutoCommit(true);
+                db.conn.setAutoCommit(false);
+                db.conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+                db.conn.close();
+                db.conn.setAutoCommit(true);
 
-             } catch (SQLException e) {
-                 e.printStackTrace();
-             }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
 
-         }
-     }
+        }
+    }
 
     public boolean VerifyUser(String username, String password) {
         if (!Objects.equals(username, "") && !Objects.equals(password, "")) {
@@ -67,29 +63,26 @@ import java.util.Objects;
 
     }
 
-    static Alert alert = new Alert(Alert.AlertType.ERROR, "Please fill in all the fields");
-
-
     void CreateAccount(
             @NotNull String username,
             @NotNull String password,
             @NotNull String email,
             @NotNull String firstname,
-             @NotNull String lastname,
-             @NotNull String middlename,
-             @NotNull String gender,
-             @NotNull String birthdate,
-             @NotNull String phone,
-             @NotNull String address,
-             @NotNull String city,
-             @NotNull String state,
-             @NotNull String country,
-             @NotNull String zipCode) throws SQLException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+            @NotNull String lastname,
+            @NotNull String middlename,
+            @NotNull String gender,
+            @NotNull String birthdate,
+            @NotNull String phone,
+            @NotNull String address,
+            @NotNull String city,
+            @NotNull String state,
+            @NotNull String country,
+            @NotNull String zipCode) throws SQLException, ClassNotFoundException, InstantiationException, IllegalAccessException {
 
         if (
-                         username.equals("") || password.equals("") || email.equals("") || city.equals("") || state.equals("") || country.equals(" ") || firstname.equals("") || lastname.equals("") || middlename.equals("") || gender.equals("") || birthdate.equals("") || country.equals("") || phone.equals("") || address.equals("")
-                 ) {
-                     alert.showAndWait();
+                username.equals("") || password.equals("") || email.equals("") || city.equals("") || state.equals("") || country.equals(" ") || firstname.equals("") || lastname.equals("") || middlename.equals("") || gender.equals("") || birthdate.equals("") || country.equals("") || phone.equals("") || address.equals("")
+        ) {
+            alert.showAndWait();
 
         } else {
             user = new User(
@@ -154,14 +147,12 @@ import java.util.Objects;
                 alert.showAndWait();
 
 
-
             }
         }
 
 
-
     }
- }
+}
 
 
 

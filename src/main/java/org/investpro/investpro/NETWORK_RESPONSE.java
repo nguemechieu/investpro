@@ -130,10 +130,10 @@ public enum NETWORK_RESPONSE {
     //  Unofficial codes
     //The following codes are not specified by any standard.
 
-    PAGE_EXPIRED(419 ),//419 Page Expired (Laravel Framework)
+    PAGE_EXPIRED(419),//419 Page Expired (Laravel Framework)
     // Used by the Laravel Framework when a CSRF Token is missing or expired.
     METHOD_ERROR(420), NON_AUTHORITATIVE_INFORMATION(203), MULTI_STATUS(900), IM_USED(226), PERMANENT_REDIRECT(308), UNPROCESSABLE_ENTITY(420), LOCKED(421), UPGRADE_REQUIRED(423), INSUFFICIENT_STORAGE(507), INTERNAL_SERVER_ERROR(500), NOT_FOUND(400), UNAUTHORIZED(402), OK(200), REQUEST_TIMEOUT(408), SERVICE_UNAVAILABLE(502), BAD_REQUEST(400);
- //420 Method Failure (Spring Framework)
+    //420 Method Failure (Spring Framework)
     //A deprecated response used by the Spring Framework when a method has failed.[31]
     //  420 //Enhance Your Calm (Twitter)
 
@@ -143,15 +143,15 @@ public enum NETWORK_RESPONSE {
 
     public NETWORK_RESPONSE value(int responseCode) {
 
-            if (this.ordinal()== responseCode) {
-                return this;
-            }
+        if (this.ordinal() == responseCode) {
+            return this;
+        }
 
         return null;
     }
 
     public boolean verify(int responseCode) {
-        return this.ordinal()== responseCode;
+        return this.ordinal() == responseCode;
     }
 
 

@@ -20,6 +20,10 @@ public class InProgressCandle {
         return closeTime;
     }
 
+    public void setCloseTime(int closeTime) {
+        this.closeTime = closeTime;
+    }
+
     /**
      * Creates a new (immutable) {@code CandleData} by copying the fields from this {@code InProgressCandle}.
      * This in effect creates a frozen "snapshot" of the in-progress candle data. This is useful when the current
@@ -69,12 +73,12 @@ public class InProgressCandle {
         this.currentTill = currentTill;
     }
 
-    public void setLastPrice(double lastPrice) {
-        this.lastPrice = lastPrice;
-    }
-
     public double getLastPrice() {
         return lastPrice;
+    }
+
+    public void setLastPrice(double lastPrice) {
+        this.lastPrice = lastPrice;
     }
 
     public double getVolumeSoFar() {
@@ -132,9 +136,5 @@ public class InProgressCandle {
     public int hashCode() {
         return Objects.hash(openTime, openPrice, highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar,
                 visible, placeHolder);
-    }
-
-    public void setCloseTime(int closeTime) {
-        this.closeTime = closeTime;
     }
 }

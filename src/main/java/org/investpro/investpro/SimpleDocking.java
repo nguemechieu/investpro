@@ -1,4 +1,5 @@
 package org.investpro.investpro;
+
 import javafx.application.Application;
 import javafx.geometry.Orientation;
 import javafx.scene.Scene;

@@ -6,9 +6,9 @@ import javafx.stage.Stage;
 import java.io.File;
 
 public class FileChoosers {
-    File file1=new File("media/mediaview.mp4");
+    File file1 = new File("media/mediaview.mp4");
 
-    public FileChoosers()  {
+    public FileChoosers() {
     }
 
     public void start() throws Exception {
@@ -20,15 +20,13 @@ public class FileChoosers {
         file1 = file.showOpenDialog(primaryStage);
 
 
-
     }
 
 
+    public File selectFile() {
+        System.out.println("Filename " + file1);
+        return file1;
 
-        public File selectFile () {
-            System.out.println("Filename "+file1);
-            return file1;
-
-        }
+    }
 
 }

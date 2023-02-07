@@ -8,8 +8,8 @@ public enum TradeExchanges {
     /**
      *
      */
- BITFINEX,
- BITSTAMP, BINANCE_WORLD;
+    BITFINEX,
+    BITSTAMP, BINANCE_WORLD;
 
     @Contract(pure = true)
     public static TradeExchanges getExchange(@NotNull String exchange) {

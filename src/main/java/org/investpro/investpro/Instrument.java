@@ -2,7 +2,7 @@ package org.investpro.investpro;
 
 import java.util.ArrayList;
 
-public class Instrument{
+public class Instrument {
     public int pipLocation;
     public String displayName;
     public String maximumPositionSize;
@@ -39,7 +39,7 @@ public class Instrument{
                 ", tradeUnitsPrecision=" + tradeUnitsPrecision +
                 ", financing=" + financing +
                 ", maximumTrailingStopDistance='" + maximumTrailingStopDistance + '\'' +
-                ", maximumOrderUnits='" + maximumOrderUnits ;
+                ", maximumOrderUnits='" + maximumOrderUnits;
     }
 
     public int getPipLocation() {

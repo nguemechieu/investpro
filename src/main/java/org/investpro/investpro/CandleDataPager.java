@@ -9,7 +9,6 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 
-
 public class CandleDataPager {
     private final CandleDataSupplier candleDataSupplier;
     private final CandleDataPreProcessor candleDataPreProcessor;

@@ -2,7 +2,7 @@ package org.investpro.investpro;
 
 public enum NewsEventImpact {
     HIGH,
-    MEDIUM, LOW,UNKNOWN;
+    MEDIUM, LOW, UNKNOWN;
 
 
     public static NewsEventImpact getEnum(String value) {

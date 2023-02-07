@@ -47,7 +47,6 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             Log.error("ex: " + ex);
             throw new RuntimeException(ex);
         }
-
         if (messageJson.has("event") && messageJson.get("event").asText().equalsIgnoreCase("info")) {
             connectionEstablished.setValue(true);
         }

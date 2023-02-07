@@ -20,7 +20,8 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
-public   class Browser {
+
+public class Browser {
     static final String[] urls = new String[]{
 
             "https://www.google.com/search?q",
@@ -36,20 +37,20 @@ public   class Browser {
             "8377-ebay_102466 (1).png",
             "amazon.png",
             "Facebook-PNG-Photos (1).png"};
+    static ImageView selectedImage = new ImageView();
+    static WebView smallView = new WebView();
+    static
+    WebView webWiew = new WebView();
+    static final WebEngine webEngine = webWiew.getEngine();
+    final Image[] images = new Image[imageFiles.length];
+    final Button showPrevDoc = new Button("Toggle Previous Docs");
     String[] captions = new String[]{
             "Google",
             "Ebay",
             "Amazon",
             "Facebook"
     };
-    static ImageView selectedImage = new ImageView();
-    static WebView smallView = new WebView();
     final Hyperlink[] hpls = new Hyperlink[captions.length];
-    final Image[] images = new Image[imageFiles.length];
-    static
-    WebView webWiew = new WebView();
-    static final WebEngine webEngine = webWiew.getEngine();
-    final Button showPrevDoc = new Button("Toggle Previous Docs");
     HBox toolBar;
     ComboBox<String> comboBox = new ComboBox<>();
     boolean needDocumentationButton = false;
@@ -65,10 +66,12 @@ public   class Browser {
             //  String url = urls[i];
 
 
-             boolean addButton = (hpl.getText().equals("Documentation"));
+            boolean addButton = (hpl.getText().equals("Documentation"));
             // process event
-            hpl.setOnAction(e -> {needDocumentationButton = addButton;
-                webEngine.load(Objects.requireNonNull(getClass().getResourceAsStream(imageFiles[1])).toString());});
+            hpl.setOnAction(e -> {
+                needDocumentationButton = addButton;
+                webEngine.load(Objects.requireNonNull(getClass().getResourceAsStream(imageFiles[1])).toString());
+            });
         }
 
 
@@ -89,7 +92,8 @@ public   class Browser {
                 config -> {
                     smallView.setFontScale(0.8);
                     if (!toolBar.getChildren().contains(smallView)) {
-                        toolBar.getChildren().add(smallView);}
+                        toolBar.getChildren().add(smallView);
+                    }
                     return smallView.getEngine();
                 }
         );
@@ -186,6 +190,12 @@ public   class Browser {
         return new Group(pane);
     }
 
+    private @NotNull Node createSpacer() {
+        Region region = new Region();
+        region.getStyleClass().add("app");
+        HBox.setHgrow(region, Priority.ALWAYS);
+        return region;
+    }
 
     // JavaScript interface object
     public static class JavaApp {
@@ -193,13 +203,6 @@ public   class Browser {
         public String toString() {
             return "JavaScript App";
         }
-    }
-
-    private @NotNull Node createSpacer() {
-        Region region = new Region();
-        region.getStyleClass().add("app");
-        HBox.setHgrow(region, Priority.ALWAYS);
-        return region;
     }
 
 

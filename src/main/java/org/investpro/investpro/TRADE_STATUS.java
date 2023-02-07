@@ -7,8 +7,7 @@ public enum TRADE_STATUS {
     CANCEL(2),
     REJECT(3),
     REJECT_FAILED(4),
-    OPEN(5)
-    ;
+    OPEN(5);
 
     private final int value;
 

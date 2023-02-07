@@ -55,25 +55,37 @@ import static javafx.scene.paint.Color.YELLOW;
 import static org.investpro.investpro.PopOver.ArrowLocation.*;
 
 public class PopOverSkin implements Skin<PopOver> {
-    Label title;
-    /**
-     *
-     */
-    Label closeIcon;
+    private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
     private final Path path;
     private final Path clip;
     private final BorderPane content;
     private final StackPane titlePane;
     private final StackPane stackPane;
     private final PopOver popOver;
+    Label title;
+    /**
+     *
+     */
+    Label closeIcon;
     private Point2D dragStartLocation;
     private double xOffset;
     private double yOffset;
     private boolean tornOff;
+    private MoveTo moveTo;
+    private QuadCurveTo topCurveTo, rightCurveTo, bottomCurveTo, leftCurveTo;
+    private HLineTo lineBTop, lineETop, lineHTop, lineKTop;
+    private LineTo lineCTop, lineDTop, lineFTop, lineGTop, lineITop, lineJTop;
+    private VLineTo lineBRight, lineERight, lineHRight, lineKRight;
+    private LineTo lineCRight, lineDRight, lineFRight, lineGRight, lineIRight,
+            lineJRight;
+    private HLineTo lineBBottom, lineEBottom, lineHBottom, lineKBottom;
+    private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
+            lineIBottom, lineJBottom;
+    private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
+    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
+            lineJLeft;
 
-    private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
-
-    public PopOverSkin(final @NotNull PopOver popOver) {
+    public PopOverSkin(final PopOver popOver) {
         this.popOver = popOver;
         stackPane = popOver.getRoot();
         stackPane.setPickOnBounds(false);
@@ -280,25 +292,6 @@ public class PopOverSkin implements Skin<PopOver> {
         return group;
     }
 
-    private MoveTo moveTo;
-
-    private QuadCurveTo topCurveTo, rightCurveTo, bottomCurveTo, leftCurveTo;
-
-    private HLineTo lineBTop, lineETop, lineHTop, lineKTop;
-    private LineTo lineCTop, lineDTop, lineFTop, lineGTop, lineITop, lineJTop;
-
-    private VLineTo lineBRight, lineERight, lineHRight, lineKRight;
-    private LineTo lineCRight, lineDRight, lineFRight, lineGRight, lineIRight,
-            lineJRight;
-
-    private HLineTo lineBBottom, lineEBottom, lineHBottom, lineKBottom;
-    private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
-            lineIBottom, lineJBottom;
-
-    private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
-    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
-            lineJLeft;
-
     private void createPathElements() {
         DoubleProperty centerYProperty = new SimpleDoubleProperty();
         DoubleProperty centerXProperty = new SimpleDoubleProperty();
@@ -378,13 +371,13 @@ public class PopOverSkin implements Skin<PopOver> {
         lineHTop = new HLineTo();
         lineHTop.xProperty().bind(
                 Bindings.subtract(Bindings.subtract(
-                        rightEdgeMinusRadiusProperty, arrowIndentProperty),
+                                rightEdgeMinusRadiusProperty, arrowIndentProperty),
                         Bindings.multiply(arrowSizeProperty, 2)));
 
         lineITop = new LineTo();
         lineITop.xProperty().bind(
                 Bindings.subtract(Bindings.subtract(
-                        rightEdgeMinusRadiusProperty, arrowIndentProperty),
+                                rightEdgeMinusRadiusProperty, arrowIndentProperty),
                         arrowSizeProperty));
         lineITop.yProperty().bind(
                 Bindings.subtract(topEdgeProperty, arrowSizeProperty));
@@ -440,7 +433,7 @@ public class PopOverSkin implements Skin<PopOver> {
         lineHRight = new VLineTo();
         lineHRight.yProperty().bind(
                 Bindings.subtract(Bindings.subtract(
-                        bottomEdgeMinusRadiusProperty, arrowIndentProperty),
+                                bottomEdgeMinusRadiusProperty, arrowIndentProperty),
                         Bindings.multiply(arrowSizeProperty, 2)));
 
         lineIRight = new LineTo();
@@ -448,7 +441,7 @@ public class PopOverSkin implements Skin<PopOver> {
                 Bindings.add(rightEdgeProperty, arrowSizeProperty));
         lineIRight.yProperty().bind(
                 Bindings.subtract(Bindings.subtract(
-                        bottomEdgeMinusRadiusProperty, arrowIndentProperty),
+                                bottomEdgeMinusRadiusProperty, arrowIndentProperty),
                         arrowSizeProperty));
 
         lineJRight = new LineTo();
