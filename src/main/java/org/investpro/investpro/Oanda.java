@@ -41,12 +41,6 @@ public class Oanda {
 
     }
 
-    public Oanda(String name, String email, String password) {
-        this.name = name;
-        this.email = email;
-        this.password = password;
-    }
-
     public CandleStickChartContainer start() throws URISyntaxException, IOException {
         Platform.setImplicitExit(false);
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: \n" + exception));

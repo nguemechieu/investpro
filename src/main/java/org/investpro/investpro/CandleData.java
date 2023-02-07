@@ -7,14 +7,14 @@ import java.util.Objects;
 
 
 public class CandleData extends RecursiveTreeObject<CandleData> {
-    private final int openTime;
-    private final double openPrice;
-    private final double closePrice;
-    private final double highPrice;
-    private final double lowPrice;
-    private final double volume;
-    private final double averagePrice = 0;
-    public int closeTime;
+    private final double averagePrice = -1;
+    public int closeTime = -1;
+    private int openTime = -1;
+    private double openPrice = -1;
+    private double closePrice = -1;
+    private double highPrice = -1;
+    private double lowPrice = -1;
+    private double volume = -1;
     private double volumeWeightedAveragePrice;
     private boolean placeHolder;
 
@@ -22,15 +22,18 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
                       double volume) {
 
 
+        if (openTime == -1 && openPrice == 1 && closePrice == -1 && highPrice == -1 && lowPrice == -1 && volume == -1) {
+
+            throw new IllegalArgumentException("Invalid CandleData openTime: " + openTime + " closeTime: " + closePrice + " highPrice: " + highPrice + " lowPrice: " + lowPrice);
+
+        }
+
         this.openTime = openTime;
         this.openPrice = openPrice;
         this.closePrice = closePrice;
         this.highPrice = highPrice;
         this.lowPrice = lowPrice;
-
         this.volume = volume;
-
-
     }
 
 

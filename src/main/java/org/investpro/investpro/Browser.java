@@ -22,16 +22,17 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 
 public class Browser {
-    static final String[] urls = new String[]{
+//    static final String[] urls = new String[]{
+//
+//            "https://www.google.com/search?q",
+//            "https://www.ebay.com",
+//            "https://www.amazon.com",
+//
+//
+//            "https://www.facebook.com"
+//
+//    };
 
-            "https://www.google.com/search?q",
-            "https://www.ebay.com",
-            "https://www.amazon.com",
-
-
-            "https://www.facebook.com"
-
-    };
     static String[] imageFiles = new String[]{
             "7123025_logo_google_g_icon.png",
             "8377-ebay_102466 (1).png",

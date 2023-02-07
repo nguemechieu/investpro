@@ -5,13 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="test0">
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Dockerfile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Binance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Binance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUS.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUs.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartToolbar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartToolbar.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Browser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Browser.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleData.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Oanda.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Oanda.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaClient.java" afterDir="false" />
     </list>
@@ -369,7 +366,14 @@
       <option name="project" value="LOCAL" />
       <updated>1675735279769</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="test0">
+      <created>1675770549152</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1675770549152</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -491,7 +495,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-method">
           <url>file://$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaClient.java</url>
-          <line>573</line>
+          <line>572</line>
           <properties class="org.investpro.investpro.OandaClient" method="getOrderBook">
             <option name="EMULATED" value="true" />
             <option name="WATCH_EXIT" value="false" />

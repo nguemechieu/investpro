@@ -1641,7 +1641,7 @@ public class OandaClient extends Exchange {
 
                         if (!res.isEmpty()) {
                             // Remove the current in-progress candle
-                            if (//res.get(0).asInt() +
+                            if (DateToInt(res.get("time").asText()) +
                                     secondsPerCandle > endTime.get()) {
                                 ((ArrayNode) res).remove(0);
                             }
@@ -1649,17 +1649,19 @@ public class OandaClient extends Exchange {
 
                             for (JsonNode candle : res) {
                                 out.println("Oanda JSON " + candle);
+
+
                                 //        JSON [1632614400000,"42695.8400","43957.8200","40192.1600","43216.3600","1119.97070800",1632700799999,"47701882.7039",50948,"514.17724000","21953536.9128","0"]
 
-                                candleData.add(new CandleData(candle.get(1).asDouble(),  // open price
-                                        candle.get(4).asDouble(),  // close price
-                                        candle.get(2).asDouble(),  // high price
-                                        candle.get(3).asDouble(),  // low price
-                                        candle.get(0).asInt(),     // open time
-                                        candle.get(5).asDouble())   // volume
+                                candleData.add(new CandleData(candle.get("o").asDouble(),  // open price
+                                        res.get("c").asDouble(),  // close price
+                                        res.get("h").asDouble(),  // high price
+                                        res.get("l").asDouble(),  // low price
+                                        res.get("time").asInt(),     // open time
+                                        res.get("volume").asDouble())   // volume
                                 );
                                 endTime.set(candle.get(0).asInt());
-                                //Log.info("Candle D"+ candleData);
+                                Log.info("Candle D" + candleData);
                             }
                             candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                             return candleData;
