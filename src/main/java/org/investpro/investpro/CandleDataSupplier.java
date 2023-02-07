@@ -8,6 +8,8 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
+import static java.lang.System.out;
+
 /**
  * @Noel Martial Nguemechieu
  */
@@ -22,6 +24,8 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     protected final IntegerProperty endTime;
 
     public CandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
+
+
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(endTime);
         if (numCandles <= 0) {
@@ -29,11 +33,15 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
         }
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
+        } else {
+            out.println("CandleS " + this);
         }
         this.numCandles = numCandles;
         this.secondsPerCandle = secondsPerCandle;
         this.tradePair = tradePair;
         this.endTime = endTime;
+
+
     }
 
     public Set<Integer> getSupportedGranularities() {
@@ -59,6 +67,8 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
             return false;
         }
         CandleDataSupplier that = (CandleDataSupplier) o;
+
+        out.println("CandleDataSupplier equals " + that);
         return numCandles == that.numCandles &&
                 secondsPerCandle == that.secondsPerCandle &&
                 Objects.equals(tradePair, that.tradePair) &&

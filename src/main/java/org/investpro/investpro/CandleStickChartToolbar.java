@@ -66,18 +66,7 @@ public class CandleStickChartToolbar extends Region {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         Objects.requireNonNull(granularities);
-        Paint[] xColor = new Color[]{
-                Color.RED,
-                Color.WHITE,
-                Color.GOLD,
-                Color.GREEN,
-                Color.BROWN,
-                Color.CORAL,
-                Color.LAVENDER
-
-        };
-
-        int i = (int) (Math.random() * xColor.length - 1);
+        Paint[] xColor = new Color[]{Color.RED, Color.WHITE, Color.GOLD, Color.GREEN, Color.BROWN, Color.CORAL, Color.LAVENDER};
 
         List<Node> toolbarNodes = new ArrayList<>((2 * granularities.size()) + Tool.values().length + 1);
         boolean passedMinuteHourBoundary = false;

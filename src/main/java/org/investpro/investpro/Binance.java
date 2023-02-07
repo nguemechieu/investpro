@@ -298,7 +298,6 @@ public class Binance {
                         afterCursor.setValue(Integer.valueOf((response.headers().firstValue(" cb-after").get())));
 
                         JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
-
                         if (!tradesResponse.isArray()) {
                             futureResult.completeExceptionally(new RuntimeException(
                                     "Trades response was not an array!"));
@@ -317,8 +316,6 @@ public class Binance {
                                             DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
                                             DefaultMoney.ofCrypto(trade.get("qty").asText(), tradePair.getBaseCurrency()),
                                             Side.getSide(trade.get("isBuyerMaker").asText()), trade.get("id").asLong(), time));
-// fvjnbskl
-//
 //                                    "id": 981492,
 //                                            "price": "0.00380100",
 //                                            "qty": "0.22000000",
@@ -326,8 +323,6 @@ public class Binance {
 //                                            "time": 1637128016269,
 //                                            "isBuyerMaker": false,
 //                                            "isBestMatch": true
-
-
                                 }
                             }
                         }
@@ -348,14 +343,14 @@ public class Binance {
         @Override
         public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
                 TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-                    currentCandleStartedAt, ZoneOffset.UTC));
-            long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
-            //  Get the closest supported granularity to the ideal granularity.
-            int actualGranularity = getCandleDataSupplier(secondsPerCandle, tradePair).getSupportedGranularities().stream()
-                    .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
-                    .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
-            // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
+//            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+//                    currentCandleStartedAt, ZoneOffset.UTC));
+//            long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
+//            //  Get the closest supported granularity to the ideal granularity.
+//            int actualGranularity = getCandleDataSupplier(secondsPerCandle, tradePair).getSupportedGranularities().stream()
+//                    .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
+//                    .orElseThrow(() -> new NoSuchElementException("Supported granularities was empty!"));
+//            // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
 //            //  data for the current live syncing candle from the raw trades method.
             String timeFrame = x + str;
             return HttpClient.newHttpClient().sendAsync(
@@ -456,7 +451,6 @@ public class Binance {
 
             @Override
             public Set<Integer> getSupportedGranularities() {
-
                 return new TreeSet<>(GRANULARITIES);
             }
 
@@ -468,10 +462,9 @@ public class Binance {
 
                 String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                         .format(LocalDateTime.ofEpochSecond(endTime.get(), 0, ZoneOffset.UTC));
-
-                final int[] startTime = {Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA)};
+                int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
                 String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                        .format(LocalDateTime.ofEpochSecond(startTime[0], 0, ZoneOffset.UTC));
+                        .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
 
 //
                 Log.info("Start date: " + startDateString)
@@ -505,8 +498,10 @@ public class Binance {
                         String.valueOf(tradePair).replace("/", "") + "&interval=" + timeFrame;
 
 
-                if (startTime[0] == EARLIEST_DATA) {
+                if (startTime == EARLIEST_DATA) {
                     // signal more data is false
+
+                    out.println("startTime: " + startTime + " is false");
                     return CompletableFuture.completedFuture(Collections.emptyList());
                 }
 
@@ -535,21 +530,18 @@ public class Binance {
                                 ArrayList<CandleData> candleData = new ArrayList<>();
 
                                 for (JsonNode candle : res) {
-
-                                    candleData.add(
-                                            new CandleData(candle.get(1).asDouble(),  // open price
-                                                    candle.get(4).asDouble(),  // close price
-                                                    candle.get(2).asDouble(),  // high price
-                                                    candle.get(3).asDouble(),  // low price
-                                                    candle.get(0).asInt(),     // open time
-                                                    candle.get(5).asDouble())   // volume
+                                    out.println("JSON " + candle);
+                                    //        JSON [1632614400000,"42695.8400","43957.8200","40192.1600","43216.3600","1119.97070800",1632700799999,"47701882.7039",50948,"514.17724000","21953536.9128","0"]
+                                    candleData.add(new CandleData(candle.get(1).asDouble(),  // open price
+                                            candle.get(4).asDouble(),  // close price
+                                            candle.get(2).asDouble(),  // high price
+                                            candle.get(3).asDouble(),  // low price
+                                            candle.get(0).asInt(),     // open time
+                                            candle.get(5).asDouble())   // volume
                                     );
-
                                     endTime.set(candle.get(0).asInt());
-                                    Log.info("candle : Open time" + new Date(candleData.get(0).getOpenTime()) + "close time" + new Date(candle.get(0).asInt()) + "\n" + "candle:" + candleData);
+                                    Log.info("Candle D" + candleData);
                                 }
-
-
                                 candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                                 return candleData;
                             } else {
