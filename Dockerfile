@@ -6,8 +6,7 @@ WORKDIR /investpro
 
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
-RUN chmod a+x /bin/mvn
-RUN ./mvnw dependency:resolve
+RUN sudo ./mvnw dependency:resolve
 
 COPY src ./src
 
