@@ -31,9 +31,9 @@ Supported Features :
 - Trade Alert
 - Trade Signal
 
-################################    
+#################   
 OPERATING SYSTEMS
-################################
+##################
 
 - WINDOWS
 - LINUX
