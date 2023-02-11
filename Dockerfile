@@ -1,6 +1,6 @@
 FROM openjdk:8-jdk-alpine
 VOLUME /tmp
-COPY ./mvn  ./mvn
+
 WORKDIR /investpro
 ARG JAVA_OPTS
 ENV JAVA_OPTS=$JAVA_OPTS
