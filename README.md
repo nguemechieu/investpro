@@ -1,9 +1,10 @@
-# InvestPro ![InvestPro, Inc](src/main/resources/logo.png)
+# InvestPro
+[![InvestPro, Inc](src/main/resources/logo.png)]
 
-![Latest release](https://img.shields.io/badge/release-1.0.1-blu)
-![Build Status](https://github.com/nguemechieu/investpro/blob/master/wiki/images/gitter.svg)
-[![GitHub license](https://github.com/nguemechieu/investpro/blob/master/wiki/license_apache.svg)](https://github.com/PaladinCloud/CE/blob/master/LICENSE)
-![Coverages](https://github.com/nguemechieu/investpro/coverages.png)
+[![Latest release](https://img.shields.io/badge/release-1.0.1-blu)]
+[![Build Status](https://github.com/nguemechieu/investpro/blob/master/wiki/images/gitter.svg)]
+[![GitHub license](https://github.com/nguemechieu/investpro/blob/master/wiki/license_apache.svg)]
+[![Coverages](https://github.com/nguemechieu/investpro/coverages.png)]
 
 Description
 
@@ -30,9 +31,9 @@ Supported Features :
 - Trade Alert
 - Trade Signal
 
-################################    
+#################   
 OPERATING SYSTEMS
-################################
+##################
 
 - WINDOWS
 - LINUX
@@ -63,6 +64,6 @@ you can use the application
 We will keep updating the environment and provisioning the provision
 with new updates and improvements
 
-################################################################
+############################
 Copyright InvestPro 2023
-################################################################
+##############################
