@@ -1,4 +1,6 @@
-package org.investpro.investpro;
+package org.investpro.investpro.oanda;
+
+import org.investpro.investpro.Order;
 
 public class OandaOrder extends Order {
     private String id;

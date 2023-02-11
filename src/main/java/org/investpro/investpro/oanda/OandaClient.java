@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.oanda;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -10,6 +10,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
+import org.investpro.investpro.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -40,14 +41,14 @@ import static java.lang.System.out;
 public class OandaClient extends Exchange {
     private static final Accounts accounts = new Accounts();
 
-    static String accountID = "001-001-2783446-006";
+    public static String accountID = "001-001-2783446-006";
     static Instrument instrument = new Instrument();
-    static Root root;
+    public static Root root;
     static Position positionObj;
     //
 //            GET	/v3/accounts/{accountID}/instruments
 //    Get the list of tradeable instruments for the given Account. The list of tradeable instruments is dependent on the regulatory division that the Account is located in, thus should be the same for all Accounts owned by a single user.
-    static ArrayList<String> instrumentsList = new ArrayList<>();
+    public static ArrayList<String> instrumentsList = new ArrayList<>();
     static String host = "https://api-fxtrade.oanda.com";
     static ArrayList<CandleData> array = new ArrayList<CandleData>();
     private static String api_key = "928727bf9a4211c110e00a5ac5689563-d07389a5e8c5ea4abf67d923007b25bc";
@@ -133,7 +134,7 @@ public class OandaClient extends Exchange {
 //    PUT	/v3/accounts/{accountID}/trades/{tradeSpecifier}/orders
 //    Create, replace and cancel a Trade’s dependent Orders (Take Profit, Stop Loss and Trailing Stop Loss) through the Trade itself
 
-    static ArrayList<String> getTradeAbleInstruments() throws OandaException {
+    public static ArrayList<String> getTradeAbleInstruments() throws OandaException {
 
 
         try {
@@ -165,7 +166,7 @@ public class OandaClient extends Exchange {
 //            GET	/v3/accounts/{accountID}
 //    Get the full details for a single Account that a client has access to. Full pending Order, open Trade and open Position representations are provided.
 
-    static Root getAccountFullDetails() throws OandaException {
+    public static Root getAccountFullDetails() throws OandaException {
         root = new Root();
         /*{"lastTransactionID":"101357","account":{"createdByUserID":2783446,"NAV":"3.0537",
          * "marginCloseoutUnrealizedPL":"0.0000","marginCallMarginUsed":"0.0000",
@@ -1162,7 +1163,7 @@ public class OandaClient extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(String tradePair, Instant stopAt) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -1387,7 +1388,7 @@ public class OandaClient extends Exchange {
 
 
     @Override
-    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair) {
         return new OandaCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
@@ -1411,7 +1412,7 @@ public class OandaClient extends Exchange {
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
 
-        public OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        public OandaCandleDataSupplier(int secondsPerCandle, String tradePair) {
             super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         }
 
@@ -1609,7 +1610,7 @@ public class OandaClient extends Exchange {
 
 
             String granularity = str + x;
-            String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') + "/candles?price=BA&from=2016-10-17T15%3A00%3A00.000000000Z&granularity=" + granularity;
+            String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/" + tradePair + "/candles?price=BA&from=2016-10-17T15%3A00%3A00.000000000Z&granularity=" + granularity;
 //
 //
             out.println("timeframe: " + granularity);
@@ -1625,6 +1626,7 @@ public class OandaClient extends Exchange {
 
             HttpRequest.Builder req = HttpRequest.newBuilder();
             req.uri(URI.create(uriStr));
+
             req.header("Authorization", "Bearer " + OandaClient.getApi_key());
             return HttpClient.newHttpClient().sendAsync(
                             req.build(),
@@ -1638,7 +1640,6 @@ public class OandaClient extends Exchange {
                         } catch (JsonProcessingException ex) {
                             throw new RuntimeException(ex);
                         }
-
                         if (!res.isEmpty()) {
                             // Remove the current in-progress candle
                             if (DateToInt(res.get("time").asText()) +

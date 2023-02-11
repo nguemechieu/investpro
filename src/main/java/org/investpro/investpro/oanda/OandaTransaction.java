@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.oanda;
 
 public record OandaTransaction() {
     private static String transactionId = "12";

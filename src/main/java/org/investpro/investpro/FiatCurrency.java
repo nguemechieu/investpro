@@ -16,6 +16,18 @@ public class FiatCurrency extends Currency {
         numericCode = -1;
     }
 
+    @Override
+    public String toString() {
+        return "FiatCurrency{" +
+                "locale=" + locale +
+                ", centralBank='" + centralBank + '\'' +
+                ", numericCode=" + numericCode +
+                ", code='" + code + '\'' +
+                ", fractionalDigits=" + fractionalDigits +
+                ", symbol='" + symbol + '\'' +
+                '}';
+    }
+
     protected FiatCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
                            String symbol, Locale locale, String centralBank, int numericCode) {
         super(CurrencyType.FIAT, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol);

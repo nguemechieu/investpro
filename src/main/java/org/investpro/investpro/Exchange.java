@@ -1,5 +1,6 @@
 package org.investpro.investpro;
 
+import org.investpro.investpro.oanda.OandaException;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
@@ -22,18 +23,20 @@ public abstract class Exchange {
         return webSocketClient;
     }
 
+    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair);
+
     /**
      * Fetches the recent trades for the given trade pair from  {@code stopAt} till now (the current time).
      * <p>
      * This method only needs to be implemented to support live syncing.
      */
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt);
+    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(String tradePair, Instant stopAt);
 
     /**
      * Returns the {@code CandleDataSupplier} implementation that will be used to provide pages of candle data for the
      * given {@code secondsPerCandle} and {@code tradePair}.
      */
-    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
+
 
     /**
      * Fetches completed candles (of smaller duration than the current {@code secondsPerCandle}) in the duration of
@@ -42,7 +45,7 @@ public abstract class Exchange {
      * TThis method only needs to be implemented to support live syncing.
      */
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) throws OandaException, InterruptedException {
+            String tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) throws OandaException, InterruptedException {
         throw new UnsupportedOperationException("Exchange: " + this + " does not support fetching candle data" +
                 " for in-progress candle");
     }
@@ -52,11 +55,11 @@ public abstract class Exchange {
     public abstract void abort();
 
 
-    public RootBidAsk getBidAsk(@NotNull TradePair tradePair) {
+    public RootBidAsk getBidAsk(@NotNull String tradePair) {
         RootBidAsk bidAsk = new RootBidAsk();
 
 
-        bidAsk.instrument = tradePair.toString('_');
+        bidAsk.instrument = tradePair;
         Ask ask = new Ask();
 
         bidAsk.asks.add(ask);

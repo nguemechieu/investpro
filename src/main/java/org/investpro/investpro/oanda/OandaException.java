@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.oanda;
 
 import java.io.Serial;
 

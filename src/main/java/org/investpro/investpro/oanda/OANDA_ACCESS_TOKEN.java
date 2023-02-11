@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.oanda;
 
 public enum OANDA_ACCESS_TOKEN {
     ACCESS_TOKEN("3285e03f03fbff5da0be47c99d00219c-6e783e35a9bd5658f2ec46d717132e21"),

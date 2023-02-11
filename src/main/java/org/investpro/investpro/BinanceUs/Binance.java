@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.BinanceUs;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -11,6 +11,7 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
+import org.investpro.investpro.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -59,7 +60,7 @@ public class Binance {
     public static final String MAINNET_API_PASS = "";
     public static final String TESTNET_TESTNET_API_URL = "https://testnet." + "binance.org";
     public static final String TESTNET_TESTNET_API_VERSION = "v1";
-    TradePair BTC_USD = TradePair.of(Currency.of("BTC"), Currency.of("USD"));
+    String BTC_USD = "ETHUSD";
     private String apiSecret;
     private String apiPass;
 
@@ -91,7 +92,7 @@ public class Binance {
 
     }
 
-    Binance() {
+    public Binance() {
     }
 
     public String getApiSecret() {
@@ -174,12 +175,14 @@ public class Binance {
         return true;
     }
 
-    public static void createMarketOrder(TradePair tradePair, String type, String side, double size) {
+    public static void createMarketOrder(String tradePair, String type, String side, double size) {
     }
 
     public CandleStickChartContainer start() throws URISyntaxException, IOException {
 
-        CandleStickChartContainer candleStickChartContainer = new CandleStickChartContainer(new BinanceU(), BTC_USD, true);
+        CandleStickChartContainer candleStickChartContainer;
+
+        candleStickChartContainer = new CandleStickChartContainer(new BinanceU(), BTC_USD, true);
         candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return candleStickChartContainer;
     }
@@ -232,7 +235,7 @@ public class Binance {
         return new JSONObject(response.toString());
     }
 
-    public static class BinanceU extends Exchange {   // private static final URI urO=URI.create("wss://stream.binance.us:9443");
+    static class BinanceU extends Exchange {   // private static final URI urO=URI.create("wss://stream.binance.us:9443");
 
 
         private static String x;
@@ -243,7 +246,7 @@ public class Binance {
         }
 
         @Override
-        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair) {
             return new BinanceUCandleDataSupplier(secondsPerCandle, tradePair);
         }
 
@@ -253,7 +256,7 @@ public class Binance {
          * This method only needs to be implemented to support live syncing.
          */
         @Override
-        public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        public CompletableFuture<List<Trade>> fetchRecentTradesUntil(String tradePair, Instant stopAt) {
             Objects.requireNonNull(tradePair);
             Objects.requireNonNull(stopAt);
 
@@ -273,7 +276,7 @@ public class Binance {
                 // We will know if we get rate limited if we get a 429 response code.
                 // FIXME: We need to address this!
                 for (int i = 0; !futureResult.isDone(); i++) {
-                    String uriStr = "https://api.binance.us/api/v3/trades?symbol=" + String.valueOf(tradePair).replace("/", "");
+                    String uriStr = "https://api.binance.us/api/v3/trades?symbol=" + tradePair;
 
                     if (i != 0) {
                         uriStr += "?after=" + afterCursor.get();
@@ -313,8 +316,8 @@ public class Binance {
                                     break;
                                 } else {
                                     tradesBeforeStopTime.add(new Trade(tradePair,
-                                            DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
-                                            DefaultMoney.ofCrypto(trade.get("qty").asText(), tradePair.getBaseCurrency()),
+                                            DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.substring(4, tradePair.length() - 1)),
+                                            DefaultMoney.ofCrypto(trade.get("qty").asText(), tradePair.substring(0, 3)),
                                             Side.getSide(trade.get("isBuyerMaker").asText()), trade.get("id").asLong(), time));
 //                                    "id": 981492,
 //                                            "price": "0.00380100",
@@ -342,7 +345,7 @@ public class Binance {
          */
         @Override
         public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-                TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+                String tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
 //            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
 //                    currentCandleStartedAt, ZoneOffset.UTC));
 //            long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
@@ -356,7 +359,7 @@ public class Binance {
             return HttpClient.newHttpClient().sendAsync(
 
                             HttpRequest.newBuilder()
-                                    .uri(URI.create("https://api.binance.us/api/v3/klines?symbol=" + String.valueOf(tradePair).replace("/", "") + "&interval=" + timeFrame))
+                                    .uri(URI.create("https://api.binance.us/api/v3/klines?symbol=" + tradePair + "&interval=" + timeFrame))
                                     .GET().build(),
                             HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
@@ -445,7 +448,7 @@ public class Binance {
             private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
             private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
 
-            BinanceUCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+            BinanceUCandleDataSupplier(int secondsPerCandle, String tradePair) {
                 super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
             }
 
@@ -472,8 +475,7 @@ public class Binance {
 //                ;
                 Log.info("End date: " + endDateString);
 
-                Log.info("TradePair " + String.valueOf(tradePair
-                ).replace("/", ""));
+                Log.info("TradePair " + tradePair);
                 Log.info("Second per Candle: " + secondsPerCandle);
 
                 if (secondsPerCandle < 3600) {
@@ -495,7 +497,7 @@ public class Binance {
                 String timeFrame = x + str;
                 out.println("timeframe: " + timeFrame);
                 String uriStr = "https://api.binance.us/api/v3/klines?symbol=" +
-                        String.valueOf(tradePair).replace("/", "") + "&interval=" + timeFrame;
+                        tradePair + "&interval=" + timeFrame;
 
 
                 if (startTime == EARLIEST_DATA) {

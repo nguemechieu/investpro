@@ -1,7 +1,10 @@
-package org.investpro.investpro;
+package org.investpro.investpro.oanda;
 
 import javafx.application.Platform;
 import javafx.scene.layout.AnchorPane;
+import org.investpro.investpro.CandleStickChartContainer;
+import org.investpro.investpro.Log;
+import org.investpro.investpro.Trade;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -9,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Date;
 
 public class Oanda {
-    TradePair BTC_USD = TradePair.of(Currency.of("EUR"), Currency.ofFiat("JPY"));
+    String BTC_USD = "EUR_JPY";
     String name;
     String email;
     String password;

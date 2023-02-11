@@ -29,4 +29,10 @@ module org.investpro.investpro {
     requires java.rmi;
     opens org.investpro.investpro to javafx.fxml;
     exports org.investpro.investpro;
+    exports org.investpro.investpro.Coinbase;
+    opens org.investpro.investpro.Coinbase to javafx.fxml;
+    exports org.investpro.investpro.BinanceUs;
+    opens org.investpro.investpro.BinanceUs to javafx.fxml;
+    exports org.investpro.investpro.oanda;
+    opens org.investpro.investpro.oanda to javafx.fxml;
 }

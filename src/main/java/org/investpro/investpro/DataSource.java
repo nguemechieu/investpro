@@ -10,7 +10,7 @@ public class DataSource implements javax.sql.DataSource {
 
     static String password = "Bigboss307#";
     static String root = "root";
-    static String dbName = "tradeexpert";
+    static String dbName = "db";
     static String url = "jdbc:mysql://localhost:3306/" + dbName;
 
     public DataSource() throws SQLException {

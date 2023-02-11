@@ -9,7 +9,7 @@ import java.util.Objects;
 public class Trade {
     public static CandleData candle;
     private JSONObject trade;
-    private TradePair tradePair;
+    private String tradePair;
     private Money price;
     private Money amount;
     private Side transactionType;
@@ -17,7 +17,7 @@ public class Trade {
     private Instant timestamp;
     private Money fee;
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
+    public Trade(String tradePair, Money price, Money amount, Side transactionType,
                  long localTradeId, Instant timestamp, Money fee) {
         this.tradePair = tradePair;
         this.price = price;
@@ -28,19 +28,19 @@ public class Trade {
         this.fee = fee;
     }
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
+    public Trade(String tradePair, Money price, Money amount, Side transactionType,
                  long localTradeId, Instant timestamp) {
         this(tradePair, price, amount, transactionType, localTradeId,
                 timestamp, DefaultMoney.NULL_MONEY);
     }
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
+    public Trade(String tradePair, Money price, Money amount, Side transactionType,
                  long localTradeId, long timestamp) {
         this(tradePair, price, amount, transactionType, localTradeId, Instant.ofEpochSecond(timestamp),
                 DefaultMoney.NULL_MONEY);
     }
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
+    public Trade(String tradePair, Money price, Money amount, Side transactionType,
                  long localTradeId, long timestamp, Money fee) {
         this(tradePair, price, amount, transactionType, localTradeId, Instant.ofEpochSecond(timestamp), fee);
     }
@@ -49,7 +49,7 @@ public class Trade {
         this.trade = trade;
     }
 
-    public TradePair getTradePair() {
+    public String getTradePair() {
         return tradePair;
     }
 

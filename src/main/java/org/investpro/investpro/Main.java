@@ -20,6 +20,10 @@ import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.chart.Axis;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.layout.*;
@@ -28,11 +32,16 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 import javafx.util.Duration;
+import org.investpro.investpro.BinanceUs.Binance;
+import org.investpro.investpro.Coinbase.CoinbasePro;
+import org.investpro.investpro.oanda.Oanda;
+import org.investpro.investpro.oanda.OandaClient;
+import org.investpro.investpro.oanda.OandaException;
+import org.investpro.investpro.oanda.OandaOrder;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.ParseException;
@@ -40,8 +49,8 @@ import java.util.*;
 
 import static java.lang.System.nanoTime;
 import static java.lang.System.out;
-import static org.investpro.investpro.OandaClient.*;
 import static org.investpro.investpro.PLATFORM.COINBASE_PRO;
+import static org.investpro.investpro.oanda.OandaClient.*;
 
 
 public class Main extends Application {
@@ -75,8 +84,7 @@ public class Main extends Application {
                         new Menu("Tools"),
                         new Menu("Charts"),
                         new Menu("Insert"),
-                        new Menu("Window"),
-                        new Menu("Settings")
+                        new Menu("Window")
                         , new Menu("Browser"),
                         new Menu("Help"),
                         new Menu("Languages"),
@@ -114,11 +122,13 @@ public class Main extends Application {
         menuElements.get(0).getItems().addAll(
                 new MenuItem("Sign in"),
                 new MenuItem("Profile"),
+
                 new MenuItem("Open Data Folder"),
                 new MenuItem("Save"),
                 new MenuItem("Save As"),
+                new MenuItem("Settings"),
                 new MenuItem("Print "),
-                new MenuItem("Print Preview"));
+                new MenuItem("Preview"));
 
         //Controlling menu events
 
@@ -186,9 +196,11 @@ public class Main extends Application {
 
                                 case Ally_Invest:
                                     alert.showAndWait();
+                                    break;
 
                                 case COINBASE_PRO:
                                     alert.showAndWait();
+                                    break;
                                 case BINANCE_COM:
                                     alert.showAndWait();
                                 default:
@@ -241,13 +253,12 @@ public class Main extends Application {
             scene.getStylesheets().add("app.css");
 
             s.setScene(scene);
-            s.setTitle("Exchange -->Login");
+            s.setTitle("Login");
 
             s.show();
         });
 
         menuElements.get(0).getItems().get(1).setOnAction(e -> {
-
             MenuItem item = (MenuItem) e.getSource();
             out.println(item.getText());
             Stage s = new Stage();
@@ -255,7 +266,7 @@ public class Main extends Application {
 
             Parent stackPane = new StackPane(vbox);
             s.setScene(new Scene(stackPane, 800, 600));
-            s.setTitle("Profile");
+            s.setTitle("User Profile");
             s.setResizable(true);
             s.show();
 
@@ -305,7 +316,7 @@ public class Main extends Application {
 
 
         menuElements.get(1).getItems().addAll(
-                new Menu("Settings"),
+
                 new Menu("Navigate"),
                 new MenuItem("Infos"),
                 new Menu("Telegram "));
@@ -373,9 +384,9 @@ public class Main extends Application {
                     vBox.setAlignment(Pos.CENTER);
                     vBox.getChildren().add(new Label("Hello World now you can test your trade strategy!"));
                     Parent stackPane = new StackPane(vBox);
-                    s.setScene(new Scene(stackPane, 800, 600));
-                    s.setTitle("Strategy Tester");
-                    s.setResizable(true);
+            s.setScene(new Scene(stackPane, 800, 600));
+            s.setTitle("Strategy Test");
+            s.setResizable(true);
                     s.show();
                 }
         );
@@ -863,16 +874,36 @@ public class Main extends Application {
         accountPerformance.setPadding(new Insets(10, 10, 10, 10));
         accountPerformance.setSpacing(10);
         accountPerformance.setAlignment(Pos.CENTER);
+        VBox vBox = new VBox();
+        vBox.setPadding(new Insets(10, 10, 10, 10));
 
-        GridPane grid_pane = new GridPane();
+        Axis<Number
+                > axis = new NumberAxis();
 
-        grid_pane.setPadding(new Insets(10, 10, 10, 10));
-        grid_pane.setVgap(10);
-        grid_pane.getChildren().add(new Label("Performance"));
+
+        axis.setLabel("Time");
+
+        CategoryAxis categoryAxis = new CategoryAxis();
+        ObservableList<Double> observer = FXCollections.observableArrayList();
+
+        observer.addAll(root.account.resettablePL);
+
+        categoryAxis.getCategories().setAll(String.valueOf(observer));
+
+        LineChart<Number, String> chartP = new LineChart<>(axis, categoryAxis);
+
+        chartP.setAxisSortingPolicy(LineChart.SortingPolicy.X_AXIS);
+        chartP.createSymbolsProperty().set(true);
+        chartP.setTitle("Account Annual Performance");
+        chartP.setPadding(new Insets(20, 20, 20, 20));
+        chartP.computeAreaInScreen();
+
+
+        vBox.getChildren().add(chartP);
 
         accountPerformance.getChildren().addAll(
-                new Label("Account Performance"),
-                grid_pane);
+                new Label("Performance"),
+                vBox);
         return accountPerformance;
     }
 
@@ -1302,7 +1333,7 @@ public class Main extends Application {
         Scene scene = new Scene(anchorpane, TRADING_SCREEN_WIDTH, TRADING_SCREEN_HEIGHT);
         scene.getStylesheets().add("/app.css");
         stage.setScene(scene);
-        stage.setTitle("InvestPro -->Welcome  " + new Date(System.currentTimeMillis()));
+        stage.setTitle("InvestPro -->Welcome  " + root.account.alias + "   " + root.account.id + new Date(System.currentTimeMillis()));
         stage.setResizable(true);
         stage.setIconified(true);
         stage.getIcons().add(new Image(String.valueOf(new URI("Invest.png"))));
@@ -1311,24 +1342,22 @@ public class Main extends Application {
 
     }
 
-    TabPane getTabPane() throws OandaException, IOException, ParseException {
+    TabPane getTabPane() throws OandaException, ParseException {
         DraggableTab[] tabs
 
                 = new DraggableTab[]{
-                new DraggableTab("Live Orders "),
+                new DraggableTab("Orders "),
                 new DraggableTab("Orders History"),
-                new DraggableTab("Account "),
-                new DraggableTab("Account Performance"),
-                new DraggableTab("Account Details"),
+                new DraggableTab("Performance"),
+                new DraggableTab("Details"),
                 new DraggableTab("Statistics"),
                 new DraggableTab("News Report"),
                 new DraggableTab("Trade Signals"),
-                new DraggableTab("Recommendation"),
                 new DraggableTab("Navigation"),
                 new DraggableTab("Oanda Wallet"),
                 new DraggableTab("Binance Us Wallet"),
-                new DraggableTab("Coinbase Pro Wallet")
-                , new DraggableTab("Coinbase Wallet")
+                new DraggableTab("Coinbase Wallet")
+
         };
 
         tabs[0].setContent(getOandaOrders());
@@ -1345,13 +1374,10 @@ public class Main extends Application {
         tabs[8].setContent(getOandaRecommendation());
         tabs[9].setContent(getOandaWallet());
         tabs[10].setContent(getCoinbaseProWallet());
-        tabs[11].setContent(getBinanceUSProWallet());
 
 
         TabPane orderTabPanes = new TabPane();
         orderTabPanes.getTabs().addAll(tabs);
-
-
         orderTabPanes.setRotateGraphic(true);
         orderTabPanes.setTabDragPolicy(TabPane.TabDragPolicy.REORDER);
         return orderTabPanes;
@@ -1362,11 +1388,7 @@ public class Main extends Application {
         return new VBox();
     }
 
-    @Contract(" -> new")
-    private @NotNull Node getBinanceUsWallet() {
 
-        return new VBox();
-    }
 
     void coinbaseWalletManager(ActionEvent actionEvent) {
 
@@ -1384,22 +1406,18 @@ public class Main extends Application {
     }
 
     private void sendMoney() {
+
     }
 
     @Contract(" -> new")
     private @NotNull Node getBinanceUSProWallet() {//Implement this method to get the coinbase transaction
-
-
         Button b = new Button("Deposit");
         Button c = new Button("Withdraw");
-        Button d = new Button("SendMoney");
-
+        Button d = new Button("Send Money");
         b.setOnAction(e -> depositCoinbase());
         c.setOnAction(e -> withdrawCoinbase());
         d.setOnAction(e -> sendMoney());
-
         GridPane grid = new GridPane();
-
         grid.setPadding(new Insets(10, 10, 10, 10));
         grid.add(new Label("--------Binance Us Wallet ------- "), 0, 0);
         grid.add(new Label(""), 1, 1);
@@ -1415,8 +1433,6 @@ public class Main extends Application {
     }
 
     private @NotNull VBox getCandleSticksChart() throws Exception, OandaException {
-
-
         TabPane candleSticksChartTabPane = new TabPane();
         DraggableTab[] candleStickChartTabs = new DraggableTab[]{
                 new DraggableTab("Oanda Com"),
@@ -1505,7 +1521,7 @@ public class Main extends Application {
         columnNewsForecast.setText("Forecast");
         TreeTableColumn<News, String> columnNewsPrevious = new TreeTableColumn<>();
         columnNewsPrevious.setText("Previous");
-        treeTableNews.setBackground(Background.fill(Color.BLACK));
+
 
         //Loading News from Forex factory url:https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823
         ObservableList<News> dat = FXCollections.observableArrayList();
@@ -1544,21 +1560,31 @@ public class Main extends Application {
         return treeTableNews;
     }
 
-    private @NotNull VBox getAccountDetails() throws IOException {
+    private @NotNull VBox getAccountDetails() {
 
         VBox accountDetails = new VBox();
         accountDetails.setSpacing(10);
+        accountDetails.setBackground(Background.fill(Color.LAVENDER));
         accountDetails.setPadding(new Insets(10, 10, 10, 10));
         accountDetails.setAlignment(Pos.CENTER);
         accountDetails.getChildren().addAll(
                 new Label("___________________ Account Details _____________________"),
                 new Label("Date :" + new Date(System.currentTimeMillis())),
-                new Label("Name: " + OandaClient.root.account.alias),
-                new Label("Balance: " + OandaClient.root.account.balance),
-                new Label("Currency: " + OandaClient.root.account.currency),
-                new Label("CreateTime: " + OandaClient.root.account.createdTime),
-                new Label("Margin Available: " + OandaClient.root.account.marginAvailable),
-                new Label("________________________________________"));
+                new Label("Name :" + OandaClient.root.account.alias),
+                new Label("Balance : " + OandaClient.root.account.balance),
+                new Label("Currency : " + OandaClient.root.account.currency),
+
+                new Label("Margin used: " + root.account.marginUsed),
+                new Label("Margin closed %: " + root.account.marginCloseoutPercent),
+                new Label("Margin rate: " + root.account.marginRate),
+                new Label("Commission : " + root.account.commission),
+                new Label("Dividend Adjustment : " + root.account.dividendAdjustment),
+                new Label("Guaranteed Execution Fees : " + root.account.guaranteedExecutionFees),
+                new Label("Margin Closeout NAV : " + root.account.marginCloseoutNAV),
+                new Label("Margin Closeout UnrealizedPL : " + root.account.marginCloseoutUnrealizedPL),
+                new Label("Create Time : " + OandaClient.root.account.createdTime),
+
+                new Label("_____________________________________________________________"));
         return accountDetails;
     }
 

@@ -12,8 +12,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
     public static final Money NULL_MONEY = DefaultMoney.ofFiat(BigDecimal.ZERO, Currency.NULL_FIAT_CURRENCY);
 
     @Contract("_, _ -> new")
-    public static @NotNull Money of(int amount, Currency currency) {
-        return of(BigDecimal.valueOf(amount), currency);
+    public static @NotNull Money of(BigDecimal amount, String currency) {
+        return of((amount), currency);
     }
 
     @Contract("_, _ -> new")

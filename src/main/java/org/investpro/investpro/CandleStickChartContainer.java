@@ -26,18 +26,18 @@ public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
     private final CandleStickChartToolbar toolbar;
     private final Exchange exchange;
-    private final TradePair tradePair;
+    private final String tradePair;
     private final SimpleIntegerProperty secondsPerCandle;
     private CandleStickChart candleStickChart;
 
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
      */
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair) throws URISyntaxException, IOException {
+    public CandleStickChartContainer(Exchange exchange, String tradePair) throws URISyntaxException, IOException {
         this(exchange, tradePair, true);
     }
 
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) throws URISyntaxException, IOException {
+    public CandleStickChartContainer(Exchange exchange, String tradePair, boolean liveSyncing) throws URISyntaxException, IOException {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         this.exchange = exchange;

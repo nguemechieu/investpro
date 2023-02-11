@@ -1,4 +1,5 @@
-package org.investpro.investpro;
+package org.investpro.investpro.BinanceUs;
+
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -6,10 +7,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import javafx.util.Pair;
+import org.investpro.investpro.*;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -24,16 +26,17 @@ import java.util.concurrent.CompletableFuture;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 
-public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
+public abstract class BinanceUsWebSocketClient extends ExchangeWebSocketClient {
+
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private final Set<TradePair> tradePairs;
+    Set<String> tradePairs;
 
 
-    public CoinbaseWebSocketClient(Set<TradePair> tradePairs) {
-        super(URI.create("wss://ws-feed.pro.coinbase.com"), new Draft_6455());
+    public BinanceUsWebSocketClient(Set<String> tradePairs) {
+        super(URI.create("wss://stream.binance.us:9443"), new Draft_6455());
         Objects.requireNonNull(tradePairs);
         this.tradePairs = tradePairs;
     }
@@ -44,20 +47,16 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         try {
             messageJson = OBJECT_MAPPER.readTree(message);
         } catch (JsonProcessingException ex) {
-            Log.error("ex: " + ex);
+            Log.error("Binance us ex: " + ex);
             throw new RuntimeException(ex);
         }
+
         if (messageJson.has("event") && messageJson.get("event").asText().equalsIgnoreCase("info")) {
             connectionEstablished.setValue(true);
         }
 
-        TradePair tradePair = null;
-        try {
-            tradePair = parseTradePair(messageJson);
-        } catch (CurrencyNotFoundException exception) {
-            Log.error("coinbase websocket client: could not initialize trade pair: " +
-                    messageJson.get("product_id").asText() + "\n" + exception);
-        }
+        String tradePair = null;
+        tradePair = parseTradePair(messageJson);
 
         Side side = messageJson.has("side") ? Side.getSide(messageJson.get("side").asText()) : null;
 
@@ -69,54 +68,42 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                     assert tradePair != null;
                     Trade newTrade = new Trade(tradePair,
                             DefaultMoney.of(new BigDecimal(messageJson.get("price").asText()),
-                                    tradePair.getCounterCurrency()),
+                                    tradePair.substring(4, tradePair.length() - 1)),
                             DefaultMoney.of(new BigDecimal(messageJson.get("size").asText()),
-                                    tradePair.getBaseCurrency()),
-                            side, messageJson.at("trade_id").asLong(),
+                                    tradePair.substring(0, 3)),
+                            side, messageJson.at("id").asLong(),
                             Instant.from(ISO_INSTANT.parse(messageJson.get("time").asText())));
                     liveTradeConsumers.get(tradePair).acceptTrades(Collections.singletonList(newTrade));
                 }
             }
-            case "error" -> throw new IllegalArgumentException("Error on Coinbase websocket client: " +
+            case "error" -> throw new IllegalArgumentException("Error on Binance Us websocket client: " +
                     messageJson.get("message").asText());
             default -> throw new IllegalStateException("Unhandled message type on Gdax websocket client: " +
                     messageJson.get("type").asText());
         }
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException {
-        final TradePair productId = TradePair.of(Currency.of(messageJson.get("product_id").asText()), Currency.of("USD"));
-        final String[] products = productId.split("-");
-        TradePair tradePair;
-        if (products[0].equalsIgnoreCase("BTC")) {
-            tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
-        } else {
-            // products[0] == "ETH"
-            if (products[1].equalsIgnoreCase("USD")) {
-                tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
-            } else {
-                // productId == "ETH-BTC"
-                tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, CryptoCurrency.class));
-            }
-        }
-
-        return tradePair;
+    @Contract(pure = true)
+    private @Nullable String parseTradePair(JsonNode messageJson) {
+        return null;
     }
 
+
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-        send(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("product_id", tradePair.toString('-')).toPrettyString());
+    public void streamLiveTrades(String tradePair, LiveTradesConsumer liveTradesConsumer) {
+        send(String.valueOf(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
+                .put("id", tradePair)));//.toString('-')).toPrettyString());
         liveTradeConsumers.put(tradePair, liveTradesConsumer);
     }
 
+
     @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
+    public void stopStreamLiveTrades(String tradePair) {
         liveTradeConsumers.remove(tradePair);
     }
 
     @Override
-    public boolean supportsStreamingTrades(TradePair tradePair) {
+    public boolean supportsStreamingTrades(String tradePair) {
         return tradePairs.contains(tradePair);
     }
 

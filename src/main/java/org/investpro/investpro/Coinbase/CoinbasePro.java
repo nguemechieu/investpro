@@ -1,10 +1,11 @@
-package org.investpro.investpro;
+package org.investpro.investpro.Coinbase;
 
 import javafx.application.Platform;
-import org.investpro.investpro.Coinbase.Coinbase;
+import org.investpro.investpro.CandleStickChartContainer;
+import org.investpro.investpro.Log;
 
 public class CoinbasePro {
-    TradePair BTC_USD = TradePair.of(Currency.of("BTC"), Currency.of("USD"));
+    String BTC_USD = "LTC-USD";
 
     public static void createMarketOrder(String toString, String type0, String side, double size) {
 

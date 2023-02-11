@@ -36,11 +36,11 @@ public class Currency implements Comparable<java.util.Currency> {
 
     }
 
-    protected final String code;
-    protected final int fractionalDigits;
-    protected final String symbol;
+    protected String code;
+    protected int fractionalDigits;
+    protected String symbol;
     private final CurrencyType currencyType;
-    private final String fullDisplayName;
+    String fullDisplayName;
     private final String shortDisplayName;
 
     /**
@@ -216,7 +216,6 @@ public class Currency implements Comparable<java.util.Currency> {
      * contract for subclasses must be based on currency
      * type and code alone.
      *
-     * @return
      */
     @Override
     public final int hashCode() {

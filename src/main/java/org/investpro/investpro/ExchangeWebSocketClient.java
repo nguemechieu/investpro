@@ -16,7 +16,7 @@ import java.util.concurrent.CountDownLatch;
 
 public abstract class ExchangeWebSocketClient extends org.java_websocket.client.WebSocketClient {
     protected final BooleanProperty connectionEstablished;
-    protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers = new ConcurrentHashMap<>();
+    protected final Map<String, LiveTradesConsumer> liveTradeConsumers = new ConcurrentHashMap<String, LiveTradesConsumer>();
     protected final CountDownLatch webSocketInitializedLatch = new CountDownLatch(1);
 
 
@@ -29,11 +29,12 @@ public abstract class ExchangeWebSocketClient extends org.java_websocket.client.
         return webSocketInitializedLatch;
     }
 
-    public abstract void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer);
+    public abstract void streamLiveTrades(String tradePair, LiveTradesConsumer liveTradesConsumer);
 
-    public abstract void stopStreamLiveTrades(TradePair tradePair);
+    public abstract void stopStreamLiveTrades(String tradePair);
 
-    public abstract boolean supportsStreamingTrades(TradePair tradePair);
+
+    public abstract boolean supportsStreamingTrades(String tradePair);
 
     @Override
     public void onError(Exception exception) {

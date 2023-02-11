@@ -3,23 +3,23 @@ package org.investpro.investpro;
 import java.util.Date;
 
 public class Order {
-    String timestamp;
-    Long id;
-    TRADE_ORDER_TYPE order_type;
-    double lotSize;
-    double price;
-    double total;
-    double remaining;
-    double fee;
-    String currency;
-    Date created;
-    double stopLoss;
-    double takeProfit;
-    Date updated;
-    Date closed;
-    String status;
-    String symbol;
-    String type;
+    public String timestamp;
+    public TRADE_ORDER_TYPE order_type;
+    public double remaining;
+    public double fee;
+    protected Long id;
+    protected double lotSize;
+    protected double price;
+    protected double total;
+    protected String currency;
+    protected Date created;
+    protected double stopLoss;
+    protected double takeProfit;
+    protected Date updated;
+    protected Date closed;
+    protected String status;
+    protected String symbol;
+    protected String type;
 
     public Order() {
         this.created = new Date();

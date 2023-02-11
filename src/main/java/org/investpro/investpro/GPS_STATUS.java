@@ -19,8 +19,10 @@ public enum GPS_STATUS {
 
 
     private static int checker;
+    private static int statusCode;
 
     public static GPS_STATUS NETWORK_RESPONSE(int statusCode) {
+        GPS_STATUS.statusCode = statusCode;
         return switch (statusCode) {
             case 0 -> ON;
             case 1 -> OFF;

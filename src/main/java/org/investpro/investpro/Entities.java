@@ -15,7 +15,7 @@ public class Entities {
     public String url;
     public User user;
     public String language;
-    String custom_emoji_id;
+    public String custom_emoji_id;
 
     public Entities(
             String type,

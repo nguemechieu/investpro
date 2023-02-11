@@ -15,7 +15,6 @@ public class KeyboardButton {
         this.text = start;
         this.request_contact = false;
         this.request_location = false;
-        Object request_poll = null;
     }
 
     @Override

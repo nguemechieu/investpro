@@ -1,5 +1,4 @@
-package org.investpro.investpro;
-
+package org.investpro.investpro.Coinbase;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -7,30 +6,35 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import javafx.util.Pair;
+import org.investpro.investpro.*;
 import org.java_websocket.drafts.Draft_6455;
-import org.jetbrains.annotations.NotNull;
+import org.java_websocket.handshake.ServerHandshake;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
-public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
 
+public abstract class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private final Set<String> tradePairs;
 
 
-    public OandaWebSocketClient(Set<TradePair> tradePairs) {
-        super(URI.create("wss://api-fxtrade.oanda.com"), new Draft_6455());
+    public CoinbaseWebSocketClient(Set<String> tradePairs) {
+        super(URI.create("wss://ws-feed.pro.coinbase.com"), new Draft_6455());
         Objects.requireNonNull(tradePairs);
+        this.tradePairs = tradePairs;
     }
 
     @Override
@@ -42,19 +46,12 @@ public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
             Log.error("ex: " + ex);
             throw new RuntimeException(ex);
         }
-
         if (messageJson.has("event") && messageJson.get("event").asText().equalsIgnoreCase("info")) {
             connectionEstablished.setValue(true);
         }
 
-
-        @NotNull TradePair tradePair = null;
-        try {
-            tradePair = parseTradePair(messageJson);
-        } catch (CurrencyNotFoundException exception) {
-            Log.error("Oanda websocket client: could not initialize trade pair: " +
-                    messageJson.get("instrument").asText() + "\n" + exception);
-        }
+        String tradePair = null;
+        tradePair = parseTradePair(messageJson);
 
         Side side = messageJson.has("side") ? Side.getSide(messageJson.get("side").asText()) : null;
 
@@ -63,52 +60,102 @@ public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
                     send(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString());
             case "match" -> {
                 if (liveTradeConsumers.containsKey(tradePair)) {
-
                     assert tradePair != null;
                     Trade newTrade = new Trade(tradePair,
                             DefaultMoney.of(new BigDecimal(messageJson.get("price").asText()),
-                                    tradePair.getCounterCurrency()),
+                                    tradePair.substring(4, tradePair.length() - 1)),
                             DefaultMoney.of(new BigDecimal(messageJson.get("size").asText()),
-                                    tradePair.getBaseCurrency()),
-                            side, messageJson.at("id").asLong(),
+                                    tradePair.substring(0, 3)),
+                            side, messageJson.at("trade_id").asLong(),
                             Instant.from(ISO_INSTANT.parse(messageJson.get("time").asText())));
                     liveTradeConsumers.get(tradePair).acceptTrades(Collections.singletonList(newTrade));
                 }
             }
-            case "error" -> throw new IllegalArgumentException("Error on Oanda websocket client: " +
+            case "error" -> throw new IllegalArgumentException("Error on Coinbase websocket client: " +
                     messageJson.get("message").asText());
             default -> throw new IllegalStateException("Unhandled message type on Gdax websocket client: " +
                     messageJson.get("type").asText());
         }
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException {
-
-        messageJson.get("instrument").asText();
-        TradePair productId = new TradePair(Currency.of(messageJson.get("instrument").asText()), Currency.of("USD"));
-        final String[] products = productId.split("-");
-        TradePair tradePair;
-        if (products[0].equalsIgnoreCase("BTC")) {
-            tradePair = TradePair.parse(productId, "_", new Pair<>(FiatCurrency.class, FiatCurrency.class));
-        } else {
-            // products[0] == "ETH"
-            if (products[1].equalsIgnoreCase("usd")) {
-                tradePair = TradePair.parse(productId, "_", new Pair<>(FiatCurrency.class, FiatCurrency.class));
-            } else {
-                // productId == "ETH-BTC"
-                tradePair = TradePair.parse(productId, "_", new Pair<>(FiatCurrency.class, CryptoCurrency.class));
-            }
-        }
-
-        return tradePair;
+    private String parseTradePair(JsonNode messageJson) {
+        return null;
     }
 
+
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+    public void streamLiveTrades(String tradePair, LiveTradesConsumer liveTradesConsumer) {
         send(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("instrument", tradePair.toString('_')).toPrettyString());
+                .put("product_id", tradePair).toPrettyString());
         liveTradeConsumers.put(tradePair, liveTradesConsumer);
     }
 
 
+    @Override
+    public void stopStreamLiveTrades(String tradePair) {
+        liveTradeConsumers.remove(tradePair);
+    }
+
+    @Override
+    public boolean supportsStreamingTrades(String tradePair) {
+        return tradePairs.contains(tradePair);
+    }
+
+    @Override
+    public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<WebSocket> sendBinary(ByteBuffer data, boolean last) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<WebSocket> sendPing(ByteBuffer message) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<WebSocket> sendPong(ByteBuffer message) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<WebSocket> sendClose(int statusCode, String reason) {
+        return null;
+    }
+
+    @Override
+    public void request(long n) {
+
+    }
+
+    @Override
+    public String getSubprotocol() {
+        return null;
+    }
+
+    @Override
+    public boolean isOutputClosed() {
+        return false;
+    }
+
+    @Override
+    public boolean isInputClosed() {
+        return false;
+    }
+
+    @Override
+    public void abort() {
+
+    }
+
+    @Override
+    public void onClose(int code, String reason, boolean remote) {
+    }
+
+    @Override
+    public void onOpen(ServerHandshake serverHandshake) {
+    }
 }
