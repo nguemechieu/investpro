@@ -7,7 +7,8 @@ COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
 USER daemon
-RUN chmod + rwx /investpro
+RUN chmod +rwx    
+
 RUN  ./mvnw dependency:resolve
 
 COPY src ./src
