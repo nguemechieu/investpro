@@ -3,10 +3,11 @@
 FROM eclipse-temurin:17-jdk-jammy
 
 WORKDIR /investpro
-USER daemon
-RUN chmod -a /investpro
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
+
+USER daemon
+RUN chmod + rwx /investpro
 RUN  ./mvnw dependency:resolve
 
 COPY src ./src
