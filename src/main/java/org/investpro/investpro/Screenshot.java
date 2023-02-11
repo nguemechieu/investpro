@@ -10,7 +10,7 @@ import java.io.IOException;
 
 public class Screenshot {
 
-    static void capture(File file1) {//Capturing screen image
+    public static void capture(File file1) {//Capturing screen image
 
         System.out.println("Capturing screenshot...");
         Alert alertAlert = new Alert(Alert.AlertType.INFORMATION);

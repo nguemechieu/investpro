@@ -1,5 +1,7 @@
-package org.investpro.investpro;
+package org.investpro.investpro.Coinbase;
 
+import org.investpro.investpro.CandleData;
+import org.investpro.investpro.Log;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -9,18 +11,22 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 
-public class CandleDataPager {
-    private final CandleDataSupplier candleDataSupplier;
+public class CoinbaseCandleDataPager {
+    private final Coinbase.CoinbaseCandleDataSupplier candleDataSupplier;
     private final CandleDataPreProcessor candleDataPreProcessor;
 
-    public CandleDataPager(CandleStickChart candleStickChart, CandleDataSupplier candleDataSupplier) {
+
+    public CoinbaseCandleDataPager(CoinbaseCandleStickChart candleStickChart, Coinbase.CoinbaseCandleDataSupplier candleDataSupplier) {
+
+
         Objects.requireNonNull(candleStickChart);
         Objects.requireNonNull(candleDataSupplier);
         this.candleDataSupplier = candleDataSupplier;
-        candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
+        this.candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
     }
 
-    public CandleDataSupplier getCandleDataSupplier() {
+
+    public Coinbase.CoinbaseCandleDataSupplier getCandleDataSupplier() {
         return candleDataSupplier;
     }
 
@@ -29,10 +35,10 @@ public class CandleDataPager {
     }
 
     private static class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
-        private final CandleStickChart candleStickChart;
+        private final CoinbaseCandleStickChart candleStickChart;
         private boolean hitFirstNonPlaceHolder;
 
-        CandleDataPreProcessor(CandleStickChart candleStickChart) {
+        CandleDataPreProcessor(CoinbaseCandleStickChart candleStickChart) {
             this.candleStickChart = candleStickChart;
         }
 

@@ -1,11 +1,14 @@
-package org.investpro.investpro;
+package org.investpro.investpro.BinanceUs;
 
 import javafx.application.Platform;
+import javafx.beans.Observable;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
@@ -24,9 +27,13 @@ import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontSmoothingType;
 import javafx.scene.text.TextAlignment;
+import javafx.util.Callback;
 import javafx.util.Pair;
-import org.investpro.investpro.BinanceUs.Binance;
-import org.investpro.investpro.Coinbase.CoinbasePro;
+
+import org.investpro.investpro.Currency;
+import org.investpro.investpro.*;
+import org.investpro.investpro.oanda.CandleDataSupplier;
+import org.investpro.investpro.oanda.OandaCandleStickChartToolbar;
 import org.investpro.investpro.oanda.OandaClient;
 import org.investpro.investpro.oanda.OandaException;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +52,7 @@ import java.util.stream.Collectors;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.investpro.investpro.CandleStickChartUtils.*;
 import static org.investpro.investpro.ChartColors.*;
+import static org.investpro.investpro.TRADE_PLATFORM.BinanceUs;
 
 /**
  * A resizable chart that allows for analyzing the trading activity of a commodity over time. The chart is made up of
@@ -56,7 +64,7 @@ import static org.investpro.investpro.ChartColors.*;
  * duration of the candle, if the price of the commodity increased during the duration, the candle is colored
  * green and represents a "bullish" trading period. Conversely, if the price decreased then the candle is colored
  * red which represents a "bearish" period. To display a {@code CandleStickChart} in a scene one must use
- * a {@link CandleStickChartContainer}. To enforce this usage, the constructors for this class are package-private.
+ * a {@link }. To enforce this usage, the constructors for this class are package-private.
  * <p>
  * JavaFX offers various charts in it's javafx.scene.chart package, but does not offer a candle-stick
  * chart out-of-the-box. It does however offer an XYChart which could be used as a starting-point for a candle-stick
@@ -77,9 +85,9 @@ import static org.investpro.investpro.ChartColors.*;
  *
  * @author NOEL M NGUEMECHIEU
  */
-public class CandleStickChart extends Region {
+public class BinanceUsCandleStickChart extends Region {
     private static final DecimalFormat MARKER_FORMAT = new DecimalFormat("#.000");
-    private final CandleDataPager candleDataPager;
+    private final BinanceCandleDataPager candleDataPager;
     private final CandleStickChartOptions chartOptions;
     /**
      * Maps an open time (as a Unix timestamp) to the computed candle data (high price, low price, etc.) for a trading
@@ -119,7 +127,7 @@ public class CandleStickChart extends Region {
 
     /**
      * Creates a new {@code CandleStickChart}. This constructor is package-private because it should only
-     * be instantiated by a {@link CandleStickChartContainer}.
+     * be instantiated by a {@link BinanceUsCandleStickChartContainer}.
      *
      * @param exchange           the {@code Exchange} object on which the trades represented by candles happened on
      * @param candleDataSupplier the {@code CandleDataSupplier} that will supply contiguous chunks of
@@ -132,9 +140,9 @@ public class CandleStickChart extends Region {
      * @param containerWidth     the width property of the parent node that contains the chart
      * @param containerHeight    the height property of the parent node that contains the chart
      */
-    CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, String tradePair,
-                     boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
-                     ObservableNumberValue containerHeight) {
+  public   BinanceUsCandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, String tradePair,
+                                     boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
+                                     ObservableNumberValue containerHeight) {
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
         Objects.requireNonNull(tradePair);
@@ -149,10 +157,10 @@ public class CandleStickChart extends Region {
         this.secondsPerCandle = secondsPerCandle;
         this.liveSyncing = liveSyncing;
         zoomLevelMap = new ConcurrentHashMap<>();
-        candleDataPager = new CandleDataPager(this, candleDataSupplier);
+        candleDataPager = new BinanceCandleDataPager(this, candleDataSupplier);
         data = Collections.synchronizedNavigableMap(new TreeMap<>(Integer::compare));
         chartOptions = new CandleStickChartOptions();
-        canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 15);
+        canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 14);
         progressIndicator = new ProgressIndicator(-1);
         getStyleClass().add("candle-chart");
         xAxis = new StableTicksAxis();
@@ -172,7 +180,7 @@ public class CandleStickChart extends Region {
         xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
         yAxis.setTickLabelFormatter(new MoneyAxisFormatter(Currency.of(tradePair.substring(4, tradePair.length() - 1))));
         extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(Currency.of(tradePair.substring(4, tradePair.length() - 1))));
-        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 12);
+        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 15);
         yAxis.setTickLabelFont(axisFont);
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
@@ -201,10 +209,10 @@ public class CandleStickChart extends Region {
 
         Label loadingLabel = new Label("");
 
-        if (!progressIndicator.isVisible()) {
+        if (progressIndicator.isVisible()) {
             loadingLabel.setText("Loading...");
             loadingLabel.setVisible(true);
-            loadingLabel.setFont(Font.font("Arial", 300));
+            loadingLabel.setFont(Font.font("Arial", 15));
         }
 
 
@@ -213,7 +221,7 @@ public class CandleStickChart extends Region {
 
         loadingIndicatorContainer.setFillWidth(true);
         loadingIndicatorContainer.setSpacing(10);
-        loadingIndicatorContainer.setTranslateX(50);
+        loadingIndicatorContainer.setTranslateX(40);
         loadingIndicatorContainer.setAlignment(Pos.CENTER);
         loadingIndicatorContainer.setMouseTransparent(true);
         //
@@ -276,29 +284,30 @@ public class CandleStickChart extends Region {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
                 double numberOfVisibleWholeCandles = Math.floor(containerWidth.getValue().doubleValue() / candleWidth);
-                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 100 + (float) (candleWidth / 2);
-                chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 100 +
-                        (float) (candleWidth / 2);
+                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 100+ (float) (candleWidth / 2);
+               // chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 10 +
+                 //       (float) (candleWidth / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
-                canvas = new Canvas(chartWidth - 100, chartHeight);
+                canvas = new Canvas(chartWidth , chartHeight );
 
 
                 canvas.applyCss();
-                canvas.getGraphicsContext2D().setFont(Font.font("Helvetica", 14));
+                canvas.getGraphicsContext2D().setFont(Font.font("Helvetica", 15));
                 // Label infosNews = new Label("Infos :");
 
                 btnBuy.setBackground(Background.fill(Color.GREEN));
 
+                @NotNull PLATFORM exchange0=PLATFORM.OANDA;
                 btnSell.setOnAction(e -> {
                     try {
-                        CreateOrder("SELL", spinner.getValue(), PLATFORM.valueOf(exchange.toString()));
+                        CreateOrder("SELL", spinner.getValue(), exchange0);
                     } catch (OandaException ex) {
                         throw new RuntimeException(ex);
                     }
                 });
                 btnBuy.setOnAction(e -> {
                     try {
-                        CreateOrder("BUY", spinner.getValue(), PLATFORM.valueOf(exchange.toString()));
+                        CreateOrder("BUY", spinner.getValue(), exchange0);
                     } catch (OandaException ex) {
                         throw new RuntimeException(ex);
                     }
@@ -309,7 +318,7 @@ public class CandleStickChart extends Region {
                 loadingIndicatorContainer.setTranslateY(250);
                 symbolLabel.setTranslateY(200);
                 symbolLabel.setTranslateX(600);
-                symbolLabel.setFont(Font.font(100));
+                symbolLabel.setFont(Font.font(10));
 
                 Label telegramLabel = new Label();
 
@@ -353,9 +362,17 @@ public class CandleStickChart extends Region {
 
                 VBox vb3 = new VBox();
                 VBox vb4 = new VBox();
+                ListView<Order> orderContainer=new ListView<>();
+                orderContainer.setTranslateX(100);
+                orderContainer.setTranslateY(500);
+                List<Order> list0=new ArrayList<>();
 
+                list0.addAll(  Binance.getOrders());
+                Callback<Order, Observable[]> callback= param -> new Observable[0];
+                ObservableList<Order> ordersList= FXCollections.observableList(list0,callback);
+                orderContainer.setItems(ordersList);
 
-                AnchorPane chartStackPane = new AnchorPane(vbCanvas, list, isConnected, grid, telegramLabel, symbolLabel, loadingIndicatorContainer);
+                AnchorPane chartStackPane = new AnchorPane(vbCanvas, list, isConnected, grid, orderContainer,telegramLabel, symbolLabel, loadingIndicatorContainer);
                 chartStackPane.setTranslateX(20); // Only necessary when wrapped in StackPane...why?
                 chartStackPane.setPrefSize(1300, 730);
 
@@ -393,7 +410,7 @@ public class CandleStickChart extends Region {
 
         switch (exchangeName) {
 
-            case COINBASE_PRO -> CoinbasePro.createMarketOrder(tradePair, "MARKET", side, size);
+            case COINBASE_PRO -> BinanceUs.createMarketOrder(tradePair, "MARKET", side, size);
             case BINANCE_US -> Binance.createMarketOrder(tradePair, "MARKET", side, size);
             case OANDA -> OandaClient.createMarketOrder(tradePair, "MARKET", side, (int) size);
 
@@ -527,13 +544,13 @@ public class CandleStickChart extends Region {
 
     private void layoutChart() {
         Log.info("CandleStickChart.layoutChart start");
-        extraAxisExtension.setStartX(chartWidth - 100);
-        extraAxisExtension.setEndX(chartWidth - 100);
+        extraAxisExtension.setStartX(chartWidth - 10);
+        extraAxisExtension.setEndX(chartWidth - 10);
         extraAxisExtension.setStartY(10);
         extraAxisExtension.setEndY((chartHeight - 10) * 0.75);
 
         graphicsContext.setFill(Color.BLACK);
-        graphicsContext.fillRect(10, 0, chartWidth - 100, chartHeight - 10);
+        graphicsContext.fillRect(10, 0, chartWidth - 10, chartHeight - 10);
         double top = snappedTopInset();
         double left = snappedLeftInset();
         top = snapPositionY(top);
@@ -630,7 +647,7 @@ public class CandleStickChart extends Region {
             // Draw horizontal grid lines aligned with y-axis major tick marks
             for (Axis.TickMark<Number> tickMark : yAxis.getTickMarks()) {
                 graphicsContext.setStroke(Color.rgb(189, 189, 189, 0.6));
-                graphicsContext.setLineWidth(2);
+                graphicsContext.setLineWidth(3);
                 graphicsContext.strokeLine(0, tickMark.getPosition(), canvas.getWidth(), tickMark.getPosition());
             }
         }

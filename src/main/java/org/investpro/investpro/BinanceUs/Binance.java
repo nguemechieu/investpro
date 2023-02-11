@@ -12,6 +12,9 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import org.investpro.investpro.*;
+import org.investpro.investpro.Coinbase.Coinbase;
+import org.investpro.investpro.oanda.CandleDataSupplier;
+import org.investpro.investpro.oanda.OandaCandleStickChartToolbar;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -86,6 +89,10 @@ public class Binance {
             this.apiPass = apiPass;
         }
 
+    }
+
+    public static Collection<? extends Order> getOrders() {
+        return new ArrayList<>();
     }
 
     public void init() {
@@ -178,11 +185,11 @@ public class Binance {
     public static void createMarketOrder(String tradePair, String type, String side, double size) {
     }
 
-    public CandleStickChartContainer start() throws URISyntaxException, IOException {
+    public BinanceUsCandleStickChartContainer start() throws URISyntaxException, IOException {
 
-        CandleStickChartContainer candleStickChartContainer;
+        BinanceUsCandleStickChartContainer candleStickChartContainer;
 
-        candleStickChartContainer = new CandleStickChartContainer(new BinanceU(), BTC_USD, true);
+        candleStickChartContainer = new BinanceUsCandleStickChartContainer(new BinanceU(), BTC_USD, true);
         candleStickChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return candleStickChartContainer;
     }
@@ -234,8 +241,7 @@ public class Binance {
 
         return new JSONObject(response.toString());
     }
-
-    static class BinanceU extends Exchange {   // private static final URI urO=URI.create("wss://stream.binance.us:9443");
+    public  class BinanceU extends Exchange {   // private static final URI urO=URI.create("wss://stream.binance.us:9443");
 
 
         private static String x;
@@ -245,9 +251,10 @@ public class Binance {
             super(null); // This argument is for creating a WebSocket client for live trading data.
         }
 
+
         @Override
-        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair) {
-            return new BinanceUCandleDataSupplier(secondsPerCandle, tradePair);
+        public Coinbase.CoinbaseCandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair) {
+            return null;
         }
 
         /**
@@ -438,6 +445,11 @@ public class Binance {
         @Override
         public void abort() {
 
+        }
+
+        @Override
+        public Future<List<CandleData>> get() {
+            return null;
         }
 
         public static class BinanceUCandleDataSupplier extends CandleDataSupplier {

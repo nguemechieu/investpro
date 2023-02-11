@@ -8,44 +8,41 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="test1">
-      <change afterPath="$PROJECT_DIR$/hs_err_pid18972.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceCandleDataPager.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsCandleDataSupplier.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsCandleStickChart.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsCandleStickChartContainer.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsCandleStickChartOptions.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsCandleStickChartToolbar.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsExchange.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseCandleStickChart.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseCandleStickChartOptions.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseCandleStickChartToolbar.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/Exchange.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/CandleDataPager.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/CandleDataSupplier.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaCandleStickChartToolbar.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaContainer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/module-info.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/module-info.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Binance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/Binance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUsWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/BinanceUsWebSocketClient.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChart.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChart.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartContainer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartContainer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/Binance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/BinanceUs/Binance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataPager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseCandleDataPager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleDataSupplier.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseCandleDataSupplier.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChart.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/CandleStickChart.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartContainer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseCandleStickChartContainer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartToolbar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CandleStickChartToolbar.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/Coinbase.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/Coinbase.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CoinbasePro.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbasePro.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CoinbaseWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbaseWebSocketClient.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CryptoCurrency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CryptoCurrency.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CryptoCurrencyDataProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CryptoCurrencyDataProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Currency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Currency.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CurrencyDataProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/CurrencyDataProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DataSource.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DataSource.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoney.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/DefaultMoney.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Entities.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Entities.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbasePro.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Coinbase/CoinbasePro.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Exchange.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Exchange.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ExchangeWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ExchangeWebSocketClient.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/FiatCurrency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/FiatCurrency.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/FiatCurrencyDataProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/FiatCurrencyDataProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/GPS_STATUS.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/GPS_STATUS.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/KeyboardButton.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/KeyboardButton.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OANDA_ACCESS_TOKEN.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OANDA_ACCESS_TOKEN.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Oanda.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/Oanda.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaClient.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaOrder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaOrder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaTransaction.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaTransaction.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/OandaWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaWebSocketClient.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Order.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Order.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ReverseRawTradeDataProcessor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ReverseRawTradeDataProcessor.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TRADE_EVENTS.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TRADE_EVENTS.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TRADE_ORDER_TYPE.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TRADE_ORDER_TYPE.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Trade.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Trade.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TradePair.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Screenshot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/Screenshot.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TRADE_PLATFORM.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TRADE_PLATFORM.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TelegramClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/TelegramClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ZoomLevel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/ZoomLevel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/Oanda.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/Oanda.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaWebSocketClient.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,8 +53,8 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Enum" />
-        <option value="Class" />
         <option value="Interface" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -101,32 +98,32 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_ADD_EXTERNAL_FILES&quot;: &quot;true&quot;,
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/nguem&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.47816092&quot;,
-    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_ADD_EXTERNAL_FILES": "true",
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "last_opened_file_path": "C:/Users/nguem/source/investpro/src/main/java/org/investpro/investpro/oanda",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.47816092",
+    "run.code.analysis.last.selected.profile": "pProject Default",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="org.investpro.investpro" />
       <recent name="org.investpro.investpro.passwordVault" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\nguem\source\investpro\src\main\java\org\investpro\investpro\oanda" />
+      <recent name="C:\Users\nguem\source\investpro\src\main\java\org\investpro\investpro\BinanceUs" />
       <recent name="C:\Users\nguem\source\repos\investpro\src\main\resources\images" />
       <recent name="C:\Users\nguem\source\repos\investpro\src\main\resources" />
       <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\resources\img" />
-      <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\java\org\investpro\investpro" />
-      <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\resources" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\nguem\source\repos\investpro\src\main\resources" />
@@ -138,6 +135,11 @@
     <key name="MoveClassesOrPackagesDialog.RECENTS_KEY">
       <recent name="org.investpro.investpro" />
       <recent name="" />
+    </key>
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="org.investpro.investpro.oanda" />
+      <recent name="org.investpro.investpro.BinanceUs" />
+      <recent name="org.investpro.investpro.Coinbase" />
     </key>
   </component>
   <component name="RunAnythingCache">
@@ -490,7 +492,14 @@
       <option name="project" value="LOCAL" />
       <updated>1675800920776</updated>
     </task>
-    <option name="localTasksCounter" value="30" />
+    <task id="LOCAL-00030" summary="test1">
+      <created>1676121258106</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1676121258106</updated>
+    </task>
+    <option name="localTasksCounter" value="31" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -604,8 +613,8 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-method">
           <url>file://$PROJECT_DIR$/src/main/java/org/investpro/investpro/oanda/OandaClient.java</url>
-          <line>572</line>
-          <properties class="org.investpro.investpro.OandaClient" method="getOrderBook">
+          <line>11</line>
+          <properties class="org.investpro.investpro.oanda.OandaClient">
             <option name="EMULATED" value="true" />
             <option name="WATCH_EXIT" value="false" />
           </properties>

@@ -1,6 +1,6 @@
-package org.investpro.investpro;
+package org.investpro.investpro.BinanceUs;
 
-import org.investpro.investpro.Coinbase.Coinbase;
+import org.investpro.investpro.*;
 import org.investpro.investpro.oanda.OandaException;
 import org.jetbrains.annotations.NotNull;
 
@@ -8,13 +8,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
-public abstract class Exchange extends org.investpro.investpro.Coinbase.Exchange {
+public abstract class BinanceUsExchange {
     protected final ExchangeWebSocketClient webSocketClient;
 
-    protected Exchange(ExchangeWebSocketClient webSocketClient) {
-        super(webSocketClient);
+    protected BinanceUsExchange(ExchangeWebSocketClient webSocketClient) {
 
         this.webSocketClient = webSocketClient;
     }
@@ -27,7 +25,7 @@ public abstract class Exchange extends org.investpro.investpro.Coinbase.Exchange
         return webSocketClient;
     }
 
-    public abstract Coinbase.CoinbaseCandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair);
+    public abstract BinanceUsCandleDataSupplier getCandleDataSupplier(int secondsPerCandle, String tradePair);
 
     /**
      * Fetches the recent trades for the given trade pair from  {@code stopAt} till now (the current time).
@@ -72,6 +70,4 @@ public abstract class Exchange extends org.investpro.investpro.Coinbase.Exchange
 
         return bidAsk;
     }
-
-    public abstract Future<List<CandleData>> get();
 }

@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.Coinbase;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.BooleanPropertyBase;
@@ -25,17 +25,10 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
-import org.investpro.investpro.Coinbase.CoinbaseCandleStickChart;
-import org.investpro.investpro.Coinbase.CoinbaseCandleStickChartOptions;
-import org.investpro.investpro.oanda.OandaCandleStickChartToolbar;
+import org.investpro.investpro.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.awt.*;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -57,14 +50,14 @@ import static org.investpro.investpro.FXUtils.computeTextDimensions;
  * The toolbar buttons are labelled with either text (which is used for the duration buttons,
  * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom in/out).
  */
-public class CandleStickChartToolbar extends Region {
+public class CoinbaseCandleStickChartToolbar extends Region {
     private final HBox toolbar;
     private final PopOver optionsPopOver;
     private final Separator functionOptionsSeparator;
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
 
-    public CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
+    public CoinbaseCandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                                    Set<Integer> granularities) {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
@@ -189,38 +182,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    public void registerEventHandlers(CoinbaseCandleStickChart candleStickChart, IntegerProperty secondsPerCandle) throws URISyntaxException, IOException {
-        Objects.requireNonNull(secondsPerCandle);
-        for (Node childNode : toolbar.getChildren()) {
-            if (childNode instanceof ToolbarButton tool) {
-                if (tool.duration != -1) {
-                    tool.setOnAction(event -> secondsPerCandle.setValue(tool.duration));
-                } else if (tool.tool != null && tool.tool.isZoomFunction()) {
-                    tool.setOnAction(event -> candleStickChart.changeZoom(
-                            tool.tool.getZoomDirection()));
-
-
-                } else if (tool.tool != null && tool.tool.isScreenShot()) {
-
-                    tool.setOnAction(e -> Screenshot.capture(new File(System.getProperty("user.home") + "/Documents/screenshot" + System.currentTimeMillis() + ".png")));
-                } else if (tool.tool != null && tool.tool.isSearch()) {
-
-                    tool.setOnAction(r -> {
-                        try {
-                            Desktop.getDesktop().browse(new URI("https://www.google.com/"));
-                        } catch (IOException | URISyntaxException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-
-                }
-
-
-            }
-        }
-    }
-
-    public void setChartOptions(CoinbaseCandleStickChartOptions chartOptions) {
+    public void setChartOptions(@NotNull CoinbaseCandleStickChartOptions chartOptions) {
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
 
@@ -264,11 +226,11 @@ public class CandleStickChartToolbar extends Region {
     }
 
 
-    public static class ToolbarButton extends Button {
+    private static class ToolbarButton extends Button {
         private final String textLabel;
         private final ImageView graphicLabel;
-          Tool tool;
-        public final int duration;
+        private final Tool tool;
+        private final int duration;
         private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
         private final BooleanProperty active = new BooleanPropertyBase(false) {
             public void invalidated() {
@@ -320,8 +282,6 @@ public class CandleStickChartToolbar extends Region {
         public void setActive(boolean active) {
             this.active.set(active);
         }
-
-
     }
 
     private class SizeChangeListener extends DelayedSizeChangeListener {

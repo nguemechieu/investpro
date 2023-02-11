@@ -1,4 +1,4 @@
-package org.investpro.investpro;
+package org.investpro.investpro.BinanceUs;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.BooleanPropertyBase;
@@ -20,14 +20,11 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
-import org.investpro.investpro.Coinbase.CoinbaseCandleStickChart;
-import org.investpro.investpro.Coinbase.CoinbaseCandleStickChartOptions;
-import org.investpro.investpro.oanda.OandaCandleStickChartToolbar;
+import org.investpro.investpro.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -57,14 +54,14 @@ import static org.investpro.investpro.FXUtils.computeTextDimensions;
  * The toolbar buttons are labelled with either text (which is used for the duration buttons,
  * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom in/out).
  */
-public class CandleStickChartToolbar extends Region {
+public class BinanceUsCandleStickChartToolbar extends javafx.scene.layout.Region {
     private final HBox toolbar;
     private final PopOver optionsPopOver;
     private final Separator functionOptionsSeparator;
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
 
-    public CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
+    public BinanceUsCandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                                    Set<Integer> granularities) {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
@@ -189,7 +186,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    public void registerEventHandlers(CoinbaseCandleStickChart candleStickChart, IntegerProperty secondsPerCandle) throws URISyntaxException, IOException {
+    public void registerEventHandlers(BinanceUsCandleStickChartContainer candleStickChart, IntegerProperty secondsPerCandle) throws URISyntaxException, IOException {
         Objects.requireNonNull(secondsPerCandle);
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
@@ -220,7 +217,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    public void setChartOptions(CoinbaseCandleStickChartOptions chartOptions) {
+    public void setChartOptions(BinanceUsCandleStickChartOptions chartOptions) {
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
 
@@ -264,11 +261,11 @@ public class CandleStickChartToolbar extends Region {
     }
 
 
-    public static class ToolbarButton extends Button {
+    private static class ToolbarButton extends Button {
         private final String textLabel;
         private final ImageView graphicLabel;
-          Tool tool;
-        public final int duration;
+        private final Tool tool;
+        private final int duration;
         private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
         private final BooleanProperty active = new BooleanPropertyBase(false) {
             public void invalidated() {
@@ -320,8 +317,6 @@ public class CandleStickChartToolbar extends Region {
         public void setActive(boolean active) {
             this.active.set(active);
         }
-
-
     }
 
     private class SizeChangeListener extends DelayedSizeChangeListener {
