@@ -48,8 +48,9 @@ public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
         }
 
 
-        @NotNull String tradePair ;
-        tradePair = Objects.requireNonNull(parseTradePair(messageJson));
+        @NotNull String tradePair = null;
+        assert parseTradePair(messageJson) != null;
+        tradePair = parseTradePair(messageJson);
 
         Side side = messageJson.has("side") ? Side.getSide(messageJson.get("side").asText()) : null;
 
@@ -59,6 +60,7 @@ public abstract class OandaWebSocketClient extends ExchangeWebSocketClient {
             case "match" -> {
                 if (liveTradeConsumers.containsKey(tradePair)) {
 
+                    assert tradePair != null;
                     Trade newTrade = new Trade(tradePair,
                             DefaultMoney.of(new BigDecimal(messageJson.get("price").asText()),
                                     tradePair),

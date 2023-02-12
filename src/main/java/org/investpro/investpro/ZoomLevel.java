@@ -21,15 +21,15 @@ public class ZoomLevel {
     private final Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap;
     private int minXValue;
 
-    public ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
-                     final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
-                     final int minXValue) {
+    ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
+              final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
+              final int minXValue) {
         this.zoomLevelId = zoomLevelId;
         this.candleWidth = candleWidth;
         numVisibleCandles = new SimpleDoubleProperty(plotAreaWidthProperty.doubleValue() / candleWidth);
         numVisibleCandles.bind(Bindings.createDoubleBinding(() -> plotAreaWidthProperty.doubleValue() / candleWidth,
                 plotAreaWidthProperty));
-        this.secondsPerPixel = (float)secondsPerCandle / candleWidth;
+        this.secondsPerPixel = secondsPerCandle / candleWidth;
         pixelsPerSecond = 1d / secondsPerPixel;
         this.xAxisFormatter = xAxisFormatter;
         this.minXValue = minXValue;
@@ -37,7 +37,7 @@ public class ZoomLevel {
         extremaForCandleRangeMap = new ConcurrentHashMap<>();
     }
 
-    public static int getNextZoomLevelId(ZoomLevel zoomLevel, ZoomDirection zoomDirection) {
+    static int getNextZoomLevelId(ZoomLevel zoomLevel, ZoomDirection zoomDirection) {
         if (zoomDirection == ZoomDirection.IN) {
             return zoomLevel.zoomLevelId - 1;
         } else {

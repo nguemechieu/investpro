@@ -25,9 +25,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
-import org.investpro.investpro.Coinbase.CoinbaseCandleStickChart;
-import org.investpro.investpro.Coinbase.CoinbaseCandleStickChartOptions;
-import org.investpro.investpro.oanda.OandaCandleStickChartToolbar;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -64,8 +61,8 @@ public class CandleStickChartToolbar extends Region {
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
 
-    public CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
-                                   Set<Integer> granularities) {
+    CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
+                            Set<Integer> granularities) {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         Objects.requireNonNull(granularities);
@@ -180,7 +177,7 @@ public class CandleStickChartToolbar extends Region {
         getChildren().setAll(toolbar);
     }
 
-    public void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
+    void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(secondsPerCandle);
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
@@ -189,7 +186,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    public void registerEventHandlers(CoinbaseCandleStickChart candleStickChart, IntegerProperty secondsPerCandle) throws URISyntaxException, IOException {
+    void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) throws URISyntaxException, IOException {
         Objects.requireNonNull(secondsPerCandle);
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
@@ -220,7 +217,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    public void setChartOptions(CoinbaseCandleStickChartOptions chartOptions) {
+    void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
 
@@ -264,11 +261,11 @@ public class CandleStickChartToolbar extends Region {
     }
 
 
-    public static class ToolbarButton extends Button {
+    private static class ToolbarButton extends Button {
         private final String textLabel;
         private final ImageView graphicLabel;
-          Tool tool;
-        public final int duration;
+        private final Tool tool;
+        private final int duration;
         private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
         private final BooleanProperty active = new BooleanPropertyBase(false) {
             public void invalidated() {
@@ -320,8 +317,6 @@ public class CandleStickChartToolbar extends Region {
         public void setActive(boolean active) {
             this.active.set(active);
         }
-
-
     }
 
     private class SizeChangeListener extends DelayedSizeChangeListener {

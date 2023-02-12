@@ -1,13 +1,11 @@
-package org.investpro.investpro.BinanceUs;
+package org.investpro.investpro;
 
 import javafx.animation.FadeTransition;
-import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
-import org.investpro.investpro.ZoomDirection;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -24,31 +22,31 @@ import java.util.Objects;
  */
 
 
-public class BinanceUsCandleStickChartContainer extends Region {
-
-     Binance.BinanceU binanceUs;
-    boolean sync=true;
-    private  VBox candleChartContainer;
-    private BinanceUsCandleStickChartToolbar toolbar;
-    private  BinanceUsExchange exchange;
+public class CandleStickChartContainer extends Region {
+    private final VBox candleChartContainer;
+    private final CandleStickChartToolbar toolbar;
+    private final Exchange exchange;
     private final String tradePair;
-    private SimpleIntegerProperty secondsPerCandle;
-    private BinanceUsCandleStickChartContainer candleStickChart;
+    private final SimpleIntegerProperty secondsPerCandle;
+    private CandleStickChart candleStickChart;
 
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
      */
+    public CandleStickChartContainer(Exchange exchange, String tradePair) throws URISyntaxException, IOException {
+        this(exchange, tradePair, true);
+    }
 
-    public BinanceUsCandleStickChartContainer(BinanceUsExchange exchange, BinanceUsCandleDataSupplier candleDataSupplier, String tradePair, boolean liveSyncing, int secondsPerCandle, ReadOnlyDoubleProperty readOnlyDoubleProperty, ReadOnlyDoubleProperty onlyDoubleProperty) throws URISyntaxException, IOException {
+    public CandleStickChartContainer(Exchange exchange, String tradePair, boolean liveSyncing) throws URISyntaxException, IOException {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         this.exchange = exchange;
         this.tradePair = tradePair;
-        this.secondsPerCandle = new SimpleIntegerProperty(3600);
+        secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
-         candleDataSupplier = exchange.getCandleDataSupplier(this.secondsPerCandle.get(), tradePair);
-        toolbar = new BinanceUsCandleStickChartToolbar(widthProperty(), heightProperty(),
+        CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
+        toolbar = new CandleStickChartToolbar(widthProperty(), heightProperty(),
                 candleDataSupplier.getSupportedGranularities());
         VBox toolbarContainer = new VBox(toolbar);
         toolbarContainer.setPrefWidth(Double.MAX_VALUE);
@@ -70,22 +68,18 @@ public class BinanceUsCandleStickChartContainer extends Region {
         containerRoot.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
         getChildren().setAll(containerRoot);
         // FIXME: candleStickChart is null at this point.
-        toolbar.registerEventHandlers(candleStickChart, this.secondsPerCandle);
+        toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 
-        this.secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
+        secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
+                createNewChart(newDurationValue.intValue(), liveSyncing);
                 try {
-                    createNewChart(newDurationValue.intValue(), liveSyncing);
-                } catch (URISyntaxException | IOException e) {
-                    throw new RuntimeException(e);
-                }
-                try {
-                    toolbar.registerEventHandlers(candleStickChart, this.secondsPerCandle);
+                    toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
                 } catch (URISyntaxException | IOException e) {
                     throw new RuntimeException(e);
                 }
                 toolbar.setChartOptions(candleStickChart.getChartOptions());
-                toolbar.setActiveToolbarButton(this.secondsPerCandle);
+                toolbar.setActiveToolbarButton(secondsPerCandle);
                 animateInNewChart(candleStickChart);
             }
         });
@@ -93,19 +87,7 @@ public class BinanceUsCandleStickChartContainer extends Region {
         //secondsPerCandle.set(300);
     }
 
-    public BinanceUsCandleStickChartContainer(Binance.BinanceU binanceUs, String btcUsd, boolean b) {
-
-        this.binanceUs = binanceUs;
-        this.tradePair=btcUsd;
-        this.sync=b;
-    }
-
-    private BinanceUsCandleStickChartOptions getChartOptions() {
-        return new BinanceUsCandleStickChartOptions();
-    }
-
-
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws URISyntaxException, IOException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
         }
@@ -115,11 +97,11 @@ public class BinanceUsCandleStickChartContainer extends Region {
         */
 
 
-        candleStickChart = new BinanceUsCandleStickChartContainer(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
+        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
                 tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
-    private void animateInNewChart(BinanceUsCandleStickChartContainer newChart) {
+    private void animateInNewChart(CandleStickChart newChart) {
         Objects.requireNonNull(newChart, "newChart must not be null");
 
         if (candleStickChart != null) {
@@ -154,8 +136,5 @@ public class BinanceUsCandleStickChartContainer extends Region {
     @Override
     protected double computeMinHeight(double width) {
         return 350;
-    }
-
-    public void changeZoom(ZoomDirection zoomDirection) {
     }
 }

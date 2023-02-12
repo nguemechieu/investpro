@@ -1,6 +1,5 @@
 package org.investpro.investpro;
 
-
 import com.jfoenix.controls.RecursiveTreeItem;
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import javafx.application.Application;
@@ -35,7 +34,10 @@ import javafx.util.Callback;
 import javafx.util.Duration;
 import org.investpro.investpro.BinanceUs.Binance;
 import org.investpro.investpro.Coinbase.CoinbasePro;
-import org.investpro.investpro.oanda.*;
+import org.investpro.investpro.oanda.Oanda;
+import org.investpro.investpro.oanda.OandaClient;
+import org.investpro.investpro.oanda.OandaException;
+import org.investpro.investpro.oanda.OandaOrder;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -48,8 +50,6 @@ import java.util.*;
 import static java.lang.System.nanoTime;
 import static java.lang.System.out;
 import static org.investpro.investpro.PLATFORM.COINBASE_PRO;
-import static org.investpro.investpro.oanda.Oanda.getOrdersList;
-import static org.investpro.investpro.oanda.Oanda.instrumentsList;
 import static org.investpro.investpro.oanda.OandaClient.*;
 
 
@@ -60,6 +60,15 @@ public class Main extends Application {
     public static final int TRADING_SCREEN_MAXIMUM_WIDTH = (int) Screen.getPrimary().getBounds().getWidth();
     public static final int TRADING_SCREEN_MAXIMUM_HEIGHT = (int) Screen.getPrimary().getBounds().getHeight();
     static Alert alert;
+    static ArrayList<String> symb;
+
+    static {
+        try {
+            symb = getTradeAbleInstruments();
+        } catch (OandaException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public double amount;
 
@@ -179,8 +188,8 @@ public class Main extends Application {
                             Alert alert = new Alert(Alert.AlertType.INFORMATION);
                             alert.setTitle("Connect...");
                             alert.setContentText("Connecting to " + (platform) + " ...");
-                            Oanda.setApi_Key(apiKey);
-                            Oanda.accountID = (accountId);
+                            OandaClient.setApi_Key(apiKey);
+                            OandaClient.accountID = (accountId);
                             switch (platform) {
                                 case BINANCE_US:
                                     alert.showAndWait();
@@ -332,7 +341,11 @@ public class Main extends Application {
                     vbox.setAlignment(Pos.CENTER);
 
                     ListView<String> symListView = new ListView<>();
-
+                    try {
+                        symListView.getItems().addAll(getTradeAbleInstruments());
+                    } catch (OandaException ex) {
+                        throw new RuntimeException(ex);
+                    }
                     vbox.getChildren().add(symListView);
                     stackPane.getChildren().add(vbox);
 
@@ -517,7 +530,11 @@ public class Main extends Application {
             spinner1.decrement(-1);
             spinner1.increment(1);
             ComboBox<String> combo_box = new ComboBox<>();
-
+            try {
+                combo_box.getItems().addAll(OandaClient.getTradeAbleInstruments());
+            } catch (OandaException ex) {
+                throw new RuntimeException(ex);
+            }
 
             btnSell.setTranslateX(190);
             btnSell.setTranslateY(50);
@@ -692,7 +709,7 @@ public class Main extends Application {
                             String type =
                                     "MARKET";
                             double price = 1.45;
-                            Oanda.createOrder(symbol9, amount, type, side);
+                            OandaClient.createOrder(symbol9, amount, type, side);
                         }
                     } catch (Exception e) {
                         out.println(e.getMessage());
@@ -725,7 +742,7 @@ public class Main extends Application {
                                     "MARKET";
                             OandaClient.createMarketOrder(symbo, type, side, amount);
                         }
-                    } catch (Exception e) {
+                    } catch (Exception | OandaException e) {
                         out.println(e.getMessage());
                         alert.setTitle("Market Sell Error");
                         alert.setHeaderText("Error");
@@ -845,7 +862,11 @@ public class Main extends Application {
         launch(Main.class, args);
     }
 
-
+    private static @NotNull Node getAccountSummary() {
+        return new ListView<>(FXCollections.observableArrayList(
+                "Account" + OandaClient.getAccountID(), "Balance" +
+                        OandaClient.getAccount().getBalance(), "Open"));
+    }
 
     private static @NotNull Node getAccountPerformance() {
         VBox accountPerformance
@@ -913,13 +934,13 @@ public class Main extends Application {
         gridPane.add(new Label("Total Trades"), 0, 0);
         TextField totalTrades = new TextField("");
         totalTrades.setEditable(false);
-        totalTrades.setText(String.valueOf(Oanda.getOpenTradesList().size()));
+        totalTrades.setText(String.valueOf(OandaClient.getOpenTradesList().size()));
         gridPane.add(totalTrades, 1, 0);
         gridPane.add(new Label("Total Orders"), 0, 2);
         TextField totalOrders = new TextField("");
         totalOrders.setEditable(false);
-        totalOrders.setText(String.valueOf(getOrdersList().size()));
-        Log.info("Order " + getOrdersList());
+        totalOrders.setText(String.valueOf(OandaClient.getOrdersList().size()));
+        Log.info("Order " + OandaClient.getOrdersList());
         gridPane.add(totalOrders, 1, 2);
 
         tradeStatistics.getChildren().addAll(gridPane);
@@ -937,9 +958,9 @@ public class Main extends Application {
         grid_pane.setVgap(10);
         grid_pane.setAlignment(Pos.CENTER);
         grid_pane.setStyle("-fx-background-color: #2de87e;");
-        Root root = Oanda.getAccountFullDetails();
+        Root root = OandaClient.getAccountFullDetails();
         grid_pane.add(new Label("Account Number"), 0, 0);
-        TextField accountID = new TextField(Oanda.getAccountID());
+        TextField accountID = new TextField(OandaClient.getAccountID());
         accountID.setEditable(false);
         grid_pane.add(accountID, 1, 0);
         grid_pane.add(new Label("Balance"), 1, 2);
@@ -1006,13 +1027,13 @@ public class Main extends Application {
 
     private static @NotNull ListView<OandaOrder> getOandaOrdersHistory() throws OandaException {
         ListView<OandaOrder> oandaOrdersHistory = new ListView<>();
-        oandaOrdersHistory.getItems().addAll(Oanda.getOrdersHistory());
+        oandaOrdersHistory.getItems().addAll(OandaClient.getOrdersHistory());
         return oandaOrdersHistory;
     }
 
     //Get Oanda forex orders
     private static @NotNull VBox getOandaOrders() throws OandaException {
-        ListView<OandaOrder> or = new ListView<>(FXCollections.observableArrayList(getOrdersList()));
+        ListView<OandaOrder> or = new ListView<>(FXCollections.observableArrayList(OandaClient.getOrdersList()));
         VBox vBox = new VBox(or);
         vBox.setSpacing(10);
         vBox.setPadding(new Insets(10, 10, 10, 10));
@@ -1096,7 +1117,7 @@ public class Main extends Application {
         volColumn.setCellValueFactory(volumeColumnValue);
         treeTable.setTranslateY(25);
         ObservableList<CandleData> datas = FXCollections.observableArrayList();
-        datas.addAll(Oanda.getForexCandles("EUR_USD"));
+        datas.addAll(OandaClient.getForexCandles("EUR_USD"));
         Callback<RecursiveTreeObject<CandleData>, ObservableList<CandleData>> calback
                 = RecursiveTreeObject::getChildren;
         RecursiveTreeItem<CandleData> root = new RecursiveTreeItem<>(datas, calback);
@@ -1276,7 +1297,7 @@ public class Main extends Application {
 
         stage.show();
     }
-    static Root root=new Root();
+
     private void createMainMenu() throws Exception, OandaException {
         Platform.setImplicitExit(false);
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> Log.error("[" + thread + "]: " + exception));
@@ -1312,7 +1333,6 @@ public class Main extends Application {
         Scene scene = new Scene(anchorpane, TRADING_SCREEN_WIDTH, TRADING_SCREEN_HEIGHT);
         scene.getStylesheets().add("/app.css");
         stage.setScene(scene);
-
         stage.setTitle("InvestPro -->Welcome  " + root.account.alias + "   " + root.account.id + new Date(System.currentTimeMillis()));
         stage.setResizable(true);
         stage.setIconified(true);
@@ -1461,16 +1481,15 @@ public class Main extends Application {
             candleStickChartTabs[i].setContent(vbox[i]);
         }
 
+        Oanda oandaCanleStickChart = new Oanda();
 
-        Node oanda=new OandaClient().start();
-        vbox[0].getChildren().add(oanda);
+        vbox[0].getChildren().add(oandaCanleStickChart.start());
         Binance binanceUsCandleChart = new Binance();
         vbox[1].getChildren().add(binanceUsCandleChart.start());
         CoinbasePro coinbaseCandleChart = new CoinbasePro();
         vbox[2].getChildren().add(coinbaseCandleChart.start());
-
-
-       // vbox[3].getChildren().add(stockCandleChart.);
+        Oanda stockCandleChart = new Oanda();
+        vbox[3].getChildren().add(stockCandleChart.start());
 
 
         candleSticksChartTabPane.getTabs().addAll(candleStickChartTabs);
@@ -1551,9 +1570,9 @@ public class Main extends Application {
         accountDetails.getChildren().addAll(
                 new Label("___________________ Account Details _____________________"),
                 new Label("Date :" + new Date(System.currentTimeMillis())),
-                new Label("Name :" + Oanda.root.account.alias),
-                new Label("Balance : " + Oanda.root.account.balance),
-                new Label("Currency : " + Oanda.root.account.currency),
+                new Label("Name :" + OandaClient.root.account.alias),
+                new Label("Balance : " + OandaClient.root.account.balance),
+                new Label("Currency : " + OandaClient.root.account.currency),
 
                 new Label("Margin used: " + root.account.marginUsed),
                 new Label("Margin closed %: " + root.account.marginCloseoutPercent),
@@ -1563,7 +1582,7 @@ public class Main extends Application {
                 new Label("Guaranteed Execution Fees : " + root.account.guaranteedExecutionFees),
                 new Label("Margin Closeout NAV : " + root.account.marginCloseoutNAV),
                 new Label("Margin Closeout UnrealizedPL : " + root.account.marginCloseoutUnrealizedPL),
-                new Label("Create Time : " + Oanda.root.account.createdTime),
+                new Label("Create Time : " + OandaClient.root.account.createdTime),
 
                 new Label("_____________________________________________________________"));
         return accountDetails;

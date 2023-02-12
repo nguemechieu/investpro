@@ -1,8 +1,6 @@
 package org.investpro.investpro;
 
 import javafx.beans.property.SimpleIntegerProperty;
-import org.investpro.investpro.oanda.CandleDataSupplier;
-import org.investpro.investpro.oanda.OandaCandleStickChartToolbar;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

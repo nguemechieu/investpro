@@ -774,7 +774,7 @@ public class TelegramClient {
 
     }
 
-    public void run() throws IOException, InterruptedException {
+    void run() throws IOException, InterruptedException {
         getMe();//initialize the chat client
         Thread.sleep(200);
         getUpdates();// update the chat client

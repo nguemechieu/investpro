@@ -20,7 +20,4 @@ public enum TRADE_PLATFORM {
     public String getCoinbase() {
         return coinbase;
     }
-
-    public void createMarketOrder(String tradePair, String market, String side, double size) {
-    }
 }

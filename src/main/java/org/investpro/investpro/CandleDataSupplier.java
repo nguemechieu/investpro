@@ -1,8 +1,6 @@
-package org.investpro.investpro.BinanceUs;
+package org.investpro.investpro;
 
 import javafx.beans.property.IntegerProperty;
-import org.investpro.investpro.CandleData;
-import org.investpro.investpro.Coinbase.CoinbaseCandleDataSupplier;
 
 import java.util.List;
 import java.util.Objects;
@@ -15,7 +13,7 @@ import static java.lang.System.out;
 /**
  * @Noel Martial Nguemechieu
  */
-public abstract class BinanceUsCandleDataSupplier extends CoinbaseCandleDataSupplier implements Supplier<Future<List<CandleData>>> {
+public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
     /**
      * The number of candles supplied per call to {@link #get()}.
@@ -25,8 +23,7 @@ public abstract class BinanceUsCandleDataSupplier extends CoinbaseCandleDataSupp
     protected final String tradePair;
     protected final IntegerProperty endTime;
 
-    public BinanceUsCandleDataSupplier(int numCandles, int secondsPerCandle, String tradePair, IntegerProperty endTime) {
-        super( numCandles, secondsPerCandle, tradePair,endTime);
+    public CandleDataSupplier(int numCandles, int secondsPerCandle, String tradePair, IntegerProperty endTime) {
 
 
         Objects.requireNonNull(tradePair);
@@ -69,7 +66,7 @@ public abstract class BinanceUsCandleDataSupplier extends CoinbaseCandleDataSupp
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        BinanceUsCandleDataSupplier that = (BinanceUsCandleDataSupplier)  o;
+        CandleDataSupplier that = (CandleDataSupplier) o;
 
         out.println("CandleDataSupplier equals " + that);
         return numCandles == that.numCandles &&
