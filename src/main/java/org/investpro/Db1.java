@@ -5,10 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Collection;
 import java.util.UUID;
 
@@ -250,6 +247,8 @@ public class Db1 implements Db {
 
     }
 
+
+
     @Override
     public Connection getConnection() {
         return conn;
@@ -276,6 +275,11 @@ public class Db1 implements Db {
     }
 
     @Override
+    public ConnectionBuilder createConnectionBuilder() throws SQLException {
+        return Db.super.createConnectionBuilder();
+    }
+
+    @Override
     public void setLoginTimeout(int seconds) {
 
     }
@@ -293,7 +297,7 @@ public class Db1 implements Db {
     public boolean isWrapperFor(Class<?> iface) {
         return false;
     }
-    public void registerCurrencies(@NotNull Collection<Currency> currencies) throws SQLException {
+    public void registerCurrencies(Collection<FiatCurrency> currencies) throws SQLException {
         //Create table currencies if not exits
         conn.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS " +
                 "currencies (" +

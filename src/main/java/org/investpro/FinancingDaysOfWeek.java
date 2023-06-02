@@ -5,6 +5,9 @@ public class FinancingDaysOfWeek {
     public int daysCharged;
 
     public FinancingDaysOfWeek() {
+        dayOfWeek = "";
+        daysCharged = 0;
+
     }
 
     public String getDayOfWeek() {

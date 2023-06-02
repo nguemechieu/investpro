@@ -5,6 +5,8 @@
       <element id="archive" name="InvestPro.jar">
         <element id="module-output" name="InvestPro" />
       </element>
+      <element id="library" level="project" name="Maven: com.fasterxml.jackson.core:jackson-annotations:2.14.2" />
+      <element id="library" level="project" name="Maven: com.fasterxml.jackson.core:jackson-databind:2.14.2" />
     </root>
   </artifact>
 </component>

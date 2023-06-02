@@ -54,7 +54,7 @@ public class Navigator extends Stage {
         }
     }
 
-    private class ExitButton extends Button {
+    private static class ExitButton extends Button {
         public ExitButton() {
             super();
             getStyleClass().add("exit-button");

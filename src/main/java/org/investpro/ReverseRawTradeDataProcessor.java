@@ -10,7 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
+public abstract class ReverseRawTradeDataProcessor extends CandleDataSupplier {
     private final ReversedLinesFileReader fileReader;
     private int start;
 
@@ -113,6 +113,11 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         endTime.set(endTime.get() - (secondsPerCandle * numCandles));
         return CompletableFuture.completedFuture(candleData.stream().sorted(Comparator.comparingInt(
                 CandleData::getOpenTime)).collect(Collectors.toList()));
+    }
+
+    @Override
+    public List<CandleData> getCandleData() {
+        return new ArrayList<CandleData>();
     }
 
     /**

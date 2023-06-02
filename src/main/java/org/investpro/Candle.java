@@ -1,6 +1,5 @@
 package org.investpro;
 
-import cryptoinvestor.cryptoinvestor.CandleData;
 
 public class Candle extends CandleData {
 

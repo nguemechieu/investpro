@@ -19,9 +19,12 @@ package org.investpro;
 import javafx.scene.text.Font;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Fonts {
+    private static final Logger logger = LoggerFactory.getLogger(Fonts.class);
     private static final String ROBOTO_LIGHT_NAME;
     private static final String ROBOTO_MEDIUM_NAME;
 
@@ -30,12 +33,12 @@ public class Fonts {
 
     static {
         try {
-            robotoLightName = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Light.ttf"), 10).getName();
-            robotoMediumName = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Medium.ttf"), 10).getName();
+            robotoLightName = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Light.ttf"), 12).getName();
+            robotoMediumName = Font.loadFont(Fonts.class.getResourceAsStream("/eu/hansolo/fx/regulators/Roboto-Medium.ttf"), 12).getName();
         } catch (Exception exception) {
 
 
-            Log.error(String.valueOf(exception));
+            logger.error(String.valueOf(exception));
         }
         ROBOTO_LIGHT_NAME = robotoLightName;
         ROBOTO_MEDIUM_NAME = robotoMediumName;

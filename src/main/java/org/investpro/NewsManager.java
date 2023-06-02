@@ -17,32 +17,34 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Objects;
 
+
 import static java.lang.System.out;
+import static org.investpro.TelegramClient.getToken;
 
 public class NewsManager {
 
     private static final String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
-    static ArrayList<News> news;
-    static News news1 = new News(null, null, null, null, "", "");
+    static ArrayList<News> news = new ArrayList<>();
+    static News news1 = new News("", "", "", new Date(), "", "");
 
-    public NewsManager() {
-
+    public NewsManager() throws ParseException {
+        load();
+        news.add(news1);
 
     }
 
-    public static ArrayList<org.investpro.News> getNewsList() throws ParseException {
+    public static ArrayList<News> getNewsList() throws ParseException {
         return load();
 
     }
 
-    private static ArrayList<News> load() throws ParseException {
+    public static ArrayList<News> load() throws ParseException {
         news = new ArrayList<>();//
         JSONArray jsonArray = Objects.requireNonNull(makeRequest());
         int length = jsonArray.length();
-
         for (int i = 0; i < length; i++) {
             JSONObject json = jsonArray.getJSONObject(i);
-            String title = "hello";
+            String title = null;
             if (json.has("title")) {
                 title = json.getString("title");
                 news1.setTitle(title);
@@ -53,12 +55,12 @@ public class NewsManager {
                 news1.setCountry(country);
             }
 
-            String impact = null;
+            String impact = "";
             if (json.has("impact")) {
                 impact = json.getString("impact");
                 news1.setImpact(impact);
             }
-            String date = null;
+            String date = "";
             if (json.has("date")) {
                 date = json.getString("date");
 
@@ -74,11 +76,10 @@ public class NewsManager {
             if (json.has("previous")) {
                 previous = json.getString("previous");
                 news1.setPrevious(previous);
+                news.add(i, new News(title, country, impact, StringToDate(date), forecast, previous));
+            } else {
+                news.add(i, new News(title, country, impact, StringToDate(date), forecast, previous));
             }
-            assert date != null;
-
-            news.add(i, new News(title, country, impact, StringToDate(date), forecast, previous));
-
             out.println("New" + news1);
 
 
@@ -89,25 +90,23 @@ public class NewsManager {
     @Contract("null -> fail")
     public static Date StringToDate(String str) throws ParseException {//TODO implement date
         if (str == null) throw new IllegalArgumentException("Invalid date string");
-
-
         //ZonedDateTime.from(DateTimeFormatter.ofPattern( "yyyy-MM-dd'T'HH:mm:ss").parse(str.substring(0, 19)));
-        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
-                .parse(str);
+        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(str);
     }
 
 
     //makeRequest return JSONObject
     private static @Nullable JSONArray makeRequest() {
         try {
-            HttpURLConnection connection = (HttpURLConnection) new URL(NewsManager.url).openConnection();
+            HttpURLConnection connection = (HttpURLConnection)
+                    new URL(NewsManager.url).openConnection();
             connection.setDoOutput(true);
             connection.setDoInput(true);
             connection.setUseCaches(false);
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Accept", "application/json");
-            // connection.setRequestProperty("Authorization", "Bearer " + getToken());
+            connection.setRequestProperty("Authorization", "Bearer " + getToken());
             connection.connect();
             int responseCode = connection.getResponseCode();
             out.printf("Response Code: %d%n", responseCode);

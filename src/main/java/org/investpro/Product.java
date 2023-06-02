@@ -21,13 +21,7 @@ public class Product {
         this.tradePair = tradePair;
     }
 
-    public Product(String name, String description, String url, String category, String currency) {
-        this.name = name;
-        this.description = description;
-        this.url = url;
-        this.category = category;
-        this.currency = currency;
-    }
+
 
     public Product() {
         this.name = "";

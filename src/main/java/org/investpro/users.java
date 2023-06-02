@@ -92,20 +92,6 @@ public class users implements Serializable {
     @Column(name = "password_hash")
     private String passwordHash;
 
-    public users(int id, String name, String profile_bio, String profile_url, String avatar_url, String resource, String resource_path) {
-        this.profile_bio = profile_bio;
-        this.profile_url = profile_url;
-        this.avatar_url = avatar_url;
-        this.resource = resource;
-        this.resource_path = resource_path;
-        this.Id = id;
-        this.createdAt = String.valueOf(Locale.getDefault());
-        this.updatedAt = String.valueOf(Locale.getDefault());
-        this.active = true;
-        this.passwordHash = "";
-
-        this.name = name;
-    }
 
 
 
@@ -155,30 +141,6 @@ public class users implements Serializable {
 
 
 
-
-    public users(String name, String username, String password, String email, String firstname, String lastname, String middlename, String gender, String birthdate, String phone, String address, String city, String state, String country, String zipCode) {
-        this.name = name;
-
-        this.username = username;
-        this.password = password;
-
-        this.email = email;
-        this.firstname = firstname;
-        this.lastname = lastname;
-        this.middlename = middlename;
-        this.gender = gender;
-        this.birthdate = birthdate;
-        this.phone = phone;
-        this.address = address;
-        this.city = city;
-        this.state = state;
-        this.country = country;
-        this.zip = zipCode;
-        this.createdAt = String.valueOf(Locale.getDefault());
-
-        this.updatedAt = String.valueOf(Locale.getDefault());
-
-    }
 
     public users(String username, String password, String email, String firstname, String lastname, String middlename, String gender, String birthdate, String phone, String address, String city, String state, String country, String zipCode) {
 

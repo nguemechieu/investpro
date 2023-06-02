@@ -76,6 +76,8 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         } catch (CurrencyNotFoundException | SQLException exception) {
             logger.error("coinbase websocket client: could not initialize trade pair: " +
                     messageJson.get("product_id").asText(), exception);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
         }
 
         Side side = messageJson.has("side") ? Side.getSide(messageJson.get("side").asText()) : null;
@@ -103,7 +105,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException {
+    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
         final String productId = messageJson.get("product_id").asText();
         final String[] products = productId.split("-");
         TradePair tradePair;

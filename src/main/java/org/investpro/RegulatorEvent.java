@@ -27,11 +27,6 @@ public class RegulatorEvent extends Event {
     public static final EventType<RegulatorEvent> ADJUSTED = new EventType<>(ANY, "adjusted");
 
 
-    // ******************** Constructors **********************************
-    public RegulatorEvent(final EventType<RegulatorEvent> TYPE) {
-        super(TYPE);
-    }
-
     public RegulatorEvent(final Object SRC, final EventTarget TARGET, final EventType<RegulatorEvent> TYPE) {
         super(SRC, TARGET, TYPE);
     }

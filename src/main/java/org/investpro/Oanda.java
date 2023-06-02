@@ -52,7 +52,7 @@ public class Oanda extends Exchange {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final List<String> tradePairs = getTradePair();
     static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
-    private final ArrayList<OrderCancelTransaction> getOrderCancelTransaction = new ArrayList<>();
+     ArrayList<OrderCancelTransaction> getOrderCancelTransaction = new ArrayList<>();
     static HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
     String account_id;
     String url;
@@ -1908,8 +1908,9 @@ public class Oanda extends Exchange {
                         instrumentNode.get("displayPrecision").asInt(),
                         instrumentNode.get("name").asText(),""
                 ) {
+
                     @Override
-                    public int compareTo(@NotNull Currency o) {
+                    public int compareTo(java.util.@NotNull Currency o) {
                         return 0;
                     }
 

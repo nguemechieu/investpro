@@ -10,7 +10,7 @@ public enum PLATFORM {
     BINANCE_EU("Binance Eu"),
     BINANCE_WORLD("BinanceWorld"),
     COINBASE_PRO("CoinbasePro"),
-    OANDA("Oanda"),
+    OANDA("cryptoinvestor.cryptoinvestor.CurrencyDataProvider.Oanda"),
     BITFINEX("Bitfinex"), BINANCE_CN(
             "BinanceCn"
     ), Ally_Invest("Ally Invest"), AMERICAN_TRADE("AMERI TRADE "), BINANCE_COM("BINANCE COM");

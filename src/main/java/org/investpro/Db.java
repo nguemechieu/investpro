@@ -1,6 +1,8 @@
 package org.investpro;
 
 import javax.sql.DataSource;
+import java.sql.SQLException;
+import java.util.Collection;
 
 public interface Db extends DataSource {
 
@@ -97,4 +99,5 @@ public interface Db extends DataSource {
     );
 
 
+    void registerCurrencies(Collection<FiatCurrency> values) throws SQLException;
 }

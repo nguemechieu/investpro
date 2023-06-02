@@ -81,8 +81,8 @@ public class ToggleSwitch extends Labeled {
      * FXMLLoader.java)
      *
      * @param initialValue the initial value of the switch
-     * @param textOn the text to display when the switch is on
-     * @param textOff the text to display when the switch is off
+     * @param textOn       the text to display when the switch is on
+     * @param textOff      the text to display when the switch is off
      */
     public ToggleSwitch(@NamedArg("initialValue") boolean initialValue,
                         @NamedArg("textOn") String textOn,

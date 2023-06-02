@@ -8,6 +8,7 @@ public class Financing {
     public ArrayList<FinancingDaysOfWeek> financingDaysOfWeek;
 
     public Financing() {
+        financingDaysOfWeek = new ArrayList<>();
     }
 
     public String getShortRate() {

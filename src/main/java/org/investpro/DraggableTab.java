@@ -1,5 +1,6 @@
 package org.investpro;
 
+import javafx.beans.property.DoubleProperty;
 import javafx.collections.ListChangeListener;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
@@ -26,6 +27,7 @@ import java.util.Set;
 
 public class DraggableTab extends Tab {
 
+
     private static final Set<TabPane> tabPanes = new HashSet<>();
     private static final Stage markerStage;
 
@@ -38,12 +40,12 @@ public class DraggableTab extends Tab {
         markerStage.setScene(new Scene(markerStack));
     }
 
-    private final Label nameLabel;
-    private final Stage dragStage;
-    private boolean detachable;
+    Label nameLabel;
+    Stage dragStage;
+    boolean detachable;
 
 
-    public DraggableTab(String text) {
+    public DraggableTab(String text, Object icon) {
         nameLabel = new Label(text);
         setGraphic(nameLabel);
         detachable = true;
@@ -57,6 +59,7 @@ public class DraggableTab extends Tab {
         nameLabel.setOnMouseDragged(new EventHandler<>() {
 
             @Override
+
             public void handle(MouseEvent t) {
                 dragStage.setWidth(nameLabel.getWidth() + 10);
                 dragStage.setHeight(nameLabel.getHeight() + 10);
@@ -164,7 +167,21 @@ public class DraggableTab extends Tab {
                     }
                     Rectangle2D lastTabRect = getAbsoluteRect(tabPane.getTabs().get(tabPane.getTabs().size() - 1));
                     if (screenPoint.getX() < (firstTabRect.getMinX() + firstTabRect.getWidth() / 2)) {
-                        tabInsertIndex = 0;
+
+
+                        for (int i = 0; i < tabPane.getTabs().size() - 1; i++) {
+                            Tab leftTab = tabPane.getTabs().get(i);
+                            Tab rightTab = tabPane.getTabs().get(i + 1);
+                            if (leftTab instanceof DraggableTab && rightTab instanceof DraggableTab) {
+                                Rectangle2D leftTabRect = getAbsoluteRect(leftTab);
+                                Rectangle2D rightTabRect = getAbsoluteRect(rightTab);
+                                if (betweenX(leftTabRect, rightTabRect, screenPoint.getX())) {
+                                    tabInsertIndex = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+
                     } else if (screenPoint.getX() > (lastTabRect.getMaxX() - lastTabRect.getWidth() / 2)) {
                         tabInsertIndex = tabPane.getTabs().size();
                     } else {
@@ -210,6 +227,7 @@ public class DraggableTab extends Tab {
         double upperBound = r2.getMaxX() - r2.getWidth() / 2;
         return xPoint >= lowerBound && xPoint <= upperBound;
     }
+
 
     record InsertData(int index, TabPane insertPane) {
 

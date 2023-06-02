@@ -6,7 +6,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
-import javafx.geometry.Side;
+
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -67,12 +67,11 @@ public class TradeView extends Region  {
         Button AddBtn = new Button("LOAD NEW CHART");
         AddBtn.setOnAction(
                 event -> {
-                    String symbol = symbolChoicebox.getValue();
-                    logger.debug(symbol);
-                    String sym1 = symbol.split("/")[0];
-                    String sym2 = symbol.split("/")[1];
+
+                    String sym1 = symbolChoicebox.getValue().split("/")[0];
+                    String sym2 =          symbolChoicebox.getValue().split("/")[1];
                     logger.debug(sym1 + sym2);
-                    DraggableTab tradeTab2 = new DraggableTab(sym1 + "/" + sym2, "");
+                    DraggableTab tradeTab2 = new DraggableTab(sym1 + "/" + sym2, "Invest.png");
                     CandleStickChartContainer container2;
                     try {
                         TradePair tradePair3 = new TradePair(sym1, sym2);
@@ -121,7 +120,7 @@ public class TradeView extends Region  {
                                                     symbolChoicebox.getValue().split("/")[0],
                                                     symbolChoicebox.getValue().split("/")[1]
                                             ),
-                                            cryptoinvestor.cryptoinvestor.Side.BUY,
+                                            Side.BUY,
 
                                             ENUM_ORDER_TYPE.MARKET, price,
 
@@ -148,7 +147,7 @@ public class TradeView extends Region  {
                                             new TradePair(
                                                     symbolChoicebox.getValue().split("/")[0],
                                                     symbolChoicebox.getValue().split("/")[1]),
-                                            cryptoinvestor.cryptoinvestor.Side.SELL,
+                                            Side.SELL,
                                             ENUM_ORDER_TYPE.MARKET, price,
                                             quantity,
                                             new Date(), stopPrice,
@@ -196,7 +195,7 @@ public class TradeView extends Region  {
 
 
                                     ),
-                                    cryptoinvestor.cryptoinvestor.Side.BUY,
+                                    Side.BUY,
                                     ENUM_ORDER_TYPE.ENTRY, price,
                                     quantity,
                                     new Date(), stopPrice,
@@ -217,7 +216,7 @@ public class TradeView extends Region  {
                                             symbolChoicebox.getValue().split("/")[0],
                                             symbolChoicebox.getValue().split("/")[1]
                                     ),
-                                    cryptoinvestor.cryptoinvestor.Side.BUY,
+                                    Side.BUY,
 
                                     ENUM_ORDER_TYPE.ENTRY, price,
 
@@ -235,7 +234,7 @@ public class TradeView extends Region  {
                     Button sellStopBtn = new Button("SELL STOP");
                     Button sellCancelBtn = new Button("SELL CANCEL");
                     Button buyCancelBtn = new Button("BUY CANCEL");
-                    Button cancelAllBtn = new Button("CANCEL ALL");
+                   // Button cancelAllBtn = new Button("CANCEL ALL");
 
 
                     Button buyLimitBtn = new Button("BUY LIMIT");
@@ -246,7 +245,7 @@ public class TradeView extends Region  {
                                             symbolChoicebox.getValue().split("/")[0],
                                             symbolChoicebox.getValue().split("/")[1]
                                     ),
-                                    cryptoinvestor.cryptoinvestor.Side.BUY,
+                                    Side.BUY,
 
                                     ENUM_ORDER_TYPE.LIMIT, price,
 
@@ -268,7 +267,7 @@ public class TradeView extends Region  {
                                             symbolChoicebox.getValue().split("/")[0],
                                             symbolChoicebox.getValue().split("/")[1]
                                     ),
-                                    cryptoinvestor.cryptoinvestor.Side.SELL,
+                                    Side.SELL,
 
                                     ENUM_ORDER_TYPE.LIMIT, price,
 
@@ -289,7 +288,7 @@ public class TradeView extends Region  {
                                             new TradePair(
                                                     symbolChoicebox.getValue().split("/")[0],
                                                     symbolChoicebox.getValue().split("/")[1]),
-                                            cryptoinvestor.cryptoinvestor.Side.BUY,
+                                            Side.BUY,
 
                                             ENUM_ORDER_TYPE.ENTRY, price,
 
@@ -308,7 +307,7 @@ public class TradeView extends Region  {
                                                                 symbolChoicebox.getValue().split("/")[0],
                                                                 symbolChoicebox.getValue().split("/")[1]
                                                         ),
-                                                        cryptoinvestor.cryptoinvestor.Side.SELL,
+                                                        Side.SELL,
 
                                                         ENUM_ORDER_TYPE.ENTRY, price,
 
@@ -358,7 +357,7 @@ public class TradeView extends Region  {
                     gridPane.add(closeAll, 0, 5);
                     gridPane.add(trailingBuy, 0, 2);
                     gridPane.add(trailingSell, 1, 2);
-                    stage.setTitle(" Cryptoinvestor  ");
+                    stage.setTitle(" InvestPro");
                     stage.setScene(new Scene(gridPane, 600, 320));
                     stage.setAlwaysOnTop(true);
                     stage.show();
@@ -513,10 +512,10 @@ public class TradeView extends Region  {
             TreeTableColumn<Account, String> status = new TreeTableColumn<>("Status");
             TreeTableColumn<Account, String> created = new TreeTableColumn<>("Created");
             TreeTableColumn<Account, String> updated = new TreeTableColumn<>("Updated");
-            TreeTableColumn<Account, String> id = new TreeTableColumn<>("ID");
+           TreeTableColumn<Account, String> id = new TreeTableColumn<>("ID");
 
 
-            accounts.getColumns().addAll(name, balance, currency, type, status, created, updated);
+            accounts.getColumns().addAll(id,name, balance, currency, type, status, created, updated);
             ObservableList<Account> obs0 = FXCollections.observableArrayList();
             obs0.addAll(account);
             RecursiveTreeItem<Account> obs1 = new RecursiveTreeItem<>(obs0, RecursiveTreeObject::getChildren);

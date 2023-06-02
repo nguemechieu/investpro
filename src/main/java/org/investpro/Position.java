@@ -1,12 +1,14 @@
 package org.investpro;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class Position {
     public String dividendAdjustment;
     public String unrealizedPL;
     public String resettablePL;
     public String guaranteedExecutionFees;
     public String financing;
-    // @JsonProperty("short")
+    @JsonProperty("short")
     public Short myshort = new Short("", "", "", "", "", "", "");
     public String instrument;
     public String commission;

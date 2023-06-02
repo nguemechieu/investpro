@@ -22,22 +22,16 @@ public class SimpleDocking extends Application {
         final FlowPane centerArea = new FlowPane();
         final Button undockButton = new Button("Undock");
         undockButton.setOnAction(
-                e -> {
-                    centerArea.getChildren().add(undockButton);
-
-                }
+                e -> centerArea.getChildren().add(undockButton)
         );
 
         rootPane.getItems().addAll(centerArea, dockedArea);
 
         stage.setScene(new Scene(rootPane, 300, 300));
         stage.show();
-
-        final Dialog dialog = new Dialog();
+        Dialog<Object> dialog = new Dialog<>();
         undockButton.disableProperty().bind(dialog.getDialogPane().cacheProperty());
 
-        undockButton.setOnAction(actionEvent -> {
-            rootPane.getItems().remove(dockedArea);
-        });
+        undockButton.setOnAction(actionEvent -> rootPane.getItems().remove(dockedArea));
     }
 }

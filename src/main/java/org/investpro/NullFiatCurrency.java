@@ -18,14 +18,14 @@ public class NullFiatCurrency extends FiatCurrency {
         );
     }
 
-    @Override
-    public int compareTo(cryptoinvestor.cryptoinvestor.@NotNull Currency o) {
-        return 0;
-    }
 
     @Override
     public int compareTo(@NotNull Currency o) {
         return 0;
     }
 
+    @Override
+    public int compareTo(@NotNull org.investpro.Currency o) {
+        return 0;
+    }
 }

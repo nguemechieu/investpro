@@ -79,6 +79,19 @@ public class CandleStickChartOptions {
             return "Align Open/Close";
         }
     };
+    private final ReadOnlyBooleanWrapper newsGridLinesVisible =
+            new ReadOnlyBooleanWrapper(false) {
+                @Override
+                public Object getBean() {
+                    return CandleStickChartOptions.this;
+                }
+
+                @Contract(pure = true)
+                @Override
+                public @NotNull String getName() {
+                    return "News Grid Lines";
+                }
+            };
 
     public CandleStickChartOptions() {
         optionsPane = new VBox();
@@ -134,6 +147,29 @@ public class CandleStickChartOptions {
         return alignOpenClose.getReadOnlyProperty();
     }
 
+    public final ReadOnlyBooleanProperty isNewsGridLinesVisible() {
+
+        return newsGridLinesVisible.getReadOnlyProperty();
+    }
+
+    public boolean isAutoTrading() {
+        return true;
+    }
+
+    public void setAutoTrading(boolean b) {
+        ;
+
+        if (b) {
+            verticalGridLinesVisible.set(true);
+            horizontalGridLinesVisible.set(true);
+            showVolume.set(true);
+            alignOpenClose.set(true);
+            newsGridLinesVisible.set(true);
+
+        }
+    }
+
+
     private static class ChartOption {
         private final ToggleSwitch optionSwitch;
         private final Label optionLabel;
@@ -144,4 +180,5 @@ public class CandleStickChartOptions {
             optionLabel = new Label(optionProperty.getName() + ':');
         }
     }
+
 }

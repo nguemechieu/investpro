@@ -232,7 +232,6 @@ public class ReversedLinesFileReader implements Closeable {
          * Reads a line.
          *
          * @return the line or null
-         * @throws IOException if there is an error reading from the file
          */
         private String readLine() {
 
@@ -289,7 +288,7 @@ public class ReversedLinesFileReader implements Closeable {
         }
 
         /**
-         * Creates the buffer containing any left over bytes.
+         * Creates the buffer containing any leftover bytes.
          */
         private void createLeftOver() {
             final int lineLengthBytes = currentLastBytePos + 1;

@@ -1,5 +1,6 @@
 package org.investpro;
 
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -590,7 +591,7 @@ class Geocode {
         this.viewport = viewport;
     }
 
-    private void setViewport(JSONObject jsonObject) {
+    private void setViewport(@NotNull JSONObject jsonObject) {
         if (jsonObject.has("viewport")) {
             JSONObject viewport = jsonObject.getJSONObject("viewport");
             if (viewport.has("lat")) {

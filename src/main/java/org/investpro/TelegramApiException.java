@@ -1,8 +1,6 @@
 package org.investpro;
 
 
-
-
 public class TelegramApiException extends Throwable {
 
 

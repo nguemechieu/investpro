@@ -41,12 +41,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.lang.System.nanoTime;
 import static java.lang.System.out;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static org.investpro.UsersManager.alert;
 
 public class BinanceUs extends Exchange {
 
     private static final Logger logger = LoggerFactory.getLogger(BinanceUs.class);
-
-
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -64,11 +63,12 @@ public class BinanceUs extends Exchange {
     private String symbol;
     private double price;
 
-    public BinanceUs(String apiKey) {
-        super(binanceUsWebSocket(apiKey));
+    public BinanceUs(String apiKey, String apiSecret) {
+        super(binanceUsWebSocket(apiKey,apiSecret));
 
 
         this.api_key = apiKey;
+        this.apiSecret = apiSecret;
 
 
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
@@ -80,10 +80,18 @@ public class BinanceUs extends Exchange {
         requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
         requestBuilder.header("Origin", "https://api.binance.us");
         requestBuilder.header("Referer", "https://api.binance.us");
-        requestBuilder.header("Sec-Fetch-Dest", "empty");
-        requestBuilder.header("Sec-Fetch-Mode", "cors");
+
+
+
+
+
         requestBuilder.header("Accept", "application/json");
-        requestBuilder.header("Authorization", "Bearer " + apiKey);
+        requestBuilder.header("X-MBX-APIKEY", "Bearer " + apiKey);
+        requestBuilder.header("X-MBX-APISECRET", apiSecret);
+        requestBuilder.header("Sec-Fetch-Site", "same-origin");
+        requestBuilder.header("Sec-Fetch-User", "?1");
+
+        requestBuilder.header("Accept-Language", "en-US,en;q=0.9");
 
         logger.info("BinanceUs " + nanoTime());
         this.api_key = apiKey;
@@ -94,7 +102,7 @@ public class BinanceUs extends Exchange {
 
     }
 
-    private static ExchangeWebSocketClient binanceUsWebSocket(String apiKey) {
+    private static ExchangeWebSocketClient binanceUsWebSocket(String apiKey, String apiSecret) {
 
         BinanceWebSocket binanceUsWebSocket = new BinanceWebSocket(apiKey);
 
@@ -104,10 +112,13 @@ public class BinanceUs extends Exchange {
         binanceUsWebSocket.addHeader("Sec-Fetch-Dest", "empty");
         binanceUsWebSocket.addHeader("Sec-Fetch-Mode", "cors");
         binanceUsWebSocket.addHeader("Accept", "application/json");
-        binanceUsWebSocket.addHeader("Authorization", "Bearer " + apiKey);
+        binanceUsWebSocket.addHeader(
+                "X-MBX-APIKEY", "Bearer " + apiKey
+        );
+        binanceUsWebSocket.addHeader("X-MBX-APISECRET", apiSecret);
         binanceUsWebSocket.addHeader("Sec-Fetch-Site", "same-origin");
         binanceUsWebSocket.addHeader("Sec-Fetch-User", "?1");
-        binanceUsWebSocket.addHeader("Accept-Encoding", "gzip, deflate, br");
+
 
         binanceUsWebSocket.connect();
         return binanceUsWebSocket;
@@ -3202,7 +3213,7 @@ public class BinanceUs extends Exchange {
         return api_key;
     }
 
-    public @NotNull List<Currency>  getAvailableSymbols() throws IOException, InterruptedException {
+    public @NotNull List<Currency> getAvailableSymbols() throws IOException, InterruptedException {
         requestBuilder.uri(
                 URI.create("https://api.binance.us/api/v3/exchangeInfo")
         );
@@ -3295,19 +3306,19 @@ public class BinanceUs extends Exchange {
                 currencies.add(new Currency(
                                        CurrencyType.CRYPTO, symbol, symbol, symbol,
                                        Integer.parseInt(baseAssetPrecision), symbol, "") {
-                                   @Override
-                                   public int compareTo(@NotNull Currency o) {
-                                       return 0;
-                                   }
+                    @Override
+                    public int compareTo(@NotNull Currency o) {
+                        return 0;
+                    }
 
-                                   @Override
-                                   public int compareTo(@NotNull Currency o) {
-                                       return 0;
-                                   }
+                    @Override
+                    public int compareTo(java.util.@NotNull Currency o) {
+                        return 0;
+                    }});
 
-                               }
 
-                );
+
+
 
                     logger.info(
 
@@ -3569,7 +3580,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Error");
             alert.setHeaderText(null);
 

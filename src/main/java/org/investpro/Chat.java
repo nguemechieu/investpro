@@ -2,9 +2,9 @@ package org.investpro;
 
 
 public class Chat {
-    public Chat m_new_one;
-    public boolean done;
+
     public String message_text;
+    String chat_type;
     String chat_id;
     String title;
     String type;
@@ -15,6 +15,7 @@ public class Chat {
     public Chat(int chat_id, String chat_type, String chat_title, String text, String chat_first_name, String chat_last_name, String chat_username) {
 
         this.message_text = text;
+        this.chat_type = chat_type;
         this.chat_id = String.valueOf(chat_id);
         this.title = chat_title;
         this.photo = chat_first_name + " " + chat_last_name +
@@ -27,6 +28,10 @@ public class Chat {
         this.title = title;
         this.type = type;
         this.username = username;
+    }
+
+    public static String getWelcomeMessage() {
+        return "Welcome to Cryptoinvestor!";
     }
 
     public String getChat_id() {

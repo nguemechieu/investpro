@@ -6,6 +6,7 @@ import javafx.scene.Scene;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextBoundsType;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -61,11 +62,13 @@ public class FXUtils {
         return MONOSPACED_FONT;
     }
 
-    public static Dimension2D computeTextDimensions(String text) {
+    @Contract("_ -> new")
+    public static @NotNull Dimension2D computeTextDimensions(String text) {
         return computeTextDimensions(text, null, 0, null, "");
     }
 
-    public static Dimension2D computeTextDimensions(String text, Font font) {
+    @Contract("_, _ -> new")
+    public static @NotNull Dimension2D computeTextDimensions(String text, Font font) {
         return computeTextDimensions(text, font, 0, null, "");
     }
 
@@ -83,8 +86,9 @@ public class FXUtils {
      * @return the {@code Dimension2D} object that has the width and height of the text, as measured with
      * the font, line spacing, bounds type and styles
      */
-    public static Dimension2D computeTextDimensions(String text, Font font, double lineSpacing,
-                                                    TextBoundsType boundsType, String style) {
+    @Contract("_, _, _, _, _ -> new")
+    public static @NotNull Dimension2D computeTextDimensions(@NotNull String text, Font font, double lineSpacing,
+                                                             TextBoundsType boundsType, String style) {
         if (text.isEmpty()) {
             return new Dimension2D(0, 0);
         }

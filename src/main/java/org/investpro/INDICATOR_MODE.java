@@ -3,7 +3,6 @@ package org.investpro;
 public enum INDICATOR_MODE {
 
     MODE_DEMA(2),
-    MODE_DEMA_DEMA(9),
     MODE_DEMA_RSI(8),
     MODE_EMA(1),
     MODE_RSE(5),

@@ -1486,9 +1486,10 @@ public class Coinbase extends Exchange {
                     }
 
                     @Override
-                    public int compareTo(@NotNull Currency o) {
+                    public int compareTo(java.util.@NotNull Currency o) {
                         return 0;
                     }
+
                 };
                 symbols.add(currency);
             }

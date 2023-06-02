@@ -10,8 +10,8 @@ import java.util.function.Consumer;
 
 
 public class CandleDataPager {
-    private final CandleDataSupplier candleDataSupplier;
-    private final CandleDataPreProcessor candleDataPreProcessor;
+    CandleDataSupplier candleDataSupplier;
+    CandleDataPreProcessor candleDataPreProcessor;
 
     public CandleDataPager(CandleStickChart candleStickChart, CandleDataSupplier candleDataSupplier) {
         Objects.requireNonNull(candleStickChart);
@@ -43,7 +43,15 @@ public class CandleDataPager {
                 candleData = futureCandleData.get();
             } catch (InterruptedException | ExecutionException ex) {
                 Log.error("exception during accepting futureCandleData: " + ex);
-                return;
+                Log.info(
+                        "candleStickChart: " + candleStickChart +
+                                ", candleDataPreProcessor: ", ""
+                );
+
+
+                return
+
+                        ;
             }
 
             if (!candleData.isEmpty()) {
@@ -59,6 +67,7 @@ public class CandleDataPager {
                         hitFirstNonPlaceHolder = true;
                         candleStickChart.getCandlePageConsumer().accept(nonPlaceHolders);
                     }
+
                 }
             }
         }

@@ -1,6 +1,5 @@
 package org.investpro;
 
-import org.investpro.Log;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;

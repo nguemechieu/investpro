@@ -2,22 +2,18 @@ package org.investpro;
 
 import javafx.beans.property.IntegerProperty;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 import static java.lang.System.out;
 
-/**
- * @Noel Martial Nguemechieu
- */
 public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
-    private static final Set<Integer> GRANULARITIES = Set.of(60, 60 * 5, 60 * 15, 60 * 30, 3600, 3600 * 2, 3600 * 3, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4, 3600 * 24 * 365);
-    /**
-     * The number of candles supplied per call to {@link #get()}.
-     */
+
     protected final int numCandles;
     protected final int secondsPerCandle;
     protected final TradePair tradePair;
@@ -44,9 +40,7 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
 
     }
 
-    public Set<Integer> getSupportedGranularities() {
-        return GRANULARITIES;
-    }
+
 
     @Override
     public String toString() {
@@ -79,4 +73,14 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     public int hashCode() {
         return Objects.hash(numCandles, secondsPerCandle, tradePair, endTime);
     }
+
+    public abstract List<CandleData> getCandleData();
+
+
+    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
+
+    public abstract CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
+            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
+
+    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt);
 }

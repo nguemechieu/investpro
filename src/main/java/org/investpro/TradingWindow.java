@@ -20,7 +20,7 @@ import java.text.ParseException;
 import java.util.Objects;
 import java.util.Properties;
 
-import static cryptoinvestor.cryptoinvestor.NewsManager.load;
+import static org.investpro.NewsManager.load;
 
 public class TradingWindow extends AnchorPane {
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
@@ -45,7 +45,7 @@ public class TradingWindow extends AnchorPane {
 //                            api_secret,
 //                            account_id);
                    case BINANCE_US -> new BinanceUs(
-                           "xxx");
+                           "odkr6pfbgl10ZM7i2D4kZ8FgOZLDjzs3iAY2IV2E67Cm316dkQs397bScVzhH4b1","3ilQvixaFv3Y1sdZ48jO0JqShoQUU6SdQkbviOAgIB2zHR9xu8J7hQSPZGqzxoTd");
 //                case BITSTAMP: {
 //
 //                     new Bitstamp(
@@ -75,7 +75,7 @@ public class TradingWindow extends AnchorPane {
 
                    case OANDA -> new Oanda("001-001-2783446-002",
 
-                           "77be89b17b7fe4c04affd4200454827c-dea60a746483dc7702878bdfa372bb99");
+                           "690b43930d606088874f601a03c254d1-ff286fb3b7ba0459d8db9398dc6297f6");
 //                case POLONIEX:
 //                    exchange = new Poloniex(
 //
@@ -104,29 +104,27 @@ public class TradingWindow extends AnchorPane {
                tab.setContent(
                        new VBox(new Label(i.name(),
                                new Separator(Orientation.VERTICAL)),
-                               new TradeView(exchange, "2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo")));
+                               new TradeView(exchange, "2125623831:AAGtuhGO9JxHh72nYfD6WN6mog7UkDIIL0o")));
            }
 
         tabPane.getTabs().addAll(getNewsTab(),browserTab());
        setPrefSize(1530, 780);
         getStyleClass().add("trading-window");
-        getStylesheets().add(Objects.requireNonNull(getClass().getResource("/cryptoinvestor/app.css")).toExternalForm());
+        getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
         tabPane.setTranslateY(25);
 
         logger.debug("TradingWindow initialized");
         getChildren().addAll(getMenuBar(), tabPane);
 
     Properties properties = new Properties();
-    properties.load(Objects.requireNonNull(getClass().getResourceAsStream("/cryptoinvestor/app.properties")));
+    properties.load(Objects.requireNonNull(getClass().getResourceAsStream("/app.properties")));
     logger.debug("Properties loaded");
     logger.info("properties "+properties.values());
     }
 
     private @NotNull Tab browserTab() {
 
-        DraggableTab browserTab = new DraggableTab("Browser", "");
-        browserTab.setContent(new StackPane(new Browser()));
-        return browserTab;
+        return new DraggableTab("Browser", "");
     }
 
     private @NotNull Tab getNewsTab() throws ParseException {

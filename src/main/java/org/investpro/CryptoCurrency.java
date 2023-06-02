@@ -1,36 +1,33 @@
 package org.investpro;
 
+import org.jetbrains.annotations.NotNull;
+
+public abstract class CryptoCurrency extends Currency {
 
 
-public class CryptoCurrency extends Currency {
-
-    String maxCoinsIssued;
-
-    protected CryptoCurrency() {
-        super(CurrencyType.CRYPTO, "", "", "", 0, "");
-
-        maxCoinsIssued = "";
-    }
-
-    protected CryptoCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
-                             String symbol) {
-        super(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol);
+    protected CryptoCurrency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
+        super(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
 
         this.code = code;
         this.fractionalDigits = fractionalDigits;
         this.symbol = symbol;
         this.fullDisplayName = fullDisplayName;
-
+        this.shortDisplayName = shortDisplayName;
+        this.currencyType = currencyType;
 
     }
 
     @Override
     public String toString() {
-        return "CryptoCurrency{" +
-                ", code='" + code + '\'' +
-                ", fractionalDigits=" + fractionalDigits +
-                ", symbol='" + symbol + '\'' +
-                ", fullDisplayName='" + fullDisplayName + '\'' +
-                '}';
+        return
+                "currencyType=" + currencyType +
+                        ", fullDisplayName='" + fullDisplayName + '\'' +
+                        ", code='" + code + '\'' +
+                        ", fractionalDigits=" + fractionalDigits +
+                        ", symbol='" + symbol + '\'' +
+                        ", shortDisplayName='" + shortDisplayName + '\'';
     }
+
+
+    public abstract int compareTo(java.util.@NotNull Currency o);
 }

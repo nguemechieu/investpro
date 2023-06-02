@@ -2,6 +2,7 @@ package org.investpro;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.sql.SQLException;
 
 
 public interface Money {
@@ -13,7 +14,7 @@ public interface Money {
 
     Money plus(long summand);
 
-    Money plus(double summand);
+    Money plus(double summand) throws SQLException, ClassNotFoundException;
 
     Money negate();
 
@@ -23,7 +24,7 @@ public interface Money {
 
     Money minus(long subtrahend);
 
-    Money minus(double subtrahend);
+    Money minus(double subtrahend) throws SQLException, ClassNotFoundException;
 
     Money multipliedBy(long multiplier);
 

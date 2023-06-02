@@ -8,20 +8,22 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 import static java.lang.System.out;
 
 
-public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
+public class CryptoCurrencyDataProvider  {
 
 
-    public CryptoCurrencyDataProvider() {
+    public CryptoCurrencyDataProvider() throws SQLException, ClassNotFoundException {
+
     }
 
-    @Override
-    protected void registerCurrencies() {
+
+    public  void registerCurrencies() {
 
         HttpRequest.Builder request = HttpRequest.newBuilder();
         request.setHeader("Accept", "application/json");
@@ -115,7 +117,10 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
                         List<Currency> coinsToRegister = new ArrayList<>();
 
 
-                        coinsToRegister.add(i, new CryptoCurrency(name, id, symbol, maxPrecision, crypto_address_link));
+                        String image=
+                                "https://api.coinmarketcap.com/v1/ticker/" + id + "/?convert=USD";
+                        out.println("image " + image);
+                    //    coinsToRegister.add(i, new CryptoCurrency(name, id, symbol, maxPrecision, crypto_address_link,name,image));
 
                         //        String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
                         //      String symbol

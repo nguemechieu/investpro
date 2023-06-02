@@ -1,6 +1,6 @@
 package org.investpro;
 
-import cryptoinvestor.cryptoinvestor.Account;
+
 import org.json.JSONObject;
 
 public class BinanceUsAccount extends Account {

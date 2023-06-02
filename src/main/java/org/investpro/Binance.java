@@ -572,14 +572,9 @@ if (response.statusCode() == 200) {
                 symbols.get(i).get("baseAssetPrecision").asInt(),
                 symbols.get(i).get("filters").get(0).get("filterType").asText(),
                 ""
-                ) {
+        ) {
             @Override
-            public int compareTo(@NotNull Currency o) {
-                return 0;
-            }
-
-            @Override
-            public int compareTo(@NotNull Currency o) {
+            public int compareTo(java.util.@NotNull Currency o) {
                 return 0;
             }
         });
@@ -631,12 +626,7 @@ if (response.statusCode() == 200) {
                         ""
                 ) {
                     @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
-
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
+                    public int compareTo(java.util.@NotNull Currency o) {
                         return 0;
                     }
                 });

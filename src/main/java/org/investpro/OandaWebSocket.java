@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import cryptoinvestor.cryptoinvestor.*;
+
 import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
@@ -84,7 +84,7 @@ public abstract class OandaWebSocket extends ExchangeWebSocketClient {
         } catch (CurrencyNotFoundException exception) {
             logger.error("oanda websocket client: could not initialize trade pair: " +
                     messageJson.get("asks").asText(), exception);
-        } catch (SQLException e) {
+        } catch (SQLException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
 
@@ -117,7 +117,7 @@ public abstract class OandaWebSocket extends ExchangeWebSocketClient {
         }
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException {
+    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
         final String productId = messageJson.get("instrument").asText();
         final String[] products = productId.split("_");
         TradePair tradePair;

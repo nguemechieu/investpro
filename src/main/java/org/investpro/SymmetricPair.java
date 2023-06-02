@@ -18,6 +18,8 @@ public record SymmetricPair<F, S>(F first, S second) {
      * @param second the second object in the pair
      */
     public SymmetricPair {
+        Objects.requireNonNull(first);
+        Objects.requireNonNull(second);
     }
 
     /**
@@ -25,7 +27,7 @@ public record SymmetricPair<F, S>(F first, S second) {
      *
      * @param a the first object in the Pair
      * @param b the second object in the pair
-     * @return a Pair that is templatized with the types of a and b
+     * @return a Pair that is templates with the types of a and b
      */
     @Contract(value = "_, _ -> new", pure = true)
     public static <A, B> @NotNull SymmetricPair<A, B> of(A a, B b) {

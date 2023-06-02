@@ -5,77 +5,85 @@
 //create user account
 package org.investpro;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import org.hibernate.annotations.Table;
+
 import java.io.Serializable;
 import java.util.Locale;
 
 @Entity
-@Table(name = "users")
+@Table(
+        appliesTo = "users"
+)
 public class User implements Serializable {
+
+
+//    profile_bio string, optional	Bio for user's public profile
+//    profile_url string, optional	Public profile location if user has one
+//    avatar_url string	User's avatar url
+//    resource string, constant user
+//    resource_path string
+
+
     public static final long serialVersionUID = 1L;
-    @Column(name = "birthdate")
-    private String birthdate;
     @Id
-    @Column(name = "id", unique = true, nullable = false)
-    private int Id;
-    @Column(name = "username", nullable = false, unique = true)
+    @GeneratedValue
+    private Long id;
     private String username;
-    @Column(name = "gender", nullable = false)
-    private String gender;
-    @Column(name = "password", nullable = false, unique = true)
     private String password;
-    @Column(name = "email", unique = true, nullable = false)
-    private String email;
-    @Column(name = "phone", nullable = false, unique = true)
-    private String phone;
-    @Column(name = "firstname", nullable = false, unique = true)
-    private String firstname;
-    @Column(name = "lastname", nullable = false, unique = true)
-    private String lastname;
-    @Column(name = "middlename")
-    private String middlename;
-    @Column(name = "address", unique = true, nullable = false)
-    private String address;
-    @Column(name = "city")
-    private String city;
-    @Column(name = "state")
-    private String state;
-    @Column(name = "country")
-    private String country;
-    @Column(name = "zip")
-    private String zip;
-    @Column(name = "role")
-    private String role;
-    @Column(name = "created_at")
+    private String profile_bio;
+    private String profile_url;
+    private String avatar_url;
+    private String resource;
+    private String resource_path;
     private String createdAt;
-    @Column(name = "updated_at")
     private String updatedAt;
-    @Column(name = "active")
     private boolean active;
-    @Column(name = "password_hash")
     private String passwordHash;
-    @Column(name = "password_reset_token")
-    private String passwordResetToken;
-    @Column(name = "password_reset_sent_at")
-    private String passwordResetSentAt;
+    private String first_name;
+    private String last_name;
+    private String middle_name;
+    private String gender;
+    private String age;
+    private String email;
+    private String phone;
+    private String address;
+    private String city;
+    private String state;
+    private String zip;
+    private String country;
+
+    public User(int id, String name, String profile_bio, String profile_url, String avatar_url, String resource, String resource_path) {
+        this.profile_bio = profile_bio;
+        this.profile_url = profile_url;
+        this.avatar_url = avatar_url;
+        this.resource = resource;
+        this.resource_path = resource_path;
+
+        this.createdAt = String.valueOf(Locale.getDefault());
+        this.updatedAt = String.valueOf(Locale.getDefault());
+        this.active = true;
+        this.passwordHash = "";
+
+        this.username = name;
+        this.id = (long) id;
+    }
 
     public User() {
+
     }
 
     public User(String username, String password, String email, String firstname, String lastname, String middlename, String gender, String birthdate, String phone, String address, String city, String state, String country, String zipCode) {
+
 
         this.username = username;
         this.password = password;
 
         this.email = email;
-        this.firstname = firstname;
-        this.lastname = lastname;
-        this.middlename = middlename;
-        this.gender = gender;
-        this.birthdate = birthdate;
+
         this.phone = phone;
         this.address = address;
         this.city = city;
@@ -86,64 +94,16 @@ public class User implements Serializable {
 
         this.updatedAt = String.valueOf(Locale.getDefault());
 
+        this.active = true;
+        this.passwordHash = "";
     }
 
-    public String getBirthdate() {
-        return birthdate;
+    public Long getId() {
+        return id;
     }
 
-    public void setBirthdate(String birthdate) {
-        this.birthdate = birthdate;
-    }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return super.equals(obj);
-    }
-
-    @Override
-    protected Object clone() throws CloneNotSupportedException {
-        return super.clone();
-    }
-
-    @Override
-    public String toString() {
-        return "User{" +
-                "Id=" + Id +
-                ", username='" + username + '\'' +
-                ", gender='" + gender + '\'' +
-                ", password='" + password + '\'' +
-                ", email='" + email + '\'' +
-                ", phone='" + phone + '\'' +
-                ", firstname='" + firstname + '\'' +
-                ", lastname='" + lastname + '\'' +
-                ", middlename='" + middlename + '\'' +
-                ", address='" + address + '\'' +
-                ", city='" + city + '\'' +
-                ", state='" + state + '\'' +
-                ", country='" + country + '\'' +
-                ", zip='" + zip + '\'' +
-                ", role='" + role + '\'' +
-                ", createdAt='" + createdAt + '\'' +
-                ", updatedAt='" + updatedAt + '\'' +
-                ", active=" + active +
-                ", passwordHash='" + passwordHash + '\'' +
-                ", passwordResetToken='" + passwordResetToken + '\'' +
-                ", passwordResetSentAt='" + passwordResetSentAt + '\'' +
-                '}';
-    }
-
-    public int getId() {
-        return Id;
-    }
-
-    public void setId(int id) {
-        Id = id;
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getUsername() {
@@ -154,6 +114,38 @@ public class User implements Serializable {
         this.username = username;
     }
 
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getFirst_name() {
+        return first_name;
+    }
+
+    public void setFirst_name(String first_name) {
+        this.first_name = first_name;
+    }
+
+    public String getLast_name() {
+        return last_name;
+    }
+
+    public void setLast_name(String last_name) {
+        this.last_name = last_name;
+    }
+
+    public String getMiddle_name() {
+        return middle_name;
+    }
+
+    public void setMiddle_name(String middle_name) {
+        this.middle_name = middle_name;
+    }
+
     public String getGender() {
         return gender;
     }
@@ -162,12 +154,12 @@ public class User implements Serializable {
         this.gender = gender;
     }
 
-    public String getPassword() {
-        return password;
+    public String getAge() {
+        return age;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public void setAge(String age) {
+        this.age = age;
     }
 
     public String getEmail() {
@@ -186,28 +178,54 @@ public class User implements Serializable {
         this.phone = phone;
     }
 
-    public String getFirstname() {
-        return firstname;
+    public String getProfile_bio() {
+        return profile_bio;
     }
 
-    public void setFirstname(String firstname) {
-        this.firstname = firstname;
+    public void setProfile_bio(String profile_bio) {
+        this.profile_bio = profile_bio;
     }
 
-    public String getLastname() {
-        return lastname;
+    public String getProfile_url() {
+        return profile_url;
     }
 
-    public void setLastname(String lastname) {
-        this.lastname = lastname;
+    public void setProfile_url(String profile_url) {
+        this.profile_url = profile_url;
     }
 
-    public String getMiddlename() {
-        return middlename;
+    public String getAvatar_url() {
+        return avatar_url;
     }
 
-    public void setMiddlename(String middlename) {
-        this.middlename = middlename;
+    public void setAvatar_url(String avatar_url) {
+        this.avatar_url = avatar_url;
+    }
+
+    public String getResource() {
+        return resource;
+    }
+
+    public void setResource(String resource) {
+        this.resource = resource;
+    }
+
+    public String getResource_path() {
+        return resource_path;
+    }
+
+    public void setResource_path(String resource_path) {
+        this.resource_path = resource_path;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return super.equals(obj);
+    }
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        return super.clone();
     }
 
     public String getAddress() {
@@ -250,14 +268,6 @@ public class User implements Serializable {
         this.zip = zip;
     }
 
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
     public String getCreatedAt() {
         return createdAt;
     }
@@ -288,22 +298,6 @@ public class User implements Serializable {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
-    }
-
-    public String getPasswordResetToken() {
-        return passwordResetToken;
-    }
-
-    public void setPasswordResetToken(String passwordResetToken) {
-        this.passwordResetToken = passwordResetToken;
-    }
-
-    public String getPasswordResetSentAt() {
-        return passwordResetSentAt;
-    }
-
-    public void setPasswordResetSentAt(String passwordResetSentAt) {
-        this.passwordResetSentAt = passwordResetSentAt;
     }
 
 

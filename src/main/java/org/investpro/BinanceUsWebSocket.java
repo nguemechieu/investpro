@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import cryptoinvestor.cryptoinvestor.*;
+
 import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
@@ -183,7 +183,7 @@ public abstract class BinanceUsWebSocket extends ExchangeWebSocketClient {
 
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException {
+    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
         String productId0 = messageJson.get("s").asText();
         String productId1;
         if (productId0.contains("USDT") || productId0.contains("USD")) {

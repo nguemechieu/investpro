@@ -15,6 +15,7 @@ public class InProgressCandle {
     private boolean placeHolder;
 
     private int closeTime;
+    private double closePriceSoFar;
 
     public int getCloseTime() {
         return closeTime;
@@ -24,11 +25,7 @@ public class InProgressCandle {
         this.closeTime = closeTime;
     }
 
-    /**
-     * Creates a new (immutable) {@code CandleData} by copying the fields from this {@code InProgressCandle}.
-     * This in effect creates a frozen "snapshot" of the in-progress candle data. This is useful when the current
-     * time passes the close time of the current in-progress candle and it needs to be added to a chart's data set.
-     */
+
     public CandleData snapshot() {
         return new CandleData(openPrice, lastPrice, highPriceSoFar, lowPriceSoFar, openTime, volumeSoFar);
     }
@@ -137,4 +134,56 @@ public class InProgressCandle {
         return Objects.hash(openTime, openPrice, highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar,
                 visible, placeHolder);
     }
+
+    public void setOpenPriceSoFar(int i) {
+        this.openPrice = i;
+    }
+
+    public double getClosePriceSoFar() {
+        return closePriceSoFar;
+    }
+
+    public void setClosePriceSoFar(double i) {
+        this.closePriceSoFar = i;
+    }
+
+    public void setOpenTimeSoFar(int i) {
+        this.openTime = i;
+    }
+
+    public void setCloseTimeSoFar(int i) {
+        this.closeTime = i;
+    }
+
+    public double getTotalVolume() {
+
+        return volumeSoFar * currentTill;
+
+
+    }
+
+    public double getVolume24h() {
+        return volumeSoFar * 24;
+    }
+
+    public double getHighPrice24h() {
+        return highPriceSoFar * 24;
+    }
+
+    public double getLowPrice24h() {
+        return lowPriceSoFar * 24;
+    }
+
+    public void setVolume(double volume) {
+        this.volumeSoFar = volume;
+    }
+
+    public void setClosePrice(double closePrice) {
+        this.closePriceSoFar = closePrice;
+    }
+
+    public void setHighestBidPrice(double highestBidPrice) {
+        this.highPriceSoFar = highestBidPrice;
+    }
+
 }

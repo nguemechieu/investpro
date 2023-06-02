@@ -1,13 +1,12 @@
 package org.investpro;
 
-import java.util.ArrayList;
 
 public class Instrument {
     public int pipLocation;
     public String displayName;
     public String maximumPositionSize;
     public String type;
-    public ArrayList<Tag> tags;
+
     public String minimumTrailingStopDistance;
     public String marginRate;
     public String minimumTradeSize;
@@ -18,12 +17,29 @@ public class Instrument {
     public Financing financing;
     public String maximumTrailingStopDistance;
     public String maximumOrderUnits;
+    String tags;
 
     public Instrument() {
+        pipLocation = 0;
+        displayName = "";
+        maximumPositionSize = "";
+        type = "";
+        minimumTrailingStopDistance = "";
+        marginRate = "";
+        minimumTradeSize = "";
+        displayPrecision = 0;
+        guaranteedStopLossOrderMode = "";
+        name = "";
+        tradeUnitsPrecision = 0;
+        financing = new Financing();
+        maximumTrailingStopDistance = "";
+        maximumOrderUnits = "";
+        tags = "";
     }
 
     @Override
     public String toString() {
+
         return "Instrument " +
                 "pipLocation=" + pipLocation +
                 ", displayName='" + displayName + '\'' +
@@ -58,9 +74,6 @@ public class Instrument {
         return type;
     }
 
-    public ArrayList<Tag> getTags() {
-        return tags;
-    }
 
     public String getMinimumTrailingStopDistance() {
         return minimumTrailingStopDistance;

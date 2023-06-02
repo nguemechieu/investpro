@@ -24,12 +24,15 @@ public class ZoomLevel {
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
               final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
               final int minXValue) {
+        if (candleWidth <= 0) {
+            throw new IllegalArgumentException("candleWidth must be greater than 0");
+        }
         this.zoomLevelId = zoomLevelId;
         this.candleWidth = candleWidth;
         numVisibleCandles = new SimpleDoubleProperty(plotAreaWidthProperty.doubleValue() / candleWidth);
         numVisibleCandles.bind(Bindings.createDoubleBinding(() -> plotAreaWidthProperty.doubleValue() / candleWidth,
                 plotAreaWidthProperty));
-        this.secondsPerPixel = secondsPerCandle / candleWidth;
+        this.secondsPerPixel = (float) secondsPerCandle / candleWidth;
         pixelsPerSecond = 1d / secondsPerPixel;
         this.xAxisFormatter = xAxisFormatter;
         this.minXValue = minXValue;
@@ -115,5 +118,9 @@ public class ZoomLevel {
         return String.format("ZoomLevel [id = %d, numVisibleCandles = %s, secondsPerPixel = %f, pixelsPerSecond = " +
                         "%f, candleWidth = %d, minXValue = %d", zoomLevelId, numVisibleCandles, secondsPerPixel,
                 pixelsPerSecond, candleWidth, minXValue);
+    }
+
+    public double getMaxXValue() {
+        return numVisibleCandles.get() * secondsPerPixel;
     }
 }

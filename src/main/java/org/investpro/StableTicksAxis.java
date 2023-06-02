@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Jason Winnebeck
+ * Copyright 2013 Jason Winne-beck
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
             9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
     };
     private static final int[] powersOf10 = {
-            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
+            1, 10, 16, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
     };
     private static final int[] halfPowersOf10 = {
             3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
@@ -88,6 +88,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private double labelSize = -1;
 
     public StableTicksAxis() {
+        this(0.0, 1.0);
     }
 
     public StableTicksAxis(double lowerBound, double upperBound) {
@@ -154,44 +155,42 @@ public class StableTicksAxis extends ValueAxis<Number> {
      * <p>
      * From Guava's IntMath.java.
      *
-     * @throws IllegalArgumentException if {@code x <= 0}
+     * @throws IllegalArgumentException if {@code xb <= 0}
      * @throws ArithmeticException      if {@code mode} is {@link RoundingMode#UNNECESSARY} and {@code x}
      *                                  is not a power of ten
      */
     @SuppressWarnings("fallthrough")
-    public static int log10(int x, RoundingMode mode) {
-        if (x <= 0) {
-            throw new IllegalArgumentException("x must be positive but was: " + x);
+    public static int log10(int xb, RoundingMode mode) {
+        if (xb <= 0) {
+            throw new IllegalArgumentException("x must be positive but was: " + xb);
         }
-        int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
-        int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
+        int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(xb)];
+        int logFloor = y - lessThanBranchFree(xb, powersOf10[y]);
         int floorPow = powersOf10[logFloor];
         switch (mode) {
             case UNNECESSARY:
-                if (x != floorPow) {
-                    throw new ArithmeticException("mode was UNNECESSARY, but rounding was necessary");
-                }
+                if (xb != floorPow) throw new ArithmeticException("mode was UNNECESSARY, but rounding was necessary");
                 // fall through
             case FLOOR:
             case DOWN:
                 return logFloor;
             case CEILING:
             case UP:
-                return logFloor + lessThanBranchFree(floorPow, x);
+                return logFloor + lessThanBranchFree(floorPow, xb);
             case HALF_DOWN:
             case HALF_UP:
             case HALF_EVEN:
                 // sqrt(10) is irrational, so log10(x) - logFloor is never exactly 0.5
-                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
+                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], xb);
             default:
                 throw new AssertionError();
         }
     }
 
-    static int lessThanBranchFree(int x, int y) {
+    static int lessThanBranchFree(int x1, int y1) {
         // The double negation is optimized away by normal Java, but is necessary for GWT
         // to make sure bit twiddling works as expected.
-        return (x - y) >>> (Integer.SIZE - 1);
+        return (x1 - y1) >>> (Integer.SIZE - 1);
     }
 
     /**
@@ -237,8 +236,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     @Override
-    protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
-        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
+    public Range autoRange(double minValue, double maxValue, double length, double labelSize) {
+        // NOTE(dwell): if the range is very small, display it like a flat line, the scaling doesn't work very well at
         // these values. 1e-300 was chosen arbitrarily.
         if (Math.abs(minValue - maxValue) < 1e-300) {
             // Normally this is the case for all points with the same value
@@ -314,7 +313,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(getLowerBound(), getUpperBound());
     }
 
-    private Range getRange(double minValue, double maxValue) {
+    private @NotNull Range getRange(double minValue, double maxValue) {
         double length = getLength();
         double delta = maxValue - minValue;
         double scale = calculateNewScale(length, minValue, maxValue);
@@ -326,7 +325,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     protected List<Number> calculateTickValues(double length, Object range) {
         Range rangeVal = (Range) range;
 
-        // Use floor so we start generating ticks before the axis starts -- this is really only relevant
+        // Use floor, so we start generating ticks before the axis starts -- this is really only relevant
         // because of the minor ticks before the first visible major tick. We'll generate a first
         // invisible major tick but the ValueAxis seems to filter it out.
         double firstTick = Math.floor(rangeVal.low / rangeVal.tickSpacing) * rangeVal.tickSpacing;

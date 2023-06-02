@@ -6,5 +6,6 @@ public enum Answer {
     ;
 
     Answer(int i) {
+
     }
 }

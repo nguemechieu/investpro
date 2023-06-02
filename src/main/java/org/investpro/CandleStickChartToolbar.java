@@ -42,11 +42,11 @@ import static org.investpro.FXUtils.computeTextDimensions;
 
 /**
  * A resizable toolbar, placed at the top of a {@code CandleStickChart} and contained
- * inside of a {@code CandleStickChartContainer}, that contains a series of labelled
+ * inside a {@code CandleStickChartContainer}, that contains a series of labelled
  * buttons that allow for controlling the chart paired with this toolbar. Some of the
  * functions of the buttons are:
  * <p>
- * <uldvat</li>
+ * <plat</li>
  * <li>Print the chart</li>
  * <li>Configure the chart's options (via a PopOver triggered by a button)</li>
  * </ul>

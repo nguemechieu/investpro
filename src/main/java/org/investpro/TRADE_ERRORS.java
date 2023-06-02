@@ -36,18 +36,14 @@ public enum TRADE_ERRORS {
     ORDER_CANCEL(19),
     ORDER_REJECT(20),
     ORDER_REPLACE(21),
-    MARGIN_WARGIN(22),
+    MARGIN_MARGIN(22),
     MARGIN_STOP_ORDER(23);
 
-    private final int value;
 
     TRADE_ERRORS(int value) {
-        this.value = value;
 
 
     }
 
-    public int Value() {
-        return value;
-    }
+
 }

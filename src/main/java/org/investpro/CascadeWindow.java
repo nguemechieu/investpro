@@ -9,7 +9,9 @@ import javafx.stage.Stage;
 
 
 public class CascadeWindow extends Region {
-    public CascadeWindow(int i, int i1) {
+
+
+    public CascadeWindow() {
         StackPane stackPane = new StackPane();
         VBox vb = new VBox();
         stackPane.getChildren().addAll(vb);

@@ -8,7 +8,6 @@ public class Locales implements Comparable<Locales> {
 
 
     public Locales(@NotNull String language, @NotNull String country) {
-        super();
         this.country = country.toUpperCase();
         this.language = language.toLowerCase();
     }

@@ -8,7 +8,7 @@ public enum TradeMode {
     /**
      * Trade is enabled.
      */
-    ENABLED_ONLY_IF_ENABLED, ENABLED;
+    ENABLED_ONLY_IF_ENABLED, ENABLED, AUTOMATIC, MANUAL, SIGNAL_ONLY;
 
     public boolean isEnabled() {
 

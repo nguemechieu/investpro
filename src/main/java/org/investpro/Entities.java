@@ -1,7 +1,7 @@
 package org.investpro;
 
 public class Entities {
-    // type	String	Type of the entity. Currently, can be “mention” (@username), “hashtag” (#hashtag), “cashtag” ($USD), “bot_command” (/start@jobs_bot), “url” (https://telegram.org), “email” (do-not-reply@telegram.org), “phone_number” (+1-212-555-0123), “bold” (bold text), “italic” (italic text), “underline” (underlined text), “strikethrough” (strikethrough text), “spoiler” (spoiler message), “code” (monowidth string), “pre” (monowidth block), “text_link” (for clickable text URLs), “text_mention” (for users without usernames), “custom_emoji” (for inline custom emoji stickers)
+    // type	String	Type of the entity. Currently, can be “mention” (@username), “hashtag” (#hashtag), “hashtag” ($USD), “bot_command” (/start@jobs_bot), “url” (https://telegram.org), “email” (do-not-reply@telegram.org), “phone_number” (+1-212-555-0123), “bold” (bold text), “italic” (italic text), “underline” (underlined text), “strikethrough” (strikethrough text), “spoiler” (spoiler message), “code” (monowidth string), “pre” (monowidth block), “text_link” (for clickable text URLs), “text_mention” (for users without usernames), “custom_emoji” (for inline custom emoji stickers)
     // offset	Integer	Offset in UTF-16 code units to the start of the entity
     // length	Integer	Length of the entity in UTF-16 code units
     // url	String	Optional. For “text_link” only, URL that will be opened after user taps on the text
@@ -13,7 +13,7 @@ public class Entities {
     public Integer offset;
     public Integer length;
     public String url;
-    public User user;
+    public users user;
     public String language;
     public String custom_emoji_id;
 
@@ -22,7 +22,7 @@ public class Entities {
             Integer offset,
             Integer length,
             String url,
-            User user,
+            users user,
             String custom_emoji_id,
             String language
     ) {
@@ -58,11 +58,11 @@ public class Entities {
         this.url = url;
     }
 
-    public User getUser() {
+    public users getUser() {
         return user;
     }
 
-    public void setUser(User user) {
+    public void setUser(users user) {
         this.user = user;
     }
 

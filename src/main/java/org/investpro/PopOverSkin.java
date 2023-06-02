@@ -1,30 +1,4 @@
-//CHECKSTYLE:OFF
-/*
- * Copyright (c) 2013, ControlsFX
- * All rights reserved.
- * <p/>
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- * * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- * * Redistributions in binary form must reproduce the above copyright
- * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution.
- * * Neither the name of ControlsFX, any associated website, nor the
- * names of its contributors may be used to endorse or promote products
- * derived from this software without specific prior written permission.
- * <p/>
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL CONTROLSFX BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+
 package org.investpro;
 
 import javafx.beans.InvalidationListener;
@@ -52,10 +26,9 @@ import static java.lang.Double.MAX_VALUE;
 import static javafx.geometry.Pos.CENTER_LEFT;
 import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
 import static javafx.scene.paint.Color.YELLOW;
-import static org.investpro.PopOver.ArrowLocation.*;
 
-public class PopOverSkin implements Skin<PopOver> {
-    private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
+ public class PopOverSkin implements Skin<PopOver> {
+    private static final String DETACHED_STYLE_CLASS = "detached";
     private final Path path;
     private final Path clip;
     private final BorderPane content;
@@ -63,9 +36,6 @@ public class PopOverSkin implements Skin<PopOver> {
     private final StackPane stackPane;
     private final PopOver popOver;
     Label title;
-    /**
-     *
-     */
     Label closeIcon;
     private Point2D dragStartLocation;
     private double xOffset;
@@ -82,10 +52,9 @@ public class PopOverSkin implements Skin<PopOver> {
     private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
             lineIBottom, lineJBottom;
     private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
-    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
-            lineJLeft;
+     private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft, lineJLeft;
 
-    public PopOverSkin(final PopOver popOver) {
+    public PopOverSkin(final @NotNull PopOver popOver) {
         this.popOver = popOver;
         stackPane = popOver.getRoot();
         stackPane.setPickOnBounds(false);
@@ -109,7 +78,7 @@ public class PopOverSkin implements Skin<PopOver> {
         title.textProperty().bind(popOver.titleProperty());
         title.setMaxSize(MAX_VALUE, MAX_VALUE);
         title.setAlignment(Pos.CENTER);
-        title.getStyleClass().add("text"); //$NON-NLS-1$
+        title.getStyleClass().add("text");
 
         closeIcon = new Label();
         closeIcon.setGraphic(createCloseIcon());
@@ -187,11 +156,6 @@ public class PopOverSkin implements Skin<PopOver> {
         path.setManaged(false);
 
         clip = new Path();
-
-        /*
-         * The clip is a path and the path has to be filled with a color.
-         * Otherwise clipping will not work.
-         */
         clip.setFill(YELLOW);
 
         createPathElements();
@@ -247,6 +211,7 @@ public class PopOverSkin implements Skin<PopOver> {
 
         content.setClip(clip);
     }
+
 
     @Override
     public Node getNode() {
@@ -595,17 +560,17 @@ public class PopOverSkin implements Skin<PopOver> {
         List<PathElement> elements = new ArrayList<>();
         elements.add(moveTo);
 
-        if (showArrow(TOP_LEFT)) {
+        if (showArrow(PopOver.ArrowLocation.TOP_LEFT)) {
             elements.add(lineBTop);
             elements.add(lineCTop);
             elements.add(lineDTop);
         }
-        if (showArrow(TOP_CENTER)) {
+        if (showArrow(PopOver.ArrowLocation.TOP_CENTER)) {
             elements.add(lineETop);
             elements.add(lineFTop);
             elements.add(lineGTop);
         }
-        if (showArrow(TOP_RIGHT)) {
+        if (showArrow(PopOver.ArrowLocation.TOP_RIGHT)) {
             elements.add(lineHTop);
             elements.add(lineITop);
             elements.add(lineJTop);
@@ -613,17 +578,17 @@ public class PopOverSkin implements Skin<PopOver> {
         elements.add(lineKTop);
         elements.add(rightCurveTo);
 
-        if (showArrow(RIGHT_TOP)) {
+        if (showArrow(PopOver.ArrowLocation.RIGHT_TOP)) {
             elements.add(lineBRight);
             elements.add(lineCRight);
             elements.add(lineDRight);
         }
-        if (showArrow(RIGHT_CENTER)) {
+        if (showArrow(PopOver.ArrowLocation.RIGHT_CENTER)) {
             elements.add(lineERight);
             elements.add(lineFRight);
             elements.add(lineGRight);
         }
-        if (showArrow(RIGHT_BOTTOM)) {
+        if (showArrow(PopOver.ArrowLocation.RIGHT_BOTTOM)) {
             elements.add(lineHRight);
             elements.add(lineIRight);
             elements.add(lineJRight);
@@ -631,17 +596,17 @@ public class PopOverSkin implements Skin<PopOver> {
         elements.add(lineKRight);
         elements.add(bottomCurveTo);
 
-        if (showArrow(BOTTOM_RIGHT)) {
+        if (showArrow(PopOver.ArrowLocation.BOTTOM_RIGHT)) {
             elements.add(lineBBottom);
             elements.add(lineCBottom);
             elements.add(lineDBottom);
         }
-        if (showArrow(BOTTOM_CENTER)) {
+        if (showArrow(PopOver.ArrowLocation.BOTTOM_CENTER)) {
             elements.add(lineEBottom);
             elements.add(lineFBottom);
             elements.add(lineGBottom);
         }
-        if (showArrow(BOTTOM_LEFT)) {
+        if (showArrow(PopOver.ArrowLocation.BOTTOM_LEFT)) {
             elements.add(lineHBottom);
             elements.add(lineIBottom);
             elements.add(lineJBottom);
@@ -649,17 +614,17 @@ public class PopOverSkin implements Skin<PopOver> {
         elements.add(lineKBottom);
         elements.add(leftCurveTo);
 
-        if (showArrow(LEFT_BOTTOM)) {
+        if (showArrow(PopOver.ArrowLocation.LEFT_BOTTOM)) {
             elements.add(lineBLeft);
             elements.add(lineCLeft);
             elements.add(lineDLeft);
         }
-        if (showArrow(LEFT_CENTER)) {
+        if (showArrow(PopOver.ArrowLocation.LEFT_CENTER)) {
             elements.add(lineELeft);
             elements.add(lineFLeft);
             elements.add(lineGLeft);
         }
-        if (showArrow(LEFT_TOP)) {
+        if (showArrow(PopOver.ArrowLocation.LEFT_TOP)) {
             elements.add(lineHLeft);
             elements.add(lineILeft);
             elements.add(lineJLeft);

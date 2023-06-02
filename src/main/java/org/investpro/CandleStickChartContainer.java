@@ -3,13 +3,16 @@ package org.investpro;
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.text.ParseException;
 import java.util.Objects;
+
+import static javafx.scene.layout.AnchorPane.*;
 
 /**
  * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
@@ -23,56 +26,60 @@ import java.util.Objects;
 
 
 public class CandleStickChartContainer extends Region {
-    private final VBox candleChartContainer;
-    private final CandleStickChartToolbar toolbar;
-    private final Exchange exchange;
-    private final TradePair tradePair;
-    private final SimpleIntegerProperty secondsPerCandle;
-    private CandleStickChart candleStickChart;
 
-    /**
-     * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
-     */
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair) throws URISyntaxException, IOException {
-        this(exchange, tradePair, true);
+    static {
+        new SimpleIntegerProperty(3600);
     }
 
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) throws URISyntaxException, IOException {
+    boolean liveSyncing;
+    CandleStickChartToolbar toolbar;
+    VBox candleChartContainer;
+    TradePair tradePair;
+    SimpleIntegerProperty secondsPerCandle;
+    private CandleStickChart candleStickChart;
+    private final String telegramToken;
+
+    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, String telegramToken, boolean liveSyncing) throws URISyntaxException, IOException {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(tradePair, "tradePair must not be null");
-        this.exchange = exchange;
+        this.telegramToken=telegramToken;
+
         this.tradePair = tradePair;
+        this.liveSyncing = liveSyncing;
         secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
+
+
         toolbar = new CandleStickChartToolbar(widthProperty(), heightProperty(),
-                candleDataSupplier.getSupportedGranularities());
-        VBox toolbarContainer = new VBox(toolbar);
+                exchange.getSupportedGranularities());
+        HBox toolbarContainer = new HBox(toolbar);
         toolbarContainer.setPrefWidth(Double.MAX_VALUE);
         toolbarContainer.setPrefHeight(20);
         toolbarContainer.prefWidthProperty().bind(prefWidthProperty());
-        AnchorPane.setTopAnchor(toolbarContainer, 10.0);
-        AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
-        AnchorPane.setRightAnchor(toolbarContainer, 0.0);
+        toolbarContainer.setTranslateX(100);
 
-
+        setLeftAnchor(toolbarContainer, 82.0);
+        setRightAnchor(toolbarContainer, 0.0);
         candleChartContainer = new VBox();
+        candleChartContainer.setPrefWidth(Double.MAX_VALUE);
+        candleChartContainer.setPrefHeight(300);
+        setTopAnchor(candleChartContainer, 46.0);
+        setLeftAnchor(candleChartContainer, 15.0);
+        setRightAnchor(candleChartContainer, 15.0);
 
-        AnchorPane.setTopAnchor(candleChartContainer, 46.0);
-        AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
-        AnchorPane.setRightAnchor(candleChartContainer, 15.0);
-        AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
-        AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
-        containerRoot.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        getChildren().setAll(containerRoot);
-        // FIXME: candleStickChart is null at this point.
+        AnchorPane containerRoot = new AnchorPane(toolbarContainer,candleChartContainer);
+        getChildren().addAll(containerRoot);
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
-
         secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
-                createNewChart(newDurationValue.intValue(), liveSyncing);
+                try {
+                    createNewChart(exchange, newDurationValue.intValue(), liveSyncing);
+                } catch (ParseException | TelegramApiException | IOException | InterruptedException |
+                         URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
                 try {
                     toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
                 } catch (URISyntaxException | IOException e) {
@@ -84,34 +91,45 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        //secondsPerCandle.set(300);
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) {
+
+    private void createNewChart(Exchange exchange, int secondsPerCandle, boolean liveSyncing) throws ParseException, TelegramApiException, IOException, InterruptedException, URISyntaxException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
         }
-        /*
-        CandleDataSupplier candleDataSupplier = new ReverseRawTradeDataProcessor(Paths.get("C:\\bitstampUSD.csv"),
-                secondsPerCandle.get(), TradePair.of(amountUnit, priceUnit));
-        */
 
 
-        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
-                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        if (tradePair != null) {
+
+            candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
+                    tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty(), telegramToken);
+            candleChartContainer.getChildren().setAll(candleStickChart);
+            animateInNewChart(candleStickChart);
+            toolbar.setChartOptions(candleStickChart.getChartOptions());
+        } else {
+
+            new Message(
+
+                    Message.MessageType.WARNING,
+
+                    "Please select a trade pair before creating a new chart."
+            );
+        }
+
     }
 
     private void animateInNewChart(CandleStickChart newChart) {
         Objects.requireNonNull(newChart, "newChart must not be null");
 
         if (candleStickChart != null) {
-            FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(300), candleStickChart);
+            FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(200), candleStickChart);
             fadeTransitionOut.setFromValue(1.0);
             fadeTransitionOut.setToValue(0.0);
             fadeTransitionOut.setOnFinished(event -> {
                 candleStickChart = newChart;
                 candleChartContainer.getChildren().setAll(newChart);
-                FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(300), candleStickChart);
+                FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(200), candleStickChart);
                 fadeTransitionIn.setFromValue(0.0);
                 fadeTransitionIn.setToValue(1.0);
                 fadeTransitionIn.play();
@@ -121,7 +139,7 @@ public class CandleStickChartContainer extends Region {
         } else {
             candleStickChart = newChart;
             candleChartContainer.getChildren().setAll(newChart);
-            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(400), candleStickChart);
+            FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(300), candleStickChart);
             fadeTransitionIn.setFromValue(0.0);
             fadeTransitionIn.setToValue(1.0);
             fadeTransitionIn.play();
@@ -130,11 +148,13 @@ public class CandleStickChartContainer extends Region {
 
     @Override
     protected double computeMinWidth(double height) {
-        return 350;
+        return 900;
     }
 
     @Override
     protected double computeMinHeight(double width) {
-        return 350;
+        return 500;
     }
+
+
 }

@@ -7,19 +7,21 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
 
+import static java.lang.System.getProperty;
+
 
 public record UsersManager() {
-    static User user;
+    static users user;
     static DataSource db;
     static Alert alert = new Alert(Alert.AlertType.ERROR, "Please fill in all the fields");
-
     static {
         try {
 
             db = new DataSource();
-            db.setUrl("jdbc:mysql://localhost:3306/db");
-            db.setUser("root");
-            db.setPassword("Bigboss307#");
+            db.setUrl(
+                    getProperty("db.url"));
+            db.setUser(getProperty("db.user"));
+            db.setPassword(getProperty("db.password"));
 
 
         } catch (SQLException e) {
@@ -27,17 +29,15 @@ public record UsersManager() {
         }
     }
 
-    public User getUser() {
+    public users getUser() {
         return user;
     }
 
-    public void setUser(User user) {
+    public void setUser(users user) {
         UsersManager.user = user;
     }
 
     public void RememberUser(boolean text) {
-
-
         if (text) {
             try {
 
@@ -63,7 +63,7 @@ public record UsersManager() {
 
     }
 
-    void CreateAccount(
+    public  void CreateAccount(
             @NotNull String username,
             @NotNull String password,
             @NotNull String email,
@@ -85,7 +85,7 @@ public record UsersManager() {
             alert.showAndWait();
 
         } else {
-            user = new User(
+            user = new users(
                     username,
                     password,
                     email,

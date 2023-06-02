@@ -1,41 +1,47 @@
 package org.investpro;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.animation.Animation;
-import javafx.event.ActionEvent;
-import javafx.scene.paint.Color;
-import javafx.stage.Stage;
+import javafx.scene.control.Alert;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.HttpsURLConnection;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.text.ParseException;
+import java.time.Duration;
 import java.util.*;
 
 import static java.lang.System.out;
 
-
 //  makeRequest("https://api.telegram.org/bot" + token + "/setWebhook");
 public class TelegramClient {
-
-
     public static final ArrayList<Chat> ArrayListChat = new ArrayList<>();
-    private static final KeyboardButton[] keyboard = new KeyboardButton[]{new KeyboardButton("1", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("2", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("3", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("4", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("5", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("6", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("7", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("8", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("9", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("0", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE)};
+    private static final Logger logger = LoggerFactory.getLogger(TelegramClient.class);
+
+
+
+
     public static int offset = 0;
     public static String message = "";
+    protected static Path path;
     static boolean disable_content_type_detection = false;
-    static int limit = 10;
-    static int page = 1;
+     int limit = 10;
+     int page = 1;
     //chat_id	//Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
     // message_thread_id;//	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
     // text	String	Yes	Text of the message to be sent, 1-4096 characters after entities parsing
@@ -62,8 +68,6 @@ public class TelegramClient {
     static String location = "";
     static String last_name = "";
     static String first_name = "";
-    static TELEGRAM_API_INFOS telegramApiKey = TELEGRAM_API_INFOS.TELEGRAM_API_KEY;
-    static TELEGRAM_API_INFOS telegramApiUrl = TELEGRAM_API_INFOS.TELEGRAM_API_URL;
     static boolean supportsInlineQueries = false;
     static boolean canReadAllGroupMessages = false;
     static boolean isBot = false;
@@ -80,6 +84,12 @@ public class TelegramClient {
     static String channelName;
     static String method;
     static String chat_id;//Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+    static String chat_title = "";
+    static String chat_type = "";
+    static String chat_username = "";
+    static File chat_voice_file_id;
+    static File chat_caption_file_id;
+
     private static String entity_type = "";
     private static String inline_keyboard_text = "";
     private static boolean is_restricted = false;
@@ -110,22 +120,27 @@ public class TelegramClient {
     private static String photo;
     private static String caption;
     private static String reply_to_message_id;
+    private static ObjectMapper mapper;
+    private static String from_id;
+    private static String token;
+    private static String chat_photo_file_id = "";
+    private static String username;
+    private static Object marketInfo;
+    private static boolean isOnline;
+    private static String networkError;
     public int MinAfter, LastUpd, Upd;
     protected String host = "https://api.telegram.org";
-    protected Path path;
-    String reply_markup = "";
-    String chat_title = "";
-    String chat_type = "";
-    String chat_username = "";
+    KeyboardButton[] keyboard = new KeyboardButton[]{new KeyboardButton("1", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("2", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("3", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("4", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("5", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("6", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("7", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("8", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("9", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE), new KeyboardButton("0", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE)};
+    static String reply_markup = "";
     int Now;
     int BeforeNewsStop = 30;
     int AfterNewsStop = 60;
     boolean FirstAlert, SecondAlert;
-    boolean sendnews = true;
-    private String from_id;
-    private String token;
-    private String chat_photo_file_id = "";
-    private String username;
+    boolean sendNews = true;
+    File chat_video_file_id;
+    private static JsonNode response;
+    private final String address;
+    private PrintStream res;
     private boolean Signal;
     private boolean Vhigh;
     private boolean Vmedium, Vlow;
@@ -135,14 +150,27 @@ public class TelegramClient {
     private String from_first_name;
     private String judulnews;
     private boolean DrawLines;
+    private String lastMessage;
+    private String chatDescription;
 
-    public TelegramClient(String token) throws IOException, InterruptedException, TelegramApiException {
+    static HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+    static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+    private final DoubleSummaryStatistics initializationLatch;
+    File thumb = new File("/photo/400PngdpiLogoBW.png");
+    private double latitude;
+    private double longitude;
+    private String city;
+    private String country;
+    private String timezone;
+    private String foursquare_id;
+    private String foursquare_type;
+    private String foursquare_name;
+    private String google_place_id;
+    private String google_place_type;
+    private Duration duration;
 
-        if (token == null) throw new TelegramApiException("Telegram token can't be  null ");
-        this.token = token;
 
 
-    }
 
     public static int getLength() {
         return length;
@@ -172,9 +200,32 @@ public class TelegramClient {
         return updateMode;
     }
 
+    public static void sendMessageToChannel(String s) {
+        requestBuilder.uri(URI.create("https://api.telegram.org/bot" + token + "/sendMessage?chat_id=" + chat_id + "&text=" + s + "&parse_mode=Markdown&disable_web_page_preview=true&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup + "&parse_mode=Markdown&disable_web_page_preview=true&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup + "&parse_mode=Markdown&disable_web_page_preview=true&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup + "&parse_mode=Markdown&disable_web_page_preview=true&disable_"));
+
+        //.uri(URI.create("https://api.telegram.org/bot" + token+ "/sendMessage?chat_id=" + chat_id + "&text=" + s + "&parse_mode=Markdown&disable_web_page_preview=true&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup + "&parse_mode=Markdown&disable_web_page_preview=true&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup + "&parse_mode=Markdown&disable_web_page_preview=true&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup    )
+        requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
+        client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).thenApply(
+                HttpResponse::body
+        ).thenApply(
+                response -> {
+                    try {
+                        TelegramClient.response = new ObjectMapper().readTree(response);
+                        TelegramClient.response = TelegramClient.response.get("result");
+                        TelegramClient.response = TelegramClient.response.get("ok");
+                        logger.info(TelegramClient.response.toString());
+                    } catch (JsonProcessingException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                });
+
+    }
+
     public void setUpdateMode(UPDATE_MODE updateMode) {
         TelegramClient.updateMode = updateMode;
     }
+
 
     public static String getLocation() {
         return location;
@@ -231,8 +282,6 @@ public class TelegramClient {
     }
 
     public static void setForward_from_chat(String forward_from_chat) {
-
-
         TelegramClient.forward_from_chat = forward_from_chat;
     }
 
@@ -296,44 +345,65 @@ public class TelegramClient {
         return chat_last_name;
     }
 
+    public void setChat_last_name(String chat_last_name) {
+        TelegramClient.chat_last_name = chat_last_name;
+    }
+
     //makeRequest return JSONObject
     @Contract("_, _ -> new")
-    private static @NotNull JSONObject makeRequest(String url, String method) throws IOException {
-        HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
-        conn.setRequestMethod(method);
-        conn.setDoOutput(true);
-        conn.setDoInput(true);
-        conn.setUseCaches(false);
-        conn.setAllowUserInteraction(false);
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("charset", "utf-8");
-        conn.setRequestProperty("Accept-Charset", "utf-8");
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-        //  conn.setRequestProperty("Authorization","Bearer "+getToken());// "2032573404:AAE3yV0yFvtO8irplRnj2YK59dOXUITC1Eo");
-        conn.setRequestProperty("Connection", "Keep-Alive");
-        conn.setRequestProperty("Accept", "*/*");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Pragma", "no-cache");
-        conn.setRequestProperty("Cache-Control", "no-cache");
-        //conn.setRequestProperty("Accept-Language", "en-US,en;q=0" + ";q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6");
-//conn.setRequestProperty("Host", "https://api.telegram.org");
-//        conn.setRequestProperty("Origin", "https://api.telegram.org");
-//       conn.setRequestProperty("Sec-Fetch-Mode", "cors");
-        //conn.setRequestProperty("Sec-Fetch-Site", "same-origin");
-        //conn.setRequestProperty("Sec-Fetch-User", "?1");
-        conn.setRequestProperty("Upgrade-Insecure-Requests", "1");
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10)");
-        conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
-        conn.connect();
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String inputLine;
-        StringBuilder response = new StringBuilder();
-        while ((inputLine = in.readLine()) != null) {
-            response.append(inputLine);
+    private static @NotNull JSONObject makeRequest(String url, @NotNull String method) {
+        HttpResponse<String> response;
+        try {   url = url + "?offset=" + offset + "&limit=" + length;
+
+
+
+            requestBuilder.uri(URI.create(url));
+
+            requestBuilder.GET();
+            requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.)");
+            requestBuilder.header("Accept", "application/json");
+
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
         }
-        in.close();
-        out.println(response);
-        return new JSONObject(response.toString());
+
+        try {
+
+
+
+            NETWORK_RESPONSE networkResponse;
+
+            if (response.statusCode() != 200) {
+                isOnline = false;
+//                Alert alert = new Alert(Alert.AlertType.ERROR);
+//                alert.setTitle("Error");
+//                alert.setHeaderText(response.statusCode() + "");
+//                alert.setContentText(response.headers().firstValue("Content-Type").get());
+//                alert.showAndWait();
+logger.info("Error: " + response.statusCode() + " " + response.headers().toString());
+                //networkError = response.headers().firstValue("Content-Type").get();
+                logger.info("Telegram  " + networkError);
+
+return new JSONObject();
+            } else {
+                isOnline = true;
+                networkResponse = mapper.readValue(response.body(), NETWORK_RESPONSE.class);
+                logger.info("Telegram -->" + networkResponse.getMessage());
+
+            }
+
+        } catch (Exception e) {
+            networkError = e.getMessage();
+            out.println(e.getMessage());
+
+        }
+       /// assert response != null;
+        out.println(response.body());
+        return new JSONObject(response.body());
     }
 
     public static @NotNull List<String> getCommands() {
@@ -355,10 +425,6 @@ public class TelegramClient {
         commands.add("/start");
         commands.add("/stop");
         return commands;
-    }
-
-    public void setChat_last_name(String chat_last_name) {
-        TelegramClient.chat_last_name = chat_last_name;
     }
 
     public static boolean isSupportsInlineQueries() {
@@ -591,6 +657,38 @@ public class TelegramClient {
         TelegramClient.entities = entities;
     }
 
+    public static @Nullable Object connect() {
+        isOnline = true;
+
+        String url = "https://api.telegram.org/bot" + token + "/getMe";
+
+
+        requestBuilder.uri(URI.create(url));
+        requestBuilder.header("Content-Type", "application/json");
+        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
+        requestBuilder.header("Accept", "application/json");
+        requestBuilder.header("Authorization", "Bearer " + token);
+        requestBuilder.method("GET", HttpRequest.BodyPublishers.noBody());
+        client.sendAsync(requestBuilder.build(),
+                HttpResponse.BodyHandlers.ofString()
+        ).thenApply(
+                HttpResponse::body
+        ).thenApply(response -> {
+            try {
+                JSONObject jsonObject = new JSONObject(response);
+                marketInfo = jsonObject.getJSONObject("result");
+
+                return mapper.readValue(response, NETWORK_RESPONSE.class);
+
+
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+             return null;
+        }
+
     public String getFrom_first_name() {
         return from_first_name;
     }
@@ -604,7 +702,7 @@ public class TelegramClient {
     }
 
     public void setFrom_id(String from_id) {
-        this.from_id = from_id;
+        TelegramClient.from_id = from_id;
     }
 
     public String getChat_first_name() {
@@ -628,7 +726,7 @@ public class TelegramClient {
     }
 
     public void setChat_photo_file_id(String chat_photo_file_id) {
-        this.chat_photo_file_id = chat_photo_file_id;
+        TelegramClient.chat_photo_file_id = chat_photo_file_id;
     }
 
     public String getChat_title() {
@@ -636,7 +734,7 @@ public class TelegramClient {
     }
 
     public void setChat_title(String chat_title) {
-        this.chat_title = chat_title;
+        TelegramClient.chat_title = chat_title;
     }
 
     public String getChat_type() {
@@ -644,7 +742,7 @@ public class TelegramClient {
     }
 
     public void setChat_type(String chat_type) {
-        this.chat_type = chat_type;
+        TelegramClient.chat_type = chat_type;
     }
 
     public String getChat_username() {
@@ -652,7 +750,7 @@ public class TelegramClient {
     }
 
     public void setChat_username(String chat_username) {
-        this.chat_username = chat_username;
+        TelegramClient.chat_username = chat_username;
     }
 
     public String getLanguage() {
@@ -774,14 +872,23 @@ public class TelegramClient {
 
     }
 
-    void run() throws IOException, InterruptedException {
-        getMe();//initialize the chat client
-        Thread.sleep(200);
-        getUpdates();// update the chat client
+    void run() throws IOException, InterruptedException, ParseException {
+
+
+        if (isOnline()) {
+            getUpdates();// update the chat client
+            if (getUpdates().length() > 0) {
+
+                //Trade news on
+                newsTrade();
+            }
+
+        }
+
 
     }
 
-    public String getChatId() {
+    public static String getChatId() {
         return chatId;
     }
 
@@ -807,43 +914,109 @@ public class TelegramClient {
         // selective	;//Boolean	Optional. Use this parameter if you want to force reply from specific users
         return ("&force_reply=" + false + "&input_field_placeholder=" + 0 + "&selective=" + false);
     }
+//
+//
+//    private @NotNull String ReplyKeyboardMarkup() {
+//
+//
+//        reply_markup = Arrays.toString(keyboard) +    //Array of KeyboardButton	Array of button rows, each represented by an Array of KeyboardButton objects
+//                "&resize_keyboard=" + false +//Boolean	Optional. Requests clients to resize the keyboard vertically for optimal fit (e.g., make the keyboard smaller if there are just two rows of buttons). Defaults to false, in which case the custom keyboard is always of the same height as the app's standard keyboard.
+//                "&one_time_keyboard=" + false +//	Boolean	Optional. Requests clients to hide the keyboard as soon as it's been used. The keyboard will still be available, but clients will automatically display the usual letter-keyboard in the chat - the user can press a special button in the input field to see the custom keyboard again. Defaults to false.
+//                "&input_field_placeholder=" + "" +    //String	Optional. The placeholder to be shown in the input field when the keyboard is active; 1-64 characters
+//                "&selective=" + false;////Boolean	Optional. Use this parameter if you want to show the keyboard to specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
+//        //       Example: A user requests to change the bots' language, bot replies to the request with a keyboard to select the new language. Other users in the group don't see the keyboard.
+//        return "&reply_markup=" + reply_markup;
+//    }
 
-    public void sendMessage(String text) throws IOException {
-// String data = "key=" + API_KEY + "&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
-        boolean one_time_keyboard = false;
+    public static void sendMessage(String text) throws IOException, InterruptedException {
+
+        String path = getToken() + "/sendMessage";//&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
+
+
+        boolean one_time_keyboard = true;
         String input_field_placeholder = "";
-        boolean selective = false;//"&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
-        String params =//"as_HTML="+true + "silently="+true;
-                "&parse_mode=Markdown" + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&allow_sending_without_reply=" + allow_sending_without_reply + "&channel_id=" + getChannel_Id() + "&reply_markup=" + ReplyKeyboardMarkup() + "&force_reply=" + ForceReply() + "&reply_to_message_id=" + getReplyToMessageId() + "&one_time_keyboard=" + one_time_keyboard + "&input_field_placeholder=" + input_field_placeholder + "&selective=" + selective;
+        boolean selective = true;//"&chat_id=" + chatId + "&text=" + text + "&parse_mode=Markdown";
+        String params = "as_HTML=" + true + "silently=" + true;
+        //"&parse_mode=Markdown" + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&allow_sending_without_reply=" + allow_sending_without_reply + "&channel_id=" + getChannel_Id() + "&reply_markup=" + ReplyKeyboardMarkup() + "&force_reply=" + ForceReply() + "&reply_to_message_id=" + getReplyToMessageId() + "&one_time_keyboard=" + one_time_keyboard + "&input_field_placeholder=" + input_field_placeholder + "&selective=" + selective;
 
         sendChatAction(ENUM_CHAT_ACTION.typing);
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/sendMessage?chat_id=" + getChatId() + "&text=" + text + params
+        String url = "https://api.telegram.org/bot";
+//setHost("https://api.telegram.org");
+        HttpResponse<String> response;
 
-                , "POST");
+//        private static final String INSTANCE_ID = "YOUR_INSTANCE_ID_HERE";
+//        private static final String CLIENT_ID = "YOUR_CLIENT_ID_HERE";
+//        private static final String CLIENT_SECRET = "YOUR_CLIENT_SECRET_HERE";
+//        private static final String TG_GATEWAY_URL = "https://api.whatsmate.net/v3/telegram/group/text/message/" + INSTANCE_ID;
+
+
+        String group_name = "Muscle Men Club";  //  TODO: Specify the group name here.
+        String group_admin = "19159876123";     //  TODO: Specify the number of the group admin here.
+        String message = "Your six-pack is on the way!";
+
+        //  TelegramGroupTextSender.sendGroupMessage(group_name, group_admin, message);
+
+
+        /**
+         * Sends out a group message via WhatsMate Telegram Gateway.
+         */
+        //  public static void sendGroupMessage(String group_name, String group_admin, String message) throws Exception {
+        // TODO: Should have used a 3rd party library to make a JSON string from an object
+        String jsonPayload = "{" + "\"chat_id\": \"" + getChatId() + "\"," +
+                "\"text\":\"" +
+                text +
+                "\"," +
+                "\"parse_mode\":\"" + "Markdown" +
+                "\"" +
+                "}";
+
+        URL urls = new URL(url + path);
+
+
+        HttpURLConnection conn = (HttpURLConnection) urls.openConnection();
+        conn.setDoOutput(true);
+        conn.setRequestMethod("POST");
+        // conn.setRequestProperty("X-WM-CLIENT-ID", 12332);
+        conn.setRequestProperty("Authorization", getToken());
+        conn.setRequestProperty("Content-Type", "application/json");
+
+        OutputStream os = conn.getOutputStream();
+        os.write(jsonPayload.getBytes());
+        os.flush();
+        os.close();
+
+        int statusCode = conn.getResponseCode();
+        logger.info("Telegram " + statusCode + " " + conn.getResponseMessage());
+
+        System.out.println("Status Code: " + statusCode);
+        BufferedReader br = new BufferedReader(new InputStreamReader(
+                (statusCode == 200) ? conn.getInputStream() : conn.getErrorStream()
+        ));
+        String output;
+        while ((output = br.readLine()) != null) {
+            logger.info(output);
+        }
+        conn.disconnect();
 
 
     }
 
-    @Contract(mutates = "this")
-    private @NotNull String ReplyKeyboardMarkup() {
-
-
-        reply_markup = Arrays.toString(keyboard) +    //Array of KeyboardButton	Array of button rows, each represented by an Array of KeyboardButton objects
-                "&resize_keyboard=" + false +//Boolean	Optional. Requests clients to resize the keyboard vertically for optimal fit (e.g., make the keyboard smaller if there are just two rows of buttons). Defaults to false, in which case the custom keyboard is always of the same height as the app's standard keyboard.
-                "&one_time_keyboard=" + false +//	Boolean	Optional. Requests clients to hide the keyboard as soon as it's been used. The keyboard will still be available, but clients will automatically display the usual letter-keyboard in the chat - the user can press a special button in the input field to see the custom keyboard again. Defaults to false.
-                "&input_field_placeholder=" + "" +    //String	Optional. The placeholder to be shown in the input field when the keyboard is active; 1-64 characters
-                "&selective=" + false;////Boolean	Optional. Use this parameter if you want to show the keyboard to specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
-        //       Example: A user requests to change the bots' language, bot replies to the request with a keyboard to select the new language. Other users in the group don't see the keyboard.
-        return "&reply_markup=" + reply_markup;
+    private void setHost(String s) {
+        host = s;
     }
 
     private String getReplyToMessageId() {
         return reply_to_message_id;
     }
 
-    public String getToken() {
+    public static String getToken() {
         return token;
     }
+// sender_chat": {
+//    "id": -1001659738763,
+//    "title": "TradeExpert",
+//            "username": "tradeexpert_infos",
+//            "type": "channel"
 
     public void setToken(String token1) {
         token = token1;
@@ -852,14 +1025,9 @@ public class TelegramClient {
     public String getUsername() {
         return username;
     }
-// sender_chat": {
-//    "id": -1001659738763,
-//    "title": "TradeExpert",
-//            "username": "tradeexpert_infos",
-//            "type": "channel"
 
     public void setUsername(String username) {
-        this.username = username;
+        TelegramClient.username = username;
     }
 
     public String getPhoneNumber() {
@@ -878,7 +1046,7 @@ public class TelegramClient {
         TelegramClient.languageCode = languageCode;
     }
 
-    void sendGame(String chat_id, String game_short_name) throws IOException {
+    void sendGame(String chat_id, String game_short_name) throws IOException, InterruptedException {
 //    Use this method to send a game. On success, the sent Message is returned.
 //
 //    Parameter	Type	Required	Description
@@ -895,26 +1063,228 @@ public class TelegramClient {
         makeRequest("https://api.telegram.org/bot" + token + "/sendGame" + "?chat_id=" + chat_id + "&message_thread_id=" + message_thread_id + "&game_short_name=" + game_short_name + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup, "POST");
     }
 
+    public TelegramClient(String token) throws IOException, TelegramApiException, InterruptedException {
+
+        TelegramClient.token = token;
+        this.address = "https://api.telegram.org/bot" + token;
+        this.res = System.out;
+        this.initializationLatch = new DoubleSummaryStatistics();
+
+
+        requestBuilder.header("Content-Type", "application/json");
+        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
+        requestBuilder.header("Accept", "application/json");
+        requestBuilder.header("Authorization", "Bearer " + token);
+        requestBuilder.header("Cache-Control", "no-cache");
+
+
+        sendKeyboard(
+                new KeyboardButton[]{new KeyboardButton("1", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("2", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("3", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("4", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("5", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("6", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("7", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("8", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("9", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("0", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE)});
+
+
+        logger.info("Telegram Client Created");
+    }
+
+    @Contract(pure = true)
+    private @NotNull String getCreateKeyBoard() {
+
+
+//enum KEYS_TRADE    (m_lang==LANGUAGE_EN)?"[[\"/BUY\"],[\"/SELL\"],[\"/BUYLIMIT\"],[\"/SELLIMIT\"],[\"/BUYSTOP\"],[\"/SELLSTOP\"]":"[[\"Информация\"],[\"Котировки\"],[\"Графики\"]]"
+
+//enum KEYB_SYMBOLS "[[\""+EMOJI_TOP+"\",\"/GBPUSD\",\"/EURUSD\"],[\"/AUDUSD\",\"/USDJPY\",\"/EURJPY\"],[\"/USDCAD\",\"/USDCHF\",\"/EURCHF\"]]"
+
+//enum KEYB_PERIODS cccc
+
+
+        return "[[" + "EMOJI_TOP" + ",\"M1\",\"M5\",\"M15\"],[\"" + "EMOJI_BACK" + "\",\"M30\",\"H1\",\"H4\"],[\" \",\"D1\",\"W1\",\"MN1\"]]";
+
+
+    }
+
+    //Create payment keyboard
+    public void createPayment() throws IOException {
+        sendChatAction(ENUM_CHAT_ACTION.choose_sticker);
+
+
+    }
+
+    public void createInvoice(String title, String description, String amount, String currency, String payment_mode, String payment_card_number, String payment_card_expiration_month, String payment_card_expiration_year, String payment_card_cvv, String payment_card_holder_name, String payment_card_number_type, String payment_card_type, String payment_card_brand, String payment_card_last4) throws IOException {
+        sendChatAction(ENUM_CHAT_ACTION.upload_photo);
+
+        try {
+            String photo_width = null;
+            String start_parameter = null;
+            String currency_code = null;
+            String photo_height = null;
+            String photo_description = null;
+            makeRequest("https://api.telegram.org/bot" + getToken() + "/sendInvoice" + "?chat_id=" + getChatId() + "&title=" + title + "&description=" + description + "&start_parameter=" + start_parameter + "&currency_code=" + currency_code + "&photo=" + file + "&photo_width=" + photo_width + "&photo_height=" + photo_height + "&photo_description=" + photo_description + "message_thread_id=" + message_thread_id + "&disable_notification=" + disable_notification + "&allow_sending_without_reply=" + allow_sending_without_reply, "POST");
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public static void setMethod(String method) {
+        TelegramClient.method = method;
+    }
+
+    @Override
+    public String toString() {
+        return "TelegramClient{" + "chat=" + chat + ", result='" + result + '\'' + ", date=" + date + ", author_signature='" + author_signature + '\'' + ", message_id='" + message_id + '\'' + ", text='" + text + '\'' + ", ok=" + ok + ", channelId=" + channelId + ", channelChatId=" + channelChatId + ", channelName='" + channelName + '\'' + ", file=" + file + ", animation='" + animation + '\'' + ", canDeleteMessages=" + canDeleteMessages + ", firstName='" + firstName + '\'' + ", username='" + username + '\'' + ", phoneNumber='" + phoneNumber + '\'' + ", languageCode='" + languageCode + '\'' + ", description='" + description + '\'' + ", canInviteUsers=" + canInviteUsers + ", canPostMessages=" + canPostMessages + ", canEditMessages=" + canEditMessages + ", canChangeInfo=" + canChangeInfo + ", lastName='" + lastName + '\'' + ", photo='" + photo + '\'' + ", token='" + token + '\'' + ", chatId='" + getChatId() + '\'' + ", method='" + method + '\'' + '}';
+    }
+
+    @Contract(pure = true)
+    private @Nullable String getMessageId() {
+
+        if (message_thread_id == null) return null;
+
+        if (message_thread_id.equals("")) return null;
+
+        return message_thread_id;
+    }
+
+    void logOut() {
+
+        setMethod("DELETE");
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/logout", "POST");
+
+
+    }
+    // static String entities;//	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode
+
+    void close() throws IOException, InterruptedException {
+
+        setMethod("POST");
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/close" + "?chat_id=" + chat_id, "POST");
+
+    }
+
+    void forwardMessage() throws IOException, InterruptedException {
+        setMethod("POST");
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/forwardMessage", "POST");
+    }
+
+    void copyMessage(String reply_markup) throws IOException {
+
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/copyMessage" + "?chat_id=" + chatId + "&text=" + text + "&caption=" + caption + "&parse_mode=" + parse_mode + "&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup + "&entities=" + entities + "&caption_entities=" + caption_entities, "POST");
+
+
+    }
+
     //sendPhoto to Telegram
     public void sendPhoto(File file) {
         try {
-            ActionEvent event = (ActionEvent) Stage.getWindows();
-
-            Screenshot.capture(file);
 
 
-            makeRequest("https://api.telegram.org/bot" + token + "/sendPhoto" + "?chat_id=" + getChatId() +
-                            // "&message_thread_id" +getMessage_thread_id() +
-                            "&photo=" + file.toURI()
-                    //  "&caption=" + getCaption()+
-                    //"&parse_mode=" + getParse_mode() +
-                    // "&caption_entities=" + getCaption_entities()
-                    // "&disable_notification=" + getDisable_notification() +
-                    //"&protect_content=" + protect_content +
-                    //    "&reply_to_message_id=" + getReply_to_message_id()+
-                    //"&allow_sending_without_reply=" + allow_sending_without_reply
-                    //    + "&reply_markup=" + reply_markup
-                    , "POST");
+            String boundary =
+                    "-------3141592653589793238462643383279502884197169399375105820974944592";
+            String contentDisposition = "form-data; name=\"photo\"; filename=\"" + file.getName() + "\"";
+            requestBuilder.header(
+                    "Content-Type",
+                    "multipart/form-data; boundary=" + boundary
+            );
+            requestBuilder.header(
+                    "Content-Disposition",
+                    contentDisposition
+            );
+
+
+            requestBuilder.header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36"
+            );
+
+            requestBuilder.header(
+                    "Accept",
+                    "application/json"
+            );
+
+            requestBuilder.header(
+                    "Origin",
+                    "https://api.telegram.org"
+            );
+
+            requestBuilder.header(
+                    "Referer",
+                    "https://api.telegram.org/bot" + token + "/getUpdates"
+            );
+
+            sendChatAction(
+                    ENUM_CHAT_ACTION.upload_photo
+            );
+            sendVenue();
+            String url = "https://api.telegram.org/bot" + token + "/sendPhoto";
+//
+//            Parameter	Type	Required	Description
+//            chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+//            message_thread_id	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+//            photo	InputFile or String	Yes	Photo to send. Pass a file_id as String to send a photo that exists on the Telegram servers (recommended), pass an HTTP URL as a String for Telegram to get a photo from the Internet, or upload a new photo using multipart/form-data. The photo must be at most 10 MB in size. The photo's width and height must not exceed 10000 in total. Width and height ratio must be at most 20. More information on Sending Files »
+//            caption	String	Optional	Photo caption (may also be used when resending photos by file_id), 0-1024 characters after entities parsing
+//            parse_mode	String	Optional	Mode for parsing entities in the photo caption. See formatting options for more details.
+//            caption_entities	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in the caption, which can be specified instead of parse_mode
+//            has_spoiler	Boolean	Optional	Pass True if the photo needs to be covered with a spoiler animation
+//            disable_notification	Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
+//            protect_content	Boolean	Optional	Protects the contents of the sent message from forwarding and saving
+//            reply_to_message_id	Integer	Optional	If the message is a reply, ID of the original message
+//            allow_sending_without_reply	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
+//            reply_markup	InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply	Optional	Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
+
+            logger.info("File Size: " + file.length());
+            logger.info("File Name: " + file.getName());
+            requestBuilder.POST(
+                    HttpRequest.BodyPublishers.ofString(
+                            "{\"chat_id\":\"" + getChatId() + "\"," +
+                                    "\"photo\":\"" + file.toURI() + "\"," +
+                                    "\"caption\":\"" + getCaption() + "\"," +
+                                    "\"parse_mode\":\"" + getParse_mode() + "\"," +
+                                    "\"caption_entities\":\"" + getCaption_entities() + "\"," +
+                                    "\"disable_notification\":\"" + getDisable_notification() + "\"," +
+                                    "\"protect_content\":\"" + protect_content + "\"," +
+                                    "\"reply_to_message_id\":\"" + getReply_to_message_id() + "\"," +
+                                    "\"allow_sending_without_reply\":\"" + allow_sending_without_reply + "\"," +
+                                    "\"reply_markup\":\"" + getReply_markup() + "\"}"
+                    )
+
+            );
+            requestBuilder.uri(
+                    URI.create(url)
+            );
+            HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            System.out.println(response.body());
+            System.out.println(response.statusCode());
+            System.out.println(response.headers());
+            if (response.statusCode() != 200) {
+                System.out.println(response.body());
+                System.out.println(response.statusCode());
+                System.out.println(response.headers());
+                System.out.println(response.body());
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText(null);
+                alert.setContentText(response.body());
+                alert.showAndWait();
+            } else {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText(null);
+                alert.setContentText("Photo sent");
+                alert.showAndWait();
+            }
+
 
 //
 //            chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
@@ -934,106 +1304,62 @@ public class TelegramClient {
         }
     }
 
-    @Contract(pure = true)
-    private @NotNull String getCreateKeyBoard() {
-
-
-//enum KEYS_TRADE    (m_lang==LANGUAGE_EN)?"[[\"/BUY\"],[\"/SELL\"],[\"/BUYLIMIT\"],[\"/SELLIMIT\"],[\"/BUYSTOP\"],[\"/SELLSTOP\"]":"[[\"Информация\"],[\"Котировки\"],[\"Графики\"]]"
-
-//enum KEYB_SYMBOLS "[[\""+EMOJI_TOP+"\",\"/GBPUSD\",\"/EURUSD\"],[\"/AUDUSD\",\"/USDJPY\",\"/EURJPY\"],[\"/USDCAD\",\"/USDCHF\",\"/EURCHF\"]]"
-
-//enum KEYB_PERIODS cccc
-
-
-        return "[[" + "EMOJI_TOP" + ",\"M1\",\"M5\",\"M15\"],[\"" + "EMOJI_BACK" + "\",\"M30\",\"H1\",\"H4\"],[\" \",\"D1\",\"W1\",\"MN1\"]]";
-
-
-    }
-
-    public void createPayment() {
-
-    }
-
-    public void createInvoice(String title, String description, String amount, String currency, String payment_mode, String payment_card_number, String payment_card_expiration_month, String payment_card_expiration_year, String payment_card_cvv, String payment_card_holder_name, String payment_card_number_type, String payment_card_type, String payment_card_brand, String payment_card_last4) throws IOException {
-        sendChatAction(ENUM_CHAT_ACTION.upload_photo);
-
-        try {
-            String photo_width = null;
-            String start_parameter = null;
-            String currency_code = null;
-            String photo_height = null;
-            String photo_description = null;
-            makeRequest("https://api.telegram.org/bot" + getToken() + "/sendInvoice" + "?chat_id=" + getChatId() + "&title=" + title + "&description=" + description + "&start_parameter=" + start_parameter + "&currency_code=" + currency_code + "&photo=" + file + "&photo_width=" + photo_width + "&photo_height=" + photo_height + "&photo_description=" + photo_description + "message_thread_id=" + message_thread_id + "&disable_notification=" + disable_notification + "&allow_sending_without_reply=" + allow_sending_without_reply, "POST");
-        } catch (Exception e) {
-            e.printStackTrace();
+    void sendAudio(File audioFile) throws IOException, InterruptedException {
+//        Parameter	Type	Required	Description
+//        chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+//        message_thread_id	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+//        audio	InputFile or String	Yes	Audio file to send. Pass a file_id as String to send an audio file that exists on the Telegram servers (recommended), pass an HTTP URL as a String for Telegram to get an audio file from the Internet, or upload a new one using multipart/form-data. More information on Sending Files »
+//        caption	String	Optional	Audio caption, 0-1024 characters after entities parsing
+//        parse_mode	String	Optional	Mode for parsing entities in the audio caption. See formatting options for more details.
+//        caption_entities	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in the caption, which can be specified instead of parse_mode
+//        duration	Integer	Optional	Duration of the audio in seconds
+//        performer	String	Optional	Performer
+//        title	String	Optional	Track name
+//        thumbnail	InputFile or String	Optional	Thumbnail of the file sent; can be ignored if thumbnail generation for the file is supported server-side. The thumbnail should be in JPEG format and less than 200 kB in size. A thumbnail's width and height should not exceed 320. Ignored if the file is not uploaded using multipart/form-data. Thumbnails can't be reused and can be only uploaded as a new file, so you can pass “attach://<file_attach_name>” if the thumbnail was uploaded using multipart/form-data under <file_attach_name>. More information on Sending Files »
+//        disable_notification	Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
+//        protect_content	Boolean	Optional	Protects the contents of the sent message from forwarding and saving
+//        reply_to_message_id	Integer	Optional	If the message is a reply, ID of the original message
+//        allow_sending_without_reply	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
+//        reply_markup	InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply
+        String url = "https://api.telegram.org/bot" + getToken() + "/sendAudio";
+        sendChatAction(ENUM_CHAT_ACTION.upload_audio);
+        requestBuilder.uri(URI.create(url));
+        int duration = 0;
+        String performer = "none";
+        String title = "audio";
+        String thumbnail = "";
+        requestBuilder.POST(
+                HttpRequest.BodyPublishers.ofString(
+                        "{\"chat_id\":\"" + chatId + "\"," +
+                                "\"audio\":\"" + audioFile.getAbsolutePath() + "\"," +
+                                "\"caption\":\"" + caption + "\"," +
+                                "\"parse_mode\":\"" + parse_mode + "\"," +
+                                "\"duration\":\"" + duration + "\"," +
+                                "\"performer\":\"" + performer + "\"," +
+                                "\"title\":\"" + title + "\"," +
+                                "\"thumbnail\":\"" + thumbnail + "\"," +
+                                "\"disable_notification\":\"" + disable_notification + "\"," +
+                                "\"reply_to_message_id\":\"" + reply_to_message_id + "\"," +
+                                "\"allow_sending_without_reply\":\"" + allow_sending_without_reply + "\"," +
+                                "\"reply_markup\":\"" + reply_markup + "}"
+                )
+        );
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() == 200) {
+            out.println("Audio file sent");
+        } else {
+            out.println("Audio file not sent");
+            out.println(response.body());
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText(null);
+            alert.setContentText(response.body());
+            alert.showAndWait();
         }
-    }
-
-    public String getMethod() {
-        return method;
-    }
-
-    public void setMethod(String method) {
-        TelegramClient.method = method;
-    }
-
-    @Override
-    public String toString() {
-        return "TelegramClient{" + "chat=" + chat + ", result='" + result + '\'' + ", date=" + date + ", author_signature='" + author_signature + '\'' + ", message_id='" + message_id + '\'' + ", text='" + text + '\'' + ", ok=" + ok + ", channelId=" + channelId + ", channelChatId=" + channelChatId + ", channelName='" + channelName + '\'' + ", file=" + file + ", animation='" + animation + '\'' + ", canDeleteMessages=" + canDeleteMessages + ", firstName='" + firstName + '\'' + ", username='" + username + '\'' + ", phoneNumber='" + phoneNumber + '\'' + ", languageCode='" + languageCode + '\'' + ", description='" + description + '\'' + ", canInviteUsers=" + canInviteUsers + ", canPostMessages=" + canPostMessages + ", canEditMessages=" + canEditMessages + ", canChangeInfo=" + canChangeInfo + ", lastName='" + lastName + '\'' + ", photo='" + photo + '\'' + ", token='" + token + '\'' + ", chatId='" + getChatId() + '\'' + ", method='" + method + '\'' + '}';
-    }
-
-    @Contract(pure = true)
-    private @Nullable String getMessageId() {
-
-        if (message_thread_id == null) return null;
-
-        if (message_thread_id.equals("")) return null;
-
-        return message_thread_id;
-    }
-
-    void logOut() throws IOException {
-
-        setMethod("DELETE");
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/logout", "POST");
-
 
     }
 
-    void close() throws IOException {
-
-        setMethod("POST");
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/close" + "?chat_id=" + chat_id, "POST");
-
-    }
-
-    void forwardMessage() throws IOException {
-        setMethod("POST");
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/forwardMessage", "POST");
-    }
-    // static String entities;//	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode
-
-    void copyMessage(String reply_markup) throws IOException {
-
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/copyMessage" + "?chat_id=" + chatId + "&text=" + text + "&caption=" + caption + "&parse_mode=" + parse_mode + "&disable_notification=" + disable_notification + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup + "&entities=" + entities + "&caption_entities=" + caption_entities, "POST");
-
-
-    }
-
-    void sendAudio(File audioFile) throws IOException {
-        sendChatAction(ENUM_CHAT_ACTION.record_video);
-        setMethod("POST");
-
-
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/sendAudio" + "?chat_id=" + getChatId()
-                        //  + "&disable_web_page_preview=" + disable_web_page_preview
-                        + "&audio=" + audioFile + "&audio=true" + "&caption=" + caption
-                //+ "&parse_mode=Markdown"
-                // + "&disable_notification=true"
-                , "POST");
-    }
-
-    void sendDocument(@NotNull File document) throws IOException {
+    public void sendDocument(@NotNull File document) throws IOException, InterruptedException {
         sendChatAction(ENUM_CHAT_ACTION.upload_document);
 //       chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
 //       message_thread_id	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
@@ -1049,9 +1375,38 @@ public class TelegramClient {
 //       allow_sending_without_reply	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
 //       reply_markup	InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply	Optional	Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
         setMethod("POST");
+        String url = "https://api.telegram.org/bot" + getToken() +
+                "/sendDocument";
+        requestBuilder.uri(URI.create(url));
+        requestBuilder.POST(HttpRequest.BodyPublishers.ofString(
+                "{\"chat_id\":\"" + chatId + "\"," +
+                        "\"document\":\"" + document.getAbsolutePath() + "\"," +
+                        "\"thumb\":\"" + thumb.getAbsolutePath() + "\"," +
+                        "\"caption\":\"" + caption + "\"," +
+                        "\"parse_mode\":\"" + parse_mode + "\"," +
+                        "\"caption_entities\":\"" + caption_entities + "\"," +
+                        "\"disable_content_type_detection\":\"" + disable_content_type_detection + "\"," +
+                        "\"disable_notification\":\"" + disable_notification + "\"," +
+                        "\"reply_to_message_id\":\"" + reply_to_message_id + "\"," +
+                        "\"allow_sending_without_reply\":\"" + allow_sending_without_reply + "\"," +
+                        "\"reply_markup\":\"" + reply_markup + "\"}"
+        ));
 
-        String thumb = "";
-        makeRequest("https://api.telegram.org/bot/" + getToken() + "/sendDocument" + "?chat_id=" + getChatId() + "&message_thread_id" + getMessage_id() + "&document=" + document.getName() + "&thumb" + thumb + "&caption=" + caption + "&parse_mode=" + parse_mode + "&caption_entities" + caption_entities + "&disable_content_type_detection=" + disable_content_type_detection + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup, "POST");
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200 || response.statusCode() != 201) {
+            out.println("Document not sent");
+            out.println(response.body());
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText(null);
+            alert.setContentText(response.body());
+            alert.showAndWait();
+        } else {
+            out.println("Document sent");
+        }
+
+
     }
 
     @Contract(pure = true)
@@ -1092,13 +1447,39 @@ public class TelegramClient {
 
     }
 
-    void sendVoice(File file, String reply_markup) throws IOException {
+    public void sendVoice(File file, String reply_markup) throws IOException, InterruptedException {
+//       Parameter	Type	Required	Description
+//       chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+//       message_thread_id	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+//       voice	InputFile or String	Yes	Audio file to send. Pass a file_id as String to send a file that exists on the Telegram servers (recommended), pass an HTTP URL as a String for Telegram to get a file from the Internet, or upload a new one using multipart/form-data. More information on Sending Files »
+//       caption	String	Optional	Voice message caption, 0-1024 characters after entities parsing
+//       parse_mode	String	Optional	Mode for parsing entities in the voice message caption. See formatting options for more details.
+//       caption_entities	Array of MessageEntity	Optional	A JSON-serialized list of special entities that appear in the caption, which can be specified instead of parse_mode
+//       duration	Integer	Optional	Duration of the voice message in seconds
+//       disable_notification	Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
+//       protect_content	Boolean	Optional	Protects the contents of the sent message from forwarding and saving
+//       reply_to_message_id	Integer	Optional	If the message is a reply, ID of the original message
+//       allow_sending_without_reply	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
+//       reply_markup	InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply
         sendChatAction(ENUM_CHAT_ACTION.record_voice);
-        setMethod("POST");
-        makeRequest("https://api.telegram.org/" + file + "/bot" + getToken() + "/sendVoice" + "?chat_id=" + chat_id + "&disable_notification=" + disable_notification + "&caption=" + caption + "&parse_mode=Markdown" + "&disable_notification=true" + "&reply_to_message_id=" + reply_to_message_id + "&reply_markup=" + reply_markup + "&disable_web_page_preview=" + disable_web_page_preview, "POST"
+        requestBuilder.uri(URI.create("https://api.telegram.org/bot" + getToken() +
+                "/sendVoice"));
+        requestBuilder.POST(HttpRequest.BodyPublishers.ofString(
+                "chat_id=" + chat_id + "&message_thread_id=" + message_thread_id + "&voice=" + file.toURI() + "&caption=" + caption + "&parse_mode=" + parse_mode + "&caption_entities=" + caption_entities + "&duration=" + duration + "&disable_content_type_detection=" + disable_content_type_detection + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup, StandardCharsets.UTF_8
+        ));
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        );
-
+        out.println(response.statusCode());
+        out.println(response.body());
+        if (response.statusCode() != 200 || response.statusCode() != 201) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to send voice");
+            alert.setContentText(response.body());
+            alert.showAndWait();
+        } else {
+            logger.info("Voice sent");
+        }
     }
 
     void sendVideoNote(File file) throws IOException {
@@ -1153,14 +1534,43 @@ public class TelegramClient {
         makeRequest("https://api.telegram.org/bot/" + getToken() + "/editMessageLiveLocation", "POST");
     }
 
-    void stopMessageLiveLocation() throws IOException {
+    public void stopMessageLiveLocation() throws IOException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "stopMessageLiveLocation", "POST");
     }
 
-    void sendVenue() throws IOException {
-        setMethod("POST");
-        makeRequest("https://api.telegram.org/bot/" + getToken() + "/sendVenue" + "?chat_id=" + chat.getChat_id(), "POST");
+    public void sendVenue() throws IOException {
+
+        String url = "https://api.telegram.org/bot/" + getToken() + "/sendVenue" + "?chat_id=" + chat.getChat_id();
+//
+//        Parameter	Type	Required	Description
+//        chat_id	Integer or String	Yes	Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+//        message_thread_id	Integer	Optional	Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+//        latitude	Float number	Yes	Latitude of the venue
+//        longitude	Float number	Yes	Longitude of the venue
+//        title	String	Yes	Name of the venue
+//        address	String	Yes	Address of the venue
+//        foursquare_id	String	Optional	Foursquare identifier of the venue
+//        foursquare_type	String	Optional	Foursquare type of the venue, if known. (For example, “arts_entertainment/default”, “arts_entertainment/aquarium” or “food/icecream”.)
+//        google_place_id	String	Optional	Google Places identifier of the venue
+//        google_place_type	String	Optional	Google Places type of the venue. (See supported types.)
+//        disable_notification	Boolean	Optional	Sends the message silently. Users will receive a notification with no sound.
+//        protect_content	Boolean	Optional	Protects the contents of the sent message from forwarding and saving
+//        reply_to_message_id	Integer	Optional	If the message is a reply, ID of the original message
+//        allow_sending_without_reply	Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
+//        reply_markup	InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply	Optional	Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
+//
+
+
+        requestBuilder.uri(URI.create(url));
+        requestBuilder.POST(
+                HttpRequest.BodyPublishers.ofString(
+                        "{\"chat_id\":\"" + chat.getChat_id() + "\",\"latitude\":\"" + latitude + "\",\"longitude\":\"" + longitude + "\",\"title\":\"" + title + "\",\"address\":\"" + address + "\",\"foursquare_id\":\"" + foursquare_id + "\",\"foursquare_type\":\"" + foursquare_type + "\",\"google_place_id\":\"" + google_place_id + "\",\"google_place_type\":\"" + google_place_type + "\",\"disable_notification\":\"" + disable_notification + "\",\"protect_content\":\"" + protect_content + "\",\"reply_to_message_id\":\"" + reply_to_message_id + "\",\"allow_sending_without_reply\":\"" + allow_sending_without_reply + "\",\"reply_markup\":\"" + reply_markup +
+                                "}")
+
+
+        );
+
     }
 
     void sendContact(String chat_id, String phone_number, String first_name, String last_name, String vcard, String reply_markup) throws IOException {
@@ -1196,7 +1606,7 @@ public class TelegramClient {
 
     }
 
-    void sendChatAction(ENUM_CHAT_ACTION action) throws IOException {
+    static void sendChatAction(ENUM_CHAT_ACTION action) throws IOException {
         // Type of action to broadcast. Choose one, depending on what the user is about to receive: typing for text messages, upload_photo for photos, record_video or upload_video for videos, record_voice or upload_voice for voice notes, upload_document for general files, choose_sticker for stickers, find_location for location data, record_video_note or upload_video_note for video notes.
 
         setMethod("POST");
@@ -1321,39 +1731,39 @@ public class TelegramClient {
         makeRequest("https://api.telegram.org/bot" + getToken() + "/unpinChatMessage", "POST");
     }
 
-    void setChatPhoto(String file) throws IOException {
+    void setChatPhoto(String file) throws IOException, InterruptedException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/" + file + "bot" + getToken() + "/setChatPhoto", "POST");
     }
 
-    void unpinAllChatMessages() throws IOException {
+    void unpinAllChatMessages() throws IOException, InterruptedException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/unpinAllChatMessages", "POST");
     }
 
-    void editMyCommands() throws IOException {
+    void editMyCommands() throws IOException, InterruptedException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/editMyCommands", "POST");
     }
 
-    void getMyCommands() throws IOException {
+    void getMyCommands() throws IOException, InterruptedException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/getMyCommands", "POST");
     }
 
-    void answerCallbackQuery() throws IOException {
+    void answerCallbackQuery() throws IOException, InterruptedException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/answerCallbackQuery", "POST");
     }
 
-    void leaveChat() throws IOException {
+    void leaveChat() throws IOException, InterruptedException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/leaveChat", "POST");
     }
 
-    public void getUpdates() throws IOException {
+    public String getUpdates() throws IOException {
 
-        String url = "https://api.telegram.org/bot" + getToken() + "/getUpdates" + "?&offset=" + offset +//\tInteger\tOptional\tIdentifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates. By default, updates starting with the earliest unconfirmed update are returned. An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id. The negative offset can be specified to retrieve updates starting from -offset update from the end of the updates queue. All previous updates will forgotten.\n" +
+        String url = "https://api.telegram.org/bot" +token + "/getUpdates" + "?&offset=" + offset +//\tInteger\tOptional\tIdentifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates. By default, updates starting with the earliest unconfirmed update are returned. An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id. The negative offset can be specified to retrieve updates starting from -offset update from the end of the updates queue. All previous updates will forgotten.\n" +
                 "&limit=" + 1 +//\tInteger\tOptional\tLimits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.\n" +
                 "&timeout=" + 0 +//\tInteger\tOptional\tTimeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.\n" +
                 "&allowed_updates=" + true;//\tBoolean\tOptional;
@@ -1409,6 +1819,10 @@ public class TelegramClient {
                         JSONObject message = result.getJSONObject("message");
                         if (message.has("text")) {
                             text = message.getString("text");
+                            if (message.has("parse_mode")) {
+                                parse_mode = message.getString("parse_mode");
+                            }
+                            lastMessage = text;
                         }
                         if (message.has("date")) {
                             date = String.valueOf(message.getLong("date"));
@@ -1445,12 +1859,54 @@ public class TelegramClient {
                                 }
                                 if (chat.has("video")) {
                                     JSONObject video = chat.getJSONObject("video");
+                                    if (video.has("file_id")) {
+                                        chat_video_file_id = new File(String.valueOf(video.getInt("file_id")));
+                                        //Saving file to disk
+                                        if (chat_video_file_id.exists()) {
+                                            // chat_video_file_id.deleteOnExit();
+                                            continue;
+                                        } else {
+                                            FileWriter writer = new FileWriter(chat_video_file_id);
+                                            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+                                            bufferedWriter.write(video.getString("file_path"));
+                                            bufferedWriter.close();
+                                            chat_video_file_id.deleteOnExit();
+                                        }
+                                    }
                                 }
                                 if (chat.has("voice")) {
-                                    JSONObject voice = chat.getJSONObject("voice");
+                                    JSONObject voice1 = chat.getJSONObject("voice");
+                                    if (voice1.has("file_id")) {
+                                        chat_voice_file_id = new File(String.valueOf(voice1.getInt("file_id")));
+                                        //Saving file to disk
+                                        if (chat_voice_file_id.exists()) {
+                                            // chat_voice_file_id.deleteOnExit();
+                                            continue;
+                                        } else {
+                                            FileWriter writer = new FileWriter(chat_voice_file_id);
+                                            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+                                            bufferedWriter.write(voice1.getString("file_path"));
+                                            bufferedWriter.close();
+                                            chat_voice_file_id.deleteOnExit();
+                                        }
+                                    }
                                 }
                                 if (chat.has("caption")) {
                                     JSONObject caption = chat.getJSONObject("caption");
+                                    if (caption.has("file_id")) {
+                                        chat_caption_file_id = new File(String.valueOf(caption.getInt("file_id")));
+                                        //Saving file to disk
+                                        if (chat_caption_file_id.exists()) {
+                                            // chat_caption_file_id.deleteOnExit();
+                                            continue;
+                                        } else {
+                                            FileWriter writer = new FileWriter(chat_caption_file_id);
+                                            BufferedWriter bufferedWriter = new BufferedWriter(writer);
+                                            bufferedWriter.write(caption.getString("file_path"));
+                                            bufferedWriter.close();
+                                            chat_caption_file_id.deleteOnExit();
+                                        }
+                                    }
                                 }
                                 if (chat.has("new_chat_members")) {
                                     JSONArray new_chat_members = chat.getJSONArray("new_chat_members");
@@ -1758,7 +2214,7 @@ public class TelegramClient {
                             String chatBio = chat.getString("bio");
                         }
                         if (chat.has("description")) {
-                            String chatDescription = chat.getString("description");
+                            chatDescription = chat.getString("description");
                         }
                         if (chat.has("invite_link")) {
                             String chatInviteLink = chat.getString("invite_link");
@@ -1905,46 +2361,25 @@ public class TelegramClient {
                         }
                     }
                 }
-                out.println("Updated successfully");
-                return;
+                logger.info("Updated successfully");
+                return url;
+            } else {
+                logger.info("Something went wrong while updating the bot" + jsonResponse);
             }
-            out.println("Something went wrong while updating the bot");
         }
+        return update_id;
+
     }
 
     //
-    void getChat() throws IOException {
+    void getChat() {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/getChat", "POST");
     }
 
     public String getMe() {
-        StringBuilder response = new StringBuilder();
-        JSONObject jsonResponse = new JSONObject();
-        try {
-            URL obj = new URL("https://api.telegram.org/bot" + getToken() + "/getMe");
-            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-            con.setRequestMethod("GET");
-            // con.setRequestProperty("Authorization", "Bearer " + getToken());
-            con.setRequestProperty("Content-Type", "application/json");
-            con.setRequestProperty("Accept", "application/json");
-            con.setDoOutput(true);
-            con.setDoInput(true);
-            con.connect();
-            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-            String inputLine;
 
-            while ((inputLine = in.readLine()) != null) {
-
-                response.append(inputLine);
-            }
-            out.println(response);
-            jsonResponse = new JSONObject(response.toString());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+        JSONObject jsonResponse = makeRequest("https://api.telegram.org/bot" + getToken() + "/getMe", "GET");
 
         if (jsonResponse.has("ok") && jsonResponse.getBoolean("ok") && jsonResponse.has("result")) {
             JSONObject result = jsonResponse.getJSONObject("result");
@@ -1963,17 +2398,36 @@ public class TelegramClient {
             if (result.has("chat")) {
                 canDeleteMessages = result.getBoolean("can_delete_messages");
             }
-            if (result.has("lastName")) setLastName(result.getString("last_name"));
-            if (result.has("is_bot")) setIsBot(result.getBoolean("is_bot"));
-            if (result.has("can_join_groups")) canJoinGroups = result.getBoolean("can_join_groups");
-            if (result.has("can_read_all_group_messages"))
+            if (result.has("lastName")) {
+                setLastName(result.getString("last_name"));
+            }
+            if (result.has("is_bot")) {
+
+                setIsBot(result.getBoolean("is_bot"));
+
+            }
+            // if (result.has("can_send_messages")) canSendMessages = result.getBoolean("can_send_messages");
+            if (result.has("can_join_groups")) {
+                canJoinGroups = result.getBoolean("can_join_groups");
+            }
+            if (result.has("can_read_all_group_messages")) {
                 canReadAllGroupMessages = result.getBoolean("can_read_all_group_messages");
-            if (result.has("username")) setUsername(username = result.getString("username"));
-            if (result.has("chat_id")) setChatId(result.getString("chat_id"));
-            if (result.has("method")) method = result.getString("method");
-            if (result.has("ok")) ok = result.getBoolean("ok");
-            if (result.has("supports_inline_queries"))
+            }
+            if (result.has("username")) {
+                setUsername(username = result.getString("username"));
+            }
+            if (result.has("chat_id")) {
+                setChatId(result.getString("chat_id"));
+            }
+            if (result.has("method")) {
+                method = result.getString("method");
+            }
+            if (result.has("ok")) {
+                ok = result.getBoolean("ok");
+            }
+            if (result.has("supports_inline_queries")) {
                 supportsInlineQueries = result.getBoolean("supports_inline_queries");
+            }
             out.println(jsonResponse);
         }
         return lastName;
@@ -1984,15 +2438,24 @@ public class TelegramClient {
         makeRequest("https://api.telegram.org/bot" + getToken() + "/getChatAdministrators", "POST");
     }
 
-    boolean newsTrade() throws IOException, ParseException//RETURN TRUE IF TRADE IS ALLOWED
+    boolean newsTrade() throws IOException, ParseException, InterruptedException//RETURN TRUE IF TRADE IS ALLOWED
     {
+        ArrayList<News> news = NewsManager.getNewsList();
 
-        offset = gmtoffset();
-        double CheckNews = 0;
+        offset = gmtOffset();
+        double CheckNews;
         if (MinAfter > 0) {
 
             if (new Date().getTime() - LastUpd >= Upd) {
                 out.println("News Loading...");
+                sendMessage(
+                        """
+                                News Loading...
+
+                                Please wait until the news is updated
+
+                                """
+                );
 
                 LastUpd = (int) new Date().getTime();
 
@@ -2000,91 +2463,62 @@ public class TelegramClient {
                 sendMessage("News Loading ...");
 
             }
-            int NomNews = NewsManager.getNewsList().size();
-
-            WindowRedraw();
-            //---Draw a line on the chart news--------------------------------------------
-            News[] mynews = NewsManager.getNewsList().toArray(new News[0]);
-            if (DrawLines) {
-                for (int i = NomNews - 1; i > 0; i--) {
-
-                    String Name = (mynews[i].getMinutes() + "_" + mynews[i].getImpact() + "_" + mynews[i].getTitle());
-                    sendAlert(Name);
-                    if (TimeNewsFunck(i) < new Date().getTime() && Next) continue;
-
-                    Color clrf = new Color(255, 67, 23, 45);
-                    if (Vhigh && StringFind(mynews[i].getTitle(), judulnews)) clrf = Color.RED;
-
-                    if (Vhigh && Objects.equals(mynews[i].getImpact(), "High")) clrf = Color.RED;
-                    if (Vmedium && Objects.equals(mynews[i].getImpact(), "Medium")) clrf = Color.YELLOW;
-                    if (Vlow && Objects.equals(mynews[i].getImpact(), "Low")) clrf = Color.GREEN;
-
-                    if (clrf == Color.WHITE) continue;
-
-                    if (!Objects.equals(mynews[i].getTitle(), "")) {
-//                            ObjectCreate(0,Name,OBJ_VLINE,0,TimeNewsFunck(i),Bid);
-//                            ObjectSet(Name,OBJPROP_COLOR,clrf);
-//                            ObjectSet(Name,OBJPROP_STYLE,Style);
-//                            ObjectSetInteger(0,Name,OBJPROP_BACK,true);
-                    }
-                }
-            }
-            //---------------event Processing------------------------------------
-            int i;
-            int power = 0;
-
-            for (i = 0; i < NomNews; i++) {
-                String google_urlx = "https://www.forexfactory.com/calendar?day";
 
 
-                if (Vhigh && String.valueOf(judulnews).equals(mynews[i].getTitle())) power = 1;
+            for (News news1 : news) {
+                //    String google_urlx = "https://www.forexfactory.com/calendar?day";
 
-                if (Vhigh && Objects.equals(mynews[i].getImpact(), "high")) power = 1;
-                if (Vmedium && Objects.equals(mynews[i].getImpact(), "medium")) power = 2;
-                if (Vlow && Objects.equals(mynews[i].getImpact(), "low")) power = 3;
+
+                int power = 0;
+                if (Vhigh && String.valueOf(judulnews).equals(news1.getTitle())) power = 1;
+
+                if (Vhigh && Objects.equals(news1.getImpact(), "High")) power = 1;
+                if (Vmedium && Objects.equals(news1.getImpact(), "Medium")) power = 2;
+                if (Vlow && Objects.equals(news1.getImpact(), "Low")) power = 3;
                 if (power == 0) {
+
                     continue;
                 }
-                String jamberita;
-                if (new Date().getTime() + BeforeNewsStop > TimeNewsFunck(i) && new Date().getTime() - 60L * AfterNewsStop < TimeNewsFunck(i) && mynews[i].getTitle() != "") {
-                    jamberita = "==>Within " + mynews[i].getMinutes() + " minutes\n" + mynews[i].toString();
+                String ambergris;
+                if (new Date().getTime() + BeforeNewsStop > news1.getDate().getTime() && new Date().getTime() - 60L * AfterNewsStop < news1.getDate().getTime() && news1.getTitle() != "") {
+                    ambergris = "==>Within " + news1.getMinutes() + " minutes\n" + news;
 
                     CheckNews = 1;
-                    String ms = message = mynews[i].toString();//get message data with format
+                    String ms = message = news1.toString();//get message data with format
 
-                    sendAlert(jamberita + " " + ms);
+                    sendAlert(ambergris + " " + ms);
 
                 } else {
                     CheckNews = 0;
 
                 }
-                if ((CheckNews == 1 && i != Now && Signal) || (CheckNews == 1 && i != Now && sendnews)) {
+                if ((CheckNews == 1 && Signal) || (CheckNews == 1 && sendNews)) {
 
-                    message = mynews[i].toString();
+                    message = news1.toString();
                     sendMessage(message);
 
-                    Now = i;
+                    CheckNews = 0;
 
 
                 }
                 if (CheckNews > 0 && NewsFilter) trade = false;
-                String infoberita;
+                String inferiority;
                 if (CheckNews > 0) {
 
-                    if (!StopTarget() && NewsFilter) {
-                        infoberita = " we are in the framework of the news\nAttention!! News Time \n!";
+                    if (NewsFilter) {
+                        inferiority = " we are in the framework of the news\nAttention!! News Time \n!";
 
 
                         /////  We are doing here if we are in the framework of the news
 
-                        sendAlert(infoberita);
-                        if (mynews[i].getMinutes() == AfterNewsStop - 1 && FirstAlert && i == Now && sendnews) {
+                        sendAlert(inferiority);
+                        if (news1.getMinutes() == AfterNewsStop - 1 && FirstAlert && sendNews) {
                             sendMessage("-->>First Alert\n " + message);
 
 
                         }
                         //--- second alert
-                        if (mynews[i].getMinutes() == BeforeNewsStop - 1 && SecondAlert && i == Now && sendnews) {
+                        if (news1.getMinutes() == BeforeNewsStop - 1 && SecondAlert && sendNews) {
                             sendMessage(">>Second Alert\n " + message);
                             SecondAlert = true;
 
@@ -2108,44 +2542,32 @@ public class TelegramClient {
         return trade;
     }
 
-    private int gmtoffset() {
+    private int gmtOffset() {
         return offset;
     }
 
-    private void WindowRedraw() {
-    }
-
-    private long TimeNewsFunck(int i) throws ParseException {
-        return NewsManager.getNewsList().get(i).getDate().getTime();
-    }
-
     @Contract(pure = true)
-    boolean StringFind(@NotNull String title, String judulnews) {
-        return title.contains(judulnews);
+    boolean StringFind(@NotNull String title, String dullness) {
+        return title.contains(dullness);
     }
 
-    boolean StopTarget() {
-        return true;
-    }
-
-    public void getTradeNews() throws IOException, ParseException {
+    public void getTradeNews() throws IOException, ParseException, InterruptedException {
         if (newsTrade()) {
             sendAlert("Trade is allowed No news ");
         }
     }
 
-    public void sendAlert(String alert) throws IOException {
+    public void sendAlert(String alert) {
         makeRequest("https://api.telegram.org/bot" + getToken() + "/sendMessage?chat_id=" + getChatId() + "&text=" + alert +
                 "&parse_mode=" + "MarkDown" + "&disable_web_page_preview=" + false + "&disable_notification=" + false, "POST");
     }
-
 
     void getChatMember() throws IOException {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/getChatMember", "POST");
     }
 
-    void setChatStickerSet() throws IOException {
+    void setChatStickerSet() {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/getChatStickerSet", "POST");
     }
@@ -2154,12 +2576,6 @@ public class TelegramClient {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/deleteChatStickerSet", "POST");
     }
-
-    //            }
-    void getForumTopicIconStickers() throws IOException {
-        setMethod("POST");
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/getForumTopicIconStickers", "POST");
-    }
 //    editForumTopic
 //            closeForumTopic
 //    reopenForumTopic
@@ -2167,12 +2583,18 @@ public class TelegramClient {
 //    unpinAllForumTopicMessages
 //            answerCallbackQuery
 
-    void createForumTopic() throws IOException {
+    //            }
+    void getForumTopicIconStickers() {
+        setMethod("POST");
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/getForumTopicIconStickers", "POST");
+    }
+
+    void createForumTopic() {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/createChat", "POST");
     }
 
-    void setMyCommands() throws IOException {
+    void setMyCommands() {
         setMethod("POST");
         makeRequest("https://api.telegram.org/bot" + getToken() + "/setMyCommands" + "?chat_id=" + getChatId() + "&command=" + getCommands().get(0) + "&text=" + getCommands().get(1) + "&parse_mode=" + parse_mode, "POST");
     }
@@ -2249,7 +2671,7 @@ public class TelegramClient {
 //                    "reply_to_message_id" + reply_to_message_id+//Integer	Optional	If the message is a reply, ID of the original message
 //                    "allow_sending_without_reply" + allow_sending_without_reply+    //Boolean	Optional	Pass True if the message should be sent even if the specified replied-to message is not found
 //                    "reply_markup" + reply_markup );   //InlineKeyboardMarkup	Optional	A JSON-serialized object for an inline keyboard. If empty, one 'Pay total price' button will be shown. If not empty, the first button must be a Pay button.
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/" + "/sendInvoice" + "?chat_id=" + chat_id + "&message_thread_id" + message_thread_id + "&title=" + title + "&description=" + description + "&payload" + payload + "&provider_token" + provider_token + "&currency_code=" + currency_code + "&prices=" + prices + "&max_tip_amount=" + max_tip_amount + "&suggested_tip_amount=" + suggested_tip_amount + "&start_parameter=" + start_parameter + "&provider_data=" + provider_data + "&photo_url=" + photo_url + "&photo_size=" + photo_size + "&photo_width=" + photo_width + "&photo_height=" + photo_height + "&need_name=" + need_name + "&need_phone_number=" + need_phone_number + "&need_email=" + need_email + "&need_shipping_address=" + need_shipping_address + "&send_phone_number_to_provider=" + send_phone_number_to_provider + "&send_email_to_provider=" + send_email_to_provider + "&is_flexible=" + is_flexible + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup, "POST");
+        makeRequest("https://api.telegram.org/bot" + getToken() + "/sendInvoice" + "?chat_id=" + chat_id + "&message_thread_id" + message_thread_id + "&title=" + title + "&description=" + description + "&payload" + payload + "&provider_token" + provider_token + "&currency_code=" + currency_code + "&prices=" + prices + "&max_tip_amount=" + max_tip_amount + "&suggested_tip_amount=" + suggested_tip_amount + "&start_parameter=" + start_parameter + "&provider_data=" + provider_data + "&photo_url=" + photo_url + "&photo_size=" + photo_size + "&photo_width=" + photo_width + "&photo_height=" + photo_height + "&need_name=" + need_name + "&need_phone_number=" + need_phone_number + "&need_email=" + need_email + "&need_shipping_address=" + need_shipping_address + "&send_phone_number_to_provider=" + send_phone_number_to_provider + "&send_email_to_provider=" + send_email_to_provider + "&is_flexible=" + is_flexible + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup, "POST");
 
 
     }
@@ -2257,6 +2679,13 @@ public class TelegramClient {
     public String Token(String telegramApiKey) {
         //  "2032573404:AAGImbZXeATS-XMutlqlJC8hgOP1BMlrcKM";
 
+
+        if (telegramApiKey == null || telegramApiKey.isEmpty()) {
+            telegramApiKey = "2032573404:AAGImbZXeATS-XMutlqlJC8hgOP1BMlrcKM";
+            // Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter your Telegram API Key" );
+            //alert.showAndWait();
+            logger.info("Default Telegram API Key set to: " + telegramApiKey);
+        }
         return telegramApiKey;
     }
 
@@ -2291,10 +2720,79 @@ public class TelegramClient {
         updateMode = updateNormal;
     }
 
-    public void sendKeyboard(ArrayList<KeyboardButton> keyboard) throws IOException {
-        makeRequest("https://api.telegram.org/bot" + getToken() + "/sendKeyboard" + "?chat_id=" + chat_id + "&text=" + keyboard + "&parse_mode=" + parse_mode + "&disable_web_page_preview=" + false + "&disable_notification=" + false, "POST"
+    public void sendKeyboard(KeyboardButton[] keyboard) throws IOException, InterruptedException {
 
-        );
+        if (keyboard.length > 0) {
+            String url = "https://api.telegram.org/bot" + getToken() + "/sendKeyboard";
+            requestBuilder.uri(URI.create(url));
+            requestBuilder.POST(HttpRequest.BodyPublishers.ofString(
+                    "keyboard=" + Arrays.toString(keyboard)
+            ));
+            HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                lastMessage = response.body();
+                logger.info(response.body());
+            } else {
+                NETWORK_RESPONSE networkResponse = NETWORK_RESPONSE.CREATED;
+                if (networkResponse.verify(response.statusCode())) {
+                    logger.info(response.body());
+                }
+
+
+            }
+            logger.info("Network Error: " + networkError);
+            logger.info("Values :" + response.body());
+
+        }
+    }
+
+
+    public Object MarketInfo() {
+        return marketInfo;
+    }
+
+    public boolean isOnline() {
+        return isOnline;
+    }
+
+    public ArrayList<News> getMarketNews() throws ParseException {
+        return NewsManager.load();
+    }
+
+    public String getLastMessage() {
+        return lastMessage;
+    }
+
+    public String getChatDescription() {
+        return chatDescription;
+    }
+
+    public void setChatDescription(String chatDescription) {
+        this.chatDescription = chatDescription;
+    }
+
+    public void setApiKey(String telegramApiKey) {
+        setToken(telegramApiKey);
+    }
+
+    public String getBotName() {
+        return getLastName();
+    }
+
+    public String NetworkError() {
+        return networkError;
+    }
+
+    public PrintStream getRes() {
+        return res;
+    }
+
+    public void setRes(PrintStream res) {
+        this.res = res;
+    }
+
+    public DoubleSummaryStatistics getInitializationLatch() {
+        return initializationLatch;
     }
 
 

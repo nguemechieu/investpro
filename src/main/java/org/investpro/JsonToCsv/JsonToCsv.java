@@ -23,7 +23,7 @@ public class JsonToCsv {
 
     private static final Logger logger = LoggerFactory.getLogger(JsonToCsv.class);
 
-    public void convertJsonToCsv(@NotNull String data, JSONObject data0) throws IOException {
+    public void convertJsonToCsv(@NotNull String data, @NotNull JSONObject data0) throws IOException {
         logger.info("Converting JSON to CSV");
 
 
