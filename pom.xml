@@ -17,6 +17,31 @@
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
+    <ciManagement>
+
+        <system>
+            sonar.links.ci
+        </system>
+
+
+    </ciManagement>
+
+    <distributionManagement>
+        <downloadUrl>
+            https://github.com/nguemechieu/investpro
+        </downloadUrl>
+
+    </distributionManagement>
+    <developers>
+        <developer>
+            <email>nguemechieu@live.com</email>
+            <name>nguemechieu</name>
+            <organization>TechExpert-Solutions</organization>
+            <timezone>UTC</timezone>
+
+        </developer>
+    </developers>
+
     <dependencies>
         <dependency>
             <groupId>org.java-websocket</groupId>
@@ -28,12 +53,7 @@
             <artifactId>javafx-controls</artifactId>
             <version>20</version>
         </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>

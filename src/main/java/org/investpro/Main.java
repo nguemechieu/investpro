@@ -71,8 +71,8 @@ public class Main extends Application {
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-        primaryStage.setTitle("CryptoInvestor                    " + new Date());
-        primaryStage.setScene(new Scene(tradingWindow, 1530, 780));
+        primaryStage.setTitle("InvestPro                    " + new Date());
+        primaryStage.setScene(new Scene(tradingWindow));
         primaryStage.setResizable(true);
         primaryStage.sizeToScene();
         primaryStage.setIconified(true);

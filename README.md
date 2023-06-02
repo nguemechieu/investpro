@@ -1,24 +1,15 @@
 # InvestPro
-[![InvestPro, Inc](src/main/resources/logo.png)]
+![InvestPro, Inc](src/main/resources/Invest.png)
 
-[![Latest release](https://img.shields.io/badge/release-1.0.1-blu)]
-[![Build Status](https://github.com/nguemechieu/investpro/blob/master/wiki/images/gitter.svg)]
-[![GitHub license](https://github.com/nguemechieu/investpro/blob/master/wiki/license_apache.svg)]
-[![Coverages](https://github.com/nguemechieu/investpro/coverages.png)]
 
-Description
+## Description : InvestPro is a  professional investment and utility software 
 
-        Invespro is a  professional investment and utility software
 
-Website: https://www.investpro.io)
-
-      License: Apache License
-
+      License: Apache 2
       Author: Nguemechieu Noel Martial
-
       Date created : 2022-12-23
 
-Supported Features :
+### Supported Features :
 
 - BINANCE US
 - COINBASE PRO
@@ -32,11 +23,12 @@ Supported Features :
 - Trade Signal
 
 #################   
-OPERATING SYSTEMS
+# OPERATING SYSTEMS
 ##################
 
 - WINDOWS
 - LINUX
+- MACOS
 
 ################################
 Virtual environment
@@ -63,7 +55,3 @@ you can use the application
 
 We will keep updating the environment and provisioning the provision
 with new updates and improvements
-
-############################
-Copyright InvestPro 2023
-##############################
