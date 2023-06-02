@@ -7,25 +7,33 @@
     <artifactId>InvestPro</artifactId>
     <version>1.0-SNAPSHOT</version>
     <name>InvestPro</name>
+    <url>https://github.com/nguemechieu/investpro</url>
 
-    <properties>
+<properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.9.2</junit.version>
         <maven.compiler.source>20</maven.compiler.source>
         <maven.compiler.target>20</maven.compiler.target>
+
     </properties>
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
+    <inceptionYear>2020</inceptionYear>
+    <description>
+        InvestPro is a financial and investment application
+    </description>
     <ciManagement>
-
         <system>
             sonar.links.ci
         </system>
-
-
     </ciManagement>
-
+<issueManagement>
+    <system>
+        sonar.links.issue
+    </system>
+    <url>https://github.com/nguemechieu/invespro/issues</url>
+</issueManagement>
     <distributionManagement>
         <downloadUrl>
             https://github.com/nguemechieu/investpro

@@ -5,7 +5,6 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.util.Pair;
 import org.jetbrains.annotations.NotNull;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,7 +17,8 @@ public class ZoomLevel {
     private final double secondsPerPixel;
     private final double pixelsPerSecond;
     private final InstantAxisFormatter xAxisFormatter;
-    private final Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap;
+    private Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap=
+            new ConcurrentHashMap<>();
     private int minXValue;
 
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
@@ -52,15 +52,15 @@ public class ZoomLevel {
         return candleWidth;
     }
 
-    public double getxAxisRangeInSeconds() {
+    double getxAxisRangeInSeconds() {
         return xAxisRangeInSeconds;
     }
 
-    public double getNumVisibleCandles() {
+    double getNumVisibleCandles() {
         return numVisibleCandles.get();
     }
 
-    public double getSecondsPerPixel() {
+    double getSecondsPerPixel() {
         return secondsPerPixel;
     }
 

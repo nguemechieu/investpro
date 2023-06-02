@@ -1,13 +1,10 @@
 package org.investpro;
-
 import com.google.gson.Gson;
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
-
 import org.investpro.Indicators.Signal;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
@@ -29,14 +26,15 @@ public class Trade extends RecursiveTreeObject<Trade> implements Runnable {
     private double quoteQty;
     private double qty;
     private long orderListId;
-    private long orderId;
-    private double avgPrice;
-    private double avgQty;
-    private boolean isBuy;
-    private boolean isSell;
-    private long tradeId;
-    private double closePrice;
-    private double highestBidPrice;
+
+    long orderId;
+     double avgPrice;
+    double avgQty;
+    boolean isBuy;
+     boolean isSell;
+    long tradeId;
+     double closePrice;
+     double highestBidPrice;
     Order order;
     Exchange exchange;
     TradePair tradePair;

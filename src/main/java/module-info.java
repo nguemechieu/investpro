@@ -29,7 +29,7 @@ module org.investpro.investpro {
     requires jdk.hotspot.agent;
     requires testcontainers;
     requires java.rmi;
-    requires org.slf4j;
+
     requires java.prefs;
     requires jakarta.persistence;
     requires javax.websocket.api;
@@ -45,6 +45,7 @@ module org.investpro.investpro {
 
     requires javafx.mediaEmpty;
     requires javafx.web;
+    requires org.slf4j;
 
     opens org.investpro to javafx.fxml;
     exports org.investpro;
