@@ -315,7 +315,7 @@ public class Coinbase extends Exchange {
         }
         else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            //Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -337,7 +337,7 @@ public class Coinbase extends Exchange {
             logger.info("Coinbase: " + order.toString());
         } else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            //Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -362,7 +362,7 @@ public class Coinbase extends Exchange {
         }
         else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+          //  Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -384,8 +384,7 @@ public class Coinbase extends Exchange {
             order = OBJECT_MAPPER.readValue(data.body(), Order.class);
             logger.info("Coinbase: " + order.toString());
         } else {
-            logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -416,7 +415,7 @@ public class Coinbase extends Exchange {
             stage.show();
         } else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -439,7 +438,7 @@ public class Coinbase extends Exchange {
         }
         else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -501,7 +500,7 @@ public class Coinbase extends Exchange {
             stage.show();
         } else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -522,7 +521,7 @@ public class Coinbase extends Exchange {
             logger.info("Coinbase: " + product.toString());
         } else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
