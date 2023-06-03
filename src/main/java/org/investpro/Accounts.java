@@ -2,7 +2,7 @@ package org.investpro;
 
 
 public class Accounts {
-    double balance;
+    private double balance;
     private String tags;
     private double marginPercent;
     private double profit;
