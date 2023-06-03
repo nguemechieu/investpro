@@ -99,13 +99,10 @@ public class Oanda extends Exchange {
     }
 
     private static @NotNull ExchangeWebSocketClient webSocketUrl(String accountId, String apiKey) {
-        OandaWebSocket oandaWebSocket = new OandaWebSocket(accountId) {
-            @Override
-            public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+        OandaWebSocket oandaWebSocket =
+                new OandaWebSocket(accountId)
 
-
-            }
-        };
+        ;
         oandaWebSocket.addHeader("Authorization", "Bearer " + apiKey);
         oandaWebSocket.addHeader("Content-Type:", "application/octet-stream");
         oandaWebSocket.addHeader("Origin", "https://api-fxtrade.oanda.com");

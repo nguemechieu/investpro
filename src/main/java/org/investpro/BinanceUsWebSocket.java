@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 
-public abstract class BinanceUsWebSocket extends ExchangeWebSocketClient {
+public class BinanceUsWebSocket extends ExchangeWebSocketClient {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -199,17 +199,7 @@ public abstract class BinanceUsWebSocket extends ExchangeWebSocketClient {
 
     }
 
-    @Override
-    public void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask liveTradesConsumer) {
 
-
-        send(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("s", tradePair.toString('/')).asText());
-        liveTradeConsumers.put(
-                tradePair,
-                liveTradesConsumer);
-
-    }
 
 
     @Override

@@ -458,17 +458,14 @@ public class TradeView extends Region  {
         sendScreenShotBtn.setOnAction(event -> {
 
             try {
-                try {
                     TelegramClient telegramClient = new TelegramClient(telegramToken);
                     File fil = File.createTempFile(
                             exchange.getName(), "png"
                     );
                     Screenshot.capture(fil);
                     telegramClient.sendPhoto(fil);
-                } catch (TelegramApiException | InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            } catch (IOException e) {
+
+            } catch (IOException | TelegramApiException | InterruptedException e) {
                 throw new RuntimeException(e);
             }
         });

@@ -2,15 +2,11 @@ module org.investpro.investpro {
 
     uses org.investpro.CodecFactory;
     uses org.investpro.ServiceProvider;
-    requires javafx.controls;
+
     requires javafx.fxml;
-
-
-
-
+    requires javafx.graphics;
     requires org.jetbrains.annotations;
     requires com.jfoenix;
-
     requires org.json;
     requires jdk.jsobject;
     requires java.logging;
@@ -39,13 +35,11 @@ module org.investpro.investpro {
 
     requires org.hibernate.orm.core;
     requires org.testng;
-    requires javafx.base;
 
-    requires javafx.graphics;
-
-    requires javafx.mediaEmpty;
+    requires javafx.media;
     requires javafx.web;
     requires org.slf4j;
+    requires javafx.controls;
 
     opens org.investpro to javafx.fxml;
     exports org.investpro;

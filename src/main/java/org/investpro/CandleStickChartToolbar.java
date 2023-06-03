@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -193,8 +194,14 @@ public class CandleStickChartToolbar extends Region {
                 if (tool.duration != -1) {
                     tool.setOnAction(event -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
-                    tool.setOnAction(event -> candleStickChart.changeZoom(
-                            tool.tool.getZoomDirection()));
+                    tool.setOnAction(event -> {
+                        try {
+                            candleStickChart.changeZoom(
+                                    tool.tool.getZoomDirection());
+                        } catch (TelegramApiException | ParseException | IOException | InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
 
 
                 } else if (tool.tool != null && tool.tool.isScreenShot()) {

@@ -138,12 +138,6 @@ public class BinanceWebSocket extends ExchangeWebSocketClient {
         return tradePair;
     }
 
-    @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, UpdateInProgressCandleTask liveTradesConsumer) {
-        sendText(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("s", tradePair.toString()).toPrettyString(), true);
-        liveTradeConsumers.put(tradePair, liveTradesConsumer);
-    }
 
 
     @Override
@@ -342,12 +336,7 @@ public class BinanceWebSocket extends ExchangeWebSocketClient {
 
     }
 
-    @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
-        sendText(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("s", tradePair.toString()).toPrettyString(), true);
 
-    }
 }
 
 

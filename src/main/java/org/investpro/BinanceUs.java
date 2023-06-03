@@ -601,17 +601,9 @@ public class BinanceUs extends Exchange {
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
         return
-                new BinanceUsWebSocket(tradePair) {
-                    @Override
-                    public void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask updateInProgressCandleTask) {
+                new BinanceUsWebSocket(tradePair) ;
 
-                    }
 
-                    @Override
-                    public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
-
-                    }
-                };
     }
 
     @Override

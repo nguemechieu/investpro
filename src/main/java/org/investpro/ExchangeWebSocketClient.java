@@ -14,6 +14,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -25,6 +28,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers = new ConcurrentHashMap<>();
     protected final CountDownLatch webSocketInitializedLatch = new CountDownLatch(1);
+    private List<Trade> trade=new ArrayList<>();
 
     public ExchangeWebSocketClient(URI serverUri) {
         super(serverUri);
@@ -50,7 +54,6 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
     }
 
 
-    public abstract void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask liveTradesConsumer);
 
     public abstract void stopStreamLiveTrades(TradePair tradePair);
 
@@ -116,6 +119,42 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public abstract double getPrice(TradePair tradePair) throws IOException, InterruptedException;
 
+    public void streamLiveTrades(TradePair tradePair, Object o) {
+        LiveTradesConsumer liveTradesConsumer = liveTradeConsumers.get(tradePair);
+        if (liveTradesConsumer == null) {
+            liveTradesConsumer = new LiveTradesConsumer() {
+                @Override
+                public void acceptTrades(List<Trade> trades) {
 
-    public abstract void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask);
+                }
+
+                @Override
+                public void onConnectionEstablished() throws IOException, InterruptedException, ParseException {
+
+                }
+
+                @Override
+                public void onConnectionFailed() throws IOException, InterruptedException {
+
+                }
+
+                @Override
+                public void onMessage(String message) throws IOException, InterruptedException {
+
+                }
+
+                @Override
+                public void accept(Trade trade) {
+
+                }
+
+                @Override
+                public void close() {
+
+                }
+            };
+            liveTradeConsumers.put(tradePair, liveTradesConsumer);
+        }
+        liveTradesConsumer.acceptTrades(trade);
+    }
 }

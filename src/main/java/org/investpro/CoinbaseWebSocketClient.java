@@ -125,12 +125,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
 
-    @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, UpdateInProgressCandleTask liveTradesConsumer) {
-        send(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("product_id", tradePair.toString('-')).toPrettyString());
-        liveTradeConsumers.put(tradePair, liveTradesConsumer);
-    }
+
 
     @Override
     public void stopStreamLiveTrades(TradePair tradePair) {
@@ -273,10 +268,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         return 0;
     }
 
-    @Override
-    public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
 
-    }
 
 
     @Override

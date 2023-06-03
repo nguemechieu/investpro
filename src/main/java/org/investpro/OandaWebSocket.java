@@ -31,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
-public abstract class OandaWebSocket extends ExchangeWebSocketClient {
+public class OandaWebSocket extends ExchangeWebSocketClient {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
@@ -137,14 +137,6 @@ public abstract class OandaWebSocket extends ExchangeWebSocketClient {
     }
 
 
-    @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, UpdateInProgressCandleTask liveTradesConsumer) {
-
-        sendText(OBJECT_MAPPER.createObjectNode().put("type", "subscribe")
-                .put("ask", tradePair.toString('_')).toPrettyString(), true);
-        liveTradeConsumers.put(tradePair, UpdateInProgressCandleTask.wrap(liveTradesConsumer));
-
-    }
 
 
 
