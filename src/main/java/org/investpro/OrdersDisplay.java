@@ -17,7 +17,7 @@ public class OrdersDisplay extends Stage {
     public OrdersDisplay(@NotNull Exchange exchange) throws IOException, InterruptedException, ParseException, URISyntaxException {
 
         VBox vbox = new VBox();
-        vbox.getStyleClass().add("app");
+        vbox.getStyleClass().add("/app");
         vbox.setSpacing(20);
         vbox.setPadding(new Insets(20));
         vbox.setAlignment(Pos.CENTER);

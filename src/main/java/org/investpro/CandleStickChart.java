@@ -111,7 +111,7 @@ public class CandleStickChart extends Region {
     private final NavigableMap<Integer, CandleData> data;
     private Canvas canvas;
     private GraphicsContext graphicsContext;
-    private InProgressCandle inProgressCandle;
+    private final InProgressCandle inProgressCandle;
     private double mousePrevX = -1;
     private double mousePrevY = -1;
     private double scrollDeltaXSum;
@@ -1318,10 +1318,10 @@ public class CandleStickChart extends Region {
                 logger.error("Paged candle data must be in ascending order by x-value");
                 //  throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
 //
-//         data.descendingMap().forEach((k, v) -> {
-//             logger.error("Paged candle data must be in ascending order by x-value");
-//             throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
-//         });
+         data.descendingMap().forEach((k, v) -> {
+             logger.error("Paged candle data must be in ascending order by x-value");
+             throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
+         });
             }
 
             if (data.isEmpty()) {

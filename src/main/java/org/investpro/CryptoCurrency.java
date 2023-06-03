@@ -14,6 +14,7 @@ public abstract class CryptoCurrency extends Currency {
         this.fullDisplayName = fullDisplayName;
         this.shortDisplayName = shortDisplayName;
         this.currencyType = currencyType;
+        this.image = image;
 
     }
 

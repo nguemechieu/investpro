@@ -9,10 +9,21 @@
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="test1">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/module-info.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/module-info.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Trade.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Trade.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomLevel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomLevel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.INIT" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChart.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChart.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Coinbase.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Coinbase.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ConnectionScene.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ConnectionScene.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrency.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Currency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Currency.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/OANDA_ACCESS_TOKEN.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/OandaWebSocket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/OandaWebSocket.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/OrdersDisplay.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/OrdersDisplay.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Screenshot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Screenshot.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Services.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Services.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/TradingWindow.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TradingWindow.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/UpdateInProgressCandleTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/UpdateInProgressCandleTask.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/readme.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/users.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/users.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/symbols.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/symbols.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -527,7 +538,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/org/investpro/Currency.java</url>
-          <line>318</line>
+          <line>319</line>
           <option name="timeStamp" value="28" />
         </line-breakpoint>
       </breakpoints>

@@ -1,10 +1,14 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.util.List;
 
 public interface UpdateInProgressCandleTask extends LiveTradesConsumer {
-    static LiveTradesConsumer wrap(UpdateInProgressCandleTask liveTradesConsumer) {
+    @Contract(value = "_ -> new", pure = true)
+    static @NotNull LiveTradesConsumer wrap(UpdateInProgressCandleTask liveTradesConsumer) {
         return new LiveTradesConsumer() {
             @Override
             public void acceptTrades(List<Trade> trades) {

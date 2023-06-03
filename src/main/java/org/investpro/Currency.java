@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.investpro.UsersManager.alert;
 
 public abstract class Currency implements Comparable<Currency>  {
+    protected static String image;
     CurrencyType currencyType;
     String fullDisplayName;
     String shortDisplayName;
@@ -56,7 +57,7 @@ public abstract class Currency implements Comparable<Currency>  {
 
 
 
-    private static String image;
+
 
 
     /**

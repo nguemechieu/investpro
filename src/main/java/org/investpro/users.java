@@ -18,7 +18,7 @@ import java.util.Locale;
         appliesTo = "users"
 )
 public class users implements Serializable {
-    private final String name;
+     String name;
 
 //    id string	Resource ID
 //    name string,

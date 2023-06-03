@@ -30,7 +30,7 @@ public class TradingWindow extends AnchorPane {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
            for (ENUM_EXCHANGE_LIST i : ENUM_EXCHANGE_LIST.values()) {
-               DraggableTab tab = new DraggableTab(i.name(), "");
+               DraggableTab tab = new DraggableTab(i.name(), "/InvestPro.png");
                if (i.getIcon() != null) {
                    tab.setGraphic(new ImageView((String) i.getIcon()));
                }

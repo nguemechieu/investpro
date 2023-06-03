@@ -42,6 +42,8 @@ import java.util.concurrent.Future;
 import static java.lang.System.out;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+import static org.investpro.UsersManager.alert;
+
 public class Coinbase extends Exchange {
     public static final Logger logger = LoggerFactory.getLogger(Coinbase.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
@@ -63,17 +65,14 @@ public class Coinbase extends Exchange {
     public Coinbase(String apiKey, String api_secret) throws NoSuchAlgorithmException, IOException, InterruptedException {
         super(coinbaseWebSocket(apiKey, api_secret));
         this.apiKey = apiKey;
-
-        requestBuilder.header("CB-ACCESS-KEY", " YC9mvla1Pg3mTD3E");
+        requestBuilder.header("CB-ACCESS-KEY", apiKey);
         requestBuilder.header("CB-ACCESS-PASSPHRASE", "hu3NnxlAeLYMxEuIeT8p5VddADx12b5Z");
         requestBuilder.header("CB-ACCESS-SIGN", timestampSignature(apiKey, api_secret));
         requestBuilder.header("CB-ACCESS-TIMESTAMP", String.valueOf(new Date().getTime()));
         requestBuilder.header("Content-Type", "application/json");
         requestBuilder.header("Accept", "application/json");
         requestBuilder.header("Accept-Language", "en-US,en;q=0.9");
-
         requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
-
         requestBuilder.header(
                 "Access-Control-Allow-Credentials",
                 "true"
@@ -117,7 +116,7 @@ public class Coinbase extends Exchange {
         HttpResponse<String> data = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if(data.statusCode() != 200) {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -167,7 +166,7 @@ public class Coinbase extends Exchange {
             logger.info("Coinbase: " + account.toString());
         } else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -221,7 +220,7 @@ public class Coinbase extends Exchange {
             logger.info("Coinbase: " + accounts.size());
         }else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -245,7 +244,7 @@ public class Coinbase extends Exchange {
         }
         else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -269,7 +268,7 @@ public class Coinbase extends Exchange {
         }
         else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -292,7 +291,7 @@ public class Coinbase extends Exchange {
             logger.info("Coinbase: " + orders.size());
         }else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -615,7 +614,7 @@ public class Coinbase extends Exchange {
         }
         else {
             logger.error("Coinbase: " + data.statusCode() + " " + data.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+
             alert.setTitle("Coinbase Error");
             alert.setHeaderText(null);
             alert.setContentText(data.body());
@@ -686,10 +685,10 @@ public class Coinbase extends Exchange {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
         stopAt = Instant.now().plusSeconds(3);
-//        if (stopAt.isAfter(Instant.now())) {
-//            logger.info("Coinbase stop trade at : " + stopAt);
-//            return CompletableFuture.completedFuture(Collections.emptyList());
-//        }
+       if (stopAt.isAfter(Instant.now())) {
+            logger.info("Coinbase stop trade at : " + stopAt);
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
         Instant finalStopAt = stopAt;
@@ -711,7 +710,7 @@ public class Coinbase extends Exchange {
                     }
                     requestBuilder.uri(URI.create(uriStr));
                     try {
-                        HttpResponse<String> response = HttpClient.newHttpClient().send(requestBuilder.build()
+                        HttpResponse<String> response = client.send(requestBuilder.build()
                                 ,
                                 HttpResponse.BodyHandlers.ofString());
 
@@ -1588,7 +1587,7 @@ public class Coinbase extends Exchange {
 
                             if (res.has("message")) {
 
-                                Alert alert = new Alert(Alert.AlertType.ERROR);
+
                                 alert.setTitle("Error");
                                 alert.setHeaderText(null);
                                 alert.setContentText(res.get("message").asText());

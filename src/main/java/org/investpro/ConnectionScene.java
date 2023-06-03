@@ -74,8 +74,8 @@ gridPane.setVgap(10);
         gridPane.setPrefSize(600, 300);
 
         gridPane.setStyle("-fx-background-color: rgb(25,255,25,1);");
-
-        getChildren().add(gridPane);
+stackPane.getChildren().add(gridPane);
+        getChildren().add(stackPane);
         Scene scene = new Scene(this);
         Stage stage = new Stage();
         stage.setTitle("Cryptoinvestor");

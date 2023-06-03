@@ -320,7 +320,6 @@ public abstract class OandaWebSocket extends ExchangeWebSocketClient {
     @Override
     public double getPrice(TradePair tradePair) {
 
-
         return 0;
     }
 }
