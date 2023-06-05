@@ -2,6 +2,7 @@ package org.investpro;
 
 
 
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
 import java.net.URI;
@@ -28,7 +29,7 @@ public class CryptoCurrencyDataProvider  {
         HttpRequest.Builder request = HttpRequest.newBuilder();
         request.setHeader("Accept", "application/json");
         request.setHeader("Content-Type", "application/json");
-        request.uri(URI.create("https://api.exchange.coinbase.com/currencies"));
+        request.uri(URI.create("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"));//"https://api.exchange.coinbase.com/currencies"));
 
 //
 //        "id": "GST",
@@ -117,10 +118,15 @@ public class CryptoCurrencyDataProvider  {
                         List<Currency> coinsToRegister = new ArrayList<>();
 
 
-                        String image=
+                        String image =
                                 "https://api.coinmarketcap.com/v1/ticker/" + id + "/?convert=USD";
                         out.println("image " + image);
-                    //    coinsToRegister.add(i, new CryptoCurrency(name, id, symbol, maxPrecision, crypto_address_link,name,image));
+                        coinsToRegister.add(i, new CryptoCurrency(id, name, id, maxPrecision, symbol, image) {
+                            @Override
+                            public int compareTo(java.util.@NotNull Currency o) {
+                                return 0;
+                            }
+                        });
 
                         //        String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
                         //      String symbol

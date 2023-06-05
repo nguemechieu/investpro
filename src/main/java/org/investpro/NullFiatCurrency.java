@@ -2,20 +2,20 @@ package org.investpro;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
 import java.util.Currency;
+import java.util.Locale;
 
 public class NullFiatCurrency extends FiatCurrency {
-    public NullFiatCurrency(CurrencyType fiat, String xxx, String xxx1, String xxx2, int i, String xxx3, String xxxx) throws SQLException {
+    public NullFiatCurrency
+            (String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
+             String symbol, Locale locale, String centralBank, int numericCode, String image
+            ) {
         super(
-                fiat,
-                xxx,
-                xxx1,
-                xxx2,
-                i,
-                xxx3,
-                xxxx
+                fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, locale, centralBank, numericCode, image
+
+
         );
+
     }
 
 

@@ -141,15 +141,10 @@ public class TelegramClient {
     private static JsonNode response;
     private static String address = "";
     private PrintStream res;
-    private boolean Signal;
-    private boolean Vhigh;
-    private boolean Vmedium, Vlow;
-    private boolean Next;
-    private boolean NewsFilter;
+
     private boolean trade;
     private String from_first_name;
-    private String judulnews;
-    private boolean DrawLines;
+
     private String lastMessage;
     private String chatDescription;
 
@@ -739,7 +734,7 @@ public class TelegramClient {
     }
 
     public void setReply_markup(String reply_markup) {
-        this.reply_markup = reply_markup;
+        TelegramClient.reply_markup = reply_markup;
     }
 
     public String getChat_photo_file_id() {
@@ -898,11 +893,7 @@ public class TelegramClient {
 
         if (isOnline()) {
             getUpdates();// update the chat client
-            if (getUpdates().length() > 0) {
 
-                //Trade news on
-                newsTrade();
-            }
 
         }
 
@@ -2433,109 +2424,6 @@ public class TelegramClient {
         makeRequest("https://api.telegram.org/bot" + getToken() + "/getChatAdministrators", "POST");
     }
 
-    boolean newsTrade() throws IOException, ParseException, InterruptedException//RETURN TRUE IF TRADE IS ALLOWED
-    {
-        ArrayList<News> news = NewsManager.getNewsList();
-
-        offset = gmtOffset();
-        double CheckNews;
-        if (MinAfter > 0) {
-
-            if (new Date().getTime() - LastUpd >= Upd) {
-                out.println("News Loading...");
-                sendMessage(
-                        """
-                                News Loading...
-
-                                Please wait until the news is updated
-
-                                """
-                );
-
-                LastUpd = (int) new Date().getTime();
-
-
-                sendMessage("News Loading ...");
-
-            }
-
-
-            for (News news1 : news) {
-                //    String google_urlx = "https://www.forexfactory.com/calendar?day";
-
-
-                int power = 0;
-                if (Vhigh && String.valueOf(judulnews).equals(news1.getTitle())) power = 1;
-
-                if (Vhigh && Objects.equals(news1.getImpact(), "High")) power = 1;
-                if (Vmedium && Objects.equals(news1.getImpact(), "Medium")) power = 2;
-                if (Vlow && Objects.equals(news1.getImpact(), "Low")) power = 3;
-                if (power == 0) {
-
-                    continue;
-                }
-                String ambergris;
-                if (new Date().getTime() + BeforeNewsStop > news1.getDate().getTime() && new Date().getTime() - 60L * AfterNewsStop < news1.getDate().getTime() && news1.getTitle() != "") {
-                    ambergris = "==>Within " + news1.getMinutes() + " minutes\n" + news;
-
-                    CheckNews = 1;
-                    String ms = message = news1.toString();//get message data with format
-
-                    sendAlert(ambergris + " " + ms);
-
-                } else {
-                    CheckNews = 0;
-
-                }
-                if ((CheckNews == 1 && Signal) || (CheckNews == 1 && sendNews)) {
-
-                    message = news1.toString();
-                    sendMessage(message);
-
-                    CheckNews = 0;
-
-
-                }
-                if (CheckNews > 0 && NewsFilter) trade = false;
-                String inferiority;
-                if (CheckNews > 0) {
-
-                    if (NewsFilter) {
-                        inferiority = " we are in the framework of the news\nAttention!! News Time \n!";
-
-
-                        /////  We are doing here if we are in the framework of the news
-
-                        sendAlert(inferiority);
-                        if (news1.getMinutes() == AfterNewsStop - 1 && FirstAlert && sendNews) {
-                            sendMessage("-->>First Alert\n " + message);
-
-
-                        }
-                        //--- second alert
-                        if (news1.getMinutes() == BeforeNewsStop - 1 && SecondAlert && sendNews) {
-                            sendMessage(">>Second Alert\n " + message);
-                            SecondAlert = true;
-
-                        }
-
-
-                    }
-                } else {
-
-                    if (NewsFilter) trade = true;
-
-                    // We are out of scope of the news release (No News)
-                    sendAlert(">>News Release << " + message);
-                }
-
-
-            }
-
-            return trade;
-        }
-        return trade;
-    }
 
     private int gmtOffset() {
         return offset;
@@ -2546,11 +2434,6 @@ public class TelegramClient {
         return title.contains(dullness);
     }
 
-    public void getTradeNews() throws IOException, ParseException, InterruptedException {
-        if (newsTrade()) {
-            sendAlert("Trade is allowed No news ");
-        }
-    }
 
     public void sendAlert(String alert) {
         makeRequest("https://api.telegram.org/bot" + getToken() + "/sendMessage?chat_id=" + getChatId() + "&text=" + alert +

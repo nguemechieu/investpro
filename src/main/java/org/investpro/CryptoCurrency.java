@@ -5,16 +5,16 @@ import org.jetbrains.annotations.NotNull;
 public abstract class CryptoCurrency extends Currency {
 
 
-    protected CryptoCurrency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
+    protected CryptoCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
         super(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
 
         this.code = code;
         this.fractionalDigits = fractionalDigits;
-        this.symbol = symbol;
+        Currency.symbol = symbol;
         this.fullDisplayName = fullDisplayName;
         this.shortDisplayName = shortDisplayName;
-        this.currencyType = currencyType;
-        this.image = image;
+
+        Currency.image = image;
 
     }
 

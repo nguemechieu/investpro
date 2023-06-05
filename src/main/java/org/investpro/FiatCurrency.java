@@ -11,12 +11,6 @@ public abstract class FiatCurrency extends Currency {
     String centralBank;
     int numericCode;
 
-    protected FiatCurrency() {
-        super(CurrencyType.FIAT, "", "", "", 0, "", "");
-        locale = Locale.forLanguageTag(String.valueOf(Locale.getDefault().getDisplayLanguage()));
-        centralBank = "";
-        numericCode = -1;
-    }
 
     protected FiatCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
                            String symbol, Locale locale, String centralBank, int numericCode, String image) {
@@ -33,10 +27,6 @@ public abstract class FiatCurrency extends Currency {
         this.locale = locale;
         this.centralBank = centralBank;
         this.numericCode = numericCode;
-    }
-
-    public FiatCurrency(CurrencyType fiat, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
-        super(fiat, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
     }
 
 

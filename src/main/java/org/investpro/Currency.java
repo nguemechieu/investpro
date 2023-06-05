@@ -25,23 +25,24 @@ public abstract class Currency implements Comparable<Currency> {
     protected static String symbol;
     static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
     static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency(
-            CurrencyType.CRYPTO,
-            "xx",
+            CurrencyType.NULL,
+            "XXX",
             "xxx",
-            "xxx",
-            0,
-            "xxx",
-            "xxx"
+            "", 0,
+            "",
+            "xx"
+
+
     );
      static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency(
 
-            "",
-            "",
-            "",
-            0,
-            "",
-            ""
-    ) {
+             "",
+             "",
+             "xxx",
+             0,
+             "",
+             "xx"
+     ) {
 
         @Override
         public int compareTo(java.util.@NotNull Currency o) {
@@ -532,7 +533,7 @@ public abstract class Currency implements Comparable<Currency> {
 
     private static class NullCryptoCurrency extends CryptoCurrency {
         protected NullCryptoCurrency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
-            super(currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
+            super(fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
         }
 
         @Override
@@ -543,7 +544,15 @@ public abstract class Currency implements Comparable<Currency> {
 
     private static abstract class NullFiatCurrency extends FiatCurrency {
         protected NullFiatCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
-            super(CurrencyType.FIAT, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
+            super(
+                    fullDisplayName,
+                    shortDisplayName,
+                    code,
+                    fractionalDigits,
+                    symbol, Locale.US, "NO BANK",
+                    0,
+                    image
+            );
         }
     }
 }
