@@ -99,5 +99,5 @@ public interface Db extends DataSource {
     );
 
 
-    void registerCurrencies(Collection<FiatCurrency> values) throws SQLException;
+    void save(Currency currency);
 }

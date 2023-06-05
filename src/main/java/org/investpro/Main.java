@@ -79,7 +79,10 @@ public class Main extends Application {
         primaryStage.centerOnScreen();
         primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/Invest.png"))));
 
-
+        primaryStage.setOnCloseRequest(event -> {
+            logger.info("Application closed");
+            System.exit(0);
+        });
         primaryStage.show();
 
     }

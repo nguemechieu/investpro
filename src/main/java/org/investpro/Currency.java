@@ -12,15 +12,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.investpro.UsersManager.alert;
-
-public abstract class Currency implements Comparable<Currency>  {
+public abstract class Currency implements Comparable<Currency> {
     protected static String image;
     CurrencyType currencyType;
     String fullDisplayName;
@@ -28,18 +23,18 @@ public abstract class Currency implements Comparable<Currency>  {
     protected String code;
     protected int fractionalDigits;
     protected static String symbol;
-     static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
-     static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency(
-            CurrencyType.NULL,
-            "",
-            "",
-            "",
+    static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
+    static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency(
+            CurrencyType.CRYPTO,
+            "xx",
+            "xxx",
+            "xxx",
             0,
-            "",
-            ""
+            "xxx",
+            "xxx"
     );
      static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency(
-            CurrencyType.NULL,
+
             "",
             "",
             "",
@@ -53,72 +48,12 @@ public abstract class Currency implements Comparable<Currency>  {
             return 0;
         }
     };
+    static Db1 db1;
+    static double current_price;
     private static final Logger logger = LoggerFactory.getLogger(Currency.class);
-
-
-
-
-
-
-    /**
-     * Private constructor used only for the {@code NULL_CURRENCY}.
-     */
-    protected Currency() {
-        this.currencyType = CurrencyType.NULL;
-        this.fullDisplayName = "xxx";
-        this.shortDisplayName = "xxx";
-        this.code = "XXX";
-        this.fractionalDigits = 0;
-        this.symbol = "xxx";
-        this.image = "xxx";
-
-    }
-
-    /**
-     * Protected constructor, called only by CurrencyDataProvider's.
-     */
-    protected Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code,
-                       int fractionalDigits, String symbol) {
-        Objects.requireNonNull(currencyType, "currencyType must not be null");
-        Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
-        Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
-        Objects.requireNonNull(code, "code must not be null");
-
-        if (fractionalDigits < 0) {
-            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
-        }
-        Objects.requireNonNull(symbol, "symbol must not be null");
-
-        this.currencyType = currencyType;
-        this.fullDisplayName = fullDisplayName;
-        this.shortDisplayName = shortDisplayName;
-        this.code = code;
-        this.fractionalDigits = fractionalDigits;
-        this.symbol = symbol;
-
-    }
-
-    public Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
-        this(currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol);
-
-        Objects.requireNonNull(currencyType, "currencyType must not be null");
-        Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
-        Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
-        Objects.requireNonNull(code, "code must not be null");
-
-        if (fractionalDigits < 0) {
-            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
-        }
-        Objects.requireNonNull(symbol, "symbol must not be null");
-        this.currencyType = currencyType;
-        this.fullDisplayName = fullDisplayName;
-        this.shortDisplayName = shortDisplayName;
-        this.code = code;
-        this.fractionalDigits = fractionalDigits;
-        this.symbol = symbol;
-        this.image = image;
-
-    }
+    static double market_cap;
+    static int market_cap_rank;
+    static double fully_diluted_valuation;
 
 
      static double market_cap_change_percentage_24h  ;
@@ -126,28 +61,46 @@ public abstract class Currency implements Comparable<Currency>  {
      static double market_cap_change_24h  ;
      static String id;
      static String name;
+    static double total_volume;
+    static double high_24h;
+    static double low_24h;
+    static double price_change_24h;
+    static double price_change_percentage_24h;
 
-     static double current_price;
-     static double market_cap;
-     static int market_cap_rank;
-     static double fully_diluted_valuation;
-     static double total_volume;
-     static double high_24h;
-     static double low_24h;
-     static double price_change_24h;
-     static double price_change_percentage_24h;
-
-
-
-    //Register all currencies
-static {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest.Builder builder=
-                HttpRequest.newBuilder()
-                      .GET()
-                      .uri(URI.create("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"));
+    static {
+        Properties conf1 = new Properties();
         try {
-            HttpResponse <String> response =client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            conf1.load(
+                    Currency.class.getClassLoader().getResourceAsStream("config.properties")
+            );
+        } catch (IOException e) {
+            new Message(
+                    Message.MessageType.ERROR,
+                    "could not load database parameters\n" + e.getMessage()
+            );
+
+        }
+
+
+        try {
+            db1 = new Db1(conf1);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static {
+
+
+        //Register all currencies
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest.Builder builder =
+                    HttpRequest.newBuilder()
+                            .GET()
+                            .uri(URI.create("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"));
+
+            HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 //            "id": "bitcoin",
 //                    "symbol": "btc",
 //                    "name": "Bitcoin",
@@ -175,22 +128,25 @@ static {
 //                    "roi": null,
 //                    "last_updated": "2023-06-02T20:02:20.534Z"
 
+            CryptoCurrencyDataProvider cryptoCurrencyDataProvider = null;
+            try {
+                cryptoCurrencyDataProvider = new CryptoCurrencyDataProvider();
+            } catch (SQLException | ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            cryptoCurrencyDataProvider.registerCurrencies();
 
+            FiatCurrencyDataProvider fiatCurrencyDataProvider = new FiatCurrencyDataProvider();
 
-
-
-
-
-
+            fiatCurrencyDataProvider.registerCurrencies();
 
 
             if (response.statusCode() == 200) {
-             JsonNode rates = new ObjectMapper().readTree(response.body());
-             logger.info("found " + rates.size() + " currencies");
-             logger.info("response "+response);
+                JsonNode rates = new ObjectMapper().readTree(response.body());
+                logger.info("found " + rates.size() + " currencies");
+                logger.info("response " + response);
 
                 for (JsonNode rate : rates) {
-
 
 
                     id = rate.get("id").asText();
@@ -209,32 +165,26 @@ static {
                     market_cap_change_24h = rate.get("market_cap_change_24h").asDouble();
                     market_cap_change_percentage_24h = rate.get("market_cap_change_percentage_24h").asDouble();
                     double circulating_supply = rate.get("circulating_supply").asDouble(),
-                    total_supply = rate.get("total_supply").asDouble();
-                   double max_supply = rate.get("max_supply").asDouble();
-                  double  ath = rate.get("ath").asDouble();
-                double    ath_change_percentage = rate.get("ath_change_percentage").asDouble();
-              String  ath_date = rate.get("ath_date").asText();
+                            total_supply = rate.get("total_supply").asDouble();
+                    double max_supply = rate.get("max_supply").asDouble();
+                    double ath = rate.get("ath").asDouble();
+                    double ath_change_percentage = rate.get("ath_change_percentage").asDouble();
+                    String ath_date = rate.get("ath_date").asText();
                     double atl = rate.get("atl").asDouble();
-                 double   atl_change_percentage = rate.get("atl_change_percentage").asDouble();
-              String     atl_date = rate.get("atl_date").asText();
-                  String  roi = rate.get("roi").asText();
-                   String last_updated = rate.get("last_updated").asText();
+                    double atl_change_percentage = rate.get("atl_change_percentage").asDouble();
+                    String atl_date = rate.get("atl_date").asText();
+                    String roi = rate.get("roi").asText();
+                    String last_updated = rate.get("last_updated").asText();
 
-                   logger.info("found " + id + " " + symbol + " " + name + " " +
-                           image + " " + current_price + " " + market_cap + " " + market_cap_rank + " " + fully_diluted_valuation + " " + total_volume + " " + high_24h + " " + low_24h + " " + price_change_24h + " " + price_change_percentage_24h + " " + market_cap_change_24h + " " + market_cap_change_percentage_24h + " " + circulating_supply + " " + total_supply + " " + max_supply + " " + ath + " " + ath_change_percentage + " " + ath_date + " " + atl + " " + atl_change_percentage + " " + atl_date + " " + roi + " " + last_updated);
-
-
-
-
-
-
+                    logger.info("found " + id + " " + symbol + " " + name + " " +
+                            image + " " + current_price + " " + market_cap + " " + market_cap_rank + " " + fully_diluted_valuation + " " + total_volume + " " + high_24h + " " + low_24h + " " + price_change_24h + " " + price_change_percentage_24h + " " + market_cap_change_24h + " " + market_cap_change_percentage_24h + " " + circulating_supply + " " + total_supply + " " + max_supply + " " + ath + " " + ath_change_percentage + " " + ath_date + " " + atl + " " + atl_change_percentage + " " + atl_date + " " + roi + " " + last_updated);
 
                     Currency currency = new Currency(
                             CurrencyType.CRYPTO,
                             rate.get("name").asText(),
                             rate.get("id").asText(),
                             rate.get("symbol").asText(),
-                            12,
+                            8,
                             rate.get("symbol").asText(),
 
                             rate.get("image").asText()
@@ -245,8 +195,44 @@ static {
                             return 0;
                         }
                     };
+
+                    db1.save(currency);
+
                     CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
                 }
+
+                for (java.util.Currency cur : java.util.Currency.getAvailableCurrencies()) {
+                    Currency currency = CURRENCIES.get(SymmetricPair.of(cur.getCurrencyCode(), CurrencyType.FIAT));
+                    if (currency == null && CURRENCIES.get(SymmetricPair.of(cur.getCurrencyCode(), CurrencyType.CRYPTO)) == null) {
+                        currency = new Currency(
+                                CurrencyType.FIAT,
+                                cur.getDisplayName(),
+                                cur.getCurrencyCode(),
+                                cur.getSymbol(),
+                                (Math.max(cur.getDefaultFractionDigits(), 0)),
+                                cur.getSymbol(),
+
+                                ""
+
+                        ) {
+                            @Override
+                            public int compareTo(java.util.@NotNull Currency o) {
+                                return 0;
+                            }
+                        };
+                        CURRENCIES.put(SymmetricPair.of(cur.getCurrencyCode(), CurrencyType.FIAT), currency);
+
+                        logger.info("found " + currency.code + " " + name);
+
+                        db1.save(currency);
+                    }
+                }
+
+
+                logger.info("loaded " + CURRENCIES.size() + " currencies");
+                logger.info(
+                        "currencies: " + CURRENCIES.keySet().stream().map(SymmetricPair::toString)
+                );
             }
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -254,11 +240,93 @@ static {
 
 
     }
+    /**
+     * Private constructor used only for the {@code NULL_CURRENCY}.
+     */
+    protected Currency() {
+        this.currencyType = CurrencyType.NULL;
+        this.fullDisplayName = "xxx";
+        this.shortDisplayName = "xxx";
+        this.code = "***";
+        this.fractionalDigits = 0;
+        symbol = "xxx";
+        image = "xxx";
+
+    }
+    /**
+     * Protected constructor, called only by CurrencyDataProvider's.
+     */
+    protected Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code,
+                       int fractionalDigits, String symbol) {
+        Objects.requireNonNull(currencyType, "currencyType must not be null");
+        Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
+        Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
+        Objects.requireNonNull(code, "code must not be null");
+
+        if (fractionalDigits < 0) {
+            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
+        }
+        Objects.requireNonNull(symbol, "symbol must not be null");
+
+        this.currencyType = currencyType;
+        this.fullDisplayName = fullDisplayName;
+        this.shortDisplayName = shortDisplayName;
+        this.code = code;
+        this.fractionalDigits = fractionalDigits;
+        Currency.symbol = symbol;
+
+    }
+
+    public Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
+        this(currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol);
+
+        Objects.requireNonNull(currencyType, "currencyType must not be null");
+        Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
+        Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
+        Objects.requireNonNull(code, "code must not be null");
+
+        if (fractionalDigits < 0) {
+            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
+        }
+        Objects.requireNonNull(symbol, "symbol must not be null");
+        this.currencyType = currencyType;
+        this.fullDisplayName = fullDisplayName;
+        this.shortDisplayName = shortDisplayName;
+        this.code = code;
+        this.fractionalDigits = fractionalDigits;
+        Currency.symbol = symbol;
+        Currency.image = image;
+
+    }
+
+    public Currency(CurrencyType fiat, String s, String s1, String mxn, int i, String $, Locale es, String s2, int i1) {
+        this.currencyType = fiat;
+        symbol = s;
+        name = s1;
+        image = mxn;
+        current_price = i;
+        market_cap = i1;
+        market_cap_rank = 0;
+        fully_diluted_valuation = 0;
+        total_volume = 0;
+        high_24h = 0;
+        low_24h = 0;
+        price_change_24h = 0;
+        price_change_percentage_24h = 0;
+        market_cap_change_24h = 0;
+        market_cap_change_percentage_24h = 0;
+
+    }
+
     protected static void registerCurrency(Currency currency) {
         Objects.requireNonNull(currency, "currency must not be null");
         CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
+        logger.info("found " + currency.code);
+        db1.save(currency);
     }
+
     public static Currency of(String code) throws SQLException, ClassNotFoundException {
+
         Objects.requireNonNull(code, "code must not be null");
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))
                 && CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
@@ -274,20 +342,49 @@ static {
                 logger.error("unknown currency code: " + code);
                 logger.error("known codes: " + CURRENCIES.keySet());
                 logger.info("Trying to fetch from database");
-        Db1 db1 = new Db1();
+                //Loading database parameters
+                if (
+                        CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
+                    return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
+                } else if (
+                        CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))
+                ) {
+                    return CURRENCIES.getOrDefault(SymmetricPair.of(code, CurrencyType.FIAT), NULL_FIAT_CURRENCY);
+                } else if (db1.getCurrency(code) != null
 
-        if (db1.getCurrency(code) != null) {
-            return db1.getCurrency(code);
-        } else {
-            logger.error("could not fetch from database");
-            //throw new IllegalArgumentException("unknown currency code: " + code);
+                ) {
+                    logger.error("could not fetch from database");
 
-            alert.setTitle("Error");
-            alert.setHeaderText(null);
-            alert.setContentText("could not fetch from database");
-            alert.showAndWait();
-            return NULL_CRYPTO_CURRENCY;
-        }
+
+                    return db1.getCurrency(code);
+                } else {
+                    logger.error("could not fetch from database");
+                    //Trying registering currency
+                    Currency currency = new Currency(
+                            CurrencyType.CRYPTO,
+                            code,
+                            code,
+                            code,
+                            8,
+                            code,
+
+                            ""
+
+                    ) {
+                        @Override
+                        public int compareTo(java.util.@NotNull Currency o) {
+                            return 0;
+                        }
+                    };
+                    //  CURRENCIES.put(SymmetricPair.of(code, CurrencyType.FIAT), currency);
+                    CURRENCIES.put(SymmetricPair.of(code, CurrencyType.CRYPTO), currency);
+                    db1.save(currency);
+                    return currency;
+
+
+                }
+
+
             }
         }
 
@@ -302,27 +399,17 @@ static {
      * Get the fiat currency that has a currency code equal to the
      * given {@code}. Using {@literal "¤¤¤"} as the currency code
      * returns {@literal NULL_FIAT_CURRENCY}.
-     *
      */
-    public static FiatCurrency ofFiat(@NotNull String code) {
-        if (code.equals("¤¤¤")) {
+    public static Currency ofFiat(@NotNull String code) {
+        if (code.equals("¤¤¤") || code.equals("����") || code.equals("")) {
             return NULL_FIAT_CURRENCY;
         }
 
-        FiatCurrency result = (FiatCurrency) CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
-        return result == null ? NULL_FIAT_CURRENCY : result;
-    }
-
-    public static Map<Object, Object> getMarketDataConcurrentHashMap() {
-        return CURRENCIES.values().stream()
-              .filter(currency -> currency.getCurrencyType() == CurrencyType.CRYPTO)
-              .collect(ConcurrentHashMap::new,
-                        (map, currency) -> map.put(currency.code, currency),
-                      ConcurrentHashMap::putAll);
+        return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
     }
 
 
-    public CryptoCurrency ofCrypto(@NotNull String code) {
+    public static CryptoCurrency ofCrypto(@NotNull String code) {
         if (code.equals("¤¤¤")) {
             return NULL_CRYPTO_CURRENCY;
         }
@@ -380,7 +467,7 @@ static {
     }
 
     public String getSymbol() {
-        return this.symbol;
+        return symbol;
     }
 
     /**
@@ -431,7 +518,7 @@ static {
     }
 
     public void setImage(String image) {
-        this.image = image;
+        Currency.image = image;
     }
 
 
@@ -455,8 +542,8 @@ static {
     }
 
     private static abstract class NullFiatCurrency extends FiatCurrency {
-        protected NullFiatCurrency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
-            super(currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
+        protected NullFiatCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
+            super(CurrencyType.FIAT, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
         }
     }
 }

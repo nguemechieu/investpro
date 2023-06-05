@@ -139,7 +139,7 @@ public class TelegramClient {
     boolean sendNews = true;
     File chat_video_file_id;
     private static JsonNode response;
-    private final String address;
+    private static String address = "";
     private PrintStream res;
     private boolean Signal;
     private boolean Vhigh;
@@ -157,19 +157,17 @@ public class TelegramClient {
     static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     private final DoubleSummaryStatistics initializationLatch;
     File thumb = new File("/photo/400PngdpiLogoBW.png");
-    private double latitude;
-    private double longitude;
+    private static double latitude;
+    private static double longitude;
     private String city;
     private String country;
     private String timezone;
-    private String foursquare_id;
-    private String foursquare_type;
+    private static String foursquare_id;
+    private static String foursquare_type;
     private String foursquare_name;
-    private String google_place_id;
-    private String google_place_type;
+    private static String google_place_id;
+    private static String google_place_type;
     private Duration duration;
-
-
 
 
     public static int getLength() {
@@ -221,6 +219,7 @@ public class TelegramClient {
                 });
 
     }
+
 
     public void setUpdateMode(UPDATE_MODE updateMode) {
         TelegramClient.updateMode = updateMode;
@@ -349,61 +348,35 @@ public class TelegramClient {
         TelegramClient.chat_last_name = chat_last_name;
     }
 
-    //makeRequest return JSONObject
-    @Contract("_, _ -> new")
-    private static @NotNull JSONObject makeRequest(String url, @NotNull String method) {
-        HttpResponse<String> response;
-        try {   url = url + "?offset=" + offset + "&limit=" + length;
+    public TelegramClient(String token) throws IOException, TelegramApiException, InterruptedException, ParseException {
+
+        TelegramClient.token = token;
+        address = "https://api.telegram.org/bot" + token;
+        this.res = System.out;
+        this.initializationLatch = new DoubleSummaryStatistics();
 
 
+        requestBuilder.header("Content-Type", "application/json");
+        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
+        requestBuilder.header("Accept", "application/json");
+        requestBuilder.header("Authorization", "Bearer " + token);
+        requestBuilder.header("Cache-Control", "no-cache");
+        getMe();
 
-            requestBuilder.uri(URI.create(url));
-
-            requestBuilder.GET();
-            requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.)");
-            requestBuilder.header("Accept", "application/json");
-
-            response = client.send(
-                    requestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofString()
-            );
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
-        try {
+        sendKeyboard(
+                new KeyboardButton[]{new KeyboardButton("1", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("2", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("3", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("4", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("5", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("6", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("7", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("8", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("9", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
+                        new KeyboardButton("0", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE)});
 
 
-
-            NETWORK_RESPONSE networkResponse;
-
-            if (response.statusCode() != 200) {
-                isOnline = false;
-//                Alert alert = new Alert(Alert.AlertType.ERROR);
-//                alert.setTitle("Error");
-//                alert.setHeaderText(response.statusCode() + "");
-//                alert.setContentText(response.headers().firstValue("Content-Type").get());
-//                alert.showAndWait();
-logger.info("Error: " + response.statusCode() + " " + response.headers().toString());
-                //networkError = response.headers().firstValue("Content-Type").get();
-                logger.info("Telegram  " + networkError);
-
-return new JSONObject();
-            } else {
-                isOnline = true;
-                networkResponse = mapper.readValue(response.body(), NETWORK_RESPONSE.class);
-                logger.info("Telegram -->" + networkResponse.getMessage());
-
-            }
-
-        } catch (Exception e) {
-            networkError = e.getMessage();
-            out.println(e.getMessage());
-
-        }
-       /// assert response != null;
-        out.println(response.body());
-        return new JSONObject(response.body());
+        logger.info("Telegram Client Created");
     }
 
     public static @NotNull List<String> getCommands() {
@@ -713,8 +686,56 @@ return new JSONObject();
         TelegramClient.chat_first_name = chat_first_name;
     }
 
-    public String getReply_markup() {
-        return reply_markup;
+    //makeRequest return JSONObject
+    @Contract("_, _ -> new")
+    private static @NotNull JSONObject makeRequest(String url, @NotNull String method) {
+        HttpResponse<String> response;
+        try {   url = url + "?offset=" + offset + "&limit=" + length;
+
+
+
+            requestBuilder.uri(URI.create(url));
+
+            requestBuilder.GET();
+            requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.)");
+            requestBuilder.header("Accept", "application/json");
+
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+
+
+
+            NETWORK_RESPONSE networkResponse;
+
+            if (response.statusCode() != 200) {
+                isOnline = false;
+
+                logger.info("Error: " + response.statusCode() + " " + response.body());
+
+                return new JSONObject();
+            } else {
+                isOnline = true;
+
+
+            }
+
+        } catch (Exception e) {
+            networkError = e.getMessage();
+            new Message(
+                    "Error: " + " ", e.getMessage()
+            );
+
+        }
+       /// assert response != null;
+        out.println(response.body());
+        return new JSONObject(response.body());
     }
 
     public void setReply_markup(String reply_markup) {
@@ -769,8 +790,8 @@ return new JSONObject();
         TelegramClient.first_name = first_name;
     }
 
-    public String getReply_to_message_id() {
-        return reply_to_message_id;
+    public static String getReply_markup() {
+        return reply_markup;
     }
 
     public void setReply_to_message_id(String reply_to_message_id) {
@@ -1063,35 +1084,8 @@ return new JSONObject();
         makeRequest("https://api.telegram.org/bot" + token + "/sendGame" + "?chat_id=" + chat_id + "&message_thread_id=" + message_thread_id + "&game_short_name=" + game_short_name + "&disable_notification=" + disable_notification + "&protect_content=" + protect_content + "&reply_to_message_id=" + reply_to_message_id + "&allow_sending_without_reply=" + allow_sending_without_reply + "&reply_markup=" + reply_markup, "POST");
     }
 
-    public TelegramClient(String token) throws IOException, TelegramApiException, InterruptedException {
-
-        TelegramClient.token = token;
-        this.address = "https://api.telegram.org/bot" + token;
-        this.res = System.out;
-        this.initializationLatch = new DoubleSummaryStatistics();
-
-
-        requestBuilder.header("Content-Type", "application/json");
-        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
-        requestBuilder.header("Accept", "application/json");
-        requestBuilder.header("Authorization", "Bearer " + token);
-        requestBuilder.header("Cache-Control", "no-cache");
-
-
-        sendKeyboard(
-                new KeyboardButton[]{new KeyboardButton("1", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("2", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("3", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("4", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("5", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("6", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("7", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("8", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("9", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE),
-                        new KeyboardButton("0", KeyboardButtonType.BUTTON_TYPE_SINGLE_LINE)});
-
-
-        logger.info("Telegram Client Created");
+    public static String getReply_to_message_id() {
+        return reply_to_message_id;
     }
 
     @Contract(pure = true)
@@ -1186,7 +1180,7 @@ return new JSONObject();
     }
 
     //sendPhoto to Telegram
-    public void sendPhoto(File file) {
+    public static void sendPhoto(File file) {
         try {
 
 
@@ -1272,11 +1266,12 @@ return new JSONObject();
                 System.out.println(response.statusCode());
                 System.out.println(response.headers());
                 System.out.println(response.body());
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText(null);
-                alert.setContentText(response.body());
-                alert.showAndWait();
+                new Message(
+
+                        String.valueOf(response.statusCode())
+                        ,
+                        response.body()
+                );
             } else {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
                 alert.setTitle("Success");
@@ -1539,7 +1534,7 @@ return new JSONObject();
         makeRequest("https://api.telegram.org/bot" + getToken() + "stopMessageLiveLocation", "POST");
     }
 
-    public void sendVenue() throws IOException {
+    public static void sendVenue() throws IOException {
 
         String url = "https://api.telegram.org/bot/" + getToken() + "/sendVenue" + "?chat_id=" + chat.getChat_id();
 //

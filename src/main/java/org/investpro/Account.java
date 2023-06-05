@@ -15,7 +15,7 @@ import java.util.*;
 
 @Entity
 @Table(name = "Account")
-public class Account extends RecursiveTreeObject<Account> implements @NotNull List<Account> {
+public class Account extends RecursiveTreeObject<Account> {
 
     private static final Logger logger = LoggerFactory.getLogger(Account.class);
     String uuid;
@@ -42,6 +42,8 @@ public class Account extends RecursiveTreeObject<Account> implements @NotNull Li
     private String state;
     private String openTime;
     private String closeTime;
+    private double frozen;
+    private String permissions;
 
 
     public Account(@NotNull JSONObject account) {
@@ -765,124 +767,11 @@ Object           hold;
         this.closeTime = closeTime;
     }
 
-    @Override
-    public int size() {
-        return 0;
+    public void setFrozen(double frozen) {
+        this.frozen = frozen;
     }
 
-    @Override
-    public boolean isEmpty() {
-        return false;
-    }
-
-    @Override
-    public boolean contains(Object o) {
-        return false;
-    }
-
-    @NotNull
-    @Override
-    public Iterator<Account> iterator() {
-        return null;
-    }
-
-    @NotNull
-    @Override
-    public Object[] toArray() {
-        return new Object[0];
-    }
-
-    @NotNull
-    @Override
-    public <T> T[] toArray(@NotNull T[] a) {
-        return null;
-    }
-
-    @Override
-    public boolean add(Account account) {
-        return false;
-    }
-
-    @Override
-    public boolean remove(Object o) {
-        return false;
-    }
-
-    @Override
-    public boolean containsAll(@NotNull Collection<?> c) {
-        return false;
-    }
-
-    @Override
-    public boolean addAll(@NotNull Collection<? extends Account> c) {
-        return false;
-    }
-
-    @Override
-    public boolean addAll(int index, @NotNull Collection<? extends Account> c) {
-        return false;
-    }
-
-    @Override
-    public boolean removeAll(@NotNull Collection<?> c) {
-        return false;
-    }
-
-    @Override
-    public boolean retainAll(@NotNull Collection<?> c) {
-        return false;
-    }
-
-    @Override
-    public void clear() {
-
-    }
-
-    @Override
-    public Account get(int index) {
-        return null;
-    }
-
-    @Override
-    public Account set(int index, Account element) {
-        return null;
-    }
-
-    @Override
-    public void add(int index, Account element) {
-
-    }
-
-    @Override
-    public Account remove(int index) {
-        return null;
-    }
-
-    @Override
-    public int indexOf(Object o) {
-        return 0;
-    }
-
-    @Override
-    public int lastIndexOf(Object o) {
-        return 0;
-    }
-
-    @NotNull
-    @Override
-    public ListIterator<Account> listIterator() {
-        return null;
-    }
-
-    @NotNull
-    @Override
-    public ListIterator<Account> listIterator(int index) {
-        return null;
-    }
-
-    @NotNull
-    @Override
-    public List<Account> subList(int fromIndex, int toIndex) {
-        return null;
+    public void setPermissions(String permissions) {
+        this.permissions = permissions;
     }
 }

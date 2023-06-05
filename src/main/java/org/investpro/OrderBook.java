@@ -26,4 +26,20 @@ public class OrderBook {
         this.buckets = jsonArray;
         return this;
     }
+
+    public void setPrice(double price) {
+        for (Object bucket : buckets) {
+            if (bucket instanceof JSONArray) {
+                ((JSONArray) bucket).put(price);
+            }
+        }
+    }
+
+    public void setAmount(double amount) {
+        for (Object bucket : buckets) {
+            if (bucket instanceof JSONArray) {
+                ((JSONArray) bucket).put(amount);
+            }
+        }
+    }
 }

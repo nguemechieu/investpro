@@ -41,7 +41,7 @@ public class Wallet extends Stage {
         gridPane.add(new Label("Withdraw : " + exchange.getWithdraw()), 0, 11);
 
 
-        Spinner<Double> spinner=new Spinner<>();
+        Spinner<Double> spinner = new Spinner<>();
         spinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(
                 0.0,
                 1000000.0
@@ -51,7 +51,13 @@ public class Wallet extends Stage {
         depositBtn.setOnAction(e -> exchange.deposit(spinner.getValue()));
         gridPane.add(depositBtn, 0, 8);
         Button withdrawBtn = new Button("Withdraw");
-        withdrawBtn.setOnAction(e -> exchange.withdraw(spinner.getValue()));
+        withdrawBtn.setOnAction(e -> {
+            try {
+                exchange.withdraw(spinner.getValue());
+            } catch (IOException | InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
 
         gridPane.add(withdrawBtn, 10, 8);
         setScene(gridPane.getScene());

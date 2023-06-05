@@ -12,6 +12,7 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class Exchange {
     public static TradePair tradePair;
@@ -54,7 +55,7 @@ public abstract class Exchange {
     public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle();
 
 
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, boolean isAutoTrading);
+    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt);
 
     public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
@@ -113,8 +114,18 @@ public abstract class Exchange {
 
     public abstract void deposit(Double value);
 
-    public abstract void withdraw(Double value);
+    public abstract void withdraw(Double value) throws IOException, InterruptedException;
 
+
+    public abstract void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE market, double quantity, int i, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) throws IOException, InterruptedException;
+
+    public abstract void closeAll() throws IOException, InterruptedException;
+
+    public abstract void createOrder(@NotNull TradePair tradePair, Side buy, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice);
+
+    public abstract ConcurrentHashMap<String, Double> getLiveTickerPrice() throws IOException, InterruptedException;
+
+    abstract double getLiveTickerPrices() throws IOException, InterruptedException;
 
     public abstract @NotNull List<Currency> getAvailableSymbols() throws IOException, InterruptedException;
 

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Bittrex extends Exchange {
     TradePair tradePair;
@@ -62,7 +63,7 @@ public class Bittrex extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, boolean isAutoTrading) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
         return
 
                 null;
@@ -217,6 +218,11 @@ public class Bittrex extends Exchange {
     }
 
     @Override
+    public void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE market, double quantity, int i, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) throws IOException, InterruptedException {
+
+    }
+
+    @Override
     public @NotNull List<Currency> getAvailableSymbols() throws IOException, InterruptedException {
         return new ArrayList<>();
     }
@@ -328,6 +334,17 @@ public class Bittrex extends Exchange {
     public void closeAll() {
     }
 
-    public void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice) {
+    public void createOrder(@NotNull TradePair tradePair, Side buy, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice) {
+
+    }
+
+    @Override
+    public ConcurrentHashMap<String, Double> getLiveTickerPrice() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    double getLiveTickerPrices() throws IOException, InterruptedException {
+        return 0;
     }
 }

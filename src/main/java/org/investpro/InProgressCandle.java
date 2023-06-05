@@ -186,4 +186,7 @@ public class InProgressCandle {
         this.highPriceSoFar = highestBidPrice;
     }
 
+    public double getAveragePriceSofar() {
+        return (highPriceSoFar + lowPriceSoFar) / 2;
+    }
 }

@@ -10,18 +10,17 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 
 
-public class PendingOrders {
+public class PendingOrders extends Stage {
     public PendingOrders(@NotNull Exchange exchange) throws IOException, InterruptedException {
         ListView<Order> listView = new ListView<>();
         listView.getItems().addAll(exchange.getPendingOrders());
-        Stage stage = new Stage();
+
         listView.setPrefSize(900, 500);
         listView.setBackground(Background.fill(Paint.valueOf("#000000")));
 
-        stage.setTitle("Pending Orders");
-        stage.setScene(new Scene(listView));
-
-        stage.show();
+        setTitle("Pending Orders");
+        setScene(new Scene(listView));
+        show();
 
     }
 }

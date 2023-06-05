@@ -19,13 +19,12 @@ public class TradePair extends Pair<Currency, Currency> {
     static final Logger logger = LoggerFactory.getLogger(TradePair.class);
 
 
-
     Currency baseCurrency;
     Currency counterCurrency;
     private String tradePairCode;
     private Iterable<? extends Trade> trades;
-    private long orderListId;
-    private long id;
+    long orderListId;
+    long id;
 
     public TradePair(Currency baseCurrency, Currency counterCurrency) throws SQLException {
         super(baseCurrency, counterCurrency);
@@ -185,19 +184,19 @@ public class TradePair extends Pair<Currency, Currency> {
             out.println(counterCurrency.code);
             out.println("baseCurrency image " + baseCurrency.getImage());
             out.println("counterCurrency image " + counterCurrency.getImage());
-            return baseCurrency.code + "_" + counterCurrency.code;
+            return baseCurrency.code.toUpperCase() + "_" + counterCurrency.code.toUpperCase();
         } else if (separator.equals('-')) {
             out.println(baseCurrency.code);
             out.println("-");
             out.println(counterCurrency.code);
-            return baseCurrency.code + "-" + counterCurrency.code;
+            return baseCurrency.code.toUpperCase() + "-" + counterCurrency.code.toUpperCase();
         } else if (separator.equals('/')) {
             out.println(baseCurrency.code);
             out.println("/");
-            out.println(counterCurrency.code);
+            out.println(counterCurrency.getCode());
             out.println("baseCurrency image " + baseCurrency.getImage());
             out.println("counterCurrency image " + counterCurrency.getImage());
-            return baseCurrency.code + counterCurrency.code;
+            return baseCurrency.code.toUpperCase() + counterCurrency.code.toUpperCase();
         } else {
             out.println(baseCurrency.code);
 
@@ -213,7 +212,7 @@ public class TradePair extends Pair<Currency, Currency> {
             }
             out.println("baseCurrency image " + baseCurrency.getImage());
             out.println("counterCurrency image " + counterCurrency.getImage());
-            return counterCurrency.code + separator + baseCurrency.code;
+            return counterCurrency.code.toUpperCase() + separator + baseCurrency.code.toUpperCase();
         }
     }
 
@@ -221,18 +220,6 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public Date getStartTime() {
         return new Date();
-    }
-
-    public static <U, T> U getInstrument(T t) {
-        return (U) t;
-    }
-
-    public static <K, T> K getPair(T t) {
-        return (K) t;
-    }
-
-    public String getTradePairCode() {
-        return tradePairCode;
     }
 
     public void setTradePairCode(String tradePairCode) {

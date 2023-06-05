@@ -34,6 +34,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 import static java.lang.System.nanoTime;
@@ -160,7 +161,7 @@ public Set<Integer> getSupportedGranularities() {
      * This method only needs to be implemented to support live syncing.
      */
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, boolean isAutoTrading) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -551,14 +552,19 @@ public Set<Integer> getSupportedGranularities() {
     }
 
     @Override
+    public void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE market, double quantity, int i, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) throws IOException, InterruptedException {
+
+    }
+
+    @Override
     public @NotNull List<Currency> getAvailableSymbols() throws IOException, InterruptedException {
         requestBuilder.uri(URI.create("https://api.binance.us/api/v3/exchangeInfo"));
-HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         System.out.println(response.body());
-if (response.statusCode() == 200) {
-    ObjectMapper mapper = new ObjectMapper();
-    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        if (response.statusCode() == 200) {
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
     mapper.registerModule(new JavaTimeModule());
     JsonNode root = mapper.readTree(response.body());
@@ -773,6 +779,16 @@ if (response.statusCode() == 200) {
         ));
 
 
+    }
+
+    @Override
+    public ConcurrentHashMap<String, Double> getLiveTickerPrice() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    double getLiveTickerPrices() throws IOException, InterruptedException {
+        return 0;
     }
 
     public String getApi_key() {

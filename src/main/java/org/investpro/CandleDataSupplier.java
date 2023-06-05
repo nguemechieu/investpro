@@ -2,6 +2,7 @@ package org.investpro;
 
 import javafx.beans.property.IntegerProperty;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -74,7 +75,7 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
         return Objects.hash(numCandles, secondsPerCandle, tradePair, endTime);
     }
 
-    public abstract List<CandleData> getCandleData();
+    public abstract List<CandleData> getCandleData() throws IOException, InterruptedException;
 
 
     public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);

@@ -458,14 +458,14 @@ public class TradeView extends Region  {
         sendScreenShotBtn.setOnAction(event -> {
 
             try {
-                    TelegramClient telegramClient = new TelegramClient(telegramToken);
-                    File fil = File.createTempFile(
-                            exchange.getName(), "png"
-                    );
-                    Screenshot.capture(fil);
-                    telegramClient.sendPhoto(fil);
 
-            } catch (IOException | TelegramApiException | InterruptedException e) {
+                File fil = File.createTempFile(
+                        exchange.getName(), "png"
+                );
+                Screenshot.capture(fil);
+                TelegramClient.sendPhoto(fil);
+
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         });
@@ -516,7 +516,7 @@ public class TradeView extends Region  {
             ObservableList<Account> obs0 = FXCollections.observableArrayList();
             obs0.addAll(account);
             RecursiveTreeItem<Account> obs1 = new RecursiveTreeItem<>(obs0, RecursiveTreeObject::getChildren);
-            obs1.setValue(account.get(0));
+            //  obs1.setValue(account.get(0));
             accounts.setRoot(obs1);
             accounts.setEditable(true);
             Scene scene = new Scene(accounts, 1300, 500);

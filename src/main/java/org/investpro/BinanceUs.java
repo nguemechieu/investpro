@@ -16,6 +16,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ListView;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.lang.System.nanoTime;
 import static java.lang.System.out;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
-import static org.investpro.UsersManager.alert;
+
 
 public class BinanceUs extends Exchange {
 
@@ -54,14 +55,12 @@ public class BinanceUs extends Exchange {
 
     static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     static TradePair tradePair;
-    private final HttpClient client = HttpClient.newHttpClient();
+    private static final HttpClient client = HttpClient.newHttpClient();
     private static boolean isConnected;
     private String api_key;
     private String accountId;
     private final AtomicReference<String> url = new AtomicReference<>("https://api.binance.us/api/v3/");
     private String apiSecret;
-    private String symbol;
-    private double price;
 
     public BinanceUs(String apiKey, String apiSecret) {
         super(binanceUsWebSocket(apiKey,apiSecret));
@@ -76,30 +75,26 @@ public class BinanceUs extends Exchange {
             logger.error(e.getMessage());
             e.printStackTrace();
         });
-        requestBuilder.header("Content-Type", "application/json");
-        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
-        requestBuilder.header("Origin", "https://api.binance.us");
-        requestBuilder.header("Referer", "https://api.binance.us");
-
-
-
-
 
         requestBuilder.header("Accept", "application/json");
         requestBuilder.header("X-MBX-APIKEY", "Bearer " + apiKey);
         requestBuilder.header("X-MBX-APISECRET", apiSecret);
         requestBuilder.header("Sec-Fetch-Site", "same-origin");
         requestBuilder.header("Sec-Fetch-User", "?1");
-
         requestBuilder.header("Accept-Language", "en-US,en;q=0.9");
+        requestBuilder.header("signature",
+                signature(apiKey, apiSecret)
 
+        );
         logger.info("BinanceUs " + nanoTime());
         this.api_key = apiKey;
         isConnected = false;
 
 
+    }
 
-
+    private String signature(String apiKey, String apiSecret) {
+        return "sha256=" + Base64.getEncoder().encodeToString((apiKey + ":" + apiSecret).getBytes());
     }
 
     private static ExchangeWebSocketClient binanceUsWebSocket(String apiKey, String apiSecret) {
@@ -182,8 +177,9 @@ public class BinanceUs extends Exchange {
                 account.setCommissionRates(jsonNode.get("commissionRates").get("maker").asDouble(),
                         jsonNode.get("commissionRates").get("taker").asDouble(),
                         jsonNode.get("commissionRates").get("buyer").asDouble(),
-                        jsonNode.get("commissionRates").get("seller").asDouble());
-                return account;
+                        jsonNode.get("commissionRates").get("seller").asDouble())
+                ;
+                account.setPermissions(jsonNode.get("permissions").get(0).asText());
 
 
             }
@@ -191,14 +187,16 @@ public class BinanceUs extends Exchange {
             logger.error("BinanceUs " + nanoTime());
             logger.error("BinanceUs " + response.statusCode());
             logger.error("BinanceUs " + response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("Error");
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message(
+                    "BinanceUs " + nanoTime() +
+                            "BinanceUs " + response.statusCode(),
+                    "BinanceUs " + response.body()
+            );
+
+
         }
-        return
-                null;
+        return new ArrayList<>();
+
     }
 
     //GET /sapi/v1/asset/query/trading-fee
@@ -215,11 +213,12 @@ public class BinanceUs extends Exchange {
             logger.error("BinanceUs " + nanoTime());
             logger.error("BinanceUs " + response.statusCode());
             logger.error("BinanceUs " + response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("Error");
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message(
+                    "BinanceUs " + nanoTime() +
+                            "BinanceUs " + response.statusCode(),
+                    "BinanceUs " + response.body()
+            );
+
         }
 //        [
 //        {
@@ -234,7 +233,6 @@ public class BinanceUs extends Exchange {
 //        }
 //]
         JsonNode jsonNode = OBJECT_MAPPER.readTree(response.body());
-
         String symbol = jsonNode.get(0).get("symbol").asText();
         double makerCommission = jsonNode.get(0).get("makerCommission").asDouble();
         double takerCommission = jsonNode.get(0).get("takerCommission").asDouble();
@@ -265,11 +263,11 @@ public class BinanceUs extends Exchange {
             logger.error("BinanceUs " + nanoTime());
             logger.error("BinanceUs " + response.statusCode());
             logger.error("BinanceUs " + response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("Error");
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message(
+                    "BinanceUs " + nanoTime() +
+                            "BinanceUs " + response.statusCode(),
+                    "BinanceUs " + response.body()
+            );
         }
         JsonNode jsonNode = OBJECT_MAPPER.readTree(response.body());
 
@@ -549,7 +547,7 @@ public class BinanceUs extends Exchange {
         }
 
     @Override
-    public BinanceUsCandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair) {
             @Override
             public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
@@ -566,36 +564,12 @@ public class BinanceUs extends Exchange {
                 return null;
             }
         };
-
-
     }
 
     @Override
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
         return null;
     }
-
-
-//    private @Nullable String timestampSignature(
-//            String apiKey,
-//            String passphrase
-//    ) {
-//        Objects.requireNonNull(apiKey);
-//        Objects.requireNonNull(passphrase);
-//
-//        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_INSTANT);
-//        String stringToSign = timestamp + "\n" + apiKey + "\n" + passphrase;
-//
-//        try {
-//            byte[] hash = MessageDigest.getInstance("SHA-256").digest(stringToSign.getBytes());
-//            return Base64.getEncoder().encodeToString(hash);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return null;
-//        }
-//
-//
-//    }
 
 
     @Override
@@ -623,7 +597,7 @@ public class BinanceUs extends Exchange {
      * This method only needs to be implemented to support live syncing.
      */
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, boolean isAutoTrading) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -889,11 +863,38 @@ public class BinanceUs extends Exchange {
 
     @Override
     public String getSymbol() {
-        return symbol;
+        return tradePair.toString('/');
     }
 
     @Override
     public double getLivePrice(TradePair tradePair) {
+        requestBuilder.uri(URI.create("https://api.binance.us/api/v3/prices/" + tradePair.toString('/') + "/ticker"));
+        requestBuilder.GET().build();
+
+        client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).thenApply(HttpResponse::body)
+                .thenApply(response -> {
+                    System.out.println(response);
+                    JsonNode res;
+                    try {
+                        res = OBJECT_MAPPER.readTree(response);
+                        logger.info(response);
+                    } catch (JsonProcessingException ex) {
+                        throw new RuntimeException(ex);
+                    }
+
+                    if (res.isEmpty()) {
+                        return -1;
+                    } else {
+                        if (res.get(0).has("price")) {
+                            return res.get(0).get("price").asDouble();
+                        }
+                    }
+
+
+                    return 0;
+                }).thenAccept(out::println);
+
+
         return 0;
 
     }
@@ -1005,38 +1006,36 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public void withdraw(Double value) {
+    public void withdraw(Double value) throws IOException, InterruptedException {
 
-    }
-
-
-    public void createOrder(
-            @NotNull TradePair tradePair, TRADE_ORDER_TYPE orderType,
-            Side side,
-            int size,
-            double price,
-            double stopPrice,
-            double takeProfit
-    ) {
+        String currency = tradePair.baseCurrency.code;
+        String address
+                = "234567";
+        String addressTag = tradePair.baseCurrency.code;
+        requestBuilder.uri(
+                URI.create("https://api.binance.us/" +
+                        "api/v3/withdraw" +
+                        "?currency=" + currency +
+                        "&address=" + address +
+                        "&amount=" + value +
+                        "&addressTag=" + addressTag)
+        );
+        String body =
+                requestBuilder.build().method();
+        client.send(
+                requestBuilder.build(),
+                HttpResponse.BodyHandlers.ofString()
+        ).request().expectContinue();
+        System.out.println(body);
         JSONObject jsonObject = getJSON();
         System.out.println(jsonObject.toString(4));
 
-        String uriStr = "https://api.binance.us/" +
-                "api/v3/orders/" + tradePair.toString('/') +
-                "?side=" + side +
-                "&type=" +orderType+
-                "&quantity=" + size +
-                "&price=" + price + "&stopLoss=" + stopPrice + "&takeProfit=" + takeProfit;
-
-        System.out.println(uriStr);
-
 
     }
 
-    public void CancelOrder(long orderID) {
-    }
 
-    public void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE market, double quantity, int i, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) throws IOException, InterruptedException {
+    @Override
+    public void createOrder(@NotNull TradePair tradePair, Side buy, ENUM_ORDER_TYPE market, double quantity, int i, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) throws IOException, InterruptedException {
         JSONObject jsonObject = getJSON();
         System.out.println(jsonObject.toString(4));
 
@@ -1068,6 +1067,7 @@ public class BinanceUs extends Exchange {
 
     }
 
+    @Override
     public void closeAll() throws IOException, InterruptedException {
         JSONObject jsonObject = getJSON();
         System.out.println(jsonObject.toString(4));
@@ -1078,7 +1078,7 @@ public class BinanceUs extends Exchange {
         System.out.println(uriStr);
 
         requestBuilder.DELETE();
-        //requestBuilder.POST(HttpRequest.BodyPublishers.ofString())
+
         String body =
                 requestBuilder.build().method();
         client.send(
@@ -1089,6 +1089,7 @@ public class BinanceUs extends Exchange {
         System.out.println(body);
     }
 
+    @Override
     public void createOrder(@NotNull TradePair tradePair, Side buy, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice) {
 
         JSONObject jsonObject = getJSON();
@@ -1111,6 +1112,58 @@ public class BinanceUs extends Exchange {
         ));
 
 
+    }
+
+    @Override
+    public ConcurrentHashMap<String, Double> getLiveTickerPrice() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    double getLiveTickerPrices() throws IOException, InterruptedException {
+
+        requestBuilder.uri(
+                URI.create("https://api.binance.us/api/v3/ticker/price")
+        );
+
+        HttpResponse<String> response =
+                client.send(
+                        requestBuilder.build(),
+                        HttpResponse.BodyHandlers.ofString()
+                );
+        System.out.println(response.statusCode());
+
+        JSONObject jsonObject = getJSON();
+        System.out.println(jsonObject.toString(4));
+        System.out.println(response.body());
+
+        if (response.statusCode() == 200) {
+            JSONObject jsonObject1 = getJSON();
+            System.out.println(jsonObject1.toString(4));
+            System.out.println(response.body());
+            JSONArray jsonArray = jsonObject1.getJSONArray("symbols");
+            System.out.println(jsonArray.toString(4));
+            JSONObject jsonObject2 = jsonArray.getJSONObject(0);
+            System.out.println(jsonObject2.toString(4));
+            System.out.println(response.body());
+            JSONObject jsonObject3 = jsonObject2.getJSONObject("price");
+            System.out.println(jsonObject3.toString(4));
+            System.out.println(response.body());
+            JSONObject jsonObject4 = jsonObject3.getJSONObject("price");
+            System.out.println(jsonObject4.toString(4));
+            System.out.println(response.body());
+            JSONObject jsonObject5 = jsonObject4.getJSONObject("price");
+            System.out.println(jsonObject5.toString(4));
+
+            return jsonObject5.getDouble("price");
+        } else {
+            new Message(
+                    Message.MessageType.ERROR,
+                    response.body()
+            );
+        }
+
+        return 0;
     }
 
 
@@ -1142,2065 +1195,6 @@ public class BinanceUs extends Exchange {
 //    }
 //]
 //    GET /api/v3/ticker/price
-    public ConcurrentHashMap<String, Double> getLiveTickerPrice() throws IOException, InterruptedException {
-
-//        [
-//        {
-//            "symbol": "BTCUSD4",
-//                "price": "22882.5400"
-//        },
-//        {
-//            "symbol": "ETHUSD4",
-//                "price": "1626.0300"
-//        },
-//        {
-//            "symbol": "XRPUSD",
-//                "price": "0.2970"
-//        },
-//        {
-//            "symbol": "BCHUSD4",
-//                "price": "134.2000"
-//        },
-//        {
-//            "symbol": "LTCUSD4",
-//                "price": "96.2100"
-//        },
-//        {
-//            "symbol": "USDTUSD4",
-//                "price": "1.0003"
-//        },
-//        {
-//            "symbol": "BTCUSDT",
-//                "price": "26998.92000000"
-//        },
-//        {
-//            "symbol": "ETHUSDT",
-//                "price": "1709.76000000"
-//        },
-//        {
-//            "symbol": "XRPUSDT",
-//                "price": "0.29691000"
-//        },
-//        {
-//            "symbol": "BCHUSDT",
-//                "price": "119.70000000"
-//        },
-//        {
-//            "symbol": "LTCUSDT",
-//                "price": "88.18000000"
-//        },
-//        {
-//            "symbol": "BNBUSD4",
-//                "price": "325.6257"
-//        },
-//        {
-//            "symbol": "BNBUSDT",
-//                "price": "307.50000000"
-//        },
-//        {
-//            "symbol": "ETHBTC",
-//                "price": "0.06332200"
-//        },
-//        {
-//            "symbol": "XRPBTC",
-//                "price": "0.00000864"
-//        },
-//        {
-//            "symbol": "BNBBTC",
-//                "price": "0.01138500"
-//        },
-//        {
-//            "symbol": "LTCBTC",
-//                "price": "0.00327200"
-//        },
-//        {
-//            "symbol": "BCHBTC",
-//                "price": "0.00439000"
-//        },
-//        {
-//            "symbol": "ADAUSD4",
-//                "price": "0.3920"
-//        },
-//        {
-//            "symbol": "BATUSD4",
-//                "price": "0.2843"
-//        },
-//        {
-//            "symbol": "ETCUSD4",
-//                "price": "22.7276"
-//        },
-//        {
-//            "symbol": "XLMUSD4",
-//                "price": "0.0910"
-//        },
-//        {
-//            "symbol": "ZRXUSD4",
-//                "price": "0.2525"
-//        },
-//        {
-//            "symbol": "ADAUSDT",
-//                "price": "0.33980000"
-//        },
-//        {
-//            "symbol": "BATUSDT",
-//                "price": "0.23740000"
-//        },
-//        {
-//            "symbol": "ETCUSDT",
-//                "price": "19.21000000"
-//        },
-//        {
-//            "symbol": "XLMUSDT",
-//                "price": "0.09080000"
-//        },
-//        {
-//            "symbol": "ZRXUSDT",
-//                "price": "0.21350000"
-//        },
-//        {
-//            "symbol": "LINKUSD4",
-//                "price": "6.9647"
-//        },
-//        {
-//            "symbol": "RVNUSD4",
-//                "price": "0.0295"
-//        },
-//        {
-//            "symbol": "DASHUSD4",
-//                "price": "60.2100"
-//        },
-//        {
-//            "symbol": "ZECUSD4",
-//                "price": "43.9600"
-//        },
-//        {
-//            "symbol": "ALGOUSD4",
-//                "price": "0.2580"
-//        },
-//        {
-//            "symbol": "IOTAUSD4",
-//                "price": "0.2500"
-//        },
-//        {
-//            "symbol": "BUSDUSD4",
-//                "price": "1.0005"
-//        },
-//        {
-//            "symbol": "BTCBUSD",
-//                "price": "27006.45000000"
-//        },
-//        {
-//            "symbol": "DOGEUSDT",
-//                "price": "0.07216000"
-//        },
-//        {
-//            "symbol": "WAVESUSD4",
-//                "price": "2.6353"
-//        },
-//        {
-//            "symbol": "ATOMUSDT",
-//                "price": "10.82300000"
-//        },
-//        {
-//            "symbol": "ATOMUSD4",
-//                "price": "14.4280"
-//        },
-//        {
-//            "symbol": "NEOUSDT",
-//                "price": "12.00000000"
-//        },
-//        {
-//            "symbol": "NEOUSD4",
-//                "price": "8.7720"
-//        },
-//        {
-//            "symbol": "VETUSDT",
-//                "price": "0.02179000"
-//        },
-//        {
-//            "symbol": "QTUMUSDT",
-//                "price": "2.70000000"
-//        },
-//        {
-//            "symbol": "QTUMUSD4",
-//                "price": "2.8040"
-//        },
-//        {
-//            "symbol": "NANOUSD",
-//                "price": "2.1240"
-//        },
-//        {
-//            "symbol": "ICXUSD4",
-//                "price": "0.2397"
-//        },
-//        {
-//            "symbol": "ENJUSD4",
-//                "price": "0.4568"
-//        },
-//        {
-//            "symbol": "ONTUSD4",
-//                "price": "0.2301"
-//        },
-//        {
-//            "symbol": "ONTUSDT",
-//                "price": "0.21440000"
-//        },
-//        {
-//            "symbol": "ZILUSD4",
-//                "price": "0.0287"
-//        },
-//        {
-//            "symbol": "ZILBUSD",
-//                "price": "0.02553000"
-//        },
-//        {
-//            "symbol": "VETUSD4",
-//                "price": "0.0241"
-//        },
-//        {
-//            "symbol": "BNBBUSD",
-//                "price": "307.90000000"
-//        },
-//        {
-//            "symbol": "XRPBUSD",
-//                "price": "0.30138000"
-//        },
-//        {
-//            "symbol": "ETHBUSD",
-//                "price": "1710.73000000"
-//        },
-//        {
-//            "symbol": "ALGOBUSD",
-//                "price": "0.20080000"
-//        },
-//        {
-//            "symbol": "XTZUSD4",
-//                "price": "1.1814"
-//        },
-//        {
-//            "symbol": "XTZBUSD",
-//                "price": "1.07400000"
-//        },
-//        {
-//            "symbol": "HBARUSD4",
-//                "price": "0.0699"
-//        },
-//        {
-//            "symbol": "HBARBUSD",
-//                "price": "0.05840000"
-//        },
-//        {
-//            "symbol": "OMGUSD4",
-//                "price": "1.6934"
-//        },
-//        {
-//            "symbol": "OMGBUSD",
-//                "price": "1.71540000"
-//        },
-//        {
-//            "symbol": "MATICUSD4",
-//                "price": "1.1954"
-//        },
-//        {
-//            "symbol": "MATICBUSD",
-//                "price": "1.04210000"
-//        },
-//        {
-//            "symbol": "XTZBTC",
-//                "price": "0.00003944"
-//        },
-//        {
-//            "symbol": "ADABTC",
-//                "price": "0.00001259"
-//        },
-//        {
-//            "symbol": "REPBUSD",
-//                "price": "5.20000000"
-//        },
-//        {
-//            "symbol": "REPUSD",
-//                "price": "5.3400"
-//        },
-//        {
-//            "symbol": "EOSBUSD",
-//                "price": "1.08080000"
-//        },
-//        {
-//            "symbol": "EOSUSD4",
-//                "price": "1.0900"
-//        },
-//        {
-//            "symbol": "DOGEUSD4",
-//                "price": "0.0918"
-//        },
-//        {
-//            "symbol": "KNCUSD4",
-//                "price": "0.8910"
-//        },
-//        {
-//            "symbol": "KNCUSDT",
-//                "price": "0.65700000"
-//        },
-//        {
-//            "symbol": "VTHOUSDT",
-//                "price": "0.00129100"
-//        },
-//        {
-//            "symbol": "VTHOUSD4",
-//                "price": "0.0012"
-//        },
-//        {
-//            "symbol": "USDCUSD4",
-//                "price": "1.0018"
-//        },
-//        {
-//            "symbol": "COMPUSDT",
-//                "price": "40.57000000"
-//        },
-//        {
-//            "symbol": "COMPUSD4",
-//                "price": "52.0700"
-//        },
-//        {
-//            "symbol": "MANAUSD4",
-//                "price": "0.7261"
-//        },
-//        {
-//            "symbol": "HNTUSD4",
-//                "price": "2.9002"
-//        },
-//        {
-//            "symbol": "HNTUSDT",
-//                "price": "1.27000000"
-//        },
-//        {
-//            "symbol": "MKRUSD4",
-//                "price": "697.5119"
-//        },
-//        {
-//            "symbol": "MKRUSDT",
-//                "price": "653.00000000"
-//        },
-//        {
-//            "symbol": "DAIUSD4",
-//                "price": "1.0005"
-//        },
-//        {
-//            "symbol": "ONEUSDT",
-//                "price": "0.01917000"
-//        },
-//        {
-//            "symbol": "ONEUSD4",
-//                "price": "0.0264"
-//        },
-//        {
-//            "symbol": "BANDUSDT",
-//                "price": "1.62100000"
-//        },
-//        {
-//            "symbol": "BANDUSD4",
-//                "price": "2.0780"
-//        },
-//        {
-//            "symbol": "STORJUSDT",
-//                "price": "0.32970000"
-//        },
-//        {
-//            "symbol": "STORJUSD4",
-//                "price": "0.4241"
-//        },
-//        {
-//            "symbol": "BUSDUSDT",
-//                "price": "0.99840000"
-//        },
-//        {
-//            "symbol": "UNIUSD4",
-//                "price": "6.8095"
-//        },
-//        {
-//            "symbol": "UNIUSDT",
-//                "price": "5.61200000"
-//        },
-//        {
-//            "symbol": "SOLUSD4",
-//                "price": "23.2867"
-//        },
-//        {
-//            "symbol": "SOLUSDT",
-//                "price": "19.74000000"
-//        },
-//        {
-//            "symbol": "LINKBTC",
-//                "price": "0.00025220"
-//        },
-//        {
-//            "symbol": "VETBTC",
-//                "price": "0.00000081"
-//        },
-//        {
-//            "symbol": "UNIBTC",
-//                "price": "0.00020780"
-//        },
-//        {
-//            "symbol": "EGLDUSDT",
-//                "price": "40.62000000"
-//        },
-//        {
-//            "symbol": "EGLDUSD4",
-//                "price": "44.9190"
-//        },
-//        {
-//            "symbol": "PAXGUSDT",
-//                "price": "1954.00000000"
-//        },
-//        {
-//            "symbol": "PAXGUSD4",
-//                "price": "1860.1300"
-//        },
-//        {
-//            "symbol": "OXTUSDT",
-//                "price": "0.08340000"
-//        },
-//        {
-//            "symbol": "OXTUSD4",
-//                "price": "0.0967"
-//        },
-//        {
-//            "symbol": "ZENUSDT",
-//                "price": "9.74000000"
-//        },
-//        {
-//            "symbol": "ZENUSD4",
-//                "price": "10.3240"
-//        },
-//        {
-//            "symbol": "BTCUSDC",
-//                "price": "27028.75000000"
-//        },
-//        {
-//            "symbol": "ONEBUSD",
-//                "price": "0.01927000"
-//        },
-//        {
-//            "symbol": "FILUSDT",
-//                "price": "5.26900000"
-//        },
-//        {
-//            "symbol": "FILUSD4",
-//                "price": "5.2700"
-//        },
-//        {
-//            "symbol": "AAVEUSDT",
-//                "price": "69.70000000"
-//        },
-//        {
-//            "symbol": "AAVEUSD4",
-//                "price": "85.6100"
-//        },
-//        {
-//            "symbol": "GRTUSDT",
-//                "price": "0.13070000"
-//        },
-//        {
-//            "symbol": "GRTUSD4",
-//                "price": "0.1292"
-//        },
-//        {
-//            "symbol": "SUSHIUSD4",
-//                "price": "1.4250"
-//        },
-//        {
-//            "symbol": "ANKRUSD4",
-//                "price": "0.0285"
-//        },
-//        {
-//            "symbol": "AMPUSD",
-//                "price": "0.0081"
-//        },
-//        {
-//            "symbol": "SHIBUSDT",
-//                "price": "0.00001030"
-//        },
-//        {
-//            "symbol": "SHIBBUSD",
-//                "price": "0.00001029"
-//        },
-//        {
-//            "symbol": "CRVUSDT",
-//                "price": "0.88800000"
-//        },
-//        {
-//            "symbol": "CRVUSD4",
-//                "price": "1.0470"
-//        },
-//        {
-//            "symbol": "AXSUSDT",
-//                "price": "7.97000000"
-//        },
-//        {
-//            "symbol": "AXSUSD4",
-//                "price": "10.9900"
-//        },
-//        {
-//            "symbol": "SOLBTC",
-//                "price": "0.00073010"
-//        },
-//        {
-//            "symbol": "AVAXUSDT",
-//                "price": "16.41000000"
-//        },
-//        {
-//            "symbol": "AVAXUSD4",
-//                "price": "19.9500"
-//        },
-//        {
-//            "symbol": "CTSIUSDT",
-//                "price": "0.13580000"
-//        },
-//        {
-//            "symbol": "CTSIUSD4",
-//                "price": "0.1616"
-//        },
-//        {
-//            "symbol": "DOTUSDT",
-//                "price": "5.82200000"
-//        },
-//        {
-//            "symbol": "DOTUSD4",
-//                "price": "6.6600"
-//        },
-//        {
-//            "symbol": "YFIUSDT",
-//                "price": "8044.00000000"
-//        },
-//        {
-//            "symbol": "YFIUSD4",
-//                "price": "7598.8400"
-//        },
-//        {
-//            "symbol": "1INCHUSDT",
-//                "price": "0.48500000"
-//        },
-//        {
-//            "symbol": "1INCHUSD4",
-//                "price": "0.5740"
-//        },
-//        {
-//            "symbol": "FTMUSDT",
-//                "price": "0.41370000"
-//        },
-//        {
-//            "symbol": "FTMUSD4",
-//                "price": "0.5577"
-//        },
-//        {
-//            "symbol": "USDCUSDT",
-//                "price": "0.99870000"
-//        },
-//        {
-//            "symbol": "ETHUSDC",
-//                "price": "1710.67000000"
-//        },
-//        {
-//            "symbol": "USDCBUSD",
-//                "price": "0.99950000"
-//        },
-//        {
-//            "symbol": "MATICUSDT",
-//                "price": "1.03640000"
-//        },
-//        {
-//            "symbol": "MANAUSDT",
-//                "price": "0.55880000"
-//        },
-//        {
-//            "symbol": "MANABUSD",
-//                "price": "0.56510000"
-//        },
-//        {
-//            "symbol": "ALGOUSDT",
-//                "price": "0.19850000"
-//        },
-//        {
-//            "symbol": "ADABUSD",
-//                "price": "0.34290000"
-//        },
-//        {
-//            "symbol": "SOLBUSD",
-//                "price": "19.91000000"
-//        },
-//        {
-//            "symbol": "LINKUSDT",
-//                "price": "6.84300000"
-//        },
-//        {
-//            "symbol": "EOSUSDT",
-//                "price": "1.09200000"
-//        },
-//        {
-//            "symbol": "ZECUSDT",
-//                "price": "35.10000000"
-//        },
-//        {
-//            "symbol": "ENJUSDT",
-//                "price": "0.36550000"
-//        },
-//        {
-//            "symbol": "NEARUSDT",
-//                "price": "1.82900000"
-//        },
-//        {
-//            "symbol": "NEARBUSD",
-//                "price": "1.82900000"
-//        },
-//        {
-//            "symbol": "NEARUSD4",
-//                "price": "2.3770"
-//        },
-//        {
-//            "symbol": "OMGUSDT",
-//                "price": "1.73900000"
-//        },
-//        {
-//            "symbol": "SUSHIUSDT",
-//                "price": "0.99800000"
-//        },
-//        {
-//            "symbol": "LRCUSDT",
-//                "price": "0.34020000"
-//        },
-//        {
-//            "symbol": "LRCUSD4",
-//                "price": "0.3718"
-//        },
-//        {
-//            "symbol": "LRCBTC",
-//                "price": "0.00001238"
-//        },
-//        {
-//            "symbol": "KSHIBUSD4",
-//                "price": "0.0144"
-//        },
-//        {
-//            "symbol": "LPTUSDT",
-//                "price": "6.42000000"
-//        },
-//        {
-//            "symbol": "LPTBUSD",
-//                "price": "6.59000000"
-//        },
-//        {
-//            "symbol": "LPTUSD4",
-//                "price": "8.7800"
-//        },
-//        {
-//            "symbol": "POLYUSDT",
-//                "price": "0.26240000"
-//        },
-//        {
-//            "symbol": "POLYBUSD",
-//                "price": "0.26400000"
-//        },
-//        {
-//            "symbol": "POLYUSD",
-//                "price": "0.2628"
-//        },
-//        {
-//            "symbol": "POLYBTC",
-//                "price": "0.00001360"
-//        },
-//        {
-//            "symbol": "MATICBTC",
-//                "price": "0.00003841"
-//        },
-//        {
-//            "symbol": "DOTBTC",
-//                "price": "0.00021550"
-//        },
-//        {
-//            "symbol": "NMRUSDT",
-//                "price": "17.84000000"
-//        },
-//        {
-//            "symbol": "NMRUSD4",
-//                "price": "21.3500"
-//        },
-//        {
-//            "symbol": "SLPUSDT",
-//                "price": "0.00256300"
-//        },
-//        {
-//            "symbol": "SLPUSD4",
-//                "price": "0.0032"
-//        },
-//        {
-//            "symbol": "ANTUSDT",
-//                "price": "2.22000000"
-//        },
-//        {
-//            "symbol": "ANTUSD4",
-//                "price": "2.8640"
-//        },
-//        {
-//            "symbol": "XNOUSD4",
-//                "price": "0.8450"
-//        },
-//        {
-//            "symbol": "CHZUSDT",
-//                "price": "0.11190000"
-//        },
-//        {
-//            "symbol": "CHZUSD4",
-//                "price": "0.1396"
-//        },
-//        {
-//            "symbol": "OGNUSDT",
-//                "price": "0.10630000"
-//        },
-//        {
-//            "symbol": "OGNUSD4",
-//                "price": "0.1298"
-//        },
-//        {
-//            "symbol": "GALAUSDT",
-//                "price": "0.03729000"
-//        },
-//        {
-//            "symbol": "GALAUSD4",
-//                "price": "0.0528"
-//        },
-//        {
-//            "symbol": "TLMUSDT",
-//                "price": "0.01811000"
-//        },
-//        {
-//            "symbol": "TLMUSD4",
-//                "price": "0.0235"
-//        },
-//        {
-//            "symbol": "SNXUSDT",
-//                "price": "2.31700000"
-//        },
-//        {
-//            "symbol": "SNXUSD4",
-//                "price": "2.5310"
-//        },
-//        {
-//            "symbol": "AUDIOUSDT",
-//                "price": "0.25780000"
-//        },
-//        {
-//            "symbol": "AUDIOUSD4",
-//                "price": "0.2640"
-//        },
-//        {
-//            "symbol": "ENSUSDT",
-//                "price": "12.68000000"
-//        },
-//        {
-//            "symbol": "MANABTC",
-//                "price": "0.00002074"
-//        },
-//        {
-//            "symbol": "ATOMBTC",
-//                "price": "0.00039930"
-//        },
-//        {
-//            "symbol": "AVAXBTC",
-//                "price": "0.00060880"
-//        },
-//        {
-//            "symbol": "WBTCBTC",
-//                "price": "1.00110000"
-//        },
-//        {
-//            "symbol": "REQUSDT",
-//                "price": "0.09230000"
-//        },
-//        {
-//            "symbol": "REQUSD4",
-//                "price": "0.1085"
-//        },
-//        {
-//            "symbol": "APEUSDT",
-//                "price": "3.87200000"
-//        },
-//        {
-//            "symbol": "APEUSD4",
-//                "price": "5.6927"
-//        },
-//        {
-//            "symbol": "FLUXUSDT",
-//                "price": "0.60000000"
-//        },
-//        {
-//            "symbol": "FLUXUSD4",
-//                "price": "0.9050"
-//        },
-//        {
-//            "symbol": "TRXBTC",
-//                "price": "0.00000234"
-//        },
-//        {
-//            "symbol": "TRXBUSD",
-//                "price": "0.06404000"
-//        },
-//        {
-//            "symbol": "TRXUSDT",
-//                "price": "0.06324000"
-//        },
-//        {
-//            "symbol": "TRXUSD4",
-//                "price": "0.0637"
-//        },
-//        {
-//            "symbol": "COTIUSDT",
-//                "price": "0.07040000"
-//        },
-//        {
-//            "symbol": "COTIUSD4",
-//                "price": "0.0985"
-//        },
-//        {
-//            "symbol": "VOXELUSDT",
-//                "price": "0.23230000"
-//        },
-//        {
-//            "symbol": "VOXELUSD4",
-//                "price": "0.3344"
-//        },
-//        {
-//            "symbol": "RLCUSDT",
-//                "price": "1.65500000"
-//        },
-//        {
-//            "symbol": "RLCUSD4",
-//                "price": "1.9810"
-//        },
-//        {
-//            "symbol": "USTUSDT",
-//                "price": "0.00650000"
-//        },
-//        {
-//            "symbol": "USTUSD",
-//                "price": "0.0068"
-//        },
-//        {
-//            "symbol": "BICOUSDT",
-//                "price": "0.35100000"
-//        },
-//        {
-//            "symbol": "BICOUSD4",
-//                "price": "0.3850"
-//        },
-//        {
-//            "symbol": "API3USDT",
-//                "price": "1.46600000"
-//        },
-//        {
-//            "symbol": "API3USD4",
-//                "price": "1.7070"
-//        },
-//        {
-//            "symbol": "ENSUSD4",
-//                "price": "15.0700"
-//        },
-//        {
-//            "symbol": "BTCUST",
-//                "price": "1000000.00000000"
-//        },
-//        {
-//            "symbol": "BNTUSDT",
-//                "price": "0.55200000"
-//        },
-//        {
-//            "symbol": "BNTUSD4",
-//                "price": "0.4480"
-//        },
-//        {
-//            "symbol": "IMXUSDT",
-//                "price": "1.01100000"
-//        },
-//        {
-//            "symbol": "IMXUSD4",
-//                "price": "0.8810"
-//        },
-//        {
-//            "symbol": "SPELLUSDT",
-//                "price": "0.00065490"
-//        },
-//        {
-//            "symbol": "SPELLUSD4",
-//                "price": "0.0009"
-//        },
-//        {
-//            "symbol": "JASMYUSDT",
-//                "price": "0.00496200"
-//        },
-//        {
-//            "symbol": "JASMYUSD4",
-//                "price": "0.0068"
-//        },
-//        {
-//            "symbol": "FLOWUSDT",
-//                "price": "0.90900000"
-//        },
-//        {
-//            "symbol": "FLOWUSD4",
-//                "price": "1.1100"
-//        },
-//        {
-//            "symbol": "GTCUSDT",
-//                "price": "1.96500000"
-//        },
-//        {
-//            "symbol": "GTCUSD4",
-//                "price": "2.0620"
-//        },
-//        {
-//            "symbol": "THETAUSDT",
-//                "price": "0.95800000"
-//        },
-//        {
-//            "symbol": "THETAUSD4",
-//                "price": "1.0900"
-//        },
-//        {
-//            "symbol": "TFUELUSDT",
-//                "price": "0.04970000"
-//        },
-//        {
-//            "symbol": "TFUELUSD4",
-//                "price": "0.0567"
-//        },
-//        {
-//            "symbol": "OCEANUSDT",
-//                "price": "0.32920000"
-//        },
-//        {
-//            "symbol": "OCEANUSD4",
-//                "price": "0.4314"
-//        },
-//        {
-//            "symbol": "LAZIOUSDT",
-//                "price": "2.50400000"
-//        },
-//        {
-//            "symbol": "LAZIOUSD4",
-//                "price": "3.4410"
-//        },
-//        {
-//            "symbol": "SANTOSUSDT",
-//                "price": "4.08700000"
-//        },
-//        {
-//            "symbol": "SANTOSUSD4",
-//                "price": "5.6920"
-//        },
-//        {
-//            "symbol": "ALPINEUSDT",
-//                "price": "2.08910000"
-//        },
-//        {
-//            "symbol": "ALPINEUSD4",
-//                "price": "2.7805"
-//        },
-//        {
-//            "symbol": "PORTOUSDT",
-//                "price": "2.22630000"
-//        },
-//        {
-//            "symbol": "PORTOUSD4",
-//                "price": "3.0457"
-//        },
-//        {
-//            "symbol": "RENUSDT",
-//                "price": "0.09592300"
-//        },
-//        {
-//            "symbol": "RENUSD4",
-//                "price": "0.1011"
-//        },
-//        {
-//            "symbol": "CELRUSDT",
-//                "price": "0.02746000"
-//        },
-//        {
-//            "symbol": "CELRUSD4",
-//                "price": "0.0196"
-//        },
-//        {
-//            "symbol": "SKLUSDT",
-//                "price": "0.03717000"
-//        },
-//        {
-//            "symbol": "SKLUSD4",
-//                "price": "0.0384"
-//        },
-//        {
-//            "symbol": "VITEUSDT",
-//                "price": "0.02215000"
-//        },
-//        {
-//            "symbol": "VITEUSD4",
-//                "price": "0.0254"
-//        },
-//        {
-//            "symbol": "WAXPUSDT",
-//                "price": "0.06400000"
-//        },
-//        {
-//            "symbol": "WAXPUSD4",
-//                "price": "0.0799"
-//        },
-//        {
-//            "symbol": "LTOUSDT",
-//                "price": "0.10120000"
-//        },
-//        {
-//            "symbol": "LTOUSD4",
-//                "price": "0.1039"
-//        },
-//        {
-//            "symbol": "FETUSDT",
-//                "price": "0.33870000"
-//        },
-//        {
-//            "symbol": "FETUSD4",
-//                "price": "0.4293"
-//        },
-//        {
-//            "symbol": "BONDUSDT",
-//                "price": "3.99500000"
-//        },
-//        {
-//            "symbol": "BONDUSD4",
-//                "price": "4.5100"
-//        },
-//        {
-//            "symbol": "LOKAUSDT",
-//                "price": "0.48000000"
-//        },
-//        {
-//            "symbol": "LOKAUSD4",
-//                "price": "0.7049"
-//        },
-//        {
-//            "symbol": "ICPUSDT",
-//                "price": "4.70300000"
-//        },
-//        {
-//            "symbol": "ICPUSD4",
-//                "price": "5.7000"
-//        },
-//        {
-//            "symbol": "TUSDT",
-//                "price": "0.03839000"
-//        },
-//        {
-//            "symbol": "TUSD4",
-//                "price": "0.0437"
-//        },
-//        {
-//            "symbol": "OPUSDT",
-//                "price": "2.04400000"
-//        },
-//        {
-//            "symbol": "OPUSD4",
-//                "price": "2.8290"
-//        },
-//        {
-//            "symbol": "ROSEUSDT",
-//                "price": "0.05331000"
-//        },
-//        {
-//            "symbol": "ROSEUSD4",
-//                "price": "0.0546"
-//        },
-//        {
-//            "symbol": "CELOUSDT",
-//                "price": "0.56200000"
-//        },
-//        {
-//            "symbol": "CELOUSD4",
-//                "price": "0.7990"
-//        },
-//        {
-//            "symbol": "KDAUSDT",
-//                "price": "0.90900000"
-//        },
-//        {
-//            "symbol": "KDAUSD4",
-//                "price": "1.1670"
-//        },
-//        {
-//            "symbol": "KSMUSDT",
-//                "price": "31.41000000"
-//        },
-//        {
-//            "symbol": "KSMUSD4",
-//                "price": "35.8000"
-//        },
-//        {
-//            "symbol": "ACHUSDT",
-//                "price": "0.03099000"
-//        },
-//        {
-//            "symbol": "ACHUSD4",
-//                "price": "0.0190"
-//        },
-//        {
-//            "symbol": "DARUSDT",
-//                "price": "0.16551000"
-//        },
-//        {
-//            "symbol": "DARUSD4",
-//                "price": "0.2487"
-//        },
-//        {
-//            "symbol": "RNDRUSDT",
-//                "price": "1.13100000"
-//        },
-//        {
-//            "symbol": "RNDRUSD4",
-//                "price": "1.8850"
-//        },
-//        {
-//            "symbol": "SYSUSDT",
-//                "price": "0.15800000"
-//        },
-//        {
-//            "symbol": "SYSUSD4",
-//                "price": "0.1694"
-//        },
-//        {
-//            "symbol": "RADUSDT",
-//                "price": "2.23400000"
-//        },
-//        {
-//            "symbol": "RADUSD4",
-//                "price": "1.9200"
-//        },
-//        {
-//            "symbol": "ILVUSDT",
-//                "price": "58.67000000"
-//        },
-//        {
-//            "symbol": "ILVUSD4",
-//                "price": "91.6000"
-//        },
-//        {
-//            "symbol": "LDOUSDT",
-//                "price": "2.09800000"
-//        },
-//        {
-//            "symbol": "LDOUSD4",
-//                "price": "2.0470"
-//        },
-//        {
-//            "symbol": "RAREUSDT",
-//                "price": "0.11300000"
-//        },
-//        {
-//            "symbol": "RAREUSD4",
-//                "price": "0.1560"
-//        },
-//        {
-//            "symbol": "LSKUSDT",
-//                "price": "1.01000000"
-//        },
-//        {
-//            "symbol": "LSKUSD4",
-//                "price": "1.3990"
-//        },
-//        {
-//            "symbol": "DGBUSDT",
-//                "price": "0.00931000"
-//        },
-//        {
-//            "symbol": "DGBUSD4",
-//                "price": "0.0107"
-//        },
-//        {
-//            "symbol": "REEFUSDT",
-//                "price": "0.00247600"
-//        },
-//        {
-//            "symbol": "REEFUSD4",
-//                "price": "0.0034"
-//        },
-//        {
-//            "symbol": "SRMUSDT",
-//                "price": "0.16201000"
-//        },
-//        {
-//            "symbol": "SRMUSD",
-//                "price": "0.1772"
-//        },
-//        {
-//            "symbol": "ALICEUSDT",
-//                "price": "1.40400000"
-//        },
-//        {
-//            "symbol": "ALICEUSD4",
-//                "price": "1.8010"
-//        },
-//        {
-//            "symbol": "FORTHUSDT",
-//                "price": "3.20000000"
-//        },
-//        {
-//            "symbol": "FORTHUSD4",
-//                "price": "3.6600"
-//        },
-//        {
-//            "symbol": "ASTRUSDT",
-//                "price": "0.05920000"
-//        },
-//        {
-//            "symbol": "ASTRUSD4",
-//                "price": "0.0541"
-//        },
-//        {
-//            "symbol": "BTRSTUSDT",
-//                "price": "0.83200000"
-//        },
-//        {
-//            "symbol": "BTRSTUSD4",
-//                "price": "1.0830"
-//        },
-//        {
-//            "symbol": "GALUSDT",
-//                "price": "1.57200000"
-//        },
-//        {
-//            "symbol": "GALUSD4",
-//                "price": "2.3040"
-//        },
-//        {
-//            "symbol": "SANDUSDT",
-//                "price": "0.58610000"
-//        },
-//        {
-//            "symbol": "SANDUSD4",
-//                "price": "0.7269"
-//        },
-//        {
-//            "symbol": "BALUSDT",
-//                "price": "6.54300000"
-//        },
-//        {
-//            "symbol": "BALUSD4",
-//                "price": "6.8690"
-//        },
-//        {
-//            "symbol": "POLYXUSD4",
-//                "price": "0.2063"
-//        },
-//        {
-//            "symbol": "GLMUSDT",
-//                "price": "0.22210000"
-//        },
-//        {
-//            "symbol": "GLMUSD4",
-//                "price": "0.2611"
-//        },
-//        {
-//            "symbol": "CLVUSDT",
-//                "price": "0.05993000"
-//        },
-//        {
-//            "symbol": "CLVUSD4",
-//                "price": "0.0759"
-//        },
-//        {
-//            "symbol": "TUSDUSDT",
-//                "price": "0.99890000"
-//        },
-//        {
-//            "symbol": "TUSDUSD4",
-//                "price": "1.0004"
-//        },
-//        {
-//            "symbol": "QNTUSDT",
-//                "price": "118.70000000"
-//        },
-//        {
-//            "symbol": "QNTUSD4",
-//                "price": "138.0000"
-//        },
-//        {
-//            "symbol": "STGUSDT",
-//                "price": "0.62700000"
-//        },
-//        {
-//            "symbol": "STGUSD4",
-//                "price": "0.7365"
-//        },
-//        {
-//            "symbol": "AXLUSDT",
-//                "price": "0.59500000"
-//        },
-//        {
-//            "symbol": "AXLUSD4",
-//                "price": "0.6030"
-//        },
-//        {
-//            "symbol": "KAVAUSDT",
-//                "price": "0.84100000"
-//        },
-//        {
-//            "symbol": "KAVAUSD4",
-//                "price": "0.9670"
-//        },
-//        {
-//            "symbol": "APTUSDT",
-//                "price": "10.98080000"
-//        },
-//        {
-//            "symbol": "APTUSD4",
-//                "price": "14.7068"
-//        },
-//        {
-//            "symbol": "MASKUSDT",
-//                "price": "5.71100000"
-//        },
-//        {
-//            "symbol": "MASKUSD4",
-//                "price": "4.4650"
-//        },
-//        {
-//            "symbol": "BOSONUSDT",
-//                "price": "0.23240000"
-//        },
-//        {
-//            "symbol": "BOSONUSD4",
-//                "price": "0.2539"
-//        },
-//        {
-//            "symbol": "PONDUSDT",
-//                "price": "0.00916000"
-//        },
-//        {
-//            "symbol": "PONDUSD4",
-//                "price": "0.0110"
-//        },
-//        {
-//            "symbol": "SOLUSDC",
-//                "price": "19.76000000"
-//        },
-//        {
-//            "symbol": "ADAUSDC",
-//                "price": "0.33960000"
-//        },
-//        {
-//            "symbol": "MXCUSDT",
-//                "price": "0.01904000"
-//        },
-//        {
-//            "symbol": "MXCUSD4",
-//                "price": "0.0310"
-//        },
-//        {
-//            "symbol": "JAMUSDT",
-//                "price": "0.00250100"
-//        },
-//        {
-//            "symbol": "JAMUSD4",
-//                "price": "0.0030"
-//        },
-//        {
-//            "symbol": "TRACUSDT",
-//                "price": "0.40950000"
-//        },
-//        {
-//            "symbol": "PROMUSDT",
-//                "price": "4.69000000"
-//        },
-//        {
-//            "symbol": "PROMUSD4",
-//                "price": "4.8600"
-//        },
-//        {
-//            "symbol": "DIAUSDT",
-//                "price": "0.36100000"
-//        },
-//        {
-//            "symbol": "DIAUSD4",
-//                "price": "0.4230"
-//        },
-//        {
-//            "symbol": "BTCDAI",
-//                "price": "27015.40000000"
-//        },
-//        {
-//            "symbol": "ETHDAI",
-//                "price": "1728.57000000"
-//        },
-//        {
-//            "symbol": "ADAETH",
-//                "price": "0.00019900"
-//        },
-//        {
-//            "symbol": "DOGEBTC",
-//                "price": "0.00000267"
-//        },
-//        {
-//            "symbol": "LOOMUSDT",
-//                "price": "0.06409000"
-//        },
-//        {
-//            "symbol": "LOOMUSD4",
-//                "price": "0.0541"
-//        },
-//        {
-//            "symbol": "STMXUSDT",
-//                "price": "0.00526100"
-//        },
-//        {
-//            "symbol": "BTCUSD",
-//                "price": "27033.54000000"
-//        },
-//        {
-//            "symbol": "ETHUSD",
-//                "price": "1711.67000000"
-//        },
-//        {
-//            "symbol": "BCHUSD",
-//                "price": "119.40000000"
-//        },
-//        {
-//            "symbol": "LTCUSD",
-//                "price": "88.36000000"
-//        },
-//        {
-//            "symbol": "USDTUSD",
-//                "price": "1.00070000"
-//        },
-//        {
-//            "symbol": "BNBUSD",
-//                "price": "307.90000000"
-//        },
-//        {
-//            "symbol": "ADAUSD",
-//                "price": "0.34160000"
-//        },
-//        {
-//            "symbol": "BATUSD",
-//                "price": "0.23630000"
-//        },
-//        {
-//            "symbol": "ETCUSD",
-//                "price": "19.34000000"
-//        },
-//        {
-//            "symbol": "XLMUSD",
-//                "price": "0.09130000"
-//        },
-//        {
-//            "symbol": "ZRXUSD",
-//                "price": "0.21460000"
-//        },
-//        {
-//            "symbol": "LINKUSD",
-//                "price": "6.85300000"
-//        },
-//        {
-//            "symbol": "RVNUSD",
-//                "price": "0.02390000"
-//        },
-//        {
-//            "symbol": "DASHUSD",
-//                "price": "55.49000000"
-//        },
-//        {
-//            "symbol": "ZECUSD",
-//                "price": "35.20000000"
-//        },
-//        {
-//            "symbol": "ALGOUSD",
-//                "price": "0.19900000"
-//        },
-//        {
-//            "symbol": "IOTAUSD",
-//                "price": "0.19690000"
-//        },
-//        {
-//            "symbol": "BUSDUSD",
-//                "price": "0.99950000"
-//        },
-//        {
-//            "symbol": "WAVESUSD",
-//                "price": "2.01600000"
-//        },
-//        {
-//            "symbol": "ATOMUSD",
-//                "price": "10.83500000"
-//        },
-//        {
-//            "symbol": "NEOUSD",
-//                "price": "11.97100000"
-//        },
-//        {
-//            "symbol": "QTUMUSD",
-//                "price": "2.97800000"
-//        },
-//        {
-//            "symbol": "ICXUSD",
-//                "price": "0.19880000"
-//        },
-//        {
-//            "symbol": "ENJUSD",
-//                "price": "0.36510000"
-//        },
-//        {
-//            "symbol": "ONTUSD",
-//                "price": "0.21500000"
-//        },
-//        {
-//            "symbol": "ZILUSD",
-//                "price": "0.02560000"
-//        },
-//        {
-//            "symbol": "VETUSD",
-//                "price": "0.02185000"
-//        },
-//        {
-//            "symbol": "XTZUSD",
-//                "price": "1.06830000"
-//        },
-//        {
-//            "symbol": "HBARUSD",
-//                "price": "0.05790000"
-//        },
-//        {
-//            "symbol": "OMGUSD",
-//                "price": "1.73800000"
-//        },
-//        {
-//            "symbol": "MATICUSD",
-//                "price": "1.04000000"
-//        },
-//        {
-//            "symbol": "EOSUSD",
-//                "price": "1.07860000"
-//        },
-//        {
-//            "symbol": "DOGEUSD",
-//                "price": "0.07230000"
-//        },
-//        {
-//            "symbol": "KNCUSD",
-//                "price": "0.65600000"
-//        },
-//        {
-//            "symbol": "VTHOUSD",
-//                "price": "0.00129300"
-//        },
-//        {
-//            "symbol": "USDCUSD",
-//                "price": "1.00000000"
-//        },
-//        {
-//            "symbol": "COMPUSD",
-//                "price": "40.54000000"
-//        },
-//        {
-//            "symbol": "MANAUSD",
-//                "price": "0.56160000"
-//        },
-//        {
-//            "symbol": "HNTUSD",
-//                "price": "1.28000000"
-//        },
-//        {
-//            "symbol": "MKRUSD",
-//                "price": "654.00000000"
-//        },
-//        {
-//            "symbol": "DAIUSD",
-//                "price": "1.00150000"
-//        },
-//        {
-//            "symbol": "ONEUSD",
-//                "price": "0.01910000"
-//        },
-//        {
-//            "symbol": "BANDUSD",
-//                "price": "1.63300000"
-//        },
-//        {
-//            "symbol": "STORJUSD",
-//                "price": "0.33490000"
-//        },
-//        {
-//            "symbol": "UNIUSD",
-//                "price": "5.62700000"
-//        },
-//        {
-//            "symbol": "SOLUSD",
-//                "price": "19.77000000"
-//        },
-//        {
-//            "symbol": "EGLDUSD",
-//                "price": "40.85000000"
-//        },
-//        {
-//            "symbol": "PAXGUSD",
-//                "price": "1958.00000000"
-//        },
-//        {
-//            "symbol": "OXTUSD",
-//                "price": "0.08310000"
-//        },
-//        {
-//            "symbol": "ZENUSD",
-//                "price": "9.76000000"
-//        },
-//        {
-//            "symbol": "FILUSD",
-//                "price": "5.29100000"
-//        },
-//        {
-//            "symbol": "AAVEUSD",
-//                "price": "69.60000000"
-//        },
-//        {
-//            "symbol": "GRTUSD",
-//                "price": "0.13170000"
-//        },
-//        {
-//            "symbol": "SUSHIUSD",
-//                "price": "1.00000000"
-//        },
-//        {
-//            "symbol": "ANKRUSD",
-//                "price": "0.03042000"
-//        },
-//        {
-//            "symbol": "CRVUSD",
-//                "price": "0.88300000"
-//        },
-//        {
-//            "symbol": "AXSUSD",
-//                "price": "7.94000000"
-//        },
-//        {
-//            "symbol": "AVAXUSD",
-//                "price": "16.41000000"
-//        },
-//        {
-//            "symbol": "CTSIUSD",
-//                "price": "0.13740000"
-//        },
-//        {
-//            "symbol": "DOTUSD",
-//                "price": "5.84000000"
-//        },
-//        {
-//            "symbol": "YFIUSD",
-//                "price": "8029.00000000"
-//        },
-//        {
-//            "symbol": "1INCHUSD",
-//                "price": "0.48800000"
-//        },
-//        {
-//            "symbol": "FTMUSD",
-//                "price": "0.41410000"
-//        },
-//        {
-//            "symbol": "NEARUSD",
-//                "price": "1.83500000"
-//        },
-//        {
-//            "symbol": "LRCUSD",
-//                "price": "0.33490000"
-//        },
-//        {
-//            "symbol": "KSHIBUSD",
-//                "price": "0.01350000"
-//        },
-//        {
-//            "symbol": "LPTUSD",
-//                "price": "6.41000000"
-//        },
-//        {
-//            "symbol": "NMRUSD",
-//                "price": "17.98000000"
-//        },
-//        {
-//            "symbol": "SLPUSD",
-//                "price": "0.00255100"
-//        },
-//        {
-//            "symbol": "ANTUSD",
-//                "price": "2.21900000"
-//        },
-//        {
-//            "symbol": "XNOUSD",
-//                "price": "0.87500000"
-//        },
-//        {
-//            "symbol": "CHZUSD",
-//                "price": "0.11310000"
-//        },
-//        {
-//            "symbol": "OGNUSD",
-//                "price": "0.10860000"
-//        },
-//        {
-//            "symbol": "GALAUSD",
-//                "price": "0.03732000"
-//        },
-//        {
-//            "symbol": "TLMUSD",
-//                "price": "0.01810000"
-//        },
-//        {
-//            "symbol": "SNXUSD",
-//                "price": "2.31600000"
-//        },
-//        {
-//            "symbol": "AUDIOUSD",
-//                "price": "0.25890000"
-//        },
-//        {
-//            "symbol": "REQUSD",
-//                "price": "0.09370000"
-//        },
-//        {
-//            "symbol": "APEUSD",
-//                "price": "3.87600000"
-//        },
-//        {
-//            "symbol": "FLUXUSD",
-//                "price": "0.60300000"
-//        },
-//        {
-//            "symbol": "TRXUSD",
-//                "price": "0.06324000"
-//        },
-//        {
-//            "symbol": "COTIUSD",
-//                "price": "0.07250000"
-//        },
-//        {
-//            "symbol": "VOXELUSD",
-//                "price": "0.23230000"
-//        },
-//        {
-//            "symbol": "RLCUSD",
-//                "price": "1.66200000"
-//        },
-//        {
-//            "symbol": "BICOUSD",
-//                "price": "0.35400000"
-//        },
-//        {
-//            "symbol": "API3USD",
-//                "price": "1.46100000"
-//        },
-//        {
-//            "symbol": "ENSUSD",
-//                "price": "12.72000000"
-//        },
-//        {
-//            "symbol": "BNTUSD",
-//                "price": "0.55600000"
-//        },
-//        {
-//            "symbol": "IMXUSD",
-//                "price": "1.01400000"
-//        },
-//        {
-//            "symbol": "SPELLUSD",
-//                "price": "0.00064940"
-//        },
-//        {
-//            "symbol": "JASMYUSD",
-//                "price": "0.00497800"
-//        },
-//        {
-//            "symbol": "FLOWUSD",
-//                "price": "0.91800000"
-//        },
-//        {
-//            "symbol": "GTCUSD",
-//                "price": "1.96800000"
-//        },
-//        {
-//            "symbol": "THETAUSD",
-//                "price": "0.96100000"
-//        },
-//        {
-//            "symbol": "TFUELUSD",
-//                "price": "0.05210000"
-//        },
-//        {
-//            "symbol": "OCEANUSD",
-//                "price": "0.32870000"
-//        },
-//        {
-//            "symbol": "LAZIOUSD",
-//                "price": "2.50920000"
-//        },
-//        {
-//            "symbol": "SANTOSUSD",
-//                "price": "4.17000000"
-//        },
-//        {
-//            "symbol": "ALPINEUSD",
-//                "price": "2.09480000"
-//        },
-//        {
-//            "symbol": "PORTOUSD",
-//                "price": "2.23160000"
-//        },
-//        {
-//            "symbol": "RENUSD",
-//                "price": "0.09713500"
-//        },
-//        {
-//            "symbol": "CELRUSD",
-//                "price": "0.02715000"
-//        },
-//        {
-//            "symbol": "SKLUSD",
-//                "price": "0.03716000"
-//        },
-//        {
-//            "symbol": "VITEUSD",
-//                "price": "0.02220000"
-//        },
-//        {
-//            "symbol": "WAXPUSD",
-//                "price": "0.06420000"
-//        },
-//        {
-//            "symbol": "LTOUSD",
-//                "price": "0.10490000"
-//        },
-//        {
-//            "symbol": "FETUSD",
-//                "price": "0.34000000"
-//        },
-//        {
-//            "symbol": "BONDUSD",
-//                "price": "3.94300000"
-//        },
-//        {
-//            "symbol": "LOKAUSD",
-//                "price": "0.47590000"
-//        },
-//        {
-//            "symbol": "ICPUSD",
-//                "price": "4.71300000"
-//        },
-//        {
-//            "symbol": "TUSD",
-//                "price": "0.03900000"
-//        },
-//        {
-//            "symbol": "OPUSD",
-//                "price": "2.05500000"
-//        },
-//        {
-//            "symbol": "ROSEUSD",
-//                "price": "0.05376000"
-//        },
-//        {
-//            "symbol": "CELOUSD",
-//                "price": "0.56800000"
-//        },
-//        {
-//            "symbol": "KDAUSD",
-//                "price": "0.91300000"
-//        },
-//        {
-//            "symbol": "KSMUSD",
-//                "price": "31.58000000"
-//        },
-//        {
-//            "symbol": "ACHUSD",
-//                "price": "0.03103000"
-//        },
-//        {
-//            "symbol": "DARUSD",
-//                "price": "0.16590000"
-//        },
-//        {
-//            "symbol": "RNDRUSD",
-//                "price": "1.14000000"
-//        },
-//        {
-//            "symbol": "SYSUSD",
-//                "price": "0.15680000"
-//        },
-//        {
-//            "symbol": "RADUSD",
-//                "price": "2.23500000"
-//        },
-//        {
-//            "symbol": "ILVUSD",
-//                "price": "58.50000000"
-//        },
-//        {
-//            "symbol": "LDOUSD",
-//                "price": "2.09600000"
-//        },
-//        {
-//            "symbol": "RAREUSD",
-//                "price": "0.11240000"
-//        },
-//        {
-//            "symbol": "LSKUSD",
-//                "price": "1.01100000"
-//        },
-//        {
-//            "symbol": "DGBUSD",
-//                "price": "0.00930000"
-//        },
-//        {
-//            "symbol": "REEFUSD",
-//                "price": "0.00245800"
-//        },
-//        {
-//            "symbol": "ALICEUSD",
-//                "price": "1.43600000"
-//        },
-//        {
-//            "symbol": "FORTHUSD",
-//                "price": "3.16000000"
-//        },
-//        {
-//            "symbol": "ASTRUSD",
-//                "price": "0.05900000"
-//        },
-//        {
-//            "symbol": "BTRSTUSD",
-//                "price": "0.92700000"
-//        },
-//        {
-//            "symbol": "GALUSD",
-//                "price": "1.57600000"
-//        },
-//        {
-//            "symbol": "SANDUSD",
-//                "price": "0.58990000"
-//        },
-//        {
-//            "symbol": "BALUSD",
-//                "price": "6.49500000"
-//        },
-//        {
-//            "symbol": "POLYXUSD",
-//                "price": "0.15480000"
-//        },
-//        {
-//            "symbol": "GLMUSD",
-//                "price": "0.22730000"
-//        },
-//        {
-//            "symbol": "CLVUSD",
-//                "price": "0.05998000"
-//        },
-//        {
-//            "symbol": "TUSDUSD",
-//                "price": "0.95090000"
-//        },
-//        {
-//            "symbol": "QNTUSD",
-//                "price": "118.60000000"
-//        },
-//        {
-//            "symbol": "STGUSD",
-//                "price": "0.62880000"
-//        },
-//        {
-//            "symbol": "AXLUSD",
-//                "price": "0.59500000"
-//        },
-//        {
-//            "symbol": "KAVAUSD",
-//                "price": "0.84400000"
-//        },
-//        {
-//            "symbol": "APTUSD",
-//                "price": "10.96950000"
-//        },
-//        {
-//            "symbol": "MASKUSD",
-//                "price": "5.68800000"
-//        },
-//        {
-//            "symbol": "BOSONUSD",
-//                "price": "0.22820000"
-//        },
-//        {
-//            "symbol": "PONDUSD",
-//                "price": "0.00919000"
-//        },
-//        {
-//            "symbol": "MXCUSD",
-//                "price": "0.01902000"
-//        },
-//        {
-//            "symbol": "JAMUSD",
-//                "price": "0.00272400"
-//        },
-//        {
-//            "symbol": "PROMUSD",
-//                "price": "4.69000000"
-//        },
-//        {
-//            "symbol": "DIAUSD",
-//                "price": "0.35700000"
-//        },
-//        {
-//            "symbol": "LOOMUSD",
-//                "price": "0.06541000"
-//        },
-//        {
-//            "symbol": "STMXUSD",
-//                "price": "0.00528500"
-//        },
-//        {
-//            "symbol": "SHIBUSD",
-//                "price": "0.00001034"
-//        },
-//        {
-//            "symbol": "TRACUSD",
-//                "price": "0.41700000"
-//        }
-//]
-
-        requestBuilder.uri(
-                URI.create("https://api.binance.us/api/v3/ticker/price")
-        );
-
-        HttpResponse<String> response =
-                client.send(
-                        requestBuilder.build(),
-                        HttpResponse.BodyHandlers.ofString()
-                );
-        System.out.println(response.statusCode());
-        System.out.println(response.body());
-
-        JsonNode json = OBJECT_MAPPER.readTree(response.body());
-        System.out.println(json);
-        ConcurrentHashMap<String, Double> prices=new ConcurrentHashMap<>();
-
-        for (JsonNode jsonNode : json) {
-            System.out.println(jsonNode.get("symbol").asText());
-            System.out.println(jsonNode.get("price").asText());
-           prices.put(jsonNode.get("symbol").asText(), Double.valueOf(jsonNode.get("price").asText()));
-        }
-        System.out.println(prices);
-        System.out.println(prices.size());
-        return prices;
-
-    }
     public String getApi_key() {
         return api_key;
     }
@@ -3222,7 +1216,7 @@ public class BinanceUs extends Exchange {
         //  ,{"symbol":"RNDRUSDT","status":"TRADING","baseAsset":"RNDR","baseAssetPrecision":8,"quoteAsset":"USDT","quotePrecision":8,"quoteAssetPrecision":8,"baseCommissionPrecision":8,"quoteCommissionPrecision":8,"orderTypes":["LIMIT","LIMIT_MAKER","MARKET","STOP_LOSS_LIMIT","TAKE_PROFIT_LIMIT"],"icebergAllowed":true,"ocoAllowed":true,"quoteOrderQtyMarketAllowed":true,"allowTrailingStop":true,"cancelReplaceAllowed":true,"isSpotTradingAllowed":true,"isMarginTradingAllowed":false,"filters":[{"filterType":"PRICE_FILTER","minPrice":"0.00100000","maxPrice":"1000.00000000","tickSize":"0.00100000"}
 
 
-        File file = null;
+        File file;
         try {
 
 
@@ -3247,8 +1241,6 @@ public class BinanceUs extends Exchange {
 
         ObjectMapper mapper = new ObjectMapper();
         for (JsonNode jsonNode : mapper.readTree(response.body()).get("symbols")) {
-            // System.out.println(jsonNode.get("symbols").asText());
-            //  System.out.println(jsonNode.get("status").asText());
             System.out.println(jsonNode.get("baseAsset").asText());
             System.out.println(jsonNode.get("baseAssetPrecision").asText());
             System.out.println(jsonNode.get("quoteAsset").asText());
@@ -3361,11 +1353,11 @@ public class BinanceUs extends Exchange {
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText(null);
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message(
+                    Alert.AlertType.ERROR.name(),
+
+                    response.body()
+            );
         }
     }
 
@@ -3385,13 +1377,11 @@ public class BinanceUs extends Exchange {
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText(null);
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message(
+                    Alert.AlertType.ERROR.name(),
+                    response.body()
+            );
         }
-
     }
 
     @Override
@@ -3435,7 +1425,6 @@ public class BinanceUs extends Exchange {
         System.out.println(json);
 
         ObjectMapper mapper = new ObjectMapper();
-        Set<TradePair> tradePairs = new HashSet<>();
         List<String> data = new ArrayList<>();
         for (JsonNode jsonNode : mapper.readTree(response.body()).get("symbols")) {
             // System.out.println(jsonNode.get("symbols").asText());
@@ -3572,12 +1561,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
-            alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText(null);
-
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message("error", response.body().split("\n")[0]);
         }
         return null;
 
@@ -3586,7 +1570,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     @Override
     public Account getAccounts() throws IOException, InterruptedException {
 
-        String uriStr = "https://api.binance.us/api/v3/accounts";
+        String uriStr = "https://api.binance.us/api/v3/account";
         requestBuilder.uri(URI.create(uriStr));
         requestBuilder.GET();
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
@@ -3611,22 +1595,84 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
 
     @Override
     public void getPositionBook(TradePair tradePair) throws IOException, InterruptedException {
+        String uriStr = "https://api.binance.us/api/v3/depth";
+        requestBuilder.uri(URI.create(uriStr));
+        requestBuilder.GET();
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        JSONObject jsonObject;
+
+        if (response.statusCode() == 200) {
+            jsonObject = new JSONObject(response.body());
+            System.out.println(jsonObject.toString(4));
+            return;
+        } else {
+            System.out.println(response.statusCode());
+            System.out.println(response.body());
+            new Message("error", response.body());
+        }
 
     }
 
     @Override
-    public void getOpenOrder(TradePair tradePair) {
+    public void getOpenOrder(TradePair tradePair) throws IOException, InterruptedException {
+        String uriStr = "https://api.binance.us/api/v3/openOrders";
+        requestBuilder.uri(URI.create(uriStr));
+        requestBuilder.GET();
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        JSONObject jsonObject;
+
+        if (response.statusCode() == 200) {
+            jsonObject = new JSONObject(response.body());
+            System.out.println(jsonObject.toString(4));
+            return;
+        } else {
+            System.out.println(response.statusCode());
+            System.out.println(response.body());
+            new Message("error", response.body());
+        }
 
     }
 
     @Override
     public void getOrderHistory(TradePair tradePair) throws IOException, InterruptedException {
+        String uriStr = "https://api.binance.us/api/v3/orderHistory";
+        requestBuilder.uri(URI.create(uriStr));
+        requestBuilder.GET();
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        JSONObject jsonObject;
+
+        if (response.statusCode() == 200) {
+            jsonObject = new JSONObject(response.body());
+            System.out.println(jsonObject.toString(4));
+            return;
+        } else {
+            System.out.println(response.statusCode());
+            System.out.println(response.body());
+            new Message("error", response.body());
+        }
 
     }
 
     @Override
-    public List<Order> getPendingOrders() {
+    public List<Order> getPendingOrders() throws IOException, InterruptedException {
+        String uriStr = "https://api.binance.us/api/v3/pendingOrders";
+        requestBuilder.uri(URI.create(uriStr));
+        requestBuilder.GET();
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        JSONObject jsonObject;
+
+        if (response.statusCode() == 200) {
+            jsonObject = new JSONObject(response.body());
+            System.out.println(jsonObject.toString(4));
+            return null;
+        } else {
+            System.out.println(response.statusCode());
+            System.out.println(response.body());
+            new Message("error", response.body());
+        }
+
         return null;
+
     }
 
 
@@ -3788,11 +1834,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText(null);
-            alert.setContentText(response.body());
-            alert.showAndWait();
+            new Message("error", response.body());
             return null;
         }
 
@@ -3857,13 +1899,45 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         String url = "https://api.binance.us/api/v3/";
 
         BinanceUsCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+            super(300, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         }
 
 
         @Override
-        public List<CandleData> getCandleData() {
-            return new ArrayList<>();
+        public List<CandleData> getCandleData() throws IOException, InterruptedException {
+            List<CandleData> candles = new ArrayList<>();
+
+
+            requestBuilder.uri(URI.create(url + "klines?symbol=" + tradePair.toString('/')));
+            requestBuilder.GET();
+            HttpResponse<String> response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            JsonNode json = OBJECT_MAPPER.readTree(response.body());
+            System.out.println(json);
+            System.out.println(json.get("klines").toString());
+            System.out.println(json.get("time").toString());
+
+
+            for (int i = 0; i < json.get("klines").size(); i++) {
+                JSONObject obj = new JSONObject(json.get("klines").get(i).toString());
+                CandleData candle = new CandleData(
+
+                        obj.getDouble("open"),
+                        obj.getDouble("high"),
+                        obj.getDouble("low"),
+                        obj.getDouble("close"),
+                        obj.getInt("time"),
+
+                        obj.getInt("volume")
+                );
+                System.out.println(candle);
+                candles.add(candle);
+            }
+
+
+            return candles;
         }
 
         @Override
@@ -3903,9 +1977,10 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
             }
 
             requestBuilder.uri(URI.create(uriStr));
-            //requestBuilder.header("CB-AFTER", String.valueOf(afterCursor.get()));
+
+
             return HttpClient.newHttpClient().sendAsync(
-                            requestBuilder.build(),
+                            requestBuilder.GET().build(),
                             HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
                     .thenApply(response -> {
@@ -3953,6 +2028,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
                             candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                             return candleData;
                         } else {
+                            new Message("BinanceUs Error", response);
                             return Collections.emptyList();
                         }
                     });

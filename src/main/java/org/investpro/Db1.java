@@ -7,16 +7,16 @@ import org.slf4j.LoggerFactory;
 import java.io.PrintWriter;
 import java.sql.*;
 import java.util.Collection;
+import java.util.Properties;
 import java.util.UUID;
+
 
 public class Db1 implements Db {
     private static final Logger logger = LoggerFactory.getLogger(Db1.class);
 
 
     Connection conn;//= DriverManager.getConnection("jdbc:sqlite:cryptoinvestor");
-    String DB_URL = "jdbc:mysql://localhost:3306/cryptoinvestor";
-    String USER = "root";
-    String PASS = "Bigboss307#";
+
     private String fullDisplayName;
     private String shortDisplayName;
     private int fractionalDigits;
@@ -25,19 +25,34 @@ public class Db1 implements Db {
     private String image;
 
 
-    public Db1() throws SQLException, ClassNotFoundException {
+    public Db1(@NotNull Properties conf) throws ClassNotFoundException {
+
+
+        //Class.forName() to load the driver
         Class.forName(
                 "com.mysql.cj.jdbc.Driver"
         );
-        System.out.println("connecting to the database");
-        this.conn = DriverManager.getConnection(DB_URL, USER, PASS);
 
+        try {
+
+
+            this.conn = DriverManager.getConnection(
+                    "jdbc:mysql://" + conf.getProperty("db_host") + ":" + conf.getProperty("db_port") + "/" + conf.getProperty("db_name")
+                    , conf.getProperty("db_username"), conf.getProperty("db_password"));
+        } catch (SQLException e) {
+            e.printStackTrace();
+            new Message(
+                    Message.MessageType.ERROR,
+                    "Error connecting to the database\n" + e.getMessage()
+            );
+        }
     }
+
 
     @Override
     public void createTables() {
         try {
-            String sql = "CREATE TABLE IF NOT EXISTS cryptoinvestor.cryptoinvestor ( " +
+            String sql = "CREATE TABLE IF NOT EXISTS investpro.investpro ( " +
                     "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
                     "full_display_name VARCHAR(255), " +
                     "short_display_name VARCHAR(255), " +
@@ -241,6 +256,11 @@ public class Db1 implements Db {
     public void findById(String table, String column, String value) {
         try {
             conn.createStatement().executeUpdate("SELECT * FROM " + table + " WHERE " + column + " = '" + value + "'");
+            ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + table + " WHERE " + column + " = '" + value + "'");
+            while (rs.next()) {
+                System.out.println(rs.getString(column));
+
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -290,14 +310,21 @@ public class Db1 implements Db {
     }
 
     @Override
+    public ShardingKeyBuilder createShardingKeyBuilder() throws SQLException {
+        return Db.super.createShardingKeyBuilder();
+    }
+
+    @Override
     public <T> T unwrap(Class<T> iface) {
         return null;
     }
+
     @Override
     public boolean isWrapperFor(Class<?> iface) {
         return false;
     }
-    public void registerCurrencies(Collection<FiatCurrency> currencies) throws SQLException {
+
+    public void registerCurrencies(@NotNull Collection<FiatCurrency> currencies) throws SQLException {
         //Create table currencies if not exits
         conn.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS " +
                 "currencies (" +
@@ -354,13 +381,55 @@ public class Db1 implements Db {
         }
     }
 
+    @Override
+    public void save(@NotNull Currency currency) {
+
+        try {
+            conn.createStatement().execute("SELECT * FROM currencies WHERE code = '" + currency.getCode() + "' AND currency_type = '" + currency.getCurrencyType() +
+                    "' AND + code = '" + currency.getCode() + "' ");
+            if (conn.createStatement().executeQuery("SELECT * FROM currencies WHERE code = '" + currency.getCode() + "' AND currency_type = '" + currency.getCurrencyType() + "' AND + code = '" + currency.getCode() + "' ").next()) {
+                logger.info("Currency already exists with code: " + currency.getCode());
+            } else {
+
+
+                conn.prepareStatement("INSERT INTO  currencies (  code, full_display_name, short_display_name, " +
+                        "fractional_digits, symbol, image," +
+                        "currency_type) VALUES (?,?,?,?,?,?,?)");
+
+
+                conn.createStatement().executeUpdate(
+                        "INSERT INTO currencies VALUES ('"
+                                + currency.getCode() + "','" + currency.getFullDisplayName() + "','"
+                                + currency.getShortDisplayName() + "','" + currency.getFractionalDigits() + "','" +
+                                currency.getSymbol() + "','" + currency.getImage() +
+                                "','" + currency.getCurrencyType() + "')");
+
+                logger.info(
+                        "New Currency with code: " + currency.getCode() + "was added  to the  database"
+                );
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
     public Currency getCurrency(String code) throws SQLException {
         // Get currency from database
         Currency newCurrency = null;
+
+        conn.createStatement().execute("CREATE TABLE IF NOT EXISTS currencies (code VARCHAR(255), full_display_name VARCHAR(255), short_display_name VARCHAR(255), fractional_digits INTEGER, symbol VARCHAR(255), image VARCHAR(255), currency_type VARCHAR(255));");
+
+
         ResultSet check = conn.createStatement().executeQuery("SELECT * FROM currencies WHERE code = '" + code + "'");
         if (!check.next()) {
             logger.info("Currency not found with code: " + code);
             new Message(Message.MessageType.WARNING, "Currency with code: " + code + " not found in database");
+
+            return null;
+
+
         } else {
             code = check.getString("code");
             fullDisplayName = check.getString("full_display_name");
@@ -381,7 +450,7 @@ public class Db1 implements Db {
             logger.info(format);
             CurrencyType type = CurrencyType.valueOf(currencyType);
             logger.info("Currency Type: " + type);
-            newCurrency = new CryptoCurrency(
+            newCurrency = new Currency(
                     type,
                     fullDisplayName,
                     shortDisplayName,

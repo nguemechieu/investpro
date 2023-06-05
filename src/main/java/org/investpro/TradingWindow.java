@@ -37,6 +37,7 @@ public class TradingWindow extends AnchorPane {
                tabPane.getTabs().add(tab);
                @NotNull Exchange exchange;
 
+
                exchange = switch (i) {
 //                case
 //                        BINANCE:
@@ -116,10 +117,7 @@ public class TradingWindow extends AnchorPane {
         logger.debug("TradingWindow initialized");
         getChildren().addAll(getMenuBar(), tabPane);
 
-    Properties properties = new Properties();
-    properties.load(Objects.requireNonNull(getClass().getResourceAsStream("/app.properties")));
-    logger.debug("Properties loaded");
-    logger.info("properties "+properties.values());
+
     }
 
     private @NotNull Tab browserTab() {

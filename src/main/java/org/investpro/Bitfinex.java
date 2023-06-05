@@ -34,6 +34,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 import static java.lang.System.nanoTime;
@@ -173,7 +174,7 @@ public class Bitfinex extends Exchange {
      * This method only needs to be implemented to support live syncing.
      */
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, boolean isAutoTrading) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -564,6 +565,11 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
+    public void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE market, double quantity, int i, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) throws IOException, InterruptedException {
+
+    }
+
+    @Override
     public @NotNull List<Currency> getAvailableSymbols() throws IOException, InterruptedException {
         return new ArrayList<>();
     }
@@ -683,8 +689,22 @@ public class Bitfinex extends Exchange {
     }
 
 
-
     public void closeAll() {
+    }
+
+    @Override
+    public void createOrder(@NotNull TradePair tradePair, Side buy, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice) {
+
+    }
+
+    @Override
+    public ConcurrentHashMap<String, Double> getLiveTickerPrice() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    double getLiveTickerPrices() throws IOException, InterruptedException {
+        return 0;
     }
 
     public void createOrder(TradePair tradePair, Side sell, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, @NotNull Date timestamp, long orderID, double stopPrice, double takeProfitPrice) {

@@ -195,18 +195,30 @@ public class CandleStickChartToolbar extends Region {
                     tool.setOnAction(event -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
                     tool.setOnAction(event -> {
-                        try {
                             candleStickChart.changeZoom(
                                     tool.tool.getZoomDirection());
-                        } catch (TelegramApiException | ParseException | IOException | InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+
                     });
 
 
                 } else if (tool.tool != null && tool.tool.isScreenShot()) {
 
-                    tool.setOnAction(e -> Screenshot.capture(new File(System.getProperty("user.home") + "/Documents/screenshot" + System.currentTimeMillis() + ".png")));
+                    tool.setOnAction(e -> {
+                                try {
+
+                                    Screenshot.capture(File.createTempFile(
+                                            "screenshot",
+                                            ".png"
+                                    ));
+
+
+                                } catch (IOException ex) {
+                                    throw new RuntimeException(ex);
+                                }
+                            }
+
+
+                    );
                 } else if (tool.tool != null && tool.tool.isSearch()) {
 
                     tool.setOnAction(r -> {
@@ -265,6 +277,9 @@ public class CandleStickChartToolbar extends Region {
         }
 
 
+        public String getScreenshot() {
+            return this == SCREENSHOT ? "screenshot.png" : null;
+        }
     }
 
 
