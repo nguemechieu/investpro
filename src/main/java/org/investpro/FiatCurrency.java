@@ -1,20 +1,25 @@
-package org.investpro;
-
-import org.jetbrains.annotations.NotNull;
+package com.brcolow.candlefx;
 
 import java.util.Locale;
 import java.util.Objects;
 
+/**
+ * @author Michael Ennen
+ */
+public class FiatCurrency extends Currency {
+    private final Locale locale;
+    private final String centralBank;
+    private final int numericCode;
 
-public abstract class FiatCurrency extends Currency {
-    Locale locale;
-    String centralBank;
-    int numericCode;
-
+    protected FiatCurrency() {
+        locale = Locale.US;
+        centralBank = "";
+        numericCode = -1;
+    }
 
     protected FiatCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
-                           String symbol, Locale locale, String centralBank, int numericCode, String image) {
-        super(CurrencyType.FIAT, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
+                           String symbol, Locale locale, String centralBank, int numericCode) {
+        super(CurrencyType.FIAT, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol);
 
         Objects.requireNonNull(locale, "locale must not be null");
         Objects.requireNonNull(centralBank, "centralBank must not be null");
@@ -29,17 +34,7 @@ public abstract class FiatCurrency extends Currency {
         this.numericCode = numericCode;
     }
 
-
-    @Override
-    public String toString() {
-        return
-                "locale=" + locale +
-                        ", centralBank='" + centralBank + '\'' +
-                        ", numericCode=" + numericCode +
-                        ", code='" + code + '\'' +
-                        ", fractionalDigits=" + fractionalDigits +
-                        ", symbol='" + symbol + '\'';
+    public Locale getLocale() {
+        return locale;
     }
-
-    public abstract int compareTo(@NotNull java.util.Currency o);
 }
