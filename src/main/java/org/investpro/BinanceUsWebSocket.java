@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
 import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
@@ -14,22 +13,11 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.websocket.ClientEndpointConfig;
-import javax.websocket.Endpoint;
-import javax.websocket.Extension;
-import javax.websocket.Session;
-import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
-import java.text.ParseException;
-import java.time.Instant;
-import java.util.*;
 import java.util.concurrent.CompletableFuture;
-
-import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 
 public class BinanceUsWebSocket extends ExchangeWebSocketClient {
@@ -42,13 +30,15 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
 
 
-    public BinanceUsWebSocket(@NotNull TradePair tradePair) {
+    public BinanceUsWebSocket() {
         super(
                 URI.create(
-                        "wss://stream.binance.com:9443/ws/" + tradePair.getBaseCurrency().getCode().toLowerCase() + tradePair.getCounterCurrency().getCode().toLowerCase()
+                        "wss://stream.binance.us:9443/ws/btcusdt@kline_1m"
+                        // "wss://ws-api.binance.us:443/ws-api/v3"
                 )
 
                 , new Draft_6455());
+        this.connect();
 
 
     }
@@ -115,71 +105,18 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
 
         Side side = messageJson.has("S") ? Side.getSide(messageJson.get("S").asText()) : null;
         logger.info("BinanceUsWebSocket: " + messageJson + " " + side);
-//            switch (messageJson.asText()) {
-//                case "heartbeat" ->
-//                        send(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString());
-//                case "match" -> {
+        switch (messageJson.asText()) {
+            case "heartbeat" ->
+                    send(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString());
+            case "match" -> {
 
-        String symb = messageJson.get("s").asText();
 
-        TradePair tradePair = null;
-        if (symb.contains("USDT")) {
-            symb = symb.replace("USDT", "");
-            try {
-                tradePair = new TradePair(symb, "USDT");
-            } catch (SQLException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
             }
-        } else if (symb.contains("USD") && symb.length() > 3) {
-            symb = symb.replace("USD", "");
-            try {
-                tradePair = new TradePair(symb, "USD");
-            } catch (SQLException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        } else if (symb.subSequence(3, symb.length()).equals("BTC")) {
-            symb = symb.replace("BTC", "");
-            try {
-                tradePair = new TradePair(symb, "BTC");
-            } catch (SQLException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
+            case "error" -> throw new IllegalArgumentException("Error on Binance websocket client: " +
+                    messageJson.get("message").asText());
+            default -> throw new IllegalStateException("Unhandled message type on Gdax websocket client: " +
+                    messageJson.get("type").asText());
         }
-
-
-        logger.info("BinanceUsWebSocket: " + messageJson + " " + tradePair);
-
-
-        if (liveTradeConsumers.containsKey(tradePair)) {
-            Trade newTrade;
-            try {
-
-                newTrade = new Trade(tradePair,
-                        messageJson.get("p").asDouble(),
-
-                        messageJson.get("q").asDouble(),
-
-                        side, messageJson.at("E").asLong(),
-                        Date.from(Instant.from(ISO_INSTANT.parse(messageJson.get("t").asText()))).getTime());
-
-                logger.info(
-                        "BinanceUs websocket client: received trade: " + newTrade
-                );
-            } catch (IOException | InterruptedException | URISyntaxException |
-                     ParseException e) {
-                throw new RuntimeException(e);
-            }
-            logger.info("BinanceUs websocket client: received trade: " + newTrade);
-            List<Trade> newTrades = new ArrayList<>();
-            newTrades.add(newTrade);
-            liveTradeConsumers.get(tradePair).acceptTrades(newTrades);
-        }
-        //}
-        //case "error" -> throw new IllegalArgumentException("Error on Binance websocket client: " +
-        //       messageJson.get("message").asText());
-        // default -> throw new IllegalStateException("Unhandled message type on Gdax websocket client: " +
-        //     messageJson.get("type").asText());
-        //}
 
     }
 
@@ -190,7 +127,7 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
             productId0 = productId0.split("USDT")[0];
             productId1 = productId0 + "-" + "USDT";
 
-            return TradePair.parse(productId1, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
+            return TradePair.parse(productId1, "-", new Pair<>(CryptoCurrency.class, Currency.class));
         } else if (productId0.contains("BTC")) {
             productId0 = productId0.split("BTC")[0];
             productId1 = productId0 + "-" + "BTC";
@@ -200,7 +137,11 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
     }
 
 
+    @Override
+    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+        liveTradeConsumers.put(tradePair, liveTradesConsumer);
 
+    }
 
     @Override
     public void stopStreamLiveTrades(TradePair tradePair) {
@@ -212,20 +153,9 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
         return false;
     }
 
-
-    @Override
-    public boolean isStreamingTradesSupported(TradePair tradePair) {
-        return false;
-    }
-
     @Override
     public boolean isStreamingTradesEnabled(TradePair tradePair) {
         return false;
-    }
-
-    @Override
-    public void request(long n) {
-
     }
 
     @Override
@@ -238,110 +168,6 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
         return null;
     }
 
-    @Override
-    public CompletableFuture<WebSocket> sendPing(ByteBuffer message) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<WebSocket> sendPong(ByteBuffer message) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<WebSocket> sendClose(int statusCode, String reason) {
-        return null;
-    }
-
-    @Override
-    public String getSubprotocol() {
-        return null;
-    }
-
-    @Override
-    public boolean isOutputClosed() {
-        return false;
-    }
-
-    @Override
-    public boolean isInputClosed() {
-        return false;
-    }
-
-    @Override
-    public void abort() {
-
-    }
-
-    @Override
-    public long getDefaultAsyncSendTimeout() {
-        return 0;
-    }
-
-    @Override
-    public void setAsyncSendTimeout(long timeout) {
-
-    }
-
-    @Override
-    public Session connectToServer(Object endpoint, ClientEndpointConfig path) {
-        return null;
-    }
-
-    @Override
-    public Session connectToServer(Class<?> annotatedEndpointClass, URI path) {
-        return null;
-    }
-
-    @Override
-    public Session connectToServer(Endpoint endpoint, ClientEndpointConfig clientEndpointConfiguration, URI path) {
-        return null;
-    }
-
-    @Override
-    public Session connectToServer(Class<? extends Endpoint> endpoint, ClientEndpointConfig clientEndpointConfiguration, URI path) {
-        return null;
-    }
-
-    @Override
-    public long getDefaultMaxSessionIdleTimeout() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultMaxSessionIdleTimeout(long timeout) {
-
-    }
-
-    @Override
-    public int getDefaultMaxBinaryMessageBufferSize() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultMaxBinaryMessageBufferSize(int max) {
-
-    }
-
-    @Override
-    public int getDefaultMaxTextMessageBufferSize() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultMaxTextMessageBufferSize(int max) {
-
-    }
-
-    @Override
-    public Set<Extension> getInstalledExtensions() {
-        return null;
-    }
-
-    @Override
-    public double getPrice(TradePair tradePair) {
-        return 0;
-    }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
@@ -352,6 +178,13 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
     public void onError(Exception ex) {
         logger.error("ex: ", ex);
 
+    }
+
+    @Override
+    public boolean connectBlocking() throws InterruptedException {
+
+
+        return false;
     }
 
     @Override

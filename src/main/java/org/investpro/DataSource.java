@@ -18,7 +18,6 @@ public class DataSource implements javax.sql.DataSource {
     }
 
     public Connection createConnection() {
-        conn = null;
         try {
             try {
                 Class.forName("com.mysql.cj.jdbc.Driver");
@@ -40,7 +39,7 @@ public class DataSource implements javax.sql.DataSource {
             }
 
         } catch (SQLException ex) {
-            System.out.println("An error occurred while connecting MySQL databse");
+            System.out.println("An error occurred while connecting MySQL database");
             ex.printStackTrace();
         }
         return conn;
@@ -51,7 +50,6 @@ public class DataSource implements javax.sql.DataSource {
      */
 
     public void close() {
-        // TODO Auto-generated method stub
 
 
     }

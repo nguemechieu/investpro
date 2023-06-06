@@ -1,44 +1,41 @@
 package org.investpro;
 
+
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Objects;
 
-
 import static java.lang.System.out;
-import static org.investpro.TelegramClient.getToken;
+import static org.investpro.TelegramClient.requestBuilder;
 
 public class NewsManager {
 
-    private static final String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
+    static final String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
+    public static Logger logger = LoggerFactory.getLogger(NewsManager.class);
     static ArrayList<News> news = new ArrayList<>();
     static News news1 = new News("", "", "", new Date(), "", "");
 
-    public NewsManager() throws ParseException {
+    public NewsManager() throws ParseException, IOException, InterruptedException {
         load();
         news.add(news1);
 
     }
 
-    public static ArrayList<News> getNewsList() throws ParseException {
-        return load();
 
-    }
-
-    public static ArrayList<News> load() throws ParseException {
+    public static ArrayList<News> load() throws ParseException, IOException, InterruptedException {
         news = new ArrayList<>();//
         JSONArray jsonArray = Objects.requireNonNull(makeRequest());
         int length = jsonArray.length();
@@ -96,36 +93,28 @@ public class NewsManager {
 
 
     //makeRequest return JSONObject
-    private static @Nullable JSONArray makeRequest() {
-        try {
-            HttpURLConnection connection = (HttpURLConnection)
-                    new URL(NewsManager.url).openConnection();
-            connection.setDoOutput(true);
-            connection.setDoInput(true);
-            connection.setUseCaches(false);
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("Authorization", "Bearer " + getToken());
-            connection.connect();
-            int responseCode = connection.getResponseCode();
-            out.printf("Response Code: %d%n", responseCode);
-            InputStream in = connection.getInputStream();
-            BufferedReader reader = new BufferedReader(new InputStreamReader((in)));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-            while ((inputLine = reader.readLine()) != null) {
-                response.append(inputLine);
-                response.append("\r\n");
-            }
-            reader.close();
-            return new JSONArray(response.toString());
+    private static @Nullable JSONArray makeRequest() throws IOException, InterruptedException {
 
+        requestBuilder.uri(
+                URI.create(
+                        NewsManager.url
+                )
+        );
+        requestBuilder.header("Accept", "application/json");
+        requestBuilder.header("Content-Type", "application/json");
 
-        } catch (IOException e) {
-            e.printStackTrace();
+        HttpResponse<String> response;
+        HttpClient client = HttpClient.newHttpClient();
+        response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            logger.error(response.body());
+            return null;
+
         }
-        return null;
+        return new JSONArray(response.body());
+
+
     }
 
 

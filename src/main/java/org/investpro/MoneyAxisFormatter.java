@@ -1,11 +1,12 @@
 package org.investpro;
 
 import javafx.util.StringConverter;
-import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
 import java.util.Objects;
 
+/**
+ * @author Michael Ennen
+ */
 public class MoneyAxisFormatter extends StringConverter<Number> {
     private final FastMoneyFormatter format;
     private final Currency currency;
@@ -13,7 +14,6 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
 
     public MoneyAxisFormatter(Currency currency) {
         this(currency, currency.getFractionalDigits());
-
     }
 
     public MoneyAxisFormatter(Currency currency, int precision) {
@@ -27,25 +27,15 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
     @Override
     public String toString(Number number) {
         if (currency.getCurrencyType() == CurrencyType.FIAT) {
-            try {
-                return format.format(FastMoney.ofFiat(number.doubleValue(), currency.getCode(), precision));
-            } catch (SQLException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
+            return format.format(FastMoney.ofFiat(number.doubleValue(), currency.getCode(), precision));
         } else {
-            try {
-                return format.format(FastMoney.ofCrypto(number.doubleValue(), currency.getCode(), precision));
-            } catch (SQLException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
+            return format.format(FastMoney.ofCrypto(number.doubleValue(), currency.getCode(), precision));
         }
     }
 
     @Override
-    public Number fromString(@NotNull String string) {
-
-        return string.length()
-                ;
-
+    public Number fromString(String string) {
+        // return format.parse(string).getNumber();
+        return 1;
     }
 }

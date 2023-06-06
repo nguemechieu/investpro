@@ -2,7 +2,9 @@ package org.investpro;
 
 import java.util.Objects;
 
-
+/**
+ * @author Michael Ennen
+ */
 public class InProgressCandle {
     private int openTime;
     private double openPrice;
@@ -14,18 +16,11 @@ public class InProgressCandle {
     private boolean visible; // is the in-progress candle currently visible on screen?
     private boolean placeHolder;
 
-    private int closeTime;
-    private double closePriceSoFar;
-
-    public int getCloseTime() {
-        return closeTime;
-    }
-
-    public void setCloseTime(int closeTime) {
-        this.closeTime = closeTime;
-    }
-
-
+    /**
+     * Creates a new (immutable) {@code CandleData} by copying the fields from this {@code InProgressCandle}.
+     * This in effect creates a frozen "snapshot" of the in-progress candle data. This is useful when the current
+     * time passes the close time of the current in-progress candle and it needs to be added to a chart's data set.
+     */
     public CandleData snapshot() {
         return new CandleData(openPrice, lastPrice, highPriceSoFar, lowPriceSoFar, openTime, volumeSoFar);
     }
@@ -70,12 +65,12 @@ public class InProgressCandle {
         this.currentTill = currentTill;
     }
 
-    public double getLastPrice() {
-        return lastPrice;
-    }
-
     public void setLastPrice(double lastPrice) {
         this.lastPrice = lastPrice;
+    }
+
+    public double getLastPrice() {
+        return lastPrice;
     }
 
     public double getVolumeSoFar() {
@@ -135,58 +130,11 @@ public class InProgressCandle {
                 visible, placeHolder);
     }
 
-    public void setOpenPriceSoFar(int i) {
-        this.openPrice = i;
+    public double getAveragePriceSofar() {
+        return (highPriceSoFar + lowPriceSoFar) / 2;
     }
 
     public double getClosePriceSoFar() {
-        return closePriceSoFar;
-    }
-
-    public void setClosePriceSoFar(double i) {
-        this.closePriceSoFar = i;
-    }
-
-    public void setOpenTimeSoFar(int i) {
-        this.openTime = i;
-    }
-
-    public void setCloseTimeSoFar(int i) {
-        this.closeTime = i;
-    }
-
-    public double getTotalVolume() {
-
-        return volumeSoFar * currentTill;
-
-
-    }
-
-    public double getVolume24h() {
-        return volumeSoFar * 24;
-    }
-
-    public double getHighPrice24h() {
-        return highPriceSoFar * 24;
-    }
-
-    public double getLowPrice24h() {
-        return lowPriceSoFar * 24;
-    }
-
-    public void setVolume(double volume) {
-        this.volumeSoFar = volume;
-    }
-
-    public void setClosePrice(double closePrice) {
-        this.closePriceSoFar = closePrice;
-    }
-
-    public void setHighestBidPrice(double highestBidPrice) {
-        this.highPriceSoFar = highestBidPrice;
-    }
-
-    public double getAveragePriceSofar() {
-        return (highPriceSoFar + lowPriceSoFar) / 2;
+        return lastPrice;
     }
 }

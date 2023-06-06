@@ -1,6 +1,5 @@
 package org.investpro;
 
-import javafx.beans.property.DoubleProperty;
 import javafx.collections.ListChangeListener;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
@@ -40,12 +39,14 @@ public class DraggableTab extends Tab {
         markerStage.setScene(new Scene(markerStack));
     }
 
+
     Label nameLabel;
     Stage dragStage;
     boolean detachable;
 
 
-    public DraggableTab(String text, Object icon) {
+    public DraggableTab(String text) {
+
         nameLabel = new Label(text);
         setGraphic(nameLabel);
         detachable = true;

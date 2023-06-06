@@ -4,7 +4,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serial;
 
-
 public class CurrencyNotFoundException extends Throwable {
     @Serial
     private static final long serialVersionUID = -5029723281334525952L;

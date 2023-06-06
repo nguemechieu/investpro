@@ -39,7 +39,7 @@ tabPane.setTranslateY(34);
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
         int i=0;
         i++;
-        DraggableTab tab = new DraggableTab("Tab"+i,"");
+        DraggableTab tab = new DraggableTab("Tab" + i);
         tabPane.getTabs().add(tab);
         TextField searchBar =new TextField();
         searchBar.setPromptText("Search here... ");
@@ -107,7 +107,7 @@ tabPane.setTranslateY(34);
         Button addButton = new Button("+");
         hBox.getChildren().add(addButton);
         addButton.setOnAction(e -> {
-            tabPane.getTabs().add(new DraggableTab("Tab" + tabPane.getTabs().size(), ""));
+            tabPane.getTabs().add(new DraggableTab("Tab" + tabPane.getTabs().size()));
             WebView web0 = new WebView();
             web0.setPrefSize(1530, 780);
 

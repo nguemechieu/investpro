@@ -8,8 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 public class Bittrex extends Exchange {
     TradePair tradePair;
@@ -41,10 +40,6 @@ public class Bittrex extends Exchange {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
-        return null;
-    }
 
 
     @Override
@@ -65,8 +60,47 @@ public class Bittrex extends Exchange {
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
         return
+                new CompletableFuture<List<Trade>>() {
+                    @Override
+                    public boolean cancel(boolean mayInterruptIfRunning) {
+                        return false;
+                    }
 
-                null;
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isDone() {
+                        return false;
+                    }
+
+                    @Override
+                    public List<Trade> get() throws InterruptedException, ExecutionException {
+
+
+                        return null;
+                    }
+
+                    @Override
+                    public List<Trade> get(long timeout, @NotNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+                        return null;
+                    }
+
+                };
+
+    }
+
+
+    @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
+
     }
 
     @Override

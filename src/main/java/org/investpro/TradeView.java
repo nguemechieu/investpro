@@ -6,7 +6,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
-
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -26,15 +25,15 @@ import java.util.Date;
 import java.util.List;
 
 
-public class TradeView extends Region  {
+public class TradeView extends Region {
     private static final Logger logger = LoggerFactory.getLogger(TradeView.class);
 
-    public TradeView(@NotNull Exchange exchange, String telegramToken) throws IOException, InterruptedException, ParseException, URISyntaxException, SQLException, ClassNotFoundException {
 
-        super();
+    public TradeView(@NotNull Exchange exchange, String telegramToken) throws IOException, InterruptedException, SQLException, ClassNotFoundException {
+
         TabPane tradingTabPane = new TabPane();
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
-        tradingTabPane.setSide(Side.TOP);
+        tradingTabPane.setSide(javafx.geometry.Side.TOP);
         tradingTabPane.setPadding(new Insets(10));
 
         TabPane tabPane = new TabPane();
@@ -44,6 +43,8 @@ public class TradeView extends Region  {
         logger.debug("Creating TradeView");
         ChoiceBox<String> symbolChoicebox = new ChoiceBox<>();
         try {
+
+
             symbolChoicebox.getItems().addAll(exchange.getTradePair());
         } catch (SQLException | ClassNotFoundException e) {
             throw new RuntimeException(e);
@@ -69,19 +70,20 @@ public class TradeView extends Region  {
                 event -> {
 
                     String sym1 = symbolChoicebox.getValue().split("/")[0];
-                    String sym2 =          symbolChoicebox.getValue().split("/")[1];
+                    String sym2 = symbolChoicebox.getValue().split("/")[1];
                     logger.debug(sym1 + sym2);
-                    DraggableTab tradeTab2 = new DraggableTab(sym1 + "/" + sym2, "Invest.png");
+                    DraggableTab tradeTab2 = new DraggableTab(sym1 + "/" + sym2);
                     CandleStickChartContainer container2;
+                    TradePair tradePair3;
                     try {
-                        TradePair tradePair3 = new TradePair(sym1, sym2);
-                        container2 = new CandleStickChartContainer(exchange, tradePair3, telegramToken, true);
-                        tradeTab2.setContent(container2);
-                        tradingTabPane.getTabs().add(tradeTab2);
-                        tradingTabPane.getSelectionModel().select(tradeTab2);
-                    } catch (URISyntaxException | IOException | SQLException | ClassNotFoundException e) {
+                        tradePair3 = new TradePair(sym1, sym2);
+                    } catch (SQLException | ClassNotFoundException e) {
                         throw new RuntimeException(e);
                     }
+                    container2 = new CandleStickChartContainer(exchange, tradePair3, true, telegramToken);
+                    tradeTab2.setContent(container2);
+                    tradingTabPane.getTabs().add(tradeTab2);
+                    tradingTabPane.getSelectionModel().select(tradeTab2);
                 });
 
 
@@ -115,22 +117,26 @@ public class TradeView extends Region  {
                     btnBuy.setOnAction(
                             event1 -> {
                                 try {
-                                    exchange.createOrder(
-                                            new TradePair(
-                                                    symbolChoicebox.getValue().split("/")[0],
-                                                    symbolChoicebox.getValue().split("/")[1]
-                                            ),
-                                            Side.BUY,
+                                    try {
+                                        exchange.createOrder(
+                                                new TradePair(
+                                                        symbolChoicebox.getValue().split("/")[0],
+                                                        symbolChoicebox.getValue().split("/")[1]
+                                                ),
+                                                Side.BUY,
 
-                                            ENUM_ORDER_TYPE.MARKET, price,
+                                                ENUM_ORDER_TYPE.MARKET, price,
 
-                                            quantity,
-                                            new Date(), stopPrice,
-                                            takeProfitPrice
+                                                quantity,
+                                                new Date(), stopPrice,
+                                                takeProfitPrice
 
 
-                                    );
-                                } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                                        );
+                                    } catch (SQLException | ClassNotFoundException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                } catch (IOException | InterruptedException e) {
                                     throw new RuntimeException(e);
                                 }
 
@@ -174,13 +180,7 @@ public class TradeView extends Region  {
                     );
 
                     Button closeAll = new Button("CLOSE ALL");
-                    closeAll.setOnAction(event1 -> {
-                        try {
-                            exchange.closeAllOrders();
-                        } catch (IOException | InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
+                    closeAll.setOnAction(event1 -> exchange.closeAllOrders());
 
 
                     Button trailingBuy = new Button("TRAILING BUY");
@@ -188,21 +188,25 @@ public class TradeView extends Region  {
                     trailingSell.setOnAction(event2 -> {
 
                         try {
-                            exchange.createOrder(
-                                    new TradePair(
-                                            symbolChoicebox.getValue().split("/")[0],
-                                            symbolChoicebox.getValue().split("/")[1]
+                            try {
+                                exchange.createOrder(
+                                        new TradePair(
+                                                symbolChoicebox.getValue().split("/")[0],
+                                                symbolChoicebox.getValue().split("/")[1]
 
 
-                                    ),
-                                    Side.BUY,
-                                    ENUM_ORDER_TYPE.ENTRY, price,
-                                    quantity,
-                                    new Date(), stopPrice,
-                                    takeProfitPrice
+                                        ),
+                                        Side.BUY,
+                                        ENUM_ORDER_TYPE.ENTRY, price,
+                                        quantity,
+                                        new Date(), stopPrice,
+                                        takeProfitPrice
 
-                            );
-                        } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                                );
+                            } catch (SQLException | ClassNotFoundException e) {
+                                throw new RuntimeException(e);
+                            }
+                        } catch (IOException | InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     });
@@ -240,21 +244,25 @@ public class TradeView extends Region  {
                     Button buyLimitBtn = new Button("BUY LIMIT");
                     buyLimitBtn.setOnAction(event3 -> {
                         try {
-                            exchange.createOrder(
-                                    new TradePair(
-                                            symbolChoicebox.getValue().split("/")[0],
-                                            symbolChoicebox.getValue().split("/")[1]
-                                    ),
-                                    Side.BUY,
+                            try {
+                                exchange.createOrder(
+                                        new TradePair(
+                                                symbolChoicebox.getValue().split("/")[0],
+                                                symbolChoicebox.getValue().split("/")[1]
+                                        ),
+                                        Side.BUY,
 
-                                    ENUM_ORDER_TYPE.LIMIT, price,
+                                        ENUM_ORDER_TYPE.LIMIT, price,
 
-                                    quantity,
-                                    new Date(), stopPrice,
-                                    takeProfitPrice
+                                        quantity,
+                                        new Date(), stopPrice,
+                                        takeProfitPrice
 
-                            );
-                        } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                                );
+                            } catch (SQLException | ClassNotFoundException e) {
+                                throw new RuntimeException(e);
+                            }
+                        } catch (IOException | InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     });
@@ -398,7 +406,9 @@ public class TradeView extends Region  {
         anchorPane.setPrefSize(1230, 780);
         tabPane.setPrefSize(1530, 630);
         tabPane.setTranslateY(25);
-        tabPane.setSide(Side.BOTTOM);
+        tabPane.setSide(
+                javafx.geometry.Side.BOTTOM
+        );
         tabPane.getTabs().add(new Tab("--ORDERS VIEW--"));
         tabPane.getTabs().get(0).setContent(new VBox(
 
@@ -427,25 +437,17 @@ public class TradeView extends Region  {
         for (int i = 0; i < tradingTabPane.getTabs().size(); i++) {
             if (exchange instanceof Oanda oanda) {
 
-                try {
-                    tradingTabPane.getTabs().get(i).setContent(
-                            new CandleStickChartContainer(oanda, new TradePair(symbolChoicebox.getValue().split("/")[0],
-                                    symbolChoicebox.getValue().split("/")[1]
-                            ), telegramToken, true)
-                    );
-                } catch (URISyntaxException | IOException | SQLException | ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
+                tradingTabPane.getTabs().get(i).setContent(
+                        new CandleStickChartContainer(oanda, new TradePair(symbolChoicebox.getValue().split("/")[0],
+                                symbolChoicebox.getValue().split("/")[1]
+                        ), true, telegramToken)
+                );
             } else {
-                try {
-                    tradingTabPane.getTabs().get(i).setContent(new CandleStickChartContainer(exchange, new TradePair(
+                tradingTabPane.getTabs().get(i).setContent(new CandleStickChartContainer(exchange, new TradePair(
 
-                            symbolChoicebox.getValue().split("/")[0],
-                            symbolChoicebox.getValue().split("/")[1]
-                    ), telegramToken, true));
-                } catch (URISyntaxException | IOException | SQLException | ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
+                        symbolChoicebox.getValue().split("/")[0],
+                        symbolChoicebox.getValue().split("/")[1]
+                ), true, telegramToken));
             }
         }
 
@@ -516,7 +518,7 @@ public class TradeView extends Region  {
             ObservableList<Account> obs0 = FXCollections.observableArrayList();
             obs0.addAll(account);
             RecursiveTreeItem<Account> obs1 = new RecursiveTreeItem<>(obs0, RecursiveTreeObject::getChildren);
-            //  obs1.setValue(account.get(0));
+            obs1.setValue(account.get(0));
             accounts.setRoot(obs1);
             accounts.setEditable(true);
             Scene scene = new Scene(accounts, 1300, 500);

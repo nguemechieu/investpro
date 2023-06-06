@@ -4,11 +4,14 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.util.Pair;
-import org.jetbrains.annotations.NotNull;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * @author Michael Ennen
+ */
 public class ZoomLevel {
     private final int zoomLevelId;
     private final int candleWidth;
@@ -17,27 +20,28 @@ public class ZoomLevel {
     private final double secondsPerPixel;
     private final double pixelsPerSecond;
     private final InstantAxisFormatter xAxisFormatter;
-    private Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap=
-            new ConcurrentHashMap<>();
     private int minXValue;
 
+    private final Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap;
+
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
-              final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
+              final DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
               final int minXValue) {
-        if (candleWidth <= 0) {
-            throw new IllegalArgumentException("candleWidth must be greater than 0");
-        }
         this.zoomLevelId = zoomLevelId;
         this.candleWidth = candleWidth;
         numVisibleCandles = new SimpleDoubleProperty(plotAreaWidthProperty.doubleValue() / candleWidth);
         numVisibleCandles.bind(Bindings.createDoubleBinding(() -> plotAreaWidthProperty.doubleValue() / candleWidth,
                 plotAreaWidthProperty));
-        this.secondsPerPixel = (float) secondsPerCandle / candleWidth;
+        this.secondsPerPixel = secondsPerCandle / candleWidth;
         pixelsPerSecond = 1d / secondsPerPixel;
         this.xAxisFormatter = xAxisFormatter;
         this.minXValue = minXValue;
         this.xAxisRangeInSeconds = numVisibleCandles.doubleValue() * secondsPerCandle;
         extremaForCandleRangeMap = new ConcurrentHashMap<>();
+    }
+
+    public int getCandleWidth() {
+        return candleWidth;
     }
 
     static int getNextZoomLevelId(ZoomLevel zoomLevel, ZoomDirection zoomDirection) {
@@ -48,20 +52,12 @@ public class ZoomLevel {
         }
     }
 
-    public int getCandleWidth() {
-        return candleWidth;
-    }
-
-    double getxAxisRangeInSeconds() {
+    public double getxAxisRangeInSeconds() {
         return xAxisRangeInSeconds;
     }
 
-    double getNumVisibleCandles() {
+    public double getNumVisibleCandles() {
         return numVisibleCandles.get();
-    }
-
-    double getSecondsPerPixel() {
-        return secondsPerPixel;
     }
 
     public double getPixelsPerSecond() {
@@ -82,6 +78,10 @@ public class ZoomLevel {
 
     public void setMinXValue(int minXValue) {
         this.minXValue = minXValue;
+    }
+
+    public double getSecondsPerPixel() {
+        return secondsPerPixel;
     }
 
     @Override
@@ -118,9 +118,5 @@ public class ZoomLevel {
         return String.format("ZoomLevel [id = %d, numVisibleCandles = %s, secondsPerPixel = %f, pixelsPerSecond = " +
                         "%f, candleWidth = %d, minXValue = %d", zoomLevelId, numVisibleCandles, secondsPerPixel,
                 pixelsPerSecond, candleWidth, minXValue);
-    }
-
-    public double getMaxXValue() {
-        return numVisibleCandles.get() * secondsPerPixel;
     }
 }

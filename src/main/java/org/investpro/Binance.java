@@ -16,18 +16,17 @@ import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.net.ssl.HttpsURLConnection;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.SQLException;
-import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -113,10 +112,6 @@ public class Binance extends Exchange {
     }
 
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
-        return null;
-    }
 
 
     @Override
@@ -227,13 +222,21 @@ public Set<Integer> getSupportedGranularities() {
                 } catch (IOException | InterruptedException ex) {
                     Log.error("ex: " + ex);
                     futureResult.completeExceptionally(ex);
-                } catch (ParseException | URISyntaxException e) {
-                    throw new RuntimeException(e);
                 }
             }
         });
 
         return futureResult;
+    }
+
+    @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
+
     }
 
     /**
@@ -287,7 +290,7 @@ public Set<Integer> getSupportedGranularities() {
                     JsonNode res;
                     try {
                         res = OBJECT_MAPPER.readTree(response);
-                        logger.info("Binance response: ", response);
+                        logger.info("Binance response: " + response);
                     } catch (JsonProcessingException ex) {
                         throw new RuntimeException(ex);
                     }
@@ -348,7 +351,7 @@ public Set<Integer> getSupportedGranularities() {
 
         JSONObject jsonObject = new JSONObject();
         try {
-            URL url = new URL("https://api.binance.us/api/v2/exchange-rates");
+            URL url = URI.create("https://api.binance.com/api/v2/exchange-rates").toURL();
             HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
@@ -580,6 +583,11 @@ public Set<Integer> getSupportedGranularities() {
                 ""
         ) {
             @Override
+            public int compareTo(@NotNull Currency o) {
+                return 0;
+            }
+
+            @Override
             public int compareTo(java.util.@NotNull Currency o) {
                 return 0;
             }
@@ -631,6 +639,11 @@ public Set<Integer> getSupportedGranularities() {
                         symbols.get(i).get("filters").get(0).get("filterType").asText(),
                         ""
                 ) {
+                    @Override
+                    public int compareTo(@NotNull Currency o) {
+                        return 0;
+                    }
+
                     @Override
                     public int compareTo(java.util.@NotNull Currency o) {
                         return 0;
@@ -788,6 +801,22 @@ public Set<Integer> getSupportedGranularities() {
 
     @Override
     double getLiveTickerPrices() throws IOException, InterruptedException {
+
+        requestBuilder.uri(URI.create("https://api.binance.com/api/v3/" +
+                "ticker/24hr?symbol=BTCUSDT"));
+
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
+        System.out.println(response.body());
+        if (response.statusCode() == 200) {
+
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            // ArrayNode symbols = (ArrayNode) root.get("symbols");
+            List<Currency> currencies = new ArrayList<>();
+
+        }
+
+
         return 0;
     }
 

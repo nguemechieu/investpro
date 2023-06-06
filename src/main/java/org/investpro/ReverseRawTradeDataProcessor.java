@@ -5,12 +5,16 @@ import javafx.beans.property.SimpleIntegerProperty;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-public abstract class ReverseRawTradeDataProcessor extends CandleDataSupplier {
+/**
+ * @author Michael Ennen
+ */
+public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
     private final ReversedLinesFileReader fileReader;
     private int start;
 
@@ -63,16 +67,15 @@ public abstract class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         double lastClose = -1;
         for (int i = 0; i < numCandles; i++) {
             int openTime = (start - secondsPerCandle) - (i * secondsPerCandle);
-            double volume = 0;
             if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
                 // no trades occurred during this candle
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume));
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, 0, 0, 0, true));
             } else {
                 double open = 0;
                 double high = -1;
                 double low = Double.MAX_VALUE;
                 double close = 0;
-
+                double volume = 0;
                 double priceTotal = 0;
                 double volumeWeightedPriceTotal = 0;
                 int tradeIndex = 0;
@@ -104,7 +107,7 @@ public abstract class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                 double volumeWeightedAveragePrice = volumeWeightedPriceTotal / volume;
 
                 CandleData datum = new CandleData(open, close, Math.max(open, high), Math.min(open, low), openTime,
-                        volume);
+                        volume, averagePrice, volumeWeightedAveragePrice, false);
                 candleData.add(datum);
             }
         }
@@ -117,16 +120,44 @@ public abstract class ReverseRawTradeDataProcessor extends CandleDataSupplier {
 
     @Override
     public List<CandleData> getCandleData() {
-        return new ArrayList<CandleData>();
+        return null;
+    }
+
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<org.investpro.Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return null;
     }
 
     /**
      * Represents one line of the raw trade data. We use doubles because the results don't need to be
      * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
-     *
-     * @param timestamp 1315922016,5.800000000000,1.000000000000
      */
-    private record Trade(int timestamp, double price, double amount) {
+    private static class Trade {
+        // 1315922016,5.800000000000,1.000000000000
+        private final int timestamp;
+        private final double price;
+        private final double amount;
+
+        Trade(int timestamp, double price, double amount) {
+            this.timestamp = timestamp;
+            this.price = price;
+            this.amount = amount;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(timestamp, price, amount);
+        }
 
         @Override
         public boolean equals(Object object) {

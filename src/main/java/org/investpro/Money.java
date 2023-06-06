@@ -2,19 +2,20 @@ package org.investpro;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.sql.SQLException;
 
-
+/**
+ * @author Michael Ennen
+ */
 public interface Money {
-    Number amount();
+    Number getAmount();
 
-    Currency currency();
+    Currency getCurrency();
 
     Money plus(Money summand);
 
     Money plus(long summand);
 
-    Money plus(double summand) throws SQLException, ClassNotFoundException;
+    Money plus(double summand);
 
     Money negate();
 
@@ -24,7 +25,7 @@ public interface Money {
 
     Money minus(long subtrahend);
 
-    Money minus(double subtrahend) throws SQLException, ClassNotFoundException;
+    Money minus(double subtrahend);
 
     Money multipliedBy(long multiplier);
 

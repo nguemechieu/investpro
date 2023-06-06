@@ -18,8 +18,6 @@
 
 package org.investpro;
 
-import org.jetbrains.annotations.Nullable;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -36,14 +34,18 @@ import java.util.Objects;
  */
 public class ReversedLinesFileReader implements Closeable {
 
+    private final int blockSize;
+    private final Charset encoding;
+
+    private final RandomAccessFile randomAccessFile;
+
+    private final long totalByteLength;
+    private final long totalBlockCount;
+
     private final byte[][] newLineSequences;
     private final int avoidNewlineSplitBufferSize;
     private final int byteDecrement;
-    int blockSize;
-    Charset encoding;
-    RandomAccessFile randomAccessFile;
-    long totalByteLength;
-    long totalBlockCount;
+
     private FilePart currentFilePart;
 
     private boolean trailingNewlineOfFileSkipped = false;
@@ -64,10 +66,10 @@ public class ReversedLinesFileReader implements Closeable {
     /**
      * Creates a ReversedLinesFileReader with the given block size and charset.
      *
-     * @param file      the file to be read
+     * @param file the file to be read
      * @param blockSize size of the internal buffer (for ideal performance this should
-     *                  match with the block size of the underlying file system).
-     * @param charset   the charset of the file
+     * match with the block size of the underlying file system).
+     * @param charset the charset of the file
      * @throws IOException if an I/O error occurs
      * @since 2.3
      */
@@ -176,8 +178,8 @@ public class ReversedLinesFileReader implements Closeable {
         /**
          * ctor
          *
-         * @param no                     the part number
-         * @param length                 its length
+         * @param no the part number
+         * @param length its length
          * @param leftOverOfLastFilePart remainder
          * @throws IOException if there is a problem reading the file
          */
@@ -209,7 +211,7 @@ public class ReversedLinesFileReader implements Closeable {
          * @return the new FilePart or null
          * @throws IOException if there was a problem reading the file
          */
-        private @Nullable FilePart rollOver() throws IOException {
+        private FilePart rollOver() throws IOException {
 
             if (currentLastBytePos > -1) {
                 throw new IllegalStateException("Current currentLastCharPos unexpectedly positive... "
@@ -232,6 +234,7 @@ public class ReversedLinesFileReader implements Closeable {
          * Reads a line.
          *
          * @return the line or null
+         * @throws IOException if there is an error reading from the file
          */
         private String readLine() {
 
@@ -288,7 +291,7 @@ public class ReversedLinesFileReader implements Closeable {
         }
 
         /**
-         * Creates the buffer containing any leftover bytes.
+         * Creates the buffer containing any left over bytes.
          */
         private void createLeftOver() {
             final int lineLengthBytes = currentLastBytePos + 1;
@@ -306,7 +309,7 @@ public class ReversedLinesFileReader implements Closeable {
          * Finds the new-line sequence and return its length.
          *
          * @param data buffer to scan
-         * @param i    start offset in buffer
+         * @param i start offset in buffer
          * @return length of newline sequence or 0 if none found
          */
         private int getNewLineMatchByteCount(final byte[] data, final int i) {

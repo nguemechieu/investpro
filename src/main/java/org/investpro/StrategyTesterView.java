@@ -34,7 +34,6 @@ public class StrategyTesterView extends Parent {
 
             if (strategyChoiceBox.getValue().equals("Indicator")) {
                 expertAdviserChoiceBox.getItems().addAll(
-                        exchange.getIndicatorList()
                 );
 
             } else if (strategyChoiceBox.getValue().equals("Expert Advisor")) {

@@ -2634,7 +2634,11 @@ public class TelegramClient {
     }
 
     public ArrayList<News> getMarketNews() throws ParseException {
-        return NewsManager.load();
+        try {
+            return NewsManager.load();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public String getLastMessage() {

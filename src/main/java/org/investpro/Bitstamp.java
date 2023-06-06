@@ -22,14 +22,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -140,10 +138,6 @@ public class Bitstamp extends Exchange {
                 };
     }
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
-        return null;
-    }
 
 
     private @Nullable String timestampSignature(
@@ -250,10 +244,10 @@ public class Bitstamp extends Exchange {
                                 futureResult.complete(tradesBeforeStopTime);
                                 break;
                             } else {
-                                tradesBeforeStopTime.add(new Trade(tradePair,
-                                        trade.get("price").asDouble(),
-                                        trade.get("size").asDouble(),
-                                        Side.getSide(trade.get("side").asText()), trade.get("trade_id").asLong(), time));
+//                                tradesBeforeStopTime.add(new Trade(tradePair,
+//                                        trade.get("price").asDouble(),
+//                                        trade.get("size").asDouble(),
+//                                        Side.getSide(trade.get("side").asText()), trade.get("trade_id").asLong(), time));
 
                             }
                         }
@@ -261,13 +255,21 @@ public class Bitstamp extends Exchange {
                 } catch (IOException | InterruptedException ex) {
                     Log.error("ex: " + ex);
                     futureResult.completeExceptionally(ex);
-                } catch (ParseException | URISyntaxException e) {
-                    throw new RuntimeException(e);
                 }
             }
         });
 
         return futureResult;
+    }
+
+    @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
+
     }
 
     /**

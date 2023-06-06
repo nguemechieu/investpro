@@ -24,11 +24,9 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -63,29 +61,19 @@ public class BinanceUs extends Exchange {
     private String apiSecret;
 
     public BinanceUs(String apiKey, String apiSecret) {
-        super(binanceUsWebSocket(apiKey,apiSecret));
+        super(binanceUsWebSocket(apiKey, apiSecret));
 
 
         this.api_key = apiKey;
         this.apiSecret = apiSecret;
 
 
-        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
-            logger.error("BinanceUs " + nanoTime());
-            logger.error(e.getMessage());
-            e.printStackTrace();
-        });
-
-        requestBuilder.header("Accept", "application/json");
-        requestBuilder.header("X-MBX-APIKEY", "Bearer " + apiKey);
+        requestBuilder.header("X-MBX-APIKEY", apiKey);
         requestBuilder.header("X-MBX-APISECRET", apiSecret);
-        requestBuilder.header("Sec-Fetch-Site", "same-origin");
-        requestBuilder.header("Sec-Fetch-User", "?1");
-        requestBuilder.header("Accept-Language", "en-US,en;q=0.9");
-        requestBuilder.header("signature",
-                signature(apiKey, apiSecret)
+        requestBuilder.header("Signature", signature(apiKey, apiSecret));
+        requestBuilder.header("Timestamp", String.valueOf(nanoTime()));
 
-        );
+
         logger.info("BinanceUs " + nanoTime());
         this.api_key = apiKey;
         isConnected = false;
@@ -93,34 +81,20 @@ public class BinanceUs extends Exchange {
 
     }
 
-    private String signature(String apiKey, String apiSecret) {
-        return "sha256=" + Base64.getEncoder().encodeToString((apiKey + ":" + apiSecret).getBytes());
-    }
+    private static @NotNull ExchangeWebSocketClient binanceUsWebSocket(String apiKey, String apiSecret) {
 
-    private static ExchangeWebSocketClient binanceUsWebSocket(String apiKey, String apiSecret) {
-
-        BinanceWebSocket binanceUsWebSocket = new BinanceWebSocket(apiKey);
-
-        binanceUsWebSocket.addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0;)");
-        binanceUsWebSocket.addHeader("Origin", "https://api.binance.us");
-        binanceUsWebSocket.addHeader("Referer", "https://api.binance.us");
-        binanceUsWebSocket.addHeader("Sec-Fetch-Dest", "empty");
-        binanceUsWebSocket.addHeader("Sec-Fetch-Mode", "cors");
-        binanceUsWebSocket.addHeader("Accept", "application/json");
-        binanceUsWebSocket.addHeader(
-                "X-MBX-APIKEY", "Bearer " + apiKey
-        );
-        binanceUsWebSocket.addHeader("X-MBX-APISECRET", apiSecret);
-        binanceUsWebSocket.addHeader("Sec-Fetch-Site", "same-origin");
-        binanceUsWebSocket.addHeader("Sec-Fetch-User", "?1");
+        BinanceUsWebSocket binanceUsWebSocket = new BinanceUsWebSocket();
 
 
-        binanceUsWebSocket.connect();
         return binanceUsWebSocket;
     }
 
+    private @NotNull String signature(String apiKey, String apiSecret) {
+        return "sha256=" + Base64.getEncoder().encodeToString((apiKey + ":" + apiSecret).getBytes());
+    }
 
     //api/v3/account
+    @Override
     public @NotNull List<Account> getAccount() throws IOException, InterruptedException {
         requestBuilder.uri(URI.create(
                 "https://api.binance.us/api/v3/account"
@@ -200,6 +174,7 @@ public class BinanceUs extends Exchange {
     }
 
     //GET /sapi/v1/asset/query/trading-fee
+    @Override
     public double getTradingFee() throws IOException, InterruptedException {
         requestBuilder.uri(URI.create(
                 "https://api.binance.us/sapi/v1/asset/query/trading-fee"
@@ -382,40 +357,8 @@ public class BinanceUs extends Exchange {
 //    }
 //]
 //    GET /api/v3/myTrades (HMAC SHA256)
-    public List<Trade> getTrades(@NotNull TradePair tradePair) throws IOException, InterruptedException {
-        requestBuilder.uri(URI.create(
-                "https://api.binance.us/api/v3/myTrades?symbol=" + tradePair.toString('/')
-        ));
-        requestBuilder.GET();
 
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-        logger.info("BinanceUs " + nanoTime());
-        logger.info("BinanceUs " + response.statusCode());
-        logger.info("BinanceUs " + response.body());
-        logger.info("BinanceUs " + tradePair);
-
-        List<Trade> trades = new ArrayList<>();
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode jsonNode = mapper.readTree(response.body());
-        for (int i = 0; i < jsonNode.size(); i++) {
-            Trade trade = new Trade(jsonNode.get(i).get("symbol").asText(),
-                    jsonNode.get(i).get("id").asLong(),
-                    jsonNode.get(i).get("orderId").asLong(),
-                    jsonNode.get(i).get("orderListId").asLong(),
-                    jsonNode.get(i).get("price").asText(),
-                    jsonNode.get(i).get("qty").asText(),
-                    jsonNode.get(i).get("quoteQty").asText(),
-                    jsonNode.get(i).get("commission").asText(),
-                    jsonNode.get(i).get("commissionAsset").asText(),
-                    jsonNode.get(i).get("time").asLong(),
-                    jsonNode.get(i).get("isBuyer").asBoolean(),
-                    jsonNode.get(i).get("isMaker").asBoolean(),
-                    jsonNode.get(i).get("isBestMatch").asBoolean());
-            trades.add(trade);
-        }
-        return trades;
-    }
-
+    @Override
     public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
         requestBuilder.uri(URI.create(
                 "https://api.binance.us/api/v3/order/symbol=?" + tradePair.toString('/')
@@ -494,7 +437,6 @@ public class BinanceUs extends Exchange {
 
             ObjectMapper mapper = new ObjectMapper();
             JsonNode jsonNode = mapper.readTree(response.body());
-            ArrayNode arrayNode = (ArrayNode) jsonNode;
 
 
         }
@@ -542,40 +484,21 @@ public class BinanceUs extends Exchange {
     @Override
     public String getName() {
         return
-                "BinanceUs";
+                "BINANCE_US";
 
         }
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair) {
-            @Override
-            public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-                return null;
-            }
-
-            @Override
-            public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-                return null;
-            }
-
-            @Override
-            public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-                return null;
-            }
-        };
+        return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
-        return null;
-    }
 
 
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
         return
-                new BinanceUsWebSocket(tradePair) ;
+                new BinanceUsWebSocket();
 
 
     }
@@ -591,188 +514,18 @@ public class BinanceUs extends Exchange {
 
     }
 
-    /**
-     * Fetches the recent trades for the given trade pair from  {@code stopAt} till now (the current time).
-     * <p>
-     * This method only needs to be implemented to support live syncing.
-     */
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        Objects.requireNonNull(tradePair);
-        Objects.requireNonNull(stopAt);
-
-        if (stopAt.isAfter(Instant.now())) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
-        }
-
-        CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
-            IntegerProperty afterCursor = new SimpleIntegerProperty(0);
-            List<Trade> tradesBeforeStopTime = new ArrayList<>();
-
-            // For Public Endpoints, our rate limit is 3 requests per second, up to 6 requests per second in
-            // burst.
-            // We will know if we get rate limited if we get a 429 response code.
-            for (int i = 0; !futureResult.isDone(); i++) {
-                String uriStr = "https://api.binance.us/api/v3/";
-                uriStr += "trades?symbol=" + tradePair.toString('/');
-
-                if (i != 0) {
-                    uriStr += "?after=" + afterCursor.get();
-                }
-                requestBuilder.uri(URI.create(uriStr));
-                requestBuilder.GET();
-                try {
-                    HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-                    Log.info("response headers-->: ", response.toString());
-                    if (response.headers().firstValue("date").isEmpty()) {
-                        futureResult.completeExceptionally(new RuntimeException("cryptoinvestor.cryptoinvestor.CurrencyDataProvider.BinanceUs trades response did not contain header \"date\": " + response.body()));
-
-                    }
-                    afterCursor.setValue(Integer.valueOf((response.headers().firstValue("CB-AFTER").get())));
-                    JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
-                    if (!tradesResponse.isArray()) {
-                        futureResult.completeExceptionally(new RuntimeException(
-                                "cryptoinvestor.cryptoinvestor.CurrencyDataProvider.BinanceUs trades response was not an array!"));
-                    }
-                    if (tradesResponse.isEmpty()) {
-                        futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
-                    } else {
-                        for (int j = 0; j < tradesResponse.size(); j++) {
-                            JsonNode trade = tradesResponse.get(j);
-                            Instant time = Instant.from(ISO_INSTANT.parse(trade.get("time").asText()));
-                            if (time.compareTo(stopAt) <= 0) {
-                                futureResult.complete(tradesBeforeStopTime);
-                                break;
-                            } else {
-                                tradesBeforeStopTime.add(new Trade(tradePair,
-                                        trade.get("p").asDouble(),
-
-                                        trade.get("q").asDouble(),
-
-                                        Side.getSide(trade.get("S").asText()), trade.at("E").asLong(),
-                                        Date.from(Instant.from(ISO_INSTANT.parse(trade.get("t").asText()))).getTime()));
-                            }
-                        }
-                    }
-                } catch (IOException | InterruptedException ex) {
-                    Log.error("ex: " + ex);
-                    futureResult.completeExceptionally(ex);
-                } catch (ParseException | URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-
-        return futureResult;
+        return null;
     }
+
+
+
 
     /**
      * This method only needs to be implemented to support live syncing.
      */
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-                currentCandleStartedAt, ZoneOffset.UTC));
-        // Get the closest supported granularity to the ideal granularity.
 
-
-        String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                .format(LocalDateTime.ofEpochSecond(new Date().getTime(), 0, ZoneOffset.UTC));
-
-        Log.info("Start date: " + startDateString, "");
-        Log.info("End date: " + endDateString, "");
-        Log.info("TradePair " + tradePair, "");
-        Log.info("Second per Candle: " + secondsPerCandle, "");
-        String x;
-        String str;
-        if (secondsPerCandle < 3600) {
-            x = String.valueOf(secondsPerCandle / 60);
-            str = "m";
-        } else if (secondsPerCandle < 86400) {
-            x = String.valueOf((secondsPerCandle / 3600));
-            str = "h";
-        } else if (secondsPerCandle < 604800) {
-            x = String.valueOf(secondsPerCandle / 86400);
-            str = "d";
-        } else if (secondsPerCandle < 2592000) {
-            x = String.valueOf((secondsPerCandle / 604800));
-            str = "w";
-        } else {
-            x = String.valueOf((secondsPerCandle * 7 / 2592000 / 7));
-            str = "M";
-        }
-        String timeFrame = x + str;
-
-        return client.sendAsync(
-                        requestBuilder
-                                .uri(URI.create(
-                                        "https://api.binance.us/api/v3/klines?symbol=" + tradePair.toString('/') + "&interval=" + timeFrame
-                                ))
-                                .GET().build(),
-                        HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
-                .thenApply(response -> {
-                    Log.info("BinanceUs response: ", response);
-                    JsonNode res;
-                    try {
-                        res = OBJECT_MAPPER.readTree(response);
-                        logger.info(response);
-                    } catch (JsonProcessingException ex) {
-                        throw new RuntimeException(ex);
-                    }
-
-                    if (res.isEmpty()) {
-                        return Optional.empty();
-                    }
-
-                    JsonNode currCandle;
-                    Iterator<JsonNode> candleItr = res.iterator();
-                    int currentTill = -1;
-                    double openPrice = -1;
-                    double highSoFar = -1;
-                    double lowSoFar = Double.MAX_VALUE;
-                    double volumeSoFar = 0;
-                    double lastTradePrice = -1;
-                    boolean foundFirst = false;
-                    while (candleItr.hasNext()) {
-                        currCandle = candleItr.next();
-                        if (currCandle.get(0).asInt() < currentCandleStartedAt.getEpochSecond() ||
-                                currCandle.get(0).asInt() >= currentCandleStartedAt.getEpochSecond() +
-                                        secondsPerCandle) {
-                            // skip this sub-candle if it is not in the parent candle's duration (this is just a
-                            //  Coinbase is  not respecting start/end times
-                            continue;
-
-                        } else {
-                            if (!foundFirst) {
-                                // FIXME: Why are we only using the first sub-candle here?
-                                currentTill = currCandle.get(0).asInt();
-                                lastTradePrice = currCandle.get(4).asDouble();
-                                foundFirst = true;
-                            }
-                        }
-
-                        openPrice = currCandle.get(3).asDouble();
-
-                        if (currCandle.get(2).asDouble() > highSoFar) {
-                            highSoFar = currCandle.get(2).asDouble();
-                        }
-
-                        if (currCandle.get(1).asDouble() < lowSoFar) {
-                            lowSoFar = currCandle.get(1).asDouble();
-                        }
-
-                        volumeSoFar += currCandle.get(5).asDouble();
-                    }
-
-                    int openTime = (int) (currentCandleStartedAt.toEpochMilli() / 1000L);
-
-                    return Optional.of(new InProgressCandleData(openTime, openPrice, highSoFar, lowSoFar,
-                            currentTill, lastTradePrice, volumeSoFar));
-                });
-    }
 
 
     private @NotNull JSONObject getJSON() {
@@ -854,7 +607,7 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public void onError(Exception ex) {
+    public void onError(@NotNull Exception ex) {
         System.out.println("Error");
         JSONObject jsonObject = getJSON();
         System.out.println(jsonObject.toString(4));
@@ -867,7 +620,7 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public double getLivePrice(TradePair tradePair) {
+    public double getLivePrice(@NotNull TradePair tradePair) {
         requestBuilder.uri(URI.create("https://api.binance.us/api/v3/prices/" + tradePair.toString('/') + "/ticker"));
         requestBuilder.GET().build();
 
@@ -1006,12 +759,12 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public void withdraw(Double value) throws IOException, InterruptedException {
+    public void withdraw(Double value) {
 
-        String currency = tradePair.baseCurrency.code;
+        String currency = tradePair.getBaseCurrency().code;
         String address
                 = "234567";
-        String addressTag = tradePair.baseCurrency.code;
+        String addressTag = tradePair.getBaseCurrency().code;
         requestBuilder.uri(
                 URI.create("https://api.binance.us/" +
                         "api/v3/withdraw" +
@@ -1022,10 +775,14 @@ public class BinanceUs extends Exchange {
         );
         String body =
                 requestBuilder.build().method();
-        client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        ).request().expectContinue();
+        try {
+            client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            ).request().expectContinue();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println(body);
         JSONObject jsonObject = getJSON();
         System.out.println(jsonObject.toString(4));
@@ -1040,30 +797,29 @@ public class BinanceUs extends Exchange {
         System.out.println(jsonObject.toString(4));
 
         String uriStr = "https://api.binance.us/" +
-                "api/v3/orders/" + tradePair.toString('/') +
-                "?side=" + buy +
-                "&type=" + market +
-                "&quantity=" + quantity +
-                "&timestamp=" + timestamp +
-                "&orderId=" + orderID +
-                "&stopPrice=" + stopPrice +
-                "&takeProfitPrice=" + takeProfitPrice;
+                "api/v3/orders/" + tradePair.toString('/');
+
+        String[] body =
+                {
+                        "{\"symbol\":\"" + tradePair.toString('/') + "\",\"side\":\"" + buy + "\",\"type"
+                                + "\":\"" + market + "\",\"quantity\":\"" + quantity + "\",\"timestamp\":\"" + timestamp + "\",\"orderId\":\"" + orderID + "\",\"stopPrice\":\"" + stopPrice + "\",\"takeProfitPrice\":\"" + takeProfitPrice + "\"}"
+
+                };
 
         System.out.println(uriStr);
 
         requestBuilder.POST(HttpRequest.BodyPublishers.ofString(
-                uriStr
+                Arrays.toString(body)
+
 
         ));
-        //requestBuilder.POST(HttpRequest.BodyPublishers.ofString())
-        String body =
-                requestBuilder.build().method();
+
+
         client.send(
                 requestBuilder.build(),
                 HttpResponse.BodyHandlers.ofString()
         ).request().expectContinue();
 
-        System.out.println(body);
 
     }
 
@@ -1287,18 +1043,19 @@ public class BinanceUs extends Exchange {
 
 
             symbol = baseAsset;
-                currencies.add(new Currency(
-                                       CurrencyType.CRYPTO, symbol, symbol, symbol,
-                                       Integer.parseInt(baseAssetPrecision), symbol, "") {
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
+            currencies.add(new CryptoCurrency(
+                    symbol, symbol, symbol,
+                    Integer.parseInt(baseAssetPrecision), symbol, symbol) {
+                @Override
+                public int compareTo(@NotNull Currency o) {
+                    return 0;
+                }
 
-                    @Override
-                    public int compareTo(java.util.@NotNull Currency o) {
-                        return 0;
-                    }});
+                @Override
+                public int compareTo(java.util.@NotNull Currency o) {
+                    return 0;
+                }
+            });
 
 
 
@@ -1325,7 +1082,7 @@ public class BinanceUs extends Exchange {
 
             logger.info(currencies.toString());
         }
-
+        Currency.registerCurrencies(currencies);
         return currencies;
     }
 
@@ -1362,14 +1119,19 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public void closeAllOrders() throws IOException, InterruptedException {
+    public void closeAllOrders() {
         URI uri = URI.create("https://api.binance.us/api/v3/cancel");
         requestBuilder.uri(uri);
         requestBuilder.DELETE();
-        HttpResponse<String> response = client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> response;
+        try {
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         if (response.statusCode() == 200) {
             JSONObject json = new JSONObject(response.body());
             System.out.println(json);
@@ -1403,7 +1165,7 @@ public class BinanceUs extends Exchange {
         //  ,{"symbol":"RNDRUSDT","status":"TRADING","baseAsset":"RNDR","baseAssetPrecision":8,"quoteAsset":"USDT","quotePrecision":8,"quoteAssetPrecision":8,"baseCommissionPrecision":8,"quoteCommissionPrecision":8,"orderTypes":["LIMIT","LIMIT_MAKER","MARKET","STOP_LOSS_LIMIT","TAKE_PROFIT_LIMIT"],"icebergAllowed":true,"ocoAllowed":true,"quoteOrderQtyMarketAllowed":true,"allowTrailingStop":true,"cancelReplaceAllowed":true,"isSpotTradingAllowed":true,"isMarginTradingAllowed":false,"filters":[{"filterType":"PRICE_FILTER","minPrice":"0.00100000","maxPrice":"1000.00000000","tickSize":"0.00100000"}
 
 
-        File file = null;
+        File file;
         try {
 
 
@@ -1473,6 +1235,29 @@ public class BinanceUs extends Exchange {
                             "isMarginTradingAllowed: " + jsonNode.get("isMarginTradingAllowed").asText() + "\n"
             );
 
+
+            CryptoCurrency currency = new CryptoCurrency(
+                    baseAsset,
+                    baseAsset,
+                    baseAsset,
+                    Integer.parseInt(baseAssetPrecision),
+                    baseAsset, baseAsset
+
+
+            );
+
+//            if (java.util.Currency.getAvailableCurrencies().stream().anyMatch(c -> c.getCurrencyCode().equals(currency.code))) {
+//                Log.info(
+//                        "Currency already registered: " , currency.code
+//                );
+//                //skipping if currency is already in the list
+//            }else {
+//                //registering the currency
+
+
+            Currency.registerCurrency(currency);
+
+
             data.add(
                     baseAsset + "/" + quoteAsset
             );
@@ -1483,18 +1268,20 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public void connect(String text, String text1, String userIdText) throws IOException, InterruptedException {
-requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
-        requestBuilder.header("Content-Type", "application/json");
-        requestBuilder.header("Accept", "application/json");
-        requestBuilder.header("X-MBX-APIKEY", text);
-        requestBuilder.header("X-MBX-APISECRET", text1);
-        api_key=text;
+    public void connect(String text, String text1, String userIdText) {
+        requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
 
-        HttpResponse<String> response = client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
+        api_key = text;
+
+        HttpResponse<String> response = null;
+        try {
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         JSONObject json = new JSONObject(response);
 //        System.out.println(json);
 //        System.out.println(json.get("status"));
@@ -1504,7 +1291,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         if (json.get("status").equals("ok")) {
             System.out.println(json.get("serverTime"));
             System.out.println(json.get("time"));
-            isConnected=true;
+            isConnected = true;
         }else {
             isConnected=false;
         }
@@ -1579,6 +1366,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         if (response.statusCode() == 200) {
             jsonObject = new JSONObject(response.body());
             System.out.println(jsonObject.toString(4));
+            new BinanceUsAccount(jsonObject);
             return new BinanceUsAccount(jsonObject);
         } else {
             System.out.println(response.statusCode());
@@ -1604,7 +1392,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         if (response.statusCode() == 200) {
             jsonObject = new JSONObject(response.body());
             System.out.println(jsonObject.toString(4));
-            return;
+
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
@@ -1614,17 +1402,21 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
     @Override
-    public void getOpenOrder(TradePair tradePair) throws IOException, InterruptedException {
+    public void getOpenOrder(TradePair tradePair) {
         String uriStr = "https://api.binance.us/api/v3/openOrders";
         requestBuilder.uri(URI.create(uriStr));
         requestBuilder.GET();
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response;
+        try {
+            response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         JSONObject jsonObject;
 
         if (response.statusCode() == 200) {
             jsonObject = new JSONObject(response.body());
             System.out.println(jsonObject.toString(4));
-            return;
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
@@ -1644,7 +1436,6 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
         if (response.statusCode() == 200) {
             jsonObject = new JSONObject(response.body());
             System.out.println(jsonObject.toString(4));
-            return;
         } else {
             System.out.println(response.statusCode());
             System.out.println(response.body());
@@ -1654,11 +1445,16 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
     @Override
-    public List<Order> getPendingOrders() throws IOException, InterruptedException {
+    public List<Order> getPendingOrders() {
         String uriStr = "https://api.binance.us/api/v3/pendingOrders";
         requestBuilder.uri(URI.create(uriStr));
         requestBuilder.GET();
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = null;
+        try {
+            response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         JSONObject jsonObject;
 
         if (response.statusCode() == 200) {
@@ -1704,16 +1500,21 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
     @Override
-    public void cancelAllOrders() throws IOException, InterruptedException {
+    public void cancelAllOrders() {
         requestBuilder.uri(
                 URI.create("https://api.binance.us/api/v3/orders")
         );
         requestBuilder.DELETE();
 
-        HttpResponse<String> response = client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> response;
+        try {
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         JSONObject json = new JSONObject(response.body());
         System.out.println(json);
         System.out.println(json.get("status"));
@@ -1732,16 +1533,23 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
     @Override
-    public void cancelAllOpenOrders() throws IOException, InterruptedException {
+    public void cancelAllOpenOrders() {
         requestBuilder.uri(
                 URI.create("https://api.binance.us/api/v3/openOrders")
         );
         requestBuilder.DELETE();
 
-        HttpResponse<String> response = client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> response = null;
+        try {
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         JSONObject json = new JSONObject(response.body());
         System.out.println(json);
         System.out.println(json.get("status"));
@@ -1759,18 +1567,28 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
     @Override
-    public ListView<Order> getOrderView() throws IOException, InterruptedException {
+    public ListView<Order> getOrderView() {
         ListView<Order> orders = new ListView<>();
 
         requestBuilder.uri(
                 URI.create("https://api.binance.us/api/v3/orders")
         );
 
-        HttpResponse<String> response = client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
-        JsonNode json = OBJECT_MAPPER.readTree(response.body());
+        HttpResponse<String> response;
+        try {
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        JsonNode json;
+        try {
+            json = OBJECT_MAPPER.readTree(response.body());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println(json);
         System.out.println(json.get("orders").toString());
 //[
@@ -1844,14 +1662,24 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
     @Override
-    public List<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException {
+    public List<OrderBook> getOrderBook(TradePair tradePair) {
         requestBuilder.uri(URI.create(url + "orderBook"));
         requestBuilder.GET();
-        HttpResponse<String> response = client.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString()
-        );
-        JsonNode json = OBJECT_MAPPER.readTree(response.body());
+        HttpResponse<String> response;
+        try {
+            response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        JsonNode json = null;
+        try {
+            json = OBJECT_MAPPER.readTree(response.body());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println(json);
         System.out.println(json.get("asks").toString());
         System.out.println(json.get("bids").toString());
@@ -1890,7 +1718,7 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
     }
 
 
-    public static abstract class BinanceUsCandleDataSupplier extends CandleDataSupplier {
+    public static class BinanceUsCandleDataSupplier extends CandleDataSupplier {
         private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -1904,17 +1732,27 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
 
 
         @Override
-        public List<CandleData> getCandleData() throws IOException, InterruptedException {
+        public List<CandleData> getCandleData() {
             List<CandleData> candles = new ArrayList<>();
 
 
             requestBuilder.uri(URI.create(url + "klines?symbol=" + tradePair.toString('/')));
             requestBuilder.GET();
-            HttpResponse<String> response = client.send(
-                    requestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofString()
-            );
-            JsonNode json = OBJECT_MAPPER.readTree(response.body());
+            HttpResponse<String> response = null;
+            try {
+                response = client.send(
+                        requestBuilder.build(),
+                        HttpResponse.BodyHandlers.ofString()
+                );
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            JsonNode json = null;
+            try {
+                json = OBJECT_MAPPER.readTree(response.body());
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
             System.out.println(json);
             System.out.println(json.get("klines").toString());
             System.out.println(json.get("time").toString());
@@ -1939,6 +1777,190 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
 
             return candles;
         }
+
+        @Override
+        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+            return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair);
+        }
+
+        @Override
+        public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
+                TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+                    currentCandleStartedAt, ZoneOffset.UTC));
+            // Get the closest supported granularity to the ideal granularity.
+
+
+            String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                    .format(LocalDateTime.ofEpochSecond(new Date().getTime(), 23, ZoneOffset.UTC));
+
+            Log.info("Start date: " + startDateString, "");
+            Log.info("End date: " + endDateString, "");
+            Log.info("TradePair " + tradePair, "");
+            Log.info("Second per Candle: " + secondsPerCandle, "");
+            String x;
+            String str;
+            if (secondsPerCandle < 3600) {
+                x = String.valueOf(secondsPerCandle / 60);
+                str = "m";
+            } else if (secondsPerCandle < 86400) {
+                x = String.valueOf((secondsPerCandle / 3600));
+                str = "h";
+            } else if (secondsPerCandle < 604800) {
+                x = String.valueOf(secondsPerCandle / 86400);
+                str = "d";
+            } else if (secondsPerCandle < 2592000) {
+                x = String.valueOf((secondsPerCandle / 604800));
+                str = "w";
+            } else {
+                x = String.valueOf((secondsPerCandle * 7 / 2592000 / 7));
+                str = "M";
+            }
+            String timeFrame = x + str;
+
+            return client.sendAsync(
+                            requestBuilder
+                                    .uri(URI.create(
+                                            "https://api.binance.us/api/v3/klines?symbol=" + tradePair.toString('/') + "&interval=" + timeFrame
+                                    ))
+                                    .GET().build(),
+                            HttpResponse.BodyHandlers.ofString())
+                    .thenApply(HttpResponse::body)
+                    .thenApply(response -> {
+                        Log.info("BinanceUs response: ", response);
+                        JsonNode res;
+                        try {
+                            res = OBJECT_MAPPER.readTree(response);
+                            logger.info(response);
+                        } catch (JsonProcessingException ex) {
+                            throw new RuntimeException(ex);
+                        }
+
+                        if (res.isEmpty()) {
+                            return Optional.empty();
+                        }
+
+                        JsonNode currCandle;
+                        Iterator<JsonNode> candleItr = res.iterator();
+                        int currentTill = -1;
+                        double openPrice = -1;
+                        double highSoFar = -1;
+                        double lowSoFar = Double.MAX_VALUE;
+                        double volumeSoFar = 0;
+                        double lastTradePrice = -1;
+                        boolean foundFirst = false;
+                        while (candleItr.hasNext()) {
+                            currCandle = candleItr.next();
+                            if (currCandle.get(0).asInt() < currentCandleStartedAt.getEpochSecond() ||
+                                    currCandle.get(0).asInt() >= currentCandleStartedAt.getEpochSecond() +
+                                            secondsPerCandle) {
+                                // skip this sub-candle if it is not in the parent candle's duration (this is just a
+                                //  Coinbase is  not respecting start/end times
+                                continue;
+
+                            } else {
+                                if (!foundFirst) {
+                                    // FIXME: Why are we only using the first sub-candle here?
+                                    currentTill = currCandle.get(0).asInt();
+                                    lastTradePrice = currCandle.get(4).asDouble();
+                                    foundFirst = true;
+                                }
+                            }
+
+                            openPrice = currCandle.get(3).asDouble();
+
+                            if (currCandle.get(2).asDouble() > highSoFar) {
+                                highSoFar = currCandle.get(2).asDouble();
+                            }
+
+                            if (currCandle.get(1).asDouble() < lowSoFar) {
+                                lowSoFar = currCandle.get(1).asDouble();
+                            }
+
+                            volumeSoFar += currCandle.get(5).asDouble();
+                        }
+
+                        int openTime = (int) (currentCandleStartedAt.toEpochMilli() / 1000L);
+
+                        return Optional.of(new InProgressCandleData(openTime, openPrice, highSoFar, lowSoFar,
+                                currentTill, lastTradePrice, volumeSoFar));
+                    });
+        }
+
+
+        @Override
+        public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+            Objects.requireNonNull(tradePair);
+            Objects.requireNonNull(stopAt);
+
+            if (stopAt.isAfter(Instant.now())) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+
+            CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
+            CompletableFuture.runAsync(() -> {
+                IntegerProperty afterCursor = new SimpleIntegerProperty(0);
+                List<Trade> tradesBeforeStopTime = new ArrayList<>();
+
+                // For Public Endpoints, our rate limit is 3 requests per second, up to 6 requests per second in
+                // burst.
+                // We will know if we get rate limited if we get a 429 response code.
+                for (int i = 0; !futureResult.isDone(); i++) {
+                    String uriStr = "https://api.binance.us/api/v3/";
+                    uriStr += "trades?symbol=" + tradePair.toString('/');
+
+                    if (i != 0) {
+                        uriStr += "?after=" + afterCursor.get();
+                    }
+                    requestBuilder.uri(URI.create(uriStr));
+                    requestBuilder.GET();
+                    try {
+                        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                        Log.info("response headers-->: ", response.toString());
+                        if (response.headers().firstValue("date").isEmpty()) {
+                            futureResult.completeExceptionally(new RuntimeException("InvestPro.CurrencyDataProvider.BinanceUs trades response did not contain header \"date\": " + response.body()));
+
+                        }
+                        afterCursor.setValue(Integer.valueOf((response.headers().firstValue("CB-AFTER").get())));
+                        JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
+                        if (!tradesResponse.isArray()) {
+                            futureResult.completeExceptionally(new RuntimeException(
+                                    "InvestPro.CurrencyDataProvider.BinanceUs trades response was not an array!"));
+                        }
+                        if (tradesResponse.isEmpty()) {
+                            futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
+                        } else {
+                            for (int j = 0; j < tradesResponse.size(); j++) {
+                                JsonNode trade = tradesResponse.get(j);
+                                Instant time = Instant.from(ISO_INSTANT.parse(trade.get("time").asText()));
+                                if (time.compareTo(stopAt) <= 0) {
+                                    futureResult.complete(tradesBeforeStopTime);
+                                    break;
+                                } else {
+                                    tradesBeforeStopTime.add(new Trade(tradePair,
+                                            trade.get("p").asDouble(),
+
+                                            trade.get("q").asDouble(),
+
+                                            Side.getSide(trade.get("S").asText()), trade.at("E").asLong(),
+                                            Date.from(Instant.from(ISO_INSTANT.parse(trade.get("t").asText()))).getTime()));
+
+                                    logger.info(
+                                            "tradesBeforeStopTime: " + tradesBeforeStopTime);
+
+                                }
+                            }
+                        }
+                    } catch (IOException | InterruptedException ex) {
+                        Log.error("ex: " + ex);
+                        futureResult.completeExceptionally(ex);
+                    }
+                }
+            });
+
+            return futureResult;
+        }
+
 
         @Override
         public Future<List<CandleData>> get() {
@@ -1993,8 +2015,6 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
                         }
 
                         if (!res.isEmpty()) {
-
-
                             if (res.has("message")) {
                                 System.out.println(res.get("message").asText());
                                 return
@@ -2028,16 +2048,12 @@ requestBuilder.uri(URI.create("https://api.binance.us/api/v3/"));
                             candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                             return candleData;
                         } else {
-                            new Message("BinanceUs Error", response);
+
                             return Collections.emptyList();
                         }
                     });
         }
 
-            public abstract CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle (TradePair
-            tradePair, Instant currentCandleStartedAt,long secondsIntoCurrentCandle, int secondsPerCandle);
-
-            public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil (TradePair tradePair, Instant stopAt);
-        }
+    }
 
 }

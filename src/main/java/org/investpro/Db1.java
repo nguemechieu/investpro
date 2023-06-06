@@ -324,7 +324,7 @@ public class Db1 implements Db {
         return false;
     }
 
-    public void registerCurrencies(@NotNull Collection<FiatCurrency> currencies) throws SQLException {
+    public void registerCurrencies(@NotNull Collection<Currency> currencies) throws SQLException {
         //Create table currencies if not exits
         conn.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS " +
                 "currencies (" +
@@ -417,7 +417,7 @@ public class Db1 implements Db {
 
     public Currency getCurrency(String code) throws SQLException {
         // Get currency from database
-        Currency newCurrency = null;
+        Currency newCurrency;
 
         conn.createStatement().execute("CREATE TABLE IF NOT EXISTS currencies (code VARCHAR(255), full_display_name VARCHAR(255), short_display_name VARCHAR(255), fractional_digits INTEGER, symbol VARCHAR(255), image VARCHAR(255), currency_type VARCHAR(255));");
 

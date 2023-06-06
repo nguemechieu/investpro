@@ -35,30 +35,18 @@ import javafx.scene.control.Label;
 import javafx.scene.control.SkinBase;
 import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
-    private static final List<CssMetaData<? extends Styleable, ?>> STYLEABLES;
-    static {
-        final List<CssMetaData<? extends Styleable, ?>> styleables = new ArrayList<>(SkinBase.getClassCssMetaData());
-        STYLEABLES = Collections.unmodifiableList(styleables);
-    }
-
     private final StackPane thumb;
     private final StackPane thumbArea;
     private final Label label;
     private final StackPane labelContainer;
     private final TranslateTransition transition;
     private boolean firstLayout = true;
-    /**
-     * How many milliseconds it should take for the thumb to go from
-     * one edge to the other
-     */
-    private DoubleProperty thumbMoveAnimationTime;
 
     protected ToggleSwitchSkin(ToggleSwitch control) {
         super(control);
@@ -76,14 +64,6 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         thumbArea.setOnMouseReleased(event -> mousePressedOnToggleSwitch(control));
         thumb.setOnMouseReleased(event -> mousePressedOnToggleSwitch(control));
         control.selectedProperty().addListener((observable, oldValue, newValue) -> selectedStateChanged());
-    }
-
-    /**
-     * @return The CssMetaData associated with this class, which may include the
-     * CssMetaData of its super classes.
-     */
-    public static List<CssMetaData<? extends Styleable, ?>> getClassCssMetaData() {
-        return STYLEABLES;
     }
 
     private void selectedStateChanged() {
@@ -112,13 +92,19 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         transition.play();
     }
 
-    private void updateLabel(@NotNull ToggleSwitch skinnable) {
-        label.setText(skinnable.isOn() ? skinnable.getTurnOnText() : skinnable.getTurnOffText());
+    private static final List<CssMetaData<? extends Styleable, ?>> STYLEABLES;
+
+    static {
+        final List<CssMetaData<? extends Styleable, ?>> styleables = new ArrayList<>(SkinBase.getClassCssMetaData());
+        styleables.add(THUMB_MOVE_ANIMATION_TIME);
+        STYLEABLES = Collections.unmodifiableList(styleables);
     }
 
-    private void mousePressedOnToggleSwitch(@NotNull ToggleSwitch toggleSwitch) {
-        toggleSwitch.setSelected(!toggleSwitch.isOn());
-    }
+    /**
+     * How many milliseconds it should take for the thumb to go from
+     * one edge to the other
+     */
+    private DoubleProperty thumbMoveAnimationTime;
 
     private DoubleProperty thumbMoveAnimationTimeProperty() {
         if (thumbMoveAnimationTime == null) {
@@ -223,10 +209,16 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         return getSkinnable().prefWidth(height);
     }
 
-    @Override
-    protected double computeMaxHeight(double width, double topInset, double rightInset, double bottomInset,
-                                      double leftInset) {
-        return getSkinnable().prefHeight(width);
+    /**
+     * @return The CssMetaData associated with this class, which may include the
+     * CssMetaData of its super classes.
+     */
+    public static List<CssMetaData<? extends Styleable, ?>> getClassCssMetaData() {
+        return STYLEABLES;
+    }
+
+    private void updateLabel(ToggleSwitch skinnable) {
+        label.setText(skinnable.isOn() ? skinnable.getTurnOnText() : skinnable.getTurnOffText());
     }    private static final CssMetaData<ToggleSwitch, Number> THUMB_MOVE_ANIMATION_TIME = new CssMetaData<>(
             "-thumb-move-animation-time", StyleConverter.getSizeConverter(), 300) {
         @Override
@@ -243,13 +235,21 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         }
     };
 
+    private void mousePressedOnToggleSwitch(ToggleSwitch toggleSwitch) {
+        toggleSwitch.setSelected(!toggleSwitch.isOn());
+    }
+
     @Override
-    public List<CssMetaData<? extends Styleable, ?>> getCssMetaData() {
-        return getClassCssMetaData();
+    protected double computeMaxHeight(double width, double topInset, double rightInset, double bottomInset,
+                                      double leftInset) {
+        return getSkinnable().prefHeight(width);
     }
 
 
 
-
+    @Override
+    public List<CssMetaData<? extends Styleable, ?>> getCssMetaData() {
+        return getClassCssMetaData();
+    }
 }
 

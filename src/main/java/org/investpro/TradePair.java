@@ -21,8 +21,7 @@ public class TradePair extends Pair<Currency, Currency> {
 
     Currency baseCurrency;
     Currency counterCurrency;
-    private String tradePairCode;
-    private Iterable<? extends Trade> trades;
+
     long orderListId;
     long id;
 
@@ -31,7 +30,6 @@ public class TradePair extends Pair<Currency, Currency> {
         this.baseCurrency = baseCurrency;
         this.counterCurrency = counterCurrency;
 
-        logger.debug("TradePair created: {}", this);
         logger.debug("TradePair created: {}", this);
 
     }
@@ -222,18 +220,6 @@ public class TradePair extends Pair<Currency, Currency> {
         return new Date();
     }
 
-    public void setTradePairCode(String tradePairCode) {
-        this.tradePairCode = tradePairCode;
-    }
-
-    public Iterable<? extends Trade> getTrades() {
-
-        return trades;
-    }
-
-    public long getOrderListId() {
-        return orderListId;
-    }
 
     public long getId() {
         return id;

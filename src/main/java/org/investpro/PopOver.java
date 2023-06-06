@@ -1,5 +1,3 @@
-package org.investpro;
-
 //CHECKSTYLE:OFF
 /*
  * Copyright (c) 2013 - 2015 ControlsFX
@@ -28,22 +26,12 @@ package org.investpro;
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-
-import static java.util.Objects.requireNonNull;
-import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
+package org.investpro;
 
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.event.EventHandler;
@@ -57,6 +45,9 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
+
+import static java.util.Objects.requireNonNull;
+import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
 
 /**
  * The PopOver control provides detailed information about an owning node in a
@@ -124,7 +115,7 @@ public class PopOver extends PopupControl {
     }
 
     /**
-     * Creates a pop over with the given node as the content node.
+     * Creates a pop-over with the given node as the content node.
      *
      * @param content The content shown by the pop over
      */
@@ -257,16 +248,32 @@ public class PopOver extends PopupControl {
         Bounds bounds = owner.localToScreen(owner.getBoundsInLocal());
 
         switch (getArrowLocation()) {
-            case BOTTOM_CENTER, BOTTOM_LEFT, BOTTOM_RIGHT -> show(owner, bounds.getMinX() + bounds.getWidth() / 2,
-                    bounds.getMinY() + offset);
-            case LEFT_BOTTOM, LEFT_CENTER, LEFT_TOP -> show(owner, bounds.getMaxX() - offset,
-                    bounds.getMinY() + bounds.getHeight() / 2);
-            case RIGHT_BOTTOM, RIGHT_CENTER, RIGHT_TOP -> show(owner, bounds.getMinX() + offset,
-                    bounds.getMinY() + bounds.getHeight() / 2);
-            case TOP_CENTER, TOP_LEFT, TOP_RIGHT -> show(owner, bounds.getMinX() + bounds.getWidth() / 2,
-                    bounds.getMinY() + bounds.getHeight() - offset);
-            default -> {
-            }
+            case BOTTOM_CENTER:
+            case BOTTOM_LEFT:
+            case BOTTOM_RIGHT:
+                show(owner, bounds.getMinX() + bounds.getWidth() / 2,
+                        bounds.getMinY() + offset);
+                break;
+            case LEFT_BOTTOM:
+            case LEFT_CENTER:
+            case LEFT_TOP:
+                show(owner, bounds.getMaxX() - offset,
+                        bounds.getMinY() + bounds.getHeight() / 2);
+                break;
+            case RIGHT_BOTTOM:
+            case RIGHT_CENTER:
+            case RIGHT_TOP:
+                show(owner, bounds.getMinX() + offset,
+                        bounds.getMinY() + bounds.getHeight() / 2);
+                break;
+            case TOP_CENTER:
+            case TOP_LEFT:
+            case TOP_RIGHT:
+                show(owner, bounds.getMinX() + bounds.getWidth() / 2,
+                        bounds.getMinY() + bounds.getHeight() - offset);
+                break;
+            default:
+                break;
         }
     }
 
@@ -452,22 +459,30 @@ public class PopOver extends PopupControl {
         Bounds bounds = PopOver.this.getSkin().getNode().getBoundsInParent();
 
         switch (getArrowLocation()) {
-            case TOP_CENTER, TOP_LEFT, TOP_RIGHT -> {
+            case TOP_CENTER:
+            case TOP_LEFT:
+            case TOP_RIGHT:
                 setAnchorX(getAnchorX() + bounds.getMinX() - computeXOffset());
                 setAnchorY(getAnchorY() + bounds.getMinY() + getArrowSize());
-            }
-            case LEFT_TOP, LEFT_CENTER, LEFT_BOTTOM -> {
+                break;
+            case LEFT_TOP:
+            case LEFT_CENTER:
+            case LEFT_BOTTOM:
                 setAnchorX(getAnchorX() + bounds.getMinX() + getArrowSize());
                 setAnchorY(getAnchorY() + bounds.getMinY() - computeYOffset());
-            }
-            case BOTTOM_CENTER, BOTTOM_LEFT, BOTTOM_RIGHT -> {
+                break;
+            case BOTTOM_CENTER:
+            case BOTTOM_LEFT:
+            case BOTTOM_RIGHT:
                 setAnchorX(getAnchorX() + bounds.getMinX() - computeXOffset());
                 setAnchorY(getAnchorY() - bounds.getMinY() - bounds.getMaxY() - 1);
-            }
-            case RIGHT_TOP, RIGHT_BOTTOM, RIGHT_CENTER -> {
+                break;
+            case RIGHT_TOP:
+            case RIGHT_BOTTOM:
+            case RIGHT_CENTER:
                 setAnchorX(getAnchorX() - bounds.getMinX() - bounds.getMaxX() - 1);
                 setAnchorY(getAnchorY() + bounds.getMinY() - computeYOffset());
-            }
+                break;
         }
     }
 
@@ -484,15 +499,22 @@ public class PopOver extends PopupControl {
     private double computeYOffset() {
         double prefContentHeight = getContentNode().prefHeight(-1);
 
-        return switch (getArrowLocation()) {
-            case LEFT_TOP, RIGHT_TOP -> getCornerRadius() + getArrowIndent() + getArrowSize();
-            case LEFT_CENTER, RIGHT_CENTER -> Math.max(prefContentHeight, 2 * (getCornerRadius()
-                    + getArrowIndent() + getArrowSize())) / 2;
-            case LEFT_BOTTOM, RIGHT_BOTTOM -> Math.max(prefContentHeight - getCornerRadius()
-                    - getArrowIndent() - getArrowSize(), getCornerRadius()
-                    + getArrowIndent() + getArrowSize());
-            default -> 0;
-        };
+        switch (getArrowLocation()) {
+            case LEFT_TOP:
+            case RIGHT_TOP:
+                return getCornerRadius() + getArrowIndent() + getArrowSize();
+            case LEFT_CENTER:
+            case RIGHT_CENTER:
+                return Math.max(prefContentHeight, 2 * (getCornerRadius()
+                        + getArrowIndent() + getArrowSize())) / 2;
+            case LEFT_BOTTOM:
+            case RIGHT_BOTTOM:
+                return Math.max(prefContentHeight - getCornerRadius()
+                        - getArrowIndent() - getArrowSize(), getCornerRadius()
+                        + getArrowIndent() + getArrowSize());
+            default:
+                return 0;
+        }
     }
 
     /**

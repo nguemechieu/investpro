@@ -2,110 +2,107 @@ package org.investpro;
 
 import com.jfoenix.controls.RecursiveTreeItem;
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
-
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.text.ParseException;
 import java.util.Objects;
-import java.util.Properties;
 
+import static org.investpro.ENUM_EXCHANGE_LIST.*;
 import static org.investpro.NewsManager.load;
+
 
 public class TradingWindow extends AnchorPane {
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
+
+
     public TradingWindow() throws Throwable {
         super();
 
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
            for (ENUM_EXCHANGE_LIST i : ENUM_EXCHANGE_LIST.values()) {
-               DraggableTab tab = new DraggableTab(i.name(), "/InvestPro.png");
-               if (i.getIcon() != null) {
-                   tab.setGraphic(new ImageView((String) i.getIcon()));
-               }
-               tabPane.getTabs().add(tab);
-               @NotNull Exchange exchange;
 
 
-               exchange = switch (i) {
-//                case
-//                        BINANCE:
-//                    new Binance(
-//                            api_key,
-//                            api_secret,
-//                            account_id);
-                   case BINANCE_US -> new BinanceUs(
-                           "odkr6pfbgl10ZM7i2D4kZ8FgOZLDjzs3iAY2IV2E67Cm316dkQs397bScVzhH4b1","3ilQvixaFv3Y1sdZ48jO0JqShoQUU6SdQkbviOAgIB2zHR9xu8J7hQSPZGqzxoTd");
-//                case BITSTAMP: {
-//
-//                     new Bitstamp(
-//                            api_key,
-//                            api_secret,
-//                            account_id);
-//
-//                }
-//               case BITFINEX:
-//                    exchange = new Bitfinex(
-//                            api_key,
-//
-//                            api_secret,
-//                            account_id
-//                    );
-//                    break;
-//                case BITTREX:
-//                    exchange =
-//                            new Bittrex(
-//
-//                                    api_key,
-//
-//                                    api_secret,
-//                                    account_id
-//                            );
-//                    break;
+//            if (i== BINANCE) {
+//                exchange = new Binance(
+//                        "wewrtyuieo",
+//                        "rteyuidfgh",
+//                        "001-001-2783446-002"
+//                );
+//            } else if (i== BITSTAMP) {
+//                exchange = new Bitstamp(
+//                        "ghjkslx","001-001-2783446-002",
+//                        "001-001-2783446-002"
+//                );
+//            }else if (i==BITFINEX) {
+//                exchange = new Bitfinex(
+//                        "wewrtyuieo",
+//                        "rteyuidfgh",
+//                        "001-001-2783446-002"
+//                );
+//            }else if (i==BITTREX) {
+//                exchange = new Bittrex(
+//                        "wewrtyuieo",
+//                        "rteyuidfgh",
+//                        "001-001-2783446-002"
+//                );
+//            }else
+               Exchange exchange = null;
+               if (i == BINANCE_US) {
 
-                   case OANDA -> new Oanda("001-001-2783446-002",
+
+                   exchange = new BinanceUs(
+                           "odkr6pfbgl10ZM7i2D4kZ8FgOZLDjzs3iAY2IV2E67Cm316dkQs397bScVzhH4b1",
+                           "3ilQvixaFv3Y1sdZ48jO0JqShoQUU6SdQkbviOAgIB2zHR9xu8J7hQSPZGqzxoTd");
+               } else if (i == OANDA) {
+                   exchange = new Oanda("001-001-2783446-002",
 
                            "690b43930d606088874f601a03c254d1-ff286fb3b7ba0459d8db9398dc6297f6");
-//                case POLONIEX:
-//                    exchange = new Poloniex(
+               } else if (i == COINBASE_PRO) {
+
+                   exchange = new Coinbase(
+                           "3ilQvixaFv3Y1sdZ48jO0JqShoQUU6SdQkbviOAgIB2zHR9xu8J7hQSPZGqzxoTd",
+                           "690b43930d606088874f601a03c254d1-ff286fb3b7ba0459d8db9398dc6297f6");
+               }
+
+//               else if (i==POLONIEX ) {
+//                exchange = new Poloniex(
+//                        "wewrtyuieo",
+//                        "rteyuidfgh",
+//                        "001-001-2783446-002"
+//                );
 //
-//                            api_key,
-//                            api_secret,
-//                            account_id
-//                    );
-//                    break;
-//                case KUCOIN:
-//                    exchange = new Kucoin(
+//            }else if (i==KUCOIN) {
 //
-//                            api_key,
-//                            api_secret,
-//                            account_id
-//                    );
-//                    break;
+//                exchange = new Kucoin(
+//                        "wewrtyuieo",
+//                        "rteyuidfgh",
+//                        "001-001-2783446-002"
+//
+//                );
 
-                   default -> new Coinbase(
-                           "gUl2gfk/zu9o6rqicLtBokMupgGG3j8AqC1kQvZfOj8qDUQdPT0dhDiK0NIOkFPLsGNQ9MjfYtIBHKSieQaJDw==",
-                           "zdkva105scm"
+               //}
 
 
-                   );
-               };
-
+               DraggableTab tab = new DraggableTab(i.name());
                tab.setContent(
                        new VBox(new Label(i.name(),
                                new Separator(Orientation.VERTICAL)),
                                new TradeView(exchange, "2125623831:AAGtuhGO9JxHh72nYfD6WN6mog7UkDIIL0o")));
+
+               tabPane.getTabs().add(tab);
+
+
            }
 
         tabPane.getTabs().addAll(getNewsTab(),browserTab());
@@ -122,21 +119,24 @@ public class TradingWindow extends AnchorPane {
 
     private @NotNull Tab browserTab() {
 
-        return new DraggableTab("Browser", "");
+        return new DraggableTab("Browser");
     }
 
     private @NotNull Tab getNewsTab() throws ParseException {
         Tab newsTab = new Tab("News");
-        TreeTableView<News>tree = new TreeTableView<>();
+        TreeTableView<News> tree = new TreeTableView<>();
 
-        ObservableList<News> ob= FXCollections.observableArrayList();
-        ob.addAll(load());
+        ObservableList<News> ob = FXCollections.observableArrayList();
+        try {
+            ob.addAll(load());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         RecursiveTreeItem<News> root = new RecursiveTreeItem<>(ob, RecursiveTreeObject::getChildren);
-           root.setExpanded(true);
-           root.setValue(
-                   ob.get(0)
-           );
-
+        root.setExpanded(true);
+        root.setValue(
+                ob.get(0)
+        );
 
 
         tree.setRoot(root);

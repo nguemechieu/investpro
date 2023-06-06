@@ -71,10 +71,10 @@ public class Order extends RecursiveTreeObject<Order> {
         this.lotSize = lotSize;
         this.price = String.valueOf(price);
         this.stopLoss = stopLoss;
-        this.symbol = tradePair.getCounterCurrency().symbol;
+        this.symbol = tradePair.getCounterCurrency().getSymbol();
         this.type = order_type;
 
-        this.currency = tradePair.getCounterCurrency().symbol;
+        this.currency = tradePair.getCounterCurrency().getSymbol();
         this.created = String.valueOf(new Date());
         this.takeProfit = takeProfit;
         this.updated = new Date();

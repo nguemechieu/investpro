@@ -1,13 +1,13 @@
 package org.investpro;
 
 import javafx.util.Pair;
-import org.jetbrains.annotations.NotNull;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-import static org.investpro.Coinbase.logger;
-
+/**
+ * @author Michael Ennen
+ */
 public final class CandleStickChartUtils {
     private static final int SECONDS_PER_MINUTE = 60;
     private static final int SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
@@ -17,7 +17,6 @@ public final class CandleStickChartUtils {
     private static final int SECONDS_PER_YEAR = 12 * SECONDS_PER_MONTH;
 
     private CandleStickChartUtils() {
-        throw new UnsupportedOperationException();
     }
 
     /**
@@ -38,10 +37,10 @@ public final class CandleStickChartUtils {
      * <p>The extrema are calculated using the "Sliding Window Maximum" algorithm adapted to get both the maximum
      * and minimum for both the volume and high/low candle prices.
      *
-     * @param extrema    the map to put the calculated extrema in to
+     * @param extrema the map to put the calculated extrema in to
      * @param candleData the candle data to extract the extrema from
      * @param windowSize the sliding window size (which corresponds to the number of visible candles for the
-     *                   current zoom level)
+     * current zoom level)
      * @see <a href="http://articles.leetcode.com/2011/01/sliding-window-maximum.html">
      * Sliding Window Maximum</a>
      */
@@ -54,15 +53,14 @@ public final class CandleStickChartUtils {
             throw new IllegalArgumentException("candleData must not be empty");
         }
         if (windowSize > candleData.size()) {
-            logger.warn("windowSize must be less than or equal to candleData.size()");
-            return;
-
+            throw new IllegalArgumentException("windowSize (" + windowSize + ") must be less than size of " +
+                    "candleData (" + candleData.size() + ")");
         }
 
-        Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
-        Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
-        Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
-        Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
 
         for (int i = 0; i < windowSize; i++) {
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=
@@ -90,8 +88,10 @@ public final class CandleStickChartUtils {
                     candleData.get(candleMaxWindow.peekLast()).getHighPrice()) {
                 candleMaxWindow.pollLast();
             }
+
             candleMaxWindow.addLast(i);
         }
+
         for (int i = windowSize; i < candleData.size(); i++) {
             extrema.put(candleData.get(i - windowSize).getOpenTime(), new Pair<>(
                     new Extrema<>((int) candleData.get(volumeMinWindow.peekFirst()).getVolume(),
@@ -129,14 +129,18 @@ public final class CandleStickChartUtils {
             while (!candleMinWindow.isEmpty() && candleMinWindow.peekFirst() <= i - windowSize) {
                 candleMinWindow.pollFirst();
             }
+
             candleMinWindow.addLast(i);
+
             while (!candleMaxWindow.isEmpty() && candleData.get(i).getHighPrice() >=
                     candleData.get(candleMaxWindow.peekLast()).getHighPrice()) {
                 candleMaxWindow.pollLast();
             }
+
             while (!candleMaxWindow.isEmpty() && candleMaxWindow.peekFirst() <= i - windowSize) {
                 candleMaxWindow.pollFirst();
             }
+
             candleMaxWindow.addLast(i);
         }
 
@@ -147,7 +151,14 @@ public final class CandleStickChartUtils {
                         (int) Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
     }
 
-
+    /**
+     * Adds the extrema for the most recent candle data (which must be sized to the number of visible candles
+     * for the current zoom level) which allows for scrolling the chart past the point where all of the most
+     * recent candles are visible.
+     *
+     * @param extrema
+     * @param candleData
+     */
     public static void putExtremaForRemainingElements(Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extrema,
                                                       final List<CandleData> candleData) {
         Objects.requireNonNull(extrema, "extrema must not be null");
@@ -182,8 +193,11 @@ public final class CandleStickChartUtils {
     /**
      * Returns the InstantAxisFormatter to use for the tick mark labels based on
      * the given range (upper bound - lower bound) of the x-axis. Work in progress.
+     *
+     * @param rangeInSeconds
+     * @return
      */
-    public static @NotNull InstantAxisFormatter getXAxisFormatterForRange(final double rangeInSeconds) {
+    public static InstantAxisFormatter getXAxisFormatterForRange(final double rangeInSeconds) {
         InstantAxisFormatter result;
 
         if (rangeInSeconds > SECONDS_PER_YEAR) {
@@ -202,6 +216,4 @@ public final class CandleStickChartUtils {
 
         return result;
     }
-
-
 }

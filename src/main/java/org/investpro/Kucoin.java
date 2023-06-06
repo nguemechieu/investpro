@@ -130,10 +130,6 @@ public class Kucoin extends Exchange {
                 };
     }
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
-        return null;
-    }
 
 //    private @Nullable String timestampSignature(
 //            String apiKey,
@@ -246,6 +242,16 @@ public class Kucoin extends Exchange {
         });
 
         return futureResult;
+    }
+
+    @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
+
     }
 
     /**

@@ -13,11 +13,6 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.websocket.ClientEndpointConfig;
-import javax.websocket.Endpoint;
-import javax.websocket.Extension;
-import javax.websocket.Session;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.WebSocket;
@@ -25,8 +20,6 @@ import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -37,10 +30,8 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private final Set<TradePair> tradePairs =
-            Collections.synchronizedSet(Collections.newSetFromMap(
-                    Collections.synchronizedMap(new HashMap<>())));
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
+    private final boolean supportsStreamingTrades;
 
     Account connectionEstablished = new Account();
 
@@ -50,9 +41,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                 "wss://ws-feed.pro.coinbase.com"
         ), new Draft_6455());
 
+        this.connect();
+        this.supportsStreamingTrades = true;
 
     }
-
     @Override
     public void onMessage(String message) {
         JsonNode messageJson;
@@ -110,11 +102,11 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         final String[] products = productId.split("-");
         TradePair tradePair;
         if (products[0].equalsIgnoreCase("BTC")) {
-            tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
+            tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, Currency.class));
         } else {
             // products[0] == "ETH"
             if (products[1].equalsIgnoreCase("usd")) {
-                tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, FiatCurrency.class));
+                tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, Currency.class));
             } else {
                 // productId == "ETH-BTC"
                 tradePair = TradePair.parse(productId, "-", new Pair<>(CryptoCurrency.class, CryptoCurrency.class));
@@ -125,31 +117,31 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
 
+    @Override
+    public void onClose(int code, String reason, boolean remote) {
+        connectionEstablished.setValue(false);
+    }
 
+    @Override
+    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+        liveTradeConsumers.put(tradePair, liveTradesConsumer);
+
+    }
 
     @Override
     public void stopStreamLiveTrades(TradePair tradePair) {
         liveTradeConsumers.remove(tradePair);
+
     }
 
     @Override
     public boolean supportsStreamingTrades(TradePair tradePair) {
-        return tradePairs.contains(tradePair);
-    }
-
-    @Override
-    public boolean isStreamingTradesSupported(TradePair tradePair) {
         return false;
     }
 
     @Override
     public boolean isStreamingTradesEnabled(TradePair tradePair) {
         return false;
-    }
-
-    @Override
-    public void request(long n) {
-
     }
 
     @Override
@@ -163,123 +155,14 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public CompletableFuture<WebSocket> sendPing(ByteBuffer message) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<WebSocket> sendPong(ByteBuffer message) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<WebSocket> sendClose(int statusCode, String reason) {
-        return null;
-    }
-
-    @Override
-    public String getSubprotocol() {
-        return null;
-    }
-
-    @Override
-    public boolean isOutputClosed() {
-        return false;
-    }
-
-    @Override
-    public boolean isInputClosed() {
-        return false;
-    }
-
-    @Override
-    public void abort() {
-        connectionEstablished.setValue(false);
-        logger.info("aborting websocket connection");
-    }
-
-    @Override
-    public long getDefaultAsyncSendTimeout() {
-        return 0;
-    }
-
-    @Override
-    public void setAsyncSendTimeout(long timeout) {
-
-    }
-
-    @Override
-    public Session connectToServer(Object endpoint, ClientEndpointConfig path) {
-        return null;
-    }
-
-    @Override
-    public Session connectToServer(Class<?> annotatedEndpointClass, URI path) {
-        return null;
-    }
-
-    @Override
-    public Session connectToServer(Endpoint endpoint, ClientEndpointConfig clientEndpointConfiguration, URI path) {
-        return null;
-    }
-
-    @Override
-    public Session connectToServer(Class<? extends Endpoint> endpoint, ClientEndpointConfig clientEndpointConfiguration, URI path) {
-        return null;
-    }
-
-    @Override
-    public long getDefaultMaxSessionIdleTimeout() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultMaxSessionIdleTimeout(long timeout) {
-
-    }
-
-    @Override
-    public int getDefaultMaxBinaryMessageBufferSize() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultMaxBinaryMessageBufferSize(int max) {
-
-    }
-
-    @Override
-    public int getDefaultMaxTextMessageBufferSize() {
-        return 0;
-    }
-
-    @Override
-    public void setDefaultMaxTextMessageBufferSize(int max) {
-
-    }
-
-    @Override
-    public Set<Extension> getInstalledExtensions() {
-        return null;
-    }
-
-    @Override
-    public double getPrice(TradePair tradePair) throws IOException, InterruptedException {
-        return 0;
-    }
-
-
-
-
-    @Override
-    public void onClose(int code, String reason, boolean remote) {
-        connectionEstablished.setValue(false);
-    }
-
-    @Override
     public void onError(Exception ex) {
         logger.error("Coinbase websocket client error: ", ex);
 
+    }
+
+    @Override
+    public boolean connectBlocking() {
+        return false;
     }
 
     @Override
@@ -288,4 +171,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
 
+    public boolean isSupportsStreamingTrades() {
+        return supportsStreamingTrades;
+    }
 }

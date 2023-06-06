@@ -12,8 +12,6 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
-
 public class ConnectionScene extends Parent {
     public ConnectionScene(@NotNull Exchange exchange) {
         StackPane stackPane = new StackPane();
@@ -53,11 +51,7 @@ gridPane.add(btnConnect,1,3);
 
         }
 
-            try {
-                exchange.connect(finalTextField.getText(), finalTextField.getText(), userId.getText());
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            exchange.connect(finalTextField.getText(), finalTextField.getText(), userId.getText());
             if (exchange.isConnected()) {
                 btnConnect.setBackground(
                         Background.fill(javafx.scene.paint.Color.GREEN)

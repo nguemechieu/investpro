@@ -1,11 +1,10 @@
 package org.investpro;
 
-import org.jetbrains.annotations.NotNull;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-
 
 public class LogOnExceptionThreadFactory implements ThreadFactory {
     private final AtomicInteger threadIndex = new AtomicInteger(1);
@@ -17,7 +16,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
      * exception handler that logs uncaught exceptions.
      *
      * @param threadNamePrefix the prefix of the thread name that will
-     *                         show up in logs, etc.
+     * show up in logs, etc.
      */
     public LogOnExceptionThreadFactory(String threadNamePrefix) {
         this(threadNamePrefix, Thread.NORM_PRIORITY);
@@ -29,7 +28,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
     }
 
     @Override
-    public Thread newThread(@NotNull Runnable runnable) {
+    public Thread newThread(Runnable runnable) {
         Objects.requireNonNull(runnable, "runnable must not be null");
         String threadName = threadNamePrefix + "-Thread-" + threadIndex.getAndIncrement();
 
@@ -38,7 +37,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
             thread.setPriority(threadPriority);
         }
 
-        thread.setUncaughtExceptionHandler((t, e) -> Log.error(t.getName() + (e.getMessage() + e)));
+        thread.setUncaughtExceptionHandler((t, e) -> LoggerFactory.getLogger(t.getName()).error(e.getMessage(), e));
 
         return thread;
     }

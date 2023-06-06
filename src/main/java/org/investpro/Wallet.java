@@ -9,9 +9,7 @@ import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.sql.SQLException;
-import java.text.ParseException;
 
 public class Wallet extends Stage {
     public Wallet(@NotNull Exchange exchange) {
@@ -26,7 +24,7 @@ public class Wallet extends Stage {
         gridPane.add(new Label("Name: " + exchange.getName()), 0, 0);
         try {
             gridPane.add(new Label("Symbol: " + exchange.getTradePair()), 0, 1);
-        } catch (IOException | InterruptedException | ParseException | URISyntaxException | SQLException |
+        } catch (IOException | InterruptedException | SQLException |
                  ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -51,13 +49,7 @@ public class Wallet extends Stage {
         depositBtn.setOnAction(e -> exchange.deposit(spinner.getValue()));
         gridPane.add(depositBtn, 0, 8);
         Button withdrawBtn = new Button("Withdraw");
-        withdrawBtn.setOnAction(e -> {
-            try {
-                exchange.withdraw(spinner.getValue());
-            } catch (IOException | InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
-        });
+        withdrawBtn.setOnAction(e -> exchange.withdraw(spinner.getValue()));
 
         gridPane.add(withdrawBtn, 10, 8);
         setScene(gridPane.getScene());

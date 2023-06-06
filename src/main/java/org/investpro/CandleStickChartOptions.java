@@ -7,91 +7,17 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Encapsulates all the possible options for a CandleStickChart.
+ * Encapsulates all of the possible options for a CandleStickChart.
+ *
+ * @author Michael Ennen
  */
 public class CandleStickChartOptions {
     private final VBox optionsPane;
-    /**
-     * {@literal true} if vertical grid lines should be drawn at major tick marks along the x-axis
-     */
-    private final ReadOnlyBooleanWrapper verticalGridLinesVisible = new ReadOnlyBooleanWrapper(false) {
-        @Override
-        public Object getBean() {
-            return CandleStickChartOptions.this;
-        }
-
-        @Contract(pure = true)
-        @Override
-        public @NotNull String getName() {
-            return "Vertical Grid Lines";
-        }
-    };
-    /**
-     * {@literal true} if horizontal grid lines should be drawn at major tick marks along the y-axis
-     */
-    private final ReadOnlyBooleanWrapper horizontalGridLinesVisible = new ReadOnlyBooleanWrapper(false) {
-        @Override
-        public Object getBean() {
-            return CandleStickChartOptions.this;
-        }
-
-        @Contract(pure = true)
-        @Override
-        public @NotNull String getName() {
-            return "Horizontal Grid Lines";
-        }
-    };
-    /**
-     * {@literal true} if volume bars should be drawn along the bottom of the chart
-     */
-    private final ReadOnlyBooleanWrapper showVolume = new ReadOnlyBooleanWrapper(true) {
-        @Override
-        public Object getBean() {
-            return CandleStickChartOptions.this;
-        }
-
-        @Contract(pure = true)
-        @Override
-        public @NotNull String getName() {
-            return "Volume Bars";
-        }
-    };
-    /**
-     * {@literal true} if the close price of candle at index N should be aligned (the same as) with the open price
-     * of the candle at index N+1.
-     */
-    private final ReadOnlyBooleanWrapper alignOpenClose = new ReadOnlyBooleanWrapper(false) {
-        @Override
-        public Object getBean() {
-            return CandleStickChartOptions.this;
-        }
-
-        @Contract(pure = true)
-        @Override
-        public @NotNull String getName() {
-            return "Align Open/Close";
-        }
-    };
-    private final ReadOnlyBooleanWrapper newsGridLinesVisible =
-            new ReadOnlyBooleanWrapper(false) {
-                @Override
-                public Object getBean() {
-                    return CandleStickChartOptions.this;
-                }
-
-                @Contract(pure = true)
-                @Override
-                public @NotNull String getName() {
-                    return "News Grid Lines";
-                }
-            };
 
     public CandleStickChartOptions() {
         optionsPane = new VBox();
@@ -115,6 +41,21 @@ public class CandleStickChartOptions {
         return optionsPane;
     }
 
+    /**
+     * {@literal true} if vertical grid lines should be drawn at major tick marks along the x-axis
+     */
+    private final ReadOnlyBooleanWrapper verticalGridLinesVisible = new ReadOnlyBooleanWrapper(false) {
+        @Override
+        public Object getBean() {
+            return CandleStickChartOptions.this;
+        }
+
+        @Override
+        public String getName() {
+            return "Vertical Grid Lines";
+        }
+    };
+
     public final boolean isVerticalGridLinesVisible() {
         return verticalGridLinesVisible.get();
     }
@@ -122,6 +63,21 @@ public class CandleStickChartOptions {
     public final ReadOnlyBooleanProperty verticalGridLinesVisibleProperty() {
         return verticalGridLinesVisible.getReadOnlyProperty();
     }
+
+    /**
+     * {@literal true} if horizontal grid lines should be drawn at major tick marks along the y-axis
+     */
+    private final ReadOnlyBooleanWrapper horizontalGridLinesVisible = new ReadOnlyBooleanWrapper(false) {
+        @Override
+        public Object getBean() {
+            return CandleStickChartOptions.this;
+        }
+
+        @Override
+        public String getName() {
+            return "Horizontal Grid Lines";
+        }
+    };
 
     public final boolean isHorizontalGridLinesVisible() {
         return horizontalGridLinesVisible.get();
@@ -131,6 +87,21 @@ public class CandleStickChartOptions {
         return horizontalGridLinesVisible.getReadOnlyProperty();
     }
 
+    /**
+     * {@literal true} if volume bars should be drawn along the bottom of the chart
+     */
+    private final ReadOnlyBooleanWrapper showVolume = new ReadOnlyBooleanWrapper(true) {
+        @Override
+        public Object getBean() {
+            return CandleStickChartOptions.this;
+        }
+
+        @Override
+        public String getName() {
+            return "Volume Bars";
+        }
+    };
+
     public final boolean isShowVolume() {
         return showVolume.get();
     }
@@ -139,6 +110,22 @@ public class CandleStickChartOptions {
         return showVolume.getReadOnlyProperty();
     }
 
+    /**
+     * {@literal true} if the close price of candle at index N should be aligned (the same as) with the open price
+     * of the candle at index N+1.
+     */
+    private final ReadOnlyBooleanWrapper alignOpenClose = new ReadOnlyBooleanWrapper(false) {
+        @Override
+        public Object getBean() {
+            return CandleStickChartOptions.this;
+        }
+
+        @Override
+        public String getName() {
+            return "Align Open/Close";
+        }
+    };
+
     public final boolean isAlignOpenClose() {
         return alignOpenClose.get();
     }
@@ -146,29 +133,6 @@ public class CandleStickChartOptions {
     public final ReadOnlyBooleanProperty alignOpenCloseProperty() {
         return alignOpenClose.getReadOnlyProperty();
     }
-
-    public final ReadOnlyBooleanProperty isNewsGridLinesVisible() {
-
-        return newsGridLinesVisible.getReadOnlyProperty();
-    }
-
-    public boolean isAutoTrading() {
-        return true;
-    }
-
-    public void setAutoTrading(boolean b) {
-        ;
-
-        if (b) {
-            verticalGridLinesVisible.set(true);
-            horizontalGridLinesVisible.set(true);
-            showVolume.set(true);
-            alignOpenClose.set(true);
-            newsGridLinesVisible.set(true);
-
-        }
-    }
-
 
     private static class ChartOption {
         private final ToggleSwitch optionSwitch;
@@ -180,5 +144,4 @@ public class CandleStickChartOptions {
             optionLabel = new Label(optionProperty.getName() + ':');
         }
     }
-
 }

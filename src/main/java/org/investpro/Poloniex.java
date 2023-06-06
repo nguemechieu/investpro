@@ -28,7 +28,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -49,14 +48,7 @@ public class Poloniex extends Exchange {
     String url = "https://poloniex.com/public?command=returnTicker";
     private final String apiKey;
 
-    public Poloniex(String POLONIEX_API_KEY ) throws TelegramApiException, IOException, ParseException, InterruptedException {
-        super(null);
-        this.apiKey = POLONIEX_API_KEY;
-        requestBuilder.header("Accept", "application/json");
-        requestBuilder.header("Content-Type", "application/json");
-        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
-        requestBuilder.header("X-MBX-APIKEY", apiKey);
-    }
+
 
     public Poloniex(String poloniexApiKey, String s, String s1) {
         super(null);
@@ -147,10 +139,6 @@ public class Poloniex extends Exchange {
                 };
     }
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle() {
-        return null;
-    }
 
     private @Nullable String timestampSignature(
             String apiKey,
@@ -260,13 +248,15 @@ public class Poloniex extends Exchange {
                                 futureResult.complete(tradesBeforeStopTime);
                                 break;
                             } else {
+//                                Side side=
+//                                        Side.valueOf(trade.get("side").asText());
 //                                tradesBeforeStopTime.add(new Trade(tradePair,
-//                                        messageJson.get("p").asDouble(),
+//                                        trade.get("p").asDouble(),
 //
-//                                        messageJson.get("q").asDouble(),
+//                                        trade.get("q").asDouble(),
 //
-//                                        side, messageJson.at("E").asLong(),
-//                                        Instant.from(ISO_INSTANT.parse(messageJson.get("t").asText()))));
+//                                        , trade.at("E").asLong(),
+//                                        Instant.from(ISO_INSTANT.parse(trade.get("t").asText()))));
                             }
                         }
                     }
@@ -278,6 +268,16 @@ public class Poloniex extends Exchange {
         });
 
         return futureResult;
+    }
+
+    @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
+
     }
 
     /**
@@ -623,10 +623,15 @@ public class Poloniex extends Exchange {
 
 
     @Override
-    public void closeAllOrders() throws IOException, InterruptedException {
+    public void closeAllOrders() {
         requestBuilder.uri(
                 URI.create("https://api.exchange.coinbase.com/orders"));
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = null;
+        try {
+            response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         if (response.statusCode() == 200) {
             JSONObject jsonObject = new JSONObject(response.body());
             System.out.println(jsonObject.toString(4));
@@ -776,7 +781,7 @@ public class Poloniex extends Exchange {
     }
 
     @Override
-    public List<Order> getPendingOrders() throws IOException, InterruptedException {
+    public List<Order> getPendingOrders() {
         return null;
     }
 

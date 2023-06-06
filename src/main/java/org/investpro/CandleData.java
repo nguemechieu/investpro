@@ -1,73 +1,40 @@
 package org.investpro;
 
 import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
-import jakarta.persistence.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.Serial;
-import java.io.Serializable;
-import java.util.Date;
 import java.util.Objects;
 
-@Entity
-@Inheritance(strategy = InheritanceType.JOINED)
-@Access(AccessType.FIELD)
-@Table(name = "CandleData")
-
-public class CandleData extends RecursiveTreeObject<CandleData> implements Serializable {
-    @Serial
-    private static final long serialVersionUID = 1L;
-
-public static final Logger logger = LoggerFactory.getLogger(CandleData.class);
-
-    public int closeTime;
-    public Date time = new Date();
-    int openTime;
-    double openPrice;
-    double closePrice;
-    double highPrice;
-    double lowPrice;
-    double volume;
-
-    private boolean placeHolder;
-    @Id
-    private Long id;
+/**
+ * @author Michael Ennen
+ */
+public class CandleData extends RecursiveTreeObject<CandleData> {
+    private final double openPrice;
+    private final double closePrice;
+    private final double highPrice;
+    private final double lowPrice;
+    private final int openTime;
+    private final double volume;
+    private final double averagePrice;
+    private final double volumeWeightedAveragePrice;
+    private final boolean placeHolder;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
                       double volume) {
+        this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
+                volume * ((highPrice + lowPrice) / 2), false);
+    }
 
-
-        if (openTime == -1 && openPrice == 1 && closePrice == -1 && highPrice == -1 && lowPrice == -1 && volume == -1) {
-
-            throw new IllegalArgumentException("Invalid CandleData openTime: " + openTime + " closeTime: " + closePrice + " highPrice: " + highPrice + " lowPrice: " + lowPrice);
-
-        }
-
-        this.openTime = openTime;
+    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
+                      double volume, double averagePrice, double volumeWeightedAveragePrice, boolean placeHolder) {
         this.openPrice = openPrice;
         this.closePrice = closePrice;
         this.highPrice = highPrice;
         this.lowPrice = lowPrice;
+        this.openTime = openTime;
         this.volume = volume;
-
-        this.placeHolder = false;
-        this.setId(Math.round(Math.random() * 1000000000));
-
-        logger.info("CandleData created with id: " + this.id);
-    }
-
-    public CandleData() {
-
-    }
-
-
-    public int getCloseTime() {
-        return closeTime;
-    }
-
-    public void setCloseTime(int closeTime) {
-        this.closeTime = closeTime;
+        this.averagePrice = averagePrice;
+        this.volumeWeightedAveragePrice = volumeWeightedAveragePrice;
+        this.placeHolder = placeHolder;
     }
 
     public double getOpenPrice() {
@@ -95,14 +62,11 @@ public static final Logger logger = LoggerFactory.getLogger(CandleData.class);
     }
 
     public double getAveragePrice() {
+        return averagePrice;
+    }
 
-        double p = openPrice + closePrice + highPrice + lowPrice;
-        if (p == 0) {
-            return 0;
-        }
-        return p / 4;
-
-
+    public double getVolumeWeightedAveragePrice() {
+        return volumeWeightedAveragePrice;
     }
 
     public boolean isPlaceHolder() {
@@ -121,53 +85,31 @@ public static final Logger logger = LoggerFactory.getLogger(CandleData.class);
 
         CandleData other = (CandleData) object;
 
-        return openPrice == other.openPrice && closePrice == other.closePrice && highPrice == other.highPrice && lowPrice == other.lowPrice && Objects.equals(openTime, other.openTime) && volume == other.volume && placeHolder == other.placeHolder;
+        return openPrice == other.openPrice &&
+                closePrice == other.closePrice &&
+                highPrice == other.highPrice &&
+                lowPrice == other.lowPrice &&
+                openTime == other.openTime &&
+                volume == other.volume &&
+                averagePrice == other.averagePrice &&
+                volumeWeightedAveragePrice == other.volumeWeightedAveragePrice &&
+                placeHolder == other.placeHolder;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(openPrice, closePrice, highPrice, lowPrice, openTime, volume,
-                placeHolder);
+        return Objects.hash(openPrice, closePrice, highPrice, lowPrice, openTime, volume, averagePrice,
+                volumeWeightedAveragePrice, placeHolder);
     }
 
     @Override
     public String toString() {
-        return "CandleData{" +
-
-                ", closeTime=" + closeTime +
-                ", openTime=" + openTime +
-                ", openPrice=" + openPrice +
-                ", closePrice=" + closePrice +
-                ", highPrice=" + highPrice +
-                ", lowPrice=" + lowPrice +
-                ", volume=" + volume +
-                ", placeHolder=" + placeHolder +
-                ", id=" + id +
-                '}';
+        return String.format("CandleData [openPrice = %f, closePrice = %f, highPrice = %f, lowPrice = %f, " +
+                        "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
+                openTime, volume, placeHolder);
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public double getChangePercent() {
-        return (closePrice - openPrice) / openPrice * 100;
-    }
-
-    public Date getTimestamp() {
-        return new Date(openTime * 1000L);
-    }
-
-
-    public double getVolumeSoFar() {
-        return volume;
-    }
-
-    public void setOpenTime(int openTime) {
-        this.openTime = openTime;
+    public String getTimestamp() {
+        return String.valueOf(openTime);
     }
 }
