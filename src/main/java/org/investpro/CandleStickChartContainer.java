@@ -33,7 +33,24 @@ public class CandleStickChartContainer extends Region {
     public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean b, String telegramBotToken) {
         this(exchange, tradePair, b);
         this.telegramBotToken = telegramBotToken;
+        liveSyncing(false);
 
+    }
+
+    private void liveSyncing(boolean b) {
+        boolean liveSyncing = false;
+        if (liveSyncing == b) {
+            return;
+        }
+        liveSyncing = b;
+        if (liveSyncing) {
+            FadeTransition fadeTransition = new FadeTransition(Duration.seconds(1), candleStickChart);
+            fadeTransition.setFromValue(1.0);
+            fadeTransition.setToValue(0.0);
+            fadeTransition.play();
+        } else {
+            candleStickChart.stop();
+        }
     }
 
     public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
@@ -80,7 +97,7 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        //secondsPerCandle.set(300);
+        secondsPerCandle.set(300);
     }
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) {

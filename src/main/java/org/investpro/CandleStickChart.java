@@ -463,6 +463,10 @@ class CandleStickChart extends AnchorPane {
         yAxis.setLayoutY(top);
         extraAxis.setLayoutX(chartWidth - 38);
         extraAxis.setLayoutY((chartHeight - 100) * 0.75);
+        yAxis.setTranslateX(chartWidth -38);
+        extraAxis.setTranslateX(-chartWidth +38);
+        extraAxisExtension.setTranslateX(-chartWidth +38);
+
         xAxis.requestAxisLayout();
         xAxis.layout();
         yAxis.requestAxisLayout();
@@ -923,6 +927,12 @@ class CandleStickChart extends AnchorPane {
     @Override
     protected double computePrefHeight(double width) {
         return chartHeight;
+    }
+
+    public void stop() {
+        if (candleDataPager!= null) {
+            candleDataPager.stop();
+        }
     }
 
     private class SizeChangeListener extends DelayedSizeChangeListener {

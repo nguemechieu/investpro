@@ -9,15 +9,13 @@
     <name>InvestPro</name>
     <url>https://github.com/nguemechieu/investpro</url>
 
-<properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <junit.version>5.9.2</junit.version>
-    <maven.compiler.source>20</maven.compiler.source>
-    <maven.compiler.target>20</maven.compiler.target>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.version>5.9.2</junit.version>
+        <maven.compiler.source>20</maven.compiler.source>
+        <maven.compiler.target>20</maven.compiler.target>
 
-    <mavenVersion>3.0</mavenVersion>
-
-</properties>
+    </properties>
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
@@ -30,12 +28,12 @@
             sonar.links.ci
         </system>
     </ciManagement>
-<issueManagement>
-    <system>
-        sonar.links.issue
-    </system>
-    <url>https://github.com/nguemechieu/invespro/issues</url>
-</issueManagement>
+    <issueManagement>
+        <system>
+            sonar.links.issue
+        </system>
+        <url>https://github.com/nguemechieu/invespro/issues</url>
+    </issueManagement>
     <distributionManagement>
         <downloadUrl>
             https://github.com/nguemechieu/investpro
@@ -81,24 +79,7 @@
             <artifactId>jfoenix</artifactId>
             <version>9.0.10</version>
         </dependency>
-        <dependency>
-            <groupId>org.jfree</groupId>
-            <artifactId>jfreechart</artifactId>
-            <version>1.5.4</version>
-        </dependency>
 
-        <dependency>
-            <groupId>org.jfree</groupId>
-            <artifactId>jfreechart-fx</artifactId>
-            <version>1.0.1</version>
-        </dependency>
-
-        <!-- FXGraphics2D is used for JavaFX support. -->
-        <dependency>
-            <groupId>org.jfree</groupId>
-            <artifactId>org.jfree.fxgraphics2d</artifactId>
-            <version>2.1.4</version>
-        </dependency>
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
@@ -224,16 +205,6 @@
             <version>7.7.0</version>
             <scope>compile</scope>
         </dependency>
-        <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-artifact</artifactId>
-            <version>${mavenVersion}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-core</artifactId>
-            <version>${mavenVersion}</version>
-        </dependency>
 
     </dependencies>
 
@@ -241,7 +212,7 @@
     <build>
 
 
-            <defaultGoal>install</defaultGoal>
+        <defaultGoal>install</defaultGoal>
 
 
         <plugins>
@@ -286,13 +257,4 @@
             </plugin>
         </plugins>
     </build>
-    <repositories>
-        <repository>
-            <id>clojars</id>
-            <name>Clojars</name>
-            <url>https://repo.clojars.org/</url>
-
-        </repository>
-
-    </repositories>
 </project>

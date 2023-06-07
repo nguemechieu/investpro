@@ -9,11 +9,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
-/**
- * Pages new candle data in chronological order to a {@code CandleStickChart} on-demand.
- *
- * @author Michael Ennen
- */
+
 public class CandleDataPager {
     private static final Logger logger = LoggerFactory.getLogger(CandleDataPager.class);
     private final CandleDataSupplier candleDataSupplier;
@@ -24,6 +20,7 @@ public class CandleDataPager {
         Objects.requireNonNull(candleDataSupplier);
         this.candleDataSupplier = candleDataSupplier;
         candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
+        candleDataPreProcessor.start();
     }
 
     public CandleDataSupplier getCandleDataSupplier() {
@@ -32,6 +29,10 @@ public class CandleDataPager {
 
     public Consumer<Future<List<CandleData>>> getCandleDataPreProcessor() {
         return candleDataPreProcessor;
+    }
+
+    public void stop() {
+        candleDataPreProcessor.stop();
     }
 
     private static class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
@@ -67,6 +68,14 @@ public class CandleDataPager {
                     }
                 }
             }
+        }
+
+        public void stop() {
+            hitFirstNonPlaceHolder = false;
+        }
+
+        public void start() {
+            hitFirstNonPlaceHolder = false;
         }
     }
 }
