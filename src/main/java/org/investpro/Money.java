@@ -7,9 +7,9 @@ import java.math.MathContext;
  * @author Michael Ennen
  */
 public interface Money {
-    Number getAmount();
+    Number amount();
 
-    Currency getCurrency();
+    Currency currency();
 
     Money plus(Money summand);
 

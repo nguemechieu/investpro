@@ -2,6 +2,7 @@ package org.investpro.Discord;
 
 
 import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -102,6 +103,7 @@ requestBuilder.header(
 
 
 
+
     }
 
     public static String getApiUrl() {
@@ -155,7 +157,7 @@ requestBuilder.header(
     public void sendMessage(String message) throws IOException, InterruptedException {
         String url = getApiUrl() + getApiVersion() + message;
         System.out.println(url);
-        String photo="";
+        String photo = "xxx";
 
         Thread.sleep(1000);
 

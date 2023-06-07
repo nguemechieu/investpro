@@ -4,7 +4,5 @@ public class DrawSignal {
     public DrawSignal(){
 
 
-
-
     }
 }

@@ -50,6 +50,7 @@ public class TradeView extends Region {
             throw new RuntimeException(e);
         }
 
+
         symbolChoicebox.setValue(exchange.getTradePair().get(0));
 
         double quantity = 1011;

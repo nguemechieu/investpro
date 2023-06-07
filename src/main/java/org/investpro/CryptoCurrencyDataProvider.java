@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -29,8 +30,6 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest.Builder request = HttpRequest.newBuilder();
-        request.header("Accept", "application/json");
-        request.header("Content-Type", "application/json");
         request.uri(URI.create("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"));
 
         HttpResponse<String> response;
@@ -57,9 +56,54 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
             coinsToRegister.add(new CryptoCurrency(
                     jsonObject1.get("name").asText(), jsonObject1.get("name").asText(), jsonObject1.get("id").asText(),
                     jsonObject1.get("current_price").asInt(),
-                    jsonObject1.get("symbol").asText(), jsonObject1.get("image").asText()
+                    jsonObject1.get("symbol").asText(), (jsonObject1.get("image").asText() != null) ? "https://assets.coingecko.com/coins/images/1/large/bitcoin.png?154703"
+                    : jsonObject1.get("image").asText()
 
             ));
+            // Download the image to the folder where the program is running (images/currency)
+
+            try {
+
+                HttpRequest.Builder request1 = HttpRequest.newBuilder();
+                request1.uri(URI.create(jsonObject1.get("image").asText()));
+
+                HttpResponse<InputStream> response1 = client.send(request1.GET().build(), HttpResponse.BodyHandlers.ofInputStream());
+
+
+                if (response1.statusCode() != 200) {
+                    throw new RuntimeException("Failed : HTTP error code : " + response1.statusCode());
+                }
+                //  InputStream inputStream = response1.body();
+                //logger.info(jsonObject1.get("id").asText() + " " + inputStream);
+
+                // Save the image to the folder where the program is running (images/currency)
+//
+//    File file = new File("src/main/resources/images/currency/" + jsonObject1.get("name").asText()+".jpg");
+//
+//    if (!file.exists()) {
+//        file.createNewFile();
+//    }else {
+//        return;
+//    }
+//
+//    OutputStream os = new FileOutputStream(file);
+//
+//    byte[] b = new byte[2048];
+//    int length;
+//
+//    while ((length = inputStream.read(b)) != -1) {
+//        os.write(b, 0, length);
+//    }
+//
+//    os.flush();
+//    os.close();
+//
+
+
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
 
             Log.info("currencies ", coinsToRegister.toString());
         }

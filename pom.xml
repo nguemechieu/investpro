@@ -81,7 +81,24 @@
             <artifactId>jfoenix</artifactId>
             <version>9.0.10</version>
         </dependency>
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>jfreechart</artifactId>
+            <version>1.5.4</version>
+        </dependency>
 
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>jfreechart-fx</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+
+        <!-- FXGraphics2D is used for JavaFX support. -->
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>org.jfree.fxgraphics2d</artifactId>
+            <version>2.1.4</version>
+        </dependency>
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>

@@ -5,7 +5,16 @@
  *                                                                             *
  ******************************************************************************/
 
+
+.label {
+     -fx-background-color: derive(#777777,80.0%);
+     -fx-border-color: derive(#777777,80.0%);
+     -fx-border-radius: 4px;
+     -fx-border-width: 1px;
+
+}
+
 .label:hover {
      -fx-background-color: derive(#777777,80.0%);
-    
+
 }

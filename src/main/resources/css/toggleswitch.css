@@ -30,6 +30,7 @@
 }
 .toggle-switch .thumb-area {
     -fx-padding: 0.75em 1.333333em 0.75em 1.333333em; /* 7 16 7 16 */
+    -fx-alignment: CENTER;
 }
 .toggle-switch:disabled {
     -fx-opacity: 0.4;

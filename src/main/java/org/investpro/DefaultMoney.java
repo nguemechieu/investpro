@@ -1,5 +1,8 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -13,30 +16,26 @@ import java.math.RoundingMode;
  *
  * @author Michael Ennen
  */
-public class DefaultMoney implements Money, Comparable<DefaultMoney> {
+public record DefaultMoney(BigDecimal amount, Currency currency) implements Money, Comparable<DefaultMoney> {
     public static final Money NULL_MONEY = DefaultMoney.ofFiat(BigDecimal.ZERO, Currency.NULL_FIAT_CURRENCY);
 
-    private final BigDecimal amount;
-    private final Currency currency;
-
-    public DefaultMoney(BigDecimal amount, Currency currency) {
-        this.amount = amount;
-        this.currency = currency;
-    }
-
-    public static Money of(int amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(int amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    public static Money of(long amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(long amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    public static Money of(float amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(float amount, Currency currency) {
         return of(new BigDecimal(Float.valueOf(amount).toString()), currency);
     }
 
-    public static Money of(double amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(double amount, Currency currency) {
         return of(new BigDecimal(Double.valueOf(amount).toString()), currency);
     }
 
@@ -60,7 +59,7 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
         return of(new BigDecimal(amount), currencyType, currencyCode);
     }
 
-    public static Money of(BigDecimal amount, CurrencyType currencyType, String currencyCode) {
+    public static Money of(BigDecimal amount, @NotNull CurrencyType currencyType, String currencyCode) {
         return switch (currencyType) {
             case FIAT -> new DefaultMoney(amount, Currency.ofFiat(currencyCode));
             case CRYPTO -> new DefaultMoney(amount, Currency.ofCrypto(currencyCode));
@@ -68,7 +67,8 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
         };
     }
 
-    public static Money of(BigDecimal amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(BigDecimal amount, Currency currency) {
         return new DefaultMoney(amount, currency);
     }
 
@@ -96,11 +96,13 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
         return of(amount, CurrencyType.FIAT, currencyCode);
     }
 
-    public static Money ofFiat(BigDecimal amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money ofFiat(BigDecimal amount, Currency currency) {
         return of(amount, currency);
     }
 
-    public static Money ofFiat(String amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money ofFiat(String amount, Currency currency) {
         return of(new BigDecimal(amount), currency);
     }
 
@@ -186,17 +188,20 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money minus(double amount) {
+    public @NotNull Money minus(double amount) {
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money minus(Money subtrahend) {
+    public @NotNull Money minus(@NotNull Money subtrahend) {
         return minus(subtrahend.toBigDecimal());
     }
 
-    public Money minus(BigDecimal amount) {
+    @Contract("_ -> new")
+    public @NotNull Money minus(BigDecimal amount) {
         return new DefaultMoney(this.amount.subtract(amount), currency);
     }
 
@@ -233,22 +238,12 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
     public boolean isLessThan(Money other) {
         if (other instanceof DefaultMoney money) {
             checkCurrenciesEqual(money);
-            return this.getAmount().compareTo(money.amount) < 0;
+            return this.amount().compareTo(money.amount) < 0;
         } else if (other instanceof FastMoney money) {
-            return this.getAmount().compareTo(money.toBigDecimal()) < 0;
+            return this.amount().compareTo(money.toBigDecimal()) < 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
         }
-    }
-
-    @Override
-    public BigDecimal getAmount() {
-        return this.amount;
-    }
-
-    @Override
-    public Currency getCurrency() {
-        return this.currency;
     }
 
     @Override
@@ -301,7 +296,7 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
         return amount;
     }
 
-    private void checkCurrenciesEqual(DefaultMoney defaultMoney) {
+    private void checkCurrenciesEqual(@NotNull DefaultMoney defaultMoney) {
         if (!currency.equals(defaultMoney.currency)) {
             throw new IllegalArgumentException("currencies are not equal: first currency: "
                     + currency + " second currency: " + defaultMoney.currency);
@@ -309,7 +304,7 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
     }
 
     @Override
-    public int compareTo(DefaultMoney other) {
+    public int compareTo(@NotNull DefaultMoney other) {
         // TODO is this really the behavior we want?
         checkCurrenciesEqual(other);
 
@@ -337,11 +332,12 @@ public class DefaultMoney implements Money, Comparable<DefaultMoney> {
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         switch (currency.getCurrencyType()) {
             case FIAT:
-                return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
+                DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
             case CRYPTO:
+                DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
             case NULL:
             default:
                 return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);

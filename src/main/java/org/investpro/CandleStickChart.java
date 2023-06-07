@@ -16,6 +16,7 @@ import javafx.scene.chart.Axis;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Separator;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -75,7 +76,7 @@ import static org.investpro.ChartColors.*;
  *
  * @author NOEL NGUEMECHIEU
  */
-class CandleStickChart extends Region {
+class CandleStickChart extends AnchorPane {
     private final CandleDataPager candleDataPager;
     private final CandleStickChartOptions chartOptions;
     /**
@@ -127,7 +128,7 @@ class CandleStickChart extends Region {
      *                           candle data, where successive supplies will be farther back in time
      * @param tradePair          the {@code TradePair} that this chart displays trading data for (the base (first) currency
      *                           will be the unit of the volume axis and the counter (second) currency will be the unit of the y-axis)
-     * @param liveSyncing        if {@literal true} the chart will be updated in real-time to reflect on-going trading
+     * @param liveSyncing        if {@literal true} the chart will be updated in real-time to reflect ongoing trading
      *                           activity
      * @param secondsPerCandle   the duration in seconds each candle represents
      * @param containerWidth     the width property of the parent node that contains the chart
@@ -204,6 +205,7 @@ class CandleStickChart extends Region {
         containerWidth.addListener(sizeListener);
         containerHeight.addListener(sizeListener);
 
+
         if (liveSyncing) {
             inProgressCandle = new InProgressCandle();
             updateInProgressCandleTask = new UpdateInProgressCandleTask();
@@ -275,6 +277,14 @@ class CandleStickChart extends Region {
                 drawChartContents(true));
         chartOptions.showVolumeProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
         chartOptions.alignOpenCloseProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
+    }
+
+    private void setGraphic(ImageView imageView) {
+
+        this.backgroundProperty().setValue(
+                new Background(new BackgroundFill(Color.TRANSPARENT, CornerRadii.EMPTY, Insets.EMPTY)));
+
+
     }
 
     private void initializeEventHandlers() {

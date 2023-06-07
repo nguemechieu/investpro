@@ -4,6 +4,12 @@
 .candle-chart-toolbar {
     -fx-alignment: CENTER_LEFT;
     -fx-padding: 0.0 8.0 0.0 0.0;
+    -fx-border-width: 0;
+    -fx-border-radius: 0;
+    -fx-border-color: transparent;
+    -fx-background-color: transparent;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
 }
 .candle-chart-toolbar-button {
     -fx-font-weight: bold;
@@ -26,16 +32,29 @@
 
 .default-color0.chart-series-area-line {
     -fx-stroke: rgb(64, 175, 59);
+    -fx-stroke-width: 1;
+    -fx-stroke-color: rgb(64, 175, 59);
 }
 .default-color1.chart-series-area-line {
     -fx-stroke: rgb(204, 20, 20);
+    -fx-stroke-width: 1;
+    -fx-stroke-color: rgb(204, 20, 20);
 }
 .default-color0.chart-series-area-fill {
     -fx-fill: rgba(50, 137, 46, 0.8);
+    -fx-fill-opacity: 1;
+    -fx-fill-width: 1;
+    -fx-fill-color: rgb(50, 137, 46);
 }
 .default-color1.chart-series-area-fill {
     -fx-fill: rgba(153, 15, 1, 0.8);
+    -fx-fill-opacity: 1;
+    -fx-fill-width: 1;
+    -fx-fill-color: rgb(153, 15, 1);
 }
 .chart-series-area-line {
     -fx-stroke-width: 2px;
+    -fx-stroke-color: rgb(204, 20, 20);
+    -fx-stroke-width: 2px;
+
 }

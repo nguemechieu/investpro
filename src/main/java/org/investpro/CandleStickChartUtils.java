@@ -1,6 +1,7 @@
 package org.investpro;
 
 import javafx.util.Pair;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -64,28 +65,31 @@ public final class CandleStickChartUtils {
 
         for (int i = 0; i < windowSize; i++) {
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=
-                    candleData.get(volumeMinWindow.peekLast()).getVolume()) {
+                    candleData.get((volumeMinWindow.peekLast() == null) ? 0 : volumeMinWindow.peekLast()).getVolume()) {
                 volumeMinWindow.pollLast();
             }
 
             volumeMinWindow.addLast(i);
 
             while (!volumeMaxWindow.isEmpty() && candleData.get(i).getVolume() >=
-                    candleData.get(volumeMaxWindow.peekLast()).getVolume()) {
+                    candleData.get(
+
+                            (volumeMinWindow.peekLast() == null) ? 0 : volumeMinWindow.peekLast()).getVolume()
+            ) {
                 volumeMaxWindow.pollLast();
             }
 
             volumeMaxWindow.addLast(i);
 
             while (!candleMinWindow.isEmpty() && candleData.get(i).getLowPrice() <=
-                    candleData.get(candleMinWindow.peekLast()).getLowPrice()) {
+                    candleData.get((candleMinWindow.peekLast() == null) ? 0 : candleMinWindow.peekLast()).getLowPrice()) {
                 candleMinWindow.pollLast();
             }
 
             candleMinWindow.addLast(i);
 
             while (!candleMaxWindow.isEmpty() && candleData.get(i).getHighPrice() >=
-                    candleData.get(candleMaxWindow.peekLast()).getHighPrice()) {
+                    candleData.get((candleMaxWindow.peekLast() == null) ? 0 : candleMaxWindow.peekLast()).getHighPrice()) {
                 candleMaxWindow.pollLast();
             }
 
@@ -94,13 +98,25 @@ public final class CandleStickChartUtils {
 
         for (int i = windowSize; i < candleData.size(); i++) {
             extrema.put(candleData.get(i - windowSize).getOpenTime(), new Pair<>(
-                    new Extrema<>((int) candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                            (int) Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                    new Extrema<>((int) candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                            (int) Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+                    new Extrema<>((int) candleData.get(
+                            (volumeMinWindow.peekLast() == null) ? 0 : volumeMinWindow.peekFirst()
+
+                    ).getVolume(),
+                            (int) Math.ceil(candleData.get(
+                                    (volumeMaxWindow.peekLast() == null) ? 0 : volumeMaxWindow.peekFirst()
+
+                            ).getVolume())),
+                    new Extrema<>((int) candleData.get(
+                            (candleMinWindow.peekLast() == null) ? 0 : candleMinWindow.peekFirst()
+                    ).getLowPrice(),
+                            (int) Math.ceil(candleData.get(
+                                    (candleMaxWindow.peekLast() == null) ? 0 : candleMaxWindow.peekFirst()
+                            ).getHighPrice()))));
 
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=
-                    candleData.get(volumeMinWindow.peekLast()).getVolume()) {
+                    candleData.get(
+                            (volumeMinWindow.peekLast() == null) ? 0 : volumeMinWindow.peekLast()).getVolume()
+            ) {
                 volumeMinWindow.pollLast();
             }
 
@@ -111,7 +127,9 @@ public final class CandleStickChartUtils {
             volumeMinWindow.addLast(i);
 
             while (!volumeMaxWindow.isEmpty() && candleData.get(i).getVolume() >=
-                    candleData.get(volumeMaxWindow.peekLast()).getVolume()) {
+                    candleData.get(
+                            (volumeMinWindow.peekLast() == null) ? 0 : volumeMinWindow.peekLast()).getVolume()
+            ) {
                 volumeMaxWindow.pollLast();
             }
 
@@ -122,7 +140,9 @@ public final class CandleStickChartUtils {
             volumeMaxWindow.addLast(i);
 
             while (!candleMinWindow.isEmpty() && candleData.get(i).getLowPrice() <=
-                    candleData.get(candleMinWindow.peekLast()).getLowPrice()) {
+                    candleData.get(
+                            (candleMinWindow.peekLast() == null) ? 0 : candleMinWindow.peekLast()).getLowPrice()) {
+
                 candleMinWindow.pollLast();
             }
 
@@ -133,7 +153,9 @@ public final class CandleStickChartUtils {
             candleMinWindow.addLast(i);
 
             while (!candleMaxWindow.isEmpty() && candleData.get(i).getHighPrice() >=
-                    candleData.get(candleMaxWindow.peekLast()).getHighPrice()) {
+                    candleData.get(
+                            (candleMaxWindow.peekLast() == null) ? 0 : candleMaxWindow.peekLast()).getHighPrice()) {
+
                 candleMaxWindow.pollLast();
             }
 
@@ -145,19 +167,27 @@ public final class CandleStickChartUtils {
         }
 
         extrema.put(candleData.get(candleData.size() - windowSize).getOpenTime(), new Pair<>(
-                new Extrema<>((int) candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                        (int) Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                new Extrema<>((int) candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                        (int) Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+                new Extrema<>((int) candleData.get(
+                        (volumeMinWindow.peekLast() == null) ? 0 : volumeMinWindow.peekFirst()
+                ).getVolume(),
+                        (int) Math.ceil(candleData.get(
+                                (volumeMaxWindow.peekLast() == null) ? 0 : volumeMaxWindow.peekFirst()
+                        ).getVolume())),
+                new Extrema<>((int) candleData.get(
+                        (candleMinWindow.peekLast() == null) ? 0 : candleMinWindow.peekFirst()
+                ).getLowPrice(),
+                        (int) Math.ceil(candleData.get(
+                                (candleMaxWindow.peekLast() == null) ? 0 : candleMaxWindow.peekFirst()
+                        ).getHighPrice()))));
     }
 
     /**
      * Adds the extrema for the most recent candle data (which must be sized to the number of visible candles
-     * for the current zoom level) which allows for scrolling the chart past the point where all of the most
+     * for the current zoom level) which allows for scrolling the chart past the point where all the most
      * recent candles are visible.
      *
-     * @param extrema
-     * @param candleData
+     * @param extrema    the map to add the extrema to
+     * @param candleData the list of candle data to add the extrema to
      */
     public static void putExtremaForRemainingElements(Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extrema,
                                                       final List<CandleData> candleData) {
@@ -194,25 +224,38 @@ public final class CandleStickChartUtils {
      * Returns the InstantAxisFormatter to use for the tick mark labels based on
      * the given range (upper bound - lower bound) of the x-axis. Work in progress.
      *
-     * @param rangeInSeconds
-     * @return
+     * @param rangeInSeconds the range in seconds
+     * @return the InstantAxisFormatter to use for the tick mark labels based on
      */
-    public static InstantAxisFormatter getXAxisFormatterForRange(final double rangeInSeconds) {
+    public static @NotNull InstantAxisFormatter getXAxisFormatterForRange(final double rangeInSeconds) {
         InstantAxisFormatter result;
 
         if (rangeInSeconds > SECONDS_PER_YEAR) {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("MMM yy"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern(
+                    "MMMM ''yy"
+            ));
         } else if (rangeInSeconds > 6 * SECONDS_PER_MONTH) {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("MMMM ''yy"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern(
+                    "'Month' w 'of' y"
+            ));
         } else if (rangeInSeconds > 6 * SECONDS_PER_WEEK) {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("'Week' w 'of' y"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern(
+                    "'Week' w 'of' y"
+            ));
         } else if (rangeInSeconds > 10 * SECONDS_PER_DAY) {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("dd MMM"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern(
+                    "'Day' w 'of' y"
+            ));
         } else if (rangeInSeconds > SECONDS_PER_DAY) {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern(
+                    "dd MMM yyyy HH:mm"
+            ));
         } else {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern(
+                    "dd MMM yyyy HH:mm:ss"
+            ));
         }
+
 
         return result;
     }

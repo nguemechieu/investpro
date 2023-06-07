@@ -11,7 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Date;
 
 @Entity
 @Table(name = "Account")
@@ -42,9 +43,8 @@ public class Account extends RecursiveTreeObject<Account> {
     private String state;
     private String openTime;
     private String closeTime;
-    private double frozen;
-    private String permissions;
-
+    double frozen;
+    String permissions;
 
     public Account(@NotNull JSONObject account) {
         logger.info("Account: " + account);
@@ -535,6 +535,7 @@ Object           hold;
 
     public void setMarginCloseoutPositionValue(String marginCloseoutPositionValue) {
         this.marginCloseoutPositionValue = marginCloseoutPositionValue;
+
     }
 
     public String getMarginCloseoutMarginUsed() {

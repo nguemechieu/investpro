@@ -1,6 +1,6 @@
 module org.investpro.investpro {
 
-    uses org.investpro.CodecFactory;
+
     uses org.investpro.ServiceProvider;
     uses org.investpro.CurrencyDataProvider;
 

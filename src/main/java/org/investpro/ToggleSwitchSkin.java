@@ -96,7 +96,7 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
 
     static {
         final List<CssMetaData<? extends Styleable, ?>> styleables = new ArrayList<>(SkinBase.getClassCssMetaData());
-        styleables.add(THUMB_MOVE_ANIMATION_TIME);
+     //   styleables.add(THUMB_MOVE_ANIMATION_TIME);
         STYLEABLES = Collections.unmodifiableList(styleables);
     }
 

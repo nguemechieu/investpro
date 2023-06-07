@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Encapsulates all of the possible options for a CandleStickChart.
+ * Encapsulates all the possible options for a CandleStickChart.
  *
  * @author Michael Ennen
  */
