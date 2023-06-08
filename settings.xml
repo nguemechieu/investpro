@@ -33,4 +33,10 @@
             <password>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</password>
         </server>
     </servers>
+
+
+        <pluginGroups>
+            <pluginGroup>com.github.ferstl</pluginGroup>
+        </pluginGroups>
+
 </settings>
