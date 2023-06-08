@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -154,23 +155,18 @@ public class OandaWebSocket extends ExchangeWebSocketClient {
     }
 
     @Override
-    public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
-        return null;
+    public void sendText(CharSequence data, boolean last) {
     }
 
-    @Override
-    public CompletableFuture<WebSocket> sendBinary(ByteBuffer data, boolean last) {
-        return null;
-    }
 
     @Override
-    public void onError(Exception exception) {
+    public void onError(@NotNull Exception exception) {
         exception.printStackTrace();
 
     }
 
     @Override
-    public boolean connectBlocking() throws InterruptedException {
+    public boolean connectBlocking() {
         return false;
     }
 
@@ -186,5 +182,34 @@ public class OandaWebSocket extends ExchangeWebSocketClient {
 
     }
 
+    @Override
+    public boolean isSupportsStreamingTrades() {
+        return false;
+    }
 
+
+    @Override
+    public void onOpen(org.java_websocket.WebSocket conn, ClientHandshake handshake) {
+
+    }
+
+    @Override
+    public void onClose(org.java_websocket.WebSocket conn, int code, String reason, boolean remote) {
+
+    }
+
+    @Override
+    public void onMessage(org.java_websocket.WebSocket conn, String message) {
+
+    }
+
+    @Override
+    public void onError(org.java_websocket.WebSocket conn, Exception ex) {
+
+    }
+
+    @Override
+    public void onStart() {
+
+    }
 }

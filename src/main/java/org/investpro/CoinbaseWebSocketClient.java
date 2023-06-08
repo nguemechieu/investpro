@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -41,10 +42,72 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                 "wss://ws-feed.pro.coinbase.com"
         ), new Draft_6455());
 
-        this.connect();
+
         this.supportsStreamingTrades = true;
 
     }
+
+    public CoinbaseWebSocketClient(String apiKey, String apiSecret) {
+        super(URI.create(
+                "wss://ws-feed.pro.coinbase.com"
+        ), new Draft_6455(), apiKey, apiSecret);
+
+        this.supportsStreamingTrades = true;
+    }
+
+    @Override
+    public void onOpen(org.java_websocket.WebSocket conn, ClientHandshake handshake) {
+        logger.info("Coinbase websocket client connected");
+
+    }
+
+    @Override
+    public void onClose(org.java_websocket.WebSocket conn, int code, String reason, boolean remote) {
+        logger.info("Coinbase websocket client disconnected");
+
+    }
+
+    @Override
+    public void onMessage(org.java_websocket.WebSocket conn, String message) {
+        JsonNode messageJson;
+        try {
+            messageJson = OBJECT_MAPPER.readTree(message);
+
+            logger.info("Received message from coinbase : " + messageJson.toString());
+        } catch (JsonProcessingException ex) {
+            logger.error("ex: ", ex);
+            throw new RuntimeException(ex);
+        }
+
+        if (messageJson.has("event") && messageJson.get("event").asText().equalsIgnoreCase("info")) {
+            connectionEstablished.setValue(true);
+        }
+
+        TradePair tradePair = null;
+        try {
+            logger.info("onMessage: {}", messageJson);
+            tradePair = parseTradePair(messageJson);
+        } catch (CurrencyNotFoundException | SQLException exception) {
+            logger.error("coinbase websocket client: could not initialize trade pair: " +
+                    messageJson.get("product_id").asText(), exception);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Override
+    public void onError(org.java_websocket.WebSocket conn, Exception ex) {
+        logger.error("Coinbase websocket client error: ", ex);
+
+    }
+
+    @Override
+    public void onStart() {
+        logger.info("Coinbase websocket client started");
+
+    }
+
     @Override
     public void onMessage(String message) {
         JsonNode messageJson;
@@ -76,7 +139,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         switch (messageJson.get("type").asText()) {
             case "heartbeat" ->
-                    send(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString());
+                    sendText(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString(),true);
             case "match" -> {
                 if (liveTradeConsumers.containsKey(tradePair)) {
                     assert tradePair != null;
@@ -145,14 +208,9 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
-        return null;
+    public void sendText(CharSequence data, boolean last) {
     }
 
-    @Override
-    public CompletableFuture<WebSocket> sendBinary(ByteBuffer data, boolean last) {
-        return null;
-    }
 
     @Override
     public void onError(Exception ex) {
@@ -166,11 +224,16 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
+    public @NotNull URI getURI() {
+        return null;
+    }
+
+    @Override
     public void onOpen(ServerHandshake serverHandshake) {
         connectionEstablished.setValue(true);
     }
 
-
+@Override
     public boolean isSupportsStreamingTrades() {
         return supportsStreamingTrades;
     }

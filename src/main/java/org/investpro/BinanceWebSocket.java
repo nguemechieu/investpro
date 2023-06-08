@@ -156,15 +156,8 @@ public abstract class BinanceWebSocket extends ExchangeWebSocketClient {
 
 
     @Override
-    public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
-        return null;
+    public void sendText(CharSequence data, boolean last) {
     }
-
-    @Override
-    public CompletableFuture<WebSocket> sendBinary(ByteBuffer data, boolean last) {
-        return null;
-    }
-
 
 
 

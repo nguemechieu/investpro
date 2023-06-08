@@ -1917,10 +1917,10 @@ public class BinanceUs extends Exchange {
                     try {
                         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
                         Log.info("response headers-->: ", response.toString());
-                        if (response.headers().firstValue("date").isEmpty()) {
-                            futureResult.completeExceptionally(new RuntimeException("InvestPro.CurrencyDataProvider.BinanceUs trades response did not contain header \"date\": " + response.body()));
-
-                        }
+//                        if (response.headers().firstValue("date").isEmpty()) {
+//                            futureResult.completeExceptionally(new RuntimeException("InvestPro.CurrencyDataProvider.BinanceUs trades response did not contain header \"date\": " + response.body()));
+//
+//                        }
                         afterCursor.setValue(Integer.valueOf((response.headers().firstValue("CB-AFTER").get())));
                         JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
                         if (!tradesResponse.isArray()) {
@@ -1929,7 +1929,8 @@ public class BinanceUs extends Exchange {
                         }
                         if (tradesResponse.isEmpty()) {
                             futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
-                        } else {
+                        }
+                        else {
                             for (int j = 0; j < tradesResponse.size(); j++) {
                                 JsonNode trade = tradesResponse.get(j);
                                 Instant time = Instant.from(ISO_INSTANT.parse(trade.get("time").asText()));

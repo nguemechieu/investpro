@@ -1,5 +1,6 @@
 # InvestPro
 ![InvestPro, Inc](src/main/resources/Invest.png)
+[![Maven Package](https://github.com/nguemechieu/investpro/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/maven-publish.yml)
 
 
 ## Description : InvestPro is a  professional investment and utility software 

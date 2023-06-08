@@ -98,29 +98,8 @@ public class Oanda extends Exchange {
     }
 
     private static @NotNull ExchangeWebSocketClient webSocketUrl(String accountId, String apiKey) {
-        OandaWebSocket oandaWebSocket =
-                new OandaWebSocket(accountId)
 
-        ;
-        oandaWebSocket.addHeader("Authorization", "Bearer " + apiKey);
-        oandaWebSocket.addHeader("Content-Type:", "application/octet-stream");
-        oandaWebSocket.addHeader("Origin", "https://api-fxtrade.oanda.com");
-        oandaWebSocket.addHeader("Referer", "https://api-fxtrade.oanda.com/v3/accounts/" + accountId);
-        oandaWebSocket.addHeader("Sec-Fetch-Dest", "empty");
-        oandaWebSocket.addHeader("Sec-Fetch-Mode", "cors");
-        oandaWebSocket.addHeader("Sec-Fetch-Site", "same-origin");
-        oandaWebSocket.addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ( KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
-        oandaWebSocket.addHeader("Access-Control-Allow-Credentials", "true");
-        oandaWebSocket.addHeader(
-                "Access-Control-Allow-Headers",
-                "Origin, X-Requested-With, Content-Type, Accept"
-        );
-        oandaWebSocket.addHeader(
-                "Access-Control-Allow-Methods",
-                "GET, POST, PUT, DELETE, OPTIONS"
-        );
-
-        return oandaWebSocket;
+        return new OandaWebSocket(accountId);
     }
 
     //
@@ -2335,11 +2314,11 @@ public class Oanda extends Exchange {
                 }
 
                 Log.info("oanda response headers: ", response.headers().toString());
-                if (response.headers().firstValue("date").isEmpty()) {
-                    futureResult.completeExceptionally(new RuntimeException(
-                            "Oanda trades response did not contain header \"date\": " + response));
-
-                }
+//                if (response.headers().firstValue("date").isEmpty()) {
+//                    futureResult.completeExceptionally(new RuntimeException(
+//                            "Oanda trades response did not contain header \"date\": " + response));
+//
+//                }
 
                 logger.info("trade Time  : " + Date.from(Instant.parse(response.headers().firstValue("date").get())));
                 //   afterCursor.setValue((int) Date.from(Instant.parse(response.headers().firstValue("date").get())).getTime());

@@ -8,6 +8,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -21,7 +22,7 @@ import static org.investpro.ENUM_EXCHANGE_LIST.*;
 import static org.investpro.NewsManager.load;
 
 
-public class TradingWindow extends AnchorPane {
+public class TradingWindow extends Region {
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
 
 
@@ -95,6 +96,7 @@ public class TradingWindow extends AnchorPane {
 
 
                DraggableTab tab = new DraggableTab(i.name());
+               assert exchange != null;
                tab.setContent(
                        new VBox(new Label(i.name(),
                                new Separator(Orientation.VERTICAL)),

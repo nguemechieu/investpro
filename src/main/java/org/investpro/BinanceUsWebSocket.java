@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.util.Pair;
 import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -38,8 +39,52 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
                 )
 
                 , new Draft_6455());
-        this.connect();
 
+
+
+    }
+
+    @Override
+    public void onOpen(org.java_websocket.WebSocket conn, ClientHandshake handshake) {
+
+        logger.info("BinanceUsWebSocket: " + conn);
+
+    }
+
+    @Override
+    public void onClose(org.java_websocket.WebSocket conn, int code, String reason, boolean remote) {
+
+        logger.info("BinanceUsWebSocket: " + code + " " + reason);
+
+
+    }
+
+    @Override
+    public void onMessage(org.java_websocket.WebSocket conn, String message) {
+        JsonNode messageJson;
+        try {
+            messageJson = OBJECT_MAPPER.readTree(message);
+        } catch (JsonProcessingException ex) {
+            logger.error("ex: ", ex);
+            throw new RuntimeException(ex);
+        }
+
+        if (messageJson.has("e") && messageJson.get("e").asText().equalsIgnoreCase("info")) {
+
+            logger.info("BinanceUsWebSocket: " + messageJson);
+
+        }
+
+    }
+
+    @Override
+    public void onError(org.java_websocket.WebSocket conn, Exception ex) {
+        logger.error("ex: ", ex);
+
+    }
+
+    @Override
+    public void onStart() {
 
     }
 
@@ -107,7 +152,7 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
         logger.info("BinanceUsWebSocket: " + messageJson + " " + side);
         switch (messageJson.asText()) {
             case "heartbeat" ->
-                    send(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString());
+                    sendText(OBJECT_MAPPER.createObjectNode().put("type", "heartbeat").put("on", "false").toPrettyString(),true);
             case "match" -> {
 
 
@@ -159,14 +204,11 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
     }
 
     @Override
-    public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
-        return null;
+    public void sendText(CharSequence data, boolean last) {
+        logger.info("sendText: {}", data);
+
     }
 
-    @Override
-    public CompletableFuture<WebSocket> sendBinary(ByteBuffer data, boolean last) {
-        return null;
-    }
 
 
     @Override
@@ -181,14 +223,24 @@ public class BinanceUsWebSocket extends ExchangeWebSocketClient {
     }
 
     @Override
-    public boolean connectBlocking() throws InterruptedException {
+    public boolean connectBlocking() {
 
 
         return false;
     }
 
     @Override
+    public @NotNull URI getURI() {
+        return null;
+    }
+
+    @Override
     public void onOpen(ServerHandshake serverHandshake) {
         logger.info("onOpen: {}", serverHandshake);
+    }
+
+    @Override
+    public boolean isSupportsStreamingTrades() {
+        return false;
     }
 }

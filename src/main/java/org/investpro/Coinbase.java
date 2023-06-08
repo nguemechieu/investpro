@@ -15,6 +15,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ListView;
 import javafx.stage.Stage;
+
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -99,7 +100,10 @@ public class Coinbase extends Exchange {
     private static @NotNull ExchangeWebSocketClient coinbaseWebSocket(String apiKey, String apiSecret) throws NoSuchAlgorithmException {
 
 
-        return new CoinbaseWebSocketClient();
+        return new CoinbaseWebSocketClient(
+                apiKey,
+                apiSecret
+        );
     }
 
     @Contract(pure = true)

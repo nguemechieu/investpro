@@ -28,9 +28,10 @@ import java.util.List;
 public class TradeView extends Region {
     private static final Logger logger = LoggerFactory.getLogger(TradeView.class);
 
-
+String telegramToken ;
     public TradeView(@NotNull Exchange exchange, String telegramToken) throws IOException, InterruptedException, SQLException, ClassNotFoundException {
 
+        this.telegramToken = telegramToken;
         TabPane tradingTabPane = new TabPane();
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
         tradingTabPane.setSide(javafx.geometry.Side.TOP);
@@ -43,8 +44,6 @@ public class TradeView extends Region {
         logger.debug("Creating TradeView");
         ChoiceBox<String> symbolChoicebox = new ChoiceBox<>();
         try {
-
-
             symbolChoicebox.getItems().addAll(exchange.getTradePair());
         } catch (SQLException | ClassNotFoundException e) {
             throw new RuntimeException(e);

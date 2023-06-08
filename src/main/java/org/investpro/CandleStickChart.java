@@ -16,7 +16,6 @@ import javafx.scene.chart.Axis;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Separator;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -90,9 +89,16 @@ class CandleStickChart extends AnchorPane {
     private final boolean liveSyncing;
     private final Map<Integer, ZoomLevel> zoomLevelMap;
     private final Consumer<List<CandleData>> candlePageConsumer;
-    private final ScheduledExecutorService updateInProgressCandleExecutor;
-    private final UpdateInProgressCandleTask updateInProgressCandleTask;
-    private final InProgressCandle inProgressCandle;
+    private ScheduledExecutorService updateInProgressCandleExecutor=
+            Executors.newSingleThreadScheduledExecutor();
+
+
+    private UpdateInProgressCandleTask updateInProgressCandleTask=
+            new UpdateInProgressCandleTask();
+
+    private InProgressCandle inProgressCandle= new InProgressCandle();
+
+
     private final StableTicksAxis xAxis;
     private final StableTicksAxis yAxis;
     private final StableTicksAxis extraAxis;
@@ -172,8 +178,8 @@ class CandleStickChart extends AnchorPane {
         yAxis.setAutoRanging(false);
         extraAxis.setAutoRanging(false);
         xAxis.setSide(Side.BOTTOM);
-        yAxis.setSide(Side.LEFT);
-        extraAxis.setSide(Side.RIGHT);
+        yAxis.setSide(Side.RIGHT);
+        extraAxis.setSide(Side.LEFT);
         xAxis.setForceZeroInRange(false);
         yAxis.setForceZeroInRange(false);
         xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern(
@@ -206,14 +212,14 @@ class CandleStickChart extends AnchorPane {
         containerHeight.addListener(sizeListener);
 
 
-        if (liveSyncing) {
+        if (!liveSyncing) {
             inProgressCandle = new InProgressCandle();
             updateInProgressCandleTask = new UpdateInProgressCandleTask();
             updateInProgressCandleExecutor = Executors.newSingleThreadScheduledExecutor(
                     new LogOnExceptionThreadFactory("UPDATE-CURRENT-CANDLE"));
 
             CompletableFuture.runAsync(() -> {
-                boolean websocketInitialized = false;
+                boolean websocketInitialized = true;
                 try {
                     websocketInitialized = exchange.getWebsocketClient().getInitializationLatch().await(
                             10, SECONDS);
@@ -232,11 +238,7 @@ class CandleStickChart extends AnchorPane {
                     updateInProgressCandleExecutor.scheduleAtFixedRate(updateInProgressCandleTask, 5, 5, SECONDS);
                 }
             });
-        } else {
-            inProgressCandle = null;
-            updateInProgressCandleTask = null;
-            updateInProgressCandleExecutor = null;
-        }
+       }
 
         candlePageConsumer = new CandlePageConsumer();
         mouseDraggedHandler = new MouseDraggedHandler();
@@ -272,19 +274,11 @@ class CandleStickChart extends AnchorPane {
         gotFirstSize.addListener(gotFirstSizeChangeListener);
 
         chartOptions.horizontalGridLinesVisibleProperty().addListener((observable, oldValue, newValue) ->
-                drawChartContents(true));
+                drawChartContents());
         chartOptions.verticalGridLinesVisibleProperty().addListener((observable, oldValue, newValue) ->
-                drawChartContents(true));
-        chartOptions.showVolumeProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
-        chartOptions.alignOpenCloseProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
-    }
-
-    private void setGraphic(ImageView imageView) {
-
-        this.backgroundProperty().setValue(
-                new Background(new BackgroundFill(Color.TRANSPARENT, CornerRadii.EMPTY, Insets.EMPTY)));
-
-
+                drawChartContents());
+        chartOptions.showVolumeProperty().addListener((observable, oldValue, newValue) -> drawChartContents());
+        chartOptions.alignOpenCloseProperty().addListener((observable, oldValue, newValue) -> drawChartContents());
     }
 
     private void initializeEventHandlers() {
@@ -342,7 +336,7 @@ class CandleStickChart extends AnchorPane {
                             setAxisBoundsForMove(deltaX);
                             setYAndExtraAxisBounds();
                             if (!skipDraw) {
-                                drawChartContents(true);
+                                drawChartContents();
                             }
                             progressIndicator.setVisible(false);
                             paging = false;
@@ -351,7 +345,7 @@ class CandleStickChart extends AnchorPane {
                         setAxisBoundsForMove(deltaX);
                         setYAndExtraAxisBounds();
                         if (!skipDraw) {
-                            drawChartContents(true);
+                            drawChartContents();
                         }
                     }
                 }
@@ -482,7 +476,7 @@ class CandleStickChart extends AnchorPane {
      * Draws the chart contents on the canvas corresponding to the current x-axis, y-axis, and extra (volume) axis
      * bounds.
      */
-    private void drawChartContents(boolean clearCanvas) {
+    private void drawChartContents() {
         // TODO should this expression start with (xAxis.getUpperBound() - secondsPerCandle)?
         // This value allows for us to go past the highest x-value by skipping the drawing of some candles.
         int numCandlesToSkip = Math.max(((int) xAxis.getUpperBound() - data.lastEntry().getValue().getOpenTime()) /
@@ -567,10 +561,8 @@ class CandleStickChart extends AnchorPane {
 
         }
 
-        if (clearCanvas) {
-            graphicsContext.setFill(Color.BLACK);
-            graphicsContext.fillRect(0, 0, chartWidth - 100, chartHeight - 100);
-        }
+        graphicsContext.setFill(Color.BLACK);
+        graphicsContext.fillRect(0, 0, chartWidth - 100, chartHeight - 100);
 
         double monetaryUnitsPerPixel = (yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight();
         double pixelsPerMonetaryUnit = 1d / monetaryUnitsPerPixel;
@@ -602,7 +594,7 @@ class CandleStickChart extends AnchorPane {
         double lowestCandleValue = Double.MAX_VALUE;
         int candleIndexOfHighest = -1;
         int candleIndexOfLowest = -1;
-        int volumeBarMaxHeight = 150;
+        int volumeBarMaxHeight = 100;
         double volumeScale = volumeBarMaxHeight / extraAxis.getUpperBound();
         double halfCandleWidth = candleWidth * 0.5;
         double lastClose = -1;
@@ -867,7 +859,7 @@ class CandleStickChart extends AnchorPane {
                         candleWidth = currZoomLevel.getCandleWidth();
                         xAxis.setLowerBound(newLowerBoundX);
                         setYAndExtraAxisBounds();
-                        drawChartContents(true);
+                        drawChartContents();
                         progressIndicator.setVisible(false);
                         paging = false;
                     });
@@ -898,7 +890,7 @@ class CandleStickChart extends AnchorPane {
         candleWidth = currZoomLevel.getCandleWidth();
         xAxis.setLowerBound(newLowerBoundX);
         setYAndExtraAxisBounds();
-        drawChartContents(true);
+        drawChartContents();
     }
 
     CandleStickChartOptions getChartOptions() {
@@ -971,7 +963,7 @@ class CandleStickChart extends AnchorPane {
                         xAxis.setLowerBound(newLowerBoundX);
                         setYAndExtraAxisBounds();
                         layoutChart();
-                        drawChartContents(true);
+                        drawChartContents();
                         progressIndicator.setVisible(false);
                         paging = false;
                     });
@@ -987,7 +979,7 @@ class CandleStickChart extends AnchorPane {
                 xAxis.setLowerBound(newLowerBoundX);
                 setYAndExtraAxisBounds();
                 layoutChart();
-                drawChartContents(true);
+                drawChartContents();
             }
         }
     }
@@ -1018,7 +1010,7 @@ class CandleStickChart extends AnchorPane {
                 candleData.size()));
         setYAndExtraAxisBounds();
         data.putAll(candleData.stream().collect(Collectors.toMap(CandleData::getOpenTime, Function.identity())));
-        drawChartContents(false);
+        drawChartContents();
         progressIndicator.setVisible(false);
         updateInProgressCandleTask.setReady(true);
     }
@@ -1044,7 +1036,6 @@ class CandleStickChart extends AnchorPane {
             if (!ready) {
                 ready = true;
                 Platform.runLater(this);
-
                 return;
             }
 
@@ -1063,7 +1054,7 @@ class CandleStickChart extends AnchorPane {
                             inProgressCandle.getOpenTime() + secondsPerCandle));
 
             // Update the in-progress candle with new trades partitioned in the in-progress candle's duration
-            List<Trade> currentCandleTrades = candlePartitionedNewTrades.get(false);
+            List<Trade> currentCandleTrades = candlePartitionedNewTrades.get(true);
 
             if (!currentCandleTrades.isEmpty()) {
                 inProgressCandle.setHighPriceSoFar(Math.max(currentCandleTrades.stream().mapToDouble(trade ->
@@ -1106,7 +1097,8 @@ class CandleStickChart extends AnchorPane {
                 data.put(inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
             }
 
-            drawChartContents(true);
+            drawChartContents();
+            Platform.runLater(this);
         }
 
         public void setReady(boolean ready) {
