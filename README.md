@@ -1,12 +1,21 @@
 # InvestPro
+
 ![InvestPro, Inc](src/main/resources/Invest.png)
-[![Maven Package](https://github.com/nguemechieu/investpro/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/maven-publish.yml)[![Maven Package](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml)
-[![Maven Package](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml)
+
+[![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/maven-publish.yml)[![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/docker-image.yml)
+[![Coverage Status](https://coveralls.io/repos/github/nguemechieu/investpro/actions/workflows/depgraph-maven-plugin/badge.svg?branch=master)](https://coveralls.io/github/nguemechieu/investpro/actions/workflows/depgraph-maven-plugin?branch=master) [![license](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
 
-## Description : InvestPro is a  professional investment and utility software 
 
+
+
+
+
+
+
+
+Description : InvestPro is a professional investment and utility software
 
       License: Apache 2
       Author: Nguemechieu Noel Martial
@@ -25,13 +34,15 @@
 - Trade Alert
 - Trade Signal
 
-#################   
+#################
+
 # OPERATING SYSTEMS
+
 ##################
 
-- WINDOWS
-- LINUX
-- MACOS
+- WINDOWS ![widows](./src/docs/windows.ico)
+- LINUX  ![widows](./src/docs/linux.ico)
+- MACOS   ![widows](./src/docs/macos.ico)
 
 ################################
 Virtual environment

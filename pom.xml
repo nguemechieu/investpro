@@ -36,13 +36,44 @@
     </issueManagement>
 
 <distributionManagement>
-<repository>
+
+    <repository>
+
+
+
         <id>github</id>
-        <name>GitHub OWNER Apache Maven Packages</name>
+        <name>nguemechieu</name>
         <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
     </repository>
-</distributionManagement>
 
+
+    <snapshotRepository>
+        <id>snapshots-investpro</id>
+        <name>plugins-snapshot-investpro</name>
+        <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
+    </snapshotRepository>
+
+
+
+</distributionManagement>
+    <repositories>
+        <repository>
+            <releases>
+                <enabled>false</enabled>
+                <updatePolicy>always</updatePolicy>
+                <checksumPolicy>warn</checksumPolicy>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+                <checksumPolicy>fail</checksumPolicy>
+            </snapshots>
+            <id>investpro</id>
+            <name>investpro</name>
+            <url>http://github.org/nguemechieu/investpro</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
 
 
 
@@ -80,6 +111,7 @@
             <version>24.0.1</version>
             <scope>compile</scope>
         </dependency>
+
         <dependency>
             <groupId>com.jfoenix</groupId>
             <artifactId>jfoenix</artifactId>
@@ -142,11 +174,7 @@
             <version>3.0.8</version>
         </dependency>
 
-        <dependency>
-            <groupId>com.github.ferstl</groupId>
-            <artifactId>depgraph-maven-plugin</artifactId>
-            <version>4.0.2</version>
-        </dependency>
+
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
