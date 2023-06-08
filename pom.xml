@@ -34,12 +34,22 @@
         </system>
         <url>https://github.com/nguemechieu/invespro/issues</url>
     </issueManagement>
-    <distributionManagement>
-        <downloadUrl>
-            https://github.com/nguemechieu/investpro
-        </downloadUrl>
 
-    </distributionManagement>
+<distributionManagement>
+<repository>
+        <id>github</id>
+        <name>GitHub OWNER Apache Maven Packages</name>
+        <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
+    </repository>
+</distributionManagement>
+
+
+
+
+
+
+
+
     <developers>
         <developer>
             <email>nguemechieu@live.com</email>
