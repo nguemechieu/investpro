@@ -25,6 +25,7 @@ module InvestPro {
     requires com.google.gson;
     requires org.hibernate.orm.core;
     requires org.junit.jupiter.api;
+    requires junit;
 
 
     opens org.investpro to javafx.fxml;
