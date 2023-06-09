@@ -1,9 +1,10 @@
 # InvestPro 
-![InvestPro, Inc](src/main/resources/Invest.png)
+![InvestPro, Inc](https://github.com/nguemechieu/investpro/src/main/resources/Invest.png)
 
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/maven-publish.yml/badge.svg)
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/docker-image.yml)
-[![Coverage Status](https://coveralls.io/repos/github/nguemechieu/investpro/actions/workflows/depgraph-maven-plugin/badge.svg?branch=master)](https://coveralls.io/github/nguemechieu/investpro/actions/workflows/depgraph-maven-plugin?branch=master) [![license](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
+[![.github/workflows/codecov.yml](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yml)
+[![license](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
 
