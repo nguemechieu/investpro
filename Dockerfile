@@ -6,4 +6,4 @@ COPY mvnw pom.xml ./
 RUN chmod +x mvnw
 RUN  ./mvnw dependency:resolve
 COPY src ./src
-CMD ["java-jar", "InvestPro 1.0-SNAPSHOT"]
+CMD ["java","jar","InvestPro 1.0-SNAPSHOT"]
