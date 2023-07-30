@@ -441,7 +441,7 @@ public class Kucoin extends Exchange {
     }
 
     @Override
-    public void onError(Exception ex) {
+    public void onError(@NotNull Exception ex) {
         System.out.println("Error");
         JSONObject jsonObject = getJSON();
         System.out.println(jsonObject.toString(4));
