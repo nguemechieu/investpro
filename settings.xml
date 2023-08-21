@@ -30,7 +30,7 @@
         <server>
             <id>github</id>
             <username>USERNAME</username>
-            <password>TOKEN</password>
+            <password>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</password>
         </server>
     </servers>
 </settings>
