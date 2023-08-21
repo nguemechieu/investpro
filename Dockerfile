@@ -1,25 +1,19 @@
-# Use the official OpenJDK image as the base image
-FROM openjdk:20-rc-jdk-slim
+# Use the official OpenJDK 20 as base image
+FROM adoptopenjdk/openjdk20:alpine-jre
 
-# Set the working directory inside the container
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy the Maven project files into the container
-COPY pom.xml .
-COPY src ./src
+# Copy the compiled Java application JAR file into the container
+COPY target/investpro.jar /app/investpro.jar
 
-# Build the application using Maven
-RUN mvn clean package
-
-# Expose the port your Java application is running on
+# Expose the port that your Java application listens on (change to the actual port)
 EXPOSE 8080
 
-# Command to run your Java application
-CMD ["java", "-jar", "target/investpro.jar"]
+# Set environment variables for MySQL connection
+ENV DB_URL=jdbc:mysql://mysql-host:3306/db_name
+ENV DB_USER=root
+ENV DB_PASSWORD=your_password
 
-# Set environment variables for database connection
-ENV DB_HOST=db_host
-ENV DB_PORT=db_port
-ENV DB_NAME=db_name
-ENV DB_USER=db_user
-ENV DB_PASS=db_password
+# Start the Java application when the container starts
+CMD ["java", "-jar", "investpro.jar"]

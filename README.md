@@ -45,13 +45,15 @@ Virtual environment
   Docker configuration file for the project
 
 #### Commands
-To pull the docker image from the repository
+* BUILD CMD
+ -         docker build -t investpro .
+* RUN CMD
+ -      docker run -p 8080:8080 --name investpro -d investpro
+
+* PULL  Docker Image from repository
       
-      docker pull investpro
+ -     docker pull investpro
 
-To run the project with docker
-
-      docker run  investpro
 
 At this point you have successfully installed the Docker image, and now
 you can use the application.
