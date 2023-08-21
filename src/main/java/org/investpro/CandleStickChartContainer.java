@@ -7,6 +7,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.Objects;
 
 /**
@@ -16,7 +18,7 @@ import java.util.Objects;
  * duration is selected, this container automatically creates a new {@code CandleStickChart} and visually
  * transitions to it.
  *
- * @author Michael Ennen
+
  */
 public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
@@ -38,11 +40,11 @@ public class CandleStickChartContainer extends Region {
     }
 
     private void liveSyncing(boolean b) {
-        boolean liveSyncing = false;
-        if (liveSyncing == b) {
+        boolean liveSyncing;
+        if (!b) {
             return;
         }
-        liveSyncing = b;
+        liveSyncing = true;
         if (liveSyncing) {
             FadeTransition fadeTransition = new FadeTransition(Duration.seconds(1), candleStickChart);
             fadeTransition.setFromValue(1.0);
@@ -84,12 +86,16 @@ public class CandleStickChartContainer extends Region {
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
         getChildren().setAll(containerRoot);
-        // FIXME: candleStickChart is null at this point.
+
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 
         secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
-                createNewChart(newDurationValue.intValue(), liveSyncing);
+                try {
+                    createNewChart(newDurationValue.intValue(), liveSyncing);
+                } catch (TelegramApiException | IOException | InterruptedException | ParseException e) {
+                    throw new RuntimeException(e);
+                }
                 toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
                 toolbar.setChartOptions(candleStickChart.getChartOptions());
                 toolbar.setActiveToolbarButton(secondsPerCandle);
@@ -100,7 +106,7 @@ public class CandleStickChartContainer extends Region {
         secondsPerCandle.set(300);
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws TelegramApiException, IOException, ParseException, InterruptedException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
         }

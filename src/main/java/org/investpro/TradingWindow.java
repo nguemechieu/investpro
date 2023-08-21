@@ -14,9 +14,15 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectInputFilter;
+import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.Objects;
+import java.util.Properties;
 
 import static org.investpro.ENUM_EXCHANGE_LIST.*;
 import static org.investpro.NewsManager.load;
@@ -26,7 +32,7 @@ public class TradingWindow extends Region {
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
 
 
-    public TradingWindow() throws Throwable {
+    public TradingWindow() throws Throwable, SQLException, IOException, InterruptedException, ClassNotFoundException, NoSuchAlgorithmException, ParseException {
         super();
 
         TabPane tabPane = new TabPane();
@@ -92,7 +98,12 @@ public class TradingWindow extends Region {
 //
 //                );
 
-               //}
+
+
+               Properties conf = new Properties(
+                       );
+
+
 
 
                DraggableTab tab = new DraggableTab(i.name());
@@ -100,7 +111,9 @@ public class TradingWindow extends Region {
                tab.setContent(
                        new VBox(new Label(i.name(),
                                new Separator(Orientation.VERTICAL)),
-                               new TradeView(exchange, "2125623831:AAGtuhGO9JxHh72nYfD6WN6mog7UkDIIL0o")));
+                               new TradeView(exchange,
+                                       conf.getProperty("telegram_api_key")
+                                       )));
 
                tabPane.getTabs().add(tab);
 
@@ -108,7 +121,7 @@ public class TradingWindow extends Region {
            }
 
         tabPane.getTabs().addAll(getNewsTab(),browserTab());
-       setPrefSize(1530, 780);
+       setPrefSize(1560, 800);
         getStyleClass().add("trading-window");
         getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
         tabPane.setTranslateY(25);

@@ -16,6 +16,10 @@
         <maven.compiler.target>20</maven.compiler.target>
 
     </properties>
+
+
+
+
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
@@ -34,32 +38,17 @@
         </system>
         <url>https://github.com/nguemechieu/invespro/issues</url>
     </issueManagement>
-
-<distributionManagement>
-
-    <repository>
-
-
-
-        <id>github</id>
-        <name>nguemechieu</name>
-        <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
-    </repository>
-
-
-    <snapshotRepository>
-        <id>snapshots-investpro</id>
-        <name>plugins-snapshot-investpro</name>
-        <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
-    </snapshotRepository>
-
-
-
-</distributionManagement>
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub OWNER Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
+        </repository>
+    </distributionManagement>
     <repositories>
         <repository>
             <releases>
-                <enabled>false</enabled>
+                <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>
                 <checksumPolicy>warn</checksumPolicy>
             </releases>
@@ -74,12 +63,6 @@
             <layout>default</layout>
         </repository>
     </repositories>
-
-
-
-
-
-
 
     <developers>
         <developer>
@@ -236,21 +219,14 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>org.java-websocket</groupId>
-            <artifactId>Java-WebSocket</artifactId>
-            <version>1.5.3</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.apache.maven.doxia/doxia-doc-renderer -->
-        <dependency>
-            <groupId>org.apache.maven.doxia</groupId>
-            <artifactId>doxia-doc-renderer</artifactId>
-            <version>1.11.1</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.apache.maven.doxia</groupId>
             <artifactId>doxia-site-renderer</artifactId>
             <version>2.0.0-M10</version>
+        </dependency>
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+            <version>1.5.3</version>
         </dependency>
 
     </dependencies>
@@ -308,10 +284,13 @@
                 <artifactId>depgraph-maven-plugin</artifactId>
                 <version>4.0.2</version>
                 <configuration>
+                    <createImage>true</createImage>
 
                 </configuration>
             </plugin>
 
         </plugins>
+
     </build>
+
 </project>

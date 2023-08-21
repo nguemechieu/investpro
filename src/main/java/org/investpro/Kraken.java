@@ -36,8 +36,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
-import static java.lang.System.nanoTime;
-import static java.lang.System.out;
+
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 public class Kraken extends Exchange {
@@ -57,6 +56,10 @@ public class Kraken extends Exchange {
     protected String API_SECRET = "FEXDflwq+XnAU2Oussbk1FOK7YM6b9A4qWbCw0TWSj0xUBCwtZ2V0MVaJIGSjWWtp9PjmR/XMQoH9IZ9GTCaKQ==";
     String API_KEY0 = "39ed6c9ec56976ad7fcab4323ac60dac";
     private final HttpClient client=HttpClient.newHttpClient();
+     TradePair tradePair;
+     Instant currentCandleStartedAt;
+    long secondsIntoCurrentCandle;
+    int secondsPerCandle;
 
     public Kraken( String telegramToken, String binanceUsApiKey) {
         super(null);
@@ -72,7 +75,7 @@ public class Kraken extends Exchange {
         requestBuilder.header("Accept", "application/json");
         requestBuilder.header("Authorization", binanceUsApiKey);
 
-        logger.info("BinanceUs " + nanoTime());
+        logger.info("BinanceUs " );
     }
 
 
@@ -87,7 +90,7 @@ public class Kraken extends Exchange {
         requestBuilder.header("Sec-Fetch-Mode", "cors");
         requestBuilder.header("Accept", "application/json");
         requestBuilder.header("Authorization", coinbaseApiKey + ":" + coinbaseSecret);
-        logger.info("Kraken " + nanoTime());
+        logger.info("Kraken " );
 
     }
 
@@ -99,36 +102,29 @@ public class Kraken extends Exchange {
 
     @Override
     public KrakenCandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        KrakenCandleDataSupplier krakenCandleDataSupplier = new KrakenCandleDataSupplier(secondsPerCandle, tradePair) {
-            @Override
-            public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-                return
-                        CompletableFuture.supplyAsync(() -> {
-
-                            String url = "https://api.kraken.com/0/public/Ticker?pair=" + tradePair.toString('_');
-
-
-                            return Optional.empty();
-                        });
-            }
-
-            @Override
-            public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-                return null;
-            }
-
-            @Override
-            public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, boolean isTrade) {
-                return null;
-            }
-
-            @Override
-            public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-                return null;
-            }
-        };
         return
-                krakenCandleDataSupplier;
+                new KrakenCandleDataSupplier(secondsPerCandle, tradePair) {
+                    @Override
+                    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(TradePair tradePair1, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle1) {
+                        return
+                                CompletableFuture.supplyAsync(Optional::empty);
+                    }
+
+                    @Override
+                    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair1, Instant stopAt) {
+                        return null;
+                    }
+
+                    @Override
+                    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair1, Instant stopAt, boolean isTrade) {
+                        return null;
+                    }
+
+                    @Override
+                    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle1, TradePair tradePair1) {
+                        return null;
+                    }
+                };
     }
 
 
@@ -254,6 +250,15 @@ public class Kraken extends Exchange {
     @Override
     public void cancelOrder(@NotNull TradePair tradePair, long orderId) throws IOException, InterruptedException {
 
+        String uriStr = "https://api.binance.us/api/v3";
+        uriStr += "order?symbol=" + tradePair.toString('/') + "/";
+        uriStr += "&orderId=" + orderId;
+        requestBuilder.uri(URI.create(uriStr));
+        HttpResponse<String> response = HttpClient.newHttpClient().send(requestBuilder.build()
+              ,
+                HttpResponse.BodyHandlers.ofString());
+        Log.info("response headers: ", response.headers().toString());
+
     }
 
     /**
@@ -262,6 +267,10 @@ public class Kraken extends Exchange {
     @Override
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        this.tradePair = tradePair;
+        this.currentCandleStartedAt = currentCandleStartedAt;
+        this.secondsIntoCurrentCandle = secondsIntoCurrentCandle;
+        this.secondsPerCandle = secondsPerCandle;
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
                 currentCandleStartedAt, ZoneOffset.UTC));
         // Get the closest supported granularity to the ideal granularity.
@@ -391,17 +400,18 @@ public class Kraken extends Exchange {
             }
             in.close();
 
-            out.println(response);
+
             //Put data into json file
             jsonObject = new JSONObject(response.toString());
-            out.println(jsonObject.toString(4));
+
+            logger.info(jsonObject.toString(4));
 
             String rates;
             if (jsonObject.has("data")) {
                 JSONObject dat = new JSONObject(jsonObject.getJSONObject("data").toString(4));
                 if (dat.has("rates")) {
                     rates = dat.getJSONObject("rates").toString(4);
-                    out.println(rates);
+                    logger.info(rates);
                 }
 
             }
@@ -410,7 +420,8 @@ public class Kraken extends Exchange {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        out.println(jsonObject.toString(4));
+
+        logger.info(jsonObject.toString(4));
         return jsonObject;
     }
 
@@ -418,33 +429,32 @@ public class Kraken extends Exchange {
     public void onOpen(ServerHandshake handshake) {
 
 
-        System.out.println("Connected");
         JSONObject jsonObject = getJSON();
-        System.out.println(jsonObject.toString(4) + " " + handshake);
+        logger.info(jsonObject.toString(4));
 
     }
 
     @Override
     public void onMessage(String message) {
-        System.out.println(message);
+
         JSONObject jsonObject = getJSON();
-        System.out.println(jsonObject.toString(4));
+       logger.info(jsonObject.toString(4));
 
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        System.out.println("Disconnected");
+
         JSONObject jsonObject = getJSON();
-        System.out.println(jsonObject.toString(4));
+        logger.info(jsonObject.toString(4));
 
     }
 
     @Override
     public void onError(Exception ex) {
-        System.out.println("Error");
+
         JSONObject jsonObject = getJSON();
-        System.out.println(jsonObject.toString(4));
+        logger.info(ex+"   "+jsonObject.toString(4));
 
     }
 
@@ -704,12 +714,29 @@ public class Kraken extends Exchange {
     }
 
     public void createOrder(TradePair tradePair, Side sell, ENUM_ORDER_TYPE market, double quantity, int i, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice) {
+
+
+
+
+
+
     }
 
     public void closeAll() {
+        JSONObject jsonObject = getJSON();
+        logger.info(
+                jsonObject.toString(4)
+        );
+
+
     }
 
     public void createOrder(TradePair tradePair, Side buy, ENUM_ORDER_TYPE stopLoss, Double quantity, double price, Instant timestamp, long orderID, double stopPrice, double takeProfitPrice) {
+
+
+
+
+
     }
 
     @Override

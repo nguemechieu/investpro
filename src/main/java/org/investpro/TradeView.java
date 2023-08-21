@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.text.ParseException;
-import java.time.Instant;
+
 import java.util.Date;
 import java.util.List;
 
@@ -53,7 +53,8 @@ String telegramToken ;
         symbolChoicebox.setValue(exchange.getTradePair().get(0));
 
         double quantity = 1011;
-        long orderID = Math.round(Instant.now().getEpochSecond() * 1000000);
+        long orderID = 12+12890;
+
         double price = exchange.getLivePrice(new TradePair(
                 symbolChoicebox.getValue().split("/")[0],
                 symbolChoicebox.getValue().split("/")[1]
@@ -75,11 +76,7 @@ String telegramToken ;
                     DraggableTab tradeTab2 = new DraggableTab(sym1 + "/" + sym2);
                     CandleStickChartContainer container2;
                     TradePair tradePair3;
-                    try {
-                        tradePair3 = new TradePair(sym1, sym2);
-                    } catch (SQLException | ClassNotFoundException e) {
-                        throw new RuntimeException(e);
-                    }
+                    tradePair3 = new TradePair(sym1, sym2);
                     container2 = new CandleStickChartContainer(exchange, tradePair3, true, telegramToken);
                     tradeTab2.setContent(container2);
                     tradingTabPane.getTabs().add(tradeTab2);
@@ -117,25 +114,21 @@ String telegramToken ;
                     btnBuy.setOnAction(
                             event1 -> {
                                 try {
-                                    try {
-                                        exchange.createOrder(
-                                                new TradePair(
-                                                        symbolChoicebox.getValue().split("/")[0],
-                                                        symbolChoicebox.getValue().split("/")[1]
-                                                ),
-                                                Side.BUY,
+                                    exchange.createOrder(
+                                            new TradePair(
+                                                    symbolChoicebox.getValue().split("/")[0],
+                                                    symbolChoicebox.getValue().split("/")[1]
+                                            ),
+                                            Side.BUY,
 
-                                                ENUM_ORDER_TYPE.MARKET, price,
+                                            ENUM_ORDER_TYPE.MARKET, price,
 
-                                                quantity,
-                                                new Date(), stopPrice,
-                                                takeProfitPrice
+                                            quantity,
+                                            new Date(), stopPrice,
+                                            takeProfitPrice
 
 
-                                        );
-                                    } catch (SQLException | ClassNotFoundException e) {
-                                        throw new RuntimeException(e);
-                                    }
+                                    );
                                 } catch (IOException | InterruptedException e) {
                                     throw new RuntimeException(e);
                                 }
@@ -158,7 +151,7 @@ String telegramToken ;
                                             quantity,
                                             new Date(), stopPrice,
                                             takeProfitPrice);
-                                } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                                } catch (IOException | InterruptedException e) {
                                     throw new RuntimeException(e);
                                 }
                             }
@@ -188,24 +181,20 @@ String telegramToken ;
                     trailingSell.setOnAction(event2 -> {
 
                         try {
-                            try {
-                                exchange.createOrder(
-                                        new TradePair(
-                                                symbolChoicebox.getValue().split("/")[0],
-                                                symbolChoicebox.getValue().split("/")[1]
+                            exchange.createOrder(
+                                    new TradePair(
+                                            symbolChoicebox.getValue().split("/")[0],
+                                            symbolChoicebox.getValue().split("/")[1]
 
 
-                                        ),
-                                        Side.BUY,
-                                        ENUM_ORDER_TYPE.ENTRY, price,
-                                        quantity,
-                                        new Date(), stopPrice,
-                                        takeProfitPrice
+                                    ),
+                                    Side.BUY,
+                                    ENUM_ORDER_TYPE.ENTRY, price,
+                                    quantity,
+                                    new Date(), stopPrice,
+                                    takeProfitPrice
 
-                                );
-                            } catch (SQLException | ClassNotFoundException e) {
-                                throw new RuntimeException(e);
-                            }
+                            );
                         } catch (IOException | InterruptedException e) {
                             throw new RuntimeException(e);
                         }
@@ -228,7 +217,7 @@ String telegramToken ;
                                     new Date(), stopPrice,
                                     takeProfitPrice
                             );
-                        } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                        } catch (IOException | InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     });
@@ -244,24 +233,20 @@ String telegramToken ;
                     Button buyLimitBtn = new Button("BUY LIMIT");
                     buyLimitBtn.setOnAction(event3 -> {
                         try {
-                            try {
-                                exchange.createOrder(
-                                        new TradePair(
-                                                symbolChoicebox.getValue().split("/")[0],
-                                                symbolChoicebox.getValue().split("/")[1]
-                                        ),
-                                        Side.BUY,
+                            exchange.createOrder(
+                                    new TradePair(
+                                            symbolChoicebox.getValue().split("/")[0],
+                                            symbolChoicebox.getValue().split("/")[1]
+                                    ),
+                                    Side.BUY,
 
-                                        ENUM_ORDER_TYPE.LIMIT, price,
+                                    ENUM_ORDER_TYPE.LIMIT, price,
 
-                                        quantity,
-                                        new Date(), stopPrice,
-                                        takeProfitPrice
+                                    quantity,
+                                    new Date(), stopPrice,
+                                    takeProfitPrice
 
-                                );
-                            } catch (SQLException | ClassNotFoundException e) {
-                                throw new RuntimeException(e);
-                            }
+                            );
                         } catch (IOException | InterruptedException e) {
                             throw new RuntimeException(e);
                         }
@@ -284,7 +269,7 @@ String telegramToken ;
                                     takeProfitPrice
 
                             );
-                        } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                        } catch (IOException | InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     });
@@ -304,7 +289,7 @@ String telegramToken ;
                                             new Date(), stopPrice,
                                             takeProfitPrice
                                     );
-                                } catch (IOException | InterruptedException | SQLException | ClassNotFoundException e) {
+                                } catch (IOException | InterruptedException e) {
                                     throw new RuntimeException(e);
                                 }
                                 sellStopBtn.setOnAction(
@@ -325,8 +310,7 @@ String telegramToken ;
 
 
                                                 );
-                                            } catch (IOException | InterruptedException | SQLException |
-                                                     ClassNotFoundException e) {
+                                            } catch (IOException | InterruptedException e) {
                                                 throw new RuntimeException(e);
                                             }
                                         });

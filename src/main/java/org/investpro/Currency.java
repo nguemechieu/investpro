@@ -13,12 +13,9 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Represents some currency. Could be a fiat currency issued by a country or a cryptocurrency.
- *
- * @author Michael Ennen
- */
+
 public abstract class Currency {
+    private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
@@ -28,7 +25,7 @@ public abstract class Currency {
     static {
         try {
             @NotNull Properties conf = new Properties();
-            conf.load(Currency.class.getResourceAsStream("/currency.properties"));
+            conf.load(Currency.class.getResourceAsStream("/conf.properties"));
             db1 = new Db1(conf);
         } catch (ClassNotFoundException | IOException e) {
             throw new RuntimeException(e);
@@ -47,7 +44,7 @@ public abstract class Currency {
     private final CurrencyType currencyType;
     protected String fullDisplayName;
     protected String shortDisplayName;
-    private static final Logger logger = LoggerFactory.getLogger(Currency.class);
+
     protected String symbol;
     private String image;
 
@@ -81,26 +78,44 @@ public abstract class Currency {
         Objects.requireNonNull(currency, "currency must not be null");
 
         CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
+        logger.info("registered currency: %s".formatted(currency));
         db1.save(currency);
     }
 
     protected static void registerCurrencies(Collection<Currency> currencies) {
         Objects.requireNonNull(currencies, "currencies must not be null");
         currencies.forEach(Currency::registerCurrency);
-        db1.save(currencies.stream().findAny().get());
+        for (Currency currency : currencies) {
+            CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
+            db1.save(currency);
+        }
     }
+
 
     public static @Nullable Currency of(String code) {
         Objects.requireNonNull(code, "code must not be null");
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))
                 && CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
-            logger.error("ambiguous currency code: " + code);
+            logger.info("ambiguous currency code: " + code);
             throw new IllegalArgumentException("ambiguous currency code: " + code + " (code" +
                     " is used for multiple currency types); use ofCrypto(...) or ofFiat(...) instead");
-        } else {
+        } else if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))){
+            return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
+        }else if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))){
+
+            return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
+        }
+
+
+        else {
 
             try {
-                return db1.getCurrency(code);
+                if (db1.getCurrency(code)==null){
+
+                    return NULL_FIAT_CURRENCY;
+                }else {
+                    return db1.getCurrency(code);
+                }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }

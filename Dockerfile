@@ -1,9 +1,25 @@
+# Use the official OpenJDK image as the base image
+FROM openjdk:20-rc-jdk-slim
 
-FROM eclipse-temurin:17-jdk-jammy
-WORKDIR /investpro
-COPY .mvn/ .mvn
-COPY mvnw pom.xml ./
-RUN chmod +x mvnw
-RUN  ./mvnw dependency:resolve
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the Maven project files into the container
+COPY pom.xml .
 COPY src ./src
-CMD ["java","jar","InvestPro 1.0-SNAPSHOT"]
+
+# Build the application using Maven
+RUN mvn clean package
+
+# Expose the port your Java application is running on
+EXPOSE 8080
+
+# Command to run your Java application
+CMD ["java", "-jar", "target/investpro.jar"]
+
+# Set environment variables for database connection
+ENV DB_HOST=db_host
+ENV DB_PORT=db_port
+ENV DB_NAME=db_name
+ENV DB_USER=db_user
+ENV DB_PASS=db_password

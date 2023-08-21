@@ -34,7 +34,7 @@ public class TradePair extends Pair<Currency, Currency> {
 
     }
 
-    public TradePair(String baseCurrency, String counterCurrency) throws SQLException, ClassNotFoundException {
+    public TradePair(String baseCurrency, String counterCurrency) {
         super(Currency.of(baseCurrency), Currency.of(counterCurrency));
 
         this.baseCurrency = Currency.of(baseCurrency);
@@ -68,7 +68,7 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public static <T extends Currency, V extends Currency> @NotNull TradePair parse(
             String tradePair, @NotNull String separator, Pair<Class<T>, Class<V>> pairType)
-            throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
+            throws CurrencyNotFoundException, SQLException {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(pairType, "pairType must not be null");
         Objects.requireNonNull(pairType.getKey(), "first member of pairType must not be null");

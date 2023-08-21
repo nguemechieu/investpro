@@ -14,7 +14,7 @@ module InvestPro {
     requires org.jetbrains.annotations;
     requires org.json;
     requires org.slf4j;
-    requires Java.WebSocket;
+
     requires com.fasterxml.jackson.databind;
     requires com.fasterxml.jackson.datatype.jsr310;
     requires java.net.http;
@@ -26,6 +26,7 @@ module InvestPro {
     requires org.hibernate.orm.core;
     requires org.junit.jupiter.api;
     requires junit;
+    requires Java.WebSocket;
 
 
     opens org.investpro to javafx.fxml;

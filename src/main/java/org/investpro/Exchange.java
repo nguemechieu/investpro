@@ -12,11 +12,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * An abstract base class for {@code Exchange} implementations.
- *
- * @author Michael Ennen
- */
+
 public abstract class Exchange {
     protected final ExchangeWebSocketClient webSocketClient;
 

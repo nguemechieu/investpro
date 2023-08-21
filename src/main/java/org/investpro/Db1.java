@@ -15,7 +15,8 @@ public class Db1 implements Db {
     private static final Logger logger = LoggerFactory.getLogger(Db1.class);
 
 
-    Connection conn;//= DriverManager.getConnection("jdbc:sqlite:cryptoinvestor");
+    Connection conn;
+    //= DriverManager.getConnection("jdbc:sqlite:cryptoinvestor");
 
     private String fullDisplayName;
     private String shortDisplayName;
@@ -383,6 +384,25 @@ public class Db1 implements Db {
 
     @Override
     public void save(@NotNull Currency currency) {
+        try {
+            conn.createStatement().execute(
+                    "CREATE TABLE IF NOT EXISTS currencies (" +
+                            "id INT PRIMARY KEY AUTO_INCREMENT," +
+                            " currency_type VARCHAR(255)," +
+                            "code  VARCHAR(255)," +
+                            "full_display_name VARCHAR(255)," +
+                            "short_display_name VARCHAR(255)," +
+                            "fractional_digits INTEGER," +
+                            "symbol VARCHAR(255)," +
+                            "image VARCHAR(255)" +
+                            ");"
+            );
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+
 
         try {
             conn.createStatement().execute("SELECT * FROM currencies WHERE code = '" + currency.getCode() + "' AND currency_type = '" + currency.getCurrencyType() +
@@ -392,17 +412,17 @@ public class Db1 implements Db {
             } else {
 
 
+
                 conn.prepareStatement("INSERT INTO  currencies (  code, full_display_name, short_display_name, " +
                         "fractional_digits, symbol, image," +
                         "currency_type) VALUES (?,?,?,?,?,?,?)");
 
 
                 conn.createStatement().executeUpdate(
-                        "INSERT INTO currencies VALUES ('"
-                                + currency.getCode() + "','" + currency.getFullDisplayName() + "','"
-                                + currency.getShortDisplayName() + "','" + currency.getFractionalDigits() + "','" +
-                                currency.getSymbol() + "','" + currency.getImage() +
-                                "','" + currency.getCurrencyType() + "')");
+                        "INSERT INTO currencies " +
+                                "(id, currency_type, code, full_display_name, short_display_name" +
+                                ", fractional_digits, symbol, image)" +
+                        " VALUES ('" + UUID.randomUUID().hashCode() + "','" + currency.getCurrencyType() + "','" + currency.getCode() + "','" + currency.getFullDisplayName() + "','" + currency.getShortDisplayName() + "','" + currency.getFractionalDigits() + "','" + currency.getSymbol() + "','" + currency.getImage() + "')");
 
                 logger.info(
                         "New Currency with code: " + currency.getCode() + "was added  to the  database"

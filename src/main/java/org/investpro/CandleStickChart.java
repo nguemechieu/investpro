@@ -75,7 +75,7 @@ import static org.investpro.ChartColors.*;
  *
  * @author NOEL NGUEMECHIEU
  */
-class CandleStickChart extends AnchorPane {
+public  class CandleStickChart extends AnchorPane {
     private final CandleDataPager candleDataPager;
     private final CandleStickChartOptions chartOptions;
     /**
@@ -142,7 +142,7 @@ class CandleStickChart extends AnchorPane {
      */
     CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
-                     ObservableNumberValue containerHeight, String telegramBotToken) {
+                     ObservableNumberValue containerHeight, String telegramBotToken) throws IOException, TelegramApiException, InterruptedException, ParseException {
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
         Objects.requireNonNull(tradePair);
@@ -152,11 +152,9 @@ class CandleStickChart extends AnchorPane {
             throw new IllegalArgumentException("CandleStickChart must be constructed on the JavaFX Application " +
                     "Thread but was called from \"" + Thread.currentThread() + "\".");
         }
-        try {
-            this.telegramBot = new TelegramClient(telegramBotToken);
-        } catch (IOException | TelegramApiException | InterruptedException | ParseException e) {
-            throw new RuntimeException(e);
-        }
+
+        this.telegramBot = new TelegramClient(telegramBotToken);
+
         this.exchange = exchange;
         this.tradePair = tradePair;
         this.secondsPerCandle = secondsPerCandle;
@@ -187,7 +185,7 @@ class CandleStickChart extends AnchorPane {
 
         yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
         extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getBaseCurrency()));
-        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 14);
+        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 15);
         yAxis.setTickLabelFont(axisFont);
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
@@ -220,12 +218,21 @@ class CandleStickChart extends AnchorPane {
 
             CompletableFuture.runAsync(() -> {
                 boolean websocketInitialized = true;
+
+
                 try {
-                    websocketInitialized = exchange.getWebsocketClient().getInitializationLatch().await(
-                            10, SECONDS);
-                } catch (InterruptedException ex) {
-                    logger.error("Interrupted while waiting for websocket client to be initialized: ", ex);
+                    if (!exchange.getWebsocketClient().getInitializationLatch().await(
+                            10, SECONDS)) {
+                        websocketInitialized = false;
+                    } else {
+                if (exchange.getWebsocketClient().supportsStreamingTrades(tradePair)) {
+                    exchange.getWebsocketClient().streamLiveTrades(tradePair, updateInProgressCandleTask);
                 }
+            }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
 
                 if (!websocketInitialized) {
                     logger.error("websocket client: " + exchange.getWebsocketClient().getURI().getHost() +
@@ -252,9 +259,9 @@ class CandleStickChart extends AnchorPane {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
                 double numberOfVisibleWholeCandles = Math.floor(containerWidth.getValue().doubleValue() / candleWidth);
-                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 60 + (float) (candleWidth / 2);
+                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 60 +  (((double)candleWidth)/2);
                 chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 60 +
-                        (float) (candleWidth / 2);
+                        ((double)(candleWidth) / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
                 canvas = new Canvas(chartWidth - 100, chartHeight - 100);
                 StackPane chartStackPane = new StackPane(canvas, loadingIndicatorContainer);
@@ -315,38 +322,39 @@ class CandleStickChart extends AnchorPane {
         Platform.runLater(() -> progressIndicatorVisibleFuture.complete(progressIndicator.isVisible()));
         progressIndicatorVisibleFuture.thenAccept(progressIndicatorVisible -> {
             // This is run on the JavaFX application thread.
-            if (!progressIndicatorVisible) {
-                int desiredXLowerBound = (int) xAxis.getLowerBound() + (deltaX == 1 ? secondsPerCandle : -secondsPerCandle);
+            if (progressIndicatorVisible) {
+                return;
+            }
+            int desiredXLowerBound = (int) xAxis.getLowerBound() + (deltaX == 1 ? secondsPerCandle : -secondsPerCandle);
 
-                // Prevent moving in the positive direction past the point where only "minCandlesRemaining" candles
-                // remain on the left-most part of the chart.
-                int minCandlesRemaining = 3;
-                if (desiredXLowerBound <= data.lastEntry().getValue().getOpenTime() -
-                        (minCandlesRemaining - 1) * secondsPerCandle) {
-                    if (desiredXLowerBound <= currZoomLevel.getMinXValue()) {
-                        CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(
-                                candleDataPager.getCandleDataPreProcessor()).whenComplete((result, throwable) -> {
-                            // Show the loading indicator and freeze the chart during the time that the new data is
-                            // being paged in.
-                            if (throwable != null) {
-                                logger.error("exception: ", throwable);
-                            }
-                            paging = true;
-                            progressIndicator.setVisible(true);
-                            setAxisBoundsForMove(deltaX);
-                            setYAndExtraAxisBounds();
-                            if (!skipDraw) {
-                                drawChartContents();
-                            }
-                            progressIndicator.setVisible(false);
-                            paging = false;
-                        });
-                    } else {
+            // Prevent moving in the positive direction past the point where only "minCandlesRemaining" candles
+            // remain on the left-most part of the chart.
+            int minCandlesRemaining = 3;
+            if (desiredXLowerBound <= data.lastEntry().getValue().getOpenTime() -
+                    (minCandlesRemaining - 1) * secondsPerCandle) {
+                if (desiredXLowerBound <= currZoomLevel.getMinXValue()) {
+                    CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(
+                            candleDataPager.getCandleDataPreProcessor()).whenComplete((result, throwable) -> {
+                        // Show the loading indicator and freeze the chart during the time that the new data is
+                        // being paged in.
+                        if (throwable != null) {
+                            logger.error("exception: ", throwable);
+                        }
+                        paging = true;
+                        progressIndicator.setVisible(true);
                         setAxisBoundsForMove(deltaX);
                         setYAndExtraAxisBounds();
                         if (!skipDraw) {
                             drawChartContents();
                         }
+                        progressIndicator.setVisible(false);
+                        paging = false;
+                    });
+                } else {
+                    setAxisBoundsForMove(deltaX);
+                    setYAndExtraAxisBounds();
+                    if (!skipDraw) {
+                        drawChartContents();
                     }
                 }
             }
@@ -381,8 +389,8 @@ class CandleStickChart extends AnchorPane {
         if (!currZoomLevel.getExtremaForCandleRangeMap().containsKey((int) xAxis.getLowerBound())) {
             // TODO(mike): Does this *always* represent a coding error on our end or can this happen during
             // normal chart functioning, and could we handle it more gracefully?
-            logger.error("The extrema map did not contain extrema for x-value: " + (int) xAxis.getLowerBound());
-            logger.error("extrema map: " + new TreeMap<>(currZoomLevel.getExtremaForCandleRangeMap()));
+            logger.info("The extrema map did not contain extrema for x-value: " + (int) xAxis.getLowerBound());
+            logger.info("extrema map: " + new TreeMap<>(currZoomLevel.getExtremaForCandleRangeMap()));
         }
 
         // The y-axis and extra axis extrema are obtained using a key offset by minus one candle duration. This makes
@@ -477,8 +485,10 @@ class CandleStickChart extends AnchorPane {
      * bounds.
      */
     private void drawChartContents() {
-        // TODO should this expression start with (xAxis.getUpperBound() - secondsPerCandle)?
-        // This value allows for us to go past the highest x-value by skipping the drawing of some candles.
+        /*
+         TODO should this expression start with (xAxis.getUpperBound() - secondsPerCandle)?
+         This value allows for us to go past the highest x-value by skipping the drawing of some candles.
+        */
         int numCandlesToSkip = Math.max(((int) xAxis.getUpperBound() - data.lastEntry().getValue().getOpenTime()) /
                 secondsPerCandle, 0);
 
@@ -936,7 +946,7 @@ class CandleStickChart extends AnchorPane {
         @Override
         public void resize() {
             chartWidth = Math.max(300, Math.floor(containerWidth.getValue().doubleValue() / candleWidth) *
-                    candleWidth - 60 + (float) (candleWidth / 2));
+                    candleWidth - 60 +  (((double) candleWidth )/ 2));
             chartHeight = Math.max(300, containerHeight.getValue().doubleValue());
             canvas.setWidth(chartWidth - 100);
             canvas.setHeight(chartHeight - 100);
@@ -989,8 +999,8 @@ class CandleStickChart extends AnchorPane {
             candleData.add(candleData.size(), inProgressCandle.snapshot());
         }
 
-        xAxis.setUpperBound(candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle);
-        xAxis.setLowerBound((candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle) -
+        xAxis.setUpperBound((double) candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle);
+        xAxis.setLowerBound((double) (candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle) -
                 (int) (Math.floor(canvas.getWidth() / candleWidth) * secondsPerCandle));
 
         currZoomLevel = new ZoomLevel(0, candleWidth, secondsPerCandle, canvas.widthProperty(),
@@ -1107,6 +1117,7 @@ class CandleStickChart extends AnchorPane {
     }
 
     private class CandlePageConsumer implements Consumer<List<CandleData>> {
+
         @Override
         public void accept(List<CandleData> candleData) {
             if (Platform.isFxApplicationThread()) {
@@ -1212,12 +1223,7 @@ class CandleStickChart extends AnchorPane {
                                     } else {
                                         logger.error("error fetching recent trades until: " +
                                                 inProgressCandleData.getCurrentTill(), exception);
-                                        try {
-                                            TelegramClient.sendMessage("error fetching recent trades until: " +
-                                                    inProgressCandleData.getCurrentTill());
-                                        } catch (IOException | InterruptedException e) {
-                                            throw new RuntimeException(e);
-                                        }
+
                                     }
                                 });
                             } else {
