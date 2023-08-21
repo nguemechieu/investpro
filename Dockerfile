@@ -5,7 +5,7 @@ FROM openjdk:latest
 WORKDIR /app
 
 # Copy the compiled Java application JAR file into the container
-COPY target/investpro.jar /app/investpro.jar
+COPY target/investpro-1.0-SNAPSHOT.jar  /app/investpro-1.0-SNAPSHOT.jar
 
 # Expose the port that your Java application listens on (change to the actual port)
 EXPOSE 8080
@@ -16,4 +16,4 @@ ENV DB_USER=root
 ENV DB_PASSWORD=your_password
 
 # Start the Java application when the container starts
-CMD ["java", "-jar", "investpro.jar"]
+CMD ["java", "-jar", "investpro-1.0-SNAPSHOT.jar"]

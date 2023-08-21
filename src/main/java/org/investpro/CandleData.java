@@ -4,9 +4,7 @@ import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 
 import java.util.Objects;
 
-/**
- * @author Michael Ennen
- */
+
 public class CandleData extends RecursiveTreeObject<CandleData> {
     private final double openPrice;
     private final double closePrice;
