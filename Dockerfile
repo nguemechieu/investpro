@@ -1,5 +1,5 @@
 # Use the official OpenJDK 20 as base image
-FROM adoptopenjdk/openjdk20:alpine-jre
+FROM openjdk20:alpine-jre
 
 # Set the working directory in the container
 WORKDIR /app
