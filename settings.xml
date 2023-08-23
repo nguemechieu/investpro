@@ -1,0 +1,65 @@
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+
+    <proxies>
+        <!-- Example proxy configuration (if needed) -->
+        <!--
+        <proxy>
+            <id>example-proxy</id>
+            <active>true</active>
+            <protocol>http</protocol>
+            <host>proxy.example.com</host>
+            <port>8080</port>
+            <username>proxy-user</username>
+            <password>proxy-password</password>
+            <nonProxyHosts>www.google.com|*.example.com</nonProxyHosts>
+        </proxy>
+        -->
+    </proxies>
+
+    <servers>
+        <!-- Example server configuration (for authentication) -->
+        <server>
+            <id>investpro</id>
+            <username>nguemechieu</username>
+            <password>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</password>
+        </server>
+    </servers>
+
+    <mirrors>
+        <!-- Example mirror configuration -->
+
+        <mirror>
+            <id>investpro-mirror</id>
+            <url>https://repo.investpro.com/maven</url>
+            <mirrorOf>central</mirrorOf>
+        </mirror>
+    </mirrors>
+
+    <profiles>
+        <profile>
+            <id>default</id>
+            <repositories>
+                <!-- Example repository configuration -->
+
+                <repository>
+                    <id>investpro-repo</id>
+                    <url>https://repo.investpro.com/maven</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+
+    <activeProfiles>
+        <activeProfile>default</activeProfile>
+    </activeProfiles>
+</settings>

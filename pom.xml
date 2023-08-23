@@ -14,12 +14,7 @@
         <junit.version>5.9.2</junit.version>
         <maven.compiler.source>20</maven.compiler.source>
         <maven.compiler.target>20</maven.compiler.target>
-
     </properties>
-
-
-
-
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
@@ -43,9 +38,25 @@
             <id>github</id>
             <name>GitHub OWNER Apache Maven Packages</name>
             <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
+
+
+
         </repository>
     </distributionManagement>
     <repositories>
+
+        <repository>
+            <id>central</id>
+            <url>https://gotoNexus</url>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </snapshots>
+            <releases>
+                <enabled>true</enabled>
+                <updatePolicy>daily</updatePolicy>
+            </releases>
+        </repository>
         <repository>
             <releases>
                 <enabled>true</enabled>
@@ -59,7 +70,7 @@
             </snapshots>
             <id>investpro</id>
             <name>investpro</name>
-            <url>http://github.org/nguemechieu/investpro</url>
+            <url>https://github.org/nguemechieu/investpro</url>
             <layout>default</layout>
         </repository>
     </repositories>
@@ -81,6 +92,7 @@
             <artifactId>javafx-controls</artifactId>
             <version>20</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.openjfx/javafx.fxml -->
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -137,6 +149,7 @@
             <artifactId>ebean-annotation</artifactId>
             <version>8.3</version>
         </dependency>
+
 
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
