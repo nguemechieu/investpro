@@ -27,6 +27,7 @@ module InvestPro {
     requires org.junit.jupiter.api;
     requires junit;
     requires Java.WebSocket;
+    requires mysql.connector.j;
 
 
     opens org.investpro to javafx.fxml;

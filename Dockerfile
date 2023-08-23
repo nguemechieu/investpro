@@ -2,7 +2,7 @@
 FROM openjdk:latest
 
 # Set the working directory in the container
-WORKDIR /app
+WORKDIR /investpro
 
 # Copy the compiled Java application JAR file into the container
 COPY target/investpro.jar /app/investpro.jar

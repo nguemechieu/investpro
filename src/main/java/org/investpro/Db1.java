@@ -16,7 +16,6 @@ public class Db1 implements Db {
 
 
     Connection conn;
-    //= DriverManager.getConnection("jdbc:sqlite:cryptoinvestor");
 
     private String fullDisplayName;
     private String shortDisplayName;
@@ -42,10 +41,9 @@ public class Db1 implements Db {
                     , conf.getProperty("db_username"), conf.getProperty("db_password"));
         } catch (SQLException e) {
             e.printStackTrace();
-            new Message(
-                    Message.MessageType.ERROR,
-                    "Error connecting to the database\n" + e.getMessage()
-            );
+
+            logger.info(       "Error connecting to the database\n" + e.getMessage());
+
         }
     }
 
