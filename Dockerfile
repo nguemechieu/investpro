@@ -11,8 +11,7 @@ COPY target/investpro-1.0-SNAPSHOT.jar  /investpro/investpro-1.0-SNAPSHOT.jar
 EXPOSE 8080
 
 # Set environment variables for MySQL connection
-ENV DB_HOST = "localhost
-ENV DB_PORT = 3306
+
 ENV DB_URL=jdbc:mysql://mysql-host:3306/db_name
 ENV DB_USER=root
 ENV DB_PASSWORD=root
