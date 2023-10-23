@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.investpro</groupId>
     <artifactId>investpro</artifactId>
-    <version>1.0-SNAPSHOT</version> <!-- Specify the correct version number -->
+    <version>1.0.0-SNAPSHOT</version> <!-- Corrected version number -->
 
     <name>investpro</name>
     <url>https://github.com/nguemechieu/investpro</url>
@@ -20,37 +20,29 @@
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
 
-
     <inceptionYear>2020</inceptionYear>
     <description>
         InvestPro is a financial and investment application
     </description>
     <ciManagement>
-        <system>
-            sonar.links.ci
-        </system>
+        <system>sonar</system>
+        <url>https://github.com/nguemechieu/investpro</url>
     </ciManagement>
     <issueManagement>
-        <system>
-            sonar.links.issue
-        </system>
-        <url>https://github.com/nguemechieu/invespro/issues</url>
+        <system>sonar</system>
+        <url>https://github.com/nguemechieu/investpro/issues</url>
     </issueManagement>
     <distributionManagement>
         <repository>
             <id>github</id>
             <name>GitHub OWNER Apache Maven Packages</name>
             <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
-
-
-
         </repository>
     </distributionManagement>
     <repositories>
-
         <repository>
             <id>central</id>
-            <url>https://gotoNexus</url>
+            <url>https://repo.maven.apache.org/maven2</url>
             <snapshots>
                 <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>
@@ -61,6 +53,8 @@
             </releases>
         </repository>
         <repository>
+            <id>investpro</id>
+            <url>https://github.org/nguemechieu/investpro</url>
             <releases>
                 <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>
@@ -71,24 +65,21 @@
                 <updatePolicy>never</updatePolicy>
                 <checksumPolicy>fail</checksumPolicy>
             </snapshots>
-            <id>investpro</id>
-            <name>investpro</name>
-            <url>https://github.org/nguemechieu/investpro</url>
-            <layout>default</layout>
         </repository>
     </repositories>
 
     <developers>
         <developer>
+            <id>nguemechieu</id>
             <email>nguemechieu@live.com</email>
             <name>nguemechieu</name>
             <organization>TechExpert-Solutions</organization>
             <timezone>UTC</timezone>
-
         </developer>
     </developers>
 
     <dependencies>
+
 
         <dependency>
             <groupId>org.openjfx</groupId>
@@ -258,9 +249,7 @@
             <version>17.alpha.0.43</version>
         </dependency>
 
-
     </dependencies>
-
 
     <build>
         <defaultGoal>install</defaultGoal>
@@ -268,7 +257,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>2.4</version> <!-- Use the appropriate version -->
+                <version>3.1.0</version>
                 <configuration>
                     <archive>
                         <manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile>
@@ -278,20 +267,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-project-info-reports-plugin</artifactId>
-                <version>3.2.1</version>
+                <version>3.1.0</version>
             </plugin>
-
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
+                <version>0.0.5</version>
                 <executions>
                     <execution>
-                        <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-
-
                             <mainClass>org.investpro/org.investpro.Main</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
@@ -299,20 +284,14 @@
                             <noManPages>true</noManPages>
                             <stripDebug>true</stripDebug>
                             <noHeaderFiles>true</noHeaderFiles>
-
-
                         </configuration>
-
-
                     </execution>
                 </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <version>3.10.1</version>
-
                 <artifactId>maven-compiler-plugin</artifactId>
-
+                <version>3.8.1</version>
                 <configuration>
                     <source>21</source>
                     <target>21</target>
@@ -322,15 +301,11 @@
             <plugin>
                 <groupId>com.github.ferstl</groupId>
                 <artifactId>depgraph-maven-plugin</artifactId>
-                <version>4.0.2</version>
+                <version>4.0.0</version>
                 <configuration>
                     <createImage>true</createImage>
-
                 </configuration>
             </plugin>
-
         </plugins>
-
     </build>
-
 </project>

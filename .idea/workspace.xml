@@ -12,8 +12,6 @@
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="ru">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/settings.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -151,9 +149,11 @@
   <component name="RunAnythingCache">
     <option name="myCommands">
       <command value="mvn " />
-      <command value="mvn install" />
       <command value="mvn compile" />
       <command value="mvn package" />
+      <command value="mvn install" />
+      <command value="mvn clean:clean" />
+      <command value="mvn test" />
       <command value="mvn deploy" />
     </option>
   </component>
@@ -268,7 +268,7 @@
       <workItem from="1692804816808" duration="2931000" />
       <workItem from="1692808164083" duration="1370000" />
       <workItem from="1697861215542" duration="2990000" />
-      <workItem from="1697943742641" duration="11665000" />
+      <workItem from="1697943742641" duration="13412000" />
     </task>
     <task id="LOCAL-00001" summary="run">
       <created>1674886114435</created>
