@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.investpro</groupId>
     <artifactId>investpro</artifactId>
-    <version>1.0.0</version> <!-- Specify the correct version number -->
+    <version>4.0.0</version> <!-- Specify the correct version number -->
 
     <name>investpro</name>
     <url>https://github.com/nguemechieu/investpro</url>
@@ -19,6 +19,8 @@
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
     </scm>
+
+
     <inceptionYear>2020</inceptionYear>
     <description>
         InvestPro is a financial and investment application

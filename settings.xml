@@ -20,14 +20,15 @@
         -->
     </proxies>
 
-    <servers>
-        <!-- Example server configuration (for authentication) -->
-        <server>
-            <id>investpro</id>
-            <username>nguemechieu</username>
-            <password>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</password>
-        </server>
-    </servers>
+<servers>
+    <server>
+        <id>github</id>
+        <username>nguemechieu</username>
+        <password>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</password>
+    </server>
+</servers>
+
+
 
     <mirrors>
         <!-- Example mirror configuration -->
@@ -56,10 +57,13 @@
                     </snapshots>
                 </repository>
             </repositories>
+
         </profile>
     </profiles>
 
     <activeProfiles>
         <activeProfile>default</activeProfile>
     </activeProfiles>
+
+
 </settings>
