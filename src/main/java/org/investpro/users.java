@@ -14,9 +14,7 @@ import java.io.Serializable;
 import java.util.Locale;
 
 @Entity
-@Table(
-        appliesTo = "users"
-)
+
 public class users implements Serializable {
      String name;
 

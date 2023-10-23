@@ -1,20 +1,18 @@
 package org.investpro.JsonToCsv;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
+import org.jetbrains.annotations.NotNull;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-
-import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Logger;
 
 public class JsonToCsv {
 

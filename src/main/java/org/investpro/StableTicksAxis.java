@@ -33,6 +33,10 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.awt.GraphicsConfigTemplate.UNNECESSARY;
+import static org.investpro.TelegramClient.KeyboardButtonType.DOWN;
+import static org.investpro.TelegramClient.KeyboardButtonType.UP;
+
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
  * makes the axis major tick marks (the labeled tick marks) have nice, rounded numbers.
@@ -117,11 +121,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
         int floorPow = powersOf10[logFloor];
         switch (mode) {
-            case UNNECESSARY:
-                if (x != floorPow) {
-                    throw new ArithmeticException("mode was UNNECESSARY, but rounding was necessary");
-                }
-                // fall through
+            // fall through
             case FLOOR:
             case DOWN:
                 return logFloor;

@@ -363,7 +363,7 @@ public class Bitfinex extends Exchange {
 
         JSONObject jsonObject = new JSONObject();
         try {
-            URL url = new URL("https://api.coinbase.com/v2/exchange-rates");
+            URL url = URI.create("https://api.coinbase.com/v2/exchange-rates").toURL();
             HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");

@@ -9,15 +9,13 @@ package org.investpro;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
-import org.hibernate.annotations.Table;
+
 
 import java.io.Serializable;
 import java.util.Locale;
 
 @Entity
-@Table(
-        appliesTo = "users"
-)
+
 public class User implements Serializable {
 
 

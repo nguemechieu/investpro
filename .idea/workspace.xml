@@ -11,152 +11,124 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="ru">
-      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/artifacts/investpro.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/sqldialects.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-console-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-console-l1-2-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-datetime-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-debug-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-errorhandling-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-file-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-file-l1-2-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-file-l2-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-handle-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-heap-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-interlocked-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-libraryloader-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-localization-l1-2-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-memory-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-namedpipe-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-processenvironment-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-processthreads-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-processthreads-l1-1-1.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-profile-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-rtlsupport-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-string-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-synch-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-synch-l1-2-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-sysinfo-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-timezone-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-util-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-conio-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-convert-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-environment-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-filesystem-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-heap-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-locale-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-math-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-multibyte-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-private-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-process-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-runtime-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-stdio-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-string-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-time-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-utility-l1-1-0.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/decora_sse.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/fxplugins.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/glass.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/glib-lite.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/gstreamer-lite.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/javafx_font.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/javafx_iio.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/jfxmedia.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/jfxwebkit.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/msvcp140.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/msvcp140_1.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/msvcp140_2.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/prism_common.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/prism_d3d.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/prism_sw.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/ucrtbase.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/vcruntime140.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/vcruntime140_1.dll" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.base/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.base/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.base/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.controls/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.controls/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.controls/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.fxml/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.fxml/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.fxml/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/jpeg_fx.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/mesa3d.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/directshow.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/glib.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/gstreamer.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/libffi.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.swing/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.swing/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.swing/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/ADDITIONAL_LICENSE_INFO" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/ASSEMBLY_EXCEPTION" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/LICENSE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/icu_web.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/libxml2.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/libxslt.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/webkit.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx-swt.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.base.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.controls.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.fxml.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.graphics.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.media.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.properties" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.swing.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.web.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/javafx-sdk-20.0.2/src.zip" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.github/workflows/maven-publish.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/maven-publish.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.github/workflows/settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/settings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/artifacts/InvestPro_jar.xml" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/MovingAverage.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TimeUnit.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/manifest.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/Main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/Main.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/shelf/Changes.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/shelf/Changes.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/.package-lock.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/boolbase/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/boolbase/index.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/boolbase/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/LICENSE" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/compile.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/compile.d.ts.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/compile.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/compile.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/compile.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/compile.d.ts.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/compile.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/compile.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/index.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/index.d.ts.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/index.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/index.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/parse.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/parse.d.ts.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/parse.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/esm/parse.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/index.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/index.d.ts.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/index.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/index.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/parse.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/parse.d.ts.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/parse.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/lib/parse.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/nth-check/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-console-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-console-l1-2-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-datetime-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-debug-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-errorhandling-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-file-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-file-l1-2-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-file-l2-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-handle-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-heap-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-interlocked-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-libraryloader-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-localization-l1-2-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-memory-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-namedpipe-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-processenvironment-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-processthreads-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-processthreads-l1-1-1.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-profile-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-rtlsupport-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-string-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-synch-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-synch-l1-2-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-sysinfo-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-timezone-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-core-util-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-conio-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-convert-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-environment-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-filesystem-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-heap-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-locale-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-math-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-multibyte-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-private-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-process-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-runtime-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-stdio-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-string-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-time-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/api-ms-win-crt-utility-l1-1-0.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/decora_sse.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/fxplugins.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/glass.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/glib-lite.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/gstreamer-lite.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/javafx_font.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/javafx_iio.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/jfxmedia.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/jfxwebkit.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/msvcp140.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/msvcp140_1.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/msvcp140_2.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/prism_common.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/prism_d3d.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/prism_sw.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/ucrtbase.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/vcruntime140.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/bin/vcruntime140_1.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.base/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.base/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.base/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.controls/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.controls/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.controls/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.fxml/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.fxml/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.fxml/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/jpeg_fx.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.graphics/mesa3d.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/directshow.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/glib.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/gstreamer.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.media/libffi.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.swing/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.swing/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.swing/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/ADDITIONAL_LICENSE_INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/ASSEMBLY_EXCEPTION" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/icu_web.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/libxml2.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/libxslt.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/legal/javafx.web/webkit.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx-swt.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.base.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.controls.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.fxml.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.graphics.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.media.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.swing.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/lib/javafx.web.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/javafx-sdk-20.0.2/src.zip" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/module-info.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/module-info.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Bitfinex.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Bitfinex.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Bittrex.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Bittrex.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/JsonToCsv/JsonToCsv.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/JsonToCsv/JsonToCsv.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/PopOverSkinTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/StableTicksAxis.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/StableTicksAxis.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/User.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/users.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/users.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/symbols.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/symbols.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -191,6 +163,9 @@
   <component name="JpbToolWindowState">
     <option name="isToolWindowVisible" value="false" />
   </component>
+  <component name="KubernetesApiPersistence">
+    <option name="context" value="docker-desktop" />
+  </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
@@ -202,6 +177,7 @@
         <option name="mavenHome" value="Use Maven wrapper" />
         <option name="outputLevel" value="ERROR" />
         <option name="printErrorStackTraces" value="true" />
+        <option name="useMavenConfig" value="true" />
         <option name="usePluginRegistry" value="true" />
       </MavenGeneralSettings>
     </option>
@@ -240,7 +216,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Artifacts",
+    "project.structure.last.edited": "Modules",
     "project.structure.proportion": "0.15",
     "project.structure.side.proportion": "0.47816092",
     "run.code.analysis.last.selected.profile": "pProject Default",
@@ -267,11 +243,11 @@
       <recent name="C:\Users\nguem\source\repos\investpro\src\main\resources" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\java\org" />
+      <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main" />
+      <recent name="C:\Users\nguem\IdeaProjects\investpro\src\main\java\org\investpro" />
       <recent name="C:\Users\nguem\OneDrive\Documents\GitHub\investpro\.m2" />
       <recent name="C:\Users\nguem\OneDrive\Documents\GitHub\investpro\.github" />
-      <recent name="C:\Users\nguem\OneDrive\Documents\GitHub\investpro\src" />
-      <recent name="C:\Users\nguem\OneDrive\Documents\GitHub\investpro" />
-      <recent name="C:\Users\nguem\OneDrive\Documents\GitHub\investpro\.github\workflows" />
     </key>
     <key name="CreateTestDialog.Recents.Supers">
       <recent name="" />
@@ -291,21 +267,23 @@
   <component name="RunAnythingCache">
     <option name="myCommands">
       <command value="mvn " />
+      <command value="mvn package" />
+      <command value="mvn install" />
+      <command value="mvn compile" />
     </option>
   </component>
-  <component name="RunManager" selected="Application.Main">
+  <component name="RunManager" selected="Docker.Dockerfile">
     <configuration default="true" type="AZURE_FUNCTION_SUPPORT" factoryName="Run Functions">
       <option name="appName" />
       <option name="appServicePlanName" />
       <option name="appServicePlanResourceGroup" />
       <option name="appSettingsKey" value="c3357943-1872-4aa0-a35f-a51aa383bfff" />
       <option name="artifact" />
-      <option name="autoPort" value="true" />
       <option name="debugOptions" />
       <option name="deployment" />
       <option name="deploymentStagingDirectoryPath" />
       <option name="funcPath" />
-      <option name="funcPort" value="0" />
+      <option name="functionHostArguments" />
       <option name="hostJsonPath" />
       <option name="insightsName" />
       <option name="instrumentationKey" />
@@ -325,38 +303,12 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="BinanceUSWebSocketClient" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="org.investpro.BinanceUSWebSocketClient" />
-      <module name="InvestPro" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="org.investpro.Kucoin" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="MovingAverageCrossoverStrategy" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="org.investpro.MovingAverageCrossoverStrategy" />
-      <module name="InvestPro" />
+    <configuration name="MovingAverage" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="org.investpro.MovingAverage" />
+      <module name="investpro" />
       <extension name="coverage">
         <pattern>
           <option name="PATTERN" value="org.investpro.*" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="OnTick" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="org.investpro.OnTick" />
-      <module name="InvestPro" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="org.investpro.Kucoin" />
           <option name="ENABLED" value="true" />
         </pattern>
       </extension>
@@ -406,19 +358,15 @@
     </configuration>
     <list>
       <item itemvalue="Application.Main" />
-      <item itemvalue="Application.BinanceUSWebSocketClient" />
-      <item itemvalue="Application.MovingAverageCrossoverStrategy" />
-      <item itemvalue="Application.OnTick" />
+      <item itemvalue="Application.MovingAverage" />
       <item itemvalue="Docker.Docker Image" />
       <item itemvalue="Docker.Dockerfile" />
       <item itemvalue="JUnit.InvestProTest" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Application.MovingAverageCrossoverStrategy" />
-        <item itemvalue="Application.BinanceUSWebSocketClient" />
-        <item itemvalue="Application.OnTick" />
         <item itemvalue="Docker.Dockerfile" />
+        <item itemvalue="Application.MovingAverage" />
         <item itemvalue="JUnit.InvestProTest" />
       </list>
     </recent_temporary>
@@ -434,6 +382,8 @@
       <workItem from="1692803417773" duration="1376000" />
       <workItem from="1692804816808" duration="2931000" />
       <workItem from="1692808164083" duration="1370000" />
+      <workItem from="1697861215542" duration="2990000" />
+      <workItem from="1697943742641" duration="9773000" />
     </task>
     <task id="LOCAL-00001" summary="run">
       <created>1674886114435</created>

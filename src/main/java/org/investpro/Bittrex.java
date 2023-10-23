@@ -83,10 +83,7 @@ public class Bittrex extends Exchange {
                         return null;
                     }
 
-                    @Override
-                    public List<Trade> get(long timeout, @NotNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-                        return null;
-                    }
+
 
                 };
 
