@@ -152,8 +152,8 @@
     <option name="myCommands">
       <command value="mvn " />
       <command value="mvn install" />
-      <command value="mvn package" />
       <command value="mvn compile" />
+      <command value="mvn package" />
       <command value="mvn deploy" />
     </option>
   </component>
@@ -268,7 +268,7 @@
       <workItem from="1692804816808" duration="2931000" />
       <workItem from="1692808164083" duration="1370000" />
       <workItem from="1697861215542" duration="2990000" />
-      <workItem from="1697943742641" duration="10780000" />
+      <workItem from="1697943742641" duration="11665000" />
     </task>
     <task id="LOCAL-00001" summary="run">
       <created>1674886114435</created>
