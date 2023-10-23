@@ -1,4 +1,4 @@
-# InvestPro 
+# Investpro
 ![InvestPro, Inc](src/main/resources/Invest.png)
 
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/maven-publish.yml/badge.svg)
