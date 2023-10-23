@@ -5,7 +5,7 @@ FROM openjdk:latest
 WORKDIR /investpro
 
 # Copy the compiled Java application JAR file into the container
-COPY target/investpro-1.0-SNAPSHOT.jar ./
+COPY . .
 
 # Expose the port that your Java application listens on (change to the actual port)
 EXPOSE 5000
