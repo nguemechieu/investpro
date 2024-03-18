@@ -1,15 +1,20 @@
 package org.investpro;
 
-import javafx.beans.property.SimpleIntegerProperty;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+
+import javafx.beans.property.SimpleIntegerProperty;
 
 /**
  * @author Michael Ennen
@@ -116,26 +121,6 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         endTime.set(endTime.get() - (secondsPerCandle * numCandles));
         return CompletableFuture.completedFuture(candleData.stream().sorted(Comparator.comparingInt(
                 CandleData::getOpenTime)).collect(Collectors.toList()));
-    }
-
-    @Override
-    public List<CandleData> getCandleData() {
-        return null;
-    }
-
-    @Override
-    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<List<org.investpro.Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        return null;
     }
 
     /**

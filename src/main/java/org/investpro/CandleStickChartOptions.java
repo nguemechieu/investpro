@@ -1,5 +1,8 @@
 package org.investpro;
 
+import java.util.List;
+import java.util.Objects;
+
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
@@ -8,11 +11,8 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 
-import java.util.List;
-import java.util.Objects;
-
 /**
- * Encapsulates all the possible options for a CandleStickChart.
+ * Encapsulates all of the possible options for a CandleStickChart.
  *
  * @author Michael Ennen
  */

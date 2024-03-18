@@ -1,11 +1,11 @@
 package org.investpro;
 
-import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
-
 import java.util.Objects;
 
-
-public class CandleData extends RecursiveTreeObject<CandleData> {
+/**
+ * @author Michael Ennen
+ */
+public class CandleData {
     private final double openPrice;
     private final double closePrice;
     private final double highPrice;
@@ -105,9 +105,5 @@ public class CandleData extends RecursiveTreeObject<CandleData> {
         return String.format("CandleData [openPrice = %f, closePrice = %f, highPrice = %f, lowPrice = %f, " +
                         "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
                 openTime, volume, placeHolder);
-    }
-
-    public String getTimestamp() {
-        return String.valueOf(openTime);
     }
 }

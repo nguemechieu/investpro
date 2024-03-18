@@ -1,11 +1,11 @@
 package org.investpro;
 
-import javafx.util.StringConverter;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+
+import javafx.util.StringConverter;
 
 /**
  * @author Michael Ennen

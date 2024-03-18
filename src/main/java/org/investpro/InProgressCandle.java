@@ -129,12 +129,4 @@ public class InProgressCandle {
         return Objects.hash(openTime, openPrice, highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar,
                 visible, placeHolder);
     }
-
-    public double getAveragePriceSofar() {
-        return (highPriceSoFar + lowPriceSoFar) / 2;
-    }
-
-    public double getClosePriceSoFar() {
-        return lastPrice;
-    }
 }

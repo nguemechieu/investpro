@@ -1,5 +1,6 @@
 package org.investpro;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -46,10 +47,6 @@ public class Trade {
         this(tradePair, price, amount, transactionType, localTradeId, Instant.ofEpochSecond(timestamp), fee);
     }
 
-    public Trade(TradePair tradePair, double p, double q, Side side, long e, long t) {
-        this(tradePair, DefaultMoney.ofFiat(p, "USD"), DefaultMoney.ofFiat(q, "USD"), side, e, t);
-    }
-
     public TradePair getTradePair() {
         return tradePair;
     }
@@ -66,9 +63,8 @@ public class Trade {
      * Returns the total amount of money this trade was, i.e. {@literal price * amount} in price
      * units.
      *
-     * @return
      */
-    public Money getTotal() {
+    public Money getTotal() throws SQLException {
         // TODO implement multiply method in Money..but think of how to do it with
         // different currencies..maybe involve a TradePair? btc * usd/btc = usd, which
         // is technically what we are doing here
@@ -112,5 +108,9 @@ public class Trade {
     @Override
     public int hashCode() {
         return Objects.hash(tradePair, price, amount, transactionType, localTradeId, timestamp);
+    }
+
+    public Trade getTrades() {
+        return this;
     }
 }

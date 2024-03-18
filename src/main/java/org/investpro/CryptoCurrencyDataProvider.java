@@ -3,6 +3,8 @@ package org.investpro;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,8 +19,14 @@ import java.util.List;
  * @author Michael Ennen
  */
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
+    private static final Logger logger = LoggerFactory.getLogger(CryptoCurrencyDataProvider.class);
 
     public CryptoCurrencyDataProvider() {
+        super();
+
+        logger.debug(
+                "CryptoCurrencyDataProvider constructor called"
+        );
     }
 
     @Override
@@ -40,7 +48,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
         }
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed : HTTP error code : " + response.statusCode());
+            throw new RuntimeException(STR."Failed : HTTP error code : \{response.statusCode()}");
         }
         String json = response.body();
         ObjectMapper mapper = new ObjectMapper();
@@ -71,7 +79,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
 
                 if (response1.statusCode() != 200) {
-                    throw new RuntimeException("Failed : HTTP error code : " + response1.statusCode());
+                    throw new RuntimeException(STR."Failed : HTTP error code : \{response1.statusCode()}");
                 }
                 //  InputStream inputStream = response1.body();
                 //logger.info(jsonObject1.get("id").asText() + " " + inputStream);
@@ -105,7 +113,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
             }
 
 
-            Log.info("currencies ", coinsToRegister.toString());
+            logger.info("currencies ", coinsToRegister);
         }
 
 
@@ -139,5 +147,6 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
 
         Currency.registerCurrencies(coinsToRegister);
+        logger.info("currencies ", coinsToRegister);
     }
 }

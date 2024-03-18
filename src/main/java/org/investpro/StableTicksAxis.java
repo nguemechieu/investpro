@@ -16,6 +16,10 @@
 
 package org.investpro;
 
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -26,16 +30,8 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.WritableValue;
 import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
-import javafx.scene.chart.ValueAxis;
 import javafx.util.Duration;
-
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
-
-import static java.awt.GraphicsConfigTemplate.UNNECESSARY;
-import static org.investpro.TelegramClient.KeyboardButtonType.DOWN;
-import static org.investpro.TelegramClient.KeyboardButtonType.UP;
+import javafx.scene.chart.ValueAxis;
 
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
@@ -62,12 +58,19 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private final Timeline animationTimeline = new Timeline();
 
-    private static final byte[] maxLog10ForLeadingZeros = {
-            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
+    private final WritableValue<Double> scaleValue = new WritableValue<>() {
+        @Override
+        public Double getValue() {
+            return getScale();
+        }
+
+        @Override
+        public void setValue(Double value) {
+            setScale(value);
+        }
     };
-    private static final int[] powersOf10 = {
-            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
-    };
+
+    private List<Number> minorTicks;
 
     /**
      * Amount of padding to add on the each end of the axis when auto ranging.
@@ -87,62 +90,6 @@ public class StableTicksAxis extends ValueAxis<Number> {
     public StableTicksAxis(double lowerBound, double upperBound) {
         super(lowerBound, upperBound);
     }
-    private static final int[] halfPowersOf10 = {
-            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
-    };
-    private final WritableValue<Double> scaleValue = new WritableValue<>() {
-        @Override
-        public Double getValue() {
-            return getScale();
-        }
-
-        @Override
-        public void setValue(Double value) {
-            setScale(value);
-        }
-    };
-    private List<Number> minorTicks;
-
-    /**
-     * Returns the base-10 logarithm of {@code x}, rounded according to the specified rounding mode.
-     * <p>
-     * From Guava's IntMath.java.
-     *
-     * @throws IllegalArgumentException if {@code x <= 0}
-     * @throws ArithmeticException      if {@code mode} is {@link RoundingMode#UNNECESSARY} and {@code x}
-     *                                  is not a power of ten
-     */
-    @SuppressWarnings("fallthrough")
-    public static int log10(int x, RoundingMode mode) {
-        if (x <= 0) {
-            throw new IllegalArgumentException("x must be positive but was: " + x);
-        }
-        int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
-        int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
-        int floorPow = powersOf10[logFloor];
-        switch (mode) {
-            // fall through
-            case FLOOR:
-            case DOWN:
-                return logFloor;
-            case CEILING:
-            case UP:
-                return logFloor + lessThanBranchFree(floorPow, x);
-            case HALF_DOWN:
-            case HALF_UP:
-            case HALF_EVEN:
-                // sqrt(10) is irrational, so log10(x) - logFloor is never exactly 0.5
-                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
-            default:
-                throw new AssertionError();
-        }
-    }
-
-    static int lessThanBranchFree(int x, int y) {
-        // The double negation is optimized away by normal Java, but is necessary for GWT
-        // to make sure bit twiddling works as expected.
-        return ~~(x - y) >>> (Integer.SIZE - 1);
-    }
 
     /**
      * Amount of padding to add on the each end of the axis when auto ranging.
@@ -154,8 +101,79 @@ public class StableTicksAxis extends ValueAxis<Number> {
     /**
      * Amount of padding to add on the each end of the axis when auto ranging.
      */
+    public DoubleProperty autoRangePaddingProperty() {
+        return autoRangePadding;
+    }
+
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
     public void setAutoRangePadding(double autoRangePadding) {
         this.autoRangePadding.set(autoRangePadding);
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public boolean isForceZeroInRange() {
+        return forceZeroInRange.get();
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public BooleanProperty forceZeroInRangeProperty() {
+        return forceZeroInRange;
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public void setForceZeroInRange(boolean forceZeroInRange) {
+        this.forceZeroInRange.set(forceZeroInRange);
+    }
+
+    @Override
+    protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
+        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
+        // these values. 1e-300 was chosen arbitrarily.
+        if (Math.abs(minValue - maxValue) < 1e-300) {
+            // Normally this is the case for all points with the same value
+            minValue = minValue - 1;
+            maxValue = maxValue + 1;
+        } else {
+            // Add padding
+            double delta = maxValue - minValue;
+            double paddedMin = minValue - delta * autoRangePadding.get();
+            // If we've crossed the 0 line, clamp to 0.
+            // noinspection FloatingPointEquality
+            if (Math.signum(paddedMin) != Math.signum(minValue)) {
+                paddedMin = 0.0;
+            }
+
+            double paddedMax = maxValue + delta * autoRangePadding.get();
+            // If we've crossed the 0 line, clamp to 0.
+            // noinspection FloatingPointEquality
+            if (Math.signum(paddedMax) != Math.signum(maxValue)) {
+                paddedMax = 0.0;
+            }
+
+            minValue = paddedMin;
+            maxValue = paddedMax;
+        }
+
+        // Handle forcing zero into the range
+        if (forceZeroInRange.get()) {
+            if (minValue < 0 && maxValue < 0) {
+                maxValue = 0;
+                minValue -= -minValue * autoRangePadding.get();
+            } else if (minValue > 0 && maxValue > 0) {
+                minValue = 0;
+                maxValue += maxValue * autoRangePadding.get();
+            }
+        }
+
+        return getRange(minValue, maxValue);
     }
 
     private static double calculateTickSpacing(double delta, int maxTicks) {
@@ -214,75 +232,61 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Returns the base-10 logarithm of {@code x}, rounded according to the specified rounding mode.
+     * <p>
+     * From Guava's IntMath.java.
+     *
+     * @throws IllegalArgumentException if {@code x <= 0}
+     * @throws ArithmeticException      if {@code mode} is {@link RoundingMode#UNNECESSARY} and {@code x}
+     *                                  is not a power of ten
      */
-    public DoubleProperty autoRangePaddingProperty() {
-        return autoRangePadding;
-    }
-
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public boolean isForceZeroInRange() {
-        return forceZeroInRange.get();
-    }
-
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public void setForceZeroInRange(boolean forceZeroInRange) {
-        this.forceZeroInRange.set(forceZeroInRange);
-    }
-
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public BooleanProperty forceZeroInRangeProperty() {
-        return forceZeroInRange;
-    }
-
-    @Override
-    protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
-        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
-        // these values. 1e-300 was chosen arbitrarily.
-        if (Math.abs(minValue - maxValue) < 1e-300) {
-            // Normally this is the case for all points with the same value
-            minValue = minValue - 1;
-            maxValue = maxValue + 1;
-        } else {
-            // Add padding
-            double delta = maxValue - minValue;
-            double paddedMin = minValue - delta * autoRangePadding.get();
-            // If we've crossed the 0 line, clamp to 0.
-            // noinspection FloatingPointEquality
-            if (Math.signum(paddedMin) != Math.signum(minValue)) {
-                paddedMin = 0.0;
-            }
-
-            double paddedMax = maxValue + delta * autoRangePadding.get();
-            // If we've crossed the 0 line, clamp to 0.
-            // noinspection FloatingPointEquality
-            if (Math.signum(paddedMax) != Math.signum(maxValue)) {
-                paddedMax = 0.0;
-            }
-
-            minValue = paddedMin;
-            maxValue = paddedMax;
+    @SuppressWarnings("fallthrough")
+    public static int log10(int x, RoundingMode mode) {
+        if (x <= 0) {
+            throw new IllegalArgumentException("x must be positive but was: " + x);
         }
-
-        // Handle forcing zero into the range
-        if (forceZeroInRange.get()) {
-            if (minValue < 0 && maxValue < 0) {
-                maxValue = 0;
-                minValue -= -minValue * autoRangePadding.get();
-            } else if (minValue > 0 && maxValue > 0) {
-                minValue = 0;
-                maxValue += maxValue * autoRangePadding.get();
-            }
+        int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
+        int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
+        int floorPow = powersOf10[logFloor];
+        switch (mode) {
+            case UNNECESSARY:
+                if (x != floorPow) {
+                    throw new ArithmeticException("mode was UNNECESSARY, but rounding was necessary");
+                }
+                // fall through
+            case FLOOR:
+            case DOWN:
+                return logFloor;
+            case CEILING:
+            case UP:
+                return logFloor + lessThanBranchFree(floorPow, x);
+            case HALF_DOWN:
+            case HALF_UP:
+            case HALF_EVEN:
+                // sqrt(10) is irrational, so log10(x) - logFloor is never exactly 0.5
+                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
+            default:
+                throw new AssertionError();
         }
-
-        return getRange(minValue, maxValue);
     }
+
+    static int lessThanBranchFree(int x, int y) {
+        // The double negation is optimized away by normal Java, but is necessary for GWT
+        // to make sure bit twiddling works as expected.
+        return ~~(x - y) >>> (Integer.SIZE - 1);
+    }
+
+    private static final byte[] maxLog10ForLeadingZeros = {
+            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
+    };
+
+    private static final int[] powersOf10 = {
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
+    };
+
+    private static final int[] halfPowersOf10 = {
+            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
+    };
 
     @Override
     protected List<Number> calculateMinorTickMarks() {

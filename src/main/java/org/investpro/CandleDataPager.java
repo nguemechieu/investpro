@@ -1,26 +1,29 @@
 package org.investpro;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+/**
+ * Pages new candle data in chronological order to a {@code CandleStickChart} on-demand.
+ *
+ * @author Michael Ennen
+ */
 public class CandleDataPager {
-    private static final Logger logger = LoggerFactory.getLogger(CandleDataPager.class);
     private final CandleDataSupplier candleDataSupplier;
     private final CandleDataPreProcessor candleDataPreProcessor;
+    private static final Logger logger = LoggerFactory.getLogger(CandleDataPager.class);
 
     public CandleDataPager(CandleStickChart candleStickChart, CandleDataSupplier candleDataSupplier) {
         Objects.requireNonNull(candleStickChart);
         Objects.requireNonNull(candleDataSupplier);
         this.candleDataSupplier = candleDataSupplier;
         candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
-        candleDataPreProcessor.start();
     }
 
     public CandleDataSupplier getCandleDataSupplier() {
@@ -29,10 +32,6 @@ public class CandleDataPager {
 
     public Consumer<Future<List<CandleData>>> getCandleDataPreProcessor() {
         return candleDataPreProcessor;
-    }
-
-    public void stop() {
-        candleDataPreProcessor.stop();
     }
 
     private static class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
@@ -68,14 +67,6 @@ public class CandleDataPager {
                     }
                 }
             }
-        }
-
-        public void stop() {
-            hitFirstNonPlaceHolder = false;
-        }
-
-        public void start() {
-            hitFirstNonPlaceHolder = false;
         }
     }
 }

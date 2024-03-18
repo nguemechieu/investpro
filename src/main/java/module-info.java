@@ -24,7 +24,9 @@ module investpro {
     requires com.fasterxml.jackson.dataformat.csv;
     requires javax.websocket.api;
     requires com.google.gson;
-    opens org.investpro to javafx.fxml;
+    requires org.xerial.sqlitejdbc;
+
+
     exports org.investpro;
 
 

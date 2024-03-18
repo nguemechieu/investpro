@@ -72,13 +72,13 @@ public class FXUtils {
      * Computes and returns the dimensions ({@code Dimension2D}) of the given string of text with
      * the given formatting options.
      *
-     * @param text        the string of text to measure
-     * @param font        the font the text should be measured with - if {@code null}, the default font is used (i.e.
-     *                    the font attributes of the nearest CSS ancestor if set)
+     * @param text the string of text to measure
+     * @param font the font the text should be measured with - if {@code null}, the default font is used (i.e.
+     * the font attributes of the nearest CSS ancestor if set)
      * @param lineSpacing the line spacing the text should be measured with, the default is 0
-     * @param boundsType  the {@code TextBoundsType} the text should be measured with - if {@code null}, the default of
-     *                    {@code TextBoundsType.LOGICAL} is used
-     * @param style       any styles (e.g. {@code "-fx-padding: 5.0"}) the text should be measured with, as a String
+     * @param boundsType the {@code TextBoundsType} the text should be measured with - if {@code null}, the default of
+     * {@code TextBoundsType.LOGICAL} is used
+     * @param style any styles (e.g. {@code "-fx-padding: 5.0"}) the text should be measured with, as a String
      * @return the {@code Dimension2D} object that has the width and height of the text, as measured with
      * the font, line spacing, bounds type and styles
      */

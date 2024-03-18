@@ -14,12 +14,20 @@ public class SymmetricPair<F, S> {
     /**
      * Constructor for a Pair.
      *
-     * @param first  the first object in the Pair
+     * @param first the first object in the Pair
      * @param second the second object in the pair
      */
     public SymmetricPair(F first, S second) {
         this.first = first;
         this.second = second;
+    }
+
+    public F getFirst() {
+        return first;
+    }
+
+    public S getSecond() {
+        return second;
     }
 
     /**
@@ -33,14 +41,6 @@ public class SymmetricPair<F, S> {
         return new SymmetricPair<>(a, b);
     }
 
-    public F getFirst() {
-        return first;
-    }
-
-    public S getSecond() {
-        return second;
-    }
-
     /**
      * Checks the two objects for equality by delegating to their respective
      * {@link Object#equals(Object)} methods.
@@ -51,10 +51,11 @@ public class SymmetricPair<F, S> {
      */
     @Override
     public boolean equals(Object object) {
-        if (!(object instanceof SymmetricPair<?, ?> sp)) {
+        if (!(object instanceof SymmetricPair)) {
             return false;
         }
 
+        SymmetricPair<?, ?> sp = (SymmetricPair<?, ?>) object;
         return (Objects.equals(this.first, sp.first) && Objects.equals(this.second, sp.second)) ||
                 (Objects.equals(this.second, sp.first) && Objects.equals(this.first, sp.second));
 

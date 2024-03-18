@@ -1,7 +1,7 @@
 .app {
     -fx-border-radius: 15%;
     -fx-font-size: 90%;
-    -fx-background-color: #12304f;
+    -fx-background-color: #4b7fb6;
     -fx-text-fill-color: #bcd5f8;
     -fx-font-family: sans-serif;
     -fx-text-stroke-width: 1px;
@@ -11,7 +11,7 @@
 }
 .Toolbar{
 -fx-border-radius:5px !important;
--fx-background-color: BLACK;
+    -fx-background-color: #1fc7c1;
 }
 
 .MenuBar{
@@ -33,14 +33,20 @@
     -fx-border-radius: 3;
     -fx-text-fill: #d0dce3;
 }
-.FlowPane {-fx-background-color:BLACK; }
-.TabPane {-fx-background-color:BLACK; }
+
+.FlowPane {
+    -fx-background-color: #151313;
+}
+
+.TabPane {
+    -fx-background-color: #4b7fb6;
+}
 .label {
     -fx-font-size: 90%;
     -fx-touch-action: none;
     -fx-user-select: none;
     -fx-font-family: sans-serif;
-    -fx-text-fill: #1d61a8;
+    -fx-text-fill: #36a12e;
 
 
     -fx-text-stroke-width: 2px;
@@ -56,7 +62,7 @@
     -fx-border-radius: 5%;
     -fx-background-color: #0f2a46;
     -fx-text-fill-color: #5bd5bf;
-    -fx-background-image : url("Invest.png");
+
 
 }
 
@@ -64,20 +70,20 @@
     -fx-background-color: black;
 }
 .chart{
-    -fx-background-color: black;
+    -fx-background-color: #ffffff;
 }
 AnchorPane {
     -fx-background-color: #043264;
-    -fx-border-color: #1dbd37;
+    -fx-border-color: #1b2d1e;
     -fx-text-fill-color: #5ed372;
     -fx-prefHeight: 780.0;
     -fx-prefWidth: 1530.0;
     -fx-border-radius: 3;
--fx-background-image : url("Invest.png");
+    /*-fx-background-image : url("Invest.png");*/
     -fx-font-size:90%;
     -fx-focus-traversable:true;
     -fx-alignment: center;
-    -fx-graphic:  url(logo.png);
+    -fx-graphic: url(Invest.png);
 
     -fx-animated: false;
     -fx-page-information-alignment: bottom;
@@ -85,7 +91,7 @@ AnchorPane {
     -fx-text-shadow: none;
 }
 
-.tab{
+tab {
     -fx-background-color: rgb(82, 152, 206);
     -fx-border-color: rgb(45, 176, 151);
     -fx-text-fill-color: rgb(255, 255, 255);
@@ -154,7 +160,7 @@ AnchorPane {
 }
 
 .axis {
-    -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #131010;
     -fx-font-color: #FFFFFF;
     -fx-tick-label-fill: #FFFFFF;
     -fx-font-size: 18pt;
@@ -170,7 +176,7 @@ AnchorPane {
 }
 
 .axis-label {
-    -fx-text-fill: #462300;
+    -fx-text-fill: #ffffff;
 }
 
 .axis-tick-mark {
@@ -178,7 +184,7 @@ AnchorPane {
     -fx-stroke-width: 3;
 }
 .axis-minor-tick-mark {
-    -fx-stroke: #859656;
+    -fx-stroke: #ffffff;
 }
 
 /*{
@@ -278,5 +284,5 @@ tab-pane-selected {
   -fx-background-color: red;
 }
 .chart-plot-background {
-    -fx-background-color: rgb(0,0,0,0.25);
+    -fx-background-color: rgb(255, 255, 255);
 }

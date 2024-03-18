@@ -54,7 +54,7 @@ public class ReversedLinesFileReader implements Closeable {
      * Creates a ReversedLinesFileReader with default block size of 4KB and the
      * specified encoding.
      *
-     * @param file    the file to be read
+     * @param file the file to be read
      * @param charset the encoding to use
      * @throws IOException if an I/O error occurs
      * @since 2.5

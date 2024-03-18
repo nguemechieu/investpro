@@ -1,10 +1,11 @@
 package org.investpro;
 
-import org.slf4j.LoggerFactory;
-
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+
+
+import org.slf4j.LoggerFactory;
 
 public class LogOnExceptionThreadFactory implements ThreadFactory {
     private final AtomicInteger threadIndex = new AtomicInteger(1);

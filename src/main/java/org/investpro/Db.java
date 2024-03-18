@@ -100,4 +100,6 @@ public interface Db extends DataSource {
 
 
     void save(Currency currency);
+
+    Currency getCurrency(String code) throws SQLException;
 }

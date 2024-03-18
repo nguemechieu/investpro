@@ -1,8 +1,7 @@
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
-
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
 
     <proxies>
         <!-- Example proxy configuration (if needed) -->
@@ -20,20 +19,17 @@
         -->
     </proxies>
 
-<servers>
-    <server>
-        <id>github</id>
-        <username>nguemechieu</username>
-
-        <password>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</password>
-    </server>
-</servers>
-
-
+    <servers>
+        <server>
+            <id>github</id>
+            <username>nguemechieu</username>
+            <password>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
+            </password>
+        </server>
+    </servers>
 
     <mirrors>
-        <!-- Example mirror configuration -->
-
+        <!-- Mirror configuration -->
         <mirror>
             <id>investpro-mirror</id>
             <url>https://repo.investpro.com/maven</url>
@@ -45,26 +41,17 @@
         <profile>
             <id>default</id>
             <repositories>
-                <!-- Example repository configuration -->
-
                 <repository>
-                    <id>investpro-repo</id>
-                    <url>https://repo.investpro.com/maven</url>
-                    <releases>
-                        <enabled>true</enabled>
-                    </releases>
-                    <snapshots>
-                        <enabled>false</enabled>
-                    </snapshots>
+                    <id>github</id>
+                    <name>GitHub nguemechieu Apache Maven Packages</name>
+                    <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
                 </repository>
             </repositories>
-
         </profile>
     </profiles>
 
     <activeProfiles>
         <activeProfile>default</activeProfile>
     </activeProfiles>
-
 
 </settings>

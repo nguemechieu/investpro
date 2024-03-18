@@ -28,6 +28,15 @@
 package org.investpro;
 
 
+import static java.lang.Double.MAX_VALUE;
+import static javafx.geometry.Pos.CENTER_LEFT;
+import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
+import static javafx.scene.paint.Color.YELLOW;
+import static org.investpro.PopOver.ArrowLocation.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
@@ -42,19 +51,20 @@ import javafx.scene.control.Skin;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.*;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.HLineTo;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
+import javafx.scene.shape.PathElement;
+import javafx.scene.shape.QuadCurveTo;
+import javafx.scene.shape.VLineTo;
 import javafx.stage.Window;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static java.lang.Double.MAX_VALUE;
-import static javafx.geometry.Pos.CENTER_LEFT;
-import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
-import static javafx.scene.paint.Color.YELLOW;
-import static org.investpro.PopOver.ArrowLocation.*;
-
 public class PopOverSkin implements Skin<PopOver> {
+    private final Label title;
+    private final Label closeIcon;
     private final Path path;
     private final Path clip;
     private final BorderPane content;
@@ -67,33 +77,6 @@ public class PopOverSkin implements Skin<PopOver> {
     private boolean tornOff;
 
     private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
-    private MoveTo moveTo;
-
-    @Override
-    public Node getNode() {
-        return stackPane;
-    }
-
-    @Override
-    public PopOver getSkinnable() {
-        return popOver;
-    }
-
-    @Override
-    public void dispose() {
-    }
-    private QuadCurveTo topCurveTo, rightCurveTo, bottomCurveTo, leftCurveTo;
-    private HLineTo lineBTop, lineETop, lineHTop, lineKTop;
-    private LineTo lineCTop, lineDTop, lineFTop, lineGTop, lineITop, lineJTop;
-    private VLineTo lineBRight, lineERight, lineHRight, lineKRight;
-    private LineTo lineCRight, lineDRight, lineFRight, lineGRight, lineIRight,
-            lineJRight;
-    private HLineTo lineBBottom, lineEBottom, lineHBottom, lineKBottom;
-    private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
-            lineIBottom, lineJBottom;
-    private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
-    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
-            lineJLeft;
 
     public PopOverSkin(final PopOver popOver) {
         this.popOver = popOver;
@@ -115,13 +98,13 @@ public class PopOverSkin implements Skin<PopOver> {
 
         stackPane.minHeightProperty().bind(stackPane.minWidthProperty());
 
-        Label title = new Label();
+        title = new Label();
         title.textProperty().bind(popOver.titleProperty());
         title.setMaxSize(MAX_VALUE, MAX_VALUE);
         title.setAlignment(Pos.CENTER);
         title.getStyleClass().add("text"); //$NON-NLS-1$
 
-        Label closeIcon = new Label();
+        closeIcon = new Label();
         closeIcon.setGraphic(createCloseIcon());
         closeIcon.setMaxSize(MAX_VALUE, MAX_VALUE);
         closeIcon.setContentDisplay(GRAPHIC_ONLY);
@@ -161,7 +144,7 @@ public class PopOverSkin implements Skin<PopOver> {
         getPopupWindow().yProperty().addListener(updatePathListener);
         popOver.arrowLocationProperty().addListener(updatePathListener);
         popOver.contentNodeProperty().addListener(
-                (value, oldContent, newContent) -> content
+                (_, _, newContent) -> content
                         .setCenter(newContent));
         popOver.detachedProperty()
                 .addListener((value, oldDetached, newDetached) -> {
@@ -172,12 +155,20 @@ public class PopOverSkin implements Skin<PopOver> {
                         content.getStyleClass().add(DETACHED_STYLE_CLASS);
                         content.setTop(titlePane);
                         switch (getSkinnable().getArrowLocation()) {
-                            case LEFT_TOP, LEFT_CENTER, LEFT_BOTTOM -> popOver.setAnchorX(
-                                    popOver.getAnchorX() + popOver.getArrowSize());
-                            case TOP_LEFT, TOP_CENTER, TOP_RIGHT -> popOver.setAnchorY(
-                                    popOver.getAnchorY() + popOver.getArrowSize());
-                            default -> {
-                            }
+                            case LEFT_TOP:
+                            case LEFT_CENTER:
+                            case LEFT_BOTTOM:
+                                popOver.setAnchorX(
+                                        popOver.getAnchorX() + popOver.getArrowSize());
+                                break;
+                            case TOP_LEFT:
+                            case TOP_CENTER:
+                            case TOP_RIGHT:
+                                popOver.setAnchorY(
+                                        popOver.getAnchorY() + popOver.getArrowSize());
+                                break;
+                            default:
+                                break;
                         }
                     } else {
                         popOver.getStyleClass().remove(DETACHED_STYLE_CLASS);
@@ -200,7 +191,7 @@ public class PopOverSkin implements Skin<PopOver> {
 
         /*
          * The clip is a path and the path has to be filled with a color.
-         * Otherwise, clipping will not work.
+         * Otherwise clipping will not work.
          */
         clip.setFill(YELLOW);
 
@@ -258,6 +249,20 @@ public class PopOverSkin implements Skin<PopOver> {
         content.setClip(clip);
     }
 
+    @Override
+    public Node getNode() {
+        return stackPane;
+    }
+
+    @Override
+    public PopOver getSkinnable() {
+        return popOver;
+    }
+
+    @Override
+    public void dispose() {
+    }
+
     private Node createCloseIcon() {
         Group group = new Group();
         group.getStyleClass().add("graphics"); //$NON-NLS-1$
@@ -287,6 +292,25 @@ public class PopOverSkin implements Skin<PopOver> {
 
         return group;
     }
+
+    private MoveTo moveTo;
+
+    private QuadCurveTo topCurveTo, rightCurveTo, bottomCurveTo, leftCurveTo;
+
+    private HLineTo lineBTop, lineETop, lineHTop, lineKTop;
+    private LineTo lineCTop, lineDTop, lineFTop, lineGTop, lineITop, lineJTop;
+
+    private VLineTo lineBRight, lineERight, lineHRight, lineKRight;
+    private LineTo lineCRight, lineDRight, lineFRight, lineGRight, lineIRight,
+            lineJRight;
+
+    private HLineTo lineBBottom, lineEBottom, lineHBottom, lineKBottom;
+    private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
+            lineIBottom, lineJBottom;
+
+    private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
+    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
+            lineJLeft;
 
     private void createPathElements() {
         DoubleProperty centerYProperty = new SimpleDoubleProperty();

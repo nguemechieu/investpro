@@ -11,7 +11,7 @@ COPY . .
 EXPOSE 5000
 
 # Set environment variables for MySQL connection (you can adjust these as needed)
-ENV DB_URL=jdbc:mysql://mysql-host:3306/db_name
+ENV DB_URL=jdbc:mysql://mysql-host:3306/db
 ENV DB_USER=root
 ENV DB_PASSWORD=root
 

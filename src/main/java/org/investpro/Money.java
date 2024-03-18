@@ -2,20 +2,21 @@ package org.investpro;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.sql.SQLException;
 
 /**
  * @author Michael Ennen
  */
 public interface Money {
-    Number amount();
+    Number getAmount();
 
-    Currency currency();
+    Currency getCurrency();
 
     Money plus(Money summand);
 
     Money plus(long summand);
 
-    Money plus(double summand);
+    Money plus(double summand) throws SQLException;
 
     Money negate();
 
@@ -25,7 +26,7 @@ public interface Money {
 
     Money minus(long subtrahend);
 
-    Money minus(double subtrahend);
+    Money minus(double subtrahend) throws SQLException;
 
     Money multipliedBy(long multiplier);
 

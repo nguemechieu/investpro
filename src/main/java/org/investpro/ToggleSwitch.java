@@ -27,7 +27,11 @@
 package org.investpro;
 
 import javafx.beans.NamedArg;
-import javafx.beans.property.*;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.ReadOnlyBooleanWrapper;
+import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.css.PseudoClass;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.Skin;
@@ -52,9 +56,10 @@ public class ToggleSwitch extends Labeled {
      * Indicates whether this ToggleSwitch is selected.
      */
     private final ReadOnlyBooleanWrapper selected;
+    final BooleanProperty turnOnTextLonger;
+
     private static final String DEFAULT_STYLE_CLASS = "toggle-switch";
     private static final PseudoClass PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected");
-    final BooleanProperty turnOnTextLonger;
 
     /**
      * Creates a toggle switch with the default Strings of
@@ -63,28 +68,6 @@ public class ToggleSwitch extends Labeled {
      */
     public ToggleSwitch(@NamedArg("initialValue") boolean initialValue) {
         this(initialValue, "On", "Off");
-    }
-    private final ReadOnlyStringWrapper turnOnText;
-
-    public final boolean isOn() {
-        return selected.get();
-    }
-
-    public final ReadOnlyBooleanProperty selectedProperty() {
-        return selected.getReadOnlyProperty();
-    }
-
-    protected final void setSelected(boolean selected) {
-        this.selected.set(selected);
-    }
-    private final ReadOnlyStringWrapper turnOffText;
-
-    public final ReadOnlyStringProperty turnOnTextProperty() {
-        return turnOnText.getReadOnlyProperty();
-    }
-
-    public final String getTurnOnText() {
-        return turnOnText.get();
     }
 
     /**
@@ -130,6 +113,30 @@ public class ToggleSwitch extends Labeled {
         // we must explicitly call pseudoClassStateChanged so that the initial color of the thumb area is correct
         pseudoClassStateChanged(PSEUDO_CLASS_SELECTED, selected.get());
     }
+
+    public final boolean isOn() {
+        return selected.get();
+    }
+
+    public final ReadOnlyBooleanProperty selectedProperty() {
+        return selected.getReadOnlyProperty();
+    }
+
+    protected final void setSelected(boolean selected) {
+        this.selected.set(selected);
+    }
+
+    private final ReadOnlyStringWrapper turnOnText;
+
+    public final ReadOnlyStringProperty turnOnTextProperty() {
+        return turnOnText.getReadOnlyProperty();
+    }
+
+    public final String getTurnOnText() {
+        return turnOnText.get();
+    }
+
+    private final ReadOnlyStringWrapper turnOffText;
 
     public final ReadOnlyStringProperty turnOffTextProperty() {
         return turnOffText.getReadOnlyProperty();

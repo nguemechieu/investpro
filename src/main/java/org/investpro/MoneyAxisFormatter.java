@@ -1,11 +1,12 @@
 package org.investpro;
 
-import javafx.util.StringConverter;
-
+import java.sql.SQLException;
 import java.util.Objects;
 
+import javafx.util.StringConverter;
+
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public class MoneyAxisFormatter extends StringConverter<Number> {
     private final FastMoneyFormatter format;
@@ -27,9 +28,17 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
     @Override
     public String toString(Number number) {
         if (currency.getCurrencyType() == CurrencyType.FIAT) {
-            return format.format(FastMoney.ofFiat(number.doubleValue(), currency.getCode(), precision));
+            try {
+                return format.format(FastMoney.ofFiat(number.doubleValue(), currency.getCode(), precision));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         } else {
-            return format.format(FastMoney.ofCrypto(number.doubleValue(), currency.getCode(), precision));
+            try {
+                return format.format(FastMoney.ofCrypto(number.doubleValue(), currency.getCode(), precision));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
