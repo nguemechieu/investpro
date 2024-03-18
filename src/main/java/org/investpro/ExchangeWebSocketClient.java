@@ -26,7 +26,7 @@ public abstract class ExchangeWebSocketClient extends CoinbaseWebSocketClient {
 
     private static final Logger logger = LoggerFactory.getLogger(ExchangeWebSocketClient.class);
 
-    protected ExchangeWebSocketClient(URI clientUri, Draft clientDraft) throws SQLException {
+    protected ExchangeWebSocketClient(URI clientUri, Draft clientDraft) throws SQLException, ClassNotFoundException {
         super(clientUri, clientDraft);
         connectionEstablished = new SimpleBooleanProperty(false);
     }

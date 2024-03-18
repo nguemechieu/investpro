@@ -292,6 +292,8 @@ class Coinbase {
                         }
 
                         if (!res.isEmpty()) {
+
+
                             // Remove the current in-progress candle
                             if (res.get(0).get(0).asInt() + secondsPerCandle > endTime.get()) {
                                 ((ArrayNode) res).remove(0);
@@ -312,6 +314,7 @@ class Coinbase {
                             candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                             return candleData;
                         } else {
+                            new Message("", STR."CoinbaseCandleDataSupplier.get()\{response}");
                             return Collections.emptyList();
                         }
                     });

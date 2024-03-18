@@ -21,7 +21,6 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Set;
 
@@ -42,7 +41,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
     private LiveTrade liveTradeConsumers;
 
 
-    public CoinbaseWebSocketClient(URI uri, Draft draft) throws SQLException {
+    public CoinbaseWebSocketClient(URI uri, Draft draft) throws SQLException, ClassNotFoundException {
         super(uri, draft);
 
 
@@ -72,7 +71,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
             tradePair = parseTradePair(messageJson);
         } catch (CurrencyNotFoundException exception) {
             logger.error(STR."coinbase websocket client: could not initialize trade pair: \{messageJson.get("product_id").asText()}", exception);
-        } catch (SQLException e) {
+        } catch (SQLException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
 
@@ -102,7 +101,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
         }
     }
 
-    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException {
+    private @NotNull TradePair parseTradePair(@NotNull JsonNode messageJson) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
         final String productId = messageJson.get("product_id").asText();
         final String[] products = productId.split("-");
         TradePair tradePair;

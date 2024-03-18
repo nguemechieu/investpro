@@ -1,13 +1,14 @@
 package org.investpro;
 
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Pages new candle data in chronological order to a {@code CandleStickChart} on-demand.
@@ -43,7 +44,7 @@ public class CandleDataPager {
         }
 
         @Override
-        public void accept(Future<List<CandleData>> futureCandleData) {
+        public void accept(@NotNull Future<List<CandleData>> futureCandleData) {
             List<CandleData> candleData;
             try {
                 candleData = futureCandleData.get();

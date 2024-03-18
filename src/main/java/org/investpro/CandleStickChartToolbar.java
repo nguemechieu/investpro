@@ -11,6 +11,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -21,9 +22,14 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -142,7 +148,40 @@ public class CandleStickChartToolbar extends Region {
         }
 
 
-        toolbar = new HBox(symbolsChoiceBox);
+        Button createChat = new Button("New Chat");
+        createChat.setOnAction(
+                e -> {
+                    Stage stage = new Stage();
+                    stage.initModality(Modality.APPLICATION_MODAL);
+                    stage.initOwner(getScene().getWindow());
+                    stage.initStyle(StageStyle.UNDECORATED);
+                    stage.setResizable(false);
+                    stage.initStyle(StageStyle.TRANSPARENT);
+
+                    VBox vBox = new VBox();
+                    vBox.setSpacing(10);
+                    vBox.setPadding(new Insets(10));
+                    vBox.setAlignment(Pos.CENTER);
+                    //vBox.getChildren().add(new ImageView(new Image(Exchange.class.getResourceAsStream("/images/chart.png"))));
+
+                    Exchange exchange;
+                    exchange = new Exchange("", "");
+                    CandleStickChartContainer candleStickChartContainer;
+                    try {
+                        candleStickChartContainer = new CandleStickChartContainer(exchange, true);
+                    } catch (SQLException | ClassNotFoundException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    vBox.getChildren().add(candleStickChartContainer);
+
+                    Scene scene = new Scene(vBox);
+                    stage.setScene(scene);
+                    stage.show();
+
+
+                }
+        );
+        toolbar = new HBox(symbolsChoiceBox, createChat);
         toolbar.getChildren().addAll(toolbarNodes);
         toolbar.getStyleClass().add("candle-chart-toolbar");
 
@@ -208,7 +247,7 @@ public class CandleStickChartToolbar extends Region {
 
         ZoomDirection getZoomDirection() {
             if (!isZoomFunction()) {
-                throw new IllegalArgumentException("cannot call getZoomDirection() on non-zoom function: " + name());
+                throw new IllegalArgumentException(STR."cannot call getZoomDirection() on non-zoom function: \{name()}");
             }
 
             return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;

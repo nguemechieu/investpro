@@ -15,7 +15,7 @@ public class TradeView extends AnchorPane {
     static {
         try {
             BTC_USD = TradePair.of(Objects.requireNonNull(Currency.of("XLM")), Currency.ofFiat("USD"));
-        } catch (SQLException e) {
+        } catch (SQLException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
     }

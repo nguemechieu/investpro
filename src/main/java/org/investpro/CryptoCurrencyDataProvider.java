@@ -6,8 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
     private static final Logger logger = LoggerFactory.getLogger(CryptoCurrencyDataProvider.class);
@@ -68,6 +67,8 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
                     : jsonObject1.get("image").asText()
 
             ));
+
+            Currency.registerCurrencies(coinsToRegister);
             // Download the image to the folder where the program is running (images/currency)
 
             try {
@@ -81,31 +82,31 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
                 if (response1.statusCode() != 200) {
                     throw new RuntimeException(STR."Failed : HTTP error code : \{response1.statusCode()}");
                 }
-                //  InputStream inputStream = response1.body();
-                //logger.info(jsonObject1.get("id").asText() + " " + inputStream);
+                InputStream inputStream = response1.body();
+                logger.info(STR."\{jsonObject1.get("id").asText()} \{inputStream}");
 
-                // Save the image to the folder where the program is running (images/currency)
-//
-//    File file = new File("src/main/resources/images/currency/" + jsonObject1.get("name").asText()+".jpg");
-//
-//    if (!file.exists()) {
-//        file.createNewFile();
-//    }else {
-//        return;
-//    }
-//
-//    OutputStream os = new FileOutputStream(file);
-//
-//    byte[] b = new byte[2048];
-//    int length;
-//
-//    while ((length = inputStream.read(b)) != -1) {
-//        os.write(b, 0, length);
-//    }
-//
-//    os.flush();
-//    os.close();
-//
+                //Save the image to the folder where the program is running (images/currency)
+
+                File file = new File(STR."src/main/resources/images/currency/\{jsonObject1.get("name").asText()}.jpg");
+
+                if (!file.exists()) {
+                    file.createNewFile();
+                } else {
+                    return;
+                }
+
+                OutputStream os = new FileOutputStream(file);
+
+                byte[] b = new byte[2048];
+                int length;
+
+                while ((length = inputStream.read(b)) != -1) {
+                    os.write(b, 0, length);
+                }
+
+                os.flush();
+                os.close();
+
 
 
             } catch (IOException | InterruptedException e) {
@@ -146,7 +147,5 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 //                "last_updated": "2023-06-06T01:16:11.958Z"
 
 
-        Currency.registerCurrencies(coinsToRegister);
-        logger.info("currencies ", coinsToRegister);
     }
 }

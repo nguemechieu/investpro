@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
@@ -24,24 +23,25 @@ public class TradePair extends Pair<Currency, Currency> {
     Currency baseCurrency;
     Currency counterCurrency;
 
-    long orderListId;
     long id;
 
-    public TradePair(Currency baseCurrency, Currency counterCurrency) throws SQLException {
+    public TradePair(Currency baseCurrency, Currency counterCurrency) throws SQLException, ClassNotFoundException {
         super(baseCurrency, counterCurrency);
         this.baseCurrency = baseCurrency;
         this.counterCurrency = counterCurrency;
 
         logger.debug("TradePair created: {}", this);
 
+
     }
 
-    public TradePair(String baseCurrency, String counterCurrency) throws SQLException {
+    public TradePair(String baseCurrency, String counterCurrency) throws SQLException, ClassNotFoundException {
         super(Currency.of(baseCurrency), Currency.of(counterCurrency));
 
         this.baseCurrency = Currency.of(baseCurrency);
         this.counterCurrency = Currency.of(counterCurrency);
         logger.debug("TradePair created: {}", this);
+
 
     }
 
@@ -52,7 +52,7 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     @Contract("_, _ -> new")
-    public static @NotNull TradePair of(@NotNull Currency baseCurrency, Currency counterCurrency) throws SQLException {
+    public static @NotNull TradePair of(@NotNull Currency baseCurrency, Currency counterCurrency) throws SQLException, ClassNotFoundException {
 
         if (baseCurrency.code.isEmpty() || counterCurrency.code.isEmpty()) {
             throw new IllegalArgumentException(
@@ -65,13 +65,13 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     @Contract("_ -> new")
-    public static @NotNull TradePair of(@NotNull Pair<Currency, Currency> currencyPair) throws SQLException {
+    public static @NotNull TradePair of(@NotNull Pair<Currency, Currency> currencyPair) throws SQLException, ClassNotFoundException {
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
 
     public static <T extends Currency, V extends Currency> @NotNull TradePair parse(
             String tradePair, @NotNull String separator, Pair<Class<T>, Class<V>> pairType)
-            throws CurrencyNotFoundException, SQLException {
+            throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(pairType, "pairType must not be null");
         Objects.requireNonNull(pairType.getKey(), "first member of pairType must not be null");
@@ -120,8 +120,7 @@ public class TradePair extends Pair<Currency, Currency> {
                 }
             } else {
                 logger.error(STR."bad value for second member of pairType - must be one of CryptoCurrency.class, FiatCurrency.class, or null but was: \{pairType.getValue()}");
-                throw new IllegalArgumentException("bad value for second member of pairType - must be one of " +
-                        "CryptoCurrency.class, FiatCurrency.class, or null but was: " + pairType.getValue());
+                throw new IllegalArgumentException(STR."bad value for second member of pairType - must be one of CryptoCurrency.class, FiatCurrency.class, or null but was: \{pairType.getValue()}");
             }
         } else {
             // tradePair must be (crypto, something)
@@ -214,9 +213,6 @@ public class TradePair extends Pair<Currency, Currency> {
 
 
 
-    public Date getStartTime() {
-        return new Date();
-    }
 
 
     public long getId() {

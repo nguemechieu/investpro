@@ -404,18 +404,22 @@ class Db1 implements Db {
             } else {
 
 
-
-                conn.prepareStatement("INSERT INTO  currencies (  code, full_display_name, short_display_name, " +
+                conn.prepareStatement("INSERT INTO  currencies (     Currency_type,  code, full_display_name, short_display_name, " +
                         "fractional_digits, symbol, image," +
-                        "currency_type) VALUES (?,?,?,?,?,?,?)");
+                        "currency_type) VALUES (?,?,?,?,?,?,?,?)");
 
 
                 conn.createStatement().executeUpdate(
                         STR."INSERT INTO currencies ( currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image) VALUES ('\{currency.getCurrencyType()}','\{currency.getCode()}','\{currency.getFullDisplayName()}','\{currency.getShortDisplayName()}','\{currency.getFractionalDigits()}','\{currency.getSymbol()}','\{currency.getImage()}')");
 
+                CurrencyType type = currency.getCurrencyType();
+
+                Currency.CURRENCIES.put(new SymmetricPair<>(currency.getCode(), type), currency);
+
                 logger.info(
                         STR."New Currency with code: \{currency.getCode()}was added  to the  database"
                 );
+
 
             }
 

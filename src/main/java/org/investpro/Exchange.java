@@ -66,9 +66,7 @@ public class Exchange extends Coinbase {
 
 
                     String shortDisplayName = rate.get("base_currency").asText();
-
                     String code = rate.get("base_currency").asText();
-
                     int fractionalDigits = rate.get("base_increment").asInt();
                     String symbol = rate.get("base_currency").asText();
                     baseCurrency = new CryptoCurrency(fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, code);
@@ -93,7 +91,7 @@ public class Exchange extends Coinbase {
 
                     logger.info(Currency.getAvailableCurrencies().toString());
                 }
-            } catch (JsonProcessingException ex) {
+            } catch (JsonProcessingException | ClassNotFoundException ex) {
                 throw new RuntimeException(ex);
             }
         } catch (IOException | InterruptedException e) {
@@ -104,13 +102,13 @@ public class Exchange extends Coinbase {
 
     }
 
-    public TradePair getSelecTradePair() throws SQLException {
-        String sym = symbolsChoiceBox.getSelectionModel().getSelectedItem();
+    public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
+        String sym = symbolsChoiceBox.getValue();
         logger.info(sym);
         if (sym == null || sym.isEmpty()) {
-            sym = "ADA/USD";
+            sym = "ETH/USD";
         }
-        return new TradePair(sym.split("/")[0],
+        return TradePair.of(sym.split("/")[0],
                 sym.split("/")[1]);
     }
 }
