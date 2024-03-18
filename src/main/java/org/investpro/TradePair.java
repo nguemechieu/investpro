@@ -8,7 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 import static java.lang.System.out;
@@ -34,12 +36,13 @@ public class TradePair extends Pair<Currency, Currency> {
 
     }
 
-    public TradePair(String baseCurrency, String counterCurrency) {
+    public TradePair(String baseCurrency, String counterCurrency) throws SQLException {
         super(Currency.of(baseCurrency), Currency.of(counterCurrency));
 
         this.baseCurrency = Currency.of(baseCurrency);
         this.counterCurrency = Currency.of(counterCurrency);
         logger.debug("TradePair created: {}", this);
+
     }
 
 
@@ -75,7 +78,7 @@ public class TradePair extends Pair<Currency, Currency> {
 
         String[] split;
 
-        if (separator.equals("")) {
+        if (separator.isEmpty()) {
             // We don't know where to split so try the most logical thing (after 3 characters). We could
             // extend this by checking that the substring is indeed a real currency and if not try 4
             // characters.
@@ -116,8 +119,7 @@ public class TradePair extends Pair<Currency, Currency> {
                     return new TradePair(Currency.of(split[0]), Currency.of(split[1]));
                 }
             } else {
-                logger.error("bad value for second member of pairType - must be one of CryptoCurrency.class, " +
-                        "FiatCurrency.class, or null but was: " + pairType.getValue());
+                logger.error(STR."bad value for second member of pairType - must be one of CryptoCurrency.class, FiatCurrency.class, or null but was: \{pairType.getValue()}");
                 throw new IllegalArgumentException("bad value for second member of pairType - must be one of " +
                         "CryptoCurrency.class, FiatCurrency.class, or null but was: " + pairType.getValue());
             }
@@ -128,19 +130,19 @@ public class TradePair extends Pair<Currency, Currency> {
                 alert.setTitle("Error");
                 alert.setHeaderText(null);
                 alert.setContentText(
-                        "The base currency of the trade pair must be a crypto currency, but was: " + split[0]);
+                        STR."The base currency of the trade pair must be a crypto currency, but was: \{split[0]}");
                 alert.showAndWait();
                 //throw new CurrencyNotFoundException(CurrencyType.CRYPTO, split[0]);
                 return new TradePair(Currency.NULL_CRYPTO_CURRENCY, Currency.of(split[1]));
             } else if (pairType.getValue() == null) {
 
-                Log.error("bad value for second member of pairType - must be one of CryptoCurrency.class,");
+                logger.error("bad value for second member of pairType - must be one of CryptoCurrency.class,");
 
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
                 alert.setHeaderText(null);
                 alert.setContentText(
-                        "The counter currency of the trade pair must be a fiat or crypto currency, but was: " + split[1]);
+                        STR."The counter currency of the trade pair must be a fiat or crypto currency, but was: \{split[1]}");
                 alert.showAndWait();
                 return new TradePair(Currency.of(split[0]), Currency.of(split[1]));
 
@@ -157,13 +159,21 @@ public class TradePair extends Pair<Currency, Currency> {
                     return new TradePair(Currency.of(split[0]), Currency.of(split[1]));
                 }
             } else {
-                logger.error("bad value for second member of pairType - must be one of CryptoCurrency.class, " +
-                        "FiatCurrency.class, or null but was: " + pairType.getValue());
-                throw new IllegalArgumentException("bad value for second member of pairType - must be one of " +
-                        "CryptoCurrency.class, FiatCurrency.class, or null but was: " + pairType.getValue());
+                logger.error(STR."bad value for second member of pairType - must be one of CryptoCurrency.class, FiatCurrency.class, or null but was: \{pairType.getValue()}");
+                throw new IllegalArgumentException(STR."bad value for second member of pairType - must be one of CryptoCurrency.class, FiatCurrency.class, or null but was: \{pairType.getValue()}");
             }
 
         }
+    }
+
+    public @NotNull List<String> getTradePairs() {
+        List<String> tradePairs = new ArrayList<>();
+
+        tradePairs.add(toString());
+
+        return tradePairs;
+
+
     }
 
     public Currency getBaseCurrency() {
@@ -177,23 +187,13 @@ public class TradePair extends Pair<Currency, Currency> {
     public String toString(@NotNull Character separator) {
 
         if (separator.equals('_')) {
-            out.println(baseCurrency.code);
-            out.println("_");
-            out.println(counterCurrency.code);
-            out.println("baseCurrency image " + baseCurrency.getImage());
-            out.println("counterCurrency image " + counterCurrency.getImage());
-            return baseCurrency.code.toUpperCase() + "_" + counterCurrency.code.toUpperCase();
+
+            return STR."\{baseCurrency.code.toUpperCase()}_\{counterCurrency.code.toUpperCase()}";
         } else if (separator.equals('-')) {
-            out.println(baseCurrency.code);
-            out.println("-");
-            out.println(counterCurrency.code);
-            return baseCurrency.code.toUpperCase() + "-" + counterCurrency.code.toUpperCase();
+
+            return STR."\{baseCurrency.code.toUpperCase()}-\{counterCurrency.code.toUpperCase()}";
         } else if (separator.equals('/')) {
-            out.println(baseCurrency.code);
-            out.println("/");
-            out.println(counterCurrency.getCode());
-            out.println("baseCurrency image " + baseCurrency.getImage());
-            out.println("counterCurrency image " + counterCurrency.getImage());
+
             return baseCurrency.code.toUpperCase() + counterCurrency.code.toUpperCase();
         } else {
             out.println(baseCurrency.code);
@@ -204,12 +204,10 @@ public class TradePair extends Pair<Currency, Currency> {
                 throw new IllegalArgumentException("baseCurrency and counterCurrency must be different");
             } else if (baseCurrency.code.isEmpty() || counterCurrency.code.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Currency code must be non-empty, but was: " + baseCurrency.code + " and" +
-                                counterCurrency.code
+                        STR."Currency code must be non-empty, but was: \{baseCurrency.code} and\{counterCurrency.code}"
                 );
             }
-            out.println("baseCurrency image " + baseCurrency.getImage());
-            out.println("counterCurrency image " + counterCurrency.getImage());
+
             return counterCurrency.code.toUpperCase() + separator + baseCurrency.code.toUpperCase();
         }
     }

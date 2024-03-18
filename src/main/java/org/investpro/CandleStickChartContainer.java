@@ -7,18 +7,17 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
-import java.io.IOException;
-import java.text.ParseException;
+import java.sql.SQLException;
 import java.util.Objects;
 
 /**
- * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
+ * A {@link javafx.scene.layout.Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
  * The contained chart will display data for the given {@code tradePair}. The toolbar allows for changing
  * the duration in seconds of each candle as well as configuring the properties of the chart. When a new
  * duration is selected, this container automatically creates a new {@code CandleStickChart} and visually
  * transitions to it.
  *
-
+ * @author Michael Ennen
  */
 public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
@@ -26,41 +25,20 @@ public class CandleStickChartContainer extends Region {
     private final Exchange exchange;
     private final TradePair tradePair;
     private final SimpleIntegerProperty secondsPerCandle;
-    private String telegramBotToken;
     private CandleStickChart candleStickChart;
 
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
      */
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean b, String telegramBotToken) {
-        this(exchange, tradePair, b);
-        this.telegramBotToken = telegramBotToken;
-        liveSyncing(false);
-
+    public CandleStickChartContainer(Exchange exchange) throws SQLException, ClassNotFoundException {
+        this(exchange, true);
     }
 
-    private void liveSyncing(boolean b) {
-        boolean liveSyncing;
-        if (!b) {
-            return;
-        }
-        liveSyncing = true;
-        if (liveSyncing) {
-            FadeTransition fadeTransition = new FadeTransition(Duration.seconds(1), candleStickChart);
-            fadeTransition.setFromValue(1.0);
-            fadeTransition.setToValue(0.0);
-            fadeTransition.play();
-        } else {
-            candleStickChart.stop();
-        }
-    }
-
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
+    public CandleStickChartContainer(Exchange exchange, boolean liveSyncing) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(exchange, "exchange must not be null");
-        Objects.requireNonNull(tradePair, "tradePair must not be null");
 
         this.exchange = exchange;
-        this.tradePair = tradePair;
+        this.tradePair = exchange.getSelecTradePair();
         secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -86,14 +64,14 @@ public class CandleStickChartContainer extends Region {
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
         getChildren().setAll(containerRoot);
-
+        // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 
         secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
                 try {
                     createNewChart(newDurationValue.intValue(), liveSyncing);
-                } catch (TelegramApiException | IOException | InterruptedException | ParseException e) {
+                } catch (SQLException e) {
                     throw new RuntimeException(e);
                 }
                 toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -103,10 +81,10 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        secondsPerCandle.set(300);
+        //secondsPerCandle.set(300);
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws TelegramApiException, IOException, ParseException, InterruptedException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
         }
@@ -114,11 +92,8 @@ public class CandleStickChartContainer extends Region {
         CandleDataSupplier candleDataSupplier = new ReverseRawTradeDataProcessor(Paths.get("C:\\bitstampUSD.csv"),
                 secondsPerCandle.get(), TradePair.of(amountUnit, priceUnit));
         */
-
         candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
-                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty(),
-                telegramBotToken
-        );
+                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
     private void animateInNewChart(CandleStickChart newChart) {

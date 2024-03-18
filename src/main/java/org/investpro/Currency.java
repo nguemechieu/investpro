@@ -1,5 +1,4 @@
 package org.investpro;
-
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -14,20 +13,28 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 
+
 public abstract class Currency {
     private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
     public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
     protected static final Db1 db1;
-    private static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
+    static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
+
+    private static final Properties conf = new Properties();
 
     static {
         try {
-            @NotNull Properties conf = new Properties();
-            conf.load(Currency.class.getResourceAsStream("/conf.properties"));
+            conf.load(Currency.class.getClassLoader().getResourceAsStream("conf.properties"));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    static {
+        try {
             db1 = new Db1(conf);
-        } catch (ClassNotFoundException | IOException e) {
+        } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
     }
@@ -39,6 +46,7 @@ public abstract class Currency {
         cryptoCurrencyDataProvider.registerCurrencies();
         FiatCurrencyDataProvider fiatCurrencyDataProvider = new FiatCurrencyDataProvider();
         fiatCurrencyDataProvider.registerCurrencies();
+
     }
 
     private final CurrencyType currencyType;
@@ -60,7 +68,7 @@ public abstract class Currency {
         Objects.requireNonNull(code, "code must not be null");
 
         if (fractionalDigits < 0) {
-            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
+            throw new IllegalArgumentException(STR."fractional digits must be non-negative, was: \{fractionalDigits}");
         }
         Objects.requireNonNull(symbol, "symbol must not be null");
 
@@ -71,55 +79,57 @@ public abstract class Currency {
         this.fractionalDigits = fractionalDigits;
         this.symbol = symbol;
         this.image = image;
+
+        for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
+            if (currencyType == CurrencyType.FIAT && !currency.getCurrencyCode().equals(code)) {
+                java.util.Currency.getAvailableCurrencies().add(currency);
+
+            }
+            if (currencyType == CurrencyType.CRYPTO && !currency.getCurrencyCode().equals(code)) {
+                java.util.Currency.getAvailableCurrencies().add(currency);
+
+            }
+        }
     }
 
 
-    protected static void registerCurrency(Currency currency) {
+    protected static void registerCurrency(Currency currency) throws ClassNotFoundException {
         Objects.requireNonNull(currency, "currency must not be null");
 
         CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
         logger.info("registered currency: %s".formatted(currency));
-        db1.save(currency);
+
+        for (Currency currency1 : CURRENCIES.values()) {
+            db1.save(currency1);
+        }
     }
 
     protected static void registerCurrencies(Collection<Currency> currencies) {
         Objects.requireNonNull(currencies, "currencies must not be null");
-        currencies.forEach(Currency::registerCurrency);
+
         for (Currency currency : currencies) {
             CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
-            db1.save(currency);
+
+        }
+        for (Currency currency : currencies) {
+            try {
+                registerCurrency(currency);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
 
-    public static @Nullable Currency of(String code) {
+    public static @Nullable Currency of(String code) throws SQLException {
         Objects.requireNonNull(code, "code must not be null");
-        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))
-                && CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))) {
-            logger.info("ambiguous currency code: " + code);
-            throw new IllegalArgumentException("ambiguous currency code: " + code + " (code" +
-                    " is used for multiple currency types); use ofCrypto(...) or ofFiat(...) instead");
-        } else if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO))){
+        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO)) && db1.getCurrency(code).currencyType == CurrencyType.CRYPTO) {
             return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
-        }else if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))){
-
-            return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
+        } else if (code.equals("���") || code.equals("XXX") || code.isEmpty()) {
+            return NULL_CRYPTO_CURRENCY;
         }
+        return db1.getCurrency(code) == null ? NULL_CRYPTO_CURRENCY : db1.getCurrency(code);
 
-
-        else {
-
-            try {
-                if (db1.getCurrency(code)==null){
-
-                    return NULL_FIAT_CURRENCY;
-                }else {
-                    return db1.getCurrency(code);
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
     /**
@@ -130,41 +140,16 @@ public abstract class Currency {
      * @param code the currency code
      * @return the fiat currency
      */
-    public static Currency ofFiat(@NotNull String code) {
-        if (code.equals("¤¤¤")) {
+    public static Currency ofFiat(@NotNull String code) throws SQLException {
+
+
+        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT)) && db1.getCurrency(code).currencyType == CurrencyType.FIAT) {
+            return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
+        } else if (code.equals("¤¤¤") || code.equals("����") || code.equals("xxx")) {
             return NULL_FIAT_CURRENCY;
         }
 
-        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT))) {
-            return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
-        } else {
-            try {
-                if (db1.getCurrency(code) == null) {
-                    return NULL_FIAT_CURRENCY;
-                } else {
-                    try {
-                        if (db1.getCurrency(code).currencyType == CurrencyType.FIAT) {
-
-                            try {
-                                return db1.getCurrency(code);
-                            } catch (SQLException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }
-                    } catch (SQLException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return
-                (Objects.equals(CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT)).code, code)) ?
-                        CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT)) :
-                        NULL_FIAT_CURRENCY;
-
-
+        return db1.getCurrency(code) == null ? NULL_FIAT_CURRENCY : db1.getCurrency(code);
     }
 
     /**
@@ -172,20 +157,9 @@ public abstract class Currency {
      * given {@code}. Using {@literal "¤¤¤"} as the currency code
      * returns {@literal NULL_CRYPTO_CURRENCY}.
      *
-     * @param code the currency code
      * @return the cryptocurrency
      */
-    public static Currency ofCrypto(@NotNull String code) {
-        if (code.equals("¤¤¤")) {
-            return NULL_CRYPTO_CURRENCY;
-        }
 
-        try {
-            return db1.getCurrency(code) == null ? NULL_CRYPTO_CURRENCY : db1.getCurrency(code);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public CurrencyType getCurrencyType() {
         return this.currencyType;
