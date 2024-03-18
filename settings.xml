@@ -19,14 +19,14 @@
         -->
     </proxies>
 
-    <servers>
-        <server>
-            <id>github</id>
-            <username>nguemechieu</username>
-            <password>github_pat_
-            </password>
-        </server>
-    </servers>
+    <!--    <servers>-->
+    <!--        <server>-->
+    <!--            <id>github</id>-->
+    <!--            <username>nguemechieu</username>-->
+    <!--            <password>-->
+    <!--            </password>-->
+    <!--        </server>-->
+    <!--    </servers>-->
 
     <mirrors>
         <!-- Mirror configuration -->
