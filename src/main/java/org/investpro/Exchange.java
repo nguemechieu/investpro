@@ -105,10 +105,10 @@ public class Exchange extends Coinbase {
     }
 
     public TradePair getSelecTradePair() throws SQLException {
-        String sym = symbolsChoiceBox.getValue();
+        String sym = symbolsChoiceBox.getSelectionModel().getSelectedItem();
         logger.info(sym);
         if (sym == null || sym.isEmpty()) {
-            sym = "BTC/USD";
+            sym = "ADA/USD";
         }
         return new TradePair(sym.split("/")[0],
                 sym.split("/")[1]);
