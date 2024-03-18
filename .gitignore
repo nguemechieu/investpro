@@ -33,7 +33,8 @@ build/
 
 ### VS Code ###
 .vscode/
-
+investpro_db.sql
+investpro.log
 ### Mac OS ###
 .DS_Store
 # Project exclude paths
