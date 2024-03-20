@@ -5,12 +5,11 @@ import java.math.MathContext;
 import java.sql.SQLException;
 
 /**
- * @author Michael Ennen
  */
 public interface Money {
-    Number getAmount();
+    Number amount();
 
-    Currency getCurrency();
+    Currency currency();
 
     Money plus(Money summand);
 

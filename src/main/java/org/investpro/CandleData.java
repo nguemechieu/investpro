@@ -3,7 +3,7 @@ package org.investpro;
 import java.util.Objects;
 
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public class CandleData {
     private final double openPrice;

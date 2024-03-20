@@ -30,8 +30,6 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
     @Override
     protected void registerCurrencies() {
-
-
         List<Currency> coinsToRegister = new ArrayList<>();
 
 
@@ -91,8 +89,6 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
                 if (!file.exists()) {
                     file.createNewFile();
-                } else {
-                    return;
                 }
 
                 OutputStream os = new FileOutputStream(file);
@@ -114,7 +110,6 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
             }
 
 
-            logger.info("currencies ", coinsToRegister);
         }
 
 

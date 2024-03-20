@@ -13,7 +13,7 @@ import java.util.function.Consumer;
 /**
  * Pages new candle data in chronological order to a {@code CandleStickChart} on-demand.
  *
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public class CandleDataPager {
     private final CandleDataSupplier candleDataSupplier;

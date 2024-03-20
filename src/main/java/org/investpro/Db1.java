@@ -13,7 +13,6 @@ import java.util.UUID;
 
 class Db1 implements Db {
     private static final Logger logger = LoggerFactory.getLogger(Db1.class);
-    private final Properties conf;
 
 
     Connection conn;
@@ -29,7 +28,6 @@ class Db1 implements Db {
 
     public Db1(@NotNull Properties conf) throws ClassNotFoundException {
 
-        this.conf = conf;
         //Class.forName() to load the driver
         Class.forName(
                 "org.sqlite.JDBC"
@@ -49,7 +47,7 @@ class Db1 implements Db {
     @Override
     public void createTables() {
         try {
-            String sql = "CREATE TABLE IF NOT EXISTS investpro.investpro ( " +
+            String sql = "CREATE TABLE IF NOT EXISTS currencies ( " +
                     "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
                     "full_display_name VARCHAR(255), " +
                     "short_display_name VARCHAR(255), " +
@@ -320,56 +318,6 @@ class Db1 implements Db {
     @Override
     public boolean isWrapperFor(Class<?> iface) {
         return false;
-    }
-
-    public void registerCurrencies(@NotNull Collection<Currency> currencies) throws SQLException {
-        //Create table currencies if not exits
-        conn.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS " +
-                "currencies (" +
-                "id INT PRIMARY KEY ," +
-                " currency_type VARCHAR(255)," +
-                "code  VARCHAR(255)," +
-                "full_display_name VARCHAR(255)," +
-                "short_display_name VARCHAR(255)," +
-                "fractional_digits INTEGER," +
-                "symbol VARCHAR(255)," +
-                "image VARCHAR(255)" +
-                ");");
-
-        //Insert currencies into database
-        for (Currency currency : currencies) {
-            try {
-                //Check if currency already exists
-                int check = conn.createStatement().executeUpdate(STR."SELECT * FROM currencies WHERE code = '\{currency.getCode()}'AND currency_type = '\{currency.getCurrencyType()}'AND + code = '\{currency.getCode()}' ");
-                if (check > 0) {
-                    conn.prepareStatement("INSERT INTO  currencies (id, currency_type, code, full_display_name, short_display_name, " +
-                            "fractional_digits, symbol, image) VALUES (?,?,?,?,?,?,?,?)");
-                    conn.createStatement().executeUpdate(STR."INSERT INTO currencies VALUES ('\{UUID.randomUUID().hashCode()}','\{currency.getCurrencyType()}','\{currency.getCode()}','\{currency.getFullDisplayName()}','\{currency.getShortDisplayName()}','\{currency.getFractionalDigits()}','\{currency.getSymbol()}','\{currency.getImage()}')");
-                    //
-                    // conn.createStatement().executeQuery(+"'DELETE FROM table a
-//                   WHERE a.ROWID IN
-//                   (SELECT ROWID FROM
-//                   (SELECT
-//                   ROWID,
-//                           ROW_NUMBER() OVER
-//                           (PARTITION BY unique_columns ORDER BY ROWID) dup
-//                   FROM table)
-//                   WHERE dup > 1);
-                    //    ');");
-
-                    conn.createStatement().executeUpdate("DELETE FROM currencies WHERE code IN (SELECT code FROM (SELECT code, ROW_COUNT()" +
-                            " OVER (PARTITION BY full_display_name ORDER BY code) dup FROM currencies) as cd WHERE dup > 1);");
-                    logger.info(
-                            STR."New Currency with code: \{currency.getCode()}was added  to the  database"
-                    );
-
-                } else {
-                    logger.info(STR."Currency already exists with code: \{currency.getCode()}");
-                }
-            } catch (SQLException e) {
-                logger.error(e.getMessage());
-            }
-        }
     }
 
     @Override

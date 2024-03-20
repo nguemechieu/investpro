@@ -9,9 +9,7 @@ import java.util.Objects;
 
 import javafx.util.Pair;
 
-/**
- * @author Michael Ennen
- */
+
 public final class CandleStickChartUtils {
     private static final int SECONDS_PER_MINUTE = 60;
     private static final int SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;

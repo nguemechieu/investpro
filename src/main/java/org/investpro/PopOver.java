@@ -87,7 +87,7 @@ public class PopOver extends PopupControl {
         getStyleClass().add(DEFAULT_STYLE_CLASS);
 
         getRoot().getStylesheets().add(
-                PopOver.class.getResource("/css/popover.css").toExternalForm()); //$NON-NLS-1$
+                requireNonNull(PopOver.class.getResource("/css/popover.css")).toExternalForm()); //$NON-NLS-1$
 
         setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
         setOnHiding(evt -> setDetached(false));
@@ -116,13 +116,7 @@ public class PopOver extends PopupControl {
         /*
          * A detached popover should of course not automatically hide itself.
          */
-        detached.addListener(it -> {
-            if (isDetached()) {
-                setAutoHide(false);
-            } else {
-                setAutoHide(true);
-            }
-        });
+        detached.addListener(it -> setAutoHide(!isDetached()));
 
         setAutoHide(true);
     }
@@ -324,8 +318,8 @@ public class PopOver extends PopupControl {
      * of the arrow of the pop over and not the location of the window.
      *
      * @param owner the owning node
-     * @param x the x coordinate for the pop over arrow tip
-     * @param y the y coordinate for the pop over arrow tip
+     * @param x the x coordinate for the pop-over arrow tip
+     * @param y the y coordinate for the pop-over arrow tip
      */
     @Override
     public final void show(Node owner, double x, double y) {
@@ -519,26 +513,19 @@ public class PopOver extends PopupControl {
     private double computeYOffset() {
         double prefContentHeight = getContentNode().prefHeight(-1);
 
-        switch (getArrowLocation()) {
-            case LEFT_TOP:
-            case RIGHT_TOP:
-                return getCornerRadius() + getArrowIndent() + getArrowSize();
-            case LEFT_CENTER:
-            case RIGHT_CENTER:
-                return Math.max(prefContentHeight, 2 * (getCornerRadius()
-                        + getArrowIndent() + getArrowSize())) / 2;
-            case LEFT_BOTTOM:
-            case RIGHT_BOTTOM:
-                return Math.max(prefContentHeight - getCornerRadius()
-                        - getArrowIndent() - getArrowSize(), getCornerRadius()
-                        + getArrowIndent() + getArrowSize());
-            default:
-                return 0;
-        }
+        return switch (getArrowLocation()) {
+            case LEFT_TOP, RIGHT_TOP -> getCornerRadius() + getArrowIndent() + getArrowSize();
+            case LEFT_CENTER, RIGHT_CENTER -> Math.max(prefContentHeight, 2 * (getCornerRadius()
+                    + getArrowIndent() + getArrowSize())) / 2;
+            case LEFT_BOTTOM, RIGHT_BOTTOM -> Math.max(prefContentHeight - getCornerRadius()
+                    - getArrowIndent() - getArrowSize(), getCornerRadius()
+                    + getArrowIndent() + getArrowSize());
+            default -> 0;
+        };
     }
 
     /**
-     * Detaches the pop over from the owning node. The pop over will no longer
+     * Detaches the pop-over from the owning node. The pop over will no longer
      * display an arrow pointing at the owner node.
      */
     public final void detach() {

@@ -55,7 +55,7 @@ import static org.investpro.ChartColors.*;
  * duration of the candle, if the price of the commodity increased during the duration, the candle is colored
  * green and represents a "bullish" trading period. Conversely, if the price decreased then the candle is colored
  * red which represents a "bearish" period. To display a {@code CandleStickChart} in a scene one must use
- * a {@link CandleStickChartContainer}. To enforce this usage, the constructors for this class are package-private.
+ * a {@link ChartContainer}. To enforce this usage, the constructors for this class are package-private.
  * <p>
  * JavaFX offers various charts in it's javafx.scene.chart package, but does not offer a candle-stick
  * chart out-of-the-box. It does however offer an XYChart which could be used as a starting-point for a candle-stick
@@ -77,8 +77,6 @@ import static org.investpro.ChartColors.*;
  * @author Michael Ennen
  */
 public class CandleStickChart extends Pane {
-    public static final List<String> SYMBOLS = new ArrayList<>();
-
 
 
     private final CandleDataPager candleDataPager;
@@ -123,7 +121,7 @@ public class CandleStickChart extends Pane {
 
     /**
      * Creates a new {@code CandleStickChart}. This constructor is package-private because it should only
-     * be instantiated by a {@link CandleStickChartContainer}.
+     * be instantiated by a {@link ChartContainer}.
      *
      * @param exchange           the {@code Exchange} object on which the trades represented by candles happened on
      * @param candleDataSupplier the {@code CandleDataSupplier} that will supply contiguous chunks of
@@ -138,14 +136,14 @@ public class CandleStickChart extends Pane {
      */
     CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
-                     ObservableNumberValue containerHeight) throws SQLException {
+                     ObservableNumberValue containerHeight) {
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
 
-        SYMBOLS.addAll(Exchange.getTradePairs());
+
 
         if (!Platform.isFxApplicationThread()) {
             throw new IllegalArgumentException(STR."CandleStickChart must be constructed on the JavaFX Application Thread but was called from \"\{Thread.currentThread()}\".");
@@ -161,9 +159,9 @@ public class CandleStickChart extends Pane {
         canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 11);
         progressIndicator = new ProgressIndicator(-1);
         getStyleClass().add("candle-chart");
-        xAxis = new StableTicksAxis();
-        yAxis = new StableTicksAxis();
-        extraAxis = new StableTicksAxis();
+        xAxis = new StableTicksAxis(0, chartHeight - 100);
+        yAxis = new StableTicksAxis(0, chartWidth - 100);
+        extraAxis = new StableTicksAxis(0, chartWidth - 100);
         xAxis.setAnimated(false);
         yAxis.setAnimated(false);
         extraAxis.setAnimated(false);

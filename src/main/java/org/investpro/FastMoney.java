@@ -185,12 +185,12 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Long getAmount() {
+    public Long amount() {
         return amount;
     }
 
     @Override
-    public Currency getCurrency() {
+    public Currency currency() {
         return currency;
     }
 
@@ -371,7 +371,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (other instanceof FastMoney money) {
             return compareTo(money) < 0;
         } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.getAmount()) < 0;
+            return toBigDecimal().compareTo(money.amount()) < 0;
         } else {
             throw new IllegalArgumentException(STR."Unknown money type: \{other.getClass()}");
         }
@@ -382,7 +382,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (other instanceof FastMoney money) {
             return compareTo(money) > 0;
         } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.getAmount()) > 0;
+            return toBigDecimal().compareTo(money.amount()) > 0;
         } else {
             throw new IllegalArgumentException(STR."Unknown money type: \{other.getClass()}");
         }
@@ -393,7 +393,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (other instanceof FastMoney money) {
             return compareTo(money) >= 0;
         } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.getAmount()) >= 0;
+            return toBigDecimal().compareTo(money.amount()) >= 0;
         } else {
             throw new IllegalArgumentException(STR."Unknown money type: \{other.getClass()}");
         }

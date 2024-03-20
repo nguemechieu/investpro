@@ -22,7 +22,7 @@ import javafx.util.Duration;
  * aa resizing is not performed but only for the final "resting" window size. This is
  * especially useful when resizing a is a computationally expensive operation.
  *
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public abstract class DelayedSizeChangeListener implements ChangeListener<Number> {
     private final double subsequentDelay;

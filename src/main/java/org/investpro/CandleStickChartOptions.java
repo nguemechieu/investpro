@@ -10,11 +10,13 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
 /**
- * Encapsulates all of the possible options for a CandleStickChart.
+ * Encapsulates all the possible options for a CandleStickChart.
  *
- * @author Michael Ennen
+
  */
 public class CandleStickChartOptions {
     private final VBox optionsPane;
@@ -50,8 +52,9 @@ public class CandleStickChartOptions {
             return CandleStickChartOptions.this;
         }
 
+        @Contract(pure = true)
         @Override
-        public String getName() {
+        public @NotNull String getName() {
             return "Vertical Grid Lines";
         }
     };

@@ -8,9 +8,7 @@ import java.util.function.Supplier;
 
 import javafx.beans.property.IntegerProperty;
 
-/**
- * @author Michael Ennen
- */
+
 public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     /**
      * The number of candles supplied per call to {@link #get()}.
@@ -20,17 +18,17 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     protected final TradePair tradePair;
     protected final IntegerProperty endTime;
 
-    private static final Set<Integer> GRANULARITIES = Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400,
+    private static final Set<Integer> GRANULARITY = Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400,
             21600, 43200, 86400);
 
     public CandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(endTime);
         if (numCandles <= 0) {
-            throw new IllegalArgumentException("numCandles must be positive but was: " + numCandles);
+            throw new IllegalArgumentException(STR."numCandles must be positive but was: \{numCandles}");
         }
         if (secondsPerCandle <= 0) {
-            throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
+            throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
         }
         this.numCandles = numCandles;
         this.secondsPerCandle = secondsPerCandle;
@@ -39,17 +37,12 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     }
 
     public Set<Integer> getSupportedGranularities() {
-        return GRANULARITIES;
+        return GRANULARITY;
     }
 
     @Override
     public String toString() {
-        return "CandleDataSupplier [" +
-                "numCandles=" + numCandles +
-                ", secondsPerCandle=" + secondsPerCandle +
-                ", tradePair=" + tradePair +
-                ", endTime=" + endTime +
-                ']';
+        return STR."CandleDataSupplier [numCandles=\{numCandles}, secondsPerCandle=\{secondsPerCandle}, tradePair=\{tradePair}, endTime=\{endTime}\{']'}";
     }
 
     @Override

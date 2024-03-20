@@ -10,7 +10,7 @@ import java.util.Objects;
 
 public class TradeView extends AnchorPane {
     private static final TradePair BTC_USD;
-    private static final Logger logger = LoggerFactory.getLogger(InvestPro.class);
+    private static final Logger logger = LoggerFactory.getLogger(TradeView.class);
 
     static {
         try {
@@ -20,20 +20,22 @@ public class TradeView extends AnchorPane {
         }
     }
 
-    TradeView() throws SQLException, ClassNotFoundException {
+    TradeView(Exchange exchange) throws SQLException, ClassNotFoundException {
         Platform.setImplicitExit(false);
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> logger.error(STR."[\{thread}]: ", exception));
 
-        CandleStickChartContainer candleStickChartContainer =
-                new CandleStickChartContainer(
-                        new Exchange("338904", "45N")
-                        , true);
+        ChartContainer candleStickChartContainer =
+                new ChartContainer(
+                        exchange
+                        , BTC_USD, true);
         AnchorPane.setTopAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setLeftAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setRightAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setBottomAnchor(candleStickChartContainer, 30.0);
         candleStickChartContainer.setMaxSize(Double.MAX_VALUE,
                 Double.MAX_VALUE);
+
+        logger.info("tradeview.title");
 
     }
 }

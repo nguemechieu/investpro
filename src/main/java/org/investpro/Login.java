@@ -12,10 +12,10 @@ public class Login extends Stage {
 
         AnchorPane vBox = new AnchorPane();
 
-        vBox.setPrefSize(getWidth() / 3, getHeight() / 3);
+        vBox.setPrefSize(getWidth() / 2, getHeight() / 3);
 
 
-        Label loginLabel = new Label("Login :");
+        Label loginLabel = new Label("Username :");
         TextField loginTextField = new TextField();
 
         Label passwordLabel = new Label("Password :");

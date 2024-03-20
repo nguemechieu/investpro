@@ -32,6 +32,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
 import javafx.util.Duration;
 import javafx.scene.chart.ValueAxis;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
@@ -84,25 +85,105 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private double labelSize = -1;
 
-    public StableTicksAxis() {
-    }
+
 
     public StableTicksAxis(double lowerBound, double upperBound) {
         super(lowerBound, upperBound);
+
+    }
+
+    private static double calculateTickSpacing(double delta, int maxTicks) {
+        if (delta <= 0.0) {
+            throw new IllegalArgumentException(STR."delta (\{delta}) must be positive");
+        }
+        if (maxTicks < 1) {
+            throw new IllegalArgumentException(STR."maxTicks (\{maxTicks}) must be >= 1");
+        }
+
+        int factor;
+        if ((int) delta != 0) {
+            factor = log10((int) delta, RoundingMode.DOWN);
+        } else {
+            factor = (int) Math.ceil(Math.log10(delta));
+        }
+        int divider = 0;
+
+        double numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
+        // We don't have enough ticks, so increase ticks until we're over the limit, then back off once.
+        if (numTicks < maxTicks) {
+            while (numTicks < maxTicks) {
+                // Move up
+                --divider;
+                if (divider < 0) {
+                    --factor;
+                    divider = dividers.length - 1;
+                }
+
+                numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
+            }
+
+            // Now back off once unless we hit exactly
+            // noinspection FloatingPointEquality
+            if (numTicks != maxTicks) {
+                ++divider;
+                if (divider >= dividers.length) {
+                    ++factor;
+                    divider = 0;
+                }
+            }
+        } else {
+            // We have too many ticks or exactly max, so decrease until we're just under (or at) the limit.
+            while (numTicks > maxTicks) {
+                ++divider;
+                if (divider >= dividers.length) {
+                    ++factor;
+                    divider = 0;
+                }
+
+                numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
+            }
+        }
+
+        return dividers[divider] * powersOfTen[factor + powersOfTenOffset];
     }
 
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Returns the base-10 logarithm of {@code x}, rounded according to the specified rounding mode.
+     * <p>
+     * From Guava's IntMath.java.
+     *
+     * @throws IllegalArgumentException if {@code x <= 0}
+     * @throws ArithmeticException      if {@code mode} is {@link RoundingMode#UNNECESSARY} and {@code x}
+     *                                  is not a power of ten
      */
-    public double getAutoRangePadding() {
-        return autoRangePadding.get();
-    }
-
-    /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
-     */
-    public DoubleProperty autoRangePaddingProperty() {
-        return autoRangePadding;
+    @SuppressWarnings("fallthrough")
+    public static int log10(int x, RoundingMode mode) {
+        if (x <= 0) {
+            throw new IllegalArgumentException(STR."x must be positive but was: \{x}");
+        }
+        int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
+        int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
+        int floorPow = powersOf10[logFloor];
+        switch (mode) {
+            case UNNECESSARY:
+                if (x != floorPow) {
+                    throw new ArithmeticException("mode was UNNECESSARY, but rounding was necessary");
+                }
+                // fall through
+            case FLOOR:
+            case DOWN:
+                return logFloor;
+            case CEILING:
+            case UP:
+                return logFloor + lessThanBranchFree(floorPow, x);
+            case HALF_DOWN:
+            case HALF_UP:
+            case HALF_EVEN:
+                // sqrt(10) is irrational, so log10(x) - logFloor is never exactly 0.5
+                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
+            default:
+                throw new AssertionError();
+        }
     }
 
     /**
@@ -176,98 +257,18 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(minValue, maxValue);
     }
 
-    private static double calculateTickSpacing(double delta, int maxTicks) {
-        if (delta <= 0.0) {
-            throw new IllegalArgumentException("delta (" + delta + ") must be positive");
-        }
-        if (maxTicks < 1) {
-            throw new IllegalArgumentException("maxTicks (" + maxTicks + ") must be >= 1");
-        }
-
-        int factor;
-        if ((int) delta != 0) {
-            factor = log10((int) delta, RoundingMode.DOWN);
-        } else {
-            factor = (int) Math.ceil(Math.log10(delta));
-        }
-        int divider = 0;
-
-        double numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
-        // We don't have enough ticks, so increase ticks until we're over the limit, then back off once.
-        if (numTicks < maxTicks) {
-            while (numTicks < maxTicks) {
-                // Move up
-                --divider;
-                if (divider < 0) {
-                    --factor;
-                    divider = dividers.length - 1;
-                }
-
-                numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
-            }
-
-            // Now back off once unless we hit exactly
-            // noinspection FloatingPointEquality
-            if (numTicks != maxTicks) {
-                ++divider;
-                if (divider >= dividers.length) {
-                    ++factor;
-                    divider = 0;
-                }
-            }
-        } else {
-            // We have too many ticks or exactly max, so decrease until we're just under (or at) the limit.
-            while (numTicks > maxTicks) {
-                ++divider;
-                if (divider >= dividers.length) {
-                    ++factor;
-                    divider = 0;
-                }
-
-                numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
-            }
-        }
-
-        return dividers[divider] * powersOfTen[factor + powersOfTenOffset];
+    /**
+     * Amount of padding to add on the end of the axis when auto ranging.
+     */
+    public double getAutoRangePadding() {
+        return autoRangePadding.get();
     }
 
     /**
-     * Returns the base-10 logarithm of {@code x}, rounded according to the specified rounding mode.
-     * <p>
-     * From Guava's IntMath.java.
-     *
-     * @throws IllegalArgumentException if {@code x <= 0}
-     * @throws ArithmeticException      if {@code mode} is {@link RoundingMode#UNNECESSARY} and {@code x}
-     *                                  is not a power of ten
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
-    @SuppressWarnings("fallthrough")
-    public static int log10(int x, RoundingMode mode) {
-        if (x <= 0) {
-            throw new IllegalArgumentException("x must be positive but was: " + x);
-        }
-        int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
-        int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
-        int floorPow = powersOf10[logFloor];
-        switch (mode) {
-            case UNNECESSARY:
-                if (x != floorPow) {
-                    throw new ArithmeticException("mode was UNNECESSARY, but rounding was necessary");
-                }
-                // fall through
-            case FLOOR:
-            case DOWN:
-                return logFloor;
-            case CEILING:
-            case UP:
-                return logFloor + lessThanBranchFree(floorPow, x);
-            case HALF_DOWN:
-            case HALF_UP:
-            case HALF_EVEN:
-                // sqrt(10) is irrational, so log10(x) - logFloor is never exactly 0.5
-                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
-            default:
-                throw new AssertionError();
-        }
+    public DoubleProperty autoRangePaddingProperty() {
+        return autoRangePadding;
     }
 
     static int lessThanBranchFree(int x, int y) {
@@ -323,7 +324,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(getLowerBound(), getUpperBound());
     }
 
-    private Range getRange(double minValue, double maxValue) {
+    private @NotNull Range getRange(double minValue, double maxValue) {
         double length = getLength();
         double delta = maxValue - minValue;
         double scale = calculateNewScale(length, minValue, maxValue);
@@ -389,18 +390,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return labelSize;
     }
 
-    private static final class Range {
-        public final double low;
-        public final double high;
-        public final double tickSpacing;
-        public final double scale;
-
-        private Range(double low, double high, double tickSpacing, double scale) {
-            this.low = low;
-            this.high = high;
-            this.tickSpacing = tickSpacing;
-            this.scale = scale;
-        }
+    private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
             return high - low;
@@ -408,12 +398,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
         @Override
         public String toString() {
-            return "Range{" +
-                    "low=" + low +
-                    ", high=" + high +
-                    ", tickSpacing=" + tickSpacing +
-                    ", scale=" + scale +
-                    '}';
+            return STR."Range{low=\{low}, high=\{high}, tickSpacing=\{tickSpacing}, scale=\{scale}\{'}'}";
         }
     }
 }

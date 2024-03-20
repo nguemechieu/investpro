@@ -3,6 +3,7 @@ package org.investpro;
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -17,35 +18,32 @@ import java.util.Objects;
  * duration is selected, this container automatically creates a new {@code CandleStickChart} and visually
  * transitions to it.
  *
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
-public class CandleStickChartContainer extends Region {
+public class ChartContainer extends Region {
     private final VBox candleChartContainer;
-    private final CandleStickChartToolbar toolbar;
+    private final ChartToolbar toolbar;
     private final Exchange exchange;
-    private final TradePair tradePair;
-    private final SimpleIntegerProperty secondsPerCandle;
-    private CandleStickChart candleStickChart;
+    private TradePair tradePair;
 
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
      */
-    public CandleStickChartContainer(Exchange exchange) throws SQLException, ClassNotFoundException {
-        this(exchange, true);
-    }
 
-    public CandleStickChartContainer(Exchange exchange, boolean liveSyncing) throws SQLException, ClassNotFoundException {
+
+    public ChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
         Objects.requireNonNull(exchange, "exchange must not be null");
 
         this.exchange = exchange;
-        this.tradePair = exchange.getSelecTradePair();
+        this.tradePair = tradePair;
+
         secondsPerCandle = new SimpleIntegerProperty(3600 * 24);
         getStyleClass().add("candle-chart-container");
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
-        toolbar = new CandleStickChartToolbar(widthProperty(), heightProperty(),
+        toolbar = new ChartToolbar(widthProperty(), heightProperty(),
                 candleDataSupplier.getSupportedGranularities());
-        VBox toolbarContainer = new VBox(toolbar);
+        HBox toolbarContainer = new HBox(toolbar);
         toolbarContainer.setPrefWidth(Double.MAX_VALUE);
         toolbarContainer.setPrefHeight(50);
         toolbarContainer.prefWidthProperty().bind(prefWidthProperty());
@@ -54,6 +52,7 @@ public class CandleStickChartContainer extends Region {
         AnchorPane.setRightAnchor(toolbarContainer, 0.0);
 
         candleChartContainer = new VBox();
+
         candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
@@ -64,10 +63,9 @@ public class CandleStickChartContainer extends Region {
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
         getChildren().setAll(containerRoot);
-        // FIXME: candleStickChart is null at this point.
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 
-        secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
+        secondsPerCandle.addListener((_, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
                 try {
                     createNewChart(newDurationValue.intValue(), liveSyncing);
@@ -81,17 +79,23 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        //secondsPerCandle.set(300);
+        secondsPerCandle.set(300);
+    }
+
+    public TradePair getTradePair() {
+        return tradePair;
+    }
+    private final SimpleIntegerProperty secondsPerCandle;
+    private CandleStickChart candleStickChart;
+
+    public void setTradePair(TradePair tradePair) {
+        this.tradePair = tradePair;
     }
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException {
         if (secondsPerCandle <= 0) {
-            throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + secondsPerCandle);
+            throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
         }
-        /*
-        CandleDataSupplier candleDataSupplier = new ReverseRawTradeDataProcessor(Paths.get("C:\\bitstampUSD.csv"),
-                secondsPerCandle.get(), TradePair.of(amountUnit, priceUnit));
-        */
         candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
                 tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
@@ -132,4 +136,6 @@ public class CandleStickChartContainer extends Region {
     protected double computeMinHeight(double width) {
         return 350;
     }
+
+
 }

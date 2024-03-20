@@ -16,7 +16,9 @@ import javafx.stage.Stage;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.text.ParseException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -30,7 +32,7 @@ public class InvestPro extends Application {
     }
 
     @Override
-    public void start(@NotNull Stage primaryStage) throws SQLException, ClassNotFoundException {
+    public void start(@NotNull Stage primaryStage) throws SQLException, ClassNotFoundException, ParseException, IOException, InterruptedException {
 
 
         AnchorPane window = new AnchorPane();
@@ -39,7 +41,7 @@ public class InvestPro extends Application {
         );
         window.getStylesheets().add(String.valueOf(Objects.requireNonNull(InvestPro.class.getResource("/app.css"))));
 
-        window.getChildren().addAll(menuBar(), new Separator(Orientation.HORIZONTAL), new Display());
+        window.getChildren().addAll(menuBar(), new Separator(Orientation.HORIZONTAL), new TradingWindow());
         primaryStage.setResizable(true);
 
 
@@ -47,7 +49,7 @@ public class InvestPro extends Application {
         primaryStage.setOnCloseRequest(_ -> Platform.exit());
 
         scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
-        primaryStage.setTitle(STR."InvestPro               ---------Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
+        primaryStage.setTitle(STR."InvestPro               --------- Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
         primaryStage.setScene(scene);
         primaryStage.show();
     }

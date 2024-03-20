@@ -59,4 +59,11 @@ public abstract class ExchangeWebSocketClient extends CoinbaseWebSocketClient {
         webSocketInitializedLatch.countDown();
         return result;
     }
+
+    public boolean isConnected() {
+        if (Platform.isFxApplicationThread()) {
+            return connectionEstablished.get();
+        }
+        return false;
+    }
 }

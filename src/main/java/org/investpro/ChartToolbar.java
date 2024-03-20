@@ -11,7 +11,6 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -22,21 +21,15 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-import static org.investpro.CandleStickChartToolbar.Tool.OPTIONS;
-import static org.investpro.Exchange.symbolsChoiceBox;
+import static org.investpro.ChartToolbar.Tool.OPTIONS;
 import static org.investpro.FXUtils.computeTextDimensions;
 
 /**
@@ -55,16 +48,16 @@ import static org.investpro.FXUtils.computeTextDimensions;
  * The toolbar buttons are labelled with either text (which is used for the duration buttons,
  * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom in/out).
  *
- * @author Michael Ennen
+
  */
-public class CandleStickChartToolbar extends Region {
-    private final HBox toolbar;
+public class ChartToolbar extends Region {
+    private final HBox toolbar = new HBox();
     private final PopOver optionsPopOver;
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
     private final Separator functionOptionsSeparator;
 
-    CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
+    public ChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                             Set<Integer> granularities) {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
@@ -148,40 +141,6 @@ public class CandleStickChartToolbar extends Region {
         }
 
 
-        Button createChat = new Button("New Chat");
-        createChat.setOnAction(
-                e -> {
-                    Stage stage = new Stage();
-                    stage.initModality(Modality.APPLICATION_MODAL);
-                    stage.initOwner(getScene().getWindow());
-                    stage.initStyle(StageStyle.UNDECORATED);
-                    stage.setResizable(false);
-                    stage.initStyle(StageStyle.TRANSPARENT);
-
-                    VBox vBox = new VBox();
-                    vBox.setSpacing(10);
-                    vBox.setPadding(new Insets(10));
-                    vBox.setAlignment(Pos.CENTER);
-                    //vBox.getChildren().add(new ImageView(new Image(Exchange.class.getResourceAsStream("/images/chart.png"))));
-
-                    Exchange exchange;
-                    exchange = new Exchange("", "");
-                    CandleStickChartContainer candleStickChartContainer;
-                    try {
-                        candleStickChartContainer = new CandleStickChartContainer(exchange, true);
-                    } catch (SQLException | ClassNotFoundException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                    vBox.getChildren().add(candleStickChartContainer);
-
-                    Scene scene = new Scene(vBox);
-                    stage.setScene(scene);
-                    stage.show();
-
-
-                }
-        );
-        toolbar = new HBox(symbolsChoiceBox, createChat);
         toolbar.getChildren().addAll(toolbarNodes);
         toolbar.getStyleClass().add("candle-chart-toolbar");
 
@@ -216,9 +175,9 @@ public class CandleStickChartToolbar extends Region {
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
                 if (tool.duration != -1) {
-                    tool.setOnAction(event -> secondsPerCandle.setValue(tool.duration));
+                    tool.setOnAction(_ -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
-                    tool.setOnAction(event -> candleStickChart.changeZoom(
+                    tool.setOnAction(_ -> candleStickChart.changeZoom(
                             tool.tool.getZoomDirection()));
                 }
             }

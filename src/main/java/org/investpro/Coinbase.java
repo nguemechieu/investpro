@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import org.java_websocket.drafts.Draft_6455;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,39 +18,70 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.Currency;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 
-class Coinbase {
+class Coinbase extends Exchange {
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final Logger logger = LoggerFactory.getLogger(Coinbase.class);
-    ExchangeWebSocketClient websocketClient;
+    CoinbaseWebSocketClient websocketClient;
+    private TradePair tradePair;
     private String apiSecret;
     private String apiKey;
 
-    Coinbase() {
-        // This argument is for creating a WebSocket client for live trading data.
-        logger.info("coinbase websocket client created");
-    }
 
-    public Coinbase(String apiKey, String apiSecret) {
+    public Coinbase(String apiKey, String apiSecret, TradePair tradePair) {
+        super(apiKey, apiSecret);
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
+        this.websocketClient = new CoinbaseWebSocketClient(URI.create("wss://ws-feed.pro.coinbase.com"), new Draft_6455());
+        websocketClient.addHeader(
+                "Accept",
+                "application/vnd.pro.coinbase.com+json"
+        );
+        websocketClient.addHeader(
+                "Content-Type",
+                "application/vnd.pro.coinbase.com+json"
+        );
+        websocketClient.addHeader(
+                "CB-ACCESS-KEY",
+                apiKey
+        );
+        websocketClient.addHeader(
+                "CB-ACCESS-SIGN",
+                apiSecret
+        );
+        this.websocketClient.setTradePair(tradePair);
+        this.tradePair = tradePair;
     }
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair);
     }
+
+    @Override
+    public String getSignal() {
+        return null;
+    }
+
+    @Override
+    public void connect() {
+
+    }
+
+
 
     public String getApiSecret() {
         return apiSecret;
@@ -67,13 +99,7 @@ class Coinbase {
         this.apiKey = apiKey;
     }
 
-    public ExchangeWebSocketClient getWebsocketClient() {
-        return websocketClient;
-    }
 
-    public void setWebsocketClient(ExchangeWebSocketClient websocketClient) {
-        this.websocketClient = websocketClient;
-    }
 
     /**
      * Fetches the recent trades for the given trade pair from  {@code stopAt} till now (the current time).
@@ -106,6 +132,7 @@ class Coinbase {
 
                 if (i != 0) {
                     uriStr += STR."?after=\{afterCursor.get()}";
+                    logger.info(STR."uriStr: \{uriStr}");
                 }
 
                 try {
@@ -156,6 +183,16 @@ class Coinbase {
         return futureResult;
     }
 
+    @Override
+    public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
+        return null;
+    }
+
+    @Override
+    public ExchangeWebSocketClient getWebsocketClient() {
+        return (ExchangeWebSocketClient) websocketClient;
+    }
+
     /**
      * This method only needs to be implemented to support live syncing.
      */
@@ -184,6 +221,12 @@ class Coinbase {
                     JsonNode res;
                     try {
                         res = OBJECT_MAPPER.readTree(response);
+
+                        if (res.has("message") && res.get("message").asText().equals("not_found")) {
+
+                            new Message("ERROR", tradePair.toString('-'));
+                        }
+
                     } catch (JsonProcessingException ex) {
                         throw new RuntimeException(ex);
                     }
@@ -237,6 +280,77 @@ class Coinbase {
                     return Optional.of(new InProgressCandleData(openTime, openPrice, highSoFar, lowSoFar,
                             currentTill, lastTradePrice, volumeSoFar));
                 });
+    }
+
+    @Override
+    public List<TradePair> getTradePairSymbol() {
+
+        //COINBASE URL TO GET ALL TRADES PAIRS
+        String url = "https://api.pro.coinbase.com/products";
+        HttpClient.Builder builder = HttpClient.newBuilder();
+        HttpClient client = builder.build();
+        HttpRequest.Builder request = HttpRequest.newBuilder();
+        request.uri(URI.create(url));
+        HttpResponse<String> response;
+        ArrayList<TradePair> tradePairs = new ArrayList<>();
+        try {
+            response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            JsonNode res;
+            try {
+                res = OBJECT_MAPPER.readTree(response.body());
+                logger.info(STR."coinbase response: \{res}");
+
+                //coinbase response: [{"id":"DOGE-BTC","base_currency":"DOGE","quote_currency":"BTC","quote_increment":"0.00000001","base_increment":"0.1","display_name":"DOGE-BTC","min_market_funds":"0.000016","margin_enabled":false,"post_only":false,"limit_only":false,"cancel_only":false,"status":"online","status_message":"","trading_disabled":false,"fx_stablecoin":false,"max_slippage_percentage":"0.03000000","auction_mode":false,
+                JsonNode rates = res;
+                for (JsonNode rate : rates) {
+                    CryptoCurrency baseCurrency, counterCurrency;
+
+
+                    String fullDisplayName = rate.get("base_currency").asText();
+
+
+                    String shortDisplayName = rate.get("base_currency").asText();
+                    String code = rate.get("base_currency").asText();
+                    int fractionalDigits = rate.get("base_increment").asInt();
+                    String symbol = rate.get("base_currency").asText();
+                    baseCurrency = new CryptoCurrency(fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, code);
+                    String fullDisplayName2 = rate.get("quote_currency").asText();
+                    String shortDisplayName2 = rate.get("quote_currency").asText();
+                    String code2 = rate.get("quote_currency").asText();
+                    int fractionalDigits2 = rate.get("quote_increment").asInt();
+                    String symbol2 = rate.get("quote_currency").asText();
+
+                    counterCurrency = new CryptoCurrency(
+                            fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2,
+                            code2
+
+                    );
+
+
+                    TradePair tp = new TradePair(
+                            baseCurrency, counterCurrency
+                    );
+                    tradePairs.add(tp);
+
+                    logger.info(Currency.getAvailableCurrencies().toString());
+                }
+            } catch (JsonProcessingException | ClassNotFoundException | SQLException ex) {
+                throw new RuntimeException(ex);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        return tradePairs;
+
+    }
+
+    public TradePair getTradePair() {
+        return tradePair;
+    }
+
+    public void setTradePair(TradePair tradePair) {
+        this.tradePair = tradePair;
     }
 
     public static class CoinbaseCandleDataSupplier extends CandleDataSupplier {
@@ -314,7 +428,7 @@ class Coinbase {
                             candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
                             return candleData;
                         } else {
-                            new Message("", STR."CoinbaseCandleDataSupplier.get()\{response}");
+                            logger.error(STR."CoinbaseCandleDataSupplier.get()\{response}");
                             return Collections.emptyList();
                         }
                     });

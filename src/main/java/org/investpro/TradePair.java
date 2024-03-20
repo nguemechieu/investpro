@@ -93,11 +93,11 @@ public class TradePair extends Pair<Currency, Currency> {
             if (Currency.of(split[0]) == Currency.of(split[1])) {
                 throw
                         new CurrencyNotFoundException(CurrencyType.valueOf(split[0]), split[1]);
-            }
+            } else
 
             if (pairType.getValue() == null) {
                 // The counter currency is not specified, so try both (fiat first)
-                if (Currency.of(split[1]) != Currency.NULL_FIAT_CURRENCY) {
+                if (Currency.ofFiat(split[1]) != Currency.NULL_FIAT_CURRENCY) {
                     return new TradePair(Currency.of(split[0]), Currency.of(split[1]));
                 } else if (Currency.of(split[1]) != Currency.NULL_FIAT_CURRENCY) {
                     return new TradePair(Currency.of(split[0]), Currency.of(split[1]));
@@ -217,5 +217,10 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public long getId() {
         return id;
+    }
+
+    public String getSymbol() {
+
+        return STR."\{baseCurrency.getSymbol()}/\{counterCurrency.getSymbol()}";
     }
 }
