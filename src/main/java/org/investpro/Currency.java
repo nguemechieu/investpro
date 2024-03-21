@@ -1,4 +1,5 @@
 package org.investpro;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -6,7 +7,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -14,8 +18,25 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class Currency {
     private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
-    public static final CryptoCurrency NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
-    public static final FiatCurrency NULL_FIAT_CURRENCY = new NullFiatCurrency();
+    public static final CryptoCurrency NULL_CRYPTO_CURRENCY;
+    public static final FiatCurrency NULL_FIAT_CURRENCY;
+
+    static {
+        try {
+            NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static {
+        try {
+            NULL_FIAT_CURRENCY = new NullFiatCurrency();
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
     protected static final Db1 db1;
     private static final Properties conf = new Properties();
@@ -66,16 +87,8 @@ public abstract class Currency {
         this.symbol = symbol;
         this.image = image;
 
-        for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-            if (currencyType == CurrencyType.FIAT && !currency.getCurrencyCode().equals(code)) {
-                java.util.Currency.getAvailableCurrencies().add(currency);
 
-            }
-            if (currencyType == CurrencyType.CRYPTO && !currency.getCurrencyCode().equals(code)) {
-                java.util.Currency.getAvailableCurrencies().add(currency);
 
-            }
-        }
     }
 
 
@@ -237,31 +250,6 @@ public abstract class Currency {
         this.image = image;
     }
 
-    private static class NullCryptoCurrency extends CryptoCurrency {
-        private NullCryptoCurrency() {
-            super(
 
-                    "Null Crypto Currency",
-                    "Null Crypto Currency",
-                    "XXX",
-                    8,
-                    "¤¤¤",
-                    "https://i.ibb.co/5Y3mZ5Y/null-crypto-currency.png"
-            );
 
-        }
-    }
-
-    private static class NullFiatCurrency extends FiatCurrency {
-
-        public NullFiatCurrency() {
-            super(
-                    "¤¤¤",
-                    "¤¤¤", "¤¤¤",
-                    2,
-                    "¤¤¤",
-                    "https://i.ibb.co/5Y3mZ5Y/null-fiat-currency.png"
-            );
-        }
-    }
 }

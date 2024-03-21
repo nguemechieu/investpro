@@ -11,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,13 +59,19 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
 
         for (JsonNode jsonObject1 : jsonObject) {
-            coinsToRegister.add(new CryptoCurrency(
-                    jsonObject1.get("name").asText(), jsonObject1.get("name").asText(), jsonObject1.get("id").asText(),
-                    jsonObject1.get("current_price").asInt(),
-                    jsonObject1.get("symbol").asText(), (jsonObject1.get("image").asText() != null) ? "https://assets.coingecko.com/coins/images/1/large/bitcoin.png?154703"
-                    : jsonObject1.get("image").asText()
+            try {
+                coinsToRegister.add(new CryptoCurrency(
+                        jsonObject1.get("name").asText(), jsonObject1.get("name").asText(), jsonObject1.get("id").asText(),
+                        jsonObject1.get("current_price").asInt(),
+                        jsonObject1.get("symbol").asText(), (jsonObject1.get("image").asText() != null) ? "https://assets.coingecko.com/coins/images/1/large/bitcoin.png?154703"
+                        : jsonObject1.get("image").asText()
 
-            ));
+                ));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
 
             Currency.registerCurrencies(coinsToRegister);
             // Download the image to the folder where the program is running (images/currency)

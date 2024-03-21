@@ -37,7 +37,7 @@ public class ChartContainer extends Region {
         this.exchange = exchange;
         this.tradePair = tradePair;
 
-        secondsPerCandle = new SimpleIntegerProperty(3600 * 24);
+        secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);

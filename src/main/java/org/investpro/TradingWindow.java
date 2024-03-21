@@ -24,8 +24,6 @@ import java.text.ParseException;
 import java.util.Date;
 import java.util.Objects;
 
-import static org.investpro.Exchange.symbolsChoiceBox;
-
 class TradingWindow extends Region {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
@@ -84,7 +82,7 @@ class TradingWindow extends Region {
 
         Node loadChartButton = new Button("Load - Chart");
         loadChartButton.getStyleClass().add("loadChartButton");
-        tradeToolbar.getItems().addAll(symbolsChoiceBox, loadChartButton);
+
         bottomTabPane.setTranslateY(550);
         bottomTabPane.setPrefSize(Double.MAX_VALUE, 230);
         bar.setTranslateY(Double.MAX_VALUE);
@@ -582,16 +580,20 @@ class TradingWindow extends Region {
 
                     new Message("EXCHANGE NOT SUPPORTED", "Please select a valid exchange");
                 }
-                for (int i = 0; i < exchange.getTradePairSymbol().size(); i++) {
-                    symbolsChoiceBox.getItems().addAll(exchange.getTradePairSymbol().get(i).toString());
-                }
+
 
             } catch (Exception e) {
                 logger.error(e.getMessage());
 
                 new Message("", e.getMessage());
             }
+
+            symbolsChoiceBox.getSelectionModel().selectNext();
         });
+        for (TradePair i : exchange.getTradePairSymbol()) {
+            symbolsChoiceBox.getItems().addAll(i.toString('-'));
+        }
+        tradeToolbar.getItems().addAll(symbolsChoiceBox, loadChartButton);
 
         autoTradeButton.setOnAction(_ -> exchange.autoTrading(true, exchange.getSignal()));
         buyButton.setOnAction(_ -> {

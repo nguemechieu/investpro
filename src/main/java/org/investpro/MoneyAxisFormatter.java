@@ -1,9 +1,9 @@
 package org.investpro;
 
+import javafx.util.StringConverter;
+
 import java.sql.SQLException;
 import java.util.Objects;
-
-import javafx.util.StringConverter;
 
 /**
  * @author NOEL NGUEMECHIEU
@@ -36,7 +36,7 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
         } else {
             try {
                 return format.format(FastMoney.ofCrypto(number.doubleValue(), currency.getCode(), precision));
-            } catch (SQLException e) {
+            } catch (SQLException | ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
         }

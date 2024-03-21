@@ -2,6 +2,8 @@ package org.investpro;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.sql.SQLException;
+
 
 public class FiatCurrency extends Currency {
     protected FiatCurrency(
@@ -11,7 +13,7 @@ public class FiatCurrency extends Currency {
             int fractionDigits,
             String symbol,
             String image
-    ) {
+    ) throws SQLException, ClassNotFoundException {
         super(CurrencyType.FIAT,
                 fullDisplayName,
                 shortDisplayName,

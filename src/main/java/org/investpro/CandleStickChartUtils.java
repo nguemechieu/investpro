@@ -1,13 +1,9 @@
 package org.investpro;
 
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 import javafx.util.Pair;
+
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 
 public final class CandleStickChartUtils {
@@ -55,15 +51,24 @@ public final class CandleStickChartUtils {
             throw new IllegalArgumentException("candleData must not be empty");
         }
         if (windowSize > candleData.size()) {
-            throw new IllegalArgumentException("windowSize (" + windowSize + ") must be less than size of " +
-                    "candleData (" + candleData.size() + ")");
+            throw new IllegalArgumentException(STR."windowSize (\{windowSize}) must be less than size of candleData (\{candleData.size()})");
         }
 
-        final Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
+        Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
 
+
+        if (candleMaxWindow.peekLast() == null) {
+            windowSize = 900;
+            candleMinWindow = new ArrayDeque<>(windowSize);
+            candleMaxWindow = new ArrayDeque<>(windowSize);
+            volumeMinWindow = new ArrayDeque<>(windowSize);
+            volumeMaxWindow = new ArrayDeque<>(windowSize);
+
+
+        }
         for (int i = 0; i < windowSize; i++) {
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=
                     candleData.get(volumeMinWindow.peekLast()).getVolume()) {
@@ -96,13 +101,15 @@ public final class CandleStickChartUtils {
 
         for (int i = windowSize; i < candleData.size(); i++) {
             extrema.put(candleData.get(i - windowSize).getOpenTime(), new Pair<>(
-                    new Extrema<>((int) candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                            (int) Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                    new Extrema<>((int) candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                            (int) Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+                    new Extrema<>((int) candleData.get((volumeMinWindow.peekFirst() == null) ? 0 : volumeMinWindow.peekFirst()).getVolume(),
+                            (int) Math.ceil(candleData.get((volumeMaxWindow.peekFirst() == null) ? 0 : volumeMaxWindow.peekFirst()
+
+                            ).getVolume())),
+                    new Extrema<>((int) candleData.get((candleMinWindow.peekFirst() == null) ? 0 : (candleMinWindow.peekFirst())).getLowPrice(),
+                            (int) Math.ceil(candleData.get((candleMaxWindow.peekFirst() == null) ? 0 : candleMaxWindow.peekFirst()).getHighPrice()))));
 
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=
-                    candleData.get(volumeMinWindow.peekLast()).getVolume()) {
+                    candleData.get((volumeMinWindow.peekFirst() == null) ? 0 : volumeMinWindow.peekLast()).getVolume()) {
                 volumeMinWindow.pollLast();
             }
 
@@ -113,7 +120,7 @@ public final class CandleStickChartUtils {
             volumeMinWindow.addLast(i);
 
             while (!volumeMaxWindow.isEmpty() && candleData.get(i).getVolume() >=
-                    candleData.get(volumeMaxWindow.peekLast()).getVolume()) {
+                    candleData.get((volumeMaxWindow.peekFirst() == null) ? 0 : volumeMaxWindow.peekLast()).getVolume()) {
                 volumeMaxWindow.pollLast();
             }
 
@@ -124,7 +131,7 @@ public final class CandleStickChartUtils {
             volumeMaxWindow.addLast(i);
 
             while (!candleMinWindow.isEmpty() && candleData.get(i).getLowPrice() <=
-                    candleData.get(candleMinWindow.peekLast()).getLowPrice()) {
+                    candleData.get((candleMinWindow.peekLast() == null) ? 0 : candleMinWindow.peekLast()).getLowPrice()) {
                 candleMinWindow.pollLast();
             }
 

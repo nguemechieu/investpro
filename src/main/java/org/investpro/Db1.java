@@ -6,9 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.sql.*;
-import java.util.Collection;
 import java.util.Properties;
-import java.util.UUID;
 
 
 class Db1 implements Db {
@@ -379,15 +377,25 @@ class Db1 implements Db {
 
     public Currency getCurrency(String code) throws SQLException {
         // Get currency from database
-        Currency newCurrency;
+        Currency newCurrency = null;
 
 
         ResultSet check = conn.createStatement().executeQuery(STR."SELECT * FROM currencies WHERE code = '\{code}'");
         if (!check.next()) {
             logger.info(STR."Currency not found with code: \{code}");
-            new Message(Message.MESSAGE_TYPE.WARNING, STR."Currency with code: \{code} not found in database");
+            //new Message(Message.MESSAGE_TYPE.WARNING, STR."Currency with code: \{code} not found in database");
 
-            return null;
+            try {
+
+                CryptoCurrency cur = new CryptoCurrency(code, code, code, 0, code, code);
+
+                //Saving new currency
+                conn.createStatement().executeUpdate("INSERT INTO currencies (     Currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image,currency_type) VALUES (?,?,?,?,?,?,?,?)");
+
+                return cur;
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
 
 
         } else {

@@ -35,6 +35,9 @@ public class TradePair extends Pair<Currency, Currency> {
 
     }
 
+    static {
+        Currency.registerCurrencies(new ArrayList<>(Currency.CURRENCIES.values()));
+    }
     public TradePair(String baseCurrency, String counterCurrency) throws SQLException, ClassNotFoundException {
         super(Currency.of(baseCurrency), Currency.of(counterCurrency));
 
