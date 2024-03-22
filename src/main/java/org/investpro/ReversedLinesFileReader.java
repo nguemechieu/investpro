@@ -18,6 +18,8 @@
 
 package org.investpro;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -38,9 +40,6 @@ public class ReversedLinesFileReader implements Closeable {
     private final Charset encoding;
 
     private final RandomAccessFile randomAccessFile;
-
-    private final long totalByteLength;
-    private final long totalBlockCount;
 
     private final byte[][] newLineSequences;
     private final int avoidNewlineSplitBufferSize;
@@ -104,8 +103,7 @@ public class ReversedLinesFileReader implements Closeable {
             throw new UnsupportedEncodingException("For UTF-16, you need to specify the byte order (use UTF-16BE or " +
                     "UTF-16LE)");
         } else {
-            throw new UnsupportedEncodingException("Encoding " + charset + " is not supported yet (feel free to " +
-                    "submit a patch)");
+            throw new UnsupportedEncodingException(STR."Encoding \{charset} is not supported yet (feel free to submit a patch)");
         }
 
         // NOTE: The new line sequences are matched in the order given, so it is important that \r\n is BEFORE \n
@@ -115,8 +113,9 @@ public class ReversedLinesFileReader implements Closeable {
 
         // Open file
         randomAccessFile = new RandomAccessFile(file.toFile(), "r");
-        totalByteLength = randomAccessFile.length();
+        long totalByteLength = randomAccessFile.length();
         int lastBlockLength = (int) (totalByteLength % blockSize);
+        long totalBlockCount;
         if (lastBlockLength > 0) {
             totalBlockCount = totalByteLength / blockSize + 1;
         } else {
@@ -211,11 +210,10 @@ public class ReversedLinesFileReader implements Closeable {
          * @return the new FilePart or null
          * @throws IOException if there was a problem reading the file
          */
-        private FilePart rollOver() throws IOException {
+        private @Nullable FilePart rollOver() throws IOException {
 
             if (currentLastBytePos > -1) {
-                throw new IllegalStateException("Current currentLastCharPos unexpectedly positive... "
-                        + "last readLine() should have returned something! currentLastCharPos=" + currentLastBytePos);
+                throw new IllegalStateException(STR."Current currentLastCharPos unexpectedly positive... last readLine() should have returned something! currentLastCharPos=\{currentLastBytePos}");
             }
 
             if (no > 1) {
@@ -223,8 +221,7 @@ public class ReversedLinesFileReader implements Closeable {
             } else {
                 // NO 1 was the last FilePart, we're finished
                 if (leftOver != null) {
-                    throw new IllegalStateException("Unexpected leftover of the last block: leftOverOfThisFilePart="
-                            + new String(leftOver, encoding));
+                    throw new IllegalStateException(STR."Unexpected leftover of the last block: leftOverOfThisFilePart=\{new String(leftOver, encoding)}");
                 }
                 return null;
             }
@@ -234,7 +231,6 @@ public class ReversedLinesFileReader implements Closeable {
          * Reads a line.
          *
          * @return the line or null
-         * @throws IOException if there is an error reading from the file
          */
         private String readLine() {
 
@@ -259,7 +255,7 @@ public class ReversedLinesFileReader implements Closeable {
                     final int lineLengthBytes = currentLastBytePos - lineStart + 1;
 
                     if (lineLengthBytes < 0) {
-                        throw new IllegalStateException("Unexpected negative line length=" + lineLengthBytes);
+                        throw new IllegalStateException(STR."Unexpected negative line length=\{lineLengthBytes}");
                     }
                     final byte[] lineData = new byte[lineLengthBytes];
                     System.arraycopy(data, lineStart, lineData, 0, lineLengthBytes);

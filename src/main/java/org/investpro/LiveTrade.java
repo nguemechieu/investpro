@@ -3,19 +3,27 @@ package org.investpro;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 
 public class LiveTrade {
     private static final Logger logger = LoggerFactory.getLogger(LiveTrade.class);
-    List<Trade> trades = new ArrayList<>();
+    List<LiveTrade> trades = new ArrayList<>();
+    private TradePair tradepair;
+
+    public LiveTrade(TradePair tradePair, Money price, Money size, Side side, long tradeId, Instant time) {
+        this.tradepair = tradePair;
+        trades.add(new LiveTrade(tradePair, price, size, side, tradeId, time));
+    }
 
 
-    Object get(TradePair tradePair) {
-        for (Trade trade : trades) {
+    LiveTrade get(TradePair tradePair) {
+        for (LiveTrade trade : trades) {
             if (trade.getTradePair().equals(tradePair)) {
                 return trade;
+
             }
         }
         return null;
@@ -24,7 +32,7 @@ public class LiveTrade {
     }
 
     boolean containsKey(TradePair tradePair) {
-        for (Trade trade : trades) {
+        for (LiveTrade trade : trades) {
             if (trade.getTradePair().equals(tradePair)) {
                 return true;
             }
@@ -45,19 +53,26 @@ public class LiveTrade {
     }
 
     void put(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-        for (Trade trade : trades) {
-
+        for (LiveTrade trade : trades) {
             if (trade.getTradePair().equals(tradePair)) {
                 liveTradesConsumer.get(tradePair).acceptTrades(
-                        (List<Trade>) trade);
-
+                        (List<LiveTrade>) trade);
             }
         }
 
 
+
     }
 
-    void acceptTrades(List<Trade> trade) {
+    void acceptTrades(List<LiveTrade> trade) {
         trades.addAll(trade);
+    }
+
+    public TradePair getTradePair() {
+        return tradepair;
+    }
+
+    public void setTradepair(TradePair tradepair) {
+        this.tradepair = tradepair;
     }
 }

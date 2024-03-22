@@ -1,39 +1,52 @@
 package org.investpro;
 
+import javafx.beans.property.SimpleIntegerProperty;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.TreeSet;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import javafx.beans.property.SimpleIntegerProperty;
 
-/**
- * @author Michael Ennen
- */
 public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
     private final ReversedLinesFileReader fileReader;
+    private static final Logger logger = LoggerFactory.getLogger(ReverseRawTradeDataProcessor.class);
+    int tradeIndex = 1;
+    double volumeWeightedPriceTotal;
+    Exchange exchange;
+    String line;
     private int start;
+    public ReverseRawTradeDataProcessor(Path rawTradeData, int secondsPerCandle, TradePair tradePair, Exchange exchange) throws IOException {
 
-    public ReverseRawTradeDataProcessor(Path rawTradeData, int secondsPerCandle, TradePair tradePair)
-            throws IOException {
-        super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        super(300, secondsPerCandle, tradePair, new SimpleIntegerProperty(secondsPerCandle));
         fileReader = new ReversedLinesFileReader(rawTradeData, StandardCharsets.UTF_8);
+        this.exchange = exchange;
+
+        logger.info("Reading raw trade data from {}", rawTradeData);
+    }
+
+    public Exchange getExchange() {
+        return exchange;
+    }
+
+    public void setExchange(Exchange exchange) {
+        this.exchange = exchange;
     }
 
     @Override
     public Future<List<CandleData>> get() {
         final Map<Integer, TreeSet<Trade>> candleTrades = new HashMap<>(numCandles);
 
-        String line;
+
         try {
             while ((line = fileReader.readLine()) != null) {
                 String[] commaSplitLine = line.split(",");
@@ -46,64 +59,74 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                 if (endTime.get() == -1) {
                     start = timestamp;
                     endTime.set(start - (secondsPerCandle * numCandles));
-                }
+                } else
 
                 if (timestamp < endTime.get()) {
                     break;
                 }
 
-                Trade trade = new Trade(timestamp, Double.parseDouble(commaSplitLine[1]),
-                        Double.parseDouble(commaSplitLine[2]));
+
+                long trade_id = 0;
+                trade_id++;
+                Trade trade = new Trade(tradePair,
+                        DefaultMoney.of(BigDecimal.valueOf(exchange.getLivePrice()),
+                                exchange.getSelecTradePair().counterCurrency),
+                        DefaultMoney.of(BigDecimal.valueOf(exchange.getSize()),
+                                exchange.getSelecTradePair().baseCurrency),
+                        Side.SELL, trade_id
+                        ,
+                        Instant.ofEpochSecond(new Date().getTime()));
+
+
 
                 int candleIndex = (numCandles - ((start - timestamp) / secondsPerCandle)) - 1;
                 if (candleTrades.get(candleIndex) == null) {
                     // noinspection Convert2Diamond
                     candleTrades.put(candleIndex, new TreeSet<Trade>((t1, t2) ->
-                            Integer.compare(t2.timestamp, t1.timestamp)));
+                            Integer.compare(t2.getTimestamp().getNano(), t1.getTimestamp().getNano())));
                 } else {
                     candleTrades.get(candleIndex).add(trade);
                 }
             }
         } catch (IOException e) {
             throw new IllegalStateException(e);
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
         }
-
+        double open = 0;
+        double high = -1;
+        double low = Double.MAX_VALUE;
+        double close = 0;
+        double volume = 0;
+        double priceTotal = 0;
         final List<CandleData> candleData = new ArrayList<>(numCandles);
         double lastClose = -1;
         for (int i = 0; i < numCandles; i++) {
             int openTime = (start - secondsPerCandle) - (i * secondsPerCandle);
             if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
                 // no trades occurred during this candle
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, 0, 0, 0, true));
+                double volumeWeightedAveragePrice1 = (lastClose == -1) ? 0 : (lastClose - openTime) / volume;
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume, volumeWeightedAveragePrice1, volumeWeightedAveragePrice1, true));
+
             } else {
-                double open = 0;
-                double high = -1;
-                double low = Double.MAX_VALUE;
-                double close = 0;
-                double volume = 0;
-                double priceTotal = 0;
-                double volumeWeightedPriceTotal = 0;
-                int tradeIndex = 0;
+
+
                 for (Trade trade : candleTrades.get(i)) {
                     if (tradeIndex == 0) {
-                        open = trade.price;
-                    }
-
-                    if (trade.price > high) {
-                        high = trade.price;
-                    }
-
-                    if (trade.price < low) {
-                        low = trade.price;
-                    }
+                        open = trade.getPrice().toDouble();
+                    } else if (trade.getPrice().toDouble() > high) {
+                        high = trade.getPrice().toDouble();
+                    } else if (trade.getPrice().toDouble() < low) {
+                        low = trade.getPrice().toDouble();
+                    } else
 
                     if (tradeIndex == candleTrades.get(i).size() - 1) {
-                        close = trade.price;
+                        close = trade.getPrice().toDouble();
                     }
 
-                    priceTotal += trade.price;
-                    volumeWeightedPriceTotal += trade.price * trade.amount;
-                    volume += trade.amount;
+                    priceTotal += trade.getPrice().toDouble();
+                    volumeWeightedPriceTotal += trade.getPrice().toDouble() * trade.getAmount().toDouble();
+                    volume += trade.getAmount().toDouble();
                     tradeIndex++;
                     lastClose = close;
                 }
@@ -123,48 +146,23 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                 CandleData::getOpenTime)).collect(Collectors.toList()));
     }
 
-    /**
-     * Represents one line of the raw trade data. We use doubles because the results don't need to be
-     * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
-     */
-    private static class Trade {
-        // 1315922016,5.800000000000,1.000000000000
-        private final int timestamp;
-        private final double price;
-        private final double amount;
+    @Override
+    public List<CandleData> getCandleData() {
+        return null;
+    }
 
-        Trade(int timestamp, double price, double amount) {
-            this.timestamp = timestamp;
-            this.price = price;
-            this.amount = amount;
-        }
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return null;
+    }
 
-        @Override
-        public int hashCode() {
-            return Objects.hash(timestamp, price, amount);
-        }
+    @Override
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        return null;
+    }
 
-        @Override
-        public boolean equals(Object object) {
-            if (object == this) {
-                return true;
-            }
-
-            if (object == null || object.getClass() != getClass()) {
-                return false;
-            }
-
-            Trade other = (Trade) object;
-
-            return Objects.equals(timestamp, other.timestamp) &&
-                    Objects.equals(price, other.price) &&
-                    Objects.equals(amount, other.amount);
-        }
-
-
-        @Override
-        public String toString() {
-            return String.format("Trade [timestamp = %d, price = %f, amount = %f]", timestamp, price, amount);
-        }
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return null;
     }
 }

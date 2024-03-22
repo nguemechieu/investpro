@@ -11,23 +11,60 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a01b8e9b-40a6-421d-9be8-9a59c55c688f" name="Changes" comment="runY&#10;&#10;Signed-off-by: Noel M Nguemechieu &lt;NGUEMECHIEU@LIVE.COM&gt;">
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Null.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/NullCryptoCurrency.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Account.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Bitfinex.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChartDisplay.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Chat.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CoinbaseCandleDataSupplier.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ENUM_CHAT_ACTION.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Entities.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Game.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/KeyboardButton.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/NETWORK_RESPONSE.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/OandaCandleDataSupplier.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TelegramApiException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TelegramClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/UPDATE_MODE.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/investpro/users.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Binance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Binance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/BinanceUs.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/BinanceUs.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CandleData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CandleData.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CandleDataSupplier.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CandleDataSupplier.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChart.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChart.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChartUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CandleStickChartUtils.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ChartContainer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ChartContainer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrency.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrencyDataProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrencyDataProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Currency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Currency.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyDataProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyDataProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyType.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyType.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Db1.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Db1.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/FastMoney.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/FastMoney.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/FiatCurrency.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/FiatCurrency.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/FiatCurrencyDataProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/FiatCurrencyDataProvider.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/MoneyAxisFormatter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/MoneyAxisFormatter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/TradePair.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TradePair.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ChartToolbar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ChartToolbar.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Coinbase.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Coinbase.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CoinbaseWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CoinbaseWebSocketClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrencyAlgorithms.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CryptoCurrencyAlgorithms.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyNotFoundException.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyNotFoundException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyStyle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/CurrencyStyle.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/DefaultMoney.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/DefaultMoney.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/DelayedSizeChangeListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/DelayedSizeChangeListener.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/DraggableTab.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/DraggableTab.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Exchange.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Exchange.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ExchangeWebSocketClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ExchangeWebSocketClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Extrema.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Extrema.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/InProgressCandleData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/InProgressCandleData.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/InstantAxisFormatter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/InstantAxisFormatter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/LiveTrade.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/LiveTrade.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Navigation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Navigation.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Oanda.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Oanda.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/PopOverSkin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/PopOverSkin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ReverseRawTradeDataProcessor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ReverseRawTradeDataProcessor.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ReversedLinesFileReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ReversedLinesFileReader.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Side.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Side.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/StableTicksAxis.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/StableTicksAxis.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/SymmetricPair.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/SymmetricPair.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ToggleSwitch.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ToggleSwitch.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/Trade.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/Trade.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/TradeView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TradeView.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/TradingWindow.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/TradingWindow.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomDirection.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomDirection.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomIn.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomLevel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/investpro/ZoomLevel.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -40,6 +77,7 @@
         <option value="module-info" />
         <option value="JUnit5 Test Class" />
         <option value="Interface" />
+        <option value="JavaFXApplication" />
         <option value="Enum" />
         <option value="Class" />
       </list>
@@ -92,54 +130,55 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_ADD_EXTERNAL_FILES": "true",
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "Application.InvestPro.executor": "Run",
-    "Application.Main.executor": "Run",
-    "Application.MovingAverage.executor": "Run",
-    "Attach to process.pid 74764.executor": "ProcessAttachDebug",
-    "Downloaded.Files.Path.Enabled": "false",
-    "LombokPluginIS_LOMBOK_JPS_FIX_ENABLED": "true",
-    "LombokPluginIS_LOMBOK_VERSION_CHECK_Enabled": "true",
-    "Maven.investpro [clean].executor": "Run",
-    "Maven.investpro [compile].executor": "Run",
-    "Maven.investpro [package].executor": "Run",
-    "Maven.investpro [validate].executor": "Run",
-    "Repository.Attach.Annotations": "false",
-    "Repository.Attach.JavaDocs": "false",
-    "Repository.Attach.Sources": "false",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit5",
-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5": "",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/nguem/OneDrive/Documents/GitHub/investpro/src/main/java/org/investpro",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Project",
-    "project.structure.proportion": "0.15",
-    "project.structure.side.proportion": "0.47816092",
-    "run.code.analysis.last.selected.profile": "pProject Default",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_ADD_EXTERNAL_FILES&quot;: &quot;true&quot;,
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;Application.CandleStickChartExample.executor&quot;: &quot;Run&quot;,
+    &quot;Application.InvestPro.executor&quot;: &quot;Run&quot;,
+    &quot;Application.Main.executor&quot;: &quot;Run&quot;,
+    &quot;Application.MovingAverage.executor&quot;: &quot;Run&quot;,
+    &quot;Attach to process.pid 74764.executor&quot;: &quot;ProcessAttachDebug&quot;,
+    &quot;Downloaded.Files.Path.Enabled&quot;: &quot;false&quot;,
+    &quot;LombokPluginIS_LOMBOK_JPS_FIX_ENABLED&quot;: &quot;true&quot;,
+    &quot;LombokPluginIS_LOMBOK_VERSION_CHECK_Enabled&quot;: &quot;true&quot;,
+    &quot;Maven.investpro [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.investpro [compile].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.investpro [package].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.investpro [validate].executor&quot;: &quot;Run&quot;,
+    &quot;Repository.Attach.Annotations&quot;: &quot;false&quot;,
+    &quot;Repository.Attach.JavaDocs&quot;: &quot;false&quot;,
+    &quot;Repository.Attach.Sources&quot;: &quot;false&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary&quot;: &quot;JUnit5&quot;,
+    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5&quot;: &quot;&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/nguem/OneDrive/Documents/GitHub/investpro/src/main/java/org/investpro&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.47816092&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "mysql"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mysql&quot;
     ],
-    "com.intellij.ide.scratch.LRUPopupBuilder$1/SQL Dialect": [
-      "SQLite"
+    &quot;com.intellij.ide.scratch.LRUPopupBuilder$1/SQL Dialect&quot;: [
+      &quot;SQLite&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="org.investpro" />
@@ -173,6 +212,9 @@
       <recent name="" />
     </key>
     <key name="CreateTestDialog.RecentsKey">
+      <recent name="org.investpro" />
+    </key>
+    <key name="CopyClassDialog.RECENTS_KEY">
       <recent name="org.investpro" />
     </key>
   </component>
@@ -214,6 +256,19 @@
       <option name="resourceGroup" />
       <option name="stagingFolder" />
       <option name="subscription" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="CandleStickChartExample" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="org.investpro.CandleStickChartExample" />
+      <module name="investpro" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="org.investpro.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
@@ -286,6 +341,7 @@
     </configuration>
     <list>
       <item itemvalue="Application.Main" />
+      <item itemvalue="Application.CandleStickChartExample" />
       <item itemvalue="Application.InvestPro" />
       <item itemvalue="Application.MovingAverage" />
       <item itemvalue="Docker.Docker Image" />
@@ -295,6 +351,7 @@
     <recent_temporary>
       <list>
         <item itemvalue="Application.InvestPro" />
+        <item itemvalue="Application.CandleStickChartExample" />
         <item itemvalue="Application.MovingAverage" />
         <item itemvalue="Docker.Dockerfile" />
         <item itemvalue="JUnit.InvestProTest" />
@@ -336,7 +393,14 @@
       <workItem from="1710826190479" duration="45694000" />
       <workItem from="1710943681254" duration="4213000" />
       <workItem from="1710948335873" duration="16247000" />
-      <workItem from="1710965345362" duration="16160000" />
+      <workItem from="1710965345362" duration="16456000" />
+      <workItem from="1710998453361" duration="10556000" />
+      <workItem from="1711039793734" duration="15635000" />
+      <workItem from="1711057871792" duration="7283000" />
+      <workItem from="1711065860375" duration="9862000" />
+      <workItem from="1711076621028" duration="9874000" />
+      <workItem from="1711087132687" duration="1374000" />
+      <workItem from="1711107654138" duration="15909000" />
     </task>
     <task id="LOCAL-00001" summary="run">
       <created>1674886114435</created>
@@ -641,7 +705,15 @@
       <option name="project" value="LOCAL" />
       <updated>1710975771485</updated>
     </task>
-    <option name="localTasksCounter" value="43" />
+    <task id="LOCAL-00043" summary="runY&#10;&#10;Signed-off-by: Noel M Nguemechieu &lt;NGUEMECHIEU@LIVE.COM&gt;">
+      <option name="closed" value="true" />
+      <created>1710981701314</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1710981701314</updated>
+    </task>
+    <option name="localTasksCounter" value="44" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -712,7 +784,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/org/investpro/Currency.java</url>
-          <line>246</line>
+          <line>249</line>
           <option name="timeStamp" value="31" />
         </line-breakpoint>
       </breakpoints>

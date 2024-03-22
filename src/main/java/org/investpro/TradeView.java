@@ -20,7 +20,7 @@ public class TradeView extends AnchorPane {
         }
     }
 
-    TradeView(Exchange exchange) throws SQLException, ClassNotFoundException {
+    TradeView(Exchange exchange) {
         Platform.setImplicitExit(false);
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> logger.error(STR."[\{thread}]: ", exception));
 

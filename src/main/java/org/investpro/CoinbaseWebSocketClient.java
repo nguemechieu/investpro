@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.net.URI;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collections;
 
@@ -58,6 +57,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
         JsonNode messageJson;
         try {
             messageJson = OBJECT_MAPPER.readTree(message);
+            logger.info(STR."message :\{messageJson}");
         } catch (JsonProcessingException ex) {
             logger.error("ex: ", ex);
             throw new RuntimeException(ex);
@@ -78,7 +78,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
             case "match":
                 if (liveTradeConsumers.containsKey(getTradePair())) {
 
-                    Trade newTrade = new Trade(getTradePair(),
+                    LiveTrade newTrade = new LiveTrade(getTradePair(),
                             DefaultMoney.of(new BigDecimal(messageJson.get("price").asText()),
                                     getTradePair().getCounterCurrency()),
                             DefaultMoney.of(new BigDecimal(messageJson.get("size").asText()),
@@ -128,6 +128,8 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake serverHandshake) {
+        connectionEstablished.setValue(true);
+        logger.info("Connection established on Coinbase websocket client: ");
     }
 
     public void setLiveTradeConsumers(LiveTrade liveTradeConsumers) {

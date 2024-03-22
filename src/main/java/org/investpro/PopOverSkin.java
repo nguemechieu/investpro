@@ -63,8 +63,6 @@ import javafx.scene.shape.VLineTo;
 import javafx.stage.Window;
 
 public class PopOverSkin implements Skin<PopOver> {
-    private final Label title;
-    private final Label closeIcon;
     private final Path path;
     private final Path clip;
     private final BorderPane content;
@@ -98,13 +96,13 @@ public class PopOverSkin implements Skin<PopOver> {
 
         stackPane.minHeightProperty().bind(stackPane.minWidthProperty());
 
-        title = new Label();
+        Label title = new Label();
         title.textProperty().bind(popOver.titleProperty());
         title.setMaxSize(MAX_VALUE, MAX_VALUE);
         title.setAlignment(Pos.CENTER);
         title.getStyleClass().add("text"); //$NON-NLS-1$
 
-        closeIcon = new Label();
+        Label closeIcon = new Label();
         closeIcon.setGraphic(createCloseIcon());
         closeIcon.setMaxSize(MAX_VALUE, MAX_VALUE);
         closeIcon.setContentDisplay(GRAPHIC_ONLY);

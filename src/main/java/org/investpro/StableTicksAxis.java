@@ -32,13 +32,14 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
 import javafx.util.Duration;
 import javafx.scene.chart.ValueAxis;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
  * makes the axis major tick marks (the labeled tick marks) have nice, rounded numbers.
  *
- * @author Jason Winnebeck
+ *
  */
 public class StableTicksAxis extends ValueAxis<Number> {
     /**
@@ -76,7 +77,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     /**
      * Amount of padding to add on the each end of the axis when auto ranging.
      */
-    private final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
+    private static final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
 
     /**
      * If true, when auto-ranging, force 0 to be the min or max end of the range.
@@ -86,7 +87,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private double labelSize = -1;
 
 
-
+    public StableTicksAxis() {
+    }
     public StableTicksAxis(double lowerBound, double upperBound) {
         super(lowerBound, upperBound);
 
@@ -187,10 +189,16 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
-    public void setAutoRangePadding(double autoRangePadding) {
-        this.autoRangePadding.set(autoRangePadding);
+    public static DoubleProperty autoRangePaddingProperty() {
+        return autoRangePadding;
+    }
+
+    static int lessThanBranchFree(int x, int y) {
+        // The double negation is optimized away by normal Java, but is necessary for GWT
+        // to make sure bit twiddling works as expected.
+        return (x - y) >>> (Integer.SIZE - 1);
     }
 
     /**
@@ -264,17 +272,25 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return autoRangePadding.get();
     }
 
-    /**
-     * Amount of padding to add on the end of the axis when auto ranging.
-     */
-    public DoubleProperty autoRangePaddingProperty() {
-        return autoRangePadding;
+    private double getLabelSize() {
+        if (labelSize == -1) {
+            Dimension2D dim = measureTickMarkLabelSize("-888.88E-88", getTickLabelRotation());
+            if (getSide().isHorizontal()) {
+                labelSize = dim.getWidth() + 2;
+            } else {
+                // Adjusted label size calculation for vertical axes
+                labelSize = dim.getHeight() + 2;
+            }
+        }
+
+        return labelSize;
     }
 
-    static int lessThanBranchFree(int x, int y) {
-        // The double negation is optimized away by normal Java, but is necessary for GWT
-        // to make sure bit twiddling works as expected.
-        return ~~(x - y) >>> (Integer.SIZE - 1);
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public void setAutoRangePadding(double autoRangePadding) {
+        StableTicksAxis.autoRangePadding.set(autoRangePadding);
     }
 
     private static final byte[] maxLog10ForLeadingZeros = {
@@ -376,29 +392,17 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
     }
 
-    private double getLabelSize() {
-        if (labelSize == -1) {
-            Dimension2D dim = measureTickMarkLabelSize("-888.88E-88", getTickLabelRotation());
-            if (getSide().isHorizontal()) {
-                labelSize = dim.getWidth();
-            } else {
-                // TODO: May want to tweak this value so the axis labels are not so closely packed together.
-                labelSize = dim.getHeight();
-            }
-        }
-
-        return labelSize;
-    }
-
     private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
             return high - low;
         }
 
+        @Contract(pure = true)
         @Override
-        public String toString() {
-            return STR."Range{low=\{low}, high=\{high}, tickSpacing=\{tickSpacing}, scale=\{scale}\{'}'}";
+        public @NotNull String toString() {
+            return STR."Range{low=\{low}, high=\{high}, tickSpacing=\{tickSpacing}, scale=\{scale}}";
         }
+
     }
 }

@@ -46,12 +46,22 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
+    Boolean isConnected() {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle) {
         return null;
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant) {
+        return null;
+    }
+
+    @Override
+    public String getTimestamp() {
         return null;
     }
 
@@ -72,6 +82,21 @@ public class BinanceUs extends Exchange {
 
     @Override
     public List<TradePair> getTradePairSymbol() {
+        return null;
+    }
+
+    @Override
+    public double getSize() {
+        return 0;
+    }
+
+    @Override
+    public double getLivePrice() {
+        return 0;
+    }
+
+    @Override
+    public String getName() {
         return null;
     }
 

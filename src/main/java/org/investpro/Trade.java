@@ -1,6 +1,4 @@
 package org.investpro;
-
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -8,44 +6,78 @@ import java.util.Objects;
  * A Trade represents a completed order (then called a trade), which is an transaction where one
  * party buys and the other one sells some amount of currency at a fixed price.
  *
- * @author Michael Ennen
+
  */
 public class Trade {
-    private final TradePair tradePair;
-    private final Money price;
-    private final Money amount;
-    private final Side transactionType;
-    private final long localTradeId;
-    private final Instant timestamp;
-    private final Money fee;
+    private TradePair tradePair;
+    private Money price;
+    private Money amount;
+    private Side transactionType;
+    private long localTradeId;
+    private Instant timestamp;
+    private Money fee;
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
-                 long localTradeId, Instant timestamp, Money fee) {
+    public Trade() {
+        super();
+    }
+
+    public Trade(TradePair tradePair, Money price, Money size, Side side, long tradeId, Instant time) {
         this.tradePair = tradePair;
+        this.price = price;
+        this.amount = size;
+        this.transactionType = side;
+        this.localTradeId = tradeId;
+        this.timestamp = time;
+    }
+
+    /**
+     * Represents one line of the raw trade data. We use doubles because the results don't need to be
+     * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
+     */
+
+    // 1315922016,5.800000000000,1.000000000000
+    public Trade(TradePair tradePair, int timestamp, Money price, Money amount, Side transactionType, long localTradeId, Money fee) {
+        this.tradePair = tradePair;
+        this.timestamp = Instant.ofEpochSecond(timestamp);
         this.price = price;
         this.amount = amount;
         this.transactionType = transactionType;
         this.localTradeId = localTradeId;
-        this.timestamp = timestamp;
         this.fee = fee;
     }
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
-                 long localTradeId, Instant timestamp) {
-        this(tradePair, price, amount, transactionType, localTradeId,
-                timestamp, DefaultMoney.NULL_MONEY);
+    public void setTradePair(TradePair tradePair) {
+        this.tradePair = tradePair;
     }
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
-                 long localTradeId, long timestamp) {
-        this(tradePair, price, amount, transactionType, localTradeId, Instant.ofEpochSecond(timestamp),
-                DefaultMoney.NULL_MONEY);
+    public void setPrice(Money price) {
+        this.price = price;
     }
 
-    public Trade(TradePair tradePair, Money price, Money amount, Side transactionType,
-                 long localTradeId, long timestamp, Money fee) {
-        this(tradePair, price, amount, transactionType, localTradeId, Instant.ofEpochSecond(timestamp), fee);
+    public void setAmount(Money amount) {
+        this.amount = amount;
     }
+
+    public void setTransactionType(Side transactionType) {
+        this.transactionType = transactionType;
+    }
+
+    public long getLocalTradeId() {
+        return localTradeId;
+    }
+
+    public void setLocalTradeId(long localTradeId) {
+        this.localTradeId = localTradeId;
+    }
+
+    public void setTimestamp(Instant timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public Money getFee() {
+        return fee;
+    }
+
 
     public TradePair getTradePair() {
         return tradePair;
@@ -59,24 +91,8 @@ public class Trade {
         return amount;
     }
 
-    /**
-     * Returns the total amount of money this trade was, i.e. {@literal price * amount} in price
-     * units.
-     *
-     */
-    public Money getTotal() throws SQLException {
-        // TODO implement multiply method in Money..but think of how to do it with
-        // different currencies..maybe involve a TradePair? btc * usd/btc = usd, which
-        // is technically what we are doing here
-        return DefaultMoney.ofFiat(price.toBigDecimal().multiply(amount.toBigDecimal()), "USD");
-    }
-
     public Instant getTimestamp() {
         return timestamp;
-    }
-
-    public Side getTransactionType() {
-        return transactionType;
     }
 
     @Override
@@ -85,32 +101,31 @@ public class Trade {
                 "timestamp = %s, fee = %s]", tradePair, price, amount, transactionType, localTradeId, timestamp, fee);
     }
 
+    public void setFee(Money fee) {
+        this.fee = fee;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(timestamp, price, amount);
+    }
+
     @Override
     public boolean equals(Object object) {
         if (object == this) {
             return true;
         }
 
-        if (object == null || object.getClass() != this.getClass()) {
+        if (object == null || object.getClass() != getClass()) {
             return false;
         }
 
         Trade other = (Trade) object;
 
-        return Objects.equals(tradePair, other.tradePair)
-                && Objects.equals(price, other.price)
-                && Objects.equals(amount, other.amount)
-                && transactionType == other.transactionType
-                && localTradeId == other.localTradeId
-                && Objects.equals(timestamp, other.timestamp);
+        return Objects.equals(timestamp, other.timestamp) &&
+                Objects.equals(price, other.price) &&
+                Objects.equals(amount, other.amount);
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(tradePair, price, amount, transactionType, localTradeId, timestamp);
-    }
 
-    public Trade getTrades() {
-        return this;
-    }
 }

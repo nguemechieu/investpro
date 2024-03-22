@@ -1,9 +1,10 @@
 package org.investpro;
 
+import java.util.Date;
 import java.util.Objects;
 
 /**
- * @author NOEL NGUEMECHIEU
+ * @author Michael Ennen
  */
 public class CandleData {
     private final double openPrice;
@@ -106,4 +107,33 @@ public class CandleData {
                         "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
                 openTime, volume, placeHolder);
     }
+
+    public Object getSignal() {
+        return null;
+    }
+
+    public Object getMA200Price() {//Calculate MA
+
+        double ma200Price = 0;
+
+        for (int i = 0; i < 200; i++) {
+            ma200Price += this.getClosePrice();
+        }
+
+        return ma200Price / 200;
+    }
+
+    public Object getMA50Price() {//Calculate MA
+
+        double ma50Price = 0;
+
+        for (int i = 0; i < 50; i++) {
+            ma50Price += this.getClosePrice();
+        }
+
+        return ma50Price / 50;
+    }
+
+
+    // return new Date(this.openTime);}
 }

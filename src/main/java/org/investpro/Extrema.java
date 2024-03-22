@@ -2,9 +2,7 @@ package org.investpro;
 
 import javafx.util.Pair;
 
-/**
- * @author Michael Ennen
- */
+
 public class Extrema<T extends Number> extends Pair<T, T> {
     public Extrema(T min, T max) {
         super(min, max);

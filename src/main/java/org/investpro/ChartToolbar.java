@@ -23,7 +23,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
+import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -34,7 +37,7 @@ import static org.investpro.FXUtils.computeTextDimensions;
 
 /**
  * A resizable toolbar, placed at the top of a {@code CandleStickChart} and contained
- * inside of a {@code CandleStickChartContainer}, that contains a series of labelled
+ * inside a {@code CandleStickChartContainer}, that contains a series of labelled
  * buttons that allow for controlling the chart paired with this toolbar. Some of the
  * functions of the buttons are:
  *
@@ -177,14 +180,20 @@ public class ChartToolbar extends Region {
                 if (tool.duration != -1) {
                     tool.setOnAction(_ -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
-                    tool.setOnAction(_ -> candleStickChart.changeZoom(
-                            tool.tool.getZoomDirection()));
+                    tool.setOnAction(_ -> {
+                        try {
+                            candleStickChart.changeZoom(
+                                    tool.tool.getZoomDirection());
+                        } catch (TelegramApiException | IOException | ParseException | InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 }
             }
         }
     }
 
-    void setChartOptions(CandleStickChartOptions chartOptions) {
+    void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
 
@@ -317,14 +326,14 @@ public class ChartToolbar extends Region {
         }
 
         @Override
-        public void handle(MouseEvent event) {
+        public void handle(@NotNull MouseEvent event) {
             // TODO Maybe we should add a small buffer space to the popover, like 10%
             if (!(event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
                     && event.getScreenX() >= optionsPopOver.getX()
                     && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
                     && event.getScreenY() >= optionsPopOver.getY())
                     && !mouseInsideOptionsButton) {
-                optionsPopOver.hide(Duration.seconds(0.25));
+                optionsPopOver.hide(Duration.seconds(0.5));
                 scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
                 mouseExitedPopOverFilter = null;
             }

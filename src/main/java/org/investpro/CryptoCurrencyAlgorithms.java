@@ -4,9 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * @author Michael Ennen
- */
+
 public final class CryptoCurrencyAlgorithms {
     private static final Map<String, Algorithm> ALGORITHM_MAP = new HashMap<>();
 

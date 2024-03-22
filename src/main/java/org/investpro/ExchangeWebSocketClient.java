@@ -17,11 +17,10 @@ import java.util.concurrent.CountDownLatch;
  * An abstract {@code WebSocketClient} implementation that encapsulates common functionality
  * needed by {@code Exchange} implementations to interface with Websocket APIs.
  *
- * @author Michael Ennen
+
  */
 public abstract class ExchangeWebSocketClient extends CoinbaseWebSocketClient {
 
-    protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers = new ConcurrentHashMap<>();
     protected final CountDownLatch webSocketInitializedLatch = new CountDownLatch(1);
 
     private static final Logger logger = LoggerFactory.getLogger(ExchangeWebSocketClient.class);

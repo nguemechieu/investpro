@@ -5,8 +5,7 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.geometry.Orientation;
 import javafx.geometry.Side;
-import javafx.scene.CacheHint;
-import javafx.scene.Node;
+
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
@@ -24,55 +23,136 @@ import java.text.ParseException;
 import java.util.Date;
 import java.util.Objects;
 
-class TradingWindow extends Region {
+class TradingWindow extends AnchorPane {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
     Button sellButton = new Button("SELL");
     Button buyButton = new Button("BUY");
+    Button loadChartButton = new Button("Load - Chart");
 
-    Button loadExchange = new Button("Load Exchange");
 
 
     Button connect = new Button("Connexion");
-    Exchange exchange = new Coinbase("", "", new TradePair("BTC", "USD"));
-
-
+    Exchange exchange;
     public TradingWindow() throws ParseException, IOException, InterruptedException, SQLException, ClassNotFoundException {
         super();
-        setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
+
+        setPrefSize(1540, 780);
         ChoiceBox<String> exchanges = new ChoiceBox<>();
-        TabPane exchangesTab = new TabPane();
-        exchangesTab.setSide(Side.TOP);
-        exchangesTab.setPrefSize(1420, 450);
-
-        exchangesTab.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         exchanges.getItems().addAll("COINBASE", "BINANCE US", "BINANCE", "OANDA", "BITFINEX", "BITMEX", "BITSTAMP", "BITTREX");
-
-
         logger.debug(
-                "TradingWindow created"
-        );
+                "TradingWindow created");
 
 
-        ToolBar tradeToolbar = new ToolBar(exchanges);
+        TabPane chartTabPane = new TabPane();
+        chartTabPane.setSide(Side.LEFT);
+
+        TabPane exchangeTabPane = new TabPane();
+        exchangeTabPane.setSide(Side.TOP);
+        Button addExchangeButton = new Button("Add Exchange");
+        Button addChart = new Button("Add Chart");
+
+        ChoiceBox<TradePair> chartSymbols = new ChoiceBox<>();
+
+        exchanges.getSelectionModel().selectFirst();
+        switch (exchanges.getSelectionModel().getSelectedItem()) {
+            case "COINBASE" -> {
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Coinbase("", "");
+                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
+
+                logger.info(exchange.getTradePairSymbol().toString());
+                chartSymbols.getSelectionModel().selectFirst();
+            }
+            case "BINANCE US" -> {
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new BinanceUs("", "");
+                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
+                chartSymbols.getSelectionModel().selectFirst();
+
+                logger.info(exchange.getTradePairSymbol().toString());
+            }
+            case "BINANCE" -> {
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Binance("", "");
+                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
+
+                logger.info(exchange.getTradePairSymbol().toString());
+                chartSymbols.getSelectionModel().selectFirst();
+
+            }
+            case "OANDA" -> {
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Oanda("", "");
+                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
+
+                logger.info(exchange.getTradePairSymbol().toString());
+                chartSymbols.getSelectionModel().selectFirst();
+
+            }
+            case "BITFINEX" -> {
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Bitfinex("", "");
+                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
+
+                logger.info(exchange.getTradePairSymbol().toString());
+                chartSymbols.getSelectionModel().selectFirst();
+
+            }
+            default -> exchanges.setValue("SELECT EXCHANGE");
+
+        }
+        chartTabPane.setPrefSize(exchanges.getPrefWidth(), exchanges.getPrefHeight() - 20);
+        //chartTabPane.setTranslateY(20);
+        addChart.setOnAction(_ -> {
+            logger.debug("Symbol selected");
+            TradePair symbol = chartSymbols.getSelectionModel().getSelectedItem();
+            Tab tab = new Tab();
+            tab.setText(symbol.toString('/'));
+            tab.setClosable(true);
+            tab.setContent(new HBox(new CandleStickChartDisplay(symbol, exchange)));
+
+            chartTabPane.getTabs().add(tab);
+            chartTabPane.getSelectionModel().select(chartTabPane.getTabs().size());
+        });
 
 
-        Button autoTradeButton = new Button("Auto Trade");
-        autoTradeButton.getStyleClass().add("autoTradeButton");
+        addExchangeButton.setOnAction(_ -> {
+            Tab tab = new Tab();
+            tab.setContent(new HBox(new ToolBar(chartSymbols, addChart), new Separator(Orientation.HORIZONTAL),
+                    chartTabPane
+            ));
+            tab.setText(exchanges.getSelectionModel().getSelectedItem());
+            exchangeTabPane.getTabs().add(tab);
+
+        });
+
+
+        ToolBar tradeToolbar = new ToolBar(exchanges, new Separator(Orientation.VERTICAL), addExchangeButton, new Separator(Orientation.VERTICAL), addChart);
+        tradeToolbar.setTranslateY(20);
+        tradeToolbar.setPrefSize(Double.MAX_VALUE, 20);
+        Button autoTradeButton = new Button("Auto");
+        autoTradeButton.setBackground(Background.fill(Color.RED));
         autoTradeButton.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
-
         tradeToolbar.getStyleClass().add("tradeToolbar");
         tradeToolbar.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
         Button cancelALLButton = new Button("Cancel ALL");
 
-        connect.getStyleClass().add("connectButton");
         connect.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
 
         tradeToolbar.getItems().addAll(connect, buyButton, sellButton, cancelALLButton);
 
-
-        exchangesTab.getStyleClass().add("exchangesTab");
 
         TabPane bottomTabPane = new TabPane();
         ToolBar bar = new ToolBar();
@@ -80,29 +160,21 @@ class TradingWindow extends Region {
         bottomTabPane.getStyleClass().add("bottomTabPane");
         bar.getStyleClass().add("bar");
 
-        Node loadChartButton = new Button("Load - Chart");
+
         loadChartButton.getStyleClass().add("loadChartButton");
 
-        bottomTabPane.setTranslateY(550);
-        bottomTabPane.setPrefSize(Double.MAX_VALUE, 230);
-        bar.setTranslateY(Double.MAX_VALUE);
-        bar.setPrefSize(Double.MAX_VALUE, 20);
-
-
-        ChoiceBox<String> symbolsChoiceBox = new ChoiceBox<>();
 
 
         exchanges.setValue("EXCHANGE");
-        exchanges.getSelectionModel().selectNext();
 
 
         bottomTabPane = new TabPane();
         bottomTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        bottomTabPane.setSide(Side.BOTTOM);
 
-        bottomTabPane.setPrefSize(1540, 230);
+
         bottomTabPane.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
         Tab tradeTab = new Tab("Trade");
+
         TreeTableView<Orders> tradeView = new TreeTableView<>();
         tradeView.setEditable(true);//We need to set editable to true so user can close live orders
         tradeView.getStylesheets().add(String.valueOf(Objects.requireNonNull(getClass().getResource("/app.css"))));
@@ -402,33 +474,30 @@ class TradingWindow extends Region {
 
         newsListView.setItems(FXCollections.observableArrayList(new NewsDataProvider().getNews()));
 
-        Canvas newsCanvas = new Canvas(200, 150);
+        Canvas newsCanvas = new Canvas(1200, 170);
 
-        newsCanvas.setMouseTransparent(true);
-        newsCanvas.setCache(true);
-        newsCanvas.setCacheHint(CacheHint.SPEED);
-        newsCanvas.setStyle(
-                "-fx-background-color: rgba(125,25,255,0.0); " +
-                        "-fx-background-radius: 10; " +
-                        "-fx-background-insets: 0; "
-        );
 
-        newsCanvas.getGraphicsContext2D().setFill(Color.BLACK);
-        newsCanvas.getGraphicsContext2D().fillRect(0, 0, 400, 200);
-        newsCanvas.getGraphicsContext2D().setStroke(Color.WHITE);
+        newsCanvas.getGraphicsContext2D().setStroke(Color.BLACK);
+        newsCanvas.getGraphicsContext2D().setFill(Color.WHITE);
 
         newsCanvas.getGraphicsContext2D().fillText(
                 "Hello Traders ..! \n Below are upcoming news.",
-                10,
-                50
+                200,
+                10
         );
         StringBuilder upcomingNews = new StringBuilder();
         try {
             for (News news : newsListView.getItems()) {
 
                 if (news.date.getTime() >= new Date().getTime() - (1000L * 60 * 60 * 24 * 30)) {
-                    upcomingNews.append(STR."\n\{news.getTitle()}");
+                    upcomingNews.append(news);
 
+
+                    newsCanvas.getGraphicsContext2D().fillText(
+                            STR."News \{upcomingNews.toString()}",
+                            10,
+                            5
+                    );
                 }
             }
         } catch (Exception e) {
@@ -436,11 +505,7 @@ class TradingWindow extends Region {
         }
 
 
-        newsCanvas.getGraphicsContext2D().fillText(
-                upcomingNews.toString(),
-                100,
-                5
-        );
+
 
 
         newsTab.setContent(new VBox(newsListView, new Separator(Orientation.HORIZONTAL), newsCanvas));
@@ -488,154 +553,48 @@ class TradingWindow extends Region {
         ));
 
 
-        setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        setTranslateY(30);
         bottomTabPane.getTabs().addAll(tradeTab, exposureTab, accountHistoryTab,
                 newsTab, alertTab, mailBoxTab, company, market, signal, article, expert);
         ProgressBar progressBar = new ProgressBar();
         ProgressIndicator progressIndicator = new ProgressIndicator();
         progressIndicator.setProgress(0);
-        progressBar.setProgress(10);
-        Circle connexionColor = new Circle(10, Paint.valueOf(String.valueOf(Color.rgb(213, 23, 1))));
 
-        if (connect.isArmed()) {
-            connexionColor.setFill(Paint.valueOf(String.valueOf(Color.rgb(13, 223, 1))));
+
+        Label barInfo = new Label();
+        Circle connexionColor = new Circle(15, Paint.valueOf(String.valueOf(Color.rgb(250, 23, 1))));
+        barInfo.setText("Not Connected ");
+        if (exchange.isConnected()) {
+            progressBar.setProgress(1);
+            connexionColor.setFill(Paint.valueOf(String.valueOf(Color.rgb(50, 233, 1))));
+            barInfo.setText("Connected ");
         }
+
+
         bar = new ToolBar(new Label("For Help, press F1!                                                          "), new Separator(Orientation.VERTICAL), new Label("Default"), new Separator(Orientation.VERTICAL),
                 new Separator(Orientation.VERTICAL)
-                , new Label("|    |    |    |    |    |"), progressBar, new Separator(Orientation.VERTICAL), new Separator(Orientation.VERTICAL), connexionColor
+                , new Label("|    |    |    |    |    |"), progressBar, new Separator(Orientation.VERTICAL), new Separator(Orientation.VERTICAL), barInfo, connexionColor
         );
+
+
+        bottomTabPane.setPrefSize(1540, 250);
+        bottomTabPane.setTranslateY(500);
+        bottomTabPane.setSide(Side.TOP);
+
+        exchangeTabPane.setTranslateY(50);
+        exchangeTabPane.setPrefSize(1540, (500));
         bar.setTranslateY(730);
-        bar.setPrefSize(1540, 20);
-        bottomTabPane.setTranslateY(430);
-        bottomTabPane.setPrefSize(1540, 300);
+        bar.setPrefSize(1540, 30);
 
-        tradeToolbar.setPrefSize(1540, 15);
+        getChildren().addAll(tradeToolbar, exchangeTabPane, bottomTabPane, bar);
 
 
-        HBox hBox = new HBox();
-        hBox.setSpacing(10);
-        hBox.setTranslateY(70);
-        hBox.getChildren().addAll(exchangesTab);
-        tradeToolbar.setBackground(Background.fill(Paint.valueOf(String.valueOf(Color.rgb(13, 123, 134)))));
-        getChildren().addAll(tradeToolbar, hBox, bottomTabPane, bar);
 
 
-//        CryptoCurrencyDataProvider cryptoCurrencyDataProvider = new CryptoCurrencyDataProvider();
-//        cryptoCurrencyDataProvider.registerCurrencies();
-//        FiatCurrencyDataProvider fiatCurrencyDataProvider = new FiatCurrencyDataProvider();
-//        fiatCurrencyDataProvider.registerCurrencies();
-
-        exchanges.setOnAction(_ -> {
-
-            try {
-
-                if (exchanges.getSelectionModel().getSelectedItem().equals("COINBASE")) {
-                    logger.debug(
-                            "Exchange selected"
-                    );
-                    try {
-
-                        if (!symbolsChoiceBox.getSelectionModel().getSelectedItem().isEmpty()) {
-
-                            String sy = symbolsChoiceBox.getSelectionModel().getSelectedItem();
-                            exchange = new Coinbase("", "", new TradePair(sy.split("/")[0],
-                                    sy.split("/")[1]));
-
-                        }
-
-                    } catch (SQLException | ClassNotFoundException e) {
-                        throw new RuntimeException(e);
-                    }
-
-                    logger.debug(
-                            "Exchange created"
-                    );
-
-                } else if (exchanges.getSelectionModel().getSelectedItem().equals("BINANCE US")) {
-                    logger.debug("Exchange selected");
-                    exchange = new BinanceUs("", "");
 
 
-                } else if (exchanges.getSelectionModel().getSelectedItem().equals("BINANCE")) {
-                    logger.debug(
-                            "Exchange selected"
-                    );
-                    exchange = new Binance("", "");
 
 
-                    logger.debug(
-                            "Exchange created"
-                    );
 
-
-                } else if (exchanges.getSelectionModel().getSelectedItem().equals("OANDA")) {
-
-                    logger.debug(
-                            "Exchange selected"
-                    );
-                    exchange = new Oanda("", "");
-
-                } else {
-
-                    new Message("EXCHANGE NOT SUPPORTED", "Please select a valid exchange");
-                }
-
-
-            } catch (Exception e) {
-                logger.error(e.getMessage());
-
-                new Message("", e.getMessage());
-            }
-
-            symbolsChoiceBox.getSelectionModel().selectNext();
-        });
-        for (TradePair i : exchange.getTradePairSymbol()) {
-            symbolsChoiceBox.getItems().addAll(i.toString('-'));
-        }
-        tradeToolbar.getItems().addAll(symbolsChoiceBox, loadChartButton);
-
-        autoTradeButton.setOnAction(_ -> exchange.autoTrading(true, exchange.getSignal()));
-        buyButton.setOnAction(_ -> {
-            logger.debug("Buy button pressed");
-            double sizes = 12, stoploss = 100000,
-                    takeprofit = 100000;
-            exchange.buy(exchange.getWebsocketClient().getTradePair(), MARKET_TYPES.LIMIT, sizes, stoploss, takeprofit);
-        });
-
-        connect.setOnAction(_ -> exchange.connect());
-
-        sellButton.setOnAction(_ -> {
-            logger.debug("Sell button pressed");
-            double sizes = 12,
-                    stoploss = 100000,
-                    takeprofit = 100000;
-            exchange.sell(exchange.getWebsocketClient().getTradePair(), MARKET_TYPES.LIMIT, sizes, stoploss, takeprofit);
-        });
-
-
-        cancelALLButton.setOnAction(_ -> {
-            logger.debug("Cancel button pressed");
-            exchange.cancelALL();
-        });
-
-
-        loadExchange.setOnAction(event -> {
-
-            DraggableTab tab = new DraggableTab(exchanges.getSelectionModel().getSelectedItem());
-
-            try {
-                tab.setContent(
-                        new TradeView(exchange)
-                );
-            } catch (SQLException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-
-            exchangesTab.getTabs().add(tab);
-
-        });
-        tradeToolbar.getItems().addAll(loadExchange, autoTradeButton);
 
     }
 

@@ -2,10 +2,8 @@ package org.investpro;
 
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
 import java.sql.SQLException;
@@ -39,7 +37,7 @@ public class ChartContainer extends Region {
 
         secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
-        setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        setPrefSize(1400, 440);
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
         toolbar = new ChartToolbar(widthProperty(), heightProperty(),
                 candleDataSupplier.getSupportedGranularities());
@@ -51,17 +49,20 @@ public class ChartContainer extends Region {
         AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
         AnchorPane.setRightAnchor(toolbarContainer, 0.0);
 
-        candleChartContainer = new VBox();
 
-        candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        candleChartContainer = new VBox();
+        candleChartContainer.setPrefSize(widthProperty().doubleValue(), heightProperty().doubleValue());
+
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
         AnchorPane.setRightAnchor(candleChartContainer, 15.0);
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
 
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
+
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
+        containerRoot.setBorder(Border.stroke(Color.ORANGE));
         getChildren().setAll(containerRoot);
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 

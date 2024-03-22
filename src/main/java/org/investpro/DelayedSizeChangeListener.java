@@ -8,6 +8,9 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.util.Duration;
 
+import java.io.IOException;
+import java.text.ParseException;
+
 /**
  * A {@code ChangeListener<Number>} implementation that calls the abstract {@code resize()} method
  * only after a delay has elapsed in which no further changes have occurred. If a change does occur
@@ -18,9 +21,9 @@ import javafx.util.Duration;
  * <p>
  * A {@code DelayedSizeChangeListener} is useful when used on a Node that has its'
  * preferred size set to {@code Double.MAX_VALUE} and thus re-sizes with the application
- * window. This way, as the Node's size passes through many intermediate values a
+ * window. This way, as the Node's size passes through many intermediate values an
  * aa resizing is not performed but only for the final "resting" window size. This is
- * especially useful when resizing a is a computationally expensive operation.
+ * especially useful when resizing an is a computationally expensive operation.
  *
  * @author NOEL NGUEMECHIEU
  */
@@ -45,7 +48,7 @@ public abstract class DelayedSizeChangeListener implements ChangeListener<Number
         timeline.play();
     }
 
-    public abstract void resize();
+    public abstract void resize() throws TelegramApiException, IOException, ParseException, InterruptedException;
 
     @Override
     public void changed(ObservableValue<? extends Number> observable, Number oldValue, final Number newValue) {
@@ -56,7 +59,11 @@ public abstract class DelayedSizeChangeListener implements ChangeListener<Number
         if (gotFirstSize.get()) {
             timeline.getKeyFrames().clear();
             timeline.getKeyFrames().add(new KeyFrame(Duration.millis(subsequentDelay), event -> {
-                resize();
+                try {
+                    resize();
+                } catch (TelegramApiException | IOException | ParseException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
                 timeline.stop();
             }));
         }

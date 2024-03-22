@@ -30,7 +30,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    public static Money of(float amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(float amount, Currency currency) {
         return of(new BigDecimal(Float.valueOf(amount).toString()), currency);
     }
 
@@ -302,13 +303,12 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     private void checkCurrenciesEqual(DefaultMoney defaultMoney) {
         if (!currency.equals(defaultMoney.currency)) {
-            throw new IllegalArgumentException("currencies are not equal: first currency: "
-                    + currency + " second currency: " + defaultMoney.currency);
+            throw new IllegalArgumentException(STR."currencies are not equal: first currency: \{currency} second currency: \{defaultMoney.currency}");
         }
     }
 
     @Override
-    public int compareTo(DefaultMoney other) {
+    public int compareTo(@NotNull DefaultMoney other) {
         // TODO is this really the behavior we want?
         checkCurrenciesEqual(other);
 
@@ -337,13 +337,9 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public String toString() {
-        switch (currency.getCurrencyType()) {
-            case FIAT:
-                return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-            case CRYPTO:
-            case NULL:
-            default:
-                return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
-        }
+        return switch (currency.getCurrencyType()) {
+            case FIAT -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
+            default -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+        };
     }
 }

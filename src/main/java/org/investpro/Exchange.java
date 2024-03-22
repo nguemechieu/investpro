@@ -61,10 +61,14 @@ public abstract class Exchange {
 
     public abstract ExchangeWebSocketClient getWebsocketClient();
 
+    abstract Boolean isConnected();
+
     public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle);
 
 
     public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant);
+
+    public abstract String getTimestamp();
 
     public abstract CandleDataSupplier getCandleDataSupplier(int i, TradePair tradePair);
 
@@ -74,4 +78,10 @@ public abstract class Exchange {
 
 
     public abstract List<TradePair> getTradePairSymbol();
+
+    public abstract double getSize();
+
+    public abstract double getLivePrice();
+
+    public abstract String getName();
 }

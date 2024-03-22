@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -26,7 +25,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.Currency;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
@@ -43,7 +41,7 @@ class Coinbase extends Exchange {
     private String apiKey;
 
 
-    public Coinbase(String apiKey, String apiSecret, TradePair tradePair) {
+    public Coinbase(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
@@ -65,7 +63,6 @@ class Coinbase extends Exchange {
                 apiSecret
         );
         this.websocketClient.setTradePair(tradePair);
-        this.tradePair = tradePair;
     }
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair);
@@ -184,13 +181,23 @@ class Coinbase extends Exchange {
     }
 
     @Override
-    public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
-        return null;
+    public String getTimestamp() {
+        return new Date().toString();
+    }
+
+    @Override
+    public TradePair getSelecTradePair() {
+        return tradePair;
     }
 
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
-        return (ExchangeWebSocketClient) websocketClient;
+        return null;
+    }
+
+    @Override
+    Boolean isConnected() {
+        return websocketClient.connectionEstablished.get();
     }
 
     /**
@@ -345,6 +352,21 @@ class Coinbase extends Exchange {
 
     }
 
+    @Override
+    public double getSize() {
+        return 0;
+    }
+
+    @Override
+    public double getLivePrice() {
+        return 0;
+    }
+
+    @Override
+    public String getName() {
+        return "Coinbase";
+    }
+
     public TradePair getTradePair() {
         return tradePair;
     }
@@ -353,85 +375,4 @@ class Coinbase extends Exchange {
         this.tradePair = tradePair;
     }
 
-    public static class CoinbaseCandleDataSupplier extends CandleDataSupplier {
-        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
-
-        CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
-        }
-
-        @Override
-        public Set<Integer> getSupportedGranularities() {
-            // https://docs.pro.coinbase.com/#get-historic-rates
-            return new TreeSet<>(Set.of(60, 300, 900, 3600, 21600, 86400));
-        }
-
-        @Override
-        public Future<List<CandleData>> get() {
-            if (endTime.get() == -1) {
-                endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
-            }
-
-            String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                    .format(LocalDateTime.ofEpochSecond(endTime.get(), 0, ZoneOffset.UTC));
-
-            int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
-            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                    .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
-
-            String uriStr = STR."https://api.pro.coinbase.com/products/\{tradePair.toString('-')}/candles?granularity=\{secondsPerCandle}&start=\{startDateString}&end=\{endDateString}";
-
-            if (startTime == EARLIEST_DATA) {
-                // signal more data is false
-                return CompletableFuture.completedFuture(Collections.emptyList());
-            }
-
-            return HttpClient.newHttpClient().sendAsync(
-                            HttpRequest.newBuilder()
-                                    .uri(URI.create(uriStr))
-                                    .GET().build(),
-                            HttpResponse.BodyHandlers.ofString())
-                    .thenApply(HttpResponse::body)
-                    .thenApply(response -> {
-                        logger.info(STR."coinbase response: \{response}");
-                        JsonNode res;
-                        try {
-                            res = OBJECT_MAPPER.readTree(response);
-                        } catch (JsonProcessingException ex) {
-                            throw new RuntimeException(ex);
-                        }
-
-                        if (!res.isEmpty()) {
-
-
-                            // Remove the current in-progress candle
-                            if (res.get(0).get(0).asInt() + secondsPerCandle > endTime.get()) {
-                                ((ArrayNode) res).remove(0);
-                            }
-                            endTime.set(startTime);
-
-                            List<CandleData> candleData = new ArrayList<>();
-                            for (JsonNode candle : res) {
-                                candleData.add(new CandleData(
-                                        candle.get(3).asDouble(),  // open price
-                                        candle.get(4).asDouble(),  // close price
-                                        candle.get(2).asDouble(),  // high price
-                                        candle.get(1).asDouble(),  // low price
-                                        candle.get(0).asInt(),     // open time
-                                        candle.get(5).asDouble()   // volume
-                                ));
-                            }
-                            candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
-                            return candleData;
-                        } else {
-                            logger.error(STR."CoinbaseCandleDataSupplier.get()\{response}");
-                            return Collections.emptyList();
-                        }
-                    });
-        }
-    }
 }

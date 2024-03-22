@@ -1,4 +1,4 @@
 package org.investpro;
 
-public class ZoomIn {
+public class Account {
 }

@@ -6,14 +6,15 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 import javafx.util.StringConverter;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * @author Michael Ennen
- */
+
 public class InstantAxisFormatter extends StringConverter<Number> {
     private final DateTimeFormatter dateTimeFormat;
 
-    public static InstantAxisFormatter of(DateTimeFormatter format) {
+    @Contract("_ -> new")
+    public static @NotNull InstantAxisFormatter of(DateTimeFormatter format) {
         return new InstantAxisFormatter(format);
     }
 
@@ -22,7 +23,7 @@ public class InstantAxisFormatter extends StringConverter<Number> {
     }
 
     @Override
-    public String toString(Number number) {
+    public String toString(@NotNull Number number) {
         return ZonedDateTime.ofInstant(Instant.ofEpochSecond(number.intValue()),
                 ZoneId.systemDefault()).format(dateTimeFormat);
     }
