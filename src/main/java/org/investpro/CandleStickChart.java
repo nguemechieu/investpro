@@ -14,6 +14,7 @@ import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
+import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.input.*;
 import javafx.scene.layout.Pane;
@@ -32,8 +33,8 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import java.io.IOException;
+import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.time.Instant;
@@ -141,7 +142,7 @@ public class CandleStickChart extends Pane {
      */
     CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
-                     ObservableNumberValue containerHeight) {
+                     ObservableNumberValue containerHeight) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
         Objects.requireNonNull(tradePair);
@@ -185,7 +186,15 @@ public class CandleStickChart extends Pane {
         yAxis.setTickLabelFont(axisFont);
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
-        VBox loadingIndicatorContainer = new VBox(progressIndicator);
+        Label loadingtext = new Label("Loading...");
+        loadingtext.setFont(axisFont);
+        loadingtext.setMouseTransparent(true);
+
+        if (progressIndicator.getProgress() == -1) {
+            loadingtext.setVisible(true);
+            loadingtext.setText(tradePair.toString());
+        }
+        VBox loadingIndicatorContainer = new VBox(progressIndicator, loadingtext);
         progressIndicator.setPrefSize(40, 40);
         loadingIndicatorContainer.setAlignment(Pos.CENTER);
         loadingIndicatorContainer.setMouseTransparent(true);
@@ -261,6 +270,25 @@ public class CandleStickChart extends Pane {
                 canvas.setOnMouseEntered(event -> canvas.getScene().setCursor(Cursor.HAND));
                 canvas.setOnMouseExited(event -> canvas.getScene().setCursor(Cursor.DEFAULT));
                 graphicsContext = canvas.getGraphicsContext2D();
+
+
+                graphicsContext.fillText(STR."Time :\{new Date()}", 10, 20);
+                //Drawing bid and ask lines
+                double bid = tradePair.getBid();
+                double ask = tradePair.getAsk();
+                Line bidLine = new Line();
+                bidLine.setStartX(10);
+                bidLine.setStartY(bid);
+                bidLine.setEndX(chartWidth);
+                bidLine.setEndY(bid);
+                bidLine.setStroke(Color.RED);
+
+                Line askLine = new Line();
+                askLine.setStartX(10);
+                askLine.setStartY(ask);
+                askLine.setEndX(chartWidth);
+                askLine.setEndY(ask);
+                askLine.setStroke(Color.BLUE);
                 layoutChart();
                 initializeEventHandlers();
                 CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(
@@ -274,7 +302,7 @@ public class CandleStickChart extends Pane {
         chartOptions.horizontalGridLinesVisibleProperty().addListener((observable, oldValue, newValue) ->
         {
             try {
-                drawChartContents(false);
+                drawChartContents(true);
             } catch (TelegramApiException | ParseException | IOException | InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -751,7 +779,7 @@ public class CandleStickChart extends Pane {
         // between candles and very few candles are on-screen).
         boolean skipLowMark = lowMarkYPos - highMarkYPos < canvasNumberFont.getSize() &&
                 candleIndexOfHighest == candleIndexOfLowest;
-        // TODO(mike): In addition to drawing the high/low markers to the left or right of the extrema, we should
+        // In addition to drawing the high/low markers to the left or right of the extrema, we should
         //  also (or maybe instead) factor in how visible the marker will be. This can be determined by seeing
         //  if it will be obscured by neighboring candles (if there is very low volatility, for example). See
         //  obscure.png for an example of where the marker is obscured by neighboring candles. Also, when the
@@ -775,12 +803,12 @@ public class CandleStickChart extends Pane {
                 // draw low marker to the right of the candle (arrow points to the left)
                 double xPos = ((canvas.getWidth() - (candleIndexOfLowest * candleWidth)) + halfCandleWidth) + 2;
                 graphicsContext.setTextAlign(TextAlignment.LEFT);
-                graphicsContext.fillText("← " + MARKER_FORMAT.format(lowestCandleValue), xPos, lowMarkYPos);
+                graphicsContext.fillText(STR."← \{MARKER_FORMAT.format(lowestCandleValue)}", xPos, lowMarkYPos);
             } else {
                 // draw low marker to the left of the candle (arrow points to the right)
                 double xPos = ((canvas.getWidth() - (candleIndexOfLowest * candleWidth)) + halfCandleWidth) - 3;
                 graphicsContext.setTextAlign(TextAlignment.RIGHT);
-                graphicsContext.fillText(MARKER_FORMAT.format(lowestCandleValue) + " →", xPos, lowMarkYPos);
+                graphicsContext.fillText(STR."\{MARKER_FORMAT.format(lowestCandleValue)} →", xPos, lowMarkYPos);
             }
         }
     }

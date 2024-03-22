@@ -2,12 +2,10 @@ package org.investpro;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.Separator;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -28,6 +26,7 @@ public class InvestPro extends Application {
 
 
     public InvestPro() {
+        super();
 
     }
 
@@ -37,19 +36,16 @@ public class InvestPro extends Application {
 
         AnchorPane window = new AnchorPane();
         window.setMaxSize(
-                1540, 800
+                1540, 780
         );
         window.getStylesheets().add(String.valueOf(Objects.requireNonNull(InvestPro.class.getResource("/app.css"))));
 
-        window.getChildren().addAll(menuBar(), new Separator(Orientation.HORIZONTAL), new TradingWindow());
+        window.getChildren().addAll(new TradingWindow());
         primaryStage.setResizable(true);
-
-
         Scene scene = new Scene(window);
         primaryStage.setOnCloseRequest(_ -> Platform.exit());
-
         scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
-        primaryStage.setTitle(STR."InvestPro               --------- Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
+        primaryStage.setTitle(STR."InvestPro                  --------- Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
         primaryStage.setScene(scene);
         primaryStage.show();
     }

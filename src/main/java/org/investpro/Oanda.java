@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -24,10 +23,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
 import java.util.Currency;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
@@ -44,7 +42,7 @@ class Oanda extends Exchange {
     private String apiKey;
 
 
-    public Oanda(String apiKey, String apiSecret, TradePair tradePair) {
+    public Oanda(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
@@ -66,12 +64,9 @@ class Oanda extends Exchange {
                 apiSecret
         );
         this.websocketClient.setTradePair(tradePair);
-        this.tradePair = tradePair;
+
     }
 
-    public Oanda(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
-    }
 
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         return new OandaCandleDataSupplier(secondsPerCandle, tradePair);
@@ -192,13 +187,13 @@ class Oanda extends Exchange {
     }
 
     @Override
-    public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
-        return null;
+    public TradePair getSelecTradePair() {
+        return tradePair;
     }
 
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
-        return (ExchangeWebSocketClient) websocketClient;
+        return null;
     }
 
     @Override

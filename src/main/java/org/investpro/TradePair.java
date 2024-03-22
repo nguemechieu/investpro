@@ -24,6 +24,8 @@ public class TradePair extends Pair<Currency, Currency> {
     Currency counterCurrency;
 
     long id;
+    private double bid;
+    private double ask;
 
     public TradePair(Currency baseCurrency, Currency counterCurrency) throws SQLException, ClassNotFoundException {
         super(baseCurrency, counterCurrency);
@@ -225,5 +227,22 @@ public class TradePair extends Pair<Currency, Currency> {
     public String getSymbol() {
 
         return STR."\{baseCurrency.getSymbol()}/\{counterCurrency.getSymbol()}";
+    }
+
+    public double getBid() {
+
+        return bid;
+    }
+
+    public void setBid(double bid) {
+        this.bid = bid;
+    }
+
+    public double getAsk() {
+        return ask;
+    }
+
+    public void setAsk(double ask) {
+        this.ask = ask;
     }
 }

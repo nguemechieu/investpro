@@ -5,11 +5,13 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.geometry.Orientation;
 import javafx.geometry.Side;
-
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
-import javafx.scene.layout.*;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Circle;
@@ -45,47 +47,40 @@ class TradingWindow extends AnchorPane {
                 "TradingWindow created");
 
 
-        TabPane chartTabPane = new TabPane();
-        chartTabPane.setSide(Side.LEFT);
 
         TabPane exchangeTabPane = new TabPane();
         exchangeTabPane.setSide(Side.TOP);
         Button addExchangeButton = new Button("Add Exchange");
         Button addChart = new Button("Add Chart");
 
+
         ChoiceBox<TradePair> chartSymbols = new ChoiceBox<>();
 
         exchanges.getSelectionModel().selectFirst();
+
+
         switch (exchanges.getSelectionModel().getSelectedItem()) {
             case "COINBASE" -> {
                 logger.debug(
                         "Exchange selected"
                 );
                 exchange = new Coinbase("", "");
-                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
 
-                logger.info(exchange.getTradePairSymbol().toString());
-                chartSymbols.getSelectionModel().selectFirst();
             }
             case "BINANCE US" -> {
                 logger.debug(
                         "Exchange selected"
                 );
                 exchange = new BinanceUs("", "");
-                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
-                chartSymbols.getSelectionModel().selectFirst();
 
-                logger.info(exchange.getTradePairSymbol().toString());
+
+
             }
             case "BINANCE" -> {
                 logger.debug(
                         "Exchange selected"
                 );
                 exchange = new Binance("", "");
-                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
-
-                logger.info(exchange.getTradePairSymbol().toString());
-                chartSymbols.getSelectionModel().selectFirst();
 
             }
             case "OANDA" -> {
@@ -93,56 +88,55 @@ class TradingWindow extends AnchorPane {
                         "Exchange selected"
                 );
                 exchange = new Oanda("", "");
-                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
-
-                logger.info(exchange.getTradePairSymbol().toString());
-                chartSymbols.getSelectionModel().selectFirst();
 
             }
             case "BITFINEX" -> {
                 logger.debug(
                         "Exchange selected"
                 );
-                exchange = new Bitfinex("", "");
-                chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
-
-                logger.info(exchange.getTradePairSymbol().toString());
-                chartSymbols.getSelectionModel().selectFirst();
 
             }
             default -> exchanges.setValue("SELECT EXCHANGE");
 
         }
-        chartTabPane.setPrefSize(exchanges.getPrefWidth(), exchanges.getPrefHeight() - 20);
-        //chartTabPane.setTranslateY(20);
-        addChart.setOnAction(_ -> {
-            logger.debug("Symbol selected");
-            TradePair symbol = chartSymbols.getSelectionModel().getSelectedItem();
-            Tab tab = new Tab();
-            tab.setText(symbol.toString('/'));
-            tab.setClosable(true);
-            tab.setContent(new HBox(new CandleStickChartDisplay(symbol, exchange)));
-
-            chartTabPane.getTabs().add(tab);
-            chartTabPane.getSelectionModel().select(chartTabPane.getTabs().size());
-        });
 
 
+        TabPane chartTabPane = new TabPane();
+        chartTabPane.setSide(Side.LEFT);
         addExchangeButton.setOnAction(_ -> {
             Tab tab = new Tab();
-            tab.setContent(new HBox(new ToolBar(chartSymbols, addChart), new Separator(Orientation.HORIZONTAL),
+
+            chartSymbols.getItems().addAll(exchange.getTradePairSymbol());
+            tab.setContent(new VBox(new ToolBar(chartSymbols, addChart),
                     chartTabPane
             ));
             tab.setText(exchanges.getSelectionModel().getSelectedItem());
             exchangeTabPane.getTabs().add(tab);
+            exchangeTabPane.getSelectionModel().select(exchangeTabPane.getTabs().size());
+
 
         });
+        addChart.setOnAction(_ -> {
+            TradePair symbol = chartSymbols.getSelectionModel().getSelectedItem();
+
+            Tab tab1 = new Tab();
+
+            tab1.setText(symbol.toString('/'));
+            tab1.setClosable(true);
+            CandleStickChartDisplay sc = new CandleStickChartDisplay(symbol, exchange);
 
 
-        ToolBar tradeToolbar = new ToolBar(exchanges, new Separator(Orientation.VERTICAL), addExchangeButton, new Separator(Orientation.VERTICAL), addChart);
-        tradeToolbar.setTranslateY(20);
-        tradeToolbar.setPrefSize(Double.MAX_VALUE, 20);
+            tab1.setContent(sc);
+            chartTabPane.getTabs().add(tab1);
+            chartTabPane.getSelectionModel().select(chartTabPane.getTabs().size() - 1);
+
+        });
         Button autoTradeButton = new Button("Auto");
+        ToolBar tradeToolbar = new ToolBar(exchanges, new Separator(Orientation.VERTICAL), addExchangeButton, new Separator(Orientation.VERTICAL), addChart, autoTradeButton);
+        tradeToolbar.setTranslateY(20);
+        tradeToolbar.setTranslateX(1540 / 4);
+        tradeToolbar.setPrefSize(Double.MAX_VALUE, 20);
+
         autoTradeButton.setBackground(Background.fill(Color.RED));
         autoTradeButton.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
         tradeToolbar.getStyleClass().add("tradeToolbar");
@@ -157,22 +151,12 @@ class TradingWindow extends AnchorPane {
         TabPane bottomTabPane = new TabPane();
         ToolBar bar = new ToolBar();
 
-        bottomTabPane.getStyleClass().add("bottomTabPane");
-        bar.getStyleClass().add("bar");
-
-
-        loadChartButton.getStyleClass().add("loadChartButton");
-
-
 
         exchanges.setValue("EXCHANGE");
-
-
         bottomTabPane = new TabPane();
         bottomTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
 
-        bottomTabPane.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/app.css")).toExternalForm());
         Tab tradeTab = new Tab("Trade");
 
         TreeTableView<Orders> tradeView = new TreeTableView<>();
@@ -474,7 +458,7 @@ class TradingWindow extends AnchorPane {
 
         newsListView.setItems(FXCollections.observableArrayList(new NewsDataProvider().getNews()));
 
-        Canvas newsCanvas = new Canvas(1200, 170);
+        Canvas newsCanvas = new Canvas(1000, 230);
 
 
         newsCanvas.getGraphicsContext2D().setStroke(Color.BLACK);
@@ -511,7 +495,7 @@ class TradingWindow extends AnchorPane {
         newsTab.setContent(new VBox(newsListView, new Separator(Orientation.HORIZONTAL), newsCanvas));
         Tab alertTab = new Tab("Alert");
         alertTab.setContent(new VBox());
-        Tab mailBoxTab = new Tab("MailBox");
+        Tab mailBoxTab = new Tab("Mail");
         mailBoxTab.setContent(new VBox(new ListView<>()));
         Tab company = new Tab("Company");
         company.setContent(new VBox());
@@ -561,7 +545,7 @@ class TradingWindow extends AnchorPane {
 
 
         Label barInfo = new Label();
-        Circle connexionColor = new Circle(15, Paint.valueOf(String.valueOf(Color.rgb(250, 23, 1))));
+        Circle connexionColor = new Circle(10, Paint.valueOf(String.valueOf(Color.rgb(250, 23, 1))));
         barInfo.setText("Not Connected ");
         if (exchange.isConnected()) {
             progressBar.setProgress(1);
@@ -581,10 +565,9 @@ class TradingWindow extends AnchorPane {
         bottomTabPane.setSide(Side.TOP);
 
         exchangeTabPane.setTranslateY(50);
-        exchangeTabPane.setPrefSize(1540, (500));
+        exchangeTabPane.setPrefSize(1540, (450));
         bar.setTranslateY(730);
         bar.setPrefSize(1540, 30);
-
         getChildren().addAll(tradeToolbar, exchangeTabPane, bottomTabPane, bar);
 
 

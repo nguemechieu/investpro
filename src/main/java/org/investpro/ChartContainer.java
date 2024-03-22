@@ -69,7 +69,11 @@ public class ChartContainer extends Region {
         secondsPerCandle.addListener((_, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
                 try {
-                    createNewChart(newDurationValue.intValue(), liveSyncing);
+                    try {
+                        createNewChart(newDurationValue.intValue(), liveSyncing);
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
                 } catch (SQLException e) {
                     throw new RuntimeException(e);
                 }
@@ -93,7 +97,7 @@ public class ChartContainer extends Region {
         this.tradePair = tradePair;
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
         }

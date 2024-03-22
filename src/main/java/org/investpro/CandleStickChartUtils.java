@@ -1,13 +1,9 @@
 package org.investpro;
 
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 import javafx.util.Pair;
+
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 /**
  * @author Michael Ennen
@@ -19,6 +15,7 @@ public final class CandleStickChartUtils {
     private static final int SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
     private static final int SECONDS_PER_MONTH = 30 * SECONDS_PER_WEEK;
     private static final int SECONDS_PER_YEAR = 12 * SECONDS_PER_MONTH;
+
 
     private CandleStickChartUtils() {
     }
@@ -57,8 +54,7 @@ public final class CandleStickChartUtils {
             throw new IllegalArgumentException("candleData must not be empty");
         }
         if (windowSize > candleData.size()) {
-            throw new IllegalArgumentException("windowSize (" + windowSize + ") must be less than size of " +
-                    "candleData (" + candleData.size() + ")");
+            throw new IllegalArgumentException(STR."windowSize (\{windowSize}) must be less than size of candleData (\{candleData.size()})");
         }
 
         Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
@@ -215,7 +211,7 @@ public final class CandleStickChartUtils {
         } else if (rangeInSeconds > SECONDS_PER_DAY) {
             result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
         } else {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm:s"));
         }
 
         return result;

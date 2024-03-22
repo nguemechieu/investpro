@@ -9,6 +9,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.scene.Scene;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
+import javafx.stage.Stage;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft;
 import org.java_websocket.handshake.ServerHandshake;
@@ -93,6 +97,13 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
             default:
                 throw new IllegalStateException(STR."Unhandled message type on Gdax websocket client: \{messageJson.get("type").asText()}");
         }
+        Stage st = new Stage();
+        StackPane stackPane = new StackPane();
+        Text txt = new Text(messageJson.get("message").asText());
+        stackPane.getChildren().add(txt);
+        st.setScene(new Scene(stackPane));
+        st.show();
+
     }
 
 
