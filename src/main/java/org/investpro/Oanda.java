@@ -73,6 +73,16 @@ class Oanda extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> cancelOrder(String orderId) {
+        return null;
+    }
+
+    @Override
     public String getSignal() {
         return null;
     }
@@ -351,6 +361,21 @@ class Oanda extends Exchange {
 
         return tradePairs;
 
+    }
+
+    @Override
+    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Ticker getLivePrice(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Account getUserAccountDetails() {
+        return null;
     }
 
     @Override

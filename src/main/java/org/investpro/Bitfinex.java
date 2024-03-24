@@ -1,5 +1,7 @@
 package org.investpro;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +49,16 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> cancelOrder(String orderId) {
+        return null;
+    }
+
+    @Override
     public String getSignal() {
         return null;
     }
@@ -58,6 +70,21 @@ public class Bitfinex extends Exchange {
 
     @Override
     public List<TradePair> getTradePairSymbol() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Ticker getLivePrice(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Account getUserAccountDetails() {
         return null;
     }
 

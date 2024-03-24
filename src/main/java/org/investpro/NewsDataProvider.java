@@ -1,11 +1,9 @@
 package org.investpro;
 
 import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import javax.swing.*;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -16,7 +14,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class NewsDataProvider {
 
@@ -32,19 +32,45 @@ public class NewsDataProvider {
         return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(str);
     }
 
+
+    HttpRequest.Builder request = HttpRequest.newBuilder();
+    HttpClient client = HttpClient.newHttpClient();
+
+    public CompletableFuture<String> getNewsData(String url) {
+        String uriStr = "www.faireconomy.media/ff_calendar_thisweek.json?version=1";
+        request.uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .GET()
+                .build();
+
+        return client
+                .sendAsync(request.GET().build(), HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body).exceptionally(throwable -> {
+                    throw new RuntimeException(throwable);
+                }).thenApply(response -> response).completeOnTimeout(
+                        "REQUEST TIMEOUT ", 5000, TimeUnit.MILLISECONDS
+                );
+
+
+    }
     List<News> getNews() throws ParseException, IOException, InterruptedException {
 
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+
+        String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
 
 
-        requestBuilder.uri(URI.create("https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823"));
+        //Checking internet connexion first before request
 
-
-        HttpResponse<String> response = HttpClient.newHttpClient().send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
 
         ArrayList<News> news = new ArrayList<>();//
-        JSONArray jsonArray = new JSONArray(response.body());
+        String data;
+        try {
+            data = getNewsData(url).get();
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        JSONArray jsonArray = new JSONArray(data);
         News news1;
         int length = jsonArray.length();
         for (int i = 0; i < length; i++) {

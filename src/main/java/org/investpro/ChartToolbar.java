@@ -25,8 +25,6 @@ import javafx.scene.text.Font;
 import javafx.util.Duration;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -59,7 +57,8 @@ public class ChartToolbar extends Region {
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
     private final Separator functionOptionsSeparator;
-
+    Button screenshot = new Button("ScreenShot");
+    Button autoTrade = new Button("Auto Trade");
     public ChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                             Set<Integer> granularities) {
         Objects.requireNonNull(containerWidth);
@@ -109,7 +108,8 @@ public class ChartToolbar extends Region {
             }
         }
 
-
+        toolbarNodes.add(autoTrade);
+        toolbarNodes.add(screenshot);
         Separator intervalZoomSeparator = new Separator();
         intervalZoomSeparator.setOpacity(0);
         toolbarNodes.add(intervalZoomSeparator);
@@ -119,18 +119,18 @@ public class ChartToolbar extends Region {
         functionOptionsSeparator.setPadding(new Insets(0, 20, 0, 0));
 
         optionsPopOver = new PopOver();
-        optionsPopOver.setTitle("Chart Options");
+        optionsPopOver.setTitle("Options");
         optionsPopOver.setHeaderAlwaysVisible(true);
         for (Tool tool : Tool.values()) {
             ToolbarButton toolbarButton;
             if (tool == OPTIONS) {
                 toolbarNodes.add(functionOptionsSeparator);
                 toolbarButton = new ToolbarButton(OPTIONS);
-                toolbarButton.setOnMouseEntered(event -> {
+                toolbarButton.setOnMouseEntered(_ -> {
                     mouseInsideOptionsButton = true;
                     optionsPopOver.show(toolbarButton);
                 });
-                toolbarButton.setOnMouseExited(event -> {
+                toolbarButton.setOnMouseExited(_ -> {
                     mouseInsideOptionsButton = false;
                     if (mouseExitedPopOverFilter == null) {
                         mouseExitedPopOverFilter = new MouseExitedPopOverFilter(getScene());
@@ -181,12 +181,8 @@ public class ChartToolbar extends Region {
                     tool.setOnAction(_ -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
                     tool.setOnAction(_ -> {
-                        try {
-                            candleStickChart.changeZoom(
-                                    tool.tool.getZoomDirection());
-                        } catch (TelegramApiException | IOException | ParseException | InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                        candleStickChart.changeZoom(
+                                tool.tool.getZoomDirection());
                     });
                 }
             }
@@ -333,7 +329,7 @@ public class ChartToolbar extends Region {
                     && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
                     && event.getScreenY() >= optionsPopOver.getY())
                     && !mouseInsideOptionsButton) {
-                optionsPopOver.hide(Duration.seconds(0.5));
+                optionsPopOver.hide(Duration.seconds(0.25));
                 scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
                 mouseExitedPopOverFilter = null;
             }

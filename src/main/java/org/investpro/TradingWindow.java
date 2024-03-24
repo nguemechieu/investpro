@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 class TradingWindow extends AnchorPane {
@@ -455,8 +456,9 @@ class TradingWindow extends AnchorPane {
 
         Tab newsTab = new Tab("News");
         ListView<News> newsListView = new ListView<>();
+        List<News> newsData = new NewsDataProvider().getNews();
 
-        newsListView.setItems(FXCollections.observableArrayList(new NewsDataProvider().getNews()));
+        newsListView.setItems(FXCollections.observableArrayList(newsData));
 
         Canvas newsCanvas = new Canvas(1000, 230);
 
@@ -565,7 +567,7 @@ class TradingWindow extends AnchorPane {
         bottomTabPane.setSide(Side.TOP);
 
         exchangeTabPane.setTranslateY(50);
-        exchangeTabPane.setPrefSize(1540, (450));
+        exchangeTabPane.setPrefSize(1540, 450);
         bar.setTranslateY(730);
         bar.setPrefSize(1540, 30);
         getChildren().addAll(tradeToolbar, exchangeTabPane, bottomTabPane, bar);

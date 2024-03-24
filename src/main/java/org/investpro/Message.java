@@ -2,8 +2,6 @@ package org.investpro;
 
 import javafx.scene.Scene;
 import javafx.scene.control.DialogPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
@@ -21,14 +19,9 @@ public class Message {
 
         DialogPane dialogPane = new DialogPane();
         dialogPane.setContentText(s);
-        dialogPane.setContent(
-                new HBox(
-                        new Text(
-                                STR."\{p0.toString()} \{s}"
-                        )
-                )
-        );
-        Scene scene = new Scene(dialogPane, 400, 300);
+
+        dialogPane.setHeaderText(p0.toString());
+        Scene scene = new Scene(dialogPane);
         Stage s1 = new Stage();
         s1.setScene(scene);
         s1.show();

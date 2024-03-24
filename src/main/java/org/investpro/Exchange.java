@@ -1,6 +1,7 @@
 package org.investpro;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import javafx.scene.control.ChoiceBox;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -9,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -21,6 +21,12 @@ public abstract class Exchange {
 
     protected String apiKey;
     protected String apiSecret;
+
+    private String tokens;
+
+    public void setTokens(String tokens) {
+        this.tokens = tokens;
+    }
 
 
     public Exchange(String apiKey, String apiSecret) {
@@ -42,21 +48,10 @@ public abstract class Exchange {
     public void autoTrading(@NotNull Boolean auto, String signal) {
 
         logger.info("auto trading enabled");
-        LivesTrade(auto, signal);
 
     }
 
-    private void LivesTrade(boolean b, String signal) {
-        if (b)
-            if (Objects.equals(signal, "BUY")) {
-                logger.info("BUY");
-            } else if (signal.equals("SELL")) {
-                logger.info("SELL");
 
-            } else {
-                logger.info("NONE");
-            }
-    }
 
 
     public abstract ExchangeWebSocketClient getWebsocketClient();
@@ -72,6 +67,10 @@ public abstract class Exchange {
 
     public abstract CandleDataSupplier getCandleDataSupplier(int i, TradePair tradePair);
 
+    public abstract CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException;
+
+    public abstract CompletableFuture<String> cancelOrder(String orderId);
+
     public abstract String getSignal();
 
     public abstract void connect();
@@ -79,9 +78,19 @@ public abstract class Exchange {
 
     public abstract List<TradePair> getTradePairSymbol();
 
+    public abstract CompletableFuture<String> getOrderBook(TradePair tradePair);
+
+    public abstract Ticker getLivePrice(TradePair tradePair);
+
+    public abstract Account getUserAccountDetails();
+
     public abstract double getSize();
 
     public abstract double getLivePrice();
 
     public abstract String getName();
+
+    public String getTelegramToken() {
+        return tokens;
+    }
 }

@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public final class CandleStickChartUtils {
     private static final int SECONDS_PER_MINUTE = 60;

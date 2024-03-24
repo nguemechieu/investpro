@@ -37,13 +37,13 @@ public class ChartContainer extends Region {
 
         secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
-        setPrefSize(1400, 440);
+
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
         toolbar = new ChartToolbar(widthProperty(), heightProperty(),
                 candleDataSupplier.getSupportedGranularities());
         HBox toolbarContainer = new HBox(toolbar);
         toolbarContainer.setPrefWidth(Double.MAX_VALUE);
-        toolbarContainer.setPrefHeight(50);
+        toolbarContainer.setPrefHeight(20);
         toolbarContainer.prefWidthProperty().bind(prefWidthProperty());
         AnchorPane.setTopAnchor(toolbarContainer, 10.0);
         AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
@@ -51,7 +51,7 @@ public class ChartContainer extends Region {
 
 
         candleChartContainer = new VBox();
-        candleChartContainer.setPrefSize(widthProperty().doubleValue(), heightProperty().doubleValue());
+        candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
@@ -62,7 +62,7 @@ public class ChartContainer extends Region {
 
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
         containerRoot.prefWidthProperty().bind(prefWidthProperty());
-        containerRoot.setBorder(Border.stroke(Color.ORANGE));
+        containerRoot.setBorder(Border.stroke(Color.PINK));
         getChildren().setAll(containerRoot);
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 

@@ -1,10 +1,9 @@
 package org.investpro;
 
-import java.util.Date;
 import java.util.Objects;
 
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public class CandleData {
     private final double openPrice;
@@ -19,8 +18,8 @@ public class CandleData {
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
                       double volume) {
-        this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
-                volume * ((highPrice + lowPrice) / 2), false);
+        this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice + openPrice + closePrice) / 4,
+                volume, false);
     }
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
@@ -52,7 +51,7 @@ public class CandleData {
         return lowPrice;
     }
 
-    public int getOpenTime() {
+    public Integer getOpenTime() {
         return openTime;
     }
 

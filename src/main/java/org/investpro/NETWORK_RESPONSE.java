@@ -3,7 +3,7 @@ package org.investpro;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
-import static org.investpro.TelegramClient.message;
+
 
 
 public enum NETWORK_RESPONSE {
@@ -144,7 +144,10 @@ public enum NETWORK_RESPONSE {
     //  420 //Enhance Your Calm (Twitter)
 
 
+    private final int responseCode;
+
     NETWORK_RESPONSE(int i) {
+        this.responseCode = i;
     }
 
     @Contract(pure = true)
@@ -166,7 +169,8 @@ public enum NETWORK_RESPONSE {
         return OK.ordinal() == responseCode;
     }
 
-    public String getMessage() {
-        return message;
+
+    public int getResponseCode() {
+        return responseCode;
     }
 }

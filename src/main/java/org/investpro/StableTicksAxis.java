@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Jason Winnebeck
+ * Copyright [2024] [TradeAdviser .LLC]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,6 @@
 
 package org.investpro;
 
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
-
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -30,10 +26,14 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.WritableValue;
 import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
-import javafx.util.Duration;
 import javafx.scene.chart.ValueAxis;
+import javafx.util.Duration;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
@@ -60,24 +60,15 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private final Timeline animationTimeline = new Timeline();
 
-    private final WritableValue<Double> scaleValue = new WritableValue<>() {
-        @Override
-        public Double getValue() {
-            return getScale();
-        }
-
-        @Override
-        public void setValue(Double value) {
-            setScale(value);
-        }
-    };
-
-    private List<Number> minorTicks;
-
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
     private static final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
+
+    private List<Number> minorTicks;
+    private static final int[] powersOf10 = {
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 1000000000
+    };
 
     /**
      * If true, when auto-ranging, force 0 to be the min or max end of the range.
@@ -222,6 +213,39 @@ public class StableTicksAxis extends ValueAxis<Number> {
         this.forceZeroInRange.set(forceZeroInRange);
     }
 
+    private static final int[] halfPowersOf10 = {
+            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766,
+            Integer.MAX_VALUE
+    };
+    private static final byte[] maxLog10ForLeadingZeros = {
+            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
+    };
+    private final WritableValue<Double> scaleValue = new WritableValue<>() {
+        @Override
+        public @NotNull Double getValue() {
+            return getScale();
+        }
+
+        @Override
+        public void setValue(Double value) {
+            setScale(value);
+        }
+    };
+
+    /**
+     * Amount of padding to add on the end of the axis when auto ranging.
+     */
+    public double getAutoRangePadding() {
+        return autoRangePadding.get();
+    }
+
+    /**
+     * Amount of padding to add on the end of the axis when auto ranging.
+     */
+    public void setAutoRangePadding(double autoRangePadding) {
+        StableTicksAxis.autoRangePadding.set(autoRangePadding);
+    }
+
     @Override
     protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
         // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
@@ -237,14 +261,14 @@ public class StableTicksAxis extends ValueAxis<Number> {
             // If we've crossed the 0 line, clamp to 0.
             // noinspection FloatingPointEquality
             if (Math.signum(paddedMin) != Math.signum(minValue)) {
-                paddedMin = 0.0;
+                paddedMin = 0.00000;
             }
 
             double paddedMax = maxValue + delta * autoRangePadding.get();
             // If we've crossed the 0 line, clamp to 0.
             // noinspection FloatingPointEquality
             if (Math.signum(paddedMax) != Math.signum(maxValue)) {
-                paddedMax = 0.0;
+                paddedMax = 0.000000000;
             }
 
             minValue = paddedMin;
@@ -265,45 +289,19 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(minValue, maxValue);
     }
 
-    /**
-     * Amount of padding to add on the end of the axis when auto ranging.
-     */
-    public double getAutoRangePadding() {
-        return autoRangePadding.get();
-    }
-
     private double getLabelSize() {
         if (labelSize == -1) {
             Dimension2D dim = measureTickMarkLabelSize("-888.88E-88", getTickLabelRotation());
             if (getSide().isHorizontal()) {
-                labelSize = dim.getWidth() + 2;
+                labelSize = dim.getWidth();
             } else {
                 // Adjusted label size calculation for vertical axes
-                labelSize = dim.getHeight() + 2;
+                labelSize = dim.getHeight();
             }
         }
 
         return labelSize;
     }
-
-    /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
-     */
-    public void setAutoRangePadding(double autoRangePadding) {
-        StableTicksAxis.autoRangePadding.set(autoRangePadding);
-    }
-
-    private static final byte[] maxLog10ForLeadingZeros = {
-            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
-    };
-
-    private static final int[] powersOf10 = {
-            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
-    };
-
-    private static final int[] halfPowersOf10 = {
-            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
-    };
 
     @Override
     protected List<Number> calculateMinorTickMarks() {
@@ -313,7 +311,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     @Override
     protected void setRange(Object range, boolean animate) {
         Range rangeVal = (Range) range;
-
+        setAutoRangePadding(((Range) range).low);
         if (animate) {
             animationTimeline.stop();
             ObservableList<KeyFrame> keyFrames = animationTimeline.getKeyFrames();

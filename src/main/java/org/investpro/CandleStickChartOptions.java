@@ -1,8 +1,5 @@
 package org.investpro;
 
-import java.util.List;
-import java.util.Objects;
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
@@ -12,6 +9,9 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Encapsulates all the possible options for a CandleStickChart.
@@ -99,8 +99,9 @@ public class CandleStickChartOptions {
             return CandleStickChartOptions.this;
         }
 
+        @Contract(pure = true)
         @Override
-        public String getName() {
+        public @NotNull String getName() {
             return "Volume Bars";
         }
     };

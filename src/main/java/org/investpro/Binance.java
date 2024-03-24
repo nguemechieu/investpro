@@ -1,8 +1,8 @@
 package org.investpro;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
+    public TradePair getSelecTradePair() {
         return null;
     }
 
@@ -75,6 +75,16 @@ public class Binance extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> cancelOrder(String orderId) {
+        return null;
+    }
+
+    @Override
     public String getSignal() {
         return null;
     }
@@ -86,6 +96,21 @@ public class Binance extends Exchange {
 
     @Override
     public List<TradePair> getTradePairSymbol() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Ticker getLivePrice(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public Account getUserAccountDetails() {
         return null;
     }
 

@@ -25,20 +25,35 @@ import java.util.Objects;
 public class InvestPro extends Application {
 
 
+    int i = 0;
+    Stage primaryStage = new Stage();
+
     public InvestPro() {
         super();
 
     }
 
+    AnchorPane window = new AnchorPane();
+
     @Override
     public void start(@NotNull Stage primaryStage) throws SQLException, ClassNotFoundException, ParseException, IOException, InterruptedException {
 
 
-        AnchorPane window = new AnchorPane();
         window.setMaxSize(
                 1540, 780
         );
+
+
         window.getStylesheets().add(String.valueOf(Objects.requireNonNull(InvestPro.class.getResource("/app.css"))));
+
+        createMultipleWindows(1);
+
+
+    }
+
+
+    // Recursive function to create multiple TradingWindow instances
+    public void createMultipleWindows(int count) throws SQLException, ParseException, IOException, InterruptedException, ClassNotFoundException {
 
         window.getChildren().addAll(new TradingWindow());
         primaryStage.setResizable(true);
@@ -48,7 +63,14 @@ public class InvestPro extends Application {
         primaryStage.setTitle(STR."InvestPro                  --------- Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
         primaryStage.setScene(scene);
         primaryStage.show();
+        // Recursive call to create the next window after 1000 milliseconds (1 second)
+
+
+
     }
+// 1000 milliseconds delay
+
+
 
 
     @Contract(" -> new")
