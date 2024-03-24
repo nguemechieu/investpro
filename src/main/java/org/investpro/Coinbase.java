@@ -61,22 +61,31 @@ class Coinbase extends Exchange {
         request.headers(
                 "CB-ACCESS-KEY", apiKey);
         request.headers(
-                "CB-ACCESS-SIGN", apiSecret);
+                "CB-ACCESS-SIGN", signer(apiKey, apiSecret));
         request.headers(
-                "CB-ACCESS-TIMESTAMP", String.valueOf(new Date().getTime()));
+                "CB-ACCESS-PASSPHRASE", apiSecret);
+        request.headers(
+                "CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
         websocketClient.addHeader(
                 "CB-ACCESS-KEY",
                 apiKey
         );
         websocketClient.addHeader(
                 "CB-ACCESS-SIGN",
-                apiSecret
+                signer(apiKey, apiSecret));
+
+        websocketClient.addHeader(
+                "CB-ACCESS-PASSPHRASE", apiSecret
         );
         websocketClient.addHeader(
-                "CB-ACCESS-TIMESTAMP", String.valueOf(new Date().getTime()));
+                "CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
         this.websocketClient.setTradePair(tradePair);
 
 
+    }
+
+    private String signer(String apiKey, String apiSecret) {
+        return String.format("%s:%s", apiKey, apiSecret);
     }
 
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
@@ -438,13 +447,13 @@ class Coinbase extends Exchange {
 
                     String shortDisplayName = rate.get("base_currency").asText();
                     String code = rate.get("base_currency").asText();
-                    int fractionalDigits = rate.get("base_increment").asInt();
+                    int fractionalDigits = 8;
                     String symbol = rate.get("base_currency").asText();
                     baseCurrency = new CryptoCurrency(fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, code);
                     String fullDisplayName2 = rate.get("quote_currency").asText();
                     String shortDisplayName2 = rate.get("quote_currency").asText();
                     String code2 = rate.get("quote_currency").asText();
-                    int fractionalDigits2 = rate.get("quote_increment").asInt();
+                    int fractionalDigits2 = 8;
                     String symbol2 = rate.get("quote_currency").asText();
 
                     counterCurrency = new CryptoCurrency(
@@ -523,18 +532,22 @@ class Coinbase extends Exchange {
     }
 
     @Override
-    public Account getUserAccountDetails() {
+    public JsonNode getUserAccountDetails() {
         String uriStr = "https://api.pro.coinbase.com/accounts";
         request.uri(URI.create(uriStr));
-
-
         try {
-            return OBJECT_MAPPER.readValue(client.build()
+            JsonNode re = OBJECT_MAPPER.readTree(client.build()
                     .send(request.GET().build(), HttpResponse.BodyHandlers.ofString())
-                    .body(), Account.class);
-        } catch (IOException | InterruptedException e) {
+                    .body());
+
+
+            logger.info(re.toString());
+            return re;
+        } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
+
+
     }
 
     // Existing code

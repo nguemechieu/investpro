@@ -440,4 +440,38 @@ class Db1 implements Db {
         }
         return newCurrency;
     }
+
+
+    public void create(String data) {
+        try {
+            PreparedStatement co = conn.prepareStatement(data);
+            co.execute();
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public ResultSet Select(String s) {
+        try {
+            ResultSet rs = conn.createStatement().executeQuery(s);
+            if (rs.next()) {
+                logger.info(rs.getString(1));
+                return rs;
+
+            }
+        } catch (SQLException e) {
+            logger.error(STR."Error finding the database\n\{e.getMessage()}");
+        }
+        return null;
+    }
+
+    public void insert(String s) {
+        try {
+            PreparedStatement co = conn.prepareStatement(s);
+            co.execute();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

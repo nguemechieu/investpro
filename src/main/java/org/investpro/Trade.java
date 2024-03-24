@@ -128,4 +128,12 @@ public class Trade {
     }
 
 
+    public Side getTransactionType() {
+        return transactionType;
+
+    }
+
+    public Long getLocalId() {
+        return localTradeId;
+    }
 }

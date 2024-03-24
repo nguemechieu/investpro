@@ -374,7 +374,7 @@ class Oanda extends Exchange {
     }
 
     @Override
-    public Account getUserAccountDetails() {
+    public JsonNode getUserAccountDetails() {
         return null;
     }
 

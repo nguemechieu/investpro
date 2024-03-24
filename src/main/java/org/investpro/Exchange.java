@@ -2,6 +2,7 @@ package org.investpro;
 
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import javafx.scene.control.ChoiceBox;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -82,7 +83,7 @@ public abstract class Exchange {
 
     public abstract Ticker getLivePrice(TradePair tradePair);
 
-    public abstract Account getUserAccountDetails();
+    public abstract JsonNode getUserAccountDetails();
 
     public abstract double getSize();
 

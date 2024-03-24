@@ -6,10 +6,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Border;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -24,12 +27,9 @@ import java.util.Objects;
 //This is InvestPro's main class
 public class InvestPro extends Application {
 
-
-    int i = 0;
-    Stage primaryStage = new Stage();
-
     public InvestPro() {
         super();
+
 
     }
 
@@ -37,24 +37,9 @@ public class InvestPro extends Application {
 
     @Override
     public void start(@NotNull Stage primaryStage) throws SQLException, ClassNotFoundException, ParseException, IOException, InterruptedException {
-
-
-        window.setMaxSize(
-                1540, 780
-        );
-
-
-        window.getStylesheets().add(String.valueOf(Objects.requireNonNull(InvestPro.class.getResource("/app.css"))));
-
-        createMultipleWindows(1);
-
-
-    }
-
-
-    // Recursive function to create multiple TradingWindow instances
-    public void createMultipleWindows(int count) throws SQLException, ParseException, IOException, InterruptedException, ClassNotFoundException {
-
+        window.setMaxSize(1540, 780);
+        window.setBorder(Border.stroke(Color.BLUE));
+        window.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
         window.getChildren().addAll(new TradingWindow());
         primaryStage.setResizable(true);
         Scene scene = new Scene(window);
@@ -62,13 +47,16 @@ public class InvestPro extends Application {
         scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
         primaryStage.setTitle(STR."InvestPro                  --------- Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
         primaryStage.setScene(scene);
+        primaryStage.getIcons().add(
+                new Image(
+                        Objects.requireNonNull(getClass().getResourceAsStream("/invest.png"))
+                )
+        );
+        primaryStage.fullScreenProperty().addListener((observable, oldValue, newValue) -> primaryStage.setFullScreen(newValue));
+
         primaryStage.show();
-        // Recursive call to create the next window after 1000 milliseconds (1 second)
-
-
 
     }
-// 1000 milliseconds delay
 
 
 

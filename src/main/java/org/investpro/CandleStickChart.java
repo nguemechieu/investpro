@@ -77,7 +77,8 @@ import static org.investpro.ChartColors.*;
 public class CandleStickChart extends Region {
     private final CandleDataPager candleDataPager;
     private final CandleStickChartOptions chartOptions;
-    private static final DecimalFormat MARKER_FORMAT = new DecimalFormat("#.00000");
+    private static final DecimalFormat MARKER_FORMAT = new DecimalFormat("#.000000000");
+    static TradeStatistics stat = new TradeStatistics();
     private final Exchange exchange;
     private final TradePair tradePair;
     private final boolean liveSyncing;
@@ -114,20 +115,6 @@ public class CandleStickChart extends Region {
     private volatile boolean paging;
     private final InProgressCandle inProgressCandle;
     private static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
-    /**
-     * Creates a new {@code CandleStickChart}. This constructor is package-private because it should only
-     * be instantiated by a {@link ChartContainer}.
-     *
-     * @param exchange           the {@code Exchange} object on which the trades represented by candles happened on
-     * @param candleDataSupplier the {@code CandleDataSupplier} that will supply contiguous chunks of
-     *                           candle data, where successive supplies will be farther back in time
-     * @param tradePair          the {@code TradePair} that this chart displays trading data for (the base (first) currency
-     *                           will be the unit of the volume axis and the counter (second) currency will be the unit of the y-axis)
-     * @param liveSyncing        if {@literal true} the chart will be updated in real-time to reflect ongoing trading
-     *                           activity
-     * @param containerWidth     the width property of the parent node that contains the chart
-     * @param containerHeight    the height property of the parent node that contains the chart
-     */
 
 
     List<Trade> currentCandleTrades;
@@ -277,6 +264,7 @@ public class CandleStickChart extends Region {
                         ((double) candleWidth / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
                 canvas = new Canvas(chartWidth - 100, chartHeight - 100);
+
                 canvas.setLayoutY(
                         (containerHeight.getValue().doubleValue() - chartHeight) / 2);
                 canvas.setLayoutX((containerWidth.getValue().doubleValue() - chartWidth) / 2);
@@ -871,7 +859,7 @@ public class CandleStickChart extends Region {
                 currZoomLevel = newZoomLevel;
             }
         } else {
-            // TODO(mike): In this case we only need to compute the extrema for any new live syncing data that has
+            //  In this case we only need to compute the extrema for any new live syncing data that has
             //  happened since the last time we were at this zoom level.
             currZoomLevel = zoomLevelMap.get(nextZoomLevelId);
             List<CandleData> candleData = new ArrayList<>(data.values());
@@ -879,6 +867,9 @@ public class CandleStickChart extends Region {
                     (int) currZoomLevel.getNumVisibleCandles());
             putExtremaForRemainingElements(currZoomLevel.getExtremaForCandleRangeMap(), candleData.subList(
                     candleData.size() - (int) Math.floor(currZoomLevel.getNumVisibleCandles()), candleData.size()));
+            xAxis.setTickLabelFormatter(currZoomLevel.getXAxisFormatter());
+            candleWidth = currZoomLevel.getCandleWidth();
+            xAxis.setLowerBound(newLowerBoundX);
         }
 
         xAxis.setTickLabelFormatter(currZoomLevel.getXAxisFormatter());
@@ -1111,6 +1102,11 @@ public class CandleStickChart extends Region {
             }
 
             drawChartContents(true);
+
+
+            for (Trade trade : liveTrades) {
+                stat.accept(trade);
+            }
         }
 
         public void setReady(boolean ready) {
@@ -1131,7 +1127,7 @@ public class CandleStickChart extends Region {
                 return;
             }
 
-            if (candleData.get(0).getOpenTime() >= candleData.get(1).getOpenTime()) {
+            if (candleData.getFirst().getOpenTime() >= candleData.get(1).getOpenTime()) {
                 logger.error("Paged candle data must be in ascending order by x-value");
                 throw new IllegalArgumentException("Paged candle data must be in ascending order by x-value");
             }
@@ -1145,8 +1141,8 @@ public class CandleStickChart extends Region {
                     // candle. Since we are live-syncing we need to fetch the data for what has occurred so far in
                     // the current candle.
                     long secondsIntoCurrentCandle = (Instant.now().toEpochMilli() / 1000L) -
-                            (candleData.get(candleData.size() - 1).getOpenTime() + secondsPerCandle);
-                    inProgressCandle.setOpenTime(candleData.get(candleData.size() - 1).getOpenTime() +
+                            (candleData.getLast().getOpenTime() + secondsPerCandle);
+                    inProgressCandle.setOpenTime(candleData.getLast().getOpenTime() +
                             secondsPerCandle);
 
                     // We first attempt to get caught up by simply requesting shorter duration candles. Say this chart

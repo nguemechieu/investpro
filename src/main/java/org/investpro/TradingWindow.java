@@ -3,15 +3,13 @@ package org.investpro;
 
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
+import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Side;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Circle;
@@ -36,11 +34,21 @@ class TradingWindow extends AnchorPane {
 
 
     Button connect = new Button("Connexion");
-    Exchange exchange;
+
     public TradingWindow() throws ParseException, IOException, InterruptedException, SQLException, ClassNotFoundException {
         super();
 
 
+        setBorder(Border.stroke(Color.BLUE));
+        setOpacity(0.8);
+        ScrollPane anc = new ScrollPane();
+        anc.setFitToWidth(true);
+        anc.setFitToHeight(true);
+        WebView webview = new WebView();
+        webview.getEngine().load("https://www.google.com");
+        anc.setContent(webview);
+
+        setRightAnchor(anc, 0.0);
         setPrefSize(1540, 780);
         ChoiceBox<String> exchanges = new ChoiceBox<>();
         exchanges.getItems().addAll("COINBASE", "BINANCE US", "BINANCE", "OANDA", "BITFINEX", "BITMEX", "BITSTAMP", "BITTREX");
@@ -65,8 +73,8 @@ class TradingWindow extends AnchorPane {
                 logger.debug(
                         "Exchange selected"
                 );
-                exchange = new Coinbase("", "");
-
+                exchange = new Coinbase("organizations/a8dd6d6f-375a-4f4b-b0b0-75f829b998eb/apiKeys/7c7e538c-8d26-4343-bac1-814ce44e26a3", "MHcCAQEEIEXosveoAkpTwXhc6UojOmKWlCP9IvaycJ1ZI509pqrvoAoGCCqGSM49AwEHoUQDQgAE3iHOfTS+43E9nTtVgnDQn4Az/xbgoA61WO7rNhqEtq1jpRh5Gahfn5og7biKiHXymAR/buynHTN/sH7ZmCHtAMg==");
+                new Message("infos", exchange.getUserAccountDetails().toString());
             }
             case "BINANCE US" -> {
                 logger.debug(
@@ -123,6 +131,18 @@ class TradingWindow extends AnchorPane {
             Tab tab1 = new Tab();
 
             tab1.setText(symbol.toString('/'));
+            Circle cir = new Circle(symbol.getSymbol().length(), symbol.getSymbol().length() * 2, symbol.getSymbol().length() * 2);
+
+            //Create random color
+
+            Paint randomColor = Color.web(String.format("#%06x", (int) (Math.random() * 0xFFFFFF)));
+            cir.setFill(randomColor);
+            exchangeTabPane.setBackground(
+                    new Background(new BackgroundFill(randomColor, CornerRadii.EMPTY, Insets.EMPTY))
+            );
+
+            tab1.setGraphic(cir)
+            ;
             tab1.setClosable(true);
             CandleStickChartDisplay sc = new CandleStickChartDisplay(symbol, exchange);
 
@@ -135,7 +155,7 @@ class TradingWindow extends AnchorPane {
         Button autoTradeButton = new Button("Auto");
         ToolBar tradeToolbar = new ToolBar(exchanges, new Separator(Orientation.VERTICAL), addExchangeButton, new Separator(Orientation.VERTICAL), addChart, autoTradeButton);
         tradeToolbar.setTranslateY(20);
-        tradeToolbar.setTranslateX(1540 / 4);
+        tradeToolbar.setTranslateX((double) 1540 / 4);
         tradeToolbar.setPrefSize(Double.MAX_VALUE, 20);
 
         autoTradeButton.setBackground(Background.fill(Color.RED));
@@ -581,6 +601,59 @@ class TradingWindow extends AnchorPane {
 
 
 
+    }
+
+    Exchange exchange;
+
+    public Exchange getExchange() {
+        return exchange;
+    }
+
+    void setExchange(Exchange exchange) {
+        this.exchange = exchange;
+        logger.debug(
+                "Exchange selected"
+        );
+        switch (exchange.getName()) {
+            case "COINBASE":
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Coinbase("", "");
+                break;
+            case "BINANCEUS":
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new BinanceUs("", "");
+                break;
+            case "BINANCE":
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Binance("", "");
+                break;
+            case "OANDA":
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Oanda("", "");
+                break;
+            case "BITFINEX":
+                logger.debug(
+                        "Exchange selected"
+                );
+                exchange = new Bitfinex("", "");
+                break;
+            case "BITMEX":
+                logger.debug(
+                        "Exchange selected"
+                );
+                break;
+            default:
+                logger.debug("NO EXCHANGE SELECTED");
+                break;
+        }
     }
 
 }

@@ -1,6 +1,7 @@
 package org.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
@@ -110,7 +111,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public Account getUserAccountDetails() {
+    public JsonNode getUserAccountDetails() {
         return null;
     }
 

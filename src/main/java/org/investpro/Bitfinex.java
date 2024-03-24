@@ -1,6 +1,7 @@
 package org.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.sql.SQLException;
 import java.time.Instant;
@@ -84,7 +85,7 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
-    public Account getUserAccountDetails() {
+    public JsonNode getUserAccountDetails() {
         return null;
     }
 
