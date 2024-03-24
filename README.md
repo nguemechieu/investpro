@@ -36,7 +36,7 @@ Noel M Nguemechieu at nguemechieu@live.com
 
 What are the supported platforms and financial data sources for InvestPro, and how can I integrate new sources or
 customize the existing ones to fit my specific needs?
-Tabnine
+
 InvestPro supports Windows, Linux, and macOS operating systems. It can connect to various financial data sources,
 including:
 
