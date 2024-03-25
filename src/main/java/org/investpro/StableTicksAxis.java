@@ -45,7 +45,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     /**
      * Possible tick spacing at the 10^1 level. These numbers must be {@literal >= 1 and < 10}.
      */
-    private static final double[] dividers = new double[]{1.0, 2.5, 5.0};
+    private static final double[] dividers = new double[]{1.0, 2.5, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0};
 
     /**
      * How many negatives powers of ten we have in the powersOfTen array.
@@ -81,7 +81,13 @@ public class StableTicksAxis extends ValueAxis<Number> {
     public StableTicksAxis() {
     }
     public StableTicksAxis(double lowerBound, double upperBound) {
+
         super(lowerBound, upperBound);
+        minorTicks = new ArrayList<>();
+        for (int i = 0; i < numMinorTicks; i++) {
+            minorTicks.add(lowerBound + (upperBound - lowerBound) / (numMinorTicks - 1) * i);
+        }
+        animationTimeline.setAutoReverse(true);
 
     }
 

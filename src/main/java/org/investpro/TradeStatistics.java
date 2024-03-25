@@ -96,7 +96,7 @@ public class TradeStatistics extends Application {
         ListView<TradeStatistics> view = new ListView<>();
         view.setOnMouseClicked(event -> {
 
-            ResultSet stats = db1.Select(STR."SELECT * FROM trade_statistics WHERE trade_pair = 'null'");
+            ResultSet stats = db1.Select("SELECT * FROM trade_statistics WHERE trade_pair = 'null'");
             if (stats != null) {
                 try {
                     while (stats.next()) {

@@ -1,6 +1,6 @@
 # Investpro
 
-![InvestPro, LLC](src/main/resources/Invest.png)
+![InvestPro, LLC](src/main/resources/investpro.png)
 
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/maven-publish.yml/badge.svg)
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/docker-image.yml)

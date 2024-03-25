@@ -103,10 +103,16 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         double lastClose = -1;
         for (int i = 0; i < numCandles; i++) {
             int openTime = (start - secondsPerCandle) - (i * secondsPerCandle);
+            int closeTime = 0;
             if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
                 // no trades occurred during this candle
                 double volumeWeightedAveragePrice1 = (lastClose == -1) ? 0 : (lastClose - openTime) / volume;
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume, volumeWeightedAveragePrice1, volumeWeightedAveragePrice1, true));
+                closeTime = (openTime + (System.currentTimeMillis() / 1000) - secondsPerCandle != 0)
+                        ? -1 :
+
+                        (int) (openTime - (System.currentTimeMillis()) + secondsPerCandle);
+
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, closeTime, volume, volumeWeightedAveragePrice1, volumeWeightedAveragePrice1, true));
 
             } else {
 
@@ -118,9 +124,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                         high = trade.getPrice().toDouble();
                     } else if (trade.getPrice().toDouble() < low) {
                         low = trade.getPrice().toDouble();
-                    } else
-
-                    if (tradeIndex == candleTrades.get(i).size() - 1) {
+                    } else if (tradeIndex == candleTrades.get(i).size() - 1) {
                         close = trade.getPrice().toDouble();
                     }
 
@@ -134,7 +138,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                 double averagePrice = priceTotal / candleTrades.get(i).size();
                 double volumeWeightedAveragePrice = volumeWeightedPriceTotal / volume;
 
-                CandleData datum = new CandleData(open, close, Math.max(open, high), Math.min(open, low), openTime,
+                CandleData datum = new CandleData(open, close, Math.max(open, high), Math.min(open, low), openTime, closeTime,
                         volume, averagePrice, volumeWeightedAveragePrice, false);
                 candleData.add(datum);
             }

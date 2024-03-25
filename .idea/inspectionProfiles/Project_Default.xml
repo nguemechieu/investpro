@@ -16,6 +16,9 @@
       <option name="customHeaders">
         <set>
           <option value="CB-AFTER" />
+          <option value="CB-ACCESS-TIMESTAMP" />
+          <option value="CB-ACCESS-SIGN" />
+          <option value="CB-ACCESS-KEY" />
         </set>
       </option>
     </inspection_tool>

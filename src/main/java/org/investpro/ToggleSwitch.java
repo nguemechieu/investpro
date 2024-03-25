@@ -27,11 +27,7 @@
 package org.investpro;
 
 import javafx.beans.NamedArg;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanWrapper;
-import javafx.beans.property.ReadOnlyStringProperty;
-import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.*;
 import javafx.css.PseudoClass;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.Skin;

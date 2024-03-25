@@ -124,6 +124,8 @@ public class CandleStickChart extends Region {
     CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
                      ObservableNumberValue containerHeight) {
+
+        logger.debug(String.valueOf(this));
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
         Objects.requireNonNull(tradePair);
@@ -142,14 +144,15 @@ public class CandleStickChart extends Region {
         candleDataPager = new CandleDataPager(this, candleDataSupplier);
         data = Collections.synchronizedNavigableMap(new TreeMap<>(Integer::compare));
         chartOptions = new CandleStickChartOptions();
-        canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 14);
-
-
-
+        canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 15);
 
         progressIndicator = new ProgressIndicator(-1);
         getStyleClass().add("candle-chart");
-        xAxis = new StableTicksAxis();
+        xAxis = new StableTicksAxis(
+                0,
+                secondsPerCandle
+        );
+
         yAxis = new StableTicksAxis();
 
         yAxis.setSide(Side.RIGHT);
@@ -177,7 +180,13 @@ public class CandleStickChart extends Region {
         yAxis.setTickLabelFont(axisFont);
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
-        Text loadingText = new Text("");
+        Text loadingText = new Text("Loading ...");
+        loadingText.setFill(Color.BLUE);
+        if (progressIndicator.isVisible()) {
+
+            loadingText.setMouseTransparent(true);
+            loadingText.setText("");
+        }
 
         VBox loadingIndicatorContainer = new VBox(progressIndicator, loadingText);
         loadingIndicatorContainer.setAlignment(Pos.CENTER);
@@ -290,11 +299,11 @@ public class CandleStickChart extends Region {
         gotFirstSize.addListener(gotFirstSizeChangeListener);
 
         chartOptions.horizontalGridLinesVisibleProperty().addListener((observable, oldValue, newValue) ->
-                drawChartContents(false));
+                drawChartContents(true));
         chartOptions.verticalGridLinesVisibleProperty().addListener((observable, oldValue, newValue) ->
-                drawChartContents(false));
-        chartOptions.showVolumeProperty().addListener((observable, oldValue, newValue) -> drawChartContents(false));
-        chartOptions.alignOpenCloseProperty().addListener((observable, oldValue, newValue) -> drawChartContents(false));
+                drawChartContents(true));
+        chartOptions.showVolumeProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
+        chartOptions.alignOpenCloseProperty().addListener((observable, oldValue, newValue) -> drawChartContents(true));
     }
 
     private void initializeEventHandlers() {
@@ -740,7 +749,6 @@ public class CandleStickChart extends Region {
         graphicsContext.setFill(Color.WHITE);
         graphicsContext.fillText(tradePair.toString(), canvas.getWidth() / 2, canvas.getHeight() / 3);
         graphicsContext.setStroke(Color.ORANGE);
-
         graphicsContext.setFill(Color.WHITE);
         graphicsContext.setTextAlign(TextAlignment.CENTER);
         graphicsContext.fillText(STR."Time :\{Date.from(Instant.ofEpochSecond(data.lastEntry().getValue().getOpenTime()))}", canvas.getWidth() / 6, canvas.getHeight() / 7);
@@ -748,8 +756,8 @@ public class CandleStickChart extends Region {
         graphicsContext.fillText(STR."O :\{data.lastEntry().getValue().getOpenPrice()}", 320, 20);
         graphicsContext.fillText(STR."H :\{data.lastEntry().getValue().getHighPrice()}", 420, 20);
         graphicsContext.fillText(STR."L :\{data.lastEntry().getValue().getLowPrice()}", 520, 20);
-        graphicsContext.fillText(STR."C :\{data.lastEntry().getValue().getClosePrice()}", 620, 20);
-        graphicsContext.fillText(STR."V :\{data.lastEntry().getValue().getVolume()}", 720, 20);
+        graphicsContext.fillText(STR."C :\{data.lastEntry().getValue().getClosePrice()}", 820, 20);
+        graphicsContext.fillText(STR."V :\{data.lastEntry().getValue().getVolume()}", 1020, 20);
 
 
         graphicsContext.setFill(Color.WHITE);
@@ -1049,7 +1057,7 @@ public class CandleStickChart extends Region {
 
             // Get rid of trades we already know about
             List<Trade> newTrades = liveTrades.stream().filter(trade -> trade.getTimestamp().getEpochSecond() >
-                    inProgressCandle.getCurrentTill()).toList();
+                    inProgressCandle.getCloseTime()).toList();
 
             // Partition the trades between the current in-progress candle and the candle after that (which we may
             // have entered after last update).
@@ -1069,7 +1077,7 @@ public class CandleStickChart extends Region {
                         inProgressCandle.getLowPriceSoFar()));
                 inProgressCandle.setVolumeSoFar(inProgressCandle.getVolumeSoFar() +
                         currentCandleTrades.stream().mapToDouble(trade -> trade.getAmount().toDouble()).sum());
-                inProgressCandle.setCurrentTill(currentTill);
+                inProgressCandle.setCloseTime(currentTill);
                 inProgressCandle.setLastPrice(currentCandleTrades.getLast()
                         .getPrice().toDouble());
                 data.put(inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
@@ -1090,7 +1098,7 @@ public class CandleStickChart extends Region {
                     inProgressCandle.setVolumeSoFar(nextCandleTrades.stream().mapToDouble(trade ->
                             trade.getAmount().toDouble()).sum());
                     inProgressCandle.setLastPrice(nextCandleTrades.getFirst().getPrice().toDouble());
-                    inProgressCandle.setCurrentTill((int) nextCandleTrades.getFirst().getTimestamp().getEpochSecond());
+                    inProgressCandle.setCloseTime((int) nextCandleTrades.getFirst().getTimestamp().getEpochSecond());
                 } else {
                     inProgressCandle.setIsPlaceholder(true);
                     inProgressCandle.setHighPriceSoFar(inProgressCandle.getLastPrice());
@@ -1169,12 +1177,12 @@ public class CandleStickChart extends Region {
                                 // is too large (some exchanges have multiple trades every second).
                                 int currentTill = (int) Instant.now().getEpochSecond();
                                 CompletableFuture<List<Trade>> tradesFuture = exchange.fetchRecentTradesUntil(
-                                        tradePair, Instant.ofEpochSecond(inProgressCandleData.getCurrentTill()));
+                                        tradePair, Instant.ofEpochSecond(inProgressCandleData.closeTime()));
 
                                 tradesFuture.whenComplete((trades, exception) -> {
                                     if (exception == null) {
                                         inProgressCandle.setOpenPrice(inProgressCandleData.getOpenPrice());
-                                        inProgressCandle.setCurrentTill(currentTill);
+                                        inProgressCandle.setCloseTime(currentTill);
 
                                         if (trades.isEmpty()) {
                                             // No trading activity happened in addition to the sub-candles from above.
@@ -1200,15 +1208,14 @@ public class CandleStickChart extends Region {
                                         }
                                         Platform.runLater(() -> setInitialState(candleData));
                                     } else {
-                                        logger.error("error fetching recent trades until: " +
-                                                inProgressCandleData.getCurrentTill(), exception);
+                                        logger.error(STR."error fetching recent trades until: \{inProgressCandleData.closeTime()}", exception);
                                     }
                                 });
                             } else {
                                 // No trades have happened during the current candle so far.
                                 inProgressCandle.setIsPlaceholder(true);
                                 inProgressCandle.setVolumeSoFar(0);
-                                inProgressCandle.setCurrentTill((int) (secondsIntoCurrentCandle +
+                                inProgressCandle.setCloseTime((int) (secondsIntoCurrentCandle +
                                         (candleData.getLast().getOpenTime() + secondsPerCandle)));
                                 Platform.runLater(() -> setInitialState(candleData));
                             }

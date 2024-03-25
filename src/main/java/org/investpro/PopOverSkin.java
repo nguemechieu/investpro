@@ -28,15 +28,6 @@
 package org.investpro;
 
 
-import static java.lang.Double.MAX_VALUE;
-import static javafx.geometry.Pos.CENTER_LEFT;
-import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
-import static javafx.scene.paint.Color.YELLOW;
-import static org.investpro.PopOver.ArrowLocation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
@@ -51,16 +42,17 @@ import javafx.scene.control.Skin;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.HLineTo;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.LineTo;
-import javafx.scene.shape.MoveTo;
-import javafx.scene.shape.Path;
-import javafx.scene.shape.PathElement;
-import javafx.scene.shape.QuadCurveTo;
-import javafx.scene.shape.VLineTo;
+import javafx.scene.shape.*;
 import javafx.stage.Window;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.lang.Double.MAX_VALUE;
+import static javafx.geometry.Pos.CENTER_LEFT;
+import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
+import static javafx.scene.paint.Color.YELLOW;
+import static org.investpro.PopOver.ArrowLocation.*;
 
 public class PopOverSkin implements Skin<PopOver> {
     private final Path path;

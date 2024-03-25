@@ -13,8 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -23,6 +21,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+
+import static org.investpro.Coinbase.client;
+import static org.investpro.Coinbase.request;
 
 public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseCandleDataSupplier.class);
@@ -82,8 +83,8 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        return HttpClient.newHttpClient().sendAsync(
-                        HttpRequest.newBuilder()
+        return client.build().sendAsync(
+                        request
                                 .uri(URI.create(uriStr))
                                 .GET().build(),
                         HttpResponse.BodyHandlers.ofString())
@@ -94,6 +95,9 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                     try {
                         res = OBJECT_MAPPER.readTree(response);
                     } catch (JsonProcessingException ex) {
+
+                        new Message(
+                                "COINBASE", ex.getMessage());
                         throw new RuntimeException(ex);
                     }
 
@@ -108,12 +112,22 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
                         List<CandleData> candleData = new ArrayList<>();
                         for (JsonNode candle : res) {
+                            int closeTime;
+
+
+                            closeTime = (candle.get(0).asInt() + (System.currentTimeMillis() / 1000) - secondsPerCandle != 0)
+                                    ? -1 :
+
+                                    (int) (-candle.get(0).asInt() - (System.currentTimeMillis()) + secondsPerCandle);
+
+
                             candleData.add(new CandleData(
                                     candle.get(3).asDouble(),  // open price
                                     candle.get(4).asDouble(),  // close price
                                     candle.get(2).asDouble(),  // high price
                                     candle.get(1).asDouble(),  // low price
-                                    candle.get(0).asInt(),     // open time
+                                    candle.get(0).asInt(),     // open time,
+                                    closeTime,  // close time
                                     candle.get(5).asDouble()   // volume
                             ));
                         }

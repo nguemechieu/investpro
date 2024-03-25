@@ -30,6 +30,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Objects;
 
+import static org.investpro.TradePair.logger;
+
 /**
  * Reads lines in a file reversely (similar to a BufferedReader, but starting at
  * the last line). Useful for e.g. searching in log files.
@@ -142,7 +144,8 @@ public class ReversedLinesFileReader implements Closeable {
             if (currentFilePart != null) {
                 line = currentFilePart.readLine();
             } else {
-                // no more fileparts: we're done, leave line set to null
+                // no more file parts: we're done, leave line set to null
+                logger.debug("No more file parts");
                 break;
             }
         }

@@ -2,7 +2,6 @@ package org.investpro;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.Collection;
 
 public interface Db extends DataSource {
 

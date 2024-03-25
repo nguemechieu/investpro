@@ -32,6 +32,7 @@ import java.util.Set;
 
 import static org.investpro.ChartToolbar.Tool.OPTIONS;
 import static org.investpro.FXUtils.computeTextDimensions;
+import static org.investpro.TradePair.logger;
 
 /**
  * A resizable toolbar, placed at the top of a {@code CandleStickChart} and contained
@@ -61,6 +62,7 @@ public class ChartToolbar extends Region {
     Button autoTrade = new Button("Auto Trade");
     public ChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                             Set<Integer> granularities) {
+        logger.debug("Creating ChartToolbar", this);
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         Objects.requireNonNull(granularities);
@@ -107,6 +109,7 @@ public class ChartToolbar extends Region {
                 toolbarNodes.add(new ToolbarButton(STR."\{granularity / 2592000}mo", granularity));
             }
         }
+
 
         toolbarNodes.add(autoTrade);
         toolbarNodes.add(screenshot);

@@ -15,14 +15,17 @@ public class CandleData {
     private final double averagePrice;
     private final double volumeWeightedAveragePrice;
     private final boolean placeHolder;
+    private int closeTime;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
+                      int closeTime,
                       double volume) {
-        this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice + openPrice + closePrice) / 4,
+        this(openPrice, closePrice, highPrice, lowPrice, openTime, closeTime, volume, (highPrice + lowPrice + openPrice + closePrice) / 4,
                 volume, false);
+        this.closeTime = closeTime;
     }
 
-    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
+    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime, int closeTime,
                       double volume, double averagePrice, double volumeWeightedAveragePrice, boolean placeHolder) {
         this.openPrice = openPrice;
         this.closePrice = closePrice;
@@ -30,6 +33,7 @@ public class CandleData {
         this.lowPrice = lowPrice;
         this.openTime = openTime;
         this.volume = volume;
+        this.closeTime = closeTime;
         this.averagePrice = averagePrice;
         this.volumeWeightedAveragePrice = volumeWeightedAveragePrice;
         this.placeHolder = placeHolder;
@@ -88,6 +92,7 @@ public class CandleData {
                 highPrice == other.highPrice &&
                 lowPrice == other.lowPrice &&
                 openTime == other.openTime &&
+                Objects.equals(closeTime, other.closeTime) &&
                 volume == other.volume &&
                 averagePrice == other.averagePrice &&
                 volumeWeightedAveragePrice == other.volumeWeightedAveragePrice &&
@@ -131,6 +136,10 @@ public class CandleData {
         }
 
         return ma50Price / 50;
+    }
+
+    public int getCloseTime() {
+        return closeTime;
     }
 
 

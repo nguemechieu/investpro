@@ -6,15 +6,15 @@ import javafx.scene.layout.StackPane;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Example of how to use the CandleFX API to create a candle stick chart for the BTC/USD tradepair on Coinbase.
- */
+
 public class CandleStickChartDisplay extends StackPane {
 
     private static final Logger logger = LoggerFactory.getLogger(CandleStickChartDisplay.class);
 
     public CandleStickChartDisplay(TradePair tradePair, Exchange exchange) {
         super();
+
+        logger.debug(String.valueOf(this));
 
         ChartContainer candleStickChartContainer = new ChartContainer(
                 exchange, tradePair, true);

@@ -1,7 +1,5 @@
 package org.investpro;
 
-import static java.lang.Math.min;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -10,6 +8,8 @@ import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.Objects;
+
+import static java.lang.Math.min;
 
 /**
  * @author NOEL NGUEMECHIEU

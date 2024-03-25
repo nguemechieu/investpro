@@ -9,14 +9,20 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import org.java_websocket.drafts.Draft_6455;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -33,6 +39,8 @@ import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 
 class Coinbase extends Exchange {
+
+    static HttpRequest.Builder request = HttpRequest.newBuilder();
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -43,49 +51,92 @@ class Coinbase extends Exchange {
     private String apiSecret;
     private String apiKey;
     HttpResponse<String> response;
-    HttpRequest.Builder request = HttpRequest.newBuilder();
-    HttpClient.Builder client = HttpClient.newBuilder();
+    static HttpClient.Builder client = HttpClient.newBuilder();
+    String endPoint = "https://api.coinbase.com/api/v3/brokerage/";
     //
 //    Accounts	Get a single account's holds	Get Account		Look for the hold object
     private JsonNode res;
+
     public Coinbase(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
-        this.websocketClient = new CoinbaseWebSocketClient(URI.create("wss://ws-feed.pro.coinbase.com"), new Draft_6455());
+        this.websocketClient = new CoinbaseWebSocketClient(URI.create("wss://advanced-trade-ws.coinbase.com"), new Draft_6455());
 
-//        CB-ACCESS-KEY API key as a string
-//        CB-ACCESS-SIGN Message signature (see below)
-//        CB-ACCESS-TIMESTAMP Timestamp for your req
+        // Generate signature using API key and secret
+        String signature = signer(apiKey, apiSecret);
 
-        request.headers(
-                "CB-ACCESS-KEY", apiKey);
-        request.headers(
-                "CB-ACCESS-SIGN", signer(apiKey, apiSecret));
-        request.headers(
-                "CB-ACCESS-PASSPHRASE", apiSecret);
-        request.headers(
-                "CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
-        websocketClient.addHeader(
-                "CB-ACCESS-KEY",
-                apiKey
-        );
-        websocketClient.addHeader(
-                "CB-ACCESS-SIGN",
-                signer(apiKey, apiSecret));
+        // Set headers for the initial request
+        request.header("CB-ACCESS-KEY", apiKey);
+        request.header("CB-ACCESS-SIGN", signature);
+        request.header("CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
 
-        websocketClient.addHeader(
-                "CB-ACCESS-PASSPHRASE", apiSecret
-        );
-        websocketClient.addHeader(
-                "CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
+        // Set headers for WebSocket client
+        this.websocketClient.addHeader("CB-ACCESS-KEY", apiKey);
+        this.websocketClient.addHeader("CB-ACCESS-SIGN", signature);
+        this.websocketClient.addHeader("CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
         this.websocketClient.setTradePair(tradePair);
+        // this.websocketClient.connect(); // Connect WebSocket client
+    }
 
+    private @Nullable String jwt_generator(String apiKey, String apiSecret) {
+        String uriStr = "https://api.pro.coinbase.com/oauth/token";
+        String requestBody = "{\"grant_type\":\"client_credentials\"}";
+        request.uri(URI.create(uriStr))
+                .header("Content-Type", "application/json").header(
+                        "Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+        try {
+            response = client.build().send(request.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            logger.error(e.getMessage());
+        }
+        JsonNode jsonNode = null;
+        try {
+            jsonNode = OBJECT_MAPPER.readTree(response.body());
+            logger.info(jsonNode.toString());
+        } catch (JsonProcessingException e) {
+            logger.error(e.getMessage());
+        }
 
+        assert jsonNode != null;
+        if (jsonNode.has("message")) return null;
+
+        JsonNode token = jsonNode.get("access_token");
+        return token.asText();
     }
 
     private String signer(String apiKey, String apiSecret) {
-        return String.format("%s:%s", apiKey, apiSecret);
+
+        // Create HMAC instance with SHA-256 algorithm
+        Mac hmacSha256;
+        try {
+            hmacSha256 = Mac.getInstance("HmacSHA256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Create secret key spec from the secret key bytes
+        String secretKey;
+        secretKey = apiSecret;
+        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+
+        // Initialize the HMAC with the secret key
+        try {
+            hmacSha256.init(secretKeySpec);
+        } catch (InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Generate the HMAC digest for the message
+        byte[] hmacDigest = hmacSha256.doFinal(apiKey.getBytes(StandardCharsets.UTF_8));
+        // Convert the digest to a Base64-encoded string
+        String hmacBase64 = Base64.getEncoder().encodeToString(hmacDigest);
+        // Print the HMAC
+        logger.info(STR."HMAC: \{hmacBase64}");
+        return hmacBase64;
+
     }
 
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
@@ -225,7 +276,7 @@ class Coinbase extends Exchange {
     public CompletableFuture<String> cancelOrder(String orderId) {
         Objects.requireNonNull(orderId);
 
-        String uriStr = STR."https://api.pro.coinbase.com/orders/\{orderId}";
+        String uriStr = STR."https://api.coinbase.com/api/v3/brokerage/orders/\{orderId}";
 
         request
                 .uri(URI.create(uriStr))
@@ -233,7 +284,7 @@ class Coinbase extends Exchange {
                 .DELETE()
                 .build();
 
-        return new Server().getData("https://api.pro.coinbase.com/orders/" + orderId, "DELETE", request);
+        return new Server().getData("https://api.coinbase.com/api/v3/brokerage/orders/" + orderId, "DELETE", request);
     }
 
     /**
@@ -260,9 +311,8 @@ class Coinbase extends Exchange {
             // For Public Endpoints, our rate limit is 3 requests per second, up to 6 requests per second in
             // burst.
             // We will know if we get rate limited if we get a 429 response code.
-            // FIXME: We need to address this!
             for (int i = 0; !futureResult.isDone(); i++) {
-                String uriStr = "https://api.pro.coinbase.com/";
+                String uriStr = "https://api.exchange.coinbase.com/";
                 uriStr += STR."products/\{tradePair.toString('-')}/trades";
 
                 if (i != 0) {
@@ -271,14 +321,18 @@ class Coinbase extends Exchange {
                 }
 
                 try {
-                    HttpResponse<String> response = HttpClient.newHttpClient().send(
-                            HttpRequest.newBuilder()
-                                    .uri(URI.create(uriStr))
+                    HttpResponse<String> response = client.build().send(
+                            request.uri(URI.create(uriStr))
                                     .GET().build(),
                             HttpResponse.BodyHandlers.ofString());
 
                     logger.info(STR."response headers: \{response.headers()}");
                     if (response.headers().firstValue("CB-AFTER").isEmpty()) {
+
+
+                        logger.error(
+                                "Exception", STR."coinbase trades response did not contain header \"cb-after\": \{response}");
+
                         futureResult.completeExceptionally(new RuntimeException(
                                 STR."coinbase trades response did not contain header \"cb-after\": \{response}"));
                         return;
@@ -290,7 +344,9 @@ class Coinbase extends Exchange {
 
                     if (!tradesResponse.isArray()) {
                         futureResult.completeExceptionally(new RuntimeException(
+
                                 "coinbase trades response was not an array!"));
+
                     }
                     if (tradesResponse.isEmpty()) {
                         futureResult.completeExceptionally(new IllegalArgumentException("tradesResponse was empty"));
@@ -338,7 +394,7 @@ class Coinbase extends Exchange {
         // TODO: If actualGranularity = secondsPerCandle there are no sub-candles to fetch and we must get all the
         //  data for the current live syncing candle from the raw trades method.
         return client.build().sendAsync(
-                        HttpRequest.newBuilder()
+                        request
                                 .uri(URI.create(String.format(
                                         "https://api.pro.coinbase.com/products/%s/candles?granularity=%s&start=%s",
                                         tradePair.toString('-'), actualGranularity, startDateString)))
@@ -349,7 +405,7 @@ class Coinbase extends Exchange {
                     logger.info(STR."coinbase response: \{response}");
 
                     if (response == null || response.isEmpty()) {
-                        new Message("ERROR", STR."\{tradePair.toString('-')} candles response was empty");
+                        logger.error("ERROR", STR."\{tradePair.toString('-')} candles response was empty");
                         return Optional.empty();
                     }
 
@@ -361,7 +417,7 @@ class Coinbase extends Exchange {
 
                     if (res.has("message") && res.get("message").asText().equals("not_found")) {
 
-                            new Message("ERROR", tradePair.toString('-'));
+                        logger.error("ERROR", tradePair.toString('-'));
                         }
 
 
@@ -369,6 +425,48 @@ class Coinbase extends Exchange {
                     if (res.isEmpty()) {
                         return Optional.empty();
                     }
+
+//
+//                    //Implementing  Raw trades
+//                    File file= new File("rawData.json");
+//                    if (!file.exists()) {
+//                        try {
+//                            file.createNewFile();
+//                        } catch (IOException e) {
+//                            throw new RuntimeException(e);
+//                        }
+//                    }
+//                    Path rawData= file.toPath();
+//                    ReverseRawTradeDataProcessor rawTrades;
+//                    try {
+//                        rawTrades = new ReverseRawTradeDataProcessor(
+//                                rawData,secondsPerCandle,tradePair,this
+//
+//                        );
+//                    } catch (IOException e) {
+//                        throw new RuntimeException(e);
+//                    }
+//
+//                    if(actualGranularity==secondsPerCandle) {
+//
+//                        try {
+//
+//
+//                            InProgressCandleData inProgressCandleData = new InProgressCandleData(
+//                                    rawTrades.get().get().getLast().getOpenTime() ,
+//                                    rawTrades.get().get().getLast().getOpenPrice(),
+//                                    rawTrades.get().get().getLast().getHighPrice(),
+//                                    rawTrades.get().get().getLast().getLowPrice(),
+//                                    rawTrades.get().get().getLast().getCloseTime(),
+//                             rawTrades.get().get().getLast().getVolume(),
+//                             rawTrades.get().get().getLast().getClosePrice());
+//                            return Optional.of(inProgressCandleData);
+//
+//
+//                        } catch ( ExecutionException | InterruptedException e) {
+//                            throw new RuntimeException(e);
+//                        }
+//                    }
 
                     JsonNode currCandle;
                     Iterator<JsonNode> candleItr = res.iterator();
@@ -502,7 +600,7 @@ class Coinbase extends Exchange {
     public Ticker getLivePrice(TradePair tradePair) {
         Objects.requireNonNull(tradePair);
 
-        String uriStr = STR."https://api.pro.coinbase.com/products/\{tradePair.toString('-')}/ticker";
+        String uriStr = STR."\{endPoint}/api/v3/brokerage/products/\{tradePair.toString('-')}/ticker";
 
 
         request.uri(URI.create(uriStr));

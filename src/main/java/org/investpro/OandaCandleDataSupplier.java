@@ -115,12 +115,18 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
 
                         List<CandleData> candleData = new ArrayList<>();
                         for (JsonNode candle : res) {
+                            int closeTime = -1;
+
+                            if ((-candle.get(0).asInt() + (System.currentTimeMillis() / 1000)) == secondsPerCandle) {
+                                closeTime = (int) (-candle.get(0).asInt() + (System.currentTimeMillis() / 1000));
+                            }
                             candleData.add(new CandleData(
                                     candle.get(3).asDouble(),  // open price
                                     candle.get(4).asDouble(),  // close price
                                     candle.get(2).asDouble(),  // high price
                                     candle.get(1).asDouble(),  // low price
-                                    candle.get(0).asInt(),     // open time
+                                    candle.get(0).asInt(),     // open time.
+                                    closeTime,  // close time
                                     candle.get(5).asDouble()   // volume
                             ));
                         }

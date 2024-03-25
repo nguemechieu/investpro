@@ -39,7 +39,9 @@ public class Message extends Exception {
         Stage s1 = new Stage();
         s1.setScene(scene);
         s1.setResizable(false);
-        s1.getIcons().add(new javafx.scene.image.Image(Objects.requireNonNull(Message.class.getResourceAsStream("/invest.png"))));
+        s1.getIcons().add(new javafx.scene.image.Image(Objects.requireNonNull(Message.class.getResourceAsStream("/investpro.png"))));
+        s1.setTitle("InvestPro");
+        s1.alwaysOnTopProperty().addListener((observable, oldValue, newValue) -> s1.setAlwaysOnTop(newValue));
         s1.show();
     }
 }

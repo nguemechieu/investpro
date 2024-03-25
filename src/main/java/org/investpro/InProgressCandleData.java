@@ -1,10 +1,9 @@
 package org.investpro;
 
-/**
- * @author Michael Ennen
- */
 public record InProgressCandleData(int openTime, double openPrice, double highPriceSoFar, double lowPriceSoFar,
-                                   int currentTill, double lastPrice, double volumeSoFar) {
+                                   int closeTime, double lastPrice, double volumeSoFar) {
+
+
 
     @Override
     public boolean equals(Object object) {
@@ -22,7 +21,7 @@ public record InProgressCandleData(int openTime, double openPrice, double highPr
                 openPrice == other.openPrice &&
                 highPriceSoFar == other.highPriceSoFar &&
                 lowPriceSoFar == other.lowPriceSoFar &&
-                currentTill == other.currentTill &&
+                closeTime == other.closeTime &&
                 lastPrice == other.lastPrice &&
                 volumeSoFar == other.volumeSoFar;
     }
@@ -31,7 +30,7 @@ public record InProgressCandleData(int openTime, double openPrice, double highPr
     public String toString() {
         return String.format("InProgressCandleData [openTime = %d, openPrice = %f, highPriceSoFar = %f, " +
                         "lowPriceSoFar = %f, currentTill = %d, lastPrice = %f, volumeSoFar = %f]", openTime, openPrice,
-                highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar);
+                highPriceSoFar, lowPriceSoFar, closeTime, lastPrice, volumeSoFar);
     }
 
     public double getHighPriceSoFar() {
@@ -49,10 +48,11 @@ public record InProgressCandleData(int openTime, double openPrice, double highPr
 
     }
 
-    public long getCurrentTill() {
-        return currentTill;
-
+    @Override
+    public int closeTime() {
+        return closeTime;
     }
+
 
     public double getOpenPrice() {
         return openPrice;

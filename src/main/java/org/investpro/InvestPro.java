@@ -49,7 +49,7 @@ public class InvestPro extends Application {
         primaryStage.setScene(scene);
         primaryStage.getIcons().add(
                 new Image(
-                        Objects.requireNonNull(getClass().getResourceAsStream("/invest.png"))
+                        Objects.requireNonNull(getClass().getResourceAsStream("/investpro.png"))
                 )
         );
         primaryStage.fullScreenProperty().addListener((observable, oldValue, newValue) -> primaryStage.setFullScreen(newValue));

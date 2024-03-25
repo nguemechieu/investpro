@@ -377,7 +377,20 @@ class Db1 implements Db {
 
     public Currency getCurrency(String code) throws SQLException {
         // Get currency from database
-        Currency newCurrency = null;
+        Currency newCurrency;
+
+        conn.createStatement().executeUpdate(
+                "CREATE TABLE IF NOT EXISTS currencies (" +
+
+                        " currency_type VARCHAR(255)," +
+                        "code  VARCHAR(255)," +
+                        "full_display_name VARCHAR(255)," +
+                        "short_display_name VARCHAR(255)," +
+                        "fractional_digits INTEGER," +
+                        "symbol VARCHAR(255)," +
+                        "image VARCHAR(255)" +
+                        ");"
+        );
 
 
         ResultSet check = conn.createStatement().executeQuery(STR."SELECT * FROM currencies WHERE code = '\{code}'");
@@ -390,7 +403,7 @@ class Db1 implements Db {
                 CryptoCurrency cur = new CryptoCurrency(code, code, code, 0, code, code);
 
                 //Saving new currency
-                conn.createStatement().executeUpdate("INSERT INTO currencies (     Currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image,currency_type) VALUES (?,?,?,?,?,?,?,?)");
+                conn.createStatement().executeUpdate("INSERT INTO currencies (     currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image,currency_type) VALUES (?,?,?,?,?,?,?,?)");
 
                 return cur;
             } catch (ClassNotFoundException e) {

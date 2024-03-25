@@ -1,5 +1,8 @@
 package org.investpro;
 
+import javafx.beans.property.IntegerProperty;
+import org.jetbrains.annotations.NotNull;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -8,9 +11,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
-
-import javafx.beans.property.IntegerProperty;
-import org.jetbrains.annotations.NotNull;
 
 
 public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {

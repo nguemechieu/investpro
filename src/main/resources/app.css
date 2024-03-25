@@ -1,31 +1,39 @@
 .app {
     -fx-border-radius: 15%;
-    -fx-font-size: 90%;
-    -fx-background-color: #4b7fb6;
+    -fx-font-size: 100%;
+    -fx-background-color: #CCCCCC /*#4b7fb6*/;
     -fx-text-fill-color: #bcd5f8;
     -fx-font-family: sans-serif;
     -fx-text-stroke-width: 1px;
     -fx-touch-action: none;
     -fx-user-select: none;
+    -fx-background-radius: inherit;
 
 }
-.Toolbar{
+
+Toolbar {
 -fx-border-radius:5px !important;
     -fx-background-color: #1fc7c1;
+    -fx-border-width: 1px;
+    -fx-border-style: solid;
+    -fx-border-color: #a17d2e;
+    -fx-background-radius: inherit;
 }
 
-.MenuBar{
+MenuBar {
 
 -fx-border-radius:3px !important;
 -fx-background-color: GOLD;
 
 -fx-text-stroke-width:2;
+
+
 }
 .text-field {
     -fx-background-color: #8cb8e5;
 }
 
-.tabPanes {
+TabPane {
     -fx-prefHeight: 780.0;
     -fx-prefWidth: 1530.0;
     -fx-background-color: #1ca5ef;
@@ -34,23 +42,11 @@
     -fx-text-fill: #d0dce3;
 }
 
-.FlowPane {
-    -fx-background-color: #151313;
+.flowPane {
+    -fx-background-color: #36a12e;
 }
 
-.TabPane {
-    -fx-background-color: #4b7fb6;
-}
-.label {
-    -fx-font-size: 90%;
-    -fx-touch-action: none;
-    -fx-user-select: none;
-    -fx-font-family: sans-serif;
-    -fx-text-fill: #36a12e;
 
-
-    -fx-text-stroke-width: 2px;
-}
 
 .text-area {
     -fx-font-size: 100%;
@@ -61,43 +57,58 @@
     -fx-font-size: 90%;
     -fx-border-radius: 5%;
     -fx-background-color: #0f2a46;
-    -fx-text-fill-color: #5bd5bf;
+    -fx-text-fill-color: #d3eb34;
 
 
 }
 
 .chart-plot-background {
-    -fx-background-color: black;
+    -fx-background-color: rgba(46, 86, 161, 0.31);
 }
 .chart{
-    -fx-background-color: #ffffff;
+    -fx-background-color: GOLD
 }
 AnchorPane {
-    -fx-background-color: #043264;
-    -fx-border-color: #1b2d1e;
-    -fx-text-fill-color: #5ed372;
+    -fx-background-color: #0e69cb;
+    -fx-border-color: #19e052;
+    -fx-text-fill-color: #bfd3c2;
     -fx-prefHeight: 780.0;
     -fx-prefWidth: 1530.0;
-    -fx-border-radius: 3;
-    /*-fx-background-image : url("Invest.png");*/
-    -fx-font-size:90%;
+    -fx-border-radius: 4;
+
+    -fx-font-size: 100%;
     -fx-focus-traversable:true;
     -fx-alignment: center;
-    -fx-graphic: url(Invest.png);
+    -fx-graphic: url(InvestPro.png);
 
     -fx-animated: false;
     -fx-page-information-alignment: bottom;
     -fx-scale-shape: inherit;
     -fx-text-shadow: none;
+    -fx-border-width: 2px;
 }
 
-tab {
-    -fx-background-color: rgb(82, 152, 206);
-    -fx-border-color: rgb(45, 176, 151);
-    -fx-text-fill-color: rgb(255, 255, 255);
-    -fx-alignment: center;
+Button {
+
+
     -fx-border-radius: 5%;
     -fx-border-width: 1px;
+    -fx-font-size: 100%;
+    -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4.0;
+    -fx-background-insets: 1.0;
+}
+
+
+.tab {
+    -fx-background-color: rgb(82, 152, 206);
+    -fx-border-color: rgb(45, 176, 151);
+
+    -fx-alignment: center;
+    -fx-border-radius: 9%;
+    -fx-border-width: 1px;
+    -fx-font-size: 100%;
 
 }
 .menu-items {
@@ -108,7 +119,7 @@ tab {
 .menu-item {
     -fx-background-color: rgb(214, 226, 241);
     -fx-border-color: rgb(115, 218, 162);
--fx-background-image : url("Invest.png");
+
 
 }
 
@@ -122,22 +133,28 @@ tab {
 .candlestick-tooltip-label {
     -fx-font-size: 0.75em;
     -fx-font-weight: bold;
-    -fx-text-fill: #666666;
+    -fx-text-fill: GOLD;
     -fx-padding: 2 5 2 0;
 }
 
 .candlestick-average-line {
     -fx-stroke: #106ece;
     -fx-stroke-width: 2px;
+    -fx-stroke-type: INSIDE;
 }
 
 .candlestick-candle {
-    -fx-background-color: rgb(255,34,34,1.00);
+    -fx-background-color: GRAY;
+    -fx-stroke: #106ece;
+    -fx-stroke-width: 2px;
+    -fx-stroke-type: INSIDE;
 }
 
 .candlestick-line {
-    -fx-stroke: #FFFFFF;
+    -fx-stroke: GOLD;
     -fx-stroke-width: 1px;
+    -fx-stroke-type: INSIDE;
+
 }
 
 
@@ -156,13 +173,13 @@ tab {
 
 
 .label-gray {
-    -fx-background-color: rgb(25,25,25,0.70);
+    -fx-background-color: rgb(23, 211, 205);
 }
 
 .axis {
-    -fx-text-fill: #131010;
-    -fx-font-color: #FFFFFF;
-    -fx-tick-label-fill: #FFFFFF;
+    -fx-text-fill: WHITE;
+    -fx-font-color: #031528;
+    -fx-tick-label-fill: GOLD;
     -fx-font-size: 18pt;
     -fx-font-family: "Segoe UI Light";
     -fx-tick-length: 20;
@@ -170,40 +187,36 @@ tab {
 }
 
 .chart-title {
-     -fx-text-fill: #FFFFFF;
+    -fx-text-fill: WHITE;
     -fx-font-size: 20pt;
     -fx-font-family: "Segoe UI Light";
 }
 
 .axis-label {
-    -fx-text-fill: #ffffff;
+    -fx-text-fill: #19e052;
 }
 
 .axis-tick-mark {
-    -fx-stroke: #637040;
+    -fx-stroke: #d3eb34;
     -fx-stroke-width: 3;
 }
 .axis-minor-tick-mark {
     -fx-stroke: #ffffff;
 }
 
-/*{
 
-}
-*/
-.chart {
-  -fx-background-color: #657F92;
-}
+
 .fx-background-color {
   -fx-background-color: red;
 }
 .chart-plot-background {
-    -fx-background-color: rgb(0,0,0,0.25);
+    -fx-background-color: rgb(14, 105, 203);
 }
 
-tab-pane-selected {
+.tab-pane-selected {
     -fx-background-color: rgb(63, 236, 80);
-    -fx-border-color: rgb(128, 41, 41);
+    -fx-border-color: rgb(14, 105, 203);
+    -fx-text-fill-color: rgb(255, 255, 255);
 }
 
 .candlestick-tooltip-label {
@@ -247,8 +260,8 @@ tab-pane-selected {
 }
 
 .axis {
-    -fx-text-fill: #FFFFFF;
-    -fx-font-color: #FFFFFF;
+    -fx-text-fill: #17d3cd;
+    -fx-font-color: #ffffff;
     -fx-tick-label-fill: #FFFFFF;
     -fx-font-size: 18pt;
     -fx-font-family: "Segoe UI Light";
@@ -257,32 +270,40 @@ tab-pane-selected {
 }
 
 .chart-title {
-     -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #17d3cd;
     -fx-font-size: 20pt;
     -fx-font-family: "Segoe UI Light";
 }
 
 .axis-label {
-    -fx-text-fill: #462300;
+    -fx-text-fill: #cee7e5;
 }
 
 .axis-tick-mark {
-    -fx-stroke: #637040;
+    -fx-stroke: #cee7e5;
     -fx-stroke-width: 3;
 }
 .axis-minor-tick-mark {
     -fx-stroke: #859656;
+    -fx-stroke-width: 1;
+    -fx-stroke-type: OUTSIDE;
+    -fx-stroke-line-cap: ROUND;
 }
 
 /*{
 }
 */
-.chart {
-  -fx-background-color: #657F92;
-}
+
 .fx-background-color {
   -fx-background-color: red;
 }
 .chart-plot-background {
-    -fx-background-color: rgb(255, 255, 255);
+    -fx-background-color: rgb(211, 235, 52);
 }
+
+tab-pane-selected {
+    -fx-background-color: rgb(63, 236, 80);
+    -fx-border-color: rgb(128, 41, 41);
+}
+
+

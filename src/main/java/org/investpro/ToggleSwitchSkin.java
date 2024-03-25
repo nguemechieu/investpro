@@ -26,24 +26,20 @@
  */
 package org.investpro;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import javafx.animation.Interpolator;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.DoubleProperty;
-import javafx.css.CssMetaData;
-import javafx.css.StyleConverter;
-import javafx.css.Styleable;
-import javafx.css.StyleableDoubleProperty;
-import javafx.css.StyleableProperty;
+import javafx.css.*;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.SkinBase;
 import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
     private final StackPane thumb;

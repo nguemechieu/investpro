@@ -156,8 +156,6 @@ public final class CandleStickChartUtils {
      * for the current zoom level) which allows for scrolling the chart past the point where all of the most
      * recent candles are visible.
      *
-     * @param extrema
-     * @param candleData
      */
     public static void putExtremaForRemainingElements(Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extrema,
                                                       final List<CandleData> candleData) {

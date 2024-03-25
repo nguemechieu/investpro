@@ -28,20 +28,10 @@
 
 package org.investpro;
 
-import static java.util.Objects.requireNonNull;
-import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
-
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.event.EventHandler;
@@ -55,6 +45,9 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
+
+import static java.util.Objects.requireNonNull;
+import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
 
 /**
  * The PopOver control provides detailed information about an owning node in a
