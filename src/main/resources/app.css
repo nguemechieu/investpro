@@ -11,6 +11,25 @@
 
 }
 
+Lable {
+    -fx-text-fill-color: #c1cec5;
+}
+
+TradingWindow {
+
+    -fx-border-radius: 15%;
+    -fx-font-size: 100%;
+    -fx-background-color: #0a325e /*#4b7fb6*/;
+    -fx-text-fill-color: #c1cec5;
+    -fx-font-family: sans-serif;
+    -fx-text-stroke-width: 1px;
+    -fx-touch-action: none;
+    -fx-user-select: none;
+    -fx-background-radius: inherit;
+    -fx-alignment: inherit;
+    -fx-text-fill: white;
+}
+
 Toolbar {
 -fx-border-radius:5px !important;
     -fx-background-color: #1fc7c1;

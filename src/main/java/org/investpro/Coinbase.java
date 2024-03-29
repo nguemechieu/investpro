@@ -9,6 +9,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import org.java_websocket.drafts.Draft_6455;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,7 +173,7 @@ class Coinbase extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException {
+    public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
         Objects.requireNonNull(order);
 
         String uriStr = "https://api.pro.coinbase.com/orders";
@@ -202,8 +203,33 @@ class Coinbase extends Exchange {
     }
 
     @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public Account getAccounts() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    public List<String> getTradePair() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
     Boolean isConnected() {
         return websocketClient.connectionEstablished.get();
+    }
+
+    @Override
+    public String getSymbol() {
+        return null;
+    }
+
+    @Override
+    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, @NotNull Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
+
     }
 
     public Account getAccount(String accountId) {
@@ -378,6 +404,16 @@ class Coinbase extends Exchange {
         return futureResult;
     }
 
+    @Override
+    public String getExchange() {
+        return null;
+    }
+
+    @Override
+    public String getCurrency() {
+        return null;
+    }
+
     /**
      * This method only needs to be implemented to support live syncing.
      */
@@ -516,6 +552,11 @@ class Coinbase extends Exchange {
     }
 
     @Override
+    public List<Order> getPendingOrders() {
+        return null;
+    }
+
+    @Override
     public List<TradePair> getTradePairSymbol() {
 
         //COINBASE URL TO GET ALL TRADES PAIRS
@@ -576,6 +617,11 @@ class Coinbase extends Exchange {
 
         return tradePairs;
 
+    }
+
+    @Override
+    public String getOrderId() {
+        return null;
     }
 
     @Override
@@ -666,12 +712,24 @@ class Coinbase extends Exchange {
         return "Coinbase";
     }
 
-    public TradePair getTradePair() {
-        return tradePair;
+
+    @Override
+    public void connect(String text, String text1, String userIdText) {
+
     }
 
     public void setTradePair(TradePair tradePair) {
         this.tradePair = tradePair;
+    }
+
+    @Override
+    public void getPositionBook(TradePair tradePair) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public void getOpenOrder(@NotNull TradePair tradePair) {
+
     }
 
 }

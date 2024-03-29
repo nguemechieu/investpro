@@ -1,11 +1,11 @@
 package org.investpro;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
+import java.io.IOException;
 import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -18,7 +18,7 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
+    public TradePair getSelecTradePair() {
         return null;
     }
 
@@ -48,8 +48,38 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
+    public double getTradingFee() throws IOException, InterruptedException {
+        return 0;
+    }
+
+    @Override
+    public Account getAccounts() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    public List<String> getTradePair() throws IOException, InterruptedException {
+        return null;
+    }
+
+    @Override
+    public void connect(String text, String text1, String userIdText) {
+
+    }
+
+    @Override
     Boolean isConnected() {
         return null;
+    }
+
+    @Override
+    public String getSymbol() {
+        return null;
+    }
+
+    @Override
+    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, @NotNull Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
+
     }
 
     @Override
@@ -58,7 +88,22 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
+    public List<Order> getPendingOrders() {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant) {
+        return null;
+    }
+
+    @Override
+    public String getExchange() {
+        return null;
+    }
+
+    @Override
+    public String getCurrency() {
         return null;
     }
 
@@ -73,7 +118,7 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException {
+    public CompletableFuture<String> createOrder(Order order) {
         return null;
     }
 
@@ -94,6 +139,11 @@ public class BinanceUs extends Exchange {
 
     @Override
     public List<TradePair> getTradePairSymbol() {
+        return null;
+    }
+
+    @Override
+    public String getOrderId() {
         return null;
     }
 
@@ -125,6 +175,16 @@ public class BinanceUs extends Exchange {
     @Override
     public String getName() {
         return null;
+    }
+
+    @Override
+    public void getPositionBook(TradePair tradePair) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public void getOpenOrder(@NotNull TradePair tradePair) {
+
     }
 
     @Override

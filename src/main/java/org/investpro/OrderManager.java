@@ -4,7 +4,7 @@ import java.util.TreeMap;
 
 public class OrderManager {
 
-    TreeMap<Long, Orders> ordersTreeMap = new TreeMap<>();
+    TreeMap<Long, Order> ordersTreeMap = new TreeMap<>();
     long Placed;
     TradePair Pair;
     Side Type;

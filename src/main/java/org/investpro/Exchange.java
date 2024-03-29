@@ -8,8 +8,10 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -57,18 +59,38 @@ public abstract class Exchange {
 
     public abstract ExchangeWebSocketClient getWebsocketClient();
 
+    public abstract double getTradingFee() throws IOException, InterruptedException;
+
+    //Get Account
+    public abstract Account getAccounts() throws IOException, InterruptedException;
+
+    public abstract List<String> getTradePair() throws IOException, InterruptedException;
+
+    public void setTradePair(TradePair newValue) {
+    }
+
     abstract Boolean isConnected();
+
+    public abstract void connect(String text, String text1, String userIdText);
+
+    public abstract String getSymbol();
 
     public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle);
 
+    public abstract void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size,
+                                     @NotNull Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException;
 
     public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant);
+
+    public abstract List<Order> getPendingOrders();
+
+    public abstract String getExchange();
 
     public abstract String getTimestamp();
 
     public abstract CandleDataSupplier getCandleDataSupplier(int i, TradePair tradePair);
 
-    public abstract CompletableFuture<String> createOrder(Orders order) throws JsonProcessingException;
+    public abstract String getCurrency();
 
     public abstract CompletableFuture<String> cancelOrder(String orderId);
 
@@ -78,6 +100,8 @@ public abstract class Exchange {
 
 
     public abstract List<TradePair> getTradePairSymbol();
+
+    public abstract CompletableFuture<String> createOrder(Order order) throws JsonProcessingException;
 
     public abstract CompletableFuture<String> getOrderBook(TradePair tradePair);
 
@@ -94,4 +118,10 @@ public abstract class Exchange {
     public String getTelegramToken() {
         return tokens;
     }
+
+    public abstract String getOrderId();
+
+    public abstract void getPositionBook(TradePair tradePair) throws IOException, InterruptedException;
+
+    public abstract void getOpenOrder(@NotNull TradePair tradePair);
 }

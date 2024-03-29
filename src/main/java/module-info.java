@@ -12,6 +12,7 @@ module investpro {
     requires javafx.web;
     requires org.json;
     requires java.desktop;
+    requires org.controlsfx.controls;
 
     exports org.investpro;
 

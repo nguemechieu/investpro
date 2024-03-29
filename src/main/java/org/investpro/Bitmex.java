@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-public class Bitfinex extends Exchange {
-    public Bitfinex(String s, String s1) {
-        super(s, s1);
+public class Bitmex extends Exchange {
+    public Bitmex(String text, String text1) {
+        super(text, text1);
     }
 
     @Override
@@ -33,7 +33,7 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
-    public Account getAccounts() throws IOException, InterruptedException {
+    public Account getAccounts() {
         return null;
     }
 

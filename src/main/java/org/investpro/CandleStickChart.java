@@ -121,6 +121,11 @@ public class CandleStickChart extends Region {
     private Object trade;
 
 
+    @Override
+    public String toString() {
+        return STR."CandleStickChart{candleDataPager=\{candleDataPager}, chartOptions=\{chartOptions}, exchange=\{exchange}, tradePair=\{tradePair}, liveSyncing=\{liveSyncing}, zoomLevelMap=\{zoomLevelMap}, candlePageConsumer=\{candlePageConsumer}, updateInProgressCandleExecutor=\{updateInProgressCandleExecutor}, updateInProgressCandleTask=\{updateInProgressCandleTask}, data=\{data}, xAxis=\{xAxis}, yAxis=\{yAxis}, extraAxis=\{extraAxis}, progressIndicator=\{progressIndicator}, extraAxisExtension=\{extraAxisExtension}, mouseDraggedHandler=\{mouseDraggedHandler}, scrollHandler=\{scrollHandler}, keyHandler=\{keyHandler}, canvasNumberFont=\{canvasNumberFont}, secondsPerCandle=\{secondsPerCandle}, canvas=\{canvas}, graphicsContext=\{graphicsContext}, candleWidth=\{candleWidth}, mousePrevX=\{mousePrevX}, mousePrevY=\{mousePrevY}, scrollDeltaXSum=\{scrollDeltaXSum}, chartWidth=\{chartWidth}, chartHeight=\{chartHeight}, inProgressCandleLastDraw=\{inProgressCandleLastDraw}, currZoomLevel=\{currZoomLevel}, paging=\{paging}, inProgressCandle=\{inProgressCandle}, currentCandleTrades=\{currentCandleTrades}, trade=\{trade}\{'}'}";
+    }
+
     CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
                      ObservableNumberValue containerHeight) {

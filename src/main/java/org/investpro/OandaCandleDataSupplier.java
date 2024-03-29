@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -25,23 +24,24 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
+
 public class OandaCandleDataSupplier extends CandleDataSupplier {
 
-
-    private static final Logger logger = LoggerFactory.getLogger(org.investpro.CoinbaseCandleDataSupplier.class);
+    private static final Logger logger = LoggerFactory.getLogger(OandaCandleDataSupplier.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
+    private final HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+    private final String apiSecret;
 
-    OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+    OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiSecret) {
         super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        this.apiSecret = apiSecret;
     }
 
-    public OandaCandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
-        super(numCandles, secondsPerCandle, tradePair, endTime);
-    }
+
 
     @Override
     public Set<Integer> getSupportedGranularities() {
@@ -69,6 +69,15 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         return null;
     }
 
+    public static int getTimeFromString(@NotNull String timeString) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
+                "yyyy-MM-dd'T'HH:mm:ss"
+        );
+        int tim = (int) Instant.parse(timeString).getEpochSecond();
+        logger.info(STR."Created timestamp: \{timeString + tim}");
+        return tim;
+    }
+
     @Override
     public Future<List<CandleData>> get() {
         if (endTime.get() == -1) {
@@ -82,60 +91,100 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
 
-        String uriStr = STR."https://api.pro.coinbase.com/products/\{tradePair.toString('-')}/candles?granularity=\{secondsPerCandle}&start=\{startDateString}&end=\{endDateString}";
+        String uriStr = STR."https://api-fxtrade.oanda.com/v3/instruments/\{tradePair.toString('_')}/candles?count=200&price=M&granularity=\{granularityToString(secondsPerCandle)}";
 
         if (startTime == EARLIEST_DATA) {
             // signal more data is false
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
+
+        requestBuilder.header("Authorization", STR."Bearer \{apiSecret}");
         return HttpClient.newHttpClient().sendAsync(
-                        HttpRequest.newBuilder()
+                        requestBuilder
                                 .uri(URI.create(uriStr))
                                 .GET().build(),
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(response -> {
-                    logger.info(STR."coinbase response: \{response}");
+
                     JsonNode res;
                     try {
                         res = OBJECT_MAPPER.readTree(response);
+                        logger.info(STR."OANDA response: \{res}");
                     } catch (JsonProcessingException ex) {
                         throw new RuntimeException(ex);
                     }
+                    List<CandleData> candleDatas = new ArrayList<>();
 
-                    if (!res.isEmpty()) {
+                    if (!res.get("candles").isEmpty()) {
 
 
+                        logger.info(STR."Response\{res.get("candles")}");
                         // Remove the current in-progress candle
-                        if (res.get(0).get(0).asInt() + secondsPerCandle > endTime.get()) {
-                            ((ArrayNode) res).remove(0);
-                        }
-                        endTime.set(startTime);
 
-                        List<CandleData> candleData = new ArrayList<>();
-                        for (JsonNode candle : res) {
-                            int closeTime = -1;
+                        for (JsonNode candle : res.get("candles")) {
+                            String tim = candle.get("time").asText();
+                            int time;
+                            if (candle.has("time")) {
 
-                            if ((-candle.get(0).asInt() + (System.currentTimeMillis() / 1000)) == secondsPerCandle) {
-                                closeTime = (int) (-candle.get(0).asInt() + (System.currentTimeMillis() / 1000));
+                                time = getTimeFromString(candle.get("time").asText());
+
+                                if (time + secondsPerCandle > endTime.get()) {
+                                    ((ArrayNode) candle.get("candles")).remove(0);
+                                }
+                                endTime.set(startTime);
+                                int closeTime = 0;
+
+                                if ((-time + (System.currentTimeMillis() / 1000)) == secondsPerCandle) {
+                                    closeTime = (candle.get("time").asInt());
                             }
-                            candleData.add(new CandleData(
-                                    candle.get(3).asDouble(),  // open price
-                                    candle.get(4).asDouble(),  // close price
-                                    candle.get(2).asDouble(),  // high price
-                                    candle.get(1).asDouble(),  // low price
-                                    candle.get(0).asInt(),     // open time.
+                                candleDatas.add(new CandleData(
+                                        candle.get("mid").get("o").asDouble(),  // open price
+                                        candle.get("mid").get("c").asDouble(),  // close price
+                                        candle.get("mid").get("h").asDouble(),  // high price
+                                        candle.get("mid").get("l").asDouble(),  // low price
+                                        candle.get("mid").get("o").asInt(),     // open time.
                                     closeTime,  // close time
-                                    candle.get(5).asDouble()   // volume
+                                        candle.get("volume").asDouble()   // volume
                             ));
+
+
+                            }
+                            candleDatas.sort(Comparator.comparingInt(CandleData::getOpenTime));
+
+                            logger.info(candleDatas.toString());
+                            return candleDatas;
                         }
-                        candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
-                        return candleData;
-                    } else {
-                        logger.error(STR."CoinbaseCandleDataSupplier.get()\{response}");
-                        return Collections.emptyList();
                     }
+
+
+                        return Collections.emptyList();
+
                 });
+    }
+
+    private @NotNull String granularityToString(int actualGranularity) {
+
+        String x;
+        String str;
+        if (actualGranularity < 3600) {
+            x = String.valueOf(actualGranularity / 60);
+            str = "M";
+        } else if (actualGranularity < 86400) {
+            x = String.valueOf((actualGranularity / 3600));
+            str = "H";
+        } else if (actualGranularity < 604800) {
+            x = "";//String.valueOf(secondsPerCandle / 86400);
+            str = "D";
+        } else if (actualGranularity < 2592000) {
+            x = String.valueOf((actualGranularity / 604800));
+            str = "W";
+        } else {
+            x = String.valueOf((actualGranularity * 7 / 2592000 / 7));
+            str = "M";
+        }
+        return str + x;
+
     }
 }

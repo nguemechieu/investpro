@@ -52,7 +52,6 @@ public class CandleDataPager {
                 logger.error("exception during accepting futureCandleData: ", ex);
                 return;
             }
-
             if (!candleData.isEmpty()) {
                 if (hitFirstNonPlaceHolder) {
                     candleStickChart.getCandlePageConsumer().accept(candleData);

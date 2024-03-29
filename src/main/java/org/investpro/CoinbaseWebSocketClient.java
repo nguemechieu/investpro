@@ -9,10 +9,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-import javafx.scene.Scene;
-import javafx.scene.layout.StackPane;
-import javafx.scene.text.Text;
-import javafx.stage.Stage;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft;
 import org.java_websocket.handshake.ServerHandshake;
@@ -38,7 +34,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    private static final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
+    private final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
     protected BooleanProperty connectionEstablished;
     private LiveTrade liveTradeConsumers;
     private TradePair tradePair;
@@ -51,6 +47,8 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
         connectionEstablished = new SimpleBooleanProperty(false);
         this.connect();
 
+        this.logger.info("Connect");
+
 
     }
 
@@ -59,6 +57,8 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         JsonNode messageJson;
+
+        logger.debug("onMessage", message);
         try {
             messageJson = OBJECT_MAPPER.readTree(message);
             logger.info(STR."message :\{messageJson}");
@@ -69,6 +69,8 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
 
         if (messageJson.has("event") && messageJson.get("event").asText().equalsIgnoreCase("info")) {
             connectionEstablished.setValue(true);
+
+
         }
 
 
@@ -97,12 +99,9 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
             default:
                 throw new IllegalStateException(STR."Unhandled message type on Gdax websocket client: \{messageJson.get("type").asText()}");
         }
-        Stage st = new Stage();
-        StackPane stackPane = new StackPane();
-        Text txt = new Text(messageJson.get("message").asText());
-        stackPane.getChildren().add(txt);
-        st.setScene(new Scene(stackPane));
-        st.show();
+
+        logger.info(messageJson.asText());
+
 
     }
 
@@ -126,7 +125,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
 
-        logger.info("Connection closed on Coinbase websocket client: ", reason);
+        logger.info("Connection closed on Coinbase websocket client: ", reason, remote);
 
     }
 
@@ -140,11 +139,7 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake serverHandshake) {
         connectionEstablished.setValue(true);
-        logger.info("Connection established on Coinbase websocket client: ");
-    }
-
-    public void setLiveTradeConsumers(LiveTrade liveTradeConsumers) {
-        this.liveTradeConsumers = liveTradeConsumers;
+        logger.info("Connection established on  websocket client: ");
     }
 
     public TradePair getTradePair() {
@@ -153,5 +148,9 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
 
     public void setTradePair(TradePair tradePair) {
         this.tradePair = tradePair;
+    }
+
+    public void setLiveTradeConsumers(LiveTrade liveTradeConsumers) {
+        this.liveTradeConsumers = liveTradeConsumers;
     }
 }

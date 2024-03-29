@@ -11,6 +11,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -60,6 +61,8 @@ public class ChartToolbar extends Region {
     private final Separator functionOptionsSeparator;
     Button screenshot = new Button("ScreenShot");
     Button autoTrade = new Button("Auto Trade");
+
+
     public ChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
                             Set<Integer> granularities) {
         logger.debug("Creating ChartToolbar", this);
@@ -113,7 +116,7 @@ public class ChartToolbar extends Region {
 
         toolbarNodes.add(autoTrade);
         toolbarNodes.add(screenshot);
-        Separator intervalZoomSeparator = new Separator();
+        Separator intervalZoomSeparator = new Separator(Orientation.VERTICAL);
         intervalZoomSeparator.setOpacity(0);
         toolbarNodes.add(intervalZoomSeparator);
 

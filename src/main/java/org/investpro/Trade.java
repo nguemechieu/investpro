@@ -3,7 +3,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * A Trade represents a completed order (then called a trade), which is an transaction where one
+ * A Trade represents a completed order (then called a trade), which is a transaction where one
  * party buys and the other one sells some amount of currency at a fixed price.
  *
 
@@ -16,6 +16,8 @@ public class Trade {
     private long localTradeId;
     private Instant timestamp;
     private Money fee;
+    private long lastTransactionID;
+    private double units;
 
     public Trade() {
         super();
@@ -135,5 +137,23 @@ public class Trade {
 
     public Long getLocalId() {
         return localTradeId;
+    }
+
+    public long getLastTransactionID() {
+        return lastTransactionID;
+    }
+
+    public void setLastTransactionID(long lastTransactionID) {
+
+        this.lastTransactionID = lastTransactionID;
+    }
+
+    public void setSize(double units) {
+        this.units = units;
+
+    }
+
+    public double getUnits() {
+        return units;
     }
 }

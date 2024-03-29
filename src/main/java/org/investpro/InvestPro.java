@@ -10,9 +10,6 @@ import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.Border;
-import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -33,16 +30,13 @@ public class InvestPro extends Application {
 
     }
 
-    AnchorPane window = new AnchorPane();
+
 
     @Override
     public void start(@NotNull Stage primaryStage) throws SQLException, ClassNotFoundException, ParseException, IOException, InterruptedException {
-        window.setMaxSize(1540, 780);
-        window.setBorder(Border.stroke(Color.BLUE));
-        window.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
-        window.getChildren().addAll(new TradingWindow());
+
         primaryStage.setResizable(true);
-        Scene scene = new Scene(window);
+        Scene scene = new Scene(new TradingWindow());
         primaryStage.setOnCloseRequest(_ -> Platform.exit());
         scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
         primaryStage.setTitle(STR."InvestPro                  --------- Copyright 2020-\{LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}            TradeAdviser.LLC");
@@ -83,11 +77,8 @@ public class InvestPro extends Application {
         MenuItem openAcccountMenuItem = new MenuItem("OPEN AN ACCOUNT");
         openAcccountMenuItem.setOnAction(_ -> new CreateAccount());
 
-        MenuItem loginMenuItem = new MenuItem("LOG IN TO TRADE");
-        loginMenuItem.setOnAction(_ ->
-                new Login()
+        MenuItem loginMenuItem = new MenuItem("LOG IN TO  TRADE");
 
-        );
 
         MenuItem exitMenuItem = new MenuItem("EXIT");
         exitMenuItem.setOnAction(_ -> Platform.exit());

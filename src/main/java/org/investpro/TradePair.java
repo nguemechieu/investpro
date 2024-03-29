@@ -16,13 +16,9 @@ import static java.lang.System.out;
 
 
 public class TradePair extends Pair<Currency, Currency> {
-
-    static final Logger logger = LoggerFactory.getLogger(TradePair.class);
-
-
+    static Logger logger = LoggerFactory.getLogger(TradePair.class);
     Currency baseCurrency;
     Currency counterCurrency;
-
     long id;
     private double bid;
     private double ask;
@@ -33,8 +29,6 @@ public class TradePair extends Pair<Currency, Currency> {
         this.counterCurrency = counterCurrency;
 
         logger.debug("TradePair created: {}", this);
-
-
     }
 
     static {
@@ -49,7 +43,6 @@ public class TradePair extends Pair<Currency, Currency> {
 
 
     }
-
 
     @Contract("_, _ -> new")
     public static @NotNull TradePair of(String baseCurrencyCode, String counterCurrencyCode) throws SQLException, ClassNotFoundException {

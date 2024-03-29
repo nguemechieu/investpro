@@ -12,10 +12,36 @@ import java.util.Objects;
 
 public class Message extends Exception {
 
+    public Message(String noExchangeSelected, MESSAGE_TYPE o) {
+        super();
+        AnchorPane pane = new AnchorPane();
+        pane.setBorder(Border.stroke(
+                Color.PINK
+        ));
+        pane.setStyle("-fx-background-color: black;");
+        DialogPane dialogPane = new DialogPane();
+        dialogPane.setContentText(noExchangeSelected);
+        dialogPane.setHeaderText(o.toString());
+        pane.getChildren().add(dialogPane);
+        pane.setPrefWidth(300);
+        pane.setPrefHeight(200);
+        pane.setMaxWidth(600);
+        pane.setMaxHeight(400);
+
+        Scene scene = new Scene(pane);
+        Stage s1 = new Stage();
+
+        s1.setScene(scene);
+        s1.setResizable(false);
+        s1.show();
+
+
+    }
+
     public enum MESSAGE_TYPE {
         ERROR,
         SUCCESS,
-        WARNING
+        INFO, WARNING
     }
 
 
