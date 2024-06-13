@@ -146,7 +146,7 @@ trading, and accessing financial data.
 * Class
 * ![CLASSES](src/docs/investpro_classes_uml_diagram.png)
 * Java Modules
-* ![JAVA MODULE](src/docs/Java Modules Uml Diagam.png)
+* ![JAVA MODULE](./src/docs/Java Modules Uml Diagam.png)
 ### Operating Systems
 
 - **WINDOWS** ![Windows](./src/docs/windows.ico)
