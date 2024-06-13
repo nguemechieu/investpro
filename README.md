@@ -72,9 +72,7 @@ Run the following command to compile and package the application:
 
 mvn clean package
 
-6.
-
-Run the following command to start the application:
+6. Run the following command to start the application:
 
 java -jar target/investpro-1.0-SNAPSHOT.jar
 
