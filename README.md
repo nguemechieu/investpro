@@ -13,8 +13,9 @@
 
 To get started with InvestPro, follow these steps:
 
-1. Build the Docker image using the command:
-   docker build -t investpro 
+1. Build the Docker image using the comman
+       
+        docker build -t investpro 
 
 The project is built using Maven, a popular build automation tool for Java projects. The source code is organized into
 packages and modules within the java directory, and the build process is defined in the pom.xml file.
@@ -49,29 +50,29 @@ including:
 
 1.
 
-Install Java Development Kit (JDK) version 11 or higher.
+    Install Java Development Kit (JDK) version 11 or higher.
 
 2.
 
-Install Apache Maven version 3.6 or higher.
+    Install Apache Maven version 3.6 or higher.
 
 3.
 
-Clone the InvestPro repository from GitHub.
+    Clone the InvestPro repository from GitHub.
 
 4.
 
-Open the project directory in a terminal or command prompt.
+    Open the project directory in a terminal or command prompt.
 
 5.
 
 Run the following command to compile and package the application:
 
-mvn clean package
+     mvn clean package
 
 6. Run the following command to start the application:
 
-java -jar target/investpro-1.0-SNAPSHOT.jar
+       java -jar target/investpro-1.0-SNAPSHOT.jar
 
 This will start the application on port 8080.
 
@@ -90,7 +91,7 @@ In addition, you will need a valid API key for the financial data sources you wi
 
 # InvestPro is a Java-based application that uses a number of key technologies and libraries to provide a robust and high-performance user experience. Some of the key technologies and libraries used in InvestPro include:
 
-JavaFX: InvestPro uses JavaFX for building the user interface, which provides a rich and interactive experience for
+    JavaFX: InvestPro uses JavaFX for building the user interface, which provides a rich and interactive experience for
 users.
 Spring: InvestPro uses Spring for dependency injection and application configuration, which makes it easier to maintain
 and extend the application.
@@ -164,6 +165,5 @@ Docker configuration file for the project.
 
 **Build Command:**
 
-```bash
-docker build -t investpro .
+    docker build -t investpro
 
