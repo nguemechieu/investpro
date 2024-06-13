@@ -32,8 +32,7 @@ don't hesitate to ask!
 
 Noel M Nguemechieu at nguemechieu@live.com
 
-# package org.investpro;
-
+# package org.investpro
 What are the supported platforms and financial data sources for InvestPro, and how can I integrate new sources or
 customize the existing ones to fit my specific needs?
 
