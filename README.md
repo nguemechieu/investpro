@@ -142,9 +142,9 @@ trading, and accessing financial data.
 # UML DIAGRAMS
 
 * Modules
-* ![MODULE](src/docs/investpro_project_module_uml.png)
+* ![MODULE](./src/docs/investpro_project_module_uml.png)
 * Class
-* ![CLASSES](src/docs/investpro_classes_uml_diagram.png)
+* ![CLASSES](./src/docs/investpro_classes_uml_diagram.png)
 * Java Modules
 * ![JAVA MODULE](./src/docs/Java Modules Uml Diagam.png)
 ### Operating Systems
