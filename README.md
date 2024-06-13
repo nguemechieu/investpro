@@ -13,8 +13,8 @@
 
 To get started with InvestPro, follow these steps:
 
-1.Build the Docker image using the command:
-  docker build -t investpro .
+1. Build the Docker image using the command:
+   docker build -t investpro 
 
 The project is built using Maven, a popular build automation tool for Java projects. The source code is organized into
 packages and modules within the java directory, and the build process is defined in the pom.xml file.
@@ -30,7 +30,7 @@ don't hesitate to ask!
 
 Noel M Nguemechieu at nguemechieu@live.com
 
-# package org.investpro
+# package org.investpro;
 What are the supported platforms and financial data sources for InvestPro, and how can I integrate new sources or
 customize the existing ones to fit my specific needs?
 
