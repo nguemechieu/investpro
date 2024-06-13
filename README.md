@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Upload coverage reports to Codecov](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml)
 
-# Welcome to InvestPro!
+# Welcome to InvestPro
 
 ## InvestPro is a powerful investment and utility software that offers a range of features for managing investments, trading, and accessing financial data. It supports platforms like BINANCE US, COINBASE PRO, OANDA, TELEGRAM BOT, FOREX NEWS FACTORY, and provides features such as portfolio management, trade alert, and trade signal.
 
