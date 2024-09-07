@@ -1,12 +1,16 @@
 package org.investpro;
 
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
 import javafx.util.Pair;
 
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-
 /**
- * @author NOEL NGUEMECHIEU
+ * @author Noel Nguemechieu
  */
 public final class CandleStickChartUtils {
     private static final int SECONDS_PER_MINUTE = 60;
@@ -15,7 +19,6 @@ public final class CandleStickChartUtils {
     private static final int SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
     private static final int SECONDS_PER_MONTH = 30 * SECONDS_PER_WEEK;
     private static final int SECONDS_PER_YEAR = 12 * SECONDS_PER_MONTH;
-
 
     private CandleStickChartUtils() {
     }
@@ -54,14 +57,15 @@ public final class CandleStickChartUtils {
             throw new IllegalArgumentException("candleData must not be empty");
         }
         if (windowSize > candleData.size()) {
-            throw new IllegalArgumentException(STR."windowSize (\{windowSize}) must be less than size of candleData (\{candleData.size()})");
+            throw new IllegalArgumentException("windowSize (" + windowSize + ") must be less than size of " +
+                    "candleData (" + candleData.size() + ")");
         }
 
-        Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
-        Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
-        Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
-        Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
-        if (windowSize <= 0) return;
+        final Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
+        final Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
+
         for (int i = 0; i < windowSize; i++) {
             while (!volumeMinWindow.isEmpty() && candleData.get(i).getVolume() <=
                     candleData.get(volumeMinWindow.peekLast()).getVolume()) {
@@ -156,6 +160,8 @@ public final class CandleStickChartUtils {
      * for the current zoom level) which allows for scrolling the chart past the point where all of the most
      * recent candles are visible.
      *
+     * @param extrema
+     * @param candleData
      */
     public static void putExtremaForRemainingElements(Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extrema,
                                                       final List<CandleData> candleData) {
@@ -209,7 +215,7 @@ public final class CandleStickChartUtils {
         } else if (rangeInSeconds > SECONDS_PER_DAY) {
             result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
         } else {
-            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm:s"));
+            result = new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
         }
 
         return result;

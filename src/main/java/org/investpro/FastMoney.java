@@ -1,13 +1,14 @@
 package org.investpro;
 
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.sql.SQLException;
 import java.util.Objects;
+
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A monetary amount - models some fixed amount in a given currency.
@@ -23,75 +24,69 @@ import java.util.Objects;
  * can fail.
  */
 public final class FastMoney implements Money, Comparable<FastMoney> {
-    private final long amount;
-    private final int precision;
-    private final Currency currency;
+
+
+    private double amount;
+    private int precision;
+    private Currency currency;
 
     private FastMoney(long amount, Currency currency) {
         this(amount, currency, currency.getFractionalDigits());
+        this.amount = amount;
+        this.currency = currency;
     }
 
-    private FastMoney(long amount, Currency currency, int precision) {
+    private FastMoney(double amount, Currency currency, int precision) {
         Objects.requireNonNull(currency, "currency must not be null");
         this.amount = amount;
         this.precision = precision;
         this.currency = currency;
     }
 
-    public static Money of(long amount, final Currency currency) {
+    public static @NotNull Money of(long amount, final Currency currency) {
         Objects.requireNonNull(currency, "currency must not be null");
         return of(amount, currency, currency.getFractionalDigits());
     }
 
-    public static Money of(long amount, final Currency currency, int precision) {
+    @Contract("_, _, _ -> new")
+    public static @NotNull Money of(long amount, final Currency currency, int precision) {
         amount *= (long) Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
-    public static Money of(final double amount, final Currency currency) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(final double amount, final Currency currency) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static @NotNull Money of(final double amount, final Currency currency, int precision) throws SQLException, ClassNotFoundException {
+    public static Money of(final double amount, final Currency currency, int precision) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static @NotNull Money ofFiat(long amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static Money ofFiat(long amount, final String currencyCode) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         return ofFiat(amount, currencyCode, Currency.ofFiat(currencyCode).getFractionalDigits());
     }
 
-    @Contract("_, _, _ -> new")
-    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
-        Objects.requireNonNull(currencyCode, "currencyCode must not be null");
-        Currency currency = Currency.ofFiat(currencyCode);
-        amount *= (long) Math.pow(10, precision);
-        return new FastMoney(amount, currency, precision);
+//    @Contract("_, _, _ -> new")
+//    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+//        Objects.requireNonNull(currencyCode, "currencyCode must not be null");
+//        Currency currency = Currency.ofFiat(currencyCode);
+//        amount *= (long) Math.pow(10, precision);
+//        return new FastMoney(amount, currency, precision);
+//    }
+
+    public static Money ofFiat(double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+        return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.FIAT);
     }
 
-    public static Money ofFiat(final double amount, final String currencyCode) throws SQLException {
-        try {
-            return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.FIAT);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+    public static Money ofFiat(final double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+        return fromDouble(amount, precision, currencyCode, CurrencyType.FIAT);
     }
 
-    public static Money ofFiat(final double amount, final String currencyCode, int precision) throws SQLException {
-        try {
-            return fromDouble(amount, precision, currencyCode, CurrencyType.FIAT);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
-    public static Money ofCrypto(long amount, final String currencyCode) throws SQLException, ClassNotFoundException {
-        return ofCrypto(amount, currencyCode, Objects.requireNonNull(Currency.of(currencyCode)).getFractionalDigits());
-    }
-
-    public static Money ofCrypto(long amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
-        Currency currency = Currency.of(currencyCode);
-        amount *= (long) Math.pow(10, precision);
+    public static Money ofCrypto(double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+        Currency currency = Currency.ofCrypto(currencyCode);
+        amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
@@ -99,9 +94,6 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.CRYPTO);
     }
 
-    public static Money ofCrypto(final double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
-        return fromDouble(amount, precision, currencyCode, CurrencyType.CRYPTO);
-    }
 
     private static Money fromDouble(final double value, final int precision, final String currencyCode,
                                     final CurrencyType currencyType) throws SQLException, ClassNotFoundException {
@@ -113,7 +105,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (currencyType == CurrencyType.FIAT) {
             direct = fromDoubleNoFallback(value, precision, Currency.ofFiat(currencyCode));
         } else {
-            direct = fromDoubleNoFallback(value, precision, Currency.of(currencyCode));
+            direct = fromDoubleNoFallback(value, precision, Currency.ofCrypto(currencyCode));
         }
 
         if (direct != null) {
@@ -123,11 +115,11 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (currencyType == CurrencyType.FIAT) {
             return DefaultMoney.of(value, Currency.ofFiat(currencyCode));
         } else {
-            return DefaultMoney.of(value, Currency.of(currencyCode));
+            return DefaultMoney.of(value, Currency.ofCrypto(currencyCode));
         }
     }
 
-    private static FastMoney fromDoubleNoFallback(final double value, final int precision, final Currency currency) {
+    private static @Nullable FastMoney fromDoubleNoFallback(final double value, final int precision, final Currency currency) {
         // attempt direct
         final FastMoney direct = fromDouble0(value, precision, currency);
         if (direct != null) {
@@ -139,13 +131,18 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
             return down;
         }
         // ulp up
-        return fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
+        final FastMoney up = fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
+        if (up != null) {
+            return up;
+        }
+
+        return null;
     }
 
     private static FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
         final double multiplied = value * Utils.MULTIPLIERS[precision];
         final long converted = (long) multiplied;
-        if (multiplied == converted) { // here is an implicit conversion from long to double
+        if (multiplied == converted) { // here is an implicit conversion from double to long
             return new FastMoney(converted, currency, precision).normalize();
         }
 
@@ -155,10 +152,10 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     private static Money fromBigDecimal(final BigDecimal value, Currency currency) {
         final BigDecimal cleaned = value.stripTrailingZeros();
 
-        // try to convert to double using a fixed precision = 3, which will cover most of currencies
+        // try to convert to double using a fixed precision = 3, which will cover most currencies
         // it is required to get rid of rounding issues
         final double dbl = value.doubleValue();
-        final Money res = fromDoubleNoFallback(dbl, currency.fractionalDigits, currency);
+        final Money res = fromDoubleNoFallback(dbl, currency.getFractionalDigits(), currency);
         if (res != null) {
             return res;
         }
@@ -194,7 +191,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public Long amount() {
-        return amount;
+        return (long) amount;
     }
 
     @Override
@@ -206,15 +203,15 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return precision;
     }
 
-    private Money plus(FastMoney other) {
-        long result;
-        int precision = currency.fractionalDigits;
-        int precisionOther = other.currency.fractionalDigits;
+    private Money plus(@NotNull FastMoney other) {
+        double result;
+        int precision = currency.getFractionalDigits();
+        int precisionOther = other.currency.getFractionalDigits();
         if (precision == precisionOther) {
             result = amount + other.amount;
         } else if (precision > precisionOther) {
             long multiplier = Utils.MULTIPLIERS[precision - precisionOther];
-            long mult = other.amount * multiplier;
+            double mult = other.amount * multiplier;
             // overflow check, alternative is double multiplication and compare with Long.MAX_VALUE.
             if (mult / multiplier != other.amount) {
                 return other.plus(new DefaultMoney(toBigDecimal(), currency));
@@ -222,7 +219,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
             result = amount + mult;
         } else {
             long multiplier = Utils.MULTIPLIERS[precisionOther - precision];
-            long mult = amount * multiplier;
+            double mult = amount * multiplier;
             if (mult / multiplier != amount) {
                 return other.plus(new DefaultMoney(toBigDecimal(), currency));
             }
@@ -245,26 +242,12 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public Money plus(long summand) {
-        return plus(FastMoney.of(summand, currency).negate());
+        return plus(FastMoney.of(summand, currency));
     }
 
     @Override
-    public Money plus(double summand) throws SQLException {
-        try {
-            return plus(FastMoney.of(summand, currency).negate());
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public Money negate() {
-        return new FastMoney(-amount, currency);
-    }
-
-    @Override
-    public Money abs() {
-        return new FastMoney(Math.abs(amount), currency);
+    public Money plus(double summand) throws SQLException, ClassNotFoundException {
+        return plus(FastMoney.of(summand, currency));
     }
 
     @Override
@@ -272,7 +255,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (subtrahend instanceof DefaultMoney) {
             return new DefaultMoney(toBigDecimal().subtract(subtrahend.toBigDecimal()), currency);
         } else if (subtrahend instanceof FastMoney) {
-            return plus(subtrahend.negate());
+            return plus(((FastMoney) subtrahend).negate());
         } else {
             throw new IllegalArgumentException("Unknown money type: " + subtrahend.getClass());
         }
@@ -280,139 +263,107 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public Money minus(long subtrahend) {
-        return plus(FastMoney.of(subtrahend, currency).negate());
+        return null;
     }
 
     @Override
-    public Money minus(double subtrahend) throws SQLException {
-        try {
-            return plus(FastMoney.of(subtrahend, currency).negate());
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+    public Money minus(double subtrahend) {
+        return null;
     }
 
     @Override
     public Money multipliedBy(long multiplier) {
-        final long resUnits = amount * multiplier;
-
-        // fast overflow test - if both values fit in the 32 bits (and positive), they can not overflow
-        if (((amount | multiplier) & Utils.MASK32) == 0) {
-            return new FastMoney(resUnits, currency, precision).normalize();
-        }
-
-        // slower overflow test - check if we will get the original value back after division. It is not possible
-        // in case of overflow.
-        final long origAmount = resUnits / multiplier;
-        if (origAmount != amount) {
-            final BigInteger res = BigInteger.valueOf(amount).multiply(BigInteger.valueOf(multiplier));
-            return fromBigDecimal(new BigDecimal(res), currency);
-        }
-        return new FastMoney(resUnits, currency, precision).normalize();
+        return null;
     }
 
     @Override
-    public Money multipliedBy(final double multiplier) {
-        final double unscaledRes = amount * multiplier; // need to apply precision
-        // try to check if we got an integer value first
-        final long unscaledLng = (long) unscaledRes;
-        if (unscaledLng == unscaledRes) { // possible overflow is also checked here
-            return new FastMoney(unscaledLng, currency, precision).normalize();
-        }
-
-        // 4 is a "safe" precision of this calculation. The higher it is - the less results will end up
-        // on the BigDecimal (DefaultMoney) branch, but at the same time the more expensive the normalization will be.
-        final FastMoney unscaledLong = fromDoubleNoFallback(unscaledRes, 4, currency);
-        if (unscaledLong != null) {
-            // if precision is not too high - stay at long values
-            if (unscaledLong.precision + precision <= Utils.MAX_ALLOWED_PRECISION) {
-                return new FastMoney(unscaledLong.amount, currency, unscaledLong.precision + precision).normalize();
-            }
-        }
-
-        // slow path via BigDecimal (DefaultMoney), we may still get FastMoney on this branch if the unscaledRes
-        // precision is too high.
-        return fromBigDecimal(toBigDecimal().multiply(new BigDecimal(multiplier, MathContext.DECIMAL64),
-                MathContext.DECIMAL64), currency);
+    public Money multipliedBy(double multiplier) {
+        return null;
     }
 
     @Override
     public Money multipliedBy(BigDecimal multiplier, MathContext mathContext) {
-        throw new UnsupportedOperationException();
+        return null;
     }
 
     @Override
-    public Money dividedBy(final long divisor) {
-        return dividedBy((double) divisor);
+    public Money dividedBy(long divisor) {
+        return null;
     }
 
     @Override
-    public Money dividedBy(final double divisor) {
-        final double unscaledRes = amount / divisor;
-        // We already have precision digits of precision. We need to take (precision - this.precision) digits
-        // more from the unscaled result. Plus one more digit for rounding.
-        final long destRes;
-        if (precision < currency.getFractionalDigits()) {
-            // take precision-m_precision digits after decimal point
-            destRes = Math.round(unscaledRes * Utils.MULTIPLIERS[currency.getFractionalDigits() - precision]);
-        } else if (precision == currency.getFractionalDigits()) {
-            // round to long
-            destRes = Math.round(unscaledRes);
-        } else {
-            destRes = Math.round(unscaledRes * Utils.MULTIPLIERS_NEG[precision - currency.getFractionalDigits()]);
-        }
-
-        return new FastMoney(destRes, currency, currency.getFractionalDigits()).normalize();
+    public Money dividedBy(double divisor) {
+        return null;
     }
 
     @Override
     public Money dividedBy(BigDecimal divisor, MathContext mathContext) {
-        throw new UnsupportedOperationException();
+        return null;
     }
 
     @Override
-    public double toDouble() {
-        // we can not replace division here with multiplication by MULTIPLIERS_NEG -
-        // it will sacrifice the exact result guarantee.
-        return ((double) amount) / Utils.MULTIPLIERS[precision];
+    public Money multiply(long multiplicand) {
+        return new FastMoney(amount * multiplicand, currency, precision).normalize();
+    }
+
+    @Override
+    public Money multiply(double multiplicand) throws SQLException, ClassNotFoundException {
+        return fromDouble(amount * multiplicand / Utils.MULTIPLIERS[precision], precision, currency.getCode(), currency.getCurrencyType());
+    }
+
+    @Override
+    public Money multiply(BigDecimal multiplicand) {
+        return fromBigDecimal(toBigDecimal().multiply(multiplicand, MathContext.DECIMAL128), currency);
+    }
+
+    @Override
+    public Money divide(long divisor) {
+        return new FastMoney(amount / divisor, currency, precision).normalize();
+    }
+
+    @Override
+    public Money divide(double divisor) throws SQLException, ClassNotFoundException {
+        return fromDouble(amount / divisor / Utils.MULTIPLIERS[precision], precision, currency.getCode(), currency.getCurrencyType());
+    }
+
+    @Override
+    public Money divide(BigDecimal divisor) {
+        return fromBigDecimal(toBigDecimal().divide(divisor, MathContext.DECIMAL128), currency);
+    }
+
+    @Override
+    public Money negate() {
+        return new FastMoney(-amount, currency, precision).normalize();
+    }
+
+    @Override
+    public Money abs() {
+        return null;
     }
 
     @Override
     public BigDecimal toBigDecimal() {
-        return BigDecimal.valueOf(amount, currency.fractionalDigits);
+        return new BigDecimal(BigInteger.valueOf((long) amount), precision);
+    }
+
+    @Override
+    public double toDouble() {
+        return 0;
     }
 
     @Override
     public boolean isLessThan(Money other) {
-        if (other instanceof FastMoney money) {
-            return compareTo(money) < 0;
-        } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.amount()) < 0;
-        } else {
-            throw new IllegalArgumentException(STR."Unknown money type: \{other.getClass()}");
-        }
+        return false;
     }
 
     @Override
     public boolean isGreaterThan(Money other) {
-        if (other instanceof FastMoney money) {
-            return compareTo(money) > 0;
-        } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.amount()) > 0;
-        } else {
-            throw new IllegalArgumentException(STR."Unknown money type: \{other.getClass()}");
-        }
+        return false;
     }
 
     @Override
     public boolean isGreaterThanOrEqualTo(Money other) {
-        if (other instanceof FastMoney money) {
-            return compareTo(money) >= 0;
-        } else if (other instanceof DefaultMoney money) {
-            return toBigDecimal().compareTo(money.amount()) >= 0;
-        } else {
-            throw new IllegalArgumentException(STR."Unknown money type: \{other.getClass()}");
-        }
+        return false;
     }
 
     @Override
@@ -420,132 +371,76 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return amount == 0L;
     }
 
-    /**
-     * If <code>amount</code> ends with zeroes - reduce the <code>precision</code> accordingly
-     *
-     * @return the normalized value
-     */
-    private FastMoney normalize() {
-        // shortcut - must be an even number (to be divisible by 10)
-        if ((amount & 1) == 1) {
-            return this;
-        }
-        int precision = this.precision;
-        long amount = this.amount;
-        long quotient;
-        long remainder;
-        while (precision > 0) {
-            quotient = amount / 10;
-            remainder = amount - ((quotient << 3) + (quotient << 1));
-            if (remainder != 0) {
-                break;
-            }
-            --precision;
-            amount = quotient;
-        }
-        if (precision == this.precision) {
-            return this;
-        } else {
-            return new FastMoney(amount, currency, precision);
-        }
-    }
-
-    private FastMoney truncate(int maxPrecision) {
-        if (precision <= maxPrecision) {
-            return this;
-        }
-
-        Utils.checkPrecision(maxPrecision);
-
-        // we can multiply by floating point values here because we will round the result afterwards
-        return new FastMoney(Math.round(amount * Utils.MULTIPLIERS_NEG[precision - maxPrecision]), currency,
-                maxPrecision).normalize();
+    @Override
+    public boolean isPositive() {
+        return amount > 0L;
     }
 
     @Override
-    public boolean equals(Object object) {
-        if (this == object) {
-            return true;
-        }
+    public boolean isPositiveOrZero() {
+        return amount >= 0L;
+    }
 
-        if (object == null || getClass() != object.getClass()) {
-            return false;
-        }
+    @Override
+    public boolean isNegative() {
+        return amount < 0L;
+    }
 
-        FastMoney other = (FastMoney) object;
-        return this.precision == other.precision && amount == other.amount;
+    @Override
+    public boolean isNegativeOrZero() {
+        return amount <= 0L;
+    }
+
+    @Override
+    public @NotNull FastMoney toFastMoney() {
+        return this;
+    }
+
+    @Override
+    public boolean canEqual(Object other) {
+        return other instanceof FastMoney;
+    }
+
+    @Override
+    public int compareTo(@NotNull FastMoney other) {
+        if (precision == other.precision) {
+            return Long.compare((long) amount, (long) other.amount);
+        } else if (precision > other.precision) {
+            return Long.compare((long) amount, (long) (other.amount * Utils.MULTIPLIERS[precision - other.precision]));
+        } else {
+            return Long.compare((long) (amount * Utils.MULTIPLIERS[other.precision - precision]), (long) other.amount);
+        }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FastMoney fastMoney = (FastMoney) o;
+        return amount == fastMoney.amount && precision == fastMoney.precision && currency.equals(fastMoney.currency);
     }
 
     @Override
     public int hashCode() {
-        final int result = (int) (amount ^ (amount >>> 32));
-        return 31 * result + precision;
+        return Objects.hash(amount, precision, currency);
     }
 
     @Override
     public String toString() {
-        return new FastMoneyFormatter().format(this);
+        return STR."\{toBigDecimal().toPlainString()} \{currency.getCode()}";
     }
 
-    private static int compare(final long x, final long y) {
-        return Long.compare(x, y);
+    private FastMoney normalize() {
+        double truncated = truncate();
+        return truncated != amount ? new FastMoney(truncated, currency, precision) : this;
     }
 
-    @Override
-    public int compareTo(final FastMoney other) {
-        if (precision == other.precision) {
-            return compare(amount, other.amount);
+    private double truncate() {
+        double truncatedAmount = amount;
+        while (precision > currency.getFractionalDigits()) {
+            truncatedAmount /= 10;
+            precision--;
         }
-        if (precision < other.precision) {
-            final long multiplier = Utils.MULTIPLIERS[other.precision - precision];
-            final long mult = amount * multiplier;
-            if (mult / multiplier == amount) { // overflow check
-                return compare(mult, other.amount);
-            }
-        }
-        if (precision > other.precision) {
-            final long multiplier = Utils.MULTIPLIERS[precision - other.precision];
-            final long mult = other.amount * multiplier;
-            if (mult / multiplier == other.amount) { // overflow check
-                return compare(amount, mult);
-            }
-        }
-
-        // fallback for generic case
-        return toBigDecimal().compareTo(other.toBigDecimal());
-    }
-
-    public static class Utils {
-        public static final int MAX_LONG_LENGTH = Long.toString(Long.MAX_VALUE).length();
-
-        public static final int MAX_ALLOWED_PRECISION = 15;
-        // needed for overflow checking during conversion
-        public static final long MAX_LONG_DIVIDED_BY_10 = Long.MAX_VALUE / 10;
-
-        /**
-         * Non-negative powers of 10
-         */
-        public static final long[] MULTIPLIERS = new long[MAX_ALLOWED_PRECISION + 1];
-        /**
-         * Non-positive powers of 10
-         */
-        public static final double[] MULTIPLIERS_NEG = new double[MAX_ALLOWED_PRECISION + 1];
-
-        public static final long MASK32 = 0xFFFFFFFF00000000L;
-
-        static {
-            long val = 1;
-            for (int i = 0; i <= MAX_ALLOWED_PRECISION; ++i) {
-                MULTIPLIERS[i] = val;
-                MULTIPLIERS_NEG[i] = 1.0 / val;
-                val *= 10;
-            }
-        }
-
-        static void checkPrecision(int precision) {
-            if (precision < 0 || precision > MAX_ALLOWED_PRECISION) {
-                throw new IllegalArgumentException(STR."precision must be between 0 and \{MAX_ALLOWED_PRECISION} but was: \{precision}");
-            }
-        }
+        return truncatedAmount;
     }
 }

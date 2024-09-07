@@ -1,4 +1,10 @@
 package org.investpro;
+
+
+import jakarta.persistence.*;
+import org.jetbrains.annotations.NotNull;
+
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -6,21 +12,59 @@ import java.util.Objects;
  * A Trade represents a completed order (then called a trade), which is a transaction where one
  * party buys and the other one sells some amount of currency at a fixed price.
  *
-
+ * @author Noel Nguemechieu
  */
+@Entity
+@Table(name = "trades")
 public class Trade {
-    private TradePair tradePair;
-    private Money price;
-    private Money amount;
-    private Side transactionType;
+
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trade_pair_id", nullable = false)
+    TradePair tradePair;
+    private Exchange exchange;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "local_trade_id", nullable = false)
     private long localTradeId;
-    private Instant timestamp;
     private Money fee;
-    private long lastTransactionID;
-    private double units;
+
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = false)
+    private Account account;
+
+    @Column(name = "price", nullable = false)
+    @Convert(converter = MoneyConverter.class)
+    private Money price;
+
+    @Column(name = "amount", nullable = false)
+    @Convert(converter = MoneyConverter.class)
+    private Money amount;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type", nullable = false)
+    private Side transactionType;
+
+    @Column(name = "timestamp", nullable = false)
+    private Instant timestamp;
+
+
+    // Constructors, getters, and other methods...
+
+    public Trade(Exchange exchange, TradePair tradePair, Money price, Money amount, Side transactionType,
+                 long localTradeId, Instant timestamp, Money fee) {
+        this.tradePair = tradePair;
+        this.price = price;
+        this.amount = amount;
+        this.transactionType = transactionType;
+        this.localTradeId = localTradeId;
+        this.timestamp = timestamp;
+        this.fee = fee;
+        this.exchange = exchange;
+    }
 
     public Trade() {
-        super();
+
     }
 
     public Trade(TradePair tradePair, Money price, Money size, Side side, long tradeId, Instant time) {
@@ -32,36 +76,108 @@ public class Trade {
         this.timestamp = time;
     }
 
-    /**
-     * Represents one line of the raw trade data. We use doubles because the results don't need to be
-     * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
-     */
 
-    // 1315922016,5.800000000000,1.000000000000
-    public Trade(TradePair tradePair, int timestamp, Money price, Money amount, Side transactionType, long localTradeId, Money fee) {
-        this.tradePair = tradePair;
-        this.timestamp = Instant.ofEpochSecond(timestamp);
-        this.price = price;
-        this.amount = amount;
-        this.transactionType = transactionType;
-        this.localTradeId = localTradeId;
-        this.fee = fee;
+    public TradePair getTradePair() {
+        return tradePair;
     }
 
-    public void setTradePair(TradePair tradePair) {
-        this.tradePair = tradePair;
+    public double getPrice() {
+        return price.toDouble();
     }
 
     public void setPrice(Money price) {
         this.price = price;
     }
 
+    public double getAmount() {
+        return amount.toDouble();
+    }
+
+    public Instant getTimestamp() {
+        return timestamp;
+    }
+
     public void setAmount(Money amount) {
         this.amount = amount;
     }
 
+    @Override
+    public String toString() {
+        return String.format("Trade [tradePair = %s, price = %s, amount = %s, transactionType = %s, localId = %s, " +
+                "timestamp = %s, fee = %s]", tradePair, price, amount, transactionType, localTradeId, timestamp, fee);
+    }
+
+    public Money getTotal() throws SQLException, ClassNotFoundException {
+        return DefaultMoney.ofFiat(price.toBigDecimal().multiply(amount.toBigDecimal()), "USD");
+    }
+
+    public Side getTransactionType() {
+        return transactionType;
+    }
+
     public void setTransactionType(Side transactionType) {
         this.transactionType = transactionType;
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (object == this) {
+            return true;
+        }
+
+        if (object == null || object.getClass() != this.getClass()) {
+            return false;
+        }
+
+        Trade other = (Trade) object;
+
+        return Objects.equals(tradePair, other.tradePair)
+                && Objects.equals(price, other.price)
+                && Objects.equals(amount, other.amount)
+                && transactionType == other.transactionType
+                && localTradeId == other.localTradeId
+                && Objects.equals(timestamp, other.timestamp);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(tradePair, price, amount, transactionType, localTradeId, timestamp);
+    }
+
+    public Account getAccount() {
+        return account;
+    }
+
+    public void setAccount(Account account) {
+        this.account = account;
+    }
+
+    public @NotNull Trade getTrade() {
+        return this;
+    }
+
+    public boolean isSell() {
+        return transactionType == Side.SELL;
+    }
+
+    public Money getFee() {
+        return fee;
+    }
+
+    public void setFee(Money fee) {
+        this.fee = fee;
+    }
+
+    public void setTimestamp(Instant timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public boolean isBuy() {
+        return transactionType == Side.BUY;
+    }
+
+    public void setTradePair(TradePair tradePair) {
+        this.tradePair = tradePair;
     }
 
     public long getLocalTradeId() {
@@ -72,88 +188,11 @@ public class Trade {
         this.localTradeId = localTradeId;
     }
 
-    public void setTimestamp(Instant timestamp) {
-        this.timestamp = timestamp;
+    public Exchange getExchange() {
+        return exchange;
     }
 
-    public Money getFee() {
-        return fee;
-    }
-
-
-    public TradePair getTradePair() {
-        return tradePair;
-    }
-
-    public Money getPrice() {
-        return price;
-    }
-
-    public Money getAmount() {
-        return amount;
-    }
-
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("Trade [tradePair = %s, price = %s, amount = %s, transactionType = %s, localId = %s, " +
-                "timestamp = %s, fee = %s]", tradePair, price, amount, transactionType, localTradeId, timestamp, fee);
-    }
-
-    public void setFee(Money fee) {
-        this.fee = fee;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(timestamp, price, amount);
-    }
-
-    @Override
-    public boolean equals(Object object) {
-        if (object == this) {
-            return true;
-        }
-
-        if (object == null || object.getClass() != getClass()) {
-            return false;
-        }
-
-        Trade other = (Trade) object;
-
-        return Objects.equals(timestamp, other.timestamp) &&
-                Objects.equals(price, other.price) &&
-                Objects.equals(amount, other.amount);
-    }
-
-
-    public Side getTransactionType() {
-        return transactionType;
-
-    }
-
-    public Long getLocalId() {
-        return localTradeId;
-    }
-
-    public long getLastTransactionID() {
-        return lastTransactionID;
-    }
-
-    public void setLastTransactionID(long lastTransactionID) {
-
-        this.lastTransactionID = lastTransactionID;
-    }
-
-    public void setSize(double units) {
-        this.units = units;
-
-    }
-
-    public double getUnits() {
-        return units;
+    public void setExchange(Exchange exchange) {
+        this.exchange = exchange;
     }
 }

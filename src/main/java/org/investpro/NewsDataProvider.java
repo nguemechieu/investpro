@@ -4,7 +4,6 @@ import org.jetbrains.annotations.Contract;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,7 +27,6 @@ public class NewsDataProvider {
     @Contract("null -> fail")
     public static Date StringToDate(String str) throws ParseException {//TODO implement date
         if (str == null) throw new IllegalArgumentException("Invalid date string");
-        //ZonedDateTime.from(DateTimeFormatter.ofPattern( "yyyy-MM-dd'T'HH:mm:ss").parse(str.substring(0, 19)));
         return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(str);
     }
 
@@ -37,7 +35,6 @@ public class NewsDataProvider {
     HttpClient client = HttpClient.newHttpClient();
 
     public CompletableFuture<String> getNewsData(String url) {
-        String uriStr = "www.faireconomy.media/ff_calendar_thisweek.json?version=1";
         request.uri(URI.create(url))
                 .header("Content-Type", "application/json")
                 .GET()
@@ -50,23 +47,19 @@ public class NewsDataProvider {
                 }).thenApply(response -> response).completeOnTimeout(
                         "REQUEST TIMEOUT ", 5000, TimeUnit.MILLISECONDS
                 );
-
-
     }
-    List<News> getNews() throws ParseException, IOException, InterruptedException {
 
-
+    List<News> getNews() throws ParseException, InterruptedException {
         String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
-
-
         //Checking internet connexion first before request
-
-
-
         ArrayList<News> news = new ArrayList<>();//
         String data;
         try {
             data = getNewsData(url).get();
+            if (data == null || !data.contains("[")) {
+                news.add(new News("No news available", "N/A", "N/A", new Date(), "N/A", "N/A"));
+                return news;
+            }
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         }
@@ -75,13 +68,14 @@ public class NewsDataProvider {
         int length = jsonArray.length();
         for (int i = 0; i < length; i++) {
             JSONObject json = jsonArray.getJSONObject(i);
-            String title = null;
-            news1 = new News(null, null, null, null, "0", "");
+            String title = "";
+            news1 = new News("N/A", "N/A", "N/A",
+                    new Date(), "N/A", "N/A");
             if (json.has("title")) {
                 title = json.getString("title");
                 news1.setTitle(title);
             }
-            String country = null;
+            String country = "";
             if (json.has("country")) {
                 country = json.getString("country");
                 news1.setCountry(country);

@@ -1,5 +1,6 @@
 package org.investpro;
 
+import org.bounce.message.Message;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
@@ -46,7 +47,7 @@ public class OrderCreateTransaction {
             this.reason = jsonObject.getJSONObject("orderCancelTransaction").getString("reason");
             this.instrument = jsonObject.getJSONObject("orderCancelTransaction").getString("instrument");
             this.orderID = jsonObject.getString("orderID");
-            new Message("OrderCreateTransaction", String.valueOf(this));
+
         } else {
 //            "accountID": "001-001-2783446-002",
 //                    "reason": "CLIENT_ORDER",

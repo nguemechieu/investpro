@@ -1,18 +1,14 @@
 package org.investpro;
 
-import javafx.beans.property.IntegerProperty;
-import org.jetbrains.annotations.NotNull;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
+import java.util.*;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
+import javafx.beans.property.IntegerProperty;
 
+/**
+ * @author Noel Nguemechieu
+ */
 public abstract class CandleDataSupplier implements Supplier<Future<List<CandleData>>> {
     /**
      * The number of candles supplied per call to {@link #get()}.
@@ -20,10 +16,13 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     protected final int numCandles;
     protected final int secondsPerCandle;
     protected final TradePair tradePair;
-    protected IntegerProperty endTime;
+    private static final Set<Integer> GRANULARITY = Set.of(
+            60, 180, 300, 900, 1800, 3600, 7200, 14400,
+            21600, 43200, 86400, 172800, 604800
 
-    private static final Set<Integer> GRANULARITY = Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400,
-            21600, 43200, 86400);
+    );
+    protected final IntegerProperty endTime;
+    List<CandleData> candleDataList = new ArrayList<>();
 
     public CandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
         Objects.requireNonNull(tradePair);
@@ -40,13 +39,13 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
         this.endTime = endTime;
     }
 
-    public Set<Integer> getSupportedGranularities() {
+    public Set<Integer> getSupportedGranularity() {
         return GRANULARITY;
     }
 
     @Override
     public String toString() {
-        return STR."CandleDataSupplier [numCandles=\{numCandles}, secondsPerCandle=\{secondsPerCandle}, tradePair=\{tradePair}, endTime=\{endTime}\{']'}";
+        return STR."CandleDataSupplier [numCandles=\{numCandles}, secondsPerCandle=\{secondsPerCandle}, tradePair=\{tradePair}, endTime=\{endTime}]";
     }
 
     @Override
@@ -69,13 +68,11 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
         return Objects.hash(numCandles, secondsPerCandle, tradePair, endTime);
     }
 
-    public abstract List<CandleData> getCandleData();
-
     public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
 
-    public abstract CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
-            @NotNull TradePair tradePair, Instant currentCandleStartedAt,
-            long secondsIntoCurrentCandle, int secondsPerCandle);
+    public void add(CandleData of) {
 
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt);
+        candleDataList.add(of);
+
+    }
 }

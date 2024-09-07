@@ -1,4 +1,4 @@
-//CHECKSTYLE:OFF
+package org.investpro;//CHECKSTYLE:OFF
 /*
  * Copyright (c) 2013, ControlsFX
  * All rights reserved.
@@ -25,8 +25,16 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.investpro;
 
+
+import static java.lang.Double.MAX_VALUE;
+import static javafx.geometry.Pos.CENTER_LEFT;
+import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
+import static javafx.scene.paint.Color.YELLOW;
+import static org.investpro.PopOver.ArrowLocation.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
@@ -42,19 +50,20 @@ import javafx.scene.control.Skin;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.*;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.HLineTo;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
+import javafx.scene.shape.PathElement;
+import javafx.scene.shape.QuadCurveTo;
+import javafx.scene.shape.VLineTo;
 import javafx.stage.Window;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static java.lang.Double.MAX_VALUE;
-import static javafx.geometry.Pos.CENTER_LEFT;
-import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
-import static javafx.scene.paint.Color.YELLOW;
-import static org.investpro.PopOver.ArrowLocation.*;
-
 public class PopOverSkin implements Skin<PopOver> {
+    private final Label title;
+    private final Label closeIcon;
     private final Path path;
     private final Path clip;
     private final BorderPane content;
@@ -88,13 +97,13 @@ public class PopOverSkin implements Skin<PopOver> {
 
         stackPane.minHeightProperty().bind(stackPane.minWidthProperty());
 
-        Label title = new Label();
+        title = new Label();
         title.textProperty().bind(popOver.titleProperty());
         title.setMaxSize(MAX_VALUE, MAX_VALUE);
         title.setAlignment(Pos.CENTER);
         title.getStyleClass().add("text"); //$NON-NLS-1$
 
-        Label closeIcon = new Label();
+        closeIcon = new Label();
         closeIcon.setGraphic(createCloseIcon());
         closeIcon.setMaxSize(MAX_VALUE, MAX_VALUE);
         closeIcon.setContentDisplay(GRAPHIC_ONLY);
@@ -134,7 +143,7 @@ public class PopOverSkin implements Skin<PopOver> {
         getPopupWindow().yProperty().addListener(updatePathListener);
         popOver.arrowLocationProperty().addListener(updatePathListener);
         popOver.contentNodeProperty().addListener(
-                (_, _, newContent) -> content
+                (value, oldContent, newContent) -> content
                         .setCenter(newContent));
         popOver.detachedProperty()
                 .addListener((value, oldDetached, newDetached) -> {

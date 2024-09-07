@@ -1,7 +1,7 @@
 package org.investpro;
 
 /**
- * @author NOEL NGUEMECHIEU
+ * @author Michael Ennen
  */
 public enum Algorithm {
     SHA256,

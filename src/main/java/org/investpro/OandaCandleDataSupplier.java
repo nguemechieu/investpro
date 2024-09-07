@@ -44,28 +44,13 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
 
 
     @Override
-    public Set<Integer> getSupportedGranularities() {
+    public Set<Integer> getSupportedGranularity() {
         // https://docs.pro.coinbase.com/#get-historic-rates
         return new TreeSet<>(Set.of(60, 300, 900, 3600, 21600, 86400));
     }
 
     @Override
-    public List<CandleData> getCandleData() {
-        return null;
-    }
-
-    @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
         return null;
     }
 
@@ -124,7 +109,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
                         // Remove the current in-progress candle
 
                         for (JsonNode candle : res.get("candles")) {
-                            String tim = candle.get("time").asText();
+
                             int time;
                             if (candle.has("time")) {
 

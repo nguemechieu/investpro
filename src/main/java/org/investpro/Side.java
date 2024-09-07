@@ -1,5 +1,6 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
@@ -18,15 +19,12 @@ public enum Side {
         }
     }
 
+    @Contract(pure = true)
     public static Side oppositeOf(Side side) {
-        switch (side) {
-            case BUY:
-                return SELL;
-            case SELL:
-                return BUY;
-            default:
-                throw new IllegalArgumentException("unknown side: " + side);
-        }
+        return switch (side) {
+            case BUY -> SELL;
+            case SELL -> BUY;
+        };
     }
 
     @Override

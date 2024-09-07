@@ -78,8 +78,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private double labelSize = -1;
 
 
-    public StableTicksAxis() {
-    }
+
     public StableTicksAxis(double lowerBound, double upperBound) {
 
         super(lowerBound, upperBound);
@@ -93,10 +92,13 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     private static double calculateTickSpacing(double delta, int maxTicks) {
         if (delta <= 0.0) {
+            delta = 1.0;
             throw new IllegalArgumentException(STR."delta (\{delta}) must be positive");
+
         }
         if (maxTicks < 1) {
             throw new IllegalArgumentException(STR."maxTicks (\{maxTicks}) must be >= 1");
+
         }
 
         int factor;
@@ -264,14 +266,14 @@ public class StableTicksAxis extends ValueAxis<Number> {
             // Add padding
             double delta = maxValue - minValue;
             double paddedMin = minValue - delta * autoRangePadding.get();
-            // If we've crossed the 0 line, clamp to 0.
+            // If we've crossed line 0, clamp to 0.
             // noinspection FloatingPointEquality
             if (Math.signum(paddedMin) != Math.signum(minValue)) {
                 paddedMin = 0.00000;
             }
 
             double paddedMax = maxValue + delta * autoRangePadding.get();
-            // If we've crossed the 0 line, clamp to 0.
+            // If we've crossed line 0, clamp to 0.
             // noinspection FloatingPointEquality
             if (Math.signum(paddedMax) != Math.signum(maxValue)) {
                 paddedMax = 0.000000000;
@@ -333,6 +335,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
         } else {
             currentLowerBound.set(rangeVal.low);
             setScale(rangeVal.scale);
+            setLowerBound(rangeVal.low);
+            setUpperBound(rangeVal.high);
         }
 
         setLowerBound(rangeVal.low);
@@ -356,9 +360,9 @@ public class StableTicksAxis extends ValueAxis<Number> {
     protected List<Number> calculateTickValues(double length, Object range) {
         Range rangeVal = (Range) range;
 
-        // Use floor so we start generating ticks before the axis starts -- this is really only relevant
+        // Use a floor so we start generating ticks before the axis starts -- this is really only relevant
         // because of the minor ticks before the first visible major tick. We'll generate a first
-        // invisible major tick but the ValueAxis seems to filter it out.
+        // invisible major tick, but the ValueAxis seems to filter it out.
         double firstTick = Math.floor(rangeVal.low / rangeVal.tickSpacing) * rangeVal.tickSpacing;
 
         // Generate one more tick than we expect, for "overlap" to get minor ticks on both sides of the
@@ -399,6 +403,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
+
+            if (high - low < 0) return 0;
             return high - low;
         }
 

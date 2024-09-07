@@ -1,5 +1,8 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Objects;
 
 /**
@@ -22,9 +25,10 @@ public record SymmetricPair<F, S>(F first, S second) {
      *
      * @param a the first object in the Pair
      * @param b the second object in the pair
-     * @return a Pair that is templatized with the types of a and b
+     * @return a Pair that is templates with the types of a and b
      */
-    public static <A, B> SymmetricPair<A, B> of(A a, B b) {
+    @Contract(value = "_, _ -> new", pure = true)
+    public static <A, B> @NotNull SymmetricPair<A, B> of(A a, B b) {
         return new SymmetricPair<>(a, b);
     }
 

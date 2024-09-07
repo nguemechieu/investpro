@@ -1,0 +1,16 @@
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             version="3.0">
+    <persistence-unit name="InvestPro">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>org.investpro.InvestPro</class>
+        <properties>
+            <!-- SQLite specific configuration -->
+            <property name="jakarta.persistence.jdbc.url" value="jdbc:sqlite:InvestPro"/>
+            <property name="jakarta.persistence.jdbc.driver" value="org.sqlite.JDBC"/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
+            <property name="hibernate.hbm2ddl.auto" value="update"/>
+
+
+        </properties>
+    </persistence-unit>
+</persistence>

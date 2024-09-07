@@ -27,13 +27,13 @@ public class FastMoneyFormatter implements MoneyFormatter<Money> {
             // TODO ideally this would only trigger if the fractional digits of the currency was 0
             // but that is not yet how it's working
             if (money.currency().getCurrencyType() == CurrencyType.FIAT) {
-                return money.currency().getSymbol() + money.amount() + ".00";
+                return STR."\{money.currency().getSymbol()}\{money.amount()}.00";
             } else {
                 return Long.toString(money.amount()) + ' ' + money.currency().getCode();
             }
         }
 
-        final char[] buf = new char[FastMoney.Utils.MAX_LONG_LENGTH + 3];
+        final char[] buf = new char[Utils.MAX_LONG_LENGTH + 3];
         int p = buf.length;
         int remainingPrecision = money.getPrecision();
         long units = Math.abs(money.amount());

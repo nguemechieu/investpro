@@ -1,64 +1,83 @@
 package org.investpro;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
+import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpResponse;
 import java.time.Instant;
+
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import static org.investpro.Coinbase.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.Coinbase.client;
+import static org.investpro.Coinbase.requestBuilder;
+
 public class BinanceUs extends Exchange {
-    public BinanceUs(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
-        this.apiKey = apiKey;
-        this.apiSecret = apiSecret;
+    public BinanceUs(String apikey, String apiSecret) {
+        super(
+
+                apikey, apiSecret
+        );
     }
 
     @Override
-    public TradePair getSelecTradePair() {
+    public Account getAccounts() throws IOException {
         return null;
     }
 
     @Override
-    public void buy(TradePair btcUsd, MARKET_TYPES marketType, double sizes, double stoploss, double takeProfit) {
-        super.buy(btcUsd, marketType, sizes, stoploss, takeProfit);
-    }
-
-    @Override
-    public void sell(TradePair btcUsd, MARKET_TYPES marketType, double sizes, double stopLoss, double takeProfit) {
-        super.sell(btcUsd, marketType, sizes, stopLoss, takeProfit);
-    }
-
-    @Override
-    public void cancelALL() {
-        super.cancelALL();
-    }
-
-    @Override
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-        super.autoTrading(auto, signal);
-    }
-
-    @Override
-    public ExchangeWebSocketClient getWebsocketClient() {
+    public Boolean isConnected() {
         return null;
     }
 
     @Override
-    public double getTradingFee() throws IOException, InterruptedException {
-        return 0;
+    public String getSymbol() {
+        return "";
     }
 
     @Override
-    public Account getAccounts() throws IOException, InterruptedException {
+    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException {
         return null;
     }
 
     @Override
-    public List<String> getTradePair() throws IOException, InterruptedException {
+    public String getExchangeMessage() {
+        return "";
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return null;
+    }
+
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public List<Order> getPendingOrders() throws IOException {
+        return List.of();
+    }
+
+    @Override
+    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public JsonParser getUserAccountDetails() {
         return null;
     }
 
@@ -68,142 +87,35 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
-    Boolean isConnected() {
+    public void getPositionBook(TradePair tradePair) {
+
+    }
+
+    @Override
+    public List<Order> getOpenOrder(@NotNull TradePair tradePair) {
+        return List.of();
+    }
+
+    @Override
+    public ObservableList<Order> getOrders() {
         return null;
     }
 
     @Override
-    public String getSymbol() {
-        return null;
-    }
+    public List<TradePair> getTradePairs() throws IOException, InterruptedException {
 
-    @Override
-    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, @NotNull Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
+        requestBuilder.uri(URI.create("https://api.binance.us/api/v3/exchangeInfo")).build();
 
-    }
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-    @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return null;
-    }
+        if (response.statusCode() != 200) {
+            throw new IOException(String.format("Failed to fetch data: HTTP error code %d", response.statusCode()));
+        }
 
-    @Override
-    public List<Order> getPendingOrders() {
-        return null;
-    }
 
-    @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant) {
-        return null;
-    }
+        return OBJECT_MAPPER.readValue(response.body(), new TypeReference<List<TradePair>>() {
+        });
 
-    @Override
-    public String getExchange() {
-        return null;
-    }
 
-    @Override
-    public String getCurrency() {
-        return null;
-    }
-
-    @Override
-    public String getTimestamp() {
-        return null;
-    }
-
-    @Override
-    public CandleDataSupplier getCandleDataSupplier(int i, TradePair tradePair) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<String> createOrder(Order order) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<String> cancelOrder(String orderId) {
-        return null;
-    }
-
-    @Override
-    public String getSignal() {
-        return null;
-    }
-
-    @Override
-    public void connect() {
-
-    }
-
-    @Override
-    public List<TradePair> getTradePairSymbol() {
-        return null;
-    }
-
-    @Override
-    public String getOrderId() {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
-        return null;
-    }
-
-    @Override
-    public Ticker getLivePrice(TradePair tradePair) {
-        return null;
-    }
-
-    @Override
-    public JsonNode getUserAccountDetails() {
-        return null;
-    }
-
-    @Override
-    public double getSize() {
-        return 0;
-    }
-
-    @Override
-    public double getLivePrice() {
-        return 0;
-    }
-
-    @Override
-    public String getName() {
-        return null;
-    }
-
-    @Override
-    public void getPositionBook(TradePair tradePair) throws IOException, InterruptedException {
-
-    }
-
-    @Override
-    public void getOpenOrder(@NotNull TradePair tradePair) {
-
-    }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return super.equals(obj);
-    }
-
-    @Override
-    protected Object clone() throws CloneNotSupportedException {
-        return super.clone();
-    }
-
-    @Override
-    public String toString() {
-        return super.toString();
     }
 }

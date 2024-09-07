@@ -1,4 +1,4 @@
-//CHECKSTYLE:OFF
+package org.investpro;//CHECKSTYLE:OFF
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -16,8 +16,6 @@
  * limitations under the License.
  */
 
-package org.investpro;
-
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
@@ -30,20 +28,21 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import static org.investpro.TradePair.logger;
-
 /**
  * Reads lines in a file reversely (similar to a BufferedReader, but starting at
- * the last line). Useful for e.g. searching in log files.
+ * the last line). Useful for e.g., searching in log files.
  */
 public class ReversedLinesFileReader implements Closeable {
 
-    private final int blockSize;
-    private final Charset encoding;
+    int blockSize;
+    Charset encoding;
 
-    private final RandomAccessFile randomAccessFile;
+    RandomAccessFile randomAccessFile;
 
-    private final byte[][] newLineSequences;
+    long totalByteLength;
+    long totalBlockCount;
+
+    private byte[][] newLineSequences = new byte[2][];
     private final int avoidNewlineSplitBufferSize;
     private final int byteDecrement;
 
@@ -99,7 +98,7 @@ public class ReversedLinesFileReader implements Closeable {
             byteDecrement = 1;
         } else if (charset == StandardCharsets.UTF_16BE || charset == StandardCharsets.UTF_16LE) {
             // UTF-16 new line sequences are not allowed as second tuple of four byte sequences,
-            // however byte order has to be specified
+            // however, byte order has to be specified
             byteDecrement = 2;
         } else if (charset == StandardCharsets.UTF_16) {
             throw new UnsupportedEncodingException("For UTF-16, you need to specify the byte order (use UTF-16BE or " +
@@ -115,9 +114,8 @@ public class ReversedLinesFileReader implements Closeable {
 
         // Open file
         randomAccessFile = new RandomAccessFile(file.toFile(), "r");
-        long totalByteLength = randomAccessFile.length();
+        totalByteLength = randomAccessFile.length();
         int lastBlockLength = (int) (totalByteLength % blockSize);
-        long totalBlockCount;
         if (lastBlockLength > 0) {
             totalBlockCount = totalByteLength / blockSize + 1;
         } else {
@@ -144,8 +142,7 @@ public class ReversedLinesFileReader implements Closeable {
             if (currentFilePart != null) {
                 line = currentFilePart.readLine();
             } else {
-                // no more file parts: we're done, leave line set to null
-                logger.debug("No more file parts");
+                // no more fileparts: we're done, leave line set to null
                 break;
             }
         }
@@ -290,7 +287,7 @@ public class ReversedLinesFileReader implements Closeable {
         }
 
         /**
-         * Creates the buffer containing any left over bytes.
+         * Creates the buffer containing any leftover bytes.
          */
         private void createLeftOver() {
             final int lineLengthBytes = currentLastBytePos + 1;

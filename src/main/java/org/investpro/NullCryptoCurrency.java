@@ -1,18 +1,15 @@
 package org.investpro;
 
-import java.sql.SQLException;
+public class NullCryptoCurrency extends CryptoCurrency {
+    public NullCryptoCurrency() throws Exception {
+        super("XXX", "XXX", "XXX", 1, "XXX", "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4");
 
-class NullCryptoCurrency extends CryptoCurrency {
-    NullCryptoCurrency() throws SQLException, ClassNotFoundException {
-        super(
 
-                "Null Crypto Currency",
-                "Null Crypto Currency",
-                "XXX",
-                8,
-                "¤¤¤",
-                "https://i.ibb.co/5Y3mZ5Y/null-crypto-currency.png"
-        );
+        this.shortDisplayName = "XXX";
+        this.fullDisplayName = "XXX";
+        this.fractionalDigits = 0;
+        this.symbol = "XXX";
+        this.code = "XXX";
 
     }
 }

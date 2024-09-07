@@ -1,10 +1,8 @@
 package org.investpro;
 
 /**
- * @author NOEL NGUEMECHIEU
+ * @author Michael Ennen
  */
 public interface MoneyFormatter<T extends Money> {
     String format(T money);
-
-
 }

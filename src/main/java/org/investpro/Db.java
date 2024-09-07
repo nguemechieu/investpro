@@ -1,11 +1,15 @@
 package org.investpro;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 
 public interface Db extends DataSource {
 
-    void createTables();
+    Connection getConn();
+
+    void createTables() throws SQLException;
 
     void dropTables();
 
@@ -98,7 +102,7 @@ public interface Db extends DataSource {
     );
 
 
-    void save(Currency currency);
+    void save(ArrayList<Currency> currency) throws SQLException;
 
-    Currency getCurrency(String code) throws SQLException;
+    Currency getCurrency(String code) throws SQLException, ClassNotFoundException;
 }

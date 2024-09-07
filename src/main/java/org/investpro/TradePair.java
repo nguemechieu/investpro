@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static java.lang.System.out;
+import static org.investpro.Currency.CURRENCIES;
 
 
 public class TradePair extends Pair<Currency, Currency> {
@@ -28,12 +29,10 @@ public class TradePair extends Pair<Currency, Currency> {
         this.baseCurrency = baseCurrency;
         this.counterCurrency = counterCurrency;
 
-        logger.debug("TradePair created: {}", this);
+
     }
 
-    static {
-        Currency.registerCurrencies(new ArrayList<>(Currency.CURRENCIES.values()));
-    }
+
     public TradePair(String baseCurrency, String counterCurrency) throws SQLException, ClassNotFoundException {
         super(Currency.of(baseCurrency), Currency.of(counterCurrency));
 

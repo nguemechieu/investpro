@@ -1,6 +1,5 @@
 package org.investpro;
 
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
@@ -15,84 +14,61 @@ import java.sql.SQLException;
  * precision are more important than speed. If speed is more
  * important, {@link FastMoney} should be used instead.
  *
- * @author NOEL NGUEMECHIEU
+ * @author Michael Ennen
  */
 public record DefaultMoney(BigDecimal amount, Currency currency) implements Money, Comparable<DefaultMoney> {
     public static final Money NULL_MONEY = DefaultMoney.ofFiat(BigDecimal.ZERO, Currency.NULL_FIAT_CURRENCY);
 
-    @Contract("_, _ -> new")
-    public static @NotNull Money of(int amount, Currency currency) {
+    public static Money of(int amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    @Contract("_, _ -> new")
-    public static @NotNull Money of(long amount, Currency currency) {
+    public static Money of(long amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    @Contract("_, _ -> new")
-    public static @NotNull Money of(float amount, Currency currency) {
+    public static Money of(float amount, Currency currency) {
         return of(new BigDecimal(Float.valueOf(amount).toString()), currency);
     }
 
-    @Contract("_, _ -> new")
-    public static @NotNull Money of(double amount, Currency currency) {
+    public static Money of(double amount, Currency currency) {
         return of(new BigDecimal(Double.valueOf(amount).toString()), currency);
     }
 
-    public static Money of(int amount, CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static Money of(int amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(BigDecimal.valueOf(amount), currencyType, currencyCode);
     }
 
-    public static Money of(long amount, CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static Money of(long amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(BigDecimal.valueOf(amount), currencyType, currencyCode);
     }
 
-    public static Money of(float amount, CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static Money of(float amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(new BigDecimal(Float.valueOf(amount).toString()), currencyType, currencyCode);
     }
 
-    public static Money of(double amount, CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static Money of(double amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(new BigDecimal(Double.valueOf(amount).toString()), currencyType, currencyCode);
     }
 
-    public static Money of(String amount, CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static Money of(String amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(new BigDecimal(amount), currencyType, currencyCode);
     }
 
-    public static Money of(BigDecimal amount, @NotNull CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static Money of(BigDecimal amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return switch (currencyType) {
-            case FIAT, CRYPTO -> new DefaultMoney(amount, Currency.of(currencyCode));
+            case FIAT -> new DefaultMoney(amount, Currency.ofFiat(currencyCode));
+            case CRYPTO -> new DefaultMoney(amount, Currency.ofCrypto(currencyCode));
             default -> throw new IllegalArgumentException(STR."unknown currency type: \{currencyType}");
         };
     }
 
-    @Contract(value = "_, _ -> new", pure = true)
-    public static @NotNull Money of(BigDecimal amount, Currency currency) {
+    public static Money of(BigDecimal amount, Currency currency) {
         return new DefaultMoney(amount, currency);
     }
 
-    public static Money ofFiat(int amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.FIAT, currencyCode);
-    }
 
-    public static Money ofFiat(long amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.FIAT, currencyCode);
-    }
-
-    public static Money ofFiat(float amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.FIAT, currencyCode);
-    }
-
-    public static Money ofFiat(double amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.FIAT, currencyCode);
-    }
-
-    public static Money ofFiat(String amount, String currencyCode) throws SQLException {
-        return of(new BigDecimal(amount), CurrencyType.FIAT, currencyCode);
-    }
-
-    public static Money ofFiat(BigDecimal amount, String currencyCode) throws SQLException {
+    public static Money ofFiat(BigDecimal amount, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(amount, CurrencyType.FIAT, currencyCode);
     }
 
@@ -100,53 +76,21 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(amount, currency);
     }
 
-    @Contract("_, _ -> new")
-    public static @NotNull Money ofFiat(String amount, Currency currency) {
+    public static Money ofFiat(String amount, Currency currency) {
         return of(new BigDecimal(amount), currency);
     }
 
-    public static Money ofCrypto(int amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.CRYPTO, currencyCode);
-    }
 
-    public static Money ofCrypto(long amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.CRYPTO, currencyCode);
-    }
-
-    public static Money ofCrypto(float amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.CRYPTO, currencyCode);
-    }
-
-    public static Money ofCrypto(double amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.CRYPTO, currencyCode);
-    }
-
-    public static Money ofCrypto(String amount, String currencyCode) throws SQLException {
-        return of(new BigDecimal(amount), CurrencyType.CRYPTO, currencyCode);
-    }
-
-    public static Money ofCrypto(BigDecimal amount, String currencyCode) throws SQLException {
-        return of(amount, CurrencyType.CRYPTO, currencyCode);
-    }
-
-    @Contract(value = "_, _ -> new", pure = true)
-    public static @NotNull Money ofCrypto(BigDecimal amount, Currency currency) {
-        return of(amount, currency);
-    }
-
-    @Contract("_, _ -> new")
-    public static @NotNull Money ofCrypto(String amount, Currency currency) {
+    public static Money ofCrypto(String amount, Currency currency) {
         return of(new BigDecimal(amount), currency);
     }
 
-    @Contract("_ -> new")
-    public @NotNull Money plus(DefaultMoney defaultMoney) {
+    public Money plus(DefaultMoney defaultMoney) {
         checkCurrenciesEqual(defaultMoney);
         return new DefaultMoney(this.amount.add(defaultMoney.amount), currency);
     }
 
-    @Contract("_ -> new")
-    public @NotNull Money plus(int amount) {
+    public Money plus(int amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
@@ -155,30 +99,55 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
-    @Contract("_ -> new")
-    public @NotNull Money plus(float amount) {
+    public Money plus(float amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
-    @Contract("_ -> new")
     @Override
-    public @NotNull Money plus(double amount) {
+    public Money plus(double amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
-    @Contract("_ -> new")
-    public @NotNull Money plus(BigDecimal amount) {
+    @Override
+    public Money multiply(long multiplicand) {
+        return null;
+    }
+
+    @Override
+    public Money multiply(double multiplicand) {
+        return null;
+    }
+
+    @Override
+    public Money multiply(BigDecimal multiplicand) {
+        return null;
+    }
+
+    @Override
+    public Money divide(long divisor) {
+        return null;
+    }
+
+    @Override
+    public Money divide(double divisor) {
+        return null;
+    }
+
+    @Override
+    public Money divide(BigDecimal divisor) {
+        return null;
+    }
+
+    public Money plus(BigDecimal amount) {
         return new DefaultMoney(this.amount.add(amount), currency);
     }
 
-    @Contract("_ -> new")
     @Override
-    public @NotNull Money plus(@NotNull Money summand) {
+    public Money plus(Money summand) {
         return this.plus(summand.toBigDecimal());
     }
 
-    @Contract("_ -> new")
-    public @NotNull Money minus(DefaultMoney defaultMoney) {
+    public Money minus(DefaultMoney defaultMoney) {
         checkCurrenciesEqual(defaultMoney);
         return new DefaultMoney(this.amount.subtract(defaultMoney.amount), currency);
     }
@@ -212,10 +181,12 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public boolean isGreaterThan(Money other) {
-        if (other instanceof DefaultMoney money) {
+        if (other instanceof DefaultMoney) {
+            DefaultMoney money = (DefaultMoney) other;
             checkCurrenciesEqual(money);
             return amount.compareTo(money.amount) > 0;
-        } else if (other instanceof FastMoney money) {
+        } else if (other instanceof FastMoney) {
+            FastMoney money = (FastMoney) other;
             return amount.compareTo(money.toBigDecimal()) > 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
@@ -224,10 +195,12 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public boolean isGreaterThanOrEqualTo(Money other) {
-        if (other instanceof DefaultMoney money) {
+        if (other instanceof DefaultMoney) {
+            DefaultMoney money = (DefaultMoney) other;
             checkCurrenciesEqual(money);
             return amount.compareTo(money.amount) >= 0;
-        } else if (other instanceof FastMoney money) {
+        } else if (other instanceof FastMoney) {
+            FastMoney money = (FastMoney) other;
             return amount.compareTo(money.toBigDecimal()) >= 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
@@ -240,11 +213,43 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
     }
 
     @Override
+    public boolean isPositive() {
+        return false;
+    }
+
+    @Override
+    public boolean isPositiveOrZero() {
+        return false;
+    }
+
+    @Override
+    public boolean isNegative() {
+        return false;
+    }
+
+    @Override
+    public boolean isNegativeOrZero() {
+        return false;
+    }
+
+    @Override
+    public @NotNull FastMoney toFastMoney() {
+        return null;
+    }
+
+    @Override
+    public boolean canEqual(Object other) {
+        return false;
+    }
+
+    @Override
     public boolean isLessThan(Money other) {
-        if (other instanceof DefaultMoney money) {
+        if (other instanceof DefaultMoney) {
+            DefaultMoney money = (DefaultMoney) other;
             checkCurrenciesEqual(money);
             return this.amount().compareTo(money.amount) < 0;
-        } else if (other instanceof FastMoney money) {
+        } else if (other instanceof FastMoney) {
+            FastMoney money = (FastMoney) other;
             return this.amount().compareTo(money.toBigDecimal()) < 0;
         } else {
             throw new IllegalArgumentException("Unknown money type: " + other.getClass());
@@ -303,12 +308,13 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     private void checkCurrenciesEqual(DefaultMoney defaultMoney) {
         if (!currency.equals(defaultMoney.currency)) {
-            throw new IllegalArgumentException(STR."currencies are not equal: first currency: \{currency} second currency: \{defaultMoney.currency}");
+            throw new IllegalArgumentException("currencies are not equal: first currency: "
+                    + currency + " second currency: " + defaultMoney.currency);
         }
     }
 
     @Override
-    public int compareTo(@NotNull DefaultMoney other) {
+    public int compareTo(DefaultMoney other) {
         // TODO is this really the behavior we want?
         checkCurrenciesEqual(other);
 
@@ -337,9 +343,13 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public String toString() {
-        return switch (currency.getCurrencyType()) {
-            case FIAT -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-            default -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
-        };
+        switch (currency.getCurrencyType()) {
+            case FIAT:
+                return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
+            case CRYPTO:
+            case NULL:
+            default:
+                return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+        }
     }
 }

@@ -2,39 +2,40 @@ package org.investpro;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
-
 /**
  * @author NOEL NGUEMECHIEU
  */
 public class CryptoCurrency extends Currency {
 
 
-    public CryptoCurrency(String fullDisplayName, String shortDisplayName, String code,
-                          int fractionalDigits, String symbol, String image
+    public CryptoCurrency(String fullDisplayName, String shortDisplayName,
+                          String code,
+                          int fractionalDigits,
+                          String symbol, String image) throws Exception {
+        super(
+                CurrencyType.CRYPTO,
+                fullDisplayName,
+                shortDisplayName,
+                code,
+                fractionalDigits,
+                symbol,
+                image
+        );
 
-    ) throws SQLException, ClassNotFoundException {
-        super(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image);
 
         this.code = code;
         this.fractionalDigits = fractionalDigits;
         this.symbol = symbol;
-        this.setImage(image);
         this.fullDisplayName = fullDisplayName;
         this.shortDisplayName = shortDisplayName;
+        this.image = image;
 
 
     }
 
-    @Override
-    public int compareTo(@NotNull Currency o) {
-        return 0;
-    }
 
     @Override
     public int compareTo(java.util.@NotNull Currency o) {
         return 0;
     }
-
-
 }

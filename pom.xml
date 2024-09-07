@@ -13,8 +13,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.9.2</junit.version>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>22</maven.compiler.source>
+        <maven.compiler.target>22</maven.compiler.target>
     </properties>
     <scm>
         <url>https://github.com/nguemechieu/investpro</url>
@@ -61,7 +61,13 @@
             <artifactId>jaxb-api</artifactId>
             <version>2.3.1</version> <!-- Use the appropriate version -->
         </dependency>
+        <!-- https://mvnrepository.com/artifact/jakarta.enterprise/jakarta.enterprise.cdi-api -->
 
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <version>2.1.0</version>
+        </dependency>
 
         <dependency>
             <groupId>org.openjfx</groupId>
@@ -82,6 +88,11 @@
             <version>24.0.1</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>nz.ac.waikato.cms.weka</groupId>
+            <artifactId>weka-stable</artifactId>
+            <version>3.8.6</version>
+        </dependency>
 
         <dependency>
             <groupId>com.jfoenix</groupId>
@@ -94,10 +105,14 @@
             <artifactId>json</artifactId>
             <version>20231013</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.stellar.sdk/android-stellar-sdk -->
 
-        <!-- https://mvnrepository.com/artifact/com.mysql/mysql-connector-j -->
-        <!-- https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc -->
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>3.0.1</version> <!-- Replace it with the appropriate version -->
+        </dependency>
+
+
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
@@ -106,9 +121,22 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version> <!-- Use the latest version -->
+            <version>1.4.12</version> <!-- Use the latest version -->
         </dependency>
 
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <version>3.0.2</version> <!-- Use the version that fits your needs -->
+        </dependency>
 
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -125,16 +153,19 @@
             <artifactId>javafx-swing</artifactId>
             <version>21-ea+17</version>
         </dependency>
-        <dependency>
-            <groupId>io.ebean</groupId>
-            <artifactId>persistence-api</artifactId>
-            <version>3.0</version>
-        </dependency>
+
         <dependency>
             <groupId>org.controlsfx</groupId>
             <artifactId>controlsfx</artifactId>
             <version>11.1.2</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/net.jcip/jcip-annotations -->
+        <dependency>
+            <groupId>net.jcip</groupId>
+            <artifactId>jcip-annotations</artifactId>
+            <version>1.0</version>
+        </dependency>
+
         <dependency>
             <groupId>io.ebean</groupId>
             <artifactId>ebean-annotation</artifactId>
@@ -161,6 +192,11 @@
             <artifactId>javafx-fxml</artifactId>
             <version>21-ea+17</version>
         </dependency>
+        <dependency>
+            <groupId>com.google.gwt</groupId>
+            <artifactId>gwt-user</artifactId>
+            <version>2.9.0</version>
+        </dependency>
 
 
         <dependency>
@@ -173,12 +209,21 @@
             <artifactId>hibernate-core</artifactId>
             <version>6.2.0.CR3</version>
         </dependency>
+        <dependency>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
+            <version>4.0.0</version> <!-- Use the latest version compatible with your setup -->
+            <scope>provided
+            </scope> <!-- Provided scope because the CDI implementation is typically provided by the application server -->
+        </dependency>
 
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.eclipse.orbit.bundles/com.google.gson -->
+        <!-- https://mvnrepository.com/artifact/org.eclipse.orbit.bundles/com.google.gson -->
 
 
         <dependency>
@@ -236,6 +281,49 @@
             <version>21-ea+17</version>
         </dependency>
 
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
+
+        <!-- Bouncy Castle Core -->
+        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk18on -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.40</version> <!-- Use the version you need -->
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.liferay/org.bouncycastle.provider -->
+        <dependency>
+            <groupId>com.liferay</groupId>
+            <artifactId>org.bouncycastle.provider</artifactId>
+            <version>1.61.LIFERAY-PATCHED-1</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>6.2.0.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.inject</groupId>
+            <artifactId>jakarta.inject-api</artifactId>
+            <version>2.0.1</version>
+            <scope>compile</scope>
+        </dependency>
 
     </dependencies>
 
@@ -265,7 +353,7 @@
                     <execution>
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>org.investpro/org.investpro.Main</mainClass>
+                            <mainClass>org.investpro/org.investpro.InvestPro</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>
@@ -281,8 +369,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <source>22
+                    </source>
+                    <target>22</target>
                     <compilerArgs>--enable-preview</compilerArgs>
                 </configuration>
             </plugin>
@@ -295,5 +384,12 @@
                 </configuration>
             </plugin>
         </plugins>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+
     </build>
 </project>

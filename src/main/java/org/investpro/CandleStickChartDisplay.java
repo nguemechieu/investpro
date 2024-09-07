@@ -13,20 +13,18 @@ public class CandleStickChartDisplay extends StackPane {
 
     public CandleStickChartDisplay(TradePair tradePair, Exchange exchange) {
         super();
+        CandleStickChartContainer candleStickChartContainer = new CandleStickChartContainer(
+                exchange, tradePair, true
 
-        logger.debug(String.valueOf(this));
-
-        ChartContainer candleStickChartContainer = new ChartContainer(
-                exchange, tradePair, true);
+        );
         AnchorPane.setTopAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setLeftAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setRightAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setBottomAnchor(candleStickChartContainer, 30.0);
-        candleStickChartContainer.setMaxSize(1200, 500);
+
         candleStickChartContainer.widthProperty().addListener((observable, oldValue, newValue) -> setPrefWidth(newValue.doubleValue()));
         candleStickChartContainer.heightProperty().addListener((observable, oldValue, newValue) -> setPrefHeight(newValue.doubleValue()));
         getChildren().add(candleStickChartContainer);
-
 
     }
 

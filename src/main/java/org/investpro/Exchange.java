@@ -1,127 +1,128 @@
 package org.investpro;
 
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import javafx.scene.control.ChoiceBox;
+import com.fasterxml.jackson.core.JsonParser;
+import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * An abstract base class for {@code Exchange} implementations.
+ */
 public abstract class Exchange {
+    protected final String apiKey;
+    protected final String apiSecret;
+    public LiveTradesConsumer liveTradesConsumer;
+    protected ExchangeWebSocketClient webSocketClient;
+    protected TradePair tradePair;
 
-    private static final Logger logger = LoggerFactory.getLogger(Exchange.class);
-    static ChoiceBox<String> symbolsChoiceBox = new ChoiceBox<>();
+    /**
+     * Constructor with WebSocket client, API key, and API secret.
+     */
+    protected Exchange(String apiKey, String apiSecret) {
+        this.apiKey = Objects.requireNonNull(apiKey, "API key must not be null");
+        this.apiSecret = Objects.requireNonNull(apiSecret, "API secret must not be null");
 
 
-    protected String apiKey;
-    protected String apiSecret;
-
-    private String tokens;
-
-    public void setTokens(String tokens) {
-        this.tokens = tokens;
-    }
-
-
-    public Exchange(String apiKey, String apiSecret) {
-        this.apiKey = apiKey;
-        this.apiSecret = apiSecret;
-    }
-
-    public abstract TradePair getSelecTradePair() throws SQLException, ClassNotFoundException;
-
-    public void buy(TradePair btcUsd, MARKET_TYPES marketType, double sizes, double stoploss, double takeProfit) {
-    }
-
-    public void sell(TradePair btcUsd, MARKET_TYPES marketType, double sizes, double stopLoss, double takeProfit) {
-    }
-
-    public void cancelALL() {
-    }
-
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-
-        logger.info("auto trading enabled");
 
     }
 
 
-
-
-    public abstract ExchangeWebSocketClient getWebsocketClient();
-
-    public abstract double getTradingFee() throws IOException, InterruptedException;
-
-    //Get Account
+    /**
+     * Abstract method to get user accounts.
+     */
     public abstract Account getAccounts() throws IOException, InterruptedException;
 
-    public abstract List<String> getTradePair() throws IOException, InterruptedException;
+    /**
+     * Abstract method to check connection status.
+     */
+    public abstract Boolean isConnected();
 
-    public void setTradePair(TradePair newValue) {
-    }
-
-    abstract Boolean isConnected();
-
-    public abstract void connect(String text, String text1, String userIdText);
-
+    /**
+     * Abstract method to get the symbol of the exchange.
+     */
     public abstract String getSymbol();
 
-    public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle);
+    /**
+     * Abstract method to create an order.
+     */
+    public abstract void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType,
+                                     double price, double size, Date timestamp, double stopLoss, double takeProfit)
+            throws IOException, InterruptedException;
 
-    public abstract void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size,
-                                     @NotNull Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException;
+    /**
+     * Abstract method to cancel an order.
+     */
+    public abstract CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException;
 
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant);
+    public abstract String getExchangeMessage();
 
-    public abstract List<Order> getPendingOrders();
+    /**
+     * Abstract method to fetch recent trades until a specific time.
+     */
+    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt);
 
-    public abstract String getExchange();
+    /**
+     * Abstract method to get a candle data supplier.
+     */
+    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
 
-    public abstract String getTimestamp();
-
-    public abstract CandleDataSupplier getCandleDataSupplier(int i, TradePair tradePair);
-
-    public abstract String getCurrency();
-
-    public abstract CompletableFuture<String> cancelOrder(String orderId);
-
-    public abstract String getSignal();
-
-    public abstract void connect();
-
-
-    public abstract List<TradePair> getTradePairSymbol();
-
-    public abstract CompletableFuture<String> createOrder(Order order) throws JsonProcessingException;
-
-    public abstract CompletableFuture<String> getOrderBook(TradePair tradePair);
-
-    public abstract Ticker getLivePrice(TradePair tradePair);
-
-    public abstract JsonNode getUserAccountDetails();
-
-    public abstract double getSize();
-
-    public abstract double getLivePrice();
-
-    public abstract String getName();
-
-    public String getTelegramToken() {
-        return tokens;
+    /**
+     * Fetches completed candles during the current live-syncing candle.
+     */
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        throw new UnsupportedOperationException(
+                String.format("Exchange: %s does not support fetching candle data for in-progress candle", this)
+        );
     }
 
-    public abstract String getOrderId();
+    /**
+     * Abstract method to get pending orders.
+     */
+    public abstract List<Order> getPendingOrders() throws IOException, InterruptedException;
 
+    public abstract CompletableFuture<String> getOrderBook(TradePair tradePair) throws IOException, InterruptedException;
+
+    /**
+     * Abstract method to get user account details.
+     */
+    public abstract JsonParser getUserAccountDetails();
+
+    /**
+     * Abstract method to connect to the exchange.
+     */
+    public abstract void connect(String text, String text1, String userIdText) throws IOException, InterruptedException;
+
+    /**
+     * Abstract method to get a position book for a trade pair.
+     */
     public abstract void getPositionBook(TradePair tradePair) throws IOException, InterruptedException;
 
-    public abstract void getOpenOrder(@NotNull TradePair tradePair);
+    public abstract List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException;
+
+    /**
+     * Abstract method to get orders.
+     */
+    public abstract ObservableList<Order> getOrders() throws IOException, InterruptedException;
+
+
+    public abstract List<TradePair> getTradePairs() throws IOException, InterruptedException;
+
+    public void clear() {
+        liveTradesConsumer.clear();
+    }
+
+    public void add(Exchange exchange) {
+        liveTradesConsumer.add(exchange);
+    }
+
+    public @NotNull List<Trade> getLiveTrades() {
+        return liveTradesConsumer.getLiveTrades();
+    }
 }

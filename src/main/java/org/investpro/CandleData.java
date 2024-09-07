@@ -3,7 +3,7 @@ package org.investpro;
 import java.util.Objects;
 
 /**
- * @author NOEL NGUEMECHIEU
+ * @author Noel Nguemechieu
  */
 public class CandleData {
     private final double openPrice;
@@ -11,21 +11,20 @@ public class CandleData {
     private final double highPrice;
     private final double lowPrice;
     private final int openTime;
-    private final double volume;
+
+
+    private static double volume;
     private final double averagePrice;
     private final double volumeWeightedAveragePrice;
     private final boolean placeHolder;
-    private int closeTime;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
-                      int closeTime,
                       double volume) {
-        this(openPrice, closePrice, highPrice, lowPrice, openTime, closeTime, volume, (highPrice + lowPrice + openPrice + closePrice) / 4,
-                volume, false);
-        this.closeTime = closeTime;
+        this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
+                volume * ((highPrice + lowPrice) / 2), false);
     }
 
-    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime, int closeTime,
+    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
                       double volume, double averagePrice, double volumeWeightedAveragePrice, boolean placeHolder) {
         this.openPrice = openPrice;
         this.closePrice = closePrice;
@@ -33,10 +32,20 @@ public class CandleData {
         this.lowPrice = lowPrice;
         this.openTime = openTime;
         this.volume = volume;
-        this.closeTime = closeTime;
         this.averagePrice = averagePrice;
         this.volumeWeightedAveragePrice = volumeWeightedAveragePrice;
         this.placeHolder = placeHolder;
+    }
+
+
+    public CandleData(double aDouble, double aDouble1, double aDouble2, double aDouble3, int anInt, int closeTime, double volume) {
+        this(aDouble, aDouble1, aDouble2, aDouble3, anInt, volume, (aDouble + aDouble1 + aDouble2 + aDouble3) / 4,
+                volume * ((aDouble + aDouble1 + aDouble2 + aDouble3) / 4), false);
+    }
+
+    public static CandleData of(long timestamp, double open, double high, double low, double close) {
+        return new CandleData(open, high, low, close, Math.toIntExact(timestamp), volume, (open + high + low + close) / 4,
+                (open + high + low + close) / 4 * volume, false);
     }
 
     public double getOpenPrice() {
@@ -55,7 +64,7 @@ public class CandleData {
         return lowPrice;
     }
 
-    public Integer getOpenTime() {
+    public int getOpenTime() {
         return openTime;
     }
 
@@ -92,8 +101,7 @@ public class CandleData {
                 highPrice == other.highPrice &&
                 lowPrice == other.lowPrice &&
                 openTime == other.openTime &&
-                Objects.equals(closeTime, other.closeTime) &&
-                volume == other.volume &&
+
                 averagePrice == other.averagePrice &&
                 volumeWeightedAveragePrice == other.volumeWeightedAveragePrice &&
                 placeHolder == other.placeHolder;
@@ -111,37 +119,4 @@ public class CandleData {
                         "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
                 openTime, volume, placeHolder);
     }
-
-    public Object getSignal() {
-        return null;
-    }
-
-    public Object getMA200Price() {//Calculate MA
-
-        double ma200Price = 0;
-
-        for (int i = 0; i < 200; i++) {
-            ma200Price += this.getClosePrice();
-        }
-
-        return ma200Price / 200;
-    }
-
-    public Object getMA50Price() {//Calculate MA
-
-        double ma50Price = 0;
-
-        for (int i = 0; i < 50; i++) {
-            ma50Price += this.getClosePrice();
-        }
-
-        return ma50Price / 50;
-    }
-
-    public int getCloseTime() {
-        return closeTime;
-    }
-
-
-    // return new Date(this.openTime);}
 }

@@ -2,15 +2,18 @@ package org.investpro;
 
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.geometry.Pos;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Date;
 import java.util.Objects;
 
 /**
- * A {@link javafx.scene.layout.Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
+ * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
  * The contained chart will display data for the given {@code tradePair}. The toolbar allows for changing
  * the duration in seconds of each candle as well as configuring the properties of the chart. When a new
  * duration is selected, this container automatically creates a new {@code CandleStickChart} and visually
@@ -19,28 +22,35 @@ import java.util.Objects;
  * @author NOEL NGUEMECHIEU
  */
 public class ChartContainer extends Region {
-    private final VBox candleChartContainer;
-    private final ChartToolbar toolbar;
+    private final CandleStickChartToolbar toolbar;
+    VBox candleChartContainer = new VBox();
     private final Exchange exchange;
     private TradePair tradePair;
+    SimpleIntegerProperty secondsPerCandle;
+
+    public TradePair getTradePair() {
+        return tradePair;
+    }
 
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
      */
 
 
-    public ChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
+    public ChartContainer(Exchange exchange, boolean liveSyncing) {
         Objects.requireNonNull(exchange, "exchange must not be null");
 
         this.exchange = exchange;
-        this.tradePair = tradePair;
 
+        candleChartContainer.setSpacing(10);
+        candleChartContainer.setAlignment(Pos.CENTER);
         secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
-
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
-        toolbar = new ChartToolbar(widthProperty(), heightProperty(),
-                candleDataSupplier.getSupportedGranularities());
+        toolbar = new CandleStickChartToolbar(widthProperty(), heightProperty(
+
+        ),
+                candleDataSupplier.getSupportedGranularity());
         HBox toolbarContainer = new HBox(toolbar);
         toolbarContainer.setPrefWidth(Double.MAX_VALUE);
         toolbarContainer.setPrefHeight(20);
@@ -48,16 +58,12 @@ public class ChartContainer extends Region {
         AnchorPane.setTopAnchor(toolbarContainer, 10.0);
         AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
         AnchorPane.setRightAnchor(toolbarContainer, 0.0);
-
-
-        candleChartContainer = new VBox();
+        AnchorPane.setBottomAnchor(toolbarContainer, 0.0);
         candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
         AnchorPane.setRightAnchor(candleChartContainer, 15.0);
         AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
-
         AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
 
         containerRoot.prefHeightProperty().bind(prefHeightProperty());
@@ -71,7 +77,7 @@ public class ChartContainer extends Region {
                 try {
                     try {
                         createNewChart(newDurationValue.intValue(), liveSyncing);
-                    } catch (ClassNotFoundException e) {
+                    } catch (ClassNotFoundException | IOException e) {
                         throw new RuntimeException(e);
                     }
                 } catch (SQLException e) {
@@ -86,23 +92,26 @@ public class ChartContainer extends Region {
 
         secondsPerCandle.set(300);
     }
-
-    public TradePair getTradePair() {
-        return tradePair;
-    }
-    private final SimpleIntegerProperty secondsPerCandle;
     private CandleStickChart candleStickChart;
 
     public void setTradePair(TradePair tradePair) {
         this.tradePair = tradePair;
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
         }
-        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
-                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        candleStickChart = new CandleStickChart(
+
+                exchange,
+                exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
+                tradePair,
+                liveSyncing,
+                secondsPerCandle,
+                widthProperty(),
+                heightProperty()
+        );//                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
     private void animateInNewChart(CandleStickChart newChart) {
@@ -112,7 +121,7 @@ public class ChartContainer extends Region {
             FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(500), candleStickChart);
             fadeTransitionOut.setFromValue(1.0);
             fadeTransitionOut.setToValue(0.0);
-            fadeTransitionOut.setOnFinished(event -> {
+            fadeTransitionOut.setOnFinished(_ -> {
                 candleStickChart = newChart;
                 candleChartContainer.getChildren().setAll(newChart);
                 FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(500), candleStickChart);

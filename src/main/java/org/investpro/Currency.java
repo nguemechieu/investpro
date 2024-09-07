@@ -1,74 +1,62 @@
 package org.investpro;
 
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.SQLException;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 
-
-public abstract class Currency {
+public abstract class Currency implements Comparable<Currency> {
     private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
     public static final CryptoCurrency NULL_CRYPTO_CURRENCY;
     public static final FiatCurrency NULL_FIAT_CURRENCY;
 
+    static ConcurrentHashMap<SymmetricPair<Currency, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
+    static Db1 db1;
+
     static {
         try {
             NULL_CRYPTO_CURRENCY = new NullCryptoCurrency();
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
-    static {
-        try {
             NULL_FIAT_CURRENCY = new NullFiatCurrency();
-        } catch (SQLException | ClassNotFoundException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
 
-    static final Map<SymmetricPair<String, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
-    protected static final Db1 db1;
-    private static final Properties conf = new Properties();
-
-    static {
         try {
-            try {
-                conf.load(Currency.class.getClassLoader().getResourceAsStream("conf.properties"));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            db1 = new Db1(conf);
-        } catch (ClassNotFoundException e) {
+
+            new CryptoCurrencyDataProvider().registerCurrencies();
+            new FiatCurrencyDataProvider().registerCurrencies();
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
+
     protected String code;
     protected int fractionalDigits;
 
-    private final CurrencyType currencyType;
+    protected CurrencyType currencyType;
     protected String fullDisplayName;
     protected String shortDisplayName;
 
     protected String symbol;
-    private String image;
+    protected String image;
+
 
 
     /**
      * Protected constructor, called only by CurrencyDataProvider's.
      */
     protected Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code,
-                       int fractionalDigits, String symbol, String image) {
+                       int fractionalDigits, String symbol, String image) throws Exception {
         Objects.requireNonNull(currencyType, "currencyType must not be null");
         Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
         Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
@@ -87,39 +75,15 @@ public abstract class Currency {
         this.symbol = symbol;
         this.image = image;
 
+        db1 = new Db1();
+        logger.info("currency registered: {}", this);
+
 
 
     }
 
 
-    protected static void registerCurrency(Currency currency) throws ClassNotFoundException {
-        Objects.requireNonNull(currency, "currency must not be null");
-
-        CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
-        logger.info("registered currency: %s".formatted(currency));
-
-        for (Currency currency1 : CURRENCIES.values()) {
-            db1.save(currency1);
-        }
-    }
-
-    protected static void registerCurrencies(List<Currency> currencies) {
-        Objects.requireNonNull(currencies, "currencies must not be null");
-
-        for (Currency currency : currencies) {
-            CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
-
-        }
-        for (Currency currency : currencies) {
-            try {
-                registerCurrency(currency);
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    public static Currency ofCrypto(String code) throws SQLException {
+    public static Currency ofCrypto(String code) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(code, "code must not be null");
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO)) || db1.getCurrency(code).currencyType == CurrencyType.CRYPTO) {
             return db1.getCurrency(code);
@@ -131,14 +95,16 @@ public abstract class Currency {
 
     }
 
-    public static @Nullable Currency of(String code) throws SQLException {
+    public static @Nullable Currency of(String code) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(code, "code must not be null");
-        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO)) && db1.getCurrency(code).currencyType == CurrencyType.CRYPTO) {
-            return CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
+        if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO)) || db1.getCurrency(code).currencyType == CurrencyType.CRYPTO) {
+            return db1.getCurrency(code);
+        } else if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT)) || db1.getCurrency(code).currencyType == CurrencyType.FIAT) {
+            return db1.getCurrency(code);
         } else if (code.equals("���") || code.equals("XXX") || code.isEmpty()) {
             return NULL_CRYPTO_CURRENCY;
         }
-        return db1.getCurrency(code) == null ? NULL_CRYPTO_CURRENCY : db1.getCurrency(code);
+        return db1.getCurrency(code) == null ? NULL_FIAT_CURRENCY : db1.getCurrency(code);
 
     }
 
@@ -150,7 +116,7 @@ public abstract class Currency {
      * @param code the currency code
      * @return the fiat currency
      */
-    public static Currency ofFiat(@NotNull String code) throws SQLException {
+    public static Currency ofFiat(@NotNull String code) throws SQLException, ClassNotFoundException {
 
 
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT)) || db1.getCurrency(code).currencyType == CurrencyType.FIAT) {
@@ -238,9 +204,6 @@ public abstract class Currency {
         return String.format("%s (%s)", fullDisplayName, code);
     }
 
-    public abstract int compareTo(@NotNull Currency o);
-
-    public abstract int compareTo(java.util.@NotNull Currency o);
 
     public String getImage() {
         return image;
@@ -251,5 +214,16 @@ public abstract class Currency {
     }
 
 
+    public BigDecimal getCurrentPrice() {
+        // implement logic to fetch current price from external API
+        //...
+        return BigDecimal.ZERO;
+    }
 
+    @Override
+    public int compareTo(@NotNull Currency o) {
+        return 0;
+    }
+
+    public abstract int compareTo(java.util.@NotNull Currency o);
 }

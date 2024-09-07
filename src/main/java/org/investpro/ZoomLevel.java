@@ -1,17 +1,16 @@
 package org.investpro;
 
-import javafx.beans.binding.Bindings;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.util.Pair;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * @author Michael Ennen
- */
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.util.Pair;
+import org.jetbrains.annotations.NotNull;
+
+
 public class ZoomLevel {
     private final int zoomLevelId;
     private final int candleWidth;
@@ -25,7 +24,7 @@ public class ZoomLevel {
     private final Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap;
 
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
-              final DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
+              final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
               final int minXValue) {
         this.zoomLevelId = zoomLevelId;
         this.candleWidth = candleWidth;
