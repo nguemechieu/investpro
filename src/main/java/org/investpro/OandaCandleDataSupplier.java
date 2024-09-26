@@ -37,8 +37,12 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
     private final String apiSecret;
 
     OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiSecret) {
-        super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        super(240, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         this.apiSecret = apiSecret;
+        requestBuilder.header(
+                "Authorization",
+                "Bearer %s".formatted(apiSecret)
+        );
     }
 
 
@@ -75,8 +79,8 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
-
-        String uriStr = STR."https://api-fxtrade.oanda.com/v3/instruments/\{tradePair.toString('_')}/candles?count=200&price=M&granularity=\{granularityToString(secondsPerCandle)}";
+       // "https://api-fxtrade.oanda.com/v3/instruments/USD_CAD/candles?price=BA&from=2016-10-17T15%3A00%3A00.000000000Z&granularity=M1"
+        String uriStr = STR."https://api-fxtrade.oanda.com/v3/instruments/\{tradePair.toString('_')}/candles?count=200&price=M&from="+startDateString+"&granularity="+granularityToString(secondsPerCandle);
 
         if (startTime == EARLIEST_DATA) {
             // signal more data is false

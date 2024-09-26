@@ -56,12 +56,12 @@ HttpClient client=HttpClient.newBuilder()
     private Order order;
     //    Accounts	Get a single account's holds	Get Account	Look for the hold object
     private JsonNode res;
+    private String message;
 
 
     public Oanda(String account_id, String apiSecret) {
         super(account_id, apiSecret);
-
-        requestBuilder.header("Authorization", "Bearer  8bf45b37af06b42c5ee42adb4525f339-975adff698b1158504abc2c216e450f5");
+        requestBuilder.header("Authorization", "Bearer  %s".formatted(apiSecret));
         requestBuilder.header("Accept", "application/json");
         requestBuilder.header("Content-Type",
                 "application/json");
@@ -199,7 +199,7 @@ HttpClient client=HttpClient.newBuilder()
     @Override
     public String getExchangeMessage() {
 
-        return null;
+        return message;
     }
 
     /**
@@ -425,7 +425,7 @@ HttpClient client=HttpClient.newBuilder()
     public Ticker getLivePrice(TradePair tradePair) {
         Objects.requireNonNull(tradePair);
 
-        String uriStr = STR."\{url}/api/v3/products/\{tradePair.toString('-')}/ticker";
+        String uriStr = STR."\{url}/instruments/\{tradePair.toString('-')}/ticker";
 
         requestBuilder.uri(URI.create(uriStr));
         try {
@@ -488,7 +488,7 @@ HttpClient client=HttpClient.newBuilder()
         String uriStr = url + STR."/accounts/\{account_id}/positions";
 
         requestBuilder.uri(URI.create(uriStr))
-                .header("Authorization", "Bearer %s".formatted(apiKey))
+
                 .build();
 
         try {
@@ -650,5 +650,9 @@ HttpClient client=HttpClient.newBuilder()
 
     public void setOrder(Order order) {
         this.order = order;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 }
