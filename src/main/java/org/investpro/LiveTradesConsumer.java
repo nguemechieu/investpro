@@ -22,7 +22,7 @@ public class LiveTradesConsumer {
     private Exchange exchange;
     private List<Trade> tradeQueue;
 
-    public LiveTradesConsumer(Exchange exchange, Account account) {
+    public LiveTradesConsumer(Exchange exchange, @NotNull Account account) {
         this.exchange = exchange;
         // Initialize consumer with a default account
         this.account = account;
@@ -247,12 +247,12 @@ public class LiveTradesConsumer {
     }
 
     // Helper method to validate a TradePair
-    private boolean isValidTradePair(TradePair pair) {
+    private boolean isValidTradePair(@NotNull TradePair pair) {
         return pair.getBaseCurrency() != null && pair.getCounterCurrency() != null;
     }
 
     // Example method to start live trading for selected pairs
-    private void startLiveTrading(List<TradePair> tradePairs) {
+    private void startLiveTrading(@NotNull List<TradePair> tradePairs) {
         // Implement logic to start live trading or listen to live market data for these pairs
         for (TradePair pair : tradePairs) {
             logger.debug("Starting live trade processing for pair: {}", pair);
@@ -281,10 +281,7 @@ public class LiveTradesConsumer {
 
     public void setCandlePageConsumer(Consumer<List<CandleData>> candlePageConsumer) {
         // Set candle page consumer for live trade processing
-    }
 
-    public void setCandleStickChart(CandleStickChart candleStickChart) {
-        // Set candle stick chart for live trade processing
     }
 
     public void clear() {
@@ -303,8 +300,7 @@ public class LiveTradesConsumer {
     }
 
     public @NotNull List<Trade> getLiveTrades() {
-        // Implement logic to get live trades from exchange
-        // Example: Use the exchange's API to fetch live trades
+
         return livesTrades;// Placeholder for actual implementation
     }
 
@@ -323,6 +319,7 @@ public class LiveTradesConsumer {
 
     public void setInProgressCandle(CandleData inProgressCandle) {
         // Set in-progress candle for live trade processing
+
     }
 
     public void setTradeQueue(List<Trade> tradeQueue) {
@@ -335,5 +332,6 @@ public class LiveTradesConsumer {
 
     public void setReady(boolean ready) {
         // Set ready status for live trade processing
+        this.ready = ready;
     }
 }

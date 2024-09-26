@@ -22,7 +22,7 @@ import java.util.Objects;
  * @author NOEL NGUEMECHIEU
  */
 public class ChartContainer extends Region {
-    private final CandleStickChartToolbar toolbar;
+    CandleStickChartToolbar toolbar;
     VBox candleChartContainer = new VBox();
     private final Exchange exchange;
     private TradePair tradePair;
@@ -59,7 +59,7 @@ public class ChartContainer extends Region {
         AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
         AnchorPane.setRightAnchor(toolbarContainer, 0.0);
         AnchorPane.setBottomAnchor(toolbarContainer, 0.0);
-        candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
         AnchorPane.setRightAnchor(candleChartContainer, 15.0);
@@ -100,18 +100,18 @@ public class ChartContainer extends Region {
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException {
         if (secondsPerCandle <= 0) {
-            throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
+            throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }
         candleStickChart = new CandleStickChart(
 
                 exchange,
-                exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
-                tradePair,
+                exchange.getCandleDataSupplier(secondsPerCandle, exchange.tradePair),
+                exchange.tradePair,
                 liveSyncing,
                 secondsPerCandle,
                 widthProperty(),
                 heightProperty()
-        );//                tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        );
     }
 
     private void animateInNewChart(CandleStickChart newChart) {

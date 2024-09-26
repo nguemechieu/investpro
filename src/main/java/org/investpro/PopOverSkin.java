@@ -1,10 +1,10 @@
-package org.investpro;//CHECKSTYLE:OFF
+package org.investpro;
+
 /*
- * Copyright (c) 2013, ControlsFX
+ * Copyright © 2024
  * All rights reserved.
- * <p/>
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Redistribution and use in a source and binary forms, with or without
+ * modification, are permitted if the following conditions are met:
  * * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
  * * Redistributions in binary form must reproduce the above copyright
@@ -13,8 +13,8 @@ package org.investpro;//CHECKSTYLE:OFF
  * * Neither the name of ControlsFX, any associated website, nor the
  * names of its contributors may be used to endorse or promote products
  * derived from this software without specific prior written permission.
- * <p/>
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS ARE" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL CONTROLSFX BE LIABLE FOR ANY
@@ -32,10 +32,8 @@ import static javafx.geometry.Pos.CENTER_LEFT;
 import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
 import static javafx.scene.paint.Color.YELLOW;
 import static org.investpro.PopOver.ArrowLocation.*;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
@@ -60,10 +58,11 @@ import javafx.scene.shape.PathElement;
 import javafx.scene.shape.QuadCurveTo;
 import javafx.scene.shape.VLineTo;
 import javafx.stage.Window;
+import org.jetbrains.annotations.NotNull;
 
 public class PopOverSkin implements Skin<PopOver> {
-    private final Label title;
-    private final Label closeIcon;
+    Label title;
+    Label closeIcon;
     private final Path path;
     private final Path clip;
     private final BorderPane content;
@@ -76,15 +75,14 @@ public class PopOverSkin implements Skin<PopOver> {
     private boolean tornOff;
 
     private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
-
-    public PopOverSkin(final PopOver popOver) {
+    public PopOverSkin(final @NotNull PopOver popOver) {
         this.popOver = popOver;
         stackPane = popOver.getRoot();
         stackPane.setPickOnBounds(false);
         Bindings.bindContent(stackPane.getStyleClass(), popOver.getStyleClass());
 
         /*
-         * The min width and height equal 2 * corner radius + 2 * arrow indent +
+         * The min width and height equal 2 * corners radius + 2 * arrow indent +
          * 2 * arrow size.
          */
         stackPane.minWidthProperty().bind(
@@ -143,10 +141,10 @@ public class PopOverSkin implements Skin<PopOver> {
         getPopupWindow().yProperty().addListener(updatePathListener);
         popOver.arrowLocationProperty().addListener(updatePathListener);
         popOver.contentNodeProperty().addListener(
-                (value, oldContent, newContent) -> content
+                (_, _, newContent) -> content
                         .setCenter(newContent));
         popOver.detachedProperty()
-                .addListener((value, oldDetached, newDetached) -> {
+                .addListener((_, _, newDetached) -> {
                     updatePath();
 
                     if (newDetached) {
@@ -190,7 +188,7 @@ public class PopOverSkin implements Skin<PopOver> {
 
         /*
          * The clip is a path and the path has to be filled with a color.
-         * Otherwise clipping will not work.
+         * Otherwise, clipping will not work.
          */
         clip.setFill(YELLOW);
 
@@ -262,7 +260,7 @@ public class PopOverSkin implements Skin<PopOver> {
     public void dispose() {
     }
 
-    private Node createCloseIcon() {
+    private @NotNull Node createCloseIcon() {
         Group group = new Group();
         group.getStyleClass().add("graphics"); //$NON-NLS-1$
 
@@ -423,7 +421,6 @@ public class PopOverSkin implements Skin<PopOver> {
         lineBRight = new VLineTo();
         lineBRight.yProperty().bind(
                 Bindings.add(topEdgePlusRadiusProperty, arrowIndentProperty));
-
         lineCRight = new LineTo();
         lineCRight.xProperty().bind(
                 Bindings.add(rightEdgeProperty, arrowSizeProperty));
@@ -451,10 +448,8 @@ public class PopOverSkin implements Skin<PopOver> {
 
         lineHRight = new VLineTo();
         lineHRight.yProperty().bind(
-                Bindings.subtract(Bindings.subtract(
-                                bottomEdgeMinusRadiusProperty, arrowIndentProperty),
+                Bindings.subtract(Bindings.subtract(bottomEdgeMinusRadiusProperty, arrowIndentProperty),
                         Bindings.multiply(arrowSizeProperty, 2)));
-
         lineIRight = new LineTo();
         lineIRight.xProperty().bind(
                 Bindings.add(rightEdgeProperty, arrowSizeProperty));
@@ -471,22 +466,18 @@ public class PopOverSkin implements Skin<PopOver> {
 
         lineKRight = new VLineTo();
         lineKRight.yProperty().bind(bottomEdgeMinusRadiusProperty);
-
         //
         // BOTTOM EDGE
         //
-
         bottomCurveTo = new QuadCurveTo();
         bottomCurveTo.xProperty().bind(rightEdgeMinusRadiusProperty);
         bottomCurveTo.yProperty().bind(bottomEdgeProperty);
         bottomCurveTo.controlXProperty().bind(rightEdgeProperty);
         bottomCurveTo.controlYProperty().bind(bottomEdgeProperty);
-
         lineBBottom = new HLineTo();
         lineBBottom.xProperty().bind(
                 Bindings.subtract(rightEdgeMinusRadiusProperty,
                         arrowIndentProperty));
-
         lineCBottom = new LineTo();
         lineCBottom.xProperty().bind(
                 Bindings.subtract(lineBBottom.xProperty(), arrowSizeProperty));
@@ -532,10 +523,7 @@ public class PopOverSkin implements Skin<PopOver> {
 
         lineKBottom = new HLineTo();
         lineKBottom.xProperty().bind(leftEdgePlusRadiusProperty);
-
-        //
         // LEFT EDGE
-        //
         leftCurveTo = new QuadCurveTo();
         leftCurveTo.xProperty().bind(leftEdgeProperty);
         leftCurveTo.yProperty().bind(
@@ -590,10 +578,8 @@ public class PopOverSkin implements Skin<PopOver> {
         lineJLeft.xProperty().bind(leftEdgeProperty);
         lineJLeft.yProperty().bind(
                 Bindings.add(topEdgePlusRadiusProperty, arrowIndentProperty));
-
         lineKLeft = new VLineTo();
         lineKLeft.yProperty().bind(topEdgePlusRadiusProperty);
-
         topCurveTo = new QuadCurveTo();
         topCurveTo.xProperty().bind(leftEdgePlusRadiusProperty);
         topCurveTo.yProperty().bind(topEdgeProperty);
@@ -613,7 +599,6 @@ public class PopOverSkin implements Skin<PopOver> {
     private void updatePath() {
         List<PathElement> elements = new ArrayList<>();
         elements.add(moveTo);
-
         if (showArrow(TOP_LEFT)) {
             elements.add(lineBTop);
             elements.add(lineCTop);
@@ -685,7 +670,6 @@ public class PopOverSkin implements Skin<PopOver> {
         }
         elements.add(lineKLeft);
         elements.add(topCurveTo);
-
         path.getElements().setAll(elements);
         clip.getElements().setAll(elements);
     }

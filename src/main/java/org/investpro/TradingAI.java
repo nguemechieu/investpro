@@ -28,13 +28,8 @@ public class TradingAI {
 
         try {
             this.model.buildClassifier(trainingData);  // Train the model
-
-            File f = new File("trainingData" + ".pkl");
-            if (!f.exists()) {
-                f.createNewFile();
-            }
-            //SerializationUtils.serializeObject(model, f);
-
+            File f = new File("trainingData.pkl");
+            if (!f.exists()) f.createNewFile();
 
         } catch (Exception e) {
             logger.severe(STR."Error building classifier: \{e.getMessage()}");
@@ -47,13 +42,12 @@ public class TradingAI {
             Instance instance = createInstance(open, high, low, close, volume);
             double prediction = model.classifyInstance(instance);
 
-            if (prediction == 0.0) {
+            if (prediction == 0.0)
                 return SIGNAL.BUY;
-            } else if (prediction == 1.0) {
+            else if (prediction == 1.0)
                 return SIGNAL.SELL;
-            } else {
+            else
                 return SIGNAL.HOLD;
-            }
 
         } catch (Exception e) {
             logger.severe(STR."Error creating instance or predicting signal: \{e.getMessage()}");

@@ -19,7 +19,6 @@ import java.util.Objects;
 public class InvestPro extends Application {
 
 
-    static final LogUtils logUtils = new LogUtils();
 
     public InvestPro() {
         super();
@@ -49,7 +48,7 @@ public class InvestPro extends Application {
                         Objects.requireNonNull(getClass().getResourceAsStream("/investpro.png"))
                 )
         );
-        primaryStage.fullScreenProperty().addListener((observable, oldValue, newValue) -> primaryStage.setFullScreen(newValue));
+        primaryStage.fullScreenProperty().addListener((_, _, newValue) -> primaryStage.setFullScreen(newValue));
         scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
 
         primaryStage.show();

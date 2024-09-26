@@ -2,7 +2,6 @@ package org.investpro;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.logging.FileHandler;
@@ -21,13 +20,10 @@ public class LogUtils {
             // Set a simple formatter (you can also use XMLFormatter or custom ones)
             SimpleFormatter formatter = new SimpleFormatter();
             fileHandler.setFormatter(formatter);
-
-
-            // Optionally, set the logging level (INFO, WARNING, SEVERE, etc.)
-            logger.isEnabledForLevel(Level.intToLevel(0)); // Log everything
+         // Optionally, set the logging level (INFO, WARNING, SEVERE, etc.)
 
         } catch (IOException e) {
-            logger.error(STR."Failed to set up logger: \{e.getMessage()}");
+            logger.error("Failed to set up logger: %s".formatted(e.getMessage()));
         }
     }
 

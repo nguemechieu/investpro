@@ -14,20 +14,19 @@ import java.util.Objects;
  *
  * @author Noel Nguemechieu
  */
-@Entity
-@Table(name = "trades")
+
 public class Trade {
 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trade_pair_id", nullable = false)
     TradePair tradePair;
-    private Exchange exchange;
+    Exchange exchange;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "local_trade_id", nullable = false)
-    private long localTradeId;
-    private Money fee;
+     long localTradeId;
+    Money fee;
 
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -111,14 +110,6 @@ public class Trade {
         return DefaultMoney.ofFiat(price.toBigDecimal().multiply(amount.toBigDecimal()), "USD");
     }
 
-    public Side getTransactionType() {
-        return transactionType;
-    }
-
-    public void setTransactionType(Side transactionType) {
-        this.transactionType = transactionType;
-    }
-
     @Override
     public boolean equals(Object object) {
         if (object == this) {
@@ -180,13 +171,6 @@ public class Trade {
         this.tradePair = tradePair;
     }
 
-    public long getLocalTradeId() {
-        return localTradeId;
-    }
-
-    public void setLocalTradeId(long localTradeId) {
-        this.localTradeId = localTradeId;
-    }
 
     public Exchange getExchange() {
         return exchange;

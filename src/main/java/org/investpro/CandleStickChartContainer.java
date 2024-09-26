@@ -36,11 +36,11 @@ public class CandleStickChartContainer extends Region {
     private CandleStickChart candleStickChart;
 
 
-    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
+    public CandleStickChartContainer(Exchange exchange,  boolean liveSyncing) {
         Objects.requireNonNull(exchange, "exchange must not be null");
-        Objects.requireNonNull(tradePair, "tradePair must not be null");
+
         this.exchange = exchange;
-        this.tradePair = tradePair;
+        this.tradePair = exchange.tradePair;
 
 
         this.candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);

@@ -24,6 +24,12 @@
           <option value="exp" />
           <option value="nbf" />
           <option value="sub" />
+          <option value="X-MBX-APIKEY" />
+          <option value="TIMESTAMP" />
+          <option value="X-Ratelimit-Reset" />
+          <option value="X-Ratelimit-Limit" />
+          <option value="Accept-Datetime-Format" />
+          <option value="X-Ratelimit-Remaining" />
         </set>
       </option>
     </inspection_tool>

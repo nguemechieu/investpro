@@ -105,4 +105,6 @@ public interface Db extends DataSource {
     void save(ArrayList<Currency> currency) throws SQLException;
 
     Currency getCurrency(String code) throws SQLException, ClassNotFoundException;
+
+
 }

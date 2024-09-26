@@ -31,12 +31,12 @@ public class DisplayExchange extends Region {
                 if (empty) {
                     setText("Select Trade Pair");
                 } else {
-                    setText(tradePair.getSymbol());
+                    setText(tradePair.toString('-'));
                 }
             }
         });
 
-        tradePairsCombo.getItems().addAll(exchange.getTradePairs());//==null?TradePair.of("ETH", "USD"): (TradePair) exchange.getTradePairs()
+        tradePairsCombo.getItems().addAll(exchange.getTradePairs().get());//==null?TradePair.of("ETH", "USD"): (TradePair) exchange.getTradePairs()
 
 
         Button autoTradeBtn = new Button("AUTO TRADE");
@@ -93,9 +93,11 @@ public class DisplayExchange extends Region {
         previousCol.setPrefWidth(150);
         previousCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue()));
 // Optionally, you can set a root for the second TreeTableView as well
-        TreeItem<String> detailRoot = new TreeItem<>("Details");
+        TreeItem<String> detailRoot = new TreeItem<>(
+
+        );
         detailRoot.setExpanded(true);
-        newsDetailTreeTableView.setRoot(detailRoot);
+        newsDetailTreeTableView.setRoot(detailRoot.getParent());
 // Add columns to the TreeTableView
         newsDetailTreeTableView.getColumns().addAll(dateCol, titleCol, impactCol, forecastCol, previousCol);
         Canvas upcoming_new_box = new Canvas(
@@ -219,7 +221,7 @@ public class DisplayExchange extends Region {
                 1540, 500
         );
 
-        Canvas historicalDataCanvas = new Canvas(1540, 700);
+        Canvas historicalDataCanvas = new Canvas(1540, 600);
         historicalDataCanvas.getStyleClass().add("historical-data-canvas");
         historicalDataCanvas.getGraphicsContext2D().setFill(
                 Color.BLACK
@@ -259,7 +261,7 @@ public class DisplayExchange extends Region {
         );
 
         tradeToolBar.getItems().addAll(market_typeCombox);
-        tradingTabPane.setPrefSize(1540, 780);
+        tradingTabPane.setPrefSize(1540, 750);
         getChildren().add(tradingTabPane);
         tradingTabPane.setSide(Side.RIGHT);
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
@@ -293,9 +295,10 @@ public class DisplayExchange extends Region {
 
             Tab tab0 = new Tab(tradePairsCombo.getSelectionModel().getSelectedItem().toString('-'));
             tab0.getStyleClass().add("chart-tab");
-            CandleStickChartDisplay candlestickChartDisplay = new CandleStickChartDisplay(tradePairsCombo.getSelectionModel().getSelectedItem(), exchange);
-            candlestickChartDisplay.setPrefSize(1540, 700);
 
+            exchange.tradePair=tradePairsCombo.getSelectionModel().getSelectedItem();
+            CandleStickChartDisplay candlestickChartDisplay = new CandleStickChartDisplay( exchange);
+            candlestickChartDisplay.setPrefSize(1440, 700);
             tab0.setContent(candlestickChartDisplay);
             candlestickChartDisplay.getStyleClass().add("candlestick-chart");
             chartradeTabPane.getStyleClass().add("tab-pane");

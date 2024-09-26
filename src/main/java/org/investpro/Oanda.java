@@ -22,6 +22,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -32,69 +33,44 @@ import java.util.concurrent.*;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 
-public class OandaExchange extends Exchange {
+public class Oanda extends Exchange {
 
-
+HttpClient client=HttpClient.newBuilder()
+        .version(HttpClient.Version.HTTP_2)
+    .connectTimeout(Duration.ofSeconds(10))
+            .build();
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private static final Logger logger = LoggerFactory.getLogger(OandaExchange.class);
-    static String apiSecret;
-    static HttpClient.Builder client = HttpClient.newBuilder();
-    static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+    private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
+    String apiSecret;
+
+     HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     ///instruments/\{tradePair.toString('_')}/candles?";
 
     static String account_id;
-    private static String apiKey;
-    ExchangeWebSocketClient oandaWebsocket;
+
     String url = "https://api-trade.oanda.com/api/v3";
-    private TradePair tradePair;
+
     private Order order;
     //    Accounts	Get a single account's holds	Get Account	Look for the hold object
     private JsonNode res;
 
-    {
-        try {
-            this.oandaWebsocket = new CoinbaseWebSocketClient(
-                    new TradePair("EUR", "JPY"), apiKey, apiSecret);
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    public OandaExchange(String apiKey, String apiSecret) throws IOException, InterruptedException, ExecutionException, TimeoutException, SQLException, ClassNotFoundException {
-        super(apiKey, apiSecret);
 
-        requestBuilder.header("Authorization", STR."Bearer \{apiSecret}");
-        OandaExchange.apiKey = apiKey;
-        requestBuilder.header("Content-Type", "application/json");
+    public Oanda(String account_id, String apiSecret) {
+        super(account_id, apiSecret);
+
+        requestBuilder.header("Authorization", "Bearer  8bf45b37af06b42c5ee42adb4525f339-975adff698b1158504abc2c216e450f5");
         requestBuilder.header("Accept", "application/json");
-        requestBuilder.header("Origin", "https://api-fxtrade.oanda.com/");
-        requestBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36");
-        requestBuilder.header("Access-Control-Allow-Credentials", "true");
-        requestBuilder.header(
-                "Access-Control-Allow-Headers",
-                "Origin, X-Requested-With, Content-Type, Accept"
-        );
-        requestBuilder.header(
-                "Access-Control-Allow-Methods",
-                "GET, POST, PUT, DELETE, OPTIONS"
-        );
-        OandaExchange.apiKey = apiKey;
+        requestBuilder.header("Content-Type",
+                "application/json");
 
-        OandaExchange.apiSecret = apiSecret;
-
-        OandaExchange.account_id = apiKey;
+        Oanda.account_id = account_id;
+        this.apiSecret=apiSecret;
 
     }
 
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(String apiKey) {
-        OandaExchange.apiKey = apiKey;
-    }
 
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         return new OandaCandleDataSupplier(secondsPerCandle, tradePair, apiSecret);
@@ -182,7 +158,7 @@ public class OandaExchange extends Exchange {
         requestBuilder.method("POST",
                 HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(new CreateOrderRequest(tradePair.toString('-'), side, orderType, price, size, timestamp, stopLoss, takeProfit))));
 
-        HttpResponse<String> response = client.build().send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() == 200) {
             logger.info("Order created: {}", response.body());
@@ -206,15 +182,16 @@ public class OandaExchange extends Exchange {
 
         String uriStr = url + STR."/orders/\{orderId}";
 
-        requestBuilder.uri(URI.create(uriStr)).header("Content-Type", "application/json").DELETE().build();
-        HttpResponse<String> response = client.build().send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        requestBuilder.uri(URI.create(uriStr)).DELETE().build();
+        HttpRequest.BodyPublisher body =HttpRequest.BodyPublishers.ofString("");
+        HttpResponse<String> response = client.send(requestBuilder.POST(body).build(), HttpResponse.BodyHandlers.ofString());
         CompletableFuture<String> futureResult = new CompletableFuture<>();
         if (response.statusCode() == 204) {
             logger.info("Order canceled: {}", orderId);
             futureResult.complete(orderId);
         } else {
             logger.error("Failed to cancel order: {}", orderId);
-            futureResult.completeExceptionally(new RuntimeException("Failed to cancel order: " + response.body()));
+            futureResult.completeExceptionally(new RuntimeException("Failed to cancel order: %s".formatted(response.body())));
         }
         return futureResult;
     }
@@ -250,7 +227,7 @@ public class OandaExchange extends Exchange {
             // burst.
             // We will know if we get rate limited if we get a 429 response code.
             for (int i = 0; !futureResult.isDone(); i++) {
-                String uriStr = STR."\{url}/";
+                String uriStr = url;
                 uriStr += STR."accounts/\{account_id}/trades?instrument=\{tradePair.toString('_')}";
 
                 if (i != 0) {
@@ -259,20 +236,20 @@ public class OandaExchange extends Exchange {
                 }
 
                 try {
-                    HttpResponse<String> response = client.build().send(
+                    HttpResponse<String> response = client.send(
                             requestBuilder.uri(URI.create(uriStr))
                                     .GET().build(),
                             HttpResponse.BodyHandlers.ofString());
 
                     logger.info(STR."trades response: \{response}");
-                    if (response.headers().firstValue("CB-AFTER").isEmpty()) {
+                    if (response.headers().firstValue("time").isEmpty()) {
                         logger.error("Exception", STR." trades response did not contain header \"cb-after\": \{response}");
                         futureResult.completeExceptionally(new RuntimeException());
                         //  trades response did not contain header \"cb-after\": \{response}"));
                         return;
                     }
 
-                    afterCursor.setValue(Integer.valueOf((response.headers().firstValue("CB-AFTER").get())));
+                    afterCursor.setValue(Integer.valueOf((response.headers().firstValue("time").get())));
                     JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
 
                     if (!tradesResponse.isArray()) {
@@ -330,10 +307,10 @@ public class OandaExchange extends Exchange {
                 .min(Comparator.comparingInt(i -> (int) Math.abs(i - idealGranularity)))
                 .orElseThrow(() -> new NoSuchElementException("Supported granularity was empty!"));
 
-        return client.build().sendAsync(
+        return client.sendAsync(
                         requestBuilder
                                 .uri(URI.create(String.format(
-                                        STR."\{url}/instruments/\{tradePair.toString('-')}/candles", actualGranularity, startDateString)))
+                                        STR."\{url}/instruments/\{tradePair.toString('_')}/candles", actualGranularity, startDateString)))
                                 .GET().build(),
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
@@ -341,7 +318,7 @@ public class OandaExchange extends Exchange {
                     logger.info(STR."candles response: \{response1}");
 
                     if (response1 == null || response1.isEmpty()) {
-                        logger.error("ERROR", STR."\{tradePair.toString('-')} candles response was empty");
+                        logger.error("ERROR", STR."\{tradePair.toString('_')} candles response was empty");
                         return Optional.empty();
                     }
 
@@ -412,7 +389,7 @@ public class OandaExchange extends Exchange {
         requestBuilder.GET();
         HttpResponse<String> response;
         try {
-            response = client.build().send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -439,7 +416,7 @@ public class OandaExchange extends Exchange {
         Objects.requireNonNull(tradePair);
         String uriStr = url + STR."/products/\{tradePair.toString('-')}/book?level=1";
         requestBuilder.uri(URI.create(uriStr)).GET().build();
-        return client.build().sendAsync(requestBuilder.uri(
+        return client.sendAsync(requestBuilder.uri(
                         URI.create(uriStr)
                 ).build(), HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body);
@@ -452,7 +429,7 @@ public class OandaExchange extends Exchange {
 
         requestBuilder.uri(URI.create(uriStr));
         try {
-            res = OBJECT_MAPPER.readTree(client.build()
+            res = OBJECT_MAPPER.readTree(client
                     .sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get(5000, TimeUnit.MILLISECONDS).body());
 
             Ticker ticker = new Ticker();
@@ -479,7 +456,7 @@ public class OandaExchange extends Exchange {
         String uriStr = STR."\{url}/accounts/\{account_id}";
         requestBuilder.uri(URI.create(uriStr));
         try {
-            JsonNode re = OBJECT_MAPPER.readTree(client.build()
+            JsonNode re = OBJECT_MAPPER.readTree(client
                     .send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
                     .body());
 
@@ -511,11 +488,11 @@ public class OandaExchange extends Exchange {
         String uriStr = url + STR."/accounts/\{account_id}/positions";
 
         requestBuilder.uri(URI.create(uriStr))
-                .header("Authorization", "Bearer " + apiKey)
+                .header("Authorization", "Bearer %s".formatted(apiKey))
                 .build();
 
         try {
-            res = OBJECT_MAPPER.readTree(client.build()
+            res = OBJECT_MAPPER.readTree(client
                     .sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get(5000, TimeUnit.MILLISECONDS).body());
 
             for (JsonNode position : res) {
@@ -539,7 +516,7 @@ public class OandaExchange extends Exchange {
         requestBuilder.uri(URI.create(uriStr));
         ArrayList<Order> orders = new ArrayList<>();
         try {
-            res = OBJECT_MAPPER.readTree(client.build()
+            res = OBJECT_MAPPER.readTree(client
                     .sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get(5000, TimeUnit.MILLISECONDS).body());
 
             Order order = OBJECT_MAPPER.readValue(res.traverse(), Order.class);
@@ -563,7 +540,7 @@ public class OandaExchange extends Exchange {
         requestBuilder.uri(URI.create(uriStr));
 
         ObservableList<Order> pendingOrders;
-        String data0 = client.build().send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).body();
+        String data0 = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).body();
 
         if (data0.contains("errorMessage") || data0.contains("error") || data0.charAt(0) == '{') {
             logger.info(data0);
@@ -587,82 +564,85 @@ public class OandaExchange extends Exchange {
         logger.info(STR."orders \{pendingOrders}");
         return FXCollections.observableArrayList(pendingOrders);
     }
-
     @Override
-    public List<TradePair> getTradePairs() {
+    public CompletableFuture<ArrayList<TradePair>> getTradePairs() {
 
-        String uriStr = STR."https://api-fxtrade.oanda.com/v3/accounts/\{account_id}/instruments";
+        String uriStr = "https://api-fxtrade.oanda.com/v3/accounts/001-001-2783446-006/instruments";
+
+//        Access-Control-Allow-Headers: Authorization, Content-Type, Accept-Datetime-Format
+//        Content-Encoding: gzip
+//        Transfer-Encoding: chunked
+//        Server: openresty/1.7.0.1
+//        Connection: keep-alive
+//        Date: Wed, 22 Jun 2016 18:32:01 GMT
+//        Access-Control-Allow-Origin: *
+//        Access-Control-Allow-Methods: PUT, PATCH, POST, GET, OPTIONS, DELETE
+//        Content-Type: application/json
+     requestBuilder
+                .header("Content-Type", "application/json")
+                .header("Accept-Datetime-Format", "UNIX")
+                .header("X-Ratelimit-Limit", "500")
+                .header("X-Ratelimit-Remaining", "499")
+                .header("X-Ratelimit-Reset", "1466561521")
+                .header("User-Agent", "java-oanda-v3-sample/1.0.0");
+             //header("Authorization", "Bearer 8bf45b37af06b42c5ee42adb4525f339-975adff698b1158504abc2c216e450f5")
+
+
 
         requestBuilder.uri(URI.create(uriStr));
-        requestBuilder.GET();
-        HttpResponse<String> response;
-        try {
-            response = client.build().send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
+        // Asynchronously send the request and handle the response
+        return client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString())
+                .thenApplyAsync(response -> {
+                    ArrayList<TradePair> instrumentsList = new ArrayList<>();
 
-        ArrayList<TradePair> instrumentsList = new ArrayList<>();
+                    if (response.statusCode() != 200) {
+                        // Log error if response status is not 200 OK
+                        logger.info("Error fetching instruments: %s".formatted(response.body()));
+                        return instrumentsList;
+                    }
 
-        if (response.statusCode() != 200) {
-            // throw (new RuntimeException(STR."Error fetching instruments: \{response.body()}"));
-            logger.info(STR."Error fetching instruments: \{response.body()}");
-            return instrumentsList;
-        } else {
+                    // Process the response body
+                    JsonNode jsonNode;
+                    try {
+                        jsonNode = OBJECT_MAPPER.readTree(response.body());
+                    } catch (JsonProcessingException e) {
+                        throw new RuntimeException(e);
+                    }
 
-            JsonNode jsonNode;
-            try {
-                jsonNode = new ObjectMapper().readTree(response.body());
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-            JsonNode instrumentsNode = jsonNode.get("instruments");
-            // String name, String type, String displayName, int pipLocation, int displayPrecision, int tradeUnitsPrecision, int minimumTradeSize, int maximumTrailingStopDistance, int minimumTrailingStopDistance, double maximumPositionSize, double maximumOrderUnits, double marginRate, String guaranteedStopLossOrderMode, String tags
-            logger.info(STR."Instruments:  \{instrumentsNode.toString()}");
-            for (JsonNode instrumentNode : instrumentsNode) {
-                //Saving new Currencies
+                    JsonNode instrumentsNode = jsonNode.get("instruments");
+                    logger.info("Instruments:  %s".formatted(instrumentsNode.toString()));
 
-//               // CURRENCIES.putIfAbsent(
-//                        new SymmetricPair<>(instrumentNode.get("displayName").asText().split("/")[0],CurrencyType.FIAT),
-//                        new FiatCurrency(
-//                                instrumentNode.get("displayName").asText().split("/")[0],
-//                                instrumentNode.get("displayName").asText().split("/")[0]
-//                                , instrumentNode.get("displayName").asText().split("/")[0],
-//                                Integer.parseInt(instrumentNode.get("displayPrecision").asText()),
-//                                instrumentNode.get("displayName").asText().split("/")[0],
-//                                Locale.getDefault()
-//                                ,"N/A",0
-//
-//                        ));
-//
-//
-//                CURRENCIES.putIfAbsent(
-//                        new SymmetricPair<>(instrumentNode.get("displayName").asText().split("/")[0],CurrencyType.FIAT),
-//                        new FiatCurrency(
-//                                instrumentNode.get("displayName").asText().split("/")[1],
-//                                instrumentNode.get("displayName").asText().split("/")[1]
-//                                , instrumentNode.get("displayName").asText().split("/")[1],
-//
-//                                Integer.parseInt(instrumentNode.get("displayPrecision").asText()),
-//                                instrumentNode.get("displayName").asText().split("/")[1],
-//                                Locale.getDefault()
-//                                ,"N/A",0
-//                        ));
+                    // Loop through the instruments and add them to the list
+                    for (JsonNode instrumentNode : instrumentsNode) {
+                        if (instrumentNode != null) {
+                            TradePair instrument;
+                            try {
+                                instrument = new TradePair(instrumentNode.get("displayName").asText().split("/")[0],
+                                        instrumentNode.get("displayName").asText().split("/")[1]);
+                            } catch (SQLException | ClassNotFoundException e) {
+                                throw new RuntimeException(e);
+                            }
+                            instrumentsList.add(instrument);
+                        }
+                    }
 
+                    // Register fiat currencies asynchronously if needed
+                    try {
+                        new FiatCurrencyDataProvider().registerCurrencies();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
 
-                TradePair instrument;
-                try {
-                    instrument = new TradePair(instrumentNode.get("displayName").asText().split("/")[0], instrumentNode.get("displayName").asText().split("/")[1]);
-                } catch (SQLException | ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
-                instrumentsList.add(instrument);
-            }
-
-        }
-        return instrumentsList;
+                    return instrumentsList;
+                })
+                .exceptionally(ex -> {
+                    // Log any exceptions that occur during the process
+                    logger.error("Error occurred during fetching trade pairs: ", ex);
+                    return new ArrayList<>();  // Return an empty list in case of error
+                });
     }
+
 
     public Order getOrder() {
         return order;

@@ -19,7 +19,7 @@ import java.util.Date;
 
 
 public class Screenshot extends Application {
-    private static Logger logger = LoggerFactory.getLogger(Screenshot.class);
+    private static final Logger logger = LoggerFactory.getLogger(Screenshot.class);
     private final Node node; // The node to capture (e.g., your chart or the root of your scene)
 
     public Screenshot(Node node) {
@@ -30,7 +30,7 @@ public class Screenshot extends Application {
         // Use Platform.runLater to ensure the capture happens on the JavaFX Application Thread
         Platform.runLater(() -> {
             WritableImage image = node.snapshot(null, null);
-            File file = new File("../doucuments/screenshot/investpro_screenshot_" + new Date().getTime() + ".png");
+            File file = new File("../documents/screenshot/investpro_screenshot_%d.png".formatted(new Date().getTime()));
 
             saveToDisk(image, file);
 
@@ -49,7 +49,7 @@ public class Screenshot extends Application {
         try {
             RenderedImage renderedImage = SwingFXUtils.fromFXImage(image, null);
             ImageIO.write(renderedImage, "png", file);
-            logger.debug(STR."Screenshot saved to \{file.getAbsolutePath()}");
+            logger.debug("Screenshot saved to %s".formatted(file.getAbsolutePath()));
         } catch (IOException e) {
             logger.error("Error saving screenshot", e);
         }

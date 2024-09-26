@@ -13,6 +13,9 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.stage.Stage;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +33,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -38,12 +40,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 import static org.investpro.Coinbase.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
-import static org.investpro.Currency.db1;
 
 public class Coinbase extends Exchange {
 
@@ -51,7 +51,7 @@ public class Coinbase extends Exchange {
     static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
 
     private static final Logger logger = LoggerFactory.getLogger(Coinbase.class);
-    static String url = "https://api.coinbase.com/api/v3";
+    static String url = "https://api.coinbase.com/api/v3/brokerage";
     //  Market Data Endpoint: wss://advanced-trade-ws.coinbase.com
     //  User Order Data Endpoint: wss://advanced-trade-ws-user.coinbase.com
     private String message;
@@ -67,15 +67,18 @@ public class Coinbase extends Exchange {
         this.message = "Coinbase";
         requestBuilder.header("Accept", "application/json");
         requestBuilder.header("Content-Type", "application/json");
-        requestBuilder.header("Access-Control", "cors");
-        // Generate signature using API key and secret
-        String signature = signer(apiKey, apiSecret);
 
-        // Set headers for the initial request
+        // Generate signature using API key and secret
+
+
+        // Set headers for the request
         requestBuilder.header("CB-ACCESS-KEY", apiKey);
 
+        long timestamp = System.currentTimeMillis();
+        String signature= signer(apiSecret,requestBuilder.toString(), String.valueOf(timestamp));
         requestBuilder.header("CB-ACCESS-SIGN", signature);
-        requestBuilder.header("CB-ACCESS-TIMESTAMP", String.valueOf(System.currentTimeMillis() / 1000));
+
+        requestBuilder.header("CB-ACCESS-TIMESTAMP", String.valueOf(timestamp));
 
         // Set headers for WebSocket client
         getWebSocketClient().addHeader("CB-ACCESS-KEY", apiKey);
@@ -84,18 +87,18 @@ public class Coinbase extends Exchange {
 
 
     }
+    // Updated signature generation method
+    private @NotNull String signer(String apiSecret, String requestPath, String timestamp)
+            throws NoSuchAlgorithmException, InvalidKeyException {
 
-    private @NotNull String signer(String apiKey, String apiSecret) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
-        String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
-        String message = STR."\{timestamp}/GET//users/self/accounts";
-        return hmacSHA256(apiSecret, message);
+        String rehash = "%sGET%s%s".formatted(timestamp, requestPath, "");
+        return hmacSHA256(apiSecret, rehash);
     }
 
-    private @NotNull String hmacSHA256(@NotNull String apiSecret, @NotNull String message) throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidKeyException {
+    private @NotNull String hmacSHA256(@NotNull String apiSecret, @NotNull String message)
+            throws NoSuchAlgorithmException, InvalidKeyException {
         Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
-        hmacSHA256.init(
-                new SecretKeySpec(apiSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256")
-        );
+        hmacSHA256.init(new SecretKeySpec(apiSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         byte[] rawHmac = hmacSHA256.doFinal(message.getBytes(StandardCharsets.UTF_8));
         StringBuilder hexString = new StringBuilder();
         for (byte b : rawHmac) {
@@ -105,12 +108,11 @@ public class Coinbase extends Exchange {
         return hexString.toString();
     }
 
-
     @Override
     public Account getAccounts() throws IOException, InterruptedException {
 
         // Here you should implement the logic to fetch account details from Coinbase API
-        requestBuilder.uri(URI.create(STR."\{url}/accounts"));
+        requestBuilder.uri(URI.create("%s/accounts".formatted(url)));
         requestBuilder.GET();
 
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
@@ -120,7 +122,7 @@ public class Coinbase extends Exchange {
             objectMapper.registerModule(new JavaTimeModule());
             return objectMapper.readValue(response.body(), Account.class);
         }
-        throw new RuntimeException(STR."Failed to fetch account details: \{response.body()}");
+        throw new RuntimeException("Failed to fetch account details: %s".formatted(response.body()));
     }
 
     @Override
@@ -132,10 +134,12 @@ public class Coinbase extends Exchange {
 
     private ExchangeWebSocketClient getWebSocketClient() {
 
-        this.webSocketClient = new ExchangeWebSocketClient(URI.create("wss://ws-feed.pro.coinbase.com"), new Draft_6455()) {
+        this.webSocketClient = new ExchangeWebSocketClient(URI.create("wss://advanced-trade-ws.coinbase.com"), new Draft_6455()) {
             @Override
             public CountDownLatch getInitializationLatch() {
-                return Coinbase.this.webSocketClient.getInitializationLatch();
+
+
+               return null;
             }
 
             @Override
@@ -293,11 +297,11 @@ public class Coinbase extends Exchange {
             // We will know if we get rate limited if we get a 429 response code.
 
             for (int i = 0; !futureResult.isDone(); i++) {
-                String uriStr = "https://api.pro.coinbase.com/";
-                uriStr += STR."products/\{tradePair.toString('-')}/trades";
+                String uriStr = url;
+                uriStr += "/products/%s/trades".formatted(tradePair.toString('-'));
 
                 if (i != 0) {
-                    uriStr += STR."?after=\{afterCursor.get()}";
+                    uriStr += "?after=%d".formatted(afterCursor.get());
                 }
 
                 try {
@@ -307,21 +311,21 @@ public class Coinbase extends Exchange {
                                     .GET().build(),
                             HttpResponse.BodyHandlers.ofString());
 
-                    logger.info(STR."response headers: \{response.headers()}");
+                    logger.info("response headers: %s".formatted(response.headers()));
 
                     if (response.statusCode() != 200) {
-                        logger.error(STR."Failed to fetch trades: \{response.body()} for trade pair: \{tradePair}");
+                        logger.error("Failed to fetch trades: %s for trade pair: %s".formatted(response.body(), tradePair));
 
                         message = response.body();
                         futureResult.completeExceptionally(new RuntimeException(
-                                STR."HTTP error response: \{response.statusCode()}"));
+                                "HTTP error response: %d".formatted(response.statusCode())));
                         return;
                     }
 
                     message = response.body();
                     if (response.headers().firstValue("CB-AFTER").isEmpty()) {
                         futureResult.completeExceptionally(new RuntimeException(
-                                STR."coinbase trades response did not contain header \"cb-after\": \{response}"));
+                                "coinbase trades response did not contain header \"cb-after\": %s".formatted(response)));
                         return;
                     }
 
@@ -452,7 +456,7 @@ public class Coinbase extends Exchange {
     @Override
     public List<Order> getPendingOrders() throws IOException, InterruptedException {
 
-        requestBuilder.uri(URI.create(STR."\{url}/orders"));
+        requestBuilder.uri(URI.create("%s/orders".formatted(url)));
         HttpResponse<String> res = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
         if (res.statusCode() != 200) {
@@ -466,7 +470,7 @@ public class Coinbase extends Exchange {
     @Override
     public CompletableFuture<String> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException {
 
-        requestBuilder.uri(URI.create(String.format(STR."\{url}/products", tradePair.toString('-'))));
+        requestBuilder.uri(URI.create(String.format("%s/products".formatted(url), tradePair.toString('-'))));
         HttpResponse<String> res = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
         if (res.statusCode() != 200) {
@@ -474,7 +478,7 @@ public class Coinbase extends Exchange {
         }
 
         OrderBook orderBook = OBJECT_MAPPER.readValue(res.body(), OrderBook.class);
-        logger.info(STR."coinbase order book: \{orderBook}");
+        logger.info("coinbase order book: %s".formatted(orderBook));
         return CompletableFuture.completedFuture(res.body());
 
 
@@ -490,7 +494,7 @@ public class Coinbase extends Exchange {
         if (text == null || text1 == null || userIdText == null) {
             throw new IllegalArgumentException("All parameters must be non-null");
         }
-        requestBuilder.uri(URI.create(String.format(STR."\{url}/accounts/%s")));
+        requestBuilder.uri(URI.create(String.format("%s/accounts/%%s".formatted(url))));
         HttpResponse<String> res = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
         if (res.statusCode() != 200) {
@@ -498,7 +502,7 @@ public class Coinbase extends Exchange {
         }
 
         Account userAccount = OBJECT_MAPPER.readValue(res.body(), Account.class);
-        logger.info(STR."coinbase user account: \{userAccount}");
+        logger.info("coinbase user account: %s".formatted(userAccount));
 
 
     }
@@ -507,7 +511,7 @@ public class Coinbase extends Exchange {
     public void getPositionBook(@NotNull TradePair tradePair) throws IOException, InterruptedException {
 
         requestBuilder.uri(
-                URI.create(String.format(STR."\{url}/products/%s/order_book", tradePair.toString('-')))
+                URI.create(String.format("%s/products/%%s/order_book".formatted(url), tradePair.toString('-')))
         );
         HttpResponse<String> res = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
@@ -516,14 +520,14 @@ public class Coinbase extends Exchange {
         }
 
         OrderBook positionBook = OBJECT_MAPPER.readValue(res.body(), OrderBook.class);
-        logger.info(STR."coinbase position book: \{positionBook}");
+        logger.info("coinbase position book: %s".formatted(positionBook));
 
     }
 
     @Override
     public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException {
 
-        requestBuilder.uri(URI.create(String.format("https://api.pro.coinbase.com/orders?product_id=%s", tradePair.toString('-'))));
+            requestBuilder.uri(URI.create(String.format(url+"/orders?product_id=%s", tradePair.toString('-'))));
         HttpResponse<String> res = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
         if (res.statusCode() != 200) {
@@ -532,7 +536,7 @@ public class Coinbase extends Exchange {
 
         List<Order> orders = OBJECT_MAPPER.readValue(res.body(), new TypeReference<>() {
         });
-        logger.info(STR."coinbase open orders: \{orders}");
+        logger.info("coinbase open orders: %s".formatted(orders));
         return orders;
 
 
@@ -560,20 +564,23 @@ public class Coinbase extends Exchange {
         return orders;
     }
 
+    ArrayList<TradePair> tradePairs = new ArrayList<>();
+
     @Override
-    public List<TradePair> getTradePairs() {
+    public CompletableFuture<ArrayList<TradePair>> getTradePairs() {
 
         requestBuilder.uri(URI.create("https://api.pro.coinbase.com/products"));
 
-        ArrayList<TradePair> tradePairs = new ArrayList<>();
+
         try {
 
             HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
 
 
             JsonNode res = OBJECT_MAPPER.readTree(response.body());
-            logger.info(STR."coinbase response: \{res}");
-            @NotNull ArrayList<Currency> cryptoCurrencyArrayList = new ArrayList<>();
+            logger.info("coinbase response: %s".formatted(res));
+
+
             //coinbase response: [{"id":"DOGE-BTC","base_currency":"DOGE","quote_currency":"BTC","quote_increment":"0.00000001","base_increment":"0.1","display_name":"DOGE-BTC","min_market_funds":"0.000016","margin_enabled":false,"post_only":false,"limit_only":false,"cancel_only":false,"status":"online","status_message":"","trading_disabled":false,"fx_stablecoin":false,"max_slippage_percentage":"0.03000000","auction_mode":false,
             for (JsonNode rate : res) {
                 CryptoCurrency baseCurrency, counterCurrency;
@@ -595,18 +602,14 @@ public class Coinbase extends Exchange {
 
                 counterCurrency = new CryptoCurrency(
                         fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2
-
                         , symbol);
-                cryptoCurrencyArrayList.add(baseCurrency);
-                cryptoCurrencyArrayList.add(counterCurrency);
 
 
                 TradePair tp = new TradePair(
                         baseCurrency, counterCurrency
                 );
                 tradePairs.add(tp);
-                logger.info(STR."coinbase trade pair: \{tp}");
-                //  TradePair tp = TradePair.of(baseCurrency, counterCurrency);
+                logger.info("coinbase trade pair: %s".formatted(tp));
 
 
             }
@@ -615,8 +618,9 @@ public class Coinbase extends Exchange {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        return CompletableFuture.completedFuture(tradePairs);
 
-        return tradePairs;
+
 
     }
 
@@ -666,15 +670,25 @@ public class Coinbase extends Exchange {
             return client.sendAsync(
                             requestBuilder
                                     .uri(URI.create(
-                                            STR."https://api.pro.coinbase.com/products/\{tradePair.toString('-')}/candles?granularity=\{secondsPerCandle}&start=\{startDateString}&end=\{endDateString}"))
+                                            "%s%s".formatted(url, "/products/%s/candles?granularity=%d&start=%s&end=%s".formatted(tradePair.toString('-'), secondsPerCandle, startDateString, endDateString))))
                                     .GET().build(),
                             HttpResponse.BodyHandlers.ofString())
                     .thenApply(response -> {
 
                         if (response.statusCode() != 200) {
 
-                            logger.error(STR."Failed to fetch candle data: \{response.body()} for trade pair: \{tradePair}");
-                            throw new RuntimeException(STR."HTTP error response: \{response.statusCode()}");
+                            logger.error("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair));
+
+
+
+                            Stage stage = new Stage();
+                            Label infos = new Label();
+                            infos.setText("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair));
+                            Scene scene = new Scene(infos);
+                            stage.setScene(scene);
+                            stage.show();
+
+
                         }
 
 
@@ -708,7 +722,7 @@ public class Coinbase extends Exchange {
                         } else {
 
                             logger.info(
-                                    STR."No candle data found for trade pair: \{tradePair} from \{startDateString} to display"
+                                    "No candle data found for trade pair: %s from %s to display".formatted(tradePair, startDateString)
                             );
                             return Collections.emptyList();
                         }

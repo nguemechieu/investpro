@@ -22,7 +22,7 @@ public class Ticker {
 
     }
 
-    public double getBidPrice() {
+    double getBidPrice() {
         return bidPrice;
     }
 

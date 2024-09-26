@@ -5,10 +5,7 @@ import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -112,7 +109,7 @@ public abstract class Exchange {
     public abstract ObservableList<Order> getOrders() throws IOException, InterruptedException;
 
 
-    public abstract List<TradePair> getTradePairs() throws IOException, InterruptedException;
+    public abstract CompletableFuture<ArrayList<TradePair>> getTradePairs() throws IOException, InterruptedException;
 
     public void clear() {
         liveTradesConsumer.clear();

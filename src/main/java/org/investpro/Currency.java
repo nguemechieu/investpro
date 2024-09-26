@@ -30,13 +30,7 @@ public abstract class Currency implements Comparable<Currency> {
             throw new RuntimeException(e);
         }
 
-        try {
 
-            new CryptoCurrencyDataProvider().registerCurrencies();
-            new FiatCurrencyDataProvider().registerCurrencies();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
 
@@ -116,7 +110,7 @@ public abstract class Currency implements Comparable<Currency> {
      * @param code the currency code
      * @return the fiat currency
      */
-    public static Currency ofFiat(@NotNull String code) throws SQLException, ClassNotFoundException {
+    public static Currency ofFiat(@NotNull String code) throws SQLException {
 
 
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.FIAT)) || db1.getCurrency(code).currencyType == CurrencyType.FIAT) {

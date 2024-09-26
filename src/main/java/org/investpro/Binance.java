@@ -3,14 +3,14 @@ package org.investpro;
 import com.fasterxml.jackson.core.JsonParser;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
-
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public class Binance extends Exchange {
+class Binance extends Exchange {
     public Binance(String text, String text1, TradePair tradePair) {
         super(
                 text,
@@ -94,7 +94,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public List<TradePair> getTradePairs() throws IOException, InterruptedException {
+    public CompletableFuture<ArrayList<TradePair>> getTradePairs() throws IOException, InterruptedException {
         return null;
     }
 }

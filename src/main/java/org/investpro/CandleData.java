@@ -1,5 +1,8 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Objects;
 
 /**
@@ -11,8 +14,6 @@ public class CandleData {
     private final double highPrice;
     private final double lowPrice;
     private final int openTime;
-
-
     private static double volume;
     private final double averagePrice;
     private final double volumeWeightedAveragePrice;
@@ -31,7 +32,7 @@ public class CandleData {
         this.highPrice = highPrice;
         this.lowPrice = lowPrice;
         this.openTime = openTime;
-        this.volume = volume;
+        CandleData.volume = volume;
         this.averagePrice = averagePrice;
         this.volumeWeightedAveragePrice = volumeWeightedAveragePrice;
         this.placeHolder = placeHolder;
@@ -43,7 +44,8 @@ public class CandleData {
                 volume * ((aDouble + aDouble1 + aDouble2 + aDouble3) / 4), false);
     }
 
-    public static CandleData of(long timestamp, double open, double high, double low, double close) {
+    @Contract("_, _, _, _, _ -> new")
+    public static @NotNull CandleData of(long timestamp, double open, double high, double low, double close) {
         return new CandleData(open, high, low, close, Math.toIntExact(timestamp), volume, (open + high + low + close) / 4,
                 (open + high + low + close) / 4 * volume, false);
     }
@@ -88,12 +90,9 @@ public class CandleData {
     public boolean equals(Object object) {
         if (object == this) {
             return true;
-        }
-
-        if (object == null || object.getClass() != getClass()) {
+        }else if (object == null || object.getClass() != getClass()) {
             return false;
         }
-
         CandleData other = (CandleData) object;
 
         return openPrice == other.openPrice &&
@@ -101,7 +100,6 @@ public class CandleData {
                 highPrice == other.highPrice &&
                 lowPrice == other.lowPrice &&
                 openTime == other.openTime &&
-
                 averagePrice == other.averagePrice &&
                 volumeWeightedAveragePrice == other.volumeWeightedAveragePrice &&
                 placeHolder == other.placeHolder;

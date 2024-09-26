@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 public class TradeView extends Region {
 
     private static final Logger logger = LoggerFactory.getLogger(TradeView.class);
-    private TradePair tradePair;
+
 
     TradeView(Exchange exchange) {
         Platform.setImplicitExit(false);
@@ -16,19 +16,12 @@ public class TradeView extends Region {
 
         CandleStickChartContainer candleStickChartContainer =
                 new CandleStickChartContainer(
-                        exchange, tradePair
+                        exchange
                         , true);
-        candleStickChartContainer.widthProperty().addListener((observable, oldValue, newValue) -> setPrefWidth(newValue.doubleValue()));
+        candleStickChartContainer.widthProperty().addListener((_, _, newValue) -> setPrefWidth(newValue.doubleValue()));
         getStyleClass().add("anchor-pane");
 
 
     }
 
-    public TradePair getTradePair() {
-        return tradePair;
-    }
-
-    public void setTradePair(TradePair tradePair) {
-        this.tradePair = tradePair;
-    }
 }

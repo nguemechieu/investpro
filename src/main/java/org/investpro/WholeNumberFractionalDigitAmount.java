@@ -1,7 +1,7 @@
 package org.investpro;
 
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public enum WholeNumberFractionalDigitAmount {
     MIN,

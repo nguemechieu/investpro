@@ -38,7 +38,7 @@ public class CandleStickChartExample extends Application {
         Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> logger.error(STR."[\{thread}]: ", exception));
         CandleStickChartContainer candleStickChartContainer =
                 new CandleStickChartContainer(
-                        new Coinbase("wertt", "dfgth"), BTC_USD, true);
+                        new Coinbase("wertt", "dfgth"), true);
         AnchorPane.setTopAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setLeftAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setRightAnchor(candleStickChartContainer, 30.0);
