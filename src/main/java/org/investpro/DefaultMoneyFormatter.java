@@ -1,6 +1,6 @@
 package org.investpro;
 
-import static java.lang.Math.min;
+import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -11,8 +11,10 @@ import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.Objects;
 
+import static java.lang.Math.min;
+
 /**
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
     public static final DefaultMoneyFormatter DEFAULT_FIAT_FORMATTER = new Builder()
@@ -46,7 +48,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
     private final boolean displayAtLeastAllFractionalDigits;
     private final int fractionalDigitsCap;
 
-    private DefaultMoneyFormatter(Builder builder) {
+    private DefaultMoneyFormatter(@NotNull Builder builder) {
         currencyStyle = builder.useCurrencySymbol ? CurrencyStyle.SYMBOL : CurrencyStyle.CODE;
         currencyPosition = builder.currencyPosition;
         putSpaceBetweenCurrencyAndAmount = builder.putSpaceBetweenCurrencyAndAmount;

@@ -4,7 +4,6 @@ package org.investpro;
 import jakarta.persistence.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -18,8 +17,6 @@ import java.util.Objects;
 public class Trade {
 
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trade_pair_id", nullable = false)
     TradePair tradePair;
     Exchange exchange;
     @Id
@@ -106,10 +103,6 @@ public class Trade {
                 "timestamp = %s, fee = %s]", tradePair, price, amount, transactionType, localTradeId, timestamp, fee);
     }
 
-    public Money getTotal() throws SQLException, ClassNotFoundException {
-        return DefaultMoney.ofFiat(price.toBigDecimal().multiply(amount.toBigDecimal()), "USD");
-    }
-
     @Override
     public boolean equals(Object object) {
         if (object == this) {
@@ -149,14 +142,6 @@ public class Trade {
 
     public boolean isSell() {
         return transactionType == Side.SELL;
-    }
-
-    public Money getFee() {
-        return fee;
-    }
-
-    public void setFee(Money fee) {
-        this.fee = fee;
     }
 
     public void setTimestamp(Instant timestamp) {

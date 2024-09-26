@@ -18,11 +18,11 @@ import javafx.util.Duration;
  * <p>
  * A {@code DelayedSizeChangeListener} is useful when used on a Node that has its'
  * preferred size set to {@code Double.MAX_VALUE} and thus re-sizes with the application
- * window. This way, as the Node's size passes through many intermediate values a
+ * window. This way, as the Node's size passes through many intermediate values, a
  * aa resizing is not performed but only for the final "resting" window size. This is
  * especially useful when resizing a is a computationally expensive operation.
  *
- * @author Michael Ennen
+ * @author Noel Nguemechieu
  */
 public abstract class DelayedSizeChangeListener implements ChangeListener<Number> {
     private final double subsequentDelay;

@@ -55,4 +55,8 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
     public abstract void onOpen(ServerHandshake handshake);
 
     public abstract boolean connectBlocking() throws InterruptedException;
+
+    public Boolean isConnected() {
+        return connectionEstablished.get();
+    }
 }

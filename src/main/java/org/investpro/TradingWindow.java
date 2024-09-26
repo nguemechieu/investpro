@@ -4,14 +4,14 @@ import io.github.cdimascio.dotenv.Dotenv;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
@@ -20,7 +20,6 @@ import java.util.Date;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class TradingWindow extends AnchorPane {
@@ -34,7 +33,7 @@ public class TradingWindow extends AnchorPane {
         logger.info("TradingWindow {}", this);
         setPrefSize(1540, 780);
 
-        Stage st = new Stage();
+
         GridPane gridPane = new GridPane();
         gridPane.setHgap(10);
         gridPane.setVgap(10);
@@ -73,7 +72,6 @@ public class TradingWindow extends AnchorPane {
                 apikeyLabel.setText("API KEY :");
                 secretLabel.setText("SECRET KEY :");
             }
-
             // Load saved API and Secret Key when exchange changes
             loadExchangeSettings(newValue, apiKeyTextField, secretKeyTextField);
         });
@@ -136,7 +134,7 @@ public class TradingWindow extends AnchorPane {
                 case "BINANCE US" -> {
                     try {
                         exchange = new BinanceUs(apiKeyTextField.getText(), secretKeyTextField.getText());
-                    } catch (UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeyException e) {
+                    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
                         throw new RuntimeException(e);
                     }
                 }
@@ -165,6 +163,8 @@ public class TradingWindow extends AnchorPane {
                 default -> throw new IllegalStateException("Unexpected value: %s".formatted(comboBox.getSelectionModel().getSelectedItem()));
             }
 
+            Stage st = new Stage();
+
             st.setTitle("%s @InvestPro Copyright 2020-%s".formatted(comboBox.getSelectionModel().getSelectedItem(), new Date()));
             try {
                 DisplayExchange display = new DisplayExchange(exchange);
@@ -192,8 +192,9 @@ public class TradingWindow extends AnchorPane {
             } catch (IOException | InterruptedException | ParseException | SQLException | ClassNotFoundException e) {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Error");
-                alert.setHeaderText(null);
+                alert.setHeaderText("");
                 alert.setContentText(e.getMessage());
+                alert.showAndWait();
             } catch (ExecutionException e) {
                 throw new RuntimeException(e);
             }

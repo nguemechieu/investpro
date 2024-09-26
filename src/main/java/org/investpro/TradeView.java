@@ -12,7 +12,7 @@ public class TradeView extends Region {
 
     TradeView(Exchange exchange) {
         Platform.setImplicitExit(false);
-        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> logger.error(STR."[\{thread}]: ", exception));
+        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> logger.error("[%s]: ".formatted(thread), exception));
 
         CandleStickChartContainer candleStickChartContainer =
                 new CandleStickChartContainer(

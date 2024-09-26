@@ -3,6 +3,7 @@ package org.investpro;
 import com.fasterxml.jackson.core.JsonParser;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
@@ -12,8 +13,8 @@ import java.util.concurrent.CompletableFuture;
  * An abstract base class for {@code Exchange} implementations.
  */
 public abstract class Exchange {
-    protected final String apiKey;
-    protected final String apiSecret;
+    protected String apiKey;
+    protected String apiSecret;
     public LiveTradesConsumer liveTradesConsumer;
     protected ExchangeWebSocketClient webSocketClient;
     protected TradePair tradePair;
@@ -33,7 +34,7 @@ public abstract class Exchange {
     /**
      * Abstract method to get user accounts.
      */
-    public abstract Account getAccounts() throws IOException, InterruptedException;
+    public abstract CompletableFuture<Account> getAccounts() throws IOException, InterruptedException;
 
     /**
      * Abstract method to check connection status.

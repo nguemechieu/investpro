@@ -1,11 +1,13 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.sql.SQLException;
+import java.util.Objects;
 
 /**
  * A monetary amount - models some fixed amount in a given
@@ -14,10 +16,9 @@ import java.sql.SQLException;
  * precision are more important than speed. If speed is more
  * important, {@link FastMoney} should be used instead.
  *
- * @author Michael Ennen
+ * @author NOEL NGUEMECHIEU
  */
 public record DefaultMoney(BigDecimal amount, Currency currency) implements Money, Comparable<DefaultMoney> {
-    public static final Money NULL_MONEY = DefaultMoney.ofFiat(BigDecimal.ZERO, Currency.NULL_FIAT_CURRENCY);
 
     public static Money of(int amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
@@ -59,7 +60,7 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return switch (currencyType) {
             case FIAT -> new DefaultMoney(amount, Currency.ofFiat(currencyCode));
             case CRYPTO -> new DefaultMoney(amount, Currency.ofCrypto(currencyCode));
-            default -> throw new IllegalArgumentException(STR."unknown currency type: \{currencyType}");
+            default -> throw new IllegalArgumentException("unknown currency type: %s".formatted(currencyType));
         };
     }
 
@@ -72,7 +73,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(amount, CurrencyType.FIAT, currencyCode);
     }
 
-    public static Money ofFiat(BigDecimal amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money ofFiat(BigDecimal amount, Currency currency) {
         return of(amount, currency);
     }
 
@@ -161,12 +163,14 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
-    public Money minus(float amount) {
+    @Contract("_ -> new")
+    public @NotNull Money minus(float amount) {
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money minus(double amount) {
+    public @NotNull Money minus(double amount) {
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
@@ -181,29 +185,25 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public boolean isGreaterThan(Money other) {
-        if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
+        if (other instanceof DefaultMoney money) {
             checkCurrenciesEqual(money);
             return amount.compareTo(money.amount) > 0;
-        } else if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        } else if (other instanceof FastMoney money) {
             return amount.compareTo(money.toBigDecimal()) > 0;
         } else {
-            throw new IllegalArgumentException("Unknown money type: " + other.getClass());
+            throw new IllegalArgumentException("Unknown money type: %s".formatted(other.getClass()));
         }
     }
 
     @Override
     public boolean isGreaterThanOrEqualTo(Money other) {
-        if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
+        if (other instanceof DefaultMoney money) {
             checkCurrenciesEqual(money);
             return amount.compareTo(money.amount) >= 0;
-        } else if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        } else if (other instanceof FastMoney money) {
             return amount.compareTo(money.toBigDecimal()) >= 0;
         } else {
-            throw new IllegalArgumentException("Unknown money type: " + other.getClass());
+            throw new IllegalArgumentException("Unknown money type: %s".formatted(other.getClass()));
         }
     }
 
@@ -234,7 +234,10 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public @NotNull FastMoney toFastMoney() {
-        return null;
+
+        return new FastMoney((long) amount.doubleValue(), currency);
+
+
     }
 
     @Override
@@ -244,15 +247,13 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public boolean isLessThan(Money other) {
-        if (other instanceof DefaultMoney) {
-            DefaultMoney money = (DefaultMoney) other;
+        if (other instanceof DefaultMoney money) {
             checkCurrenciesEqual(money);
             return this.amount().compareTo(money.amount) < 0;
-        } else if (other instanceof FastMoney) {
-            FastMoney money = (FastMoney) other;
+        } else if (other instanceof FastMoney money) {
             return this.amount().compareTo(money.toBigDecimal()) < 0;
         } else {
-            throw new IllegalArgumentException("Unknown money type: " + other.getClass());
+            throw new IllegalArgumentException("Unknown money type: %s".formatted(other.getClass()));
         }
     }
 
@@ -308,13 +309,12 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     private void checkCurrenciesEqual(DefaultMoney defaultMoney) {
         if (!currency.equals(defaultMoney.currency)) {
-            throw new IllegalArgumentException("currencies are not equal: first currency: "
-                    + currency + " second currency: " + defaultMoney.currency);
+            throw new IllegalArgumentException("currencies are not equal: first currency: %s second currency: %s".formatted(currency, defaultMoney.currency));
         }
     }
 
     @Override
-    public int compareTo(DefaultMoney other) {
+    public int compareTo(@NotNull DefaultMoney other) {
         // TODO is this really the behavior we want?
         checkCurrenciesEqual(other);
 
@@ -343,13 +343,9 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public String toString() {
-        switch (currency.getCurrencyType()) {
-            case FIAT:
-                return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-            case CRYPTO:
-            case NULL:
-            default:
-                return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+        if (Objects.requireNonNull(currency.getCurrencyType()) == CurrencyType.FIAT) {
+            return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
         }
+        return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
     }
 }

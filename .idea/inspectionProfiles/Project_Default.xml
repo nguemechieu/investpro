@@ -30,6 +30,9 @@
           <option value="X-Ratelimit-Limit" />
           <option value="Accept-Datetime-Format" />
           <option value="X-Ratelimit-Remaining" />
+          <option value="X-MBX-TIMESTAMP" />
+          <option value="X-MBX-SIGN" />
+          <option value="signature" />
         </set>
       </option>
     </inspection_tool>

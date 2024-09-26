@@ -8,7 +8,7 @@ public final class Utils {
     public static final long MAX_LONG_DIVIDED_BY_10 = Long.MAX_VALUE / 10;
     public static final int MAX_LONG_LENGTH = Long.toString(MAX_LONG_DIVIDED_BY_10).length() - 1;
     public static long[] MULTIPLIERS;
-    ;
+
 
     static {
         MULTIPLIERS = new long[MAX_ALLOWED_PRECISION + 1];
@@ -24,7 +24,7 @@ public final class Utils {
 
     public static void checkPrecision(int precision) {
         if (precision < 0 || precision > MAX_ALLOWED_PRECISION) {
-            throw new IllegalArgumentException(STR."Precision out of bounds: \{precision}");
+            throw new IllegalArgumentException("Precision out of bounds: %d".formatted(precision));
         }
     }
 }

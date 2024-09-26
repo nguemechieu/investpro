@@ -109,7 +109,7 @@ public class Coinbase extends Exchange {
     }
 
     @Override
-    public Account getAccounts() throws IOException, InterruptedException {
+    public CompletableFuture<Account> getAccounts() throws IOException, InterruptedException {
 
         // Here you should implement the logic to fetch account details from Coinbase API
         requestBuilder.uri(URI.create("%s/accounts".formatted(url)));
@@ -120,7 +120,9 @@ public class Coinbase extends Exchange {
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             objectMapper.registerModule(new JavaTimeModule());
-            return objectMapper.readValue(response.body(), Account.class);
+
+            List<Account> accounts = objectMapper.readValue(response.body(), objectMapper.getTypeFactory().constructCollectionType(List.class, Account.class));
+            return CompletableFuture.completedFuture(accounts.getFirst()); // Assuming there's only one account'
         }
         throw new RuntimeException("Failed to fetch account details: %s".formatted(response.body()));
     }
@@ -133,7 +135,6 @@ public class Coinbase extends Exchange {
     }
 
     private ExchangeWebSocketClient getWebSocketClient() {
-
         this.webSocketClient = new ExchangeWebSocketClient(URI.create("wss://advanced-trade-ws.coinbase.com"), new Draft_6455()) {
             @Override
             public CountDownLatch getInitializationLatch() {

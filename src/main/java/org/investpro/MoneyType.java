@@ -23,6 +23,11 @@ public class MoneyType implements UserType<Money>, MoneyTypes {
     }
 
     @Override
+    public String getCurrencyCode() {
+        return "";
+    }
+
+    @Override
     public int getSqlType() {
         return 0;
     }
@@ -43,7 +48,7 @@ public class MoneyType implements UserType<Money>, MoneyTypes {
     }
 
     @Override
-    public Money nullSafeGet(ResultSet rs, int position, SharedSessionContractImplementor session, Object owner) throws SQLException {
+    public Money nullSafeGet(ResultSet rs, int position, SharedSessionContractImplementor session, Object owner) {
         return null;
     }
 

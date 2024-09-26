@@ -3,6 +3,7 @@ package org.investpro;
 import com.fasterxml.jackson.core.JsonParser;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ class Binance extends Exchange {
     }
 
     @Override
-    public Account getAccounts() throws IOException {
+    public CompletableFuture<Account> getAccounts() throws IOException {
         return null;
     }
 

@@ -11,9 +11,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.HashMap;
 
 public class BinanceUSClient {
 
@@ -21,8 +21,8 @@ public class BinanceUSClient {
     private static final String HMAC_SHA256 = "HmacSHA256";
 
     public static void main(String[] args) throws Exception {
-        String apiKey = "<your_api_key>";  // Set your API key here
-        String secretKey = "<your_secret_key>";  // Set your Secret key here
+        String apiKey = "vcABr0t9ho9TqOz4J40LHyeSUzyd95JCXD1xTttdHWtOeQHjeXUjZ0bDGTcpPgtU";  // Set your API key here
+        String secretKey = "OjpaThEz48gAJNVU4oNc3h92ONl6bG6c0EuVsd57vAWZ0xP40bovh3V26f0qffAq";  // Set your Secret key here
 
         String uriPath = "/api/v3/account";
         Map<String, String> data = new HashMap<>();
@@ -49,7 +49,7 @@ public class BinanceUSClient {
     }
 
     // Make GET request with signature
-    private static String binanceUsRequest(String uriPath, Map<String, String> data, String apiKey, String apiSec)
+    public static String binanceUsRequest(String uriPath, Map<String, String> data, String apiKey, String apiSec)
             throws Exception {
 
         String signature = getBinanceUsSignature(data, apiSec);

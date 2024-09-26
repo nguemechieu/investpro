@@ -1,14 +1,14 @@
 package org.investpro;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.sql.SQLException;
 import java.util.Objects;
-
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * A monetary amount - models some fixed amount in a given currency.
@@ -30,7 +30,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     private int precision;
     private Currency currency;
 
-    private FastMoney(long amount, Currency currency) {
+    public FastMoney(long amount, Currency currency) {
         this(amount, currency, currency.getFractionalDigits());
         this.amount = amount;
         this.currency = currency;
@@ -132,11 +132,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         }
         // ulp up
         final FastMoney up = fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
-        if (up != null) {
-            return up;
-        }
-
-        return null;
+        return up;
     }
 
     private static FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
@@ -255,7 +251,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (subtrahend instanceof DefaultMoney) {
             return new DefaultMoney(toBigDecimal().subtract(subtrahend.toBigDecimal()), currency);
         } else if (subtrahend instanceof FastMoney) {
-            return plus(((FastMoney) subtrahend).negate());
+            return plus(subtrahend.negate());
         } else {
             throw new IllegalArgumentException("Unknown money type: " + subtrahend.getClass());
         }

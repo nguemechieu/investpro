@@ -5,7 +5,8 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Side;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import org.jetbrains.annotations.NotNull;
 
@@ -94,12 +95,12 @@ public class DisplayExchange extends Region {
                 news -> news.getDate().after(new Date()) // Filter upcoming news
         ).findFirst().orElse(null); // Fetch first item for simplicity
         if (upcomingNews != null) {
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Date: " + upcomingNews.getDate().toString(), 20, 50);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Title: " + upcomingNews.getTitle(), 20, 80);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Country: " + upcomingNews.getCountry(), 20, 110);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Impact: " + upcomingNews.getImpact(), 20, 140);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Forecast: " + upcomingNews.getForecast(), 20, 170);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Previous: " + upcomingNews.getPrevious(), 20, 200);
+            upcomingNewsBox.getGraphicsContext2D().strokeText("Date: %s".formatted(upcomingNews.getDate().toString()), 20, 50);
+            upcomingNewsBox.getGraphicsContext2D().strokeText("Title: %s".formatted(upcomingNews.getTitle()), 20, 80);
+            upcomingNewsBox.getGraphicsContext2D().strokeText("Country: %s".formatted(upcomingNews.getCountry()), 20, 110);
+            upcomingNewsBox.getGraphicsContext2D().strokeText("Impact: %s".formatted(upcomingNews.getImpact()), 20, 140);
+            upcomingNewsBox.getGraphicsContext2D().strokeText("Forecast: %s".formatted(upcomingNews.getForecast()), 20, 170);
+            upcomingNewsBox.getGraphicsContext2D().strokeText("Previous: %s".formatted(upcomingNews.getPrevious()), 20, 200);
 
         } else {
             upcomingNewsBox.getGraphicsContext2D().strokeText("No upcoming news available", 20, 50);
@@ -142,23 +143,20 @@ public class DisplayExchange extends Region {
                 return;
             }
 
-            Tab tab0 = new Tab(tradePairsCombo.getSelectionModel().getSelectedItem().toString('-'));
-            tab0.getStyleClass().add("chart-tab");
+            Tab tab = new Tab(tradePairsCombo.getSelectionModel().getSelectedItem().toString('-'));
+            tab.getStyleClass().add("chart-tab");
 
             exchange.tradePair=tradePairsCombo.getSelectionModel().getSelectedItem();
             CandleStickChartDisplay candlestickChartDisplay = new CandleStickChartDisplay( exchange);
             candlestickChartDisplay.setPrefSize(1440, 700);
-            tab0.setContent(candlestickChartDisplay);
+            tab = new Tab();
+            tab.setText(tradePairsCombo.getSelectionModel().getSelectedItem().toString('-'));
+            tab.setContent(candlestickChartDisplay);
             candlestickChartDisplay.getStyleClass().add("candlestick-chart");
             chartradeTabPane.getStyleClass().add("tab-pane");
-            chartradeTabPane.getTabs().add(tab0);
-            chartradeTabPane.getSelectionModel().select(tab0);
+            chartradeTabPane.getTabs().add(tab);
+            chartradeTabPane.getSelectionModel().select(tab);
         });
-        autoTradeBtn.setOnAction(
-                event -> {
-                    // Perform auto trading logic here
-                }
-        );
 
     }
 }
