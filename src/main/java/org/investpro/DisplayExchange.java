@@ -1,6 +1,9 @@
 package org.investpro;
 
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Orientation;
 import javafx.geometry.Side;
 import javafx.scene.canvas.Canvas;
@@ -9,55 +12,130 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
-import java.text.ParseException;
-import java.util.Date;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.util.*;
+import java.util.concurrent.*;
 
+import static org.investpro.Exchange.logger;
 
 public class DisplayExchange extends Region {
 
-    public DisplayExchange(@NotNull Exchange exchange) throws IOException, InterruptedException, ParseException, SQLException, ClassNotFoundException, ExecutionException {
+    private static final Logger log = LoggerFactory.getLogger(DisplayExchange.class);
+    private final Exchange exchange;
+    private final ObservableList<Order> ordersData;
+    private final ObservableList<Position> positionsData;
+    private final TreeTableView<News> newsTreeTableView;
+    private final Canvas upcomingNewsBox;
 
+    // Executor for periodic updates
+    private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+
+    public DisplayExchange(@NotNull Exchange exchange) throws Exception {
+        this.exchange = exchange;
+
+        ordersData = FXCollections.observableArrayList();
+        positionsData = FXCollections.observableArrayList();
+
+        // Create the ComboBox for Trade Pairs
         ComboBox<TradePair> tradePairsCombo = new ComboBox<>();
         tradePairsCombo.setCellFactory(_ -> new ListCell<>() {
             @Override
             protected void updateItem(TradePair tradePair, boolean empty) {
                 super.updateItem(tradePair, empty);
-                if (empty) {
-                    setText("Select Trade Pair");
-                } else {
-                    setText(tradePair.toString('-'));
-                }
+                setText(empty ? "Select Trade Pair" : tradePair.toString('/'));
             }
         });
 
+        // Populate trade pairs asynchronously
         tradePairsCombo.getItems().addAll(exchange.getTradePairs().get());
+        tradePairsCombo.setPromptText("Select TradePair");
 
+        // Create toolbar and buttons
         Button autoTradeBtn = new Button("AUTO TRADE");
         Button addChartBtn = new Button("ADD CHART");
         ToolBar tradeToolBar = new ToolBar(tradePairsCombo, addChartBtn, autoTradeBtn);
 
+        // Tab pane for the main sections
         TabPane chartradeTabPane = new TabPane();
         chartradeTabPane.setPrefSize(1540, 780);
 
+        // News section
         Tab newsTab = new Tab("FOREX NEWS");
+        newsTreeTableView = createNewsTreeTableView();
+        upcomingNewsBox = createUpcomingNewsBox();
+        newsTab.setContent(new VBox(upcomingNewsBox, new Separator(Orientation.HORIZONTAL), newsTreeTableView));
 
-        // Initialize News TreeTableView for current news
-        TreeTableView<News> newsTreeTableView = new TreeTableView<>();
-        TreeItem<News> root = new TreeItem<>(new News("","","",new Date(),"","")); // Placeholder root
+        // Other Tabs (Trade, Account, Orders, Positions)
+        Tab tradeTab = new Tab("->LIVE TRADING<-");
+        Tab accountTab = createAccountTab();
 
-        List<News> newsList = new NewsDataProvider().getNews();
-        for (News newsItem : newsList) {
-            TreeItem<News> item = new TreeItem<>(newsItem);
-            root.getChildren().add(item);
-        }
+        Tab positionTab = createPositionTab();
+        Tab orderTab = createOrderTab();
 
-        root.setExpanded(true);
-        newsTreeTableView.setRoot(root);
+        // Adding all tabs to the main TabPane
+        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, positionTab, newsTab);
+        tradingTabPane.setPrefSize(1540, 780);
+        tradingTabPane.setSide(Side.LEFT);
+        tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
+
+        // Set up the trade tab with toolbar and chart tab pane
+        tradeToolBar.setPrefSize(1540, 20);
+        tradeTab.setContent(new VBox(tradeToolBar, new Separator(Orientation.HORIZONTAL), chartradeTabPane));
+
+        // Add everything to the main container
+        getChildren().add(tradingTabPane);
+
+        // Add Chart Button Action
+        addChartBtn.setOnAction(_ -> addChart(tradePairsCombo, chartradeTabPane));
+
+        // Start periodic data updates
+        startDataUpdates();
+    }
+
+    private Tab createAccountTab() throws IOException, InterruptedException, ExecutionException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException {
+        Tab acc = new Tab("Account Details");
+
+        // Add account details here
+
+        CompletableFuture<List<Account>> account_details = exchange.getAccounts();
+
+
+        acc.setContent(        new VBox(
+                new Label("Account ID: " + account_details.get().getFirst().getAccountId()),
+                new Label("Balance: " + account_details.get().getFirst().getBalance() + " " + account_details.get().getFirst().getBalance()),
+                new Label("Created: " + account_details.get().getFirst().getCreated()),
+                new Label("Guaranteed Stop Loss: "  + " " + account_details.get().getFirst().getGuaranteedStopLoss()),
+                new Label("Margin Call: " + account_details.get().getFirst().getMarginCall()),
+
+                new Label("Margin Free: " + account_details.get().getFirst().getMarginFree()),
+                new Label("Margin Level: " + account_details.get().getFirst().getMarginLevel()),
+
+                new Label("Margin Used: %s".formatted(account_details.get().getFirst().getMarginUsed())),
+                new Label("Max Loss: %s".formatted(account_details.get().getFirst().getMaxLoss())),
+                new Label("Max Profit: %s".formatted(account_details.get().getFirst().getMaxProfit())),
+                new Label("Open Orders: %d".formatted(exchange.getOrders().size())),
+                new Label("Profit: %s".formatted(account_details.get().getFirst().getProfit()))
+
+
+
+        ));
+
+
+
+
+
+        return acc;
+    }
+
+    private @NotNull TreeTableView<News> createNewsTreeTableView() {
+        TreeTableView<News> newsTableView = new TreeTableView<>();
+        TreeItem<News> root = new TreeItem<>(new News("", "", "", new Date(), "", "")); // Placeholder root
 
         TreeTableColumn<News, String> dateCol = new TreeTableColumn<>("Date");
         dateCol.setPrefWidth(150);
@@ -66,97 +144,118 @@ public class DisplayExchange extends Region {
         TreeTableColumn<News, String> titleCol = new TreeTableColumn<>("Title");
         titleCol.setPrefWidth(200);
         titleCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getTitle()));
+
         TreeTableColumn<News, String> countryCol = new TreeTableColumn<>("Country");
         countryCol.setPrefWidth(150);
         countryCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getCountry()));
+
         TreeTableColumn<News, String> impactCol = new TreeTableColumn<>("Impact");
         impactCol.setPrefWidth(150);
         impactCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getImpact()));
 
-        TreeTableColumn<News, String> forecastCol = new TreeTableColumn<>("Forecast");
-        forecastCol.setPrefWidth(150);
-        forecastCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getForecast()));
+        newsTableView.getColumns().addAll(dateCol, titleCol, countryCol, impactCol);
+        newsTableView.setRoot(root);
+        root.setExpanded(true);
+        return newsTableView;
+    }
 
-        TreeTableColumn<News, String> previousCol = new TreeTableColumn<>("Previous");
-        previousCol.setPrefWidth(150);
-        previousCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getPrevious()));
+    private Canvas createUpcomingNewsBox() {
+        Canvas newsBox = new Canvas(1500, 300);
+        newsBox.getGraphicsContext2D().setFill(Color.BLACK);
+        newsBox.getGraphicsContext2D().fillRect(0, 0, 1500, 300);
+        newsBox.getGraphicsContext2D().setStroke(Color.WHITE);
+        newsBox.getGraphicsContext2D().strokeText("Upcoming News", 20, 20);
+        return newsBox;
+    }
 
-        newsTreeTableView.getColumns().addAll(dateCol, titleCol, countryCol, impactCol, forecastCol, previousCol);
+    private Tab createOrderTab() {
+        Tab orderTab = new Tab("ORDERS");
+        ListView<Order> orderView = new ListView<>(ordersData);
+        orderTab.setContent(new VBox(new Label("Orders:"), new Separator(Orientation.HORIZONTAL), orderView));
+        return orderTab;
+    }
 
-        // Upcoming news displayed on the canvas
-        Canvas upcomingNewsBox = new Canvas(1500, 300);
-        upcomingNewsBox.getGraphicsContext2D().setFill(Color.BLACK);
-        upcomingNewsBox.getGraphicsContext2D().fillRect(0, 0, 1500, 300);
-        upcomingNewsBox.getGraphicsContext2D().setStroke(Color.WHITE);
-        upcomingNewsBox.getGraphicsContext2D().strokeText("Upcoming News", 20, 20);
+    private @NotNull Tab createPositionTab() {
+        Tab positionTab = new Tab("POSITIONS");
+        ListView<Position> positionView = new ListView<>(positionsData);
+        positionTab.setContent(new VBox(new Label("Positions:"), new Separator(Orientation.HORIZONTAL), positionView));
+        return positionTab;
+    }
 
-        // Populate upcoming news details on the canvas
-        News upcomingNews = newsList.stream().filter(
-                news -> news.getDate().after(new Date()) // Filter upcoming news
-        ).findFirst().orElse(null); // Fetch first item for simplicity
-        if (upcomingNews != null) {
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Date: %s".formatted(upcomingNews.getDate().toString()), 20, 50);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Title: %s".formatted(upcomingNews.getTitle()), 20, 80);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Country: %s".formatted(upcomingNews.getCountry()), 20, 110);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Impact: %s".formatted(upcomingNews.getImpact()), 20, 140);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Forecast: %s".formatted(upcomingNews.getForecast()), 20, 170);
-            upcomingNewsBox.getGraphicsContext2D().strokeText("Previous: %s".formatted(upcomingNews.getPrevious()), 20, 200);
-
-        } else {
-            upcomingNewsBox.getGraphicsContext2D().strokeText("No upcoming news available", 20, 50);
+    private void addChart(@NotNull ComboBox<TradePair> tradePairsCombo, TabPane chartradeTabPane) {
+        if (tradePairsCombo.getSelectionModel().isEmpty()) {
+            new Alert(Alert.AlertType.ERROR, "Please select a Trade Pair").showAndWait();
+            return;
         }
 
-        // Add both current news table and upcoming news canvas to the VBox
-        newsTab.setContent(new VBox(upcomingNewsBox, new Separator(Orientation.HORIZONTAL), newsTreeTableView));
+        TradePair selectedPair = tradePairsCombo.getSelectionModel().getSelectedItem();
+        exchange.tradePair = selectedPair;
 
-        // Add tabs for other functionalities like trade, account, market data, etc.
-        Tab tradeTab = new Tab("TRADE");
-        Tab accountTab = new Tab("ACCOUNT");
-        Tab positionTab = new Tab("POSITIONS");
-        Tab orderTab = new Tab("ORDERS");
-        Tab marketDataTab = new Tab("MARKET DATA");
-        Tab historicalDataTab = new Tab("HISTORICAL DATA");
-        Tab browserTab = new Tab("Browser");
-        Browser browser = new Browser();
-        browserTab.setContent(browser);
-        // Populate TabPane
-        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, positionTab, orderTab, marketDataTab, historicalDataTab, newsTab,browserTab);
-        tradingTabPane.setPrefSize(1540, 780);
-        tradingTabPane.setSide(Side.LEFT);
-        tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
-
-        // Add trade toolbar
-        tradeToolBar.setPrefSize(1540, 20);
-
-        tradeTab.setContent(new VBox(tradeToolBar, new Separator(Orientation.HORIZONTAL), chartradeTabPane));
-
-        // Add everything to the main container
-        getChildren().add(tradingTabPane);
-
-        addChartBtn.setOnAction(_ -> {
-            if (tradePairsCombo.getItems() == null) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText("Trade Pair Selection Error");
-                alert.setContentText("Please select a trade pair");
-                alert.showAndWait();
-                return;
-            }
-
-            Tab tab = new Tab(tradePairsCombo.getSelectionModel().getSelectedItem().toString('-'));
-            tab.getStyleClass().add("chart-tab");
-
-            exchange.tradePair=tradePairsCombo.getSelectionModel().getSelectedItem();
-            CandleStickChartDisplay candlestickChartDisplay = new CandleStickChartDisplay( exchange);
-            candlestickChartDisplay.setPrefSize(1440, 700);
-            tab = new Tab();
-            tab.setText(tradePairsCombo.getSelectionModel().getSelectedItem().toString('-'));
-            tab.setContent(candlestickChartDisplay);
-            candlestickChartDisplay.getStyleClass().add("candlestick-chart");
-            chartradeTabPane.getStyleClass().add("tab-pane");
-            chartradeTabPane.getTabs().add(tab);
-            chartradeTabPane.getSelectionModel().select(tab);
-        });
-
+        Tab chartTab = new Tab(selectedPair.toString('-'));
+        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange);
+        chartDisplay.setPrefSize(1440, 700);
+        chartTab.setContent(chartDisplay);
+        chartradeTabPane.getTabs().add(chartTab);
+        chartradeTabPane.getSelectionModel().select(chartTab);
     }
-}
+
+    private void startDataUpdates() {
+        executorService.scheduleAtFixedRate(() -> {
+            Platform.runLater(() -> {
+                updateOrders();
+                updatePositions();
+                updateNews();
+            });
+        }, 0, 10, TimeUnit.SECONDS); // Update every 10 seconds
+    }
+
+    private void updateOrders() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<Order> updatedOrders = exchange.getOrders();
+                Platform.runLater(() -> ordersData.setAll(updatedOrders));
+            } catch (Exception e) {
+                logger.error(
+                        "Error updating orders: %s".formatted(e.getMessage()),
+                        e
+                );
+            }
+        });
+    }
+
+    private void updatePositions() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                ArrayList<Position> updatedPositions =new ArrayList<>();
+                updatedPositions.add(exchange.getPositions());
+                Platform.runLater(() -> positionsData.setAll(updatedPositions));
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+
+            }
+        });
+    }
+
+    private void updateNews() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<News> updatedNews = new NewsDataProvider().getNews();
+                Platform.runLater(() -> {
+                    newsTreeTableView.getRoot().getChildren().clear();
+                    updatedNews.forEach(news -> newsTreeTableView.getRoot().getChildren().add(new TreeItem<>(news)));
+                    updateUpcomingNewsBox(updatedNews);
+                });
+            } catch (Exception e) {
+
+                logger.error(
+                        "Error updating news: " + e.getMessage(),
+                        e
+                );
+            }
+        });
+    }
+
+    private void updateUpcomingNewsBox(List<News> newsList) {
+        upcomingNewsBox.getGraphicsContext2D().clearRect(0, 0, 1500, 300);
+
+    }}

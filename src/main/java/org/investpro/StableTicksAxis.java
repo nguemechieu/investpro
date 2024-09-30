@@ -82,11 +82,15 @@ public class StableTicksAxis extends ValueAxis<Number> {
     public StableTicksAxis(double lowerBound, double upperBound) {
 
         super(lowerBound, upperBound);
-        minorTicks = new ArrayList<>();
+        minorTicks = new ArrayList<>((int) (upperBound - lowerBound));
         for (int i = 0; i < numMinorTicks; i++) {
             minorTicks.add(lowerBound + (upperBound - lowerBound) / (numMinorTicks - 1) * i);
         }
         animationTimeline.setAutoReverse(true);
+
+    }
+
+    public StableTicksAxis() {
 
     }
 
@@ -256,7 +260,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     @Override
     protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
-        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
+        // NOTE(dwell): if the range is very small, display it like a flat line, the scaling doesn't work very well at
         // these values. 1e-300 was chosen arbitrarily.
         if (Math.abs(minValue - maxValue) < 1e-300) {
             // Normally this is the case for all points with the same value
@@ -398,6 +402,14 @@ public class StableTicksAxis extends ValueAxis<Number> {
         } else {
             return getHeight();
         }
+    }
+
+    public double getMin() {
+        return getLowerBound();
+    }
+
+    public double getMax() {
+        return getUpperBound();
     }
 
     private record Range(double low, double high, double tickSpacing, double scale) {

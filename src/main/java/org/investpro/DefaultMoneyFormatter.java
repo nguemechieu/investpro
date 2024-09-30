@@ -115,7 +115,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
 
         if (defaultMoney.amount().remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) == 0 &&
                 !displayAtLeastAllFractionalDigits) {
-            // number has no fractional digits
+            // the number has no fractional digits
             if (forceDecimalPoint) {
                 if (defaultMoney.currency().getCurrencyType() == CurrencyType.FIAT) {
                     if (locale == null) {
@@ -190,16 +190,12 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
                 // TODO not all locales use the same groupingAmount, specifically Indic languages, a good list is
                 // here: http://static-bugzilla.wikimedia.org/show_bug.cgi?id=29495
                 // if we ever care enough we will expand this switch to handle these cases
-                final int groupAmount;
-                switch (locale.getISO3Language()) {
-                    case "asm": // Assamese
-                    case "ben": // Bengali
-                    case "mar": // Marathi
-                        groupAmount = 2;
-                        break;
-                    default:
-                        groupAmount = 3;
-                }
+                final int groupAmount = switch (locale.getISO3Language()) { // Assamese
+                    // Bengali
+                    case "asm", "ben", "mar" -> // Marathi
+                            2;
+                    default -> 3;
+                };
                 numberBeforeDecimalPoint = addDigitGroupingSeparator(numberBeforeDecimalPoint,
                         decimalFormatSymbols.getGroupingSeparator(), groupAmount);
             }
@@ -230,7 +226,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
                         ((DecimalFormat) numberFormat).applyLocalizedPattern(number + suffix);
                     }
                 }
-            } else if (suffix.isEmpty()) {
+            } else {
                 if (putSpaceBetweenCurrencyAndAmount) {
                     if (locale == null) {
                         ((DecimalFormat) numberFormat).applyPattern(prefix + ' ' + number);
@@ -244,9 +240,6 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
                         ((DecimalFormat) numberFormat).applyLocalizedPattern(prefix + number);
                     }
                 }
-            } else {
-                // TODO this really shouldn't happen.
-                ((DecimalFormat) numberFormat).applyPattern(prefix + number + suffix);
             }
         }
 
@@ -299,24 +292,21 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
         private int fractionalDigitsCap = -1;
 
         public Builder withDefaultsFor(CurrencyType currencyType) {
-            switch (currencyType) {
-                case CRYPTO:
-                    return withCurrencyCode(DEFAULT_CRYPTO_FORMATTER.currencyPosition)
-                            .useDigitGroupingSeparator(DEFAULT_CRYPTO_FORMATTER.useDigitGroupingSeparator)
-                            .useASpaceBetweenCurrencyAndAmount(
-                                    DEFAULT_CRYPTO_FORMATTER.putSpaceBetweenCurrencyAndAmount)
-                            .forceDecimalPoint()
-                            .trimTrailingZerosAfterDecimalPoint();
-                case FIAT:
-                    return withCurrencySymbol(DEFAULT_FIAT_FORMATTER.currencyPosition)
-                            .useDigitGroupingSeparator(DEFAULT_FIAT_FORMATTER.useDigitGroupingSeparator)
-                            .useASpaceBetweenCurrencyAndAmount(DEFAULT_FIAT_FORMATTER.putSpaceBetweenCurrencyAndAmount)
-                            .forceDecimalPoint(DEFAULT_FIAT_FORMATTER.wholeNumberFractionalDigitAmount)
-                            .displayAtLeastAllFractionalDigits(
-                                    DEFAULT_FIAT_FORMATTER.displayAtLeastAllFractionalDigits);
-                default:
-                    throw new IllegalArgumentException("unknown currency type: " + currencyType);
-            }
+            return switch (currencyType) {
+                case CRYPTO -> withCurrencyCode(DEFAULT_CRYPTO_FORMATTER.currencyPosition)
+                        .useDigitGroupingSeparator(DEFAULT_CRYPTO_FORMATTER.useDigitGroupingSeparator)
+                        .useASpaceBetweenCurrencyAndAmount(
+                                DEFAULT_CRYPTO_FORMATTER.putSpaceBetweenCurrencyAndAmount)
+                        .forceDecimalPoint()
+                        .trimTrailingZerosAfterDecimalPoint();
+                case FIAT -> withCurrencySymbol(DEFAULT_FIAT_FORMATTER.currencyPosition)
+                        .useDigitGroupingSeparator(DEFAULT_FIAT_FORMATTER.useDigitGroupingSeparator)
+                        .useASpaceBetweenCurrencyAndAmount(DEFAULT_FIAT_FORMATTER.putSpaceBetweenCurrencyAndAmount)
+                        .forceDecimalPoint(DEFAULT_FIAT_FORMATTER.wholeNumberFractionalDigitAmount)
+                        .displayAtLeastAllFractionalDigits(
+                                DEFAULT_FIAT_FORMATTER.displayAtLeastAllFractionalDigits);
+                default -> throw new IllegalArgumentException("unknown currency type: " + currencyType);
+            };
         }
 
         public Builder withCurrencySymbol() {

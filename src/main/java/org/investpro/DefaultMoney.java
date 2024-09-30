@@ -2,6 +2,7 @@ package org.investpro;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -20,19 +21,23 @@ import java.util.Objects;
  */
 public record DefaultMoney(BigDecimal amount, Currency currency) implements Money, Comparable<DefaultMoney> {
 
-    public static Money of(int amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(int amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    public static Money of(long amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(long amount, Currency currency) {
         return of(BigDecimal.valueOf(amount), currency);
     }
 
-    public static Money of(float amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(float amount, Currency currency) {
         return of(new BigDecimal(Float.valueOf(amount).toString()), currency);
     }
 
-    public static Money of(double amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(double amount, Currency currency) {
         return of(new BigDecimal(Double.valueOf(amount).toString()), currency);
     }
 
@@ -64,21 +69,23 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         };
     }
 
-    public static Money of(BigDecimal amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money of(BigDecimal amount, Currency currency) {
         return new DefaultMoney(amount, currency);
     }
 
 
-    public static Money ofFiat(BigDecimal amount, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(BigDecimal amount, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(amount, CurrencyType.FIAT, currencyCode);
     }
 
-    @Contract("_, _ -> new")
+
     public static @NotNull Money ofFiat(BigDecimal amount, Currency currency) {
         return of(amount, currency);
     }
 
-    public static Money ofFiat(String amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money ofFiat(String amount, Currency currency) {
         return of(new BigDecimal(amount), currency);
     }
 
@@ -92,12 +99,14 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(this.amount.add(defaultMoney.amount), currency);
     }
 
-    public Money plus(int amount) {
+    @Contract("_ -> new")
+    public @NotNull Money plus(int amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money plus(long amount) {
+    public @NotNull Money plus(long amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
@@ -110,56 +119,67 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract(pure = true)
     @Override
-    public Money multiply(long multiplicand) {
+    public @Nullable Money multiply(long multiplicand) {
         return null;
     }
 
+    @Contract(pure = true)
     @Override
-    public Money multiply(double multiplicand) {
+    public @Nullable Money multiply(double multiplicand) {
         return null;
     }
 
+    @Contract(pure = true)
     @Override
-    public Money multiply(BigDecimal multiplicand) {
+    public @Nullable Money multiply(BigDecimal multiplicand) {
         return null;
     }
 
+    @Contract(pure = true)
     @Override
-    public Money divide(long divisor) {
+    public @Nullable Money divide(long divisor) {
         return null;
     }
 
+    @Contract(pure = true)
     @Override
-    public Money divide(double divisor) {
+    public @Nullable Money divide(double divisor) {
         return null;
     }
 
+    @Contract(pure = true)
     @Override
-    public Money divide(BigDecimal divisor) {
+    public @Nullable Money divide(BigDecimal divisor) {
         return null;
     }
 
-    public Money plus(BigDecimal amount) {
+    @Contract("_ -> new")
+    public @NotNull Money plus(BigDecimal amount) {
         return new DefaultMoney(this.amount.add(amount), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money plus(Money summand) {
+    public @NotNull Money plus(@NotNull Money summand) {
         return this.plus(summand.toBigDecimal());
     }
 
-    public Money minus(DefaultMoney defaultMoney) {
+    @Contract("_ -> new")
+    public @NotNull Money minus(DefaultMoney defaultMoney) {
         checkCurrenciesEqual(defaultMoney);
         return new DefaultMoney(this.amount.subtract(defaultMoney.amount), currency);
     }
 
-    public Money minus(int amount) {
+    @Contract("_ -> new")
+    public @NotNull Money minus(int amount) {
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money minus(long amount) {
+    public @NotNull Money minus(long amount) {
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
@@ -174,12 +194,14 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(this.amount.subtract(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money minus(Money subtrahend) {
+    public @NotNull Money minus(@NotNull Money subtrahend) {
         return minus(subtrahend.toBigDecimal());
     }
 
-    public Money minus(BigDecimal amount) {
+    @Contract("_ -> new")
+    public @NotNull Money minus(BigDecimal amount) {
         return new DefaultMoney(this.amount.subtract(amount), currency);
     }
 
@@ -262,18 +284,21 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(amount.negate(), currency);
     }
 
+    @Contract(" -> new")
     @Override
-    public Money abs() {
+    public @NotNull Money abs() {
         return new DefaultMoney(amount.abs(), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money multipliedBy(long multiplier) {
+    public @NotNull Money multipliedBy(long multiplier) {
         return new DefaultMoney(amount.multiply(BigDecimal.valueOf(multiplier)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money multipliedBy(double multiplier) {
+    public @NotNull Money multipliedBy(double multiplier) {
         return new DefaultMoney(amount.multiply(BigDecimal.valueOf(multiplier)), currency);
     }
 
@@ -287,13 +312,15 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(amount.divide(BigDecimal.valueOf(divisor), RoundingMode.HALF_UP), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money dividedBy(double divisor) {
+    public @NotNull Money dividedBy(double divisor) {
         return new DefaultMoney(amount.divide(BigDecimal.valueOf(divisor), RoundingMode.HALF_UP), currency);
     }
 
+    @Contract("_, _ -> new")
     @Override
-    public Money dividedBy(BigDecimal divisor, MathContext mathContext) {
+    public @NotNull Money dividedBy(BigDecimal divisor, MathContext mathContext) {
         return new DefaultMoney(amount.divide(divisor, mathContext), currency);
     }
 
@@ -307,7 +334,7 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return amount;
     }
 
-    private void checkCurrenciesEqual(DefaultMoney defaultMoney) {
+    private void checkCurrenciesEqual(@NotNull DefaultMoney defaultMoney) {
         if (!currency.equals(defaultMoney.currency)) {
             throw new IllegalArgumentException("currencies are not equal: first currency: %s second currency: %s".formatted(currency, defaultMoney.currency));
         }
@@ -315,8 +342,7 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public int compareTo(@NotNull DefaultMoney other) {
-        // TODO is this really the behavior we want?
-        checkCurrenciesEqual(other);
+              // checkCurrenciesEqual(other);
 
         return amount.compareTo(other.amount);
     }

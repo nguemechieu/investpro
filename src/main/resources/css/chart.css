@@ -4,11 +4,9 @@
 .candle-chart-toolbar {
     -fx-alignment: CENTER_LEFT;
     -fx-padding: 0.0 8.0 0.0 0.0;
-    -fx-border-width: 0;
-    -fx-border-radius: 0;
+
     -fx-border-color: transparent;
     -fx-background-color: transparent;
-    -fx-border-width: 1;
     -fx-border-radius: 3;
 }
 .candle-chart-toolbar-button {
@@ -17,7 +15,7 @@
 .candle-chart-toolbar-button .glyph {
     -fx-padding: 5.0 10.0 5.0 10.0;
 }
-.candle-chart-toolbar-button:active {
+.candle-chart-toolbar-button.active{
     -fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, #64B5F6;
 }
 .candle-chart .axis {
@@ -27,8 +25,6 @@
 .candle-chart .axis:right, .candle-chart .axis:left {
     -fx-minor-tick-visible: false;
 }
-
-// Market Depth Chart
 
 .default-color0.chart-series-area-line {
     -fx-stroke: rgb(64, 175, 59);
@@ -55,6 +51,5 @@
 .chart-series-area-line {
     -fx-stroke-width: 2px;
     -fx-stroke-color: rgb(204, 20, 20);
-    -fx-stroke-width: 2px;
 
 }

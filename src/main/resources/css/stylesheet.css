@@ -6,7 +6,7 @@
  * Button   												                   *
  *                                                                             *
  ******************************************************************************/
-#button
+
 .button {
 	-fx-text-fill-color:white;
 	-fx-border-radius: 5.0 5.0 5.0 5.0, 5.0 5.0 5.0 5.0;
@@ -37,7 +37,7 @@
 #tabadded
 .tab-header-background{
     -fx-background-color:white;
-    -fx-background-radius: 5.0;
+    -fx-background-radius: 5;
 	
 }
 #tabadded .tab:hover{
@@ -48,19 +48,19 @@
 
 
 .tab-pane{
-	 	-fx-tab-min-width:15.0px;
-	  	-fx-tab-max-width:120.0px;
-	  	-fx-tab-pref-width:120.0px;
+	 	-fx-tab-min-width:15px;
+	  	-fx-tab-max-width:120px;
+	  	-fx-tab-pref-width:120px;
 	  	
-	  	-fx-tab-min-height:30.0px;
-	  	-fx-tab-max-height:30.0px;
+	  	-fx-tab-min-height:30px;
+	  	-fx-tab-max-height:30px;
 }
 
 .tab{
 	
 	-fx-text-fill:white;
 	-fx-background-color:white;
-	-fx-background-radius: 5.0px;
+	-fx-background-radius: 5px;
 	
 	
 }
@@ -81,13 +81,12 @@
 	
 	-fx-padding:5.0 10.0 5.0 10.0;
     -fx-background-radius: 12.0 12.0 4.0 4.0;
-	
     -fx-border-radius: 10 10 10 10;
     
 	
 }
 
-#settingTabPane
+
 .tab{
 	-fx-background-color:derive(#2959ea,20.0%);
  	-fx-text-fill-color:white;
@@ -106,6 +105,7 @@
  
 #settingTabPane .tab:hover{
  -fx-background-color:derive(#2959ea,10.0%);
+	-fx-text-fill-color: white;
  
 }
 #settingTabPane
@@ -145,7 +145,7 @@
 }
 
 
-#righDrawerVbox{
+.rightDrawerVbox{
 	-fx-padding: 10.0,10.0,10.0,10.0;
 }
 

@@ -33,6 +33,9 @@
           <option value="X-MBX-TIMESTAMP" />
           <option value="X-MBX-SIGN" />
           <option value="signature" />
+          <option value="X-MBX-SIGNATURE" />
+          <option value="timestamp" />
+          <option value="recvWindow" />
         </set>
       </option>
     </inspection_tool>

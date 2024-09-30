@@ -25,7 +25,7 @@
 }
 .toggle-switch:selected .thumb-area {
     -fx-background-color: linear-gradient(to bottom, derive(-fx-text-box-border, -20%), derive(-fx-text-box-border, -30%)),
-                            linear-gradient(to bottom, derive(#0b99c9, 30%), #0b99c9);
+                            linear-gradient(to bottom, derive(#0b99c9, 30%), #1b414e);
     -fx-background-insets: 0, 1;
 }
 .toggle-switch .thumb-area {

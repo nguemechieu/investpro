@@ -36,8 +36,8 @@ public class CandleDataPager {
         return candleDataPreProcessor;
     }
 
-    private static class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
-        CandleStickChart candleStickChart;
+    private static final class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
+      final   CandleStickChart candleStickChart;
         private boolean hitFirstNonPlaceHolder;
 
 
@@ -65,14 +65,19 @@ public class CandleDataPager {
                         count++;
                         if (count == candleData.size()) {
                             logger.info("No non-placeholder candles found in the data");
+
+                            new  Messages("Warning",
+                                    "No non-placeholder candles found in the data"
+                            );
                             break;
                         }
                     }
                     List<CandleData> nonPlaceHolders = candleData.subList(count, candleData.size());
                     if (!nonPlaceHolders.isEmpty()) {
                         hitFirstNonPlaceHolder = true;
-                        candleStickChart.getCandlePageConsumer().accept(nonPlaceHolders);
+                        candleStickChart.getCandlePageConsumer().accept( nonPlaceHolders);
                     }
+
                 }
             }
         }

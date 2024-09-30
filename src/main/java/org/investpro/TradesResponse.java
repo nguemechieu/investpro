@@ -6,8 +6,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
 
-@Entity
-@Table(name = "trades_response")
+
 public class TradesResponse {
 
     @Id

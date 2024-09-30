@@ -27,6 +27,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
     ArrayList<Currency> coinsToRegister = new ArrayList<>();
 
     public CryptoCurrencyDataProvider() {
+        logger.info("CryptoCurrencyDataProvider");
     }
 
     @Contract("_ -> new")
@@ -35,8 +36,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
         requestBuilder.uri(URI.create(jsonUrl))
                 .header("Accept", "application/json")
                 .GET()
-                .build();
-
+                ;
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
@@ -131,9 +131,9 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
             cryptoLists.add(currency);
 
         }
-        db1.save(cryptoLists);
-        //   CURRENCIES.put(new SymmetricPair(CurrencyType.CRYPTO,cryptoLists.stream()), (Currency) cryptoLists
-        //    .stream().collect(Collectors.toMap(Currency::getCode, Function.identity(), (existing, replacement) -> existing)));
+        //db1.save(cryptoLists);
+         CURRENCIES.put(new SymmetricPair(CurrencyType.CRYPTO,cryptoLists.stream()), (Currency) cryptoLists
+            .stream().collect(Collectors.toMap(Currency::getCode, Function.identity(), (existing, _) -> existing)));
 
     }
 

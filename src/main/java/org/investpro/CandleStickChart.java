@@ -42,6 +42,8 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -141,13 +143,13 @@ public class CandleStickChart extends Region {
     private InProgressCandle inProgressCandle = new InProgressCandle();
     List<Trade> currentCandleTrades;
 
-    CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
+    CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
                      ObservableNumberValue containerHeight) throws IOException {
         logger.debug(String.valueOf(this));
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
-        Objects.requireNonNull(tradePair);
+        this.tradePair=exchange.tradePair;
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         if (!Platform.isFxApplicationThread()) {
@@ -158,7 +160,7 @@ public class CandleStickChart extends Region {
 
         TradeHistory stat = new TradeHistory();
         stat.getRecentTrades(1000);
-        this.tradePair = tradePair;
+
         this.secondsPerCandle = secondsPerCandle;
         this.liveSyncing = liveSyncing;
         zoomLevelMap = new ConcurrentHashMap<>();
@@ -246,28 +248,23 @@ public class CandleStickChart extends Region {
 
             CompletableFuture.runAsync(() -> {
                 boolean websocketInitialized;
-                try {
-                    websocketInitialized = exchange.webSocketClient.getInitializationLatch().await(
-                            10, SECONDS);
-                } catch (InterruptedException ex) {//" while waiting for a websocket client to be initialized: ", ex);
-                    String s = STR."Interrupted while waiting for websocket client to be initialized: \{ex.getMessage()}";
-                    logger.error(s, ex);
-                    Thread.currentThread().interrupt();
-                    return;
+                exchange.webSocketClient.setConnectionLostTimeout(
 
-                }
+                        10
+                );
+                websocketInitialized=exchange.webSocketClient.getConnection().isOpen();
 
                 if (!websocketInitialized) {
                     logger.error(STR."websocket client: \{exchange.webSocketClient.getURI().getHost()} was not initialized after 10 seconds");
                 } else {
-                    if (exchange.webSocketClient.supportsStreamingTrades(tradePair)) {
-                        exchange.webSocketClient.streamLiveTrades(tradePair, updateInProgressCandleTask);
+
+                        exchange.streamLiveTrades(tradePair, updateInProgressCandleTask);
                         try {
                             Thread.sleep(1000); // Wait for a bit to ensure the websocket is ready to receive live trades.
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
-                    }
+
 
                     updateInProgressCandleExecutor.scheduleAtFixedRate(updateInProgressCandleTask, 5, 5, SECONDS);
                 }
@@ -1193,6 +1190,8 @@ public class CandleStickChart extends Region {
     private class CandlePageConsumer implements Consumer<List<CandleData>> {
         @Override
         public void accept(List<CandleData> candleData) {
+
+
             if (Platform.isFxApplicationThread()) {
                 logger.error("candle data paging must not happen on FX thread!");
                 throw new IllegalStateException("candle data paging must not happen on FX thread!");
@@ -1244,8 +1243,13 @@ public class CandleStickChart extends Region {
                                 // begin with is that this can take a prohibitively long time if the candle duration
                                 // is too large. (Some exchanges have multiple trades every second.)
                                 int currentTill = (int) Instant.now().getEpochSecond();
-                                CompletableFuture<List<Trade>> tradesFuture = exchange.fetchRecentTradesUntil(
-                                        tradePair, Instant.ofEpochSecond(inProgressCandleData.currentTill()));
+                                CompletableFuture<List<Trade>> tradesFuture = null;
+                                try {
+                                    tradesFuture = exchange.fetchRecentTradesUntil(
+                                            tradePair, Instant.ofEpochSecond(inProgressCandleData.currentTill()));
+                                } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+                                    throw new RuntimeException(e);
+                                }
 
                                 tradesFuture.whenComplete((trades, exception) -> {
                                     if (exception == null) {

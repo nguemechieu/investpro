@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class DataSet {
-    private Map<String, Double> data; // To store investment data (e.g., stock symbol -> price)
+    private final Map<String, Double> data; // To store investment data (e.g., stock symbol -> price)
 
     public DataSet() {
         data = new HashMap<>();

@@ -3,21 +3,22 @@ package org.investpro;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Instant;
 import java.util.Objects;
 
 /**
  * @author Noel Nguemechieu
  */
 public class CandleData {
-    private final double openPrice;
-    private final double closePrice;
-    private final double highPrice;
-    private final double lowPrice;
-    private final int openTime;
-    private static double volume;
-    private final double averagePrice;
-    private final double volumeWeightedAveragePrice;
-    private final boolean placeHolder;
+    private double openPrice=0;
+    private double closePrice=0;
+    private double highPrice=0;
+    private double lowPrice=0;
+    private int openTime=0;
+    private static double volume=0;
+    private double averagePrice=0;
+    private double volumeWeightedAveragePrice=0;
+    private boolean placeHolder=false;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
                       double volume) {
@@ -27,6 +28,7 @@ public class CandleData {
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
                       double volume, double averagePrice, double volumeWeightedAveragePrice, boolean placeHolder) {
+
         this.openPrice = openPrice;
         this.closePrice = closePrice;
         this.highPrice = highPrice;
@@ -43,6 +45,24 @@ public class CandleData {
         this(aDouble, aDouble1, aDouble2, aDouble3, anInt, volume, (aDouble + aDouble1 + aDouble2 + aDouble3) / 4,
                 volume * ((aDouble + aDouble1 + aDouble2 + aDouble3) / 4), false);
     }
+
+    public CandleData(Instant instant, double closePrice, double highPrice, double lowPrice, double v, long volume) {
+
+        this.openTime = instant.getNano();
+        this.closePrice = closePrice;
+        this.highPrice = highPrice;
+        this.lowPrice = lowPrice;
+        CandleData.volume = volume;
+        this.averagePrice = (openPrice +  highPrice+ lowPrice+ closePrice) / 4;
+        this.volumeWeightedAveragePrice = volume * ((openPrice+lowPrice+closePrice+highPrice) / 4);
+        this.placeHolder = false;
+
+    }
+
+    public CandleData() {
+
+    }
+
 
     @Contract("_, _, _, _, _ -> new")
     public static @NotNull CandleData of(long timestamp, double open, double high, double low, double close) {

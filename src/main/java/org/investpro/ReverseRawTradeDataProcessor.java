@@ -122,10 +122,18 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
 
         start = endTime.get();
         endTime.set(endTime.get() - (secondsPerCandle * numCandles));
-        return CompletableFuture.completedFuture(candleData.stream().sorted(Comparator.comparingInt(
+        return CompletableFuture.completedFuture(candleData.stream().sorted(Comparator.comparingLong(
                 CandleData::getOpenTime)).collect(Collectors.toList()));
     }
 
+
+    @Override
+    public Set<Integer> getSupportedGranularity() {
+        return Set.of(
+                // Supported granularity
+                60, 300, 3600, 4*3600, 6*3600, 12*3600
+        );
+    }
 
     /**
      * This method returns an instance of CandleDataSupplier based on the provided parameters.

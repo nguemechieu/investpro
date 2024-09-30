@@ -140,4 +140,15 @@ public class TradingAI {
     }
 
 
+    public void train() {
+        try {
+            model.buildClassifier(trainingData);  // Train the model
+            File f = new File("trainingData.pkl");
+            if (!f.exists()) f.createNewFile();
+            logger.info("Training completed.");
+
+        } catch (Exception e) {
+            logger.severe(STR."Error building classifier: \{e.getMessage()}");
+        }
+    }
 }

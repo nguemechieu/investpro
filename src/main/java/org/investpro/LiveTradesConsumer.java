@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -31,7 +32,6 @@ public class LiveTradesConsumer {
         this.tradeQueue = new ArrayList<>();
         this.livesTrades = new ArrayList<>();
 
-        logger.info("Live trades consumer initialized for account: {}", account.getId());
     }
 
 
@@ -177,7 +177,9 @@ public class LiveTradesConsumer {
 
     public void run() {
         // Implement live trade processing
-        this.acceptTrades(this.getExchange().getLiveTrades()); // Get live trades from exchange and
+        this.acceptTrades(
+                getExchange().getLiveTrades(this.tradePairs) // Get live trades from exchange and
+        ); // Get live trades from exchange and
 
     }
 
@@ -267,11 +269,7 @@ public class LiveTradesConsumer {
             return;
         }
 
-        // Clear any existing account if necessary (depends on your logic)
-        this.account.clear();
 
-        // Implement account selection and processing logic
-        this.account.add(account);
         logger.info("Added account: {} to live trading.", account);
 
         // Further processing, e.g., starts listening to live market data for this account
@@ -287,7 +285,7 @@ public class LiveTradesConsumer {
     public void clear() {
         // Clear live trade processing data structure (e.g., database, in-memory store)
         this.tradePairs.clear();
-        this.account.clear();
+
         this.exchange.clear();
         this.inProgressCandle = null;
         this.ready = false;
@@ -333,5 +331,16 @@ public class LiveTradesConsumer {
     public void setReady(boolean ready) {
         // Set ready status for live trade processing
         this.ready = ready;
+    }
+
+    public Collection<? extends Trade> get(TradePair tradePair) {
+
+        ArrayList<Trade> trades = new ArrayList<>();
+        for (Trade trade : tradeQueue) {
+            if (trade.getTradePair().equals(tradePair)) {
+                trades.add(trade);
+            }
+        }
+        return trades;
     }
 }

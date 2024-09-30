@@ -35,7 +35,7 @@ class Db1 implements Db {
             this.conn = DriverManager.getConnection(String.format("jdbc:sqlite:%s", dbName));
             if (conn != null) {
                 logger.info("Connected to database: {}", conf.getProperty("dbName"));
-                createTables();
+                //createTables();
             }
         } catch (SQLException e) {
             logger.error("Error connecting to the database", e);
@@ -117,7 +117,7 @@ class Db1 implements Db {
             };
 
             for (String query : tableCreationQueries) {
-                logger.info(query);
+                //logger.info(query);
                 conn.createStatement().executeUpdate(query);
             }
 
@@ -153,11 +153,10 @@ class Db1 implements Db {
         try {
             String sql = "INSERT INTO currencies (full_display_name, short_display_name, fractional_digits, symbol, image) VALUES (?,?,?,?,?)";
             PreparedStatement stmt = this.conn.prepareStatement(sql);
-            stmt.setString(1, "Bitcoin");
-            stmt.setString(2, "BTC");
-            stmt.setInt(3, 8);
-            stmt.setString(4, "$");
-            stmt.setString(5, "bitcoin.png");
+
+
+
+
             stmt.executeUpdate();
         } catch (SQLException e) {
             logger.error("Error inserting data into the database", e);
@@ -201,21 +200,31 @@ class Db1 implements Db {
 
     @Override
     public void close() {
+        try {
+            if (conn!= null &&!conn.isClosed()) {
+                conn.close();
+            }
+        } catch (SQLException e) {
+            logger.error("Error closing the database connection", e);
+        }
 
     }
 
     @Override
     public String getDbName() {
+
         return "";
     }
 
     @Override
     public void setDbName(String dbName) {
+        this.dbName = dbName;
 
     }
 
     @Override
     public String getUserName() {
+
         return "";
     }
 

@@ -16,37 +16,28 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     protected final int numCandles;
     protected final int secondsPerCandle;
     protected final TradePair tradePair;
-    private static final Set<Integer> GRANULARITY = Set.of(
-            60, 180, 300, 900, 1800, 3600, 7200, 14400,
-            21600, 43200, 86400, 172800, 604800
-
-    );
     protected final IntegerProperty endTime;
     List<CandleData> candleDataList = new ArrayList<>();
 
     public CandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(endTime);
-        if (numCandles <= 0) {
-            throw new IllegalArgumentException(STR."numCandles must be positive but was: \{numCandles}");
-        }
+
         if (secondsPerCandle <= 0) {
-            throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
+            throw new IllegalArgumentException(String.format("secondsPerCandle must be positive but was: %d", secondsPerCandle));
         }
+        if (numCandles <= 0) {
+            throw new IllegalArgumentException("numCandles must be positive but was:%d".formatted(numCandles));
+        }
+
         this.numCandles = numCandles;
         this.secondsPerCandle = secondsPerCandle;
         this.tradePair = tradePair;
         this.endTime = endTime;
     }
 
-    public Set<Integer> getSupportedGranularity() {
-        return GRANULARITY;
-    }
 
-    @Override
-    public String toString() {
-        return STR."CandleDataSupplier [numCandles=\{numCandles}, secondsPerCandle=\{secondsPerCandle}, tradePair=\{tradePair}, endTime=\{endTime}]";
-    }
+
 
     @Override
     public boolean equals(Object o) {
@@ -68,11 +59,25 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
         return Objects.hash(numCandles, secondsPerCandle, tradePair, endTime);
     }
 
-    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
+  /**
+          * Returns a set of supported granularity values (in seconds) that this data supplier can provide.
+            *
+            * @return a set of integers representing supported granularity levels
+ */
+    public abstract Set<Integer> getSupportedGranularity();
 
+    /**
+     * Creates and returns a new {@code CandleDataSupplier} instance with the given granularity and trade pair.
+     *
+     * @param secondsPerCandle the time interval for each candle in seconds
+     * @param tradePair the trade pair for which the candle data should be supplied
+     * @return a new {@code CandleDataSupplier} instance
+     */
+    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
     public void add(CandleData of) {
 
         candleDataList.add(of);
 
     }
+
 }

@@ -1,9 +1,12 @@
 package org.investpro;
 
-import io.github.cdimascio.dotenv.Dotenv;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
@@ -11,28 +14,24 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
 import java.io.*;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.sql.SQLException;
-import java.text.ParseException;
 import java.util.Date;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class TradingWindow extends AnchorPane {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
     private static final String CONFIG_FILE = "config.properties"; // File for storing user settings
-    Exchange exchange;
+    private static final Properties properties = loadProperties(); // Load properties at the beginning
+    private Exchange exchange;
 
     public TradingWindow() {
         getStyleClass().add("trading-window");
-        logger.info("TradingWindow {}", this);
+        logger.info("Initializing TradingWindow");
         setPrefSize(1540, 780);
-
 
         GridPane gridPane = new GridPane();
         gridPane.setHgap(10);
@@ -82,8 +81,6 @@ public class TradingWindow extends AnchorPane {
         CheckBox rememberMeButton = new CheckBox();
         gridPane.add(rememberMeButton, 1, 4);
 
-        // Load previously saved settings for the last used exchange
-        Properties properties = loadProperties();
         String savedExchange = properties.getProperty("LAST_USED_EXCHANGE");
         if (savedExchange != null) {
             comboBox.setValue(savedExchange);
@@ -91,10 +88,10 @@ public class TradingWindow extends AnchorPane {
             rememberMeButton.setSelected(true);
         }
 
-        rememberMeButton.setOnAction(_ -> {
+        rememberMeButton.setOnAction(event -> {
             if (rememberMeButton.isSelected()) {
                 String selectedExchange = comboBox.getValue();
-                Properties saveProperties = loadProperties();  // Load existing properties
+                Properties saveProperties = loadProperties(); // Load existing properties
 
                 saveProperties.setProperty("EXCHANGE_%s_API_KEY".formatted(selectedExchange), apiKeyTextField.getText());
                 saveProperties.setProperty("EXCHANGE_%s_SECRET_KEY".formatted(selectedExchange), secretKeyTextField.getText());
@@ -102,7 +99,7 @@ public class TradingWindow extends AnchorPane {
 
                 try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
                     saveProperties.store(writer, "User Settings");
-                    logger.info("User settings saved to file for {}", selectedExchange);
+                    logger.info("User settings saved for {}", selectedExchange);
                 } catch (IOException e) {
                     logger.error("Failed to save properties to file", e);
                 }
@@ -111,76 +108,43 @@ public class TradingWindow extends AnchorPane {
 
         Button cancelBtn = new Button("Close");
         cancelBtn.getStyleClass().add("button");
-        cancelBtn.setOnAction(_ -> Platform.exit());
+        cancelBtn.setOnAction(event -> Platform.exit());
         gridPane.add(cancelBtn, 1, 3);
 
         Button loginBtn = new Button("Start");
         loginBtn.getStyleClass().add("button");
 
         AtomicInteger count = new AtomicInteger();
-        loginBtn.setOnAction(_ -> {
+        loginBtn.setOnAction(event -> {
             if (apiKeyTextField.getText().isEmpty() || secretKeyTextField.getText().isEmpty()) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText(null);
-                alert.setContentText("Please enter your API KEY and SECRET KEY");
-                alert.showAndWait();
+            new Messages("Error", "Please enter your API KEY and SECRET KEY");
                 return;
             }
 
-            if (comboBox.getValue() == null || Objects.equals(comboBox.getValue(), "Select your exchange")) return;
-
-            switch (comboBox.getSelectionModel().getSelectedItem()) {
-                case "BINANCE US" -> {
-                    try {
-                        exchange = new BinanceUs(apiKeyTextField.getText(), secretKeyTextField.getText());
-                    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                case "BINANCE" -> {
-                    try {
-                        exchange = new Binance(apiKeyTextField.getText(), secretKeyTextField.getText(), TradePair.of("BTC", "USD"));
-                    } catch (ClassNotFoundException | SQLException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                case "OANDA" -> exchange = new Oanda(apiKeyTextField.getText(), apiKeyTextField.getText());
-                case "COINBASE" -> {
-                    Dotenv dotenv = Dotenv.load();
-                    String privateKeyPEM = dotenv.get("COINBASE_PRIVATE_API_KEY");
-                    if (privateKeyPEM != null) {
-                        privateKeyPEM = privateKeyPEM.replace("\\n", "\n");
-                    }
-                    String name = dotenv.get("COINBASE_API_KEY_NAME");
-
-                    try {
-                        exchange = new Coinbase(name, privateKeyPEM);
-                    } catch (UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeyException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                default -> throw new IllegalStateException("Unexpected value: %s".formatted(comboBox.getSelectionModel().getSelectedItem()));
+            if (comboBox.getValue() == null || Objects.equals(comboBox.getValue(), "Select your exchange")) {
+                new Messages("Error", "Please select your exchange");
+                return;
             }
 
-            Stage st = new Stage();
-
-            st.setTitle("%s @InvestPro Copyright 2020-%s".formatted(comboBox.getSelectionModel().getSelectedItem(), new Date()));
+            // Create exchange instance based on user selection
             try {
-                DisplayExchange display = new DisplayExchange(exchange);
-                display.getStyleClass().add("display-exchange");
+                switch (comboBox.getSelectionModel().getSelectedItem()) {
+                    case "BINANCE US" -> exchange = new BinanceUS(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    case "BINANCE" -> exchange = new Binance(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    case "OANDA" -> exchange = new Oanda(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    case "COINBASE" -> exchange = new Coinbase(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    default -> throw new IllegalStateException("Unexpected value: %s".formatted(comboBox.getSelectionModel().getSelectedItem()));
+                }
 
+                Stage st = new Stage();
+                st.setTitle(String.format("%s@InvestPro ------------------------------------------Copyright 2020-%s", comboBox.getSelectionModel().getSelectedItem(), new Date()));
+
+                st.setX(Toolkit.getDefaultToolkit().getScreenSize().getWidth() / 2 - st.getWidth() / 2);
+                DisplayExchange display = new DisplayExchange(exchange);
                 Label versionLabel = new Label("Version: %s".formatted(InvestPro.class.getPackage().getImplementationVersion()));
-                versionLabel.getStyleClass().add("label");
                 versionLabel.setTranslateX(10);
                 versionLabel.setTranslateY(10);
                 getChildren().add(versionLabel);
-
-                Label exchangeNameLabel = new Label("Exchange: %s".formatted(comboBox.getSelectionModel().getSelectedItem()));
-                exchangeNameLabel.getStyleClass().add("exchange-name-label");
-                exchangeNameLabel.setTranslateX(0);
-                exchangeNameLabel.setTranslateY(count.get() * 30);
-                count.getAndIncrement();
 
                 Scene scene = new Scene(display);
                 scene.getStylesheets().add(Objects.requireNonNull(TradingWindow.class.getResource("/app.css")).toExternalForm());
@@ -188,15 +152,15 @@ public class TradingWindow extends AnchorPane {
                 st.setOnCloseRequest(_ -> Platform.exit());
                 st.setResizable(true);
                 st.show();
+                count.incrementAndGet();
 
-            } catch (IOException | InterruptedException | ParseException | SQLException | ClassNotFoundException e) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText("");
-                alert.setContentText(e.getMessage());
-                alert.showAndWait();
-            } catch (ExecutionException e) {
-                throw new RuntimeException(e);
+                Image icon = new Image(
+                        Objects.requireNonNull(TradingWindow.class.getResource("/investpro.png")).toExternalForm()
+                );
+                st.getIcons().set(0,icon);
+
+            } catch (Exception e) {
+                new Messages("Error", e.toString());
             }
         });
         gridPane.add(loginBtn, 2, 3);
@@ -209,7 +173,7 @@ public class TradingWindow extends AnchorPane {
     }
 
     // Method to load properties (user settings) from the file
-    private @NotNull Properties loadProperties() {
+    private static @NotNull Properties loadProperties() {
         Properties properties = new Properties();
         try (FileReader reader = new FileReader(CONFIG_FILE)) {
             properties.load(reader);
@@ -242,4 +206,5 @@ public class TradingWindow extends AnchorPane {
             secretKeyTextField.clear();
         }
     }
+
 }

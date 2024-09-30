@@ -4,6 +4,8 @@ package org.investpro;
 import jakarta.persistence.*;
 import org.jetbrains.annotations.NotNull;
 
+import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -69,6 +71,12 @@ public class Trade {
         this.amount = size;
         this.transactionType = side;
         this.localTradeId = tradeId;
+        this.timestamp = time;
+    }
+
+    public Trade(double price, double qty, Instant time) throws SQLException, ClassNotFoundException {
+        this.price =Money.of(BigDecimal.valueOf(price));
+        this.amount = Money.of(BigDecimal.valueOf(qty));
         this.timestamp = time;
     }
 

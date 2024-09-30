@@ -1,101 +1,391 @@
 package org.investpro;
 
-import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
-class Binance extends Exchange {
-    public Binance(String text, String text1, TradePair tradePair) {
-        super(
-                text,
-                text1
-        );
+public class Binance extends Exchange {
+
+    static HttpClient client = HttpClient.newHttpClient();
+    static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+    private static final Logger logger = LoggerFactory.getLogger(Binance.class);
+    public static final String API_URL = "https://api.binance.com/api/v3";  // Use Binance.com API
+    String apiKey;
+
+    public Binance(String apikey, String apiSecret) {
+        super(apikey, apiSecret);
+        Exchange.apiSecret = apiSecret;
+        this.apiKey = apikey;
     }
 
     @Override
-    public CompletableFuture<Account> getAccounts() throws IOException {
+    public CompletableFuture<List<Fee>> getTradingFee() throws IOException, InterruptedException {
         return null;
     }
 
     @Override
-    public Boolean isConnected() {
-        return null;
+    public CompletableFuture<List<Account>> getAccounts() throws IOException, InterruptedException {
+
+        requestBuilder.uri(URI.create(
+                "%s/api/v3/account".formatted(API_URL)
+        ));
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+        HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<Account> accounts = objectMapper.readValue(response.body(), objectMapper.getTypeFactory().constructCollectionType(List.class, Account.class));
+        return CompletableFuture.completedFuture(accounts);
+
+
     }
 
     @Override
     public String getSymbol() {
-        return "";
+        return tradePair.toString('/');
     }
 
     @Override
-    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
+    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException {
 
+        requestBuilder.uri(URI.create(
+                "%s/api/v3/order".formatted(API_URL)
+        ));
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+        requestBuilder.setHeader("Content-Type", "application/json");
+
+        CreateOrderRequest orderRequest = new CreateOrderRequest(
+                tradePair.toString('-'),
+                side,
+                orderType,
+                price,
+                size,
+                timestamp,
+                stopLoss,
+                takeProfit
+        );
+
+        requestBuilder.method("POST", HttpRequest.BodyPublishers.ofString(new ObjectMapper().writeValueAsString(orderRequest)));
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Error creating order: %d".formatted(response.statusCode()));
+        }
+        logger.info("Order created: {}", response.body());
     }
 
     @Override
-    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException {
-        return null;
+    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+
+        requestBuilder.uri(URI.create(
+                API_URL + "/api/v3/order?orderId=" + orderId
+        ));
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+        requestBuilder.method("DELETE", HttpRequest.BodyPublishers.noBody());
+
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Error cancelling order: %d".formatted(response.statusCode()));
+        }
+        logger.info("Order cancelled: {}", orderId);
+        return CompletableFuture.completedFuture(orderId);
     }
 
     @Override
     public String getExchangeMessage() {
-        return "";
-    }
-
-    @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        return null;
+        return message;
     }
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return new BinanceCandleDataSupplier(secondsPerCandle, tradePair); // Custom class to handle Binance candlestick data
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        Objects.requireNonNull(tradePair);
+        Objects.requireNonNull(stopAt);
+
+        CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
+
+        CompletableFuture.runAsync(() -> {
+            String uriStr = API_URL + "/api/v3/trades?symbol=" + tradePair.toString('-');
+
+            try {
+                HttpResponse<String> response = HttpClient.newHttpClient().send(
+                        HttpRequest.newBuilder()
+                                .uri(URI.create(uriStr))
+                                .GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+                JsonNode tradesResponse = new ObjectMapper().readTree(response.body());
+                if (!tradesResponse.isArray() || tradesResponse.isEmpty()) {
+                    futureResult.completeExceptionally(new RuntimeException("Binance trades response was empty or not an array"));
+                } else {
+                    List<Trade> trades = new ArrayList<>();
+                    for (JsonNode trade : tradesResponse) {
+                        Instant time = Instant.ofEpochMilli(trade.get("time").asLong());
+                        if (time.compareTo(stopAt) <= 0) {
+                            futureResult.complete(trades);
+                            break;
+                        } else {
+                            trades.add(new Trade(
+                                    tradePair,
+                                    DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
+                                    DefaultMoney.ofCrypto(trade.get("qty").asText(), tradePair.getBaseCurrency()),
+                                    Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY"),
+                                    trade.get("id").asLong(),
+                                    time
+                            ));
+                        }
+                    }
+                }
+            } catch (IOException | InterruptedException e) {
+                futureResult.completeExceptionally(e);
+            }
+        });
+
+        return futureResult;
+    }
+
+    @Override
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+            @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+                currentCandleStartedAt, ZoneOffset.UTC));
+
+        return client.sendAsync(
+                        requestBuilder.uri(URI.create(String.format(
+                                        "%s/api/v3/klines?symbol=%s&interval=%s&startTime=%s", API_URL,
+                                        tradePair.toString('-'),
+                                        getBinanceGranularity(secondsPerCandle),
+                                        startDateString
+                                )))
+                                .GET().build(),
+                        HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body)
+                .thenApply(response -> {
+                    logger.info("Binance response: " + response);
+                    JsonNode res;
+                    try {
+                        res = new ObjectMapper().readTree(response);
+                    } catch (JsonProcessingException ex) {
+                        throw new RuntimeException(ex);
+                    }
+
+                    if (res.isEmpty()) {
+                        return Optional.empty();
+                    }
+
+                    JsonNode currCandle = res.get(0);
+                    Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
+
+                    return Optional.of(new InProgressCandleData(
+                            (int) openTime.getEpochSecond(),
+                            currCandle.get(1).asDouble(),
+                            currCandle.get(2).asDouble(),
+                            currCandle.get(3).asDouble(),
+                            (int)currCandle.get(6).asLong(),
+                            currCandle.get(4).asDouble(),
+                            currCandle.get(5).asDouble()
+                    ));
+                });
+    }
+
+    @Override
+    public List<Order> getPendingOrders() throws IOException, InterruptedException {
+        return List.of(); // Binance doesn't have a specific endpoint for pending orders
+    }
+
+    @Override
+    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+        requestBuilder.uri(URI.create(API_URL + "/api/v3/depth?symbol=" + tradePair.toString('-')));
+        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
+        logger.info("Binance response: " + response.body());
+        ObjectMapper objectMapper = new ObjectMapper();
+        OrderBook orderBook = objectMapper.readValue(response.body(), OrderBook.class);
+        return CompletableFuture.completedFuture(orderBook);
+    }
+
+    @Override
+    public Position getPositions() throws IOException, InterruptedException, ExecutionException {
+        return null;
+    }
+
+
+
+    @Override
+    public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+        requestBuilder.uri(URI.create(API_URL + "/api/v3/openOrders?symbol=" + tradePair.toString('-')));
+        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
+        logger.info("Binance response: %s".formatted(response.body()));
+        ObjectMapper objectMapper = new ObjectMapper();
+        return Arrays.asList(objectMapper.readValue(response.body(), Order[].class));
+    }
+
+    @Override
+    public ObservableList<Order> getOrders() throws IOException, InterruptedException {
+        return null; // Implementation depends on the use of ObservableList
+    }
+
+    @Override
+    public CompletableFuture<ArrayList<TradePair>> getTradePairs() {
+        requestBuilder.uri(URI.create(API_URL + "/api/v3/exchangeInfo"));
+
+        ArrayList<TradePair> tradePairs = new ArrayList<>();
+        try {
+            HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
+            JsonNode res = new ObjectMapper().readTree(response.body());
+            logger.info("Binance response: %s".formatted(res));
+
+            JsonNode symbols = res.get("symbols");
+            for (JsonNode symbol : symbols) {
+                String baseAsset = symbol.get("baseAsset").asText();
+                String quoteAsset = symbol.get("quoteAsset").asText();
+                TradePair tp = new TradePair(baseAsset, quoteAsset);
+                tradePairs.add(tp);
+                logger.info("Binance trade pair: %s".formatted(tp));
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return CompletableFuture.completedFuture(tradePairs);
+    }
+
+    @Override
+    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+
+    }
+
+    @Override
+    public void stopStreamLiveTrades(TradePair tradePair) {
+        // Implement WebSocket closing if needed for live trade streams
+    }
+
+    @Override
+    public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
+        return List.of(); // WebSocket streaming for live prices not implemented here
+    }
+
+    @Override
+    public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
+        return List.of(); // WebSocket streaming for candlestick not implemented here
+    }
+
+    @Override
+    public List<OrderBook> streamOrderBook(@NotNull TradePair tradePair) {
+        return List.of(); // WebSocket streaming for order book not implemented here
+    }
+
+    @Override
+    public CompletableFuture<String> cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException {
+        return null; // Implement if Binance supports cancelling all orders at once
+    }
+
+    @Override
+    public boolean supportsStreamingTrades(TradePair tradePair) {
+        return false; // WebSocket support for trades can be added if needed
+    }
+
+    @Override
+    ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
         return null;
     }
 
     @Override
-    public List<Order> getPendingOrders() throws IOException {
-        return List.of();
-    }
-
-    @Override
-    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
+    ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
         return null;
     }
 
-    @Override
-    public JsonParser getUserAccountDetails() {
-        return null;
+    // Binance supported granularity (intervals)
+    private static final Set<String> SUPPORTED_GRANULARITIES = Set.of(
+            "1m", "5m", "15m", "1h", "6h", "1d"
+    );
+
+    /**
+     * Returns the closest supported granularity (time interval) for Binance.
+     *
+     * @param secondsPerCandle the candle duration in seconds
+     * @return the granularity in Binance format (e.g., "1m", "5m")
+     */
+    public String getBinanceGranularity(int secondsPerCandle) {
+        switch (secondsPerCandle) {
+            case 60:
+                return "1m";
+            case 300:
+                return "5m";
+            case 900:
+                return "15m";
+            case 3600:
+                return "1h";
+            case 21600:
+                return "6h";
+            case 86400:
+                return "1d";
+            default:
+                throw new IllegalArgumentException("Unsupported granularity: " + secondsPerCandle);
+        }
     }
 
-    @Override
-    public void connect(String text, String text1, String userIdText) {
+ //   Get Crypto Deposit History
+//    Example
+//
+//# Get HMAC SHA256 signature
+//
+//    timestamp=`date +%s000`
+//
+//    api_key=<your_api_key>
+//    secret_key=<your_secret_key>
+//    coin=<coin>
+//
+//    api_url="https://api.binance.us"
+//
+//    signature=`echo -n "coin=$coin&timestamp=$timestamp" | openssl dgst -sha256 -hmac $secret_key`
+//
+//    curl -X "GET" "$api_url/sapi/v1/capital/deposit/hisrec?coin=$coin&timestamp=$timestamp&signature=$signature" \
+//            -H "X-MBX-APIKEY: $api_key"
+//    Response
+//
+//[
+//    {
+//        "amount": "8.73234",
+//            "coin": "BNB",
+//            "network": "BSC",
+//            "status": 1,
+//            "address": "0xd709f9d0bbc6b0e746a13142dfe353086edf87c2",
+//            "addressTag": "",
+//            "txId": "0xa9ebf3f4f60bc18bd6bdf4616ff8ffa14ef93a08fe79cad40519b31ea1044290",
+//            "insertTime": 1638342348000,
+//            "transferType": 0,
+//            "confirmTimes": "0/0"
+//    }
 
-    }
+   // GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
+    // coin: The asset to get deposit history for (e.g., "BTC", "ETH", "BNB")
+    // timestamp: UTC timestamp in milliseconds
+    // signature: HMAC SHA256 signature of the parameters (coin, timestamp)
+    // X-MBX-APIKEY: Binance API key
 
-    @Override
-    public void getPositionBook(TradePair tradePair) {
 
-    }
 
-    @Override
-    public List<Order> getOpenOrder(@NotNull TradePair tradePair) {
-        return List.of();
-    }
-
-    @Override
-    public ObservableList<Order> getOrders() {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<ArrayList<TradePair>> getTradePairs() throws IOException, InterruptedException {
-        return null;
-    }
 }

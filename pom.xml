@@ -50,7 +50,7 @@
             <id>nguemechieu</id>
             <email>nguemechieu@live.com</email>
             <name>Noel</name>
-            <organization>TradeAdviser</organization>
+            <organization>TradeAdviser, LLC</organization>
             <timezone>UTC</timezone>
         </developer>
     </developers>
@@ -72,7 +72,7 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>21-ea+17</version>
+            <version>23</version>
         </dependency>
 
         <dependency>
@@ -106,11 +106,6 @@
             <version>20231013</version>
         </dependency>
 
-        <dependency>
-            <groupId>jakarta.xml.bind</groupId>
-            <artifactId>jakarta.xml.bind-api</artifactId>
-            <version>3.0.1</version>
-        </dependency>
 
         <dependency>
             <groupId>org.xerial</groupId>
@@ -121,20 +116,11 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.12</version>
+            <version>1.5.6</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.0</version>
-        </dependency>
 
-        <dependency>
-            <groupId>org.glassfish.jaxb</groupId>
-            <artifactId>jaxb-runtime</artifactId>
-            <version>3.0.2</version>
-        </dependency>
+
 
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -148,10 +134,11 @@
             <version>2.14.2</version>
         </dependency>
 
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-swing</artifactId>
-            <version>21-ea+17</version>
+            <version>23</version>
         </dependency>
 
         <dependency>
@@ -187,8 +174,14 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>21-ea+17</version>
+            <version>23</version>
         </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.8.9</version> <!-- Example version -->
+        </dependency>
+
 
         <dependency>
             <groupId>com.google.gwt</groupId>
@@ -214,18 +207,13 @@
             <version>4.0.0</version>
             <scope>provided</scope>
         </dependency>
-
         <dependency>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-            <version>9.41.1</version>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.78.1</version>
         </dependency>
 
-        <dependency>
-            <groupId>javax.websocket</groupId>
-            <artifactId>javax.websocket-api</artifactId>
-            <version>1.1</version>
-        </dependency>
+
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -233,17 +221,19 @@
             <version>5.9.2</version>
         </dependency>
 
+
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-web</artifactId>
-            <version>22.0.2</version>
+            <version>23</version> <!-- Use the appropriate JavaFX version -->
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.7</version> <!-- or the latest version -->
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.maven.doxia</groupId>
-            <artifactId>doxia-site-renderer</artifactId>
-            <version>2.0.0-M10</version>
-        </dependency>
 
         <dependency>
             <groupId>org.java-websocket</groupId>
@@ -251,11 +241,6 @@
             <version>1.5.3</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>log4j-over-slf4j</artifactId>
-            <version>1.7.25</version>
-        </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -282,10 +267,17 @@
         </dependency>
 
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.10.1</version>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.41.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.code.gson</groupId>
+                    <artifactId>gson</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
+
 
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -298,6 +290,17 @@
             <version>2.0.1</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>org.investpro</groupId>
+            <artifactId>investpro</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>2.17.0</version>
+        </dependency>
+
     </dependencies>
 
     <!-- Build Configuration -->

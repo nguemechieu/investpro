@@ -54,15 +54,15 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return new FastMoney(amount, currency, precision);
     }
 
-    public static @NotNull Money of(final double amount, final Currency currency) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(final double amount, final @NotNull Currency currency) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static Money of(final double amount, final Currency currency, int precision) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(final double amount, final @NotNull Currency currency, int precision) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static Money ofFiat(long amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(long amount, final String currencyCode) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         return ofFiat(amount, currencyCode, Currency.ofFiat(currencyCode).getFractionalDigits());
     }
@@ -75,28 +75,29 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 //        return new FastMoney(amount, currency, precision);
 //    }
 
-    public static Money ofFiat(double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.FIAT);
     }
 
-    public static Money ofFiat(final double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, precision, currencyCode, CurrencyType.FIAT);
     }
 
 
-    public static Money ofCrypto(double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+    @Contract("_, _, _ -> new")
+    public static @NotNull Money ofCrypto(double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
         Currency currency = Currency.ofCrypto(currencyCode);
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
-    public static Money ofCrypto(final double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofCrypto(final double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.CRYPTO);
     }
 
 
-    private static Money fromDouble(final double value, final int precision, final String currencyCode,
-                                    final CurrencyType currencyType) throws SQLException, ClassNotFoundException {
+    private static @NotNull Money fromDouble(final double value, final int precision, final String currencyCode,
+                                             final CurrencyType currencyType) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         Objects.requireNonNull(currencyType, "currencyType must not be null");
         Utils.checkPrecision(precision);
@@ -131,11 +132,10 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
             return down;
         }
         // ulp up
-        final FastMoney up = fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
-        return up;
+        return fromDouble0(Math.nextAfter(value, Double.MAX_VALUE), precision, currency);
     }
 
-    private static FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
+    private static @Nullable FastMoney fromDouble0(final double value, final int precision, final Currency currency) {
         final double multiplied = value * Utils.MULTIPLIERS[precision];
         final long converted = (long) multiplied;
         if (multiplied == converted) { // here is an implicit conversion from double to long
@@ -145,7 +145,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return null;
     }
 
-    private static Money fromBigDecimal(final BigDecimal value, Currency currency) {
+    private static @NotNull Money fromBigDecimal(final @NotNull BigDecimal value, Currency currency) {
         final BigDecimal cleaned = value.stripTrailingZeros();
 
         // try to convert to double using a fixed precision = 3, which will cover most currencies
@@ -323,7 +323,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Money divide(BigDecimal divisor) {
+    public @NotNull Money divide(BigDecimal divisor) {
         return fromBigDecimal(toBigDecimal().divide(divisor, MathContext.DECIMAL128), currency);
     }
 
@@ -332,13 +332,15 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return new FastMoney(-amount, currency, precision).normalize();
     }
 
+    @Contract(pure = true)
     @Override
-    public Money abs() {
+    public @Nullable Money abs() {
         return null;
     }
 
+    @Contract(" -> new")
     @Override
-    public BigDecimal toBigDecimal() {
+    public @NotNull BigDecimal toBigDecimal() {
         return new BigDecimal(BigInteger.valueOf((long) amount), precision);
     }
 
@@ -423,7 +425,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public String toString() {
-        return STR."\{toBigDecimal().toPlainString()} \{currency.getCode()}";
+        return "%s %s".formatted(toBigDecimal().toPlainString(), currency.getCode());
     }
 
     private FastMoney normalize() {

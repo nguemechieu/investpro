@@ -22,11 +22,11 @@ import java.util.Objects;
  * @author NOEL NGUEMECHIEU
  */
 public class ChartContainer extends Region {
-    CandleStickChartToolbar toolbar;
-    VBox candleChartContainer = new VBox();
+   final CandleStickChartToolbar toolbar;
+   final VBox candleChartContainer = new VBox();
     private final Exchange exchange;
     private TradePair tradePair;
-    SimpleIntegerProperty secondsPerCandle;
+   final SimpleIntegerProperty secondsPerCandle;
 
     public TradePair getTradePair() {
         return tradePair;
@@ -106,7 +106,7 @@ public class ChartContainer extends Region {
 
                 exchange,
                 exchange.getCandleDataSupplier(secondsPerCandle, exchange.tradePair),
-                exchange.tradePair,
+
                 liveSyncing,
                 secondsPerCandle,
                 widthProperty(),

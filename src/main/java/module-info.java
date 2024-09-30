@@ -1,6 +1,4 @@
 module investpro {
-    requires javafx.controls;
-    requires javafx.fxml;
     requires com.fasterxml.jackson.core;
     requires org.jetbrains.annotations;
     requires Java.WebSocket;
@@ -9,29 +7,27 @@ module investpro {
     requires java.net.http;
     requires javafx.web;
     requires org.json;
-    requires org.controlsfx.controls;
     requires io.github.cdimascio.dotenv.java;
-    requires testcontainers;
-    requires org.xerial.sqlitejdbc;
-    requires javafx.swing;
-    requires jdk.compiler;
-    requires junit;
-    requires cdi.api;
-    requires weka.stable;
     requires bounce;
-    requires com.google.gson;
     requires jakarta.persistence;
     requires org.hibernate.orm.core;
-    requires jakarta.xml.bind;
-    requires org.slf4j;
-    requires jdk.jfr;
+    requires weka.stable;
+    requires javafx.swing;
     requires com.nimbusds.jose.jwt;
-    requires org.bouncycastle.pkix;
-    requires org.bouncycastle.provider;
-    requires jdk.internal.le;
+    requires com.google.gson;
+    requires testcontainers;
+    requires org.xerial.sqlitejdbc;
+    requires org.slf4j;
+    requires org.junit.jupiter.api;
 
-    requires  jakarta.inject;
-    opens org.investpro to jakarta.cdi;
+    requires docker.java.transport.zerodep;
+    requires com.jfoenix;
+
+    requires jcip.annotations;
+    requires org.bouncycastle.provider;
+    requires org.bouncycastle.pkix;
+
+
     exports org.investpro;
 
 }

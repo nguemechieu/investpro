@@ -72,7 +72,7 @@ public class CandleStickChartContainer extends Region {
 
         toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
 
-        secondsPerCandle.addListener((observableDurationValue, oldDurationValue, newDurationValue) -> {
+        secondsPerCandle.addListener((_, oldDurationValue, newDurationValue) -> {
             if (!oldDurationValue.equals(newDurationValue)) {
                 try {
                     createNewChart(newDurationValue.intValue(), liveSyncing);
@@ -91,7 +91,7 @@ public class CandleStickChartContainer extends Region {
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException {
         if (secondsPerCandle <= 0) {
-            throw new IllegalArgumentException(STR."secondsPerCandle must be positive but was: \{secondsPerCandle}");
+            throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }
         Path path = Paths.get("trade_data.csv");
         File file = path.toFile();
@@ -117,10 +117,10 @@ public class CandleStickChartContainer extends Region {
 
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle, tradePair);
 
-        //new ReverseRawTradeDataProcessor(path,
-        //   secondsPerCandle, TradePair.of(tradePair.baseCurrency.code,tradePair.counterCurrency.code));
+        new ReverseRawTradeDataProcessor(path,
+          secondsPerCandle,exchange.tradePair);
 
-        candleStickChart = new CandleStickChart(exchange, candleDataSupplier, tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        candleStickChart = new CandleStickChart(exchange, candleDataSupplier,  liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
     private void animateInNewChart(CandleStickChart newChart) {

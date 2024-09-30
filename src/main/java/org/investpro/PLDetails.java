@@ -1,18 +1,27 @@
 package org.investpro;
 
-import jakarta.persistence.*;
 
-@Entity
-@Table(name = "pl_details")
 public class PLDetails {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+
     private Long id;
 
     private double pl;
 
     private double resettablePL;
+
+    public PLDetails(Long id, double pl, double resettablePL, double units, double unrealizedPL) {
+        this.id = id;
+        this.pl = pl;
+        this.resettablePL = resettablePL;
+        this.units = units;
+        this.unrealizedPL = unrealizedPL;
+    }
+
+    @Override
+    public String toString() {
+        return "PLDetails{id=%d, pl=%s, resettablePL=%s, units=%s, unrealizedPL=%s}".formatted(id, pl, resettablePL, units, unrealizedPL);
+    }
 
     private double units;
 
