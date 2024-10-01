@@ -5,7 +5,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,129 +12,104 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static org.investpro.Coinbase.client;
 import static org.investpro.Coinbase.requestBuilder;
-import static org.investpro.Currency.*;
 
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(CryptoCurrencyDataProvider.class);
-
-    ArrayList<Currency> coinsToRegister = new ArrayList<>();
+    private static final ArrayList<CoinInfo> coinInfoList = new ArrayList<>();
+    private final ArrayList<Currency> coinsToRegister = new ArrayList<>();
 
     public CryptoCurrencyDataProvider() {
-        logger.info("CryptoCurrencyDataProvider");
+        logger.info("CryptoCurrencyDataProvider initialized.");
     }
 
     @Contract("_ -> new")
-    private static @NotNull String fetchJsonResponse(String jsonUrl) throws IOException, InterruptedException {
-
-        requestBuilder.uri(URI.create(jsonUrl))
-                .header("Accept", "application/json")
-                .GET()
-                ;
+    private static HttpResponse<String> fetchJsonResponse(String jsonUrl) throws IOException, InterruptedException {
+        requestBuilder.uri(URI.create(jsonUrl)).header("Accept", "application/json").GET();
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new IOException(String.format("Failed to fetch da" +
-                    "ta: HTTP error code %d", response.statusCode()));
+            throw new IOException(String.format("Failed to fetch data: HTTP error code %d", response.statusCode()));
         }
 
-        return response.body();
+        return response;
     }
 
-    public void get(String baseCurrency) throws Exception {
-        String jsonUrl = String.format(
-                """
-                        https://api.coingecko.com/api/v3/coins/markets?vs_currency=%s""", baseCurrency
-        );
+    public static ArrayList<CoinInfo> getCoinInfoList() {
+        return coinInfoList;
+    }
+
+    public String getCurrencyImage(String baseCurrency) throws Exception {
+        baseCurrency = "BTC";
+        String jsonUrl = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=%s".formatted(baseCurrency);
 
         // Fetch and parse JSON response
-        String jsonResponse = fetchJsonResponse(jsonUrl);
+        requestBuilder.uri(URI.create(jsonUrl));
+        HttpResponse<String> jsonResponse = null;
 
-        Gson gson = new Gson();
-        JsonArray coinArray = gson.fromJson(jsonResponse, JsonArray.class);
+        // Add a retry mechanism with delay
+        int retries = 3;
+        int delay = 2000; // delay in milliseconds
+        while (retries > 0) {
+            try {
+                jsonResponse = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
+                if (jsonResponse.statusCode() != 200) {
+                    throw new IOException(String.format("Failed to fetch data: HTTP error code %d", jsonResponse.statusCode()));
+                }
 
-        logger.info("Registering cryptocurrencies...");
-        logger.info("-------------------------");
-        for (JsonElement element : coinArray) {
-            JsonObject coinJson = element.getAsJsonObject();
-
-            String fullDisplayName = coinJson.get("name").getAsString();
-            String shortDisplayName = coinJson.get("symbol").getAsString().toUpperCase();
-            String code = coinJson.get("symbol").getAsString().toUpperCase();
-            int fractionalDigits = coinJson.get("decimal").getAsInt();
-            String symbol = coinJson.get("symbol").getAsString();
-
-            coinsToRegister.add(new CryptoCurrency(
-                    fullDisplayName,
-                    shortDisplayName,
-                    code,
-                    fractionalDigits,
-                    symbol, symbol
-            ));
+                // Process the response here
+                break; // Exit loop on successful response
+            } catch (IOException e) {
+                if (jsonResponse != null && jsonResponse.statusCode() == 429) {
+                    logger.warn("Rate limit hit, retrying in %d seconds...".formatted(delay / 1000));
+                    Thread.sleep(delay); // Sleep before retry
+                } else {
+                    throw e;
+                }
+            }
+            retries--;
         }
 
-        for (JsonElement element : coinArray) {
-            JsonObject coinJson = element.getAsJsonObject();
-
-            String fullDisplayName = coinJson.get("name").getAsString();
-            String shortDisplayName = coinJson.get("symbol").getAsString().toUpperCase();
-            String code = coinJson.get("symbol").getAsString().toUpperCase();
-            int fractionalDigits = coinJson.get("decimal").getAsInt();
-            String symbol = coinJson.get("symbol").getAsString();
-            String algorithm = coinJson.has("algorithm") ? coinJson.get("algorithm").getAsString() : "Unknown";
-            String homeUrl = coinJson.has("home_url") ? coinJson.get("home_url").getAsString() : "N/A";
-            String walletUrl = coinJson.has("wallet_url") ? coinJson.get("wallet_url").getAsString() : "N/A";
-            int genesisTime = coinJson.has("genesis_time") ? coinJson.get("genesis_time").getAsInt() : 0;
-            int difficultyRetarget = coinJson.has("difficulty_retarget") ? coinJson.get("difficulty_retarget").getAsInt() : 0;
-            String maxCoinsIssued = coinJson.has("max_coins_issued") ? coinJson.get("max_coins_issued").getAsString() : "Unknown";
-            logger.info("Coin: ({}), Algorithm: {}, Home URL: {}, Wallet URL", code, fullDisplayName, algorithm, homeUrl, walletUrl, genesisTime, difficultyRetarget, maxCoinsIssued);
-
-            logger.info("{}", coinJson);
-            coinsToRegister.add(new CryptoCurrency(
-                    fullDisplayName,
-                    shortDisplayName,
-                    code,
-                    fractionalDigits,
-                    symbol, symbol
-            ));
+        if (retries == 0) {
+            throw new IOException("Failed to fetch data after retries.");
         }
-        db1.save(coinsToRegister);
+
+        // Continue processing the response...
+        return "Processed Image URL"; // Placeholder
     }
 
     public void registerCurrencies() throws Exception {
         String jsonUrl = "https://api.coingecko.com/api/v3/coins/list";
 
-        // Fetch and parse JSON response
-        String jsonResponse = fetchJsonResponse(jsonUrl);
+        HttpResponse<String> response = null;
+        try {
+            response = fetchJsonResponse(jsonUrl);
+            // Process the response here
+        } catch (IOException e) {
+            if (e.getMessage().contains("429")) {
+                logger.error("Rate limit exceeded: {}", e.getMessage());
+            } else {
+                logger.error("Failed to fetch data: {}", e.getMessage());
+            }
+        }
+
+        assert response != null;
 
         Gson gson = new Gson();
-        JsonArray coinArray = gson.fromJson(jsonResponse, JsonArray.class);
-        ArrayList<Currency> cryptoLists = new ArrayList<>(
-
-        );
-        cryptoLists.add(NULL_CRYPTO_CURRENCY);
+        JsonArray coinArray = gson.fromJson(response.body(), JsonArray.class);
 
         for (JsonElement element : coinArray) {
             JsonObject coinJson = element.getAsJsonObject();
             String id = coinJson.get("id").getAsString();
             String symbol = coinJson.get("symbol").getAsString().toUpperCase();
 
-            CryptoCurrency currency = new CryptoCurrency(coinJson.get("name").getAsString(), symbol, symbol, 8
-                    , symbol, id);
-            cryptoLists.add(currency);
+            String image = getCurrencyImage(id);
 
+            logger.info("Currency: {}, Image: {}", symbol, image);
         }
-        //db1.save(cryptoLists);
-         CURRENCIES.put(new SymmetricPair(CurrencyType.CRYPTO,cryptoLists.stream()), (Currency) cryptoLists
-            .stream().collect(Collectors.toMap(Currency::getCode, Function.identity(), (existing, _) -> existing)));
-
     }
-
-    // protected Currency register(Currency currency) throws Exception {}
 }

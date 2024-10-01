@@ -34,7 +34,7 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     public TradePair(@NotNull String baseCurrency, @NotNull String counterCurrency) throws SQLException, ClassNotFoundException {
-        this(Currency.of(baseCurrency), Currency.of(counterCurrency));
+        this(Objects.requireNonNull(Currency.of(baseCurrency)), Objects.requireNonNull(Currency.of(counterCurrency)));
     }
 
     @Contract("_, _ -> new")
@@ -88,7 +88,7 @@ public class TradePair extends Pair<Currency, Currency> {
         } else if (separator.equals('-')) {
             return String.format("%s-%s", baseCurrency.getCode().toUpperCase(), counterCurrency.getCode().toUpperCase());
         } else if (separator.equals('/')) {
-            return String.format("%s/%s", baseCurrency.getCode().toUpperCase(), counterCurrency.getCode().toUpperCase());
+            return String.format("%s%s", baseCurrency.getCode().toUpperCase(), counterCurrency.getCode().toUpperCase());
         } else {
             throw new IllegalArgumentException("Invalid separator: %s".formatted(separator));
         }

@@ -1,7 +1,7 @@
 package org.investpro;
 
 import javafx.collections.ObservableList;
-import org.java_websocket.client.WebSocketClient;
+import javafx.scene.image.Image;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,11 +9,17 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+
+import static org.investpro.InvestPro.db1;
+
 
 /**
  * An abstract base class for {@code Exchange} implementations without WebSocket.
@@ -23,8 +29,6 @@ public abstract class Exchange {
 
     protected static final Logger logger = LoggerFactory.getLogger(Exchange.class);
 
-
-    public WebSocketClient webSocketClient;
 
     protected String apiKey;
     protected static String apiSecret;
@@ -84,13 +88,13 @@ public abstract class Exchange {
      * Fetch candle data for the current in-progress candle, used for live syncing.
      */
     public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
-            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle)  ;
+            TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
 
 
     /**
      * Retrieve the list of pending orders.
      */
-    public abstract List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException;
+    public abstract List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException;
 
     /**
      * Fetch the order book for a specific trade pair.
@@ -103,12 +107,12 @@ public abstract class Exchange {
     /**
      * Retrieve open orders for a specific trade pair.
      */
-    public abstract List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException;
+    public abstract List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException;
 
     /**
      * Retrieve a list of orders from the exchange.
      */
-    public abstract ObservableList<Order> getOrders() throws IOException, InterruptedException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException;
+    public abstract ObservableList<Order> getOrders() throws IOException, InterruptedException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
 
     /**
      * Retrieve the available trade pairs from the exchange.
@@ -130,18 +134,17 @@ public abstract class Exchange {
     }
 
 
-
     /**
      * Streaming trades is no longer supported without WebSocket.
      * This method should be overridden if the derived class needs to implement streaming over other mechanisms.
      */
-    public abstract  void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) ;
+    public abstract void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer);
 
 
     /**
      * Stop streaming live trades for a specific trade pair.
      */
-    public abstract  void stopStreamLiveTrades(TradePair tradePair) ;
+    public abstract void stopStreamLiveTrades(TradePair tradePair);
 
 
     // WebSocket client for live updates
@@ -161,16 +164,33 @@ public abstract class Exchange {
     public abstract boolean supportsStreamingTrades(TradePair tradePair);
 
     //  Get Crypto Deposit History  GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
-    abstract ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException;
+    public abstract ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
     //  Get Crypto Withdraw History  GET /sapi/v1/capital/withdraw/history (HMAC SHA256)
-    abstract ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException;
+    public abstract ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
-    public @NotNull List<Trade> getLiveTrades(List<TradePair> tradePairs) {
-        List<Trade> allLiveTrades = new ArrayList<>();
-        for (TradePair tradePair : tradePairs) {
-            allLiveTrades.addAll(liveTradesConsumer.get(tradePair));
+
+    public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
+
+
+    public Image getChartImage(TradePair selectedPair) throws SQLException {
+
+        // Get the currency image name from the data source
+        String currency = selectedPair.getCounterCurrency().image;
+        byte[] imageBytes = new byte[0];
+        // Load the image from the database
+        try (Connection conn = db1.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("SELECT image FROM currencies WHERE image =?");
+            stmt.setString(1, currency);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                imageBytes = rs.getBytes("image");
+                return new Image(Arrays.toString(imageBytes));
+            }
+        } catch (SQLException e) {
+            logger.error("Error retrieving chart image for currency: {}", currency, e);
         }
-        return allLiveTrades;
+        return null;
+
     }
 }

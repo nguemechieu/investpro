@@ -3,8 +3,7 @@ package org.investpro;
 import java.util.List;
 import java.util.Locale;
 
-import static org.investpro.Currency.CURRENCIES;
-import static org.investpro.Currency.db1;
+import static org.investpro.InvestPro.db1;
 
 /**
  * Provides data for fiat currencies (actual paper money currencies provided by

@@ -1,6 +1,7 @@
 package org.investpro;
 
 
+import jakarta.persistence.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -8,18 +9,20 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.investpro.InvestPro.db1;
 
-public abstract class Currency implements Comparable<Currency> {
-    private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
-    public static final CryptoCurrency NULL_CRYPTO_CURRENCY;
-    public static final FiatCurrency NULL_FIAT_CURRENCY;
+@Entity
+@Table(name = "currencies")
+abstract
+class Currency implements Comparable<Currency> {
 
-    static ConcurrentHashMap<SymmetricPair<Currency, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
-    static Db1 db1;
+
+    // Currency.java
+
 
     static {
         try {
@@ -29,22 +32,33 @@ public abstract class Currency implements Comparable<Currency> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        try {
+            new CryptoCurrencyDataProvider().registerCurrencies();
+            new FiatCurrencyDataProvider().registerCurrencies();
+        } catch (Exception e) {
+
+            logger.error("Error registering currencies", e);
+        }
+
+
 
 
     }
 
+    private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
+
+    public static final CryptoCurrency NULL_CRYPTO_CURRENCY;
+    public static final FiatCurrency NULL_FIAT_CURRENCY;
+
+    static ConcurrentHashMap<SymmetricPair<Currency, CurrencyType>, Currency> CURRENCIES = new ConcurrentHashMap<>();
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
 
     protected String code;
     protected int fractionalDigits;
-
-    protected CurrencyType currencyType;
-    protected String fullDisplayName;
-    protected String shortDisplayName;
-
-    protected String symbol;
-    protected String image;
-
-
 
     /**
      * Protected constructor, called only by CurrencyDataProvider's.
@@ -69,16 +83,20 @@ public abstract class Currency implements Comparable<Currency> {
         this.symbol = symbol;
         this.image = image;
 
-        db1 = new Db1();
+
         logger.info("currency registered: {}", this);
 
 
 
     }
 
+    public Currency() {
+
+    }
 
     public static Currency ofCrypto(String code) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(code, "code must not be null");
+
         if (CURRENCIES.containsKey(SymmetricPair.of(code, CurrencyType.CRYPTO)) || db1.getCurrency(code).currencyType == CurrencyType.CRYPTO) {
             return db1.getCurrency(code);
         } else if (code.equals("���") || code.equals("XXX") || code.isEmpty()) {
@@ -87,6 +105,45 @@ public abstract class Currency implements Comparable<Currency> {
         return db1.getCurrency(code) == null ? NULL_CRYPTO_CURRENCY : db1.getCurrency(code);
 
 
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public void setFractionalDigits(int fractionalDigits) {
+        this.fractionalDigits = fractionalDigits;
+    }
+
+    public void setCurrencyType(CurrencyType currencyType) {
+        this.currencyType = currencyType;
+    }
+
+    protected CurrencyType currencyType;
+    protected String fullDisplayName;
+    protected String shortDisplayName;
+
+    protected String symbol;
+    protected String image;
+
+    public void setFullDisplayName(String fullDisplayName) {
+        this.fullDisplayName = fullDisplayName;
+    }
+
+    public void setShortDisplayName(String shortDisplayName) {
+        this.shortDisplayName = shortDisplayName;
+    }
+
+    public void setSymbol(String symbol) {
+        this.symbol = symbol;
     }
 
     public static @Nullable Currency of(String code) throws SQLException, ClassNotFoundException {
@@ -218,6 +275,7 @@ public abstract class Currency implements Comparable<Currency> {
     public int compareTo(@NotNull Currency o) {
         return 0;
     }
+
 
     public abstract int compareTo(java.util.@NotNull Currency o);
 }

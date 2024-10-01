@@ -1,73 +1,54 @@
 package org.investpro;
 
+import jakarta.persistence.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.sql.SQLException;
-import java.time.Instant;
 import java.util.Date;
 
+@Entity
+@Table(name = "orders")
 public class Order {
+
+    @Column(name = "symbol", nullable = false)
     String symbol;
-
+    @Column(name = "is_working", nullable = false)
     boolean isWorking;
-
-    public Order() {
-    }
-
-    public String getLastTransactionID() {
-        return lastTransactionID;
-    }
-
-    public Order[] getOrders() {
-        return orders;
-    }
-
-    public void setOrders(Order[] orders) {
-        this.orders = orders;
-    }
-
-    Order []orders;
-
-    public void setLastTransactionID(String lastTransactionID) {
-        this.lastTransactionID = lastTransactionID;
-    }
-
-    String lastTransactionID;
-
-    public Order(String symbol, long orderId, String side, String type, double price, double qty, long time, boolean isWorking) {
-        this.id = orderId;  // Placeholder for account reference
-
-        this.side = Side.getSide(side);
-        this.orderType = ENUM_ORDER_TYPE.valueOf(type);
-        setPrice(price);
-        setSize(qty);
-        this.timestamp =  Date.from(Instant.ofEpochMilli(time));
-        setStopLoss(stopLoss);
-        setTakeProfit(takeProfit);
-        this.isWorking = isWorking;
-        this.orderStatus = ENUM_ORDER_STATUS.NEW;  // Initial status is 'NEW'
-    }
-
-    @Override
-    public String toString() {
-        return "Order{id=%d, account=%s, tradePair=%s, side=%s, orderType=%s, price=%s, size=%s, timestamp=%s, stopLoss=%s, takeProfit=%s, orderStatus=%s}".formatted(id, account, symbol, side, orderType, price, size, timestamp, stopLoss, takeProfit, orderStatus);
-    }
-
+    @Transient
+    String lastTransactionID;  // Not mapped to database
+    @Transient
+    Order[] orders;  // Not mapped to database
+    private long orderId;
+    private long time;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", updatable = false, nullable = false)
     private Long id;
+    @ManyToOne
+    @JoinColumn(name = "account_id", nullable = false)
     private Account account;  // Foreign key reference to Account
-
+    @Column(name = "side", nullable = false)
+    @Enumerated(EnumType.STRING)
     private Side side;
+    @Column(name = "order_type", nullable = false)
+    @Enumerated(EnumType.STRING)
     private ENUM_ORDER_TYPE orderType;
+    @Column(name = "price", nullable = false)
     private double price;
+    @Column(name = "size", nullable = false)
     private double size;
+    @Column(name = "timestamp", nullable = false)
+    @Temporal(TemporalType.TIMESTAMP)
     private Date timestamp;
+    @Column(name = "stop_loss")
     private double stopLoss;
+    @Column(name = "take_profit")
     private double takeProfit;
+    @Column(name = "order_status", nullable = false)
+    @Enumerated(EnumType.STRING)
     private ENUM_ORDER_STATUS orderStatus;
 
     // Constructor
     public Order(@NotNull String symbol, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) {
-
         this.symbol = symbol;
         this.side = side;
         this.orderType = orderType;
@@ -77,6 +58,26 @@ public class Order {
         setStopLoss(stopLoss);
         setTakeProfit(takeProfit);
         this.orderStatus = ENUM_ORDER_STATUS.NEW;  // Initial status is 'NEW'
+        this.isWorking = true;
+    }
+
+    public Order() {
+    }
+
+    public Order(String symbol, long orderId, String side, String type, double price, double origQty, long time, boolean equals) {
+        this.id = orderId;  // Placeholder for account reference
+
+        this.side = Side.getSide(side);
+        this.orderType = ENUM_ORDER_TYPE.valueOf(type);
+        this.orderId = orderId; // Placeholder
+        this.price = price;
+        this.size = origQty;
+        this.time = time;
+        this.isWorking = equals;
+        this.symbol = symbol;
+        //... more fields...
+        setPrice(price);
+        //... more fields...
     }
 
     // Getters and Setters
@@ -96,7 +97,13 @@ public class Order {
         this.account = account;
     }
 
+    public String getSymbol() {
+        return symbol;
+    }
 
+    public void setSymbol(String symbol) {
+        this.symbol = symbol;
+    }
 
     public Side getSide() {
         return side;
@@ -174,22 +181,19 @@ public class Order {
         this.orderStatus = orderStatus;
     }
 
+    public boolean isWorking() {
+        return isWorking;
+    }
+
+    public void setWorking(boolean working) {
+        isWorking = working;
+    }
+
     // Additional Methods
-
-
-
-    /**
-     * Check if the order is still active (NEW or PARTIALLY_FILLED).
-     *
-     * @return true if the order is active, false otherwise.
-     */
     public boolean isOrderActive() {
         return orderStatus == ENUM_ORDER_STATUS.NEW || orderStatus == ENUM_ORDER_STATUS.PARTIALLY_FILLED;
     }
 
-    /**
-     * Fulfill the order, changing its status to FILLED.
-     */
     public void fulfillOrder() {
         if (orderStatus == ENUM_ORDER_STATUS.NEW || orderStatus == ENUM_ORDER_STATUS.PARTIALLY_FILLED) {
             orderStatus = ENUM_ORDER_STATUS.FILLED;
@@ -198,4 +202,24 @@ public class Order {
         }
     }
 
+    @Override
+    public String toString() {
+        return "Order{id=%d, account=%s, symbol=%s, side=%s, orderType=%s, price=%s, size=%s, timestamp=%s, stopLoss=%s, takeProfit=%s, orderStatus=%s}".formatted(id, account, symbol, side, orderType, price, size, timestamp, stopLoss, takeProfit, orderStatus);
+    }
+
+    public long getTime() {
+        return time;
+    }
+
+    public void setTime(long time) {
+        this.time = time;
+    }
+
+    public long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(long orderId) {
+        this.orderId = orderId;
+    }
 }

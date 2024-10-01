@@ -1,18 +1,19 @@
 package org.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Unmodifiable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -20,7 +21,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -29,26 +29,38 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
 public class BinanceUS extends Exchange {
 
-    HttpClient client = HttpClient.newHttpClient();
-    HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+    static HttpClient client = HttpClient.newHttpClient();
+    static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     private static final Logger logger = LoggerFactory.getLogger(BinanceUS.class);
     public static final String API_URL = "https://api.binance.us/api/v3";
-    String apiKey;
+    static long serverTime;
+    static long timestamp = System.currentTimeMillis() + serverTime - System.currentTimeMillis();
+    private static String apiKey;
 
-    public BinanceUS(String apikey, String apiSecret) {
+    static {
+        serverTime = Date.from(Instant.now()).getTime();//-1000 is the gap between server and client
+    }
+
+    public BinanceUS(String apikey, String apiSecret) throws NoSuchAlgorithmException, InvalidKeyException, IOException, InterruptedException {
         super(apikey, apiSecret);
-        Exchange.apiSecret = apiSecret;
-        this.apiKey = apikey;
 
 
+        BinanceUS.apiKey = apikey;
+        BinanceUS.apiSecret = apiSecret;
 
-        String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
 
+        requestBuilder.setHeader(
+                "X-MBX-APIKEY", apiKey
+        );
+
+        // Adjust timestamp with server time
+        requestBuilder.setHeader("Content-Type", "application/json");
+        timestamp = System.currentTimeMillis() + serverTime - System.currentTimeMillis();
 
 
 
@@ -56,51 +68,24 @@ public class BinanceUS extends Exchange {
 
     }
 
+    // Helper method to get Binance server time
+    private static long getServerTime() throws IOException, InterruptedException {
+        requestBuilder
+                .uri(URI.create("%s/time".formatted(API_URL)))
+                .GET()
+        ;
 
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-    private @NotNull String HmacSHA256(@NotNull String apiSecret, @NotNull String payload) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(apiSecret.getBytes(), "HmacSHA256"));
-            byte[] rawHmac = mac.doFinal(payload.getBytes());
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : rawHmac) {
-                String hex = String.format("%02x", b);
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException(e);
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Failed to get Binance server time");
         }
+
+
+        JsonNode jsonNode = OBJECT_MAPPER.readTree(response.body());
+        return jsonNode.get("serverTime").asLong();
     }
-//    Get Trade Fee
-//            Example
-//
-//    timestamp=`date +%s000`
-//
-//    api_key=<your_api_key>
-//    secret_key=<your_secret_key>
-//
-//    api_url="https://api.binance.us"
-//
-//    signature=`echo -n "timestamp=$timestamp" | openssl dgst -sha256 -hmac $secret_key`
-//
-//    curl -X GET "$api_url/sapi/v1/asset/query/trading-fee?timestamp=$timestamp&signature=$signature" \
-//            -H "X-MBX-APIKEY: $api_key"
-//    Response
-//
-//[
-//    {
-//        "symbol": "1INCHUSD",
-//            "makerCommission": "0.004",
-//            "takerCommission": "0.006"
-//    },
-//    {
-//        "symbol": "1INCHUSDT",
-//            "makerCommission": "0.004",
-//            "takerCommission": "0.006"
-//    }
-//]
+
     //GET /sapi/v1/asset/query/trading-fee (HMAC SHA256)
 
     @Override
@@ -118,54 +103,37 @@ public class BinanceUS extends Exchange {
         return CompletableFuture.completedFuture(fees);
     }
 
+
     @Override
     public CompletableFuture<List<Account>> getAccounts() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
-        long timestamp = Instant.now().getNano();
-        String queryString = "timestamp=" + timestamp/1000 + "&recvWindow=10000";  // Binance US requires a timestamp and recvWindow (optional)
 
-        // Generate the signature
-        String signature = BinanceUtils.generateSignature(queryString, apiSecret);
+        // Step 2: Create query string with timestamp and recvWindow
+        String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
 
-        // Append the signature to the query string
+        // Step 3: Generate HMAC SHA256 signature using the API secret and query string
+        String signature = HmacSHA256(apiSecret, queryString);
+
+        // Step 4: Append the signature to the query string
         queryString += "&signature=%s".formatted(signature);
 
-        // Build the URI for the request, including the query string with the signature
+        // Step 5: Build the URI for the request, including the query string with the signature
         requestBuilder.uri(URI.create("%s/account?%s".formatted(API_URL, queryString)));
 
-        // Set the headers with the API key
+        // Step 6: Set the headers with the API key
         requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
-
-        // Send the GET request and capture the response
+        // Step 7: Send the GET request and capture the response
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        // Handle non-200 status codes by showing an error message and throwing a RuntimeException
         if (response.statusCode() != 200) {
-            new Messages("Error", "%d\n%s".formatted(response.statusCode(), response.body()));
-            return CompletableFuture.completedFuture(Collections.singletonList(new Account()));  // Return empty list on error
+            throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
         }
+        Account acc = OBJECT_MAPPER.readValue(response.body(), Account.class);
 
-        // Parse the response into Account objects
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode rootNode = objectMapper.readTree(response.body());
-        JsonNode balancesNode = rootNode.get("balances");
+        logger.info("Account:%s".formatted(acc));
+        return CompletableFuture.completedFuture(Collections.singletonList(acc));
 
-        List<Account> accounts = new ArrayList<>();
 
-        if (balancesNode != null && balancesNode.isArray()) {
-            for (JsonNode balanceNode : balancesNode) {
-                Account account = new Account();
-                account.setCurrency(balanceNode.get("asset").asText());
-                account.setBalance(balanceNode.get("free").asDouble());
-                account.setLockedBalance(balanceNode.get("locked").asDouble());
-                accounts.add(account);
-            }
-        }
-
-        // Return the list of accounts (balances)
-        return CompletableFuture.completedFuture(accounts);
     }
-
-
 
     @Override
     public String getSymbol() {
@@ -182,7 +150,7 @@ public class BinanceUS extends Exchange {
         requestBuilder.setHeader("Content-Type", "application/json");
 
         CreateOrderRequest orderRequest = new CreateOrderRequest(
-                tradePair.toString('-'),
+                tradePair.toString('/'),
                 side,
                 orderType,
                 price,
@@ -221,6 +189,7 @@ public class BinanceUS extends Exchange {
         return CompletableFuture.completedFuture(orderId);
     }
 
+
     @Override
     public String getExchangeMessage() {
         return message;
@@ -239,7 +208,7 @@ public class BinanceUS extends Exchange {
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
 
         CompletableFuture.runAsync(() -> {
-            String uriStr = API_URL + "/api/v3/trades?symbol=" + tradePair.toString('-');
+            String uriStr = API_URL + "/api/v3/trades?symbol=" + tradePair.toString('/');
 
             try {
                 HttpResponse<String> response = client.send(
@@ -287,11 +256,10 @@ public class BinanceUS extends Exchange {
         return client.sendAsync(
                         requestBuilder.uri(URI.create(String.format(
                                         "%s/api/v3/klines?symbol=%s&interval=%s&startTime=%s", API_URL,
-                                        tradePair.toString('-'),
+                                tradePair.toString('/'),
                                         getBinanceGranularity(secondsPerCandle),
                                         startDateString
-                                )))
-                                .GET().build(),
+                        ))).build(),
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(response -> {
@@ -324,15 +292,66 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public List<Order> getPendingOrders() throws IOException, InterruptedException {
-        return List.of(); // Binance US doesn't have a specific endpoint for pending orders
+    public List<Order> getPendingOrders() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+
+        // Step 2: Create query string with timestamp and recvWindow
+        String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
+
+        // Step 3: Generate HMAC SHA256 signature using the API secret and query string
+        String signature = HmacSHA256(apiSecret, queryString);
+
+        // Step 4: Append the signature to the query string
+        queryString += "&signature=%s".formatted(signature);
+
+
+        // Step 6: Set the headers with the API key
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+
+        String url0 = "%s/api/v3/order?symbol=%s".formatted(API_URL, tradePair.toString('/'));
+        requestBuilder.uri(URI.create(
+                "%s?%s".formatted(url0, queryString)
+        ));
+        HttpResponse<String> response = client.send(
+                requestBuilder.build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        if (response.statusCode() != 200) {
+            new Messages("Error", "%d\n%s".formatted(response.statusCode(), response.body()));
+            throw new RuntimeException("Error fetching open orders: %d".formatted(response.statusCode()));
+        }
+        List<Order> orders = OBJECT_MAPPER.readValue(response.body(), new TypeReference<List<Order>>() {
+        });
+
+        return orders;
+
+
+
+
     }
 
     @Override
-    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
-        requestBuilder.uri(URI.create(API_URL + "/api/v3/depth?symbol=" + tradePair.toString('-')));
-        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
-        logger.info("Binance response: " + response.body());
+    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException {
+
+        // Step 2: Create query string with timestamp and recvWindow
+        String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
+
+        // Step 3: Generate HMAC SHA256 signature using the API secret and query string
+        String signature = HmacSHA256(apiSecret, queryString);
+
+        // Step 4: Append the signature to the query string
+        queryString += "&signature=%s".formatted(signature);
+
+
+        // Step 6: Set the headers with the API key
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+
+        String url0 = "%s/api/v3/depth?symbol=%s".formatted(API_URL, tradePair.toString('/'));
+        requestBuilder.uri(URI.create(
+                "%s?%s".formatted(url0, queryString)
+        ));
+        HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
+
 
         OrderBook orderBook = OBJECT_MAPPER.readValue(response.body(), OrderBook.class);
         return CompletableFuture.completedFuture(orderBook);
@@ -346,61 +365,90 @@ public class BinanceUS extends Exchange {
 
 
     @Override
-    public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
-        requestBuilder.uri(URI.create(API_URL + "/api/v3/openOrders?symbol=" + tradePair.toString('-')));
-        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
-        logger.info("Binance response: " + response.body());
+    public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException {
+
+        // Step 2: Create query string with timestamp and recvWindow
+        String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
+
+        // Step 3: Generate HMAC SHA256 signature using the API secret and query string
+        String signature = HmacSHA256(apiSecret, queryString);
+
+        // Step 4: Append the signature to the query string
+        queryString += "&signature=%s".formatted(signature);
+
+
+        // Step 6: Set the headers with the API key
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+
+        String url0 = "%s/api/v3/openOrders?symbol=%s".formatted(API_URL, tradePair.toString('/'));
+        requestBuilder.uri(URI.create(
+                "%s?%s".formatted(url0, queryString)
+        ));
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            logger.error("Error fetching open orders: HTTP status code %s", response.statusCode());
+            new Messages("Warning", "Error fetching open orders: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
+            throw new IllegalStateException(
+                    "Error fetching open orders: HTTP status code %s".formatted(response.statusCode())
+            );
+        }
+
 
         return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Order[].class));
     }
 
     @Override
-    public ObservableList<Order> getOrders() throws IOException, InterruptedException,  NoSuchAlgorithmException, InvalidKeyException {
+    public ObservableList<Order> getOrders() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+        timestamp = getServerTime();
+        // Create the message for HMAC SHA256 signature
+        String message = "timestamp=%s".formatted(timestamp);
 
-        requestBuilder.uri(
-                URI.create("%s/openOrders".formatted(API_URL)));
-        message= "timestamp: " + System.currentTimeMillis() ;
+        // Generate the signature
+        String signature = HmacSHA256(apiSecret, message);
 
-        requestBuilder.method("GET",
-        HttpRequest.BodyPublishers.ofString(
-                "{\"signature\": \"%s\"}".formatted(BinanceUtils.generateSignature( message,apiSecret))));
+        // Create the full URI with the signature
+        String fullUri = "%s/openOrders?timestamp=%d&signature=%s".formatted(API_URL, timestamp, signature);
+        // Set the request URI and method
+        requestBuilder.uri(URI.create(fullUri));
+        requestBuilder.header("X-MBX-APIKEY", apiKey);  // Include the API key in the header
+        requestBuilder.GET();  // Use GET method for openOrders request
 
-
-
-
-
+        // Send the request
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        if ( response.statusCode()!= 200 ) {
-            logger.error("Error fetching orders: HTTP status code %s".formatted(response.body()));
-            new Messages("Error", "Error fetching orders: HTTP status code %d, %s".formatted( response.statusCode(), response.body()));
-            return FXCollections.observableArrayList();
+        // Handle non-200 status codes by logging and showing an error message
+        if (response.statusCode() != 200) {
+            logger.error("Error fetching orders: HTTP status code %s".formatted(response.statusCode()));
+            new Messages("Warning", "Error fetching orders: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
+            throw new IllegalStateException(
+                    "Error fetching orders: HTTP status code %s".formatted(response.statusCode())
+            );
         }
 
-        JsonNode dat = OBJECT_MAPPER.readTree(
-                response.body()
-        );
+        // Parse the response body into JSON
+        JsonNode rootNode = OBJECT_MAPPER.readTree(response.body());
 
+        // Extract the 'orders' node and populate the order list
         ObservableList<Order> orders = FXCollections.observableArrayList();
-
-        for ( JsonNode orderNode : dat.get("orders") ) {
+        for (JsonNode orderNode : rootNode) {
             Order order = new Order(
-                    orderNode.get("symbol").asText(),
-                    orderNode.get("orderId").asLong(),
-                    orderNode.get("side").asText(),
-                    orderNode.get("type").asText(),
-                    orderNode.get("price").asDouble(),
-                    orderNode.get("qty").asDouble(),
-                    orderNode.get("time").asLong(),
-
-                    orderNode.get("isWorking").asBoolean()
+                    orderNode.get("symbol").asText(),  // Symbol of the trading pair
+                    orderNode.get("orderId").asLong(),  // Order ID
+                    orderNode.get("side").asText(),  // Side (BUY/SELL)
+                    orderNode.get("type").asText(),  // Order type
+                    orderNode.get("price").asDouble(),  // Price
+                    orderNode.get("origQty").asDouble(),  // Quantity
+                    orderNode.get("time").asLong(),  // Timestamp of order
+                    orderNode.get("status").asText().equals("FILLED")  // isWorking = true if status is "FILLED"
             );
             orders.add(order);
         }
-
+        logger.info("orders%d\nOrder%s".formatted(orders.size(), orders));
 
         return orders;
     }
+
 
     @Override
     public CompletableFuture<ArrayList<TradePair>> getTradePairs() {
@@ -424,6 +472,9 @@ public class BinanceUS extends Exchange {
         } catch (Exception e) {
             logger.error("Error fetching trade pairs: %s".formatted(e.getMessage()));
             new Messages("Error fetching BINANCE US  trade pairs: ", e.getMessage());
+            throw new IllegalStateException(
+                    "Error fetching trade pairs: %s".formatted(e.getMessage())
+            );
 
         }
         return CompletableFuture.completedFuture(tradePairs);
@@ -433,29 +484,22 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
 
         // WebSocket connection and handling for live trade streams
-        String url = "wss://stream.binance.us:9443/ws/" + tradePair.toString('/') + "@trade";
-        message =
-                "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@trade\"],\"id\": 1}".formatted(tradePair.toString('-'));
+        String url = "wss://stream.binance.us:9443/ws/%s@trade".formatted(tradePair.toString('/'));
+        String message = "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@trade\"],\"id\": 1}".formatted(tradePair.toString('-'));
         CompletableFuture<String> res = customWebSocketClient.sendWebSocketRequest(url, message);
-        res.thenAccept(message -> {
+        res.thenAccept(msg -> {
             try {
-                ObjectMapper objectMapper = new ObjectMapper();
-                LiveTrade liveTrade = objectMapper.readValue(message, LiveTrade.class);
+
+                LiveTrade liveTrade = OBJECT_MAPPER.readValue(msg, LiveTrade.class);
                 liveTradesConsumer.accept(liveTrade.getTrade());
             } catch (JsonProcessingException e) {
                 logger.error("Error parsing JSON: %s".formatted(e.getMessage()));
                 new Messages("Error parsing JSON: ", e.getMessage());
+                throw new IllegalStateException(
+                        "Error parsing JSON: %s".formatted(e.getMessage())
+                );
             }
         });
-
-        // To close the WebSocket connection after some time (optional)
-        // Example: close after 10 seconds (can be adjusted as per requirement)
-        try {
-            Thread.sleep(10000);
-        } catch (InterruptedException e) {
-            logger.error("Error sleeping: %s".formatted(e.getMessage()));
-
-        }webSocketClient.close();
     }
 
     @Override
@@ -490,6 +534,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
     }
 
+
     @Override
     public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
         return List.of(); // WebSocket streaming for candlestick not implemented here
@@ -497,7 +542,23 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
     @Override
     public List<OrderBook> streamOrderBook(@NotNull TradePair tradePair) {
-        return List.of(); // WebSocket streaming for order book not implemented here
+
+        // WebSocket streaming for order books <symbol>@bookTicker
+        String urls = "wss://stream.binance.us:9443%s@bookTicker".formatted(tradePair.toString('/'));
+        message = "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@bookTicker\"],\"id\": 1}".formatted(tradePair.toString('-'));
+
+        CompletableFuture<String> data0 = customWebSocketClient.sendWebSocketRequest(urls, message);
+        return (List<OrderBook>) data0.thenApply(message -> {
+            OrderBook orderBook;
+            try {
+                orderBook = OBJECT_MAPPER.readValue(message, OrderBook.class);
+            } catch (JsonProcessingException e) {
+                logger.error("Error parsing JSON: %s".formatted(e.getMessage()));
+                new Messages("Error parsing JSON: ", e.getMessage());
+                return List.of();
+            }
+            return new ArrayList<>((Collection) orderBook);
+        });
     }
 
     @Override
@@ -532,17 +593,28 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
   //  Get Crypto Deposit History  GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
   @Override
-    ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
+  public ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+      // Step 2: Create query string with timestamp and recvWindow
+      String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
 
-        requestBuilder.uri(
-                URI.create(API_URL + "/sapi/v1/capital/deposit/hisrec")
-        );
+      // Step 3: Generate HMAC SHA256 signature using the API secret and query string
+      String signature = HmacSHA256(apiSecret, queryString);
 
-        HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+      // Step 4: Append the signature to the query string
+      queryString += "&signature=%s".formatted(signature);
+
+
+      // Step 6: Set the headers with the API key
+      requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+      String url0 = API_URL + "/sapi/v1/capital/deposit/hisrec";
+      requestBuilder.uri(URI.create(url0 + "?" + queryString));
+
+
+      HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if ( response.statusCode()!=200 ){
             new  Messages("Error", response.body());
-            throw new RuntimeException("HTTP error response: " + response.statusCode());
+            throw new RuntimeException("HTTP error response: " + response.body());
         }
         logger.info("Binance response: " + response.body());
 
@@ -557,17 +629,28 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
     //  Get Crypto Withdraw History  GET /sapi/v1/capital/withdraw/history (HMAC SHA256)
     @Override
-    ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
+    public ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+        // Step 2: Create query string with timestamp and recvWindow
+        String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
 
-        requestBuilder.uri(
-                URI.create("%s/sapi/v1/capital/withdraw/history".formatted(API_URL))
-        );
+        // Step 3: Generate HMAC SHA256 signature using the API secret and query string
+        String signature = HmacSHA256(apiSecret, queryString);
+
+        // Step 4: Append the signature to the query string
+        queryString += "&signature=%s".formatted(signature);
+
+
+        // Step 6: Set the headers with the API key
+        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
+        String url0 = "%s/sapi/v1/capital/withdraw/history".formatted(API_URL);
+        requestBuilder.uri(URI.create(url0 + "?" + queryString));
+
 
         HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
         if ( response.statusCode()!=200 ){
             new  Messages("Error", response.body());
-            throw new RuntimeException("HTTP error response: " + response.statusCode());
+            throw new RuntimeException("HTTP error response: " + response.body());
         }
         logger.info("Binance response: " , response.body());
 
@@ -578,4 +661,125 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         return withdraws;
     }
 
+    @Override
+    public List<Trade> getLiveTrades(List<TradePair> tradePairs) {
+        return List.of();
+    }
+
+
+    private static class BinanceUsCandleDataSupplier extends CandleDataSupplier {
+
+        protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+
+        BinanceUsCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        }
+
+        @Override
+        public Set<Integer> getSupportedGranularity() {
+            // Binance uses fixed time intervals (1m, 3m, 5m, etc.)
+            // Here we map them to seconds
+            return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400));
+        }
+
+        @Override
+        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+            return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair);
+        }
+
+        @Override
+        public CompletableFuture<List<CandleData>> get() {
+            if (endTime.get() == -1) {
+                endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
+            }
+
+            long endTimeMillis = (long) endTime.get() * 1000;
+            long startTimeMillis = Math.max(endTimeMillis - (numCandles * secondsPerCandle * 1000L), 1422144000000L); // earliest timestamp
+
+            // Binance uses string intervals for granularity like "1m", "5m", etc.
+            String interval = getBinanceInterval(secondsPerCandle);
+
+            // Construct the URL
+            String url = String.format("%s/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d",
+                    API_URL, tradePair.toString('/'), interval, startTimeMillis, endTimeMillis, numCandles);
+
+            logger.info("Fetching candle data for trade pair: {} from {} to {}", tradePair.toString('/'), startTimeMillis, endTimeMillis);
+
+            // Generate the correct signature for the request
+            long timestamp = System.currentTimeMillis();
+            String queryString = String.format("symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d&timestamp=%d",
+                    tradePair.toString('/'), interval, startTimeMillis, endTimeMillis, numCandles, timestamp);
+
+            @NotNull String signature;
+            try {
+                signature = HmacSHA256(apiSecret, queryString); // Generate the signature using HmacSHA256
+            } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Append signature to the query string
+            String signedUrl = "%s&signature=%s".formatted(url, signature);
+
+            // Prepare the request with headers and API key
+            requestBuilder.uri(URI.create(signedUrl));
+            requestBuilder.setHeader("X-MBX-APIKEY", apiKey); // Set API key in the header
+            requestBuilder.GET(); // Use GET method as required for klines
+
+            return client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        if (response.statusCode() != 200) {
+                            logger.error("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair.toString('/')));
+                            new Messages("Error", "Failed to fetch candle data\n%s".formatted(response));
+                            throw new RuntimeException("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair.toString('/')));
+                        }
+
+                        JsonNode res;
+                        try {
+                            res = OBJECT_MAPPER.readTree(response.body());
+                        } catch (JsonProcessingException ex) {
+                            throw new RuntimeException(ex);
+                        }
+
+                        if (!res.isEmpty()) {
+                            List<CandleData> candleData = new ArrayList<>();
+                            for (JsonNode candle : res) {
+                                candleData.add(new CandleData(
+                                        candle.get(1).asDouble(),  // open price
+                                        candle.get(4).asDouble(),  // close price
+                                        candle.get(2).asDouble(),  // high price
+                                        candle.get(3).asDouble(),  // low price
+                                        (int) (candle.get(0).asLong() / 1000L),  // open time (convert ms to seconds)
+                                        candle.get(5).asDouble()   // volume
+                                ));
+                            }
+                            candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
+                            endTime.set((int) (startTimeMillis / 1000));  // Update endTime for pagination
+                            return candleData;
+                        } else {
+                            logger.info("No candle data found for trade pair: %s".formatted(tradePair));
+                            return Collections.emptyList();
+                        }
+                    });
+        }
+
+
+        // Helper method to convert secondsPerCandle to Binance interval strings
+        private @NotNull String getBinanceInterval(int secondsPerCandle) {
+            return switch (secondsPerCandle) {
+                case 60 -> "1m";
+                case 180 -> "3m";
+                case 300 -> "5m";
+                case 900 -> "15m";
+                case 1800 -> "30m";
+                case 3600 -> "1h";
+                case 14400 -> "4h";
+                case 86400 -> "1d";
+                default -> throw new IllegalArgumentException("Unsupported granularity: " + secondsPerCandle);
+            };
+        }
+    }
 }

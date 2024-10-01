@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -29,7 +30,7 @@ import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
 public  class Coinbase extends Exchange {
-    ; // This argument is for creating a WebSocket client for live trading data.
+
     CustomWebSocketClient webSocketClient=new CustomWebSocketClient();
 
     String websocketURL="wss://advanced-trade-ws.coinbase.com";
@@ -44,6 +45,18 @@ public  class Coinbase extends Exchange {
         super(apikey, apiSecret);
         Exchange.apiSecret = apiSecret;
         this.apiKey = apikey;
+
+        requestBuilder.setHeader(
+                "Accept", "application/json"
+        );
+
+        requestBuilder.setHeader(
+                "Authorization", "Bearer " + apiSecret
+        );
+
+        requestBuilder.setHeader(
+                "Content-Type", "application/json"
+        );
     }
 
     @Override
@@ -79,8 +92,7 @@ public  class Coinbase extends Exchange {
         requestBuilder.uri(URI.create(
                 "%s/orders".formatted(API_URL)
         )) ;
-        requestBuilder.setHeader("Content-Type", "application/json");
-        requestBuilder.setHeader("Authorization", "Bearer %s".formatted(apiKey));
+
         requestBuilder.method("POST", HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(new CreateOrderRequest(
                 tradePair.toString('/'),
                 side,
@@ -103,7 +115,7 @@ public  class Coinbase extends Exchange {
     public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
 
         requestBuilder.uri(URI.create(
-                API_URL + "/orders/" + orderId
+                "%s/orders/%s".formatted(API_URL, orderId)
         )) ;
         requestBuilder.setHeader("Content-Type", "application/json");
         requestBuilder.setHeader("Authorization", "Bearer " + apiKey);
@@ -156,10 +168,10 @@ public  class Coinbase extends Exchange {
 
             for (int i = 0; !futureResult.isDone(); i++) {
                 String uriStr = API_URL;
-                uriStr += "/products/" + tradePair.toString('-') + "/trades";
+                uriStr += "/products/%s/trades".formatted(tradePair.toString('-'));
 
                 if (i != 0) {
-                    uriStr += "?after=" + afterCursor.get();
+                    uriStr += "?after=%d".formatted(afterCursor.get());
                 }
 
                 try {
@@ -232,7 +244,7 @@ public  class Coinbase extends Exchange {
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(response -> {
-                    logger.info("coinbase response: " + response);
+                    logger.info("coinbase candles data response: " + response);
                     JsonNode res;
                     try {
                         res = OBJECT_MAPPER.readTree(response);
@@ -258,16 +270,18 @@ public  class Coinbase extends Exchange {
                         if (currCandle.get(0).asInt() < currentCandleStartedAt.getEpochSecond() ||
                                 currCandle.get(0).asInt() >= currentCandleStartedAt.getEpochSecond() +
                                         secondsPerCandle) {
-                            // skip this sub-candle if it is not in the parent candle's duration (this is just a
-                            // sanity guard) TODO(mike): Consider making this a "break;" once we understand why
-                            //  Coinbase is  not respecting start/end times
+
                             continue;
                         } else {
                             if (!foundFirst) {
-                                // FIXME: Why are we only using the first sub-candle here?
+
                                 currentTill = currCandle.get(0).asInt();
                                 lastTradePrice = currCandle.get(4).asDouble();
                                 foundFirst = true;
+                            } else if (
+                                    currCandle.get(0).asInt() - currentTill > secondsPerCandle) {
+                                // We've reached the end of the parent candle's duration
+                                break;
                             }
                         }
 
@@ -299,7 +313,7 @@ public  class Coinbase extends Exchange {
     @Override
     public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
 
-        requestBuilder.uri(URI.create(API_URL + "/products/" + tradePair.toString('-') + "/book"));
+        requestBuilder.uri(URI.create("%s/products/%s/book".formatted(API_URL, tradePair.toString('-'))));
         HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("coinbase response: " + response.body());
         ObjectMapper objectMapper = new ObjectMapper();
@@ -332,8 +346,17 @@ public  class Coinbase extends Exchange {
     }
 
     @Override
-    public ObservableList<Order> getOrders() throws IOException, InterruptedException {
-        return null;
+    public ObservableList<Order> getOrders() throws IOException, InterruptedException, ExecutionException {
+
+        requestBuilder.uri(URI.create("%s/orders".formatted(API_URL)));
+        ObservableList<Order> orders = FXCollections.observableArrayList();
+        HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
+        logger.info("coinbase response: %s".formatted(response.body()));
+        ObjectMapper objectMapper = new ObjectMapper();
+        Order[] ordersArray = objectMapper.readValue(response.body(), Order[].class);
+        Collections.addAll(orders, ordersArray);
+        return orders;
+
     }
 
 
@@ -410,19 +433,33 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                 "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
         CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
 
-        dat= customWebSocketClient.sendWebSocketRequest(urls, message);
+
         logger.info("WebSocket",dat);
     }
 
 
     @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
+    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
+
+        String urls = websocketURL + "://" + tradePair.toString('-') + ":" + 20;
+        message =
+                "{\"type\": \"unsubscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
+        CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
+        logger.info("WebSocket", dat);
 
     }
 
     @Override
     public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-        return List.of();
+
+        String urls = websocketURL + "://" + symbol.toString('-') + ":" + 20;
+        message =
+                "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"ticker\",\"product_id\": \"%s\"}]}".formatted(symbol);
+        CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
+        logger.info("WebSocket", dat);
+        return Collections.emptyList();
+
+
     }
 
     @Override
@@ -453,13 +490,18 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     }
 
     @Override
-    ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
+    public ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
         return null;
     }
 
     @Override
-    ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
+    public ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
         return null;
+    }
+
+    @Override
+    public List<Trade> getLiveTrades(List<TradePair> tradePairs) {
+        return List.of();
     }
 
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+        "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping>
+
+    <class name="org.investpro.Currency" table="currencies">
+        <id name="id" type="string" column="currency_id">
+            <generator class="native"/>
+        </id>
+        <property name="code" type="string"/>
+        <property name="currencyType" type="string"/>
+        <property name="symbol" type="string"/>
+    </class>
+
+
+    <!-- Add other mappings here -->
+
+</hibernate-mapping>

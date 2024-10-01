@@ -1,7 +1,6 @@
 package org.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,8 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -134,6 +131,7 @@ public class Oanda extends Exchange {
                         tags.add(tagsArray.getString(j));
                     }
                     account0.setTags(tags);
+
                 }
 
                 accounts.add(account0);
@@ -165,7 +163,7 @@ public class Oanda extends Exchange {
         ));
 
         CreateOrderRequest orderRequest = new CreateOrderRequest(
-                tradePair.toString('-'),
+                tradePair.toString('_'),
                 side,
                 orderType,
                 price,
@@ -265,7 +263,7 @@ public class Oanda extends Exchange {
         return client.sendAsync(
                         requestBuilder.uri(URI.create(String.format(
                                         "%s/instruments/%s/candles?granularity=%s&from=%s", API_URL,
-                                        tradePair.toString('-'),
+                                        tradePair.toString('_'),
                                         getOandaGranularity(secondsPerCandle),
                                         startDateString
                                 )))
@@ -274,7 +272,7 @@ public class Oanda extends Exchange {
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(response -> {
-                    logger.info("OANDA response: " + response);
+                    logger.info("OANDA response: %s".formatted(response));
                     JsonNode res;
                     try {
                         res = new ObjectMapper().readTree(response);
@@ -336,7 +334,7 @@ public class Oanda extends Exchange {
     public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
         requestBuilder.uri(URI.create("%s/instruments/%s/orderBook".formatted(API_URL, tradePair.toString('_'))));
 
-        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
+        HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("OANDA response: " , response.body());
         ObjectMapper objectMapper = new ObjectMapper();
         OrderBook orderBook = objectMapper.readValue(response.body(), OrderBook.class);
@@ -344,14 +342,14 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public Position getPositions() throws IOException, InterruptedException, ExecutionException {
+    public Position getPositions() throws IOException, InterruptedException {
         // OANDA position book can be fetched if needed
 
         requestBuilder.uri(URI.create("%s/accounts/%s/positions".formatted(API_URL, account_id)));
-               HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
        if ( response.statusCode()!=200)
        {
-           new Messages("Error","Error fetching positions: "+ response.body());
+           new Messages("Error", "Error fetching positions: %s".formatted(response.body()));
            throw new RuntimeException("Error fetching positions: %d".formatted(response.statusCode()));
        }
 
@@ -464,13 +462,18 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
     }
 
     @Override
-    ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
+    public ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
         return null;
     }
 
     @Override
-    ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
+    public ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
         return null;
+    }
+
+    @Override
+    public List<Trade> getLiveTrades(List<TradePair> tradePairs) {
+        return List.of();
     }
 
     // OANDA supported granularity (intervals)
@@ -534,9 +537,7 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
         }
 
         public static int getTimeFromString(@NotNull String timeString) {
-    //        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
-    //                "yyyy-MM-dd'T'HH:mm:ss"
-    //        );
+
             int tim = (int) Instant.parse(timeString).getEpochSecond();
             logger.info(STR."Created timestamp: \{timeString + tim}");
             return tim;

@@ -1,110 +1,50 @@
 package org.investpro;
 
-import javax.sql.DataSource;
+
+import weka.gui.beans.DataSource;
+
+import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
 public interface Db extends DataSource {
 
-    Connection getConn();
+  void dropTables();
 
-    void createTables() throws SQLException;
-
-    void dropTables();
-
-    void truncateTables();
-
-    void insertData();
-
-    void updateData();
-
-    void deleteData();
-
-    void createIndexes();
-
-    void dropIndexes();
-
-    void truncateIndexes();
-
-    void createConstraints();
-
-    void dropConstraints();
-
-    void close();
-
-    String getDbName();
-
-    void setDbName(String dbName);
-
-    String getUserName();
-
-    void setUserName(String userName);
-
-    String getPassword();
-
-    void setPassword(String password);
-
-    String getUrl();
-
-    void setUrl(String url);
-
-    String getDriverClassName();
-
-    String getJdbcUrl();
-
-    String getJdbcUsername();
-
-    String getJdbcPassword();
-
-    String getJdbcDriverClassName();
-
-    int find(
-            String table,
-            String column,
-            String value
-    );
-
-    void findAll(
-            String table,
-            String column,
-            String value
-    );
-
-    void update(
-            String table,
-            String column,
-            String value
-    );
-
-    void insert(
-            String table,
-            String column,
-            String value
-    );
-
-    void delete(
-            String table,
-            String column,
-            String value
-    );
-
-    void create(
-            String table,
-            String column,
-            String value
-    );
-
-    void findById(
-            String table,
-            String column,
-            String value
-    );
+  Connection getConn() throws SQLException;
 
 
-    void save(ArrayList<Currency> currency) throws SQLException;
+  void createTables() throws SQLException;
 
-    Currency getCurrency(String code) throws SQLException, ClassNotFoundException;
+  void truncateTables();
+
+  void insert(
+          String tableName,
+          String columnName,
+          String value
+  ) throws SQLException;
+
+  void update(
+          String tableName,
+          String columnName,
+          String value
+  ) throws SQLException;
 
 
+  Connection getConnection(String username, String password) throws SQLException;
+
+  void setLogWriter(PrintWriter out) throws SQLException;
+
+  void close();
+
+  // Additional CRUD operations
+  Currency getCurrency(String code) throws SQLException;
+
+  void save(ArrayList<Currency> currency) throws SQLException;
+
+  int find(String table, String column, String value) throws SQLException;
+
+
+  Connection getConnection() throws SQLException;
 }

@@ -1,5 +1,6 @@
 package org.investpro;
 
+import jakarta.persistence.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -9,19 +10,36 @@ import java.util.Objects;
 /**
  * @author Noel Nguemechieu
  */
+@Entity
+@Table(name = "candle_data")
 public class CandleData {
-    private double openPrice=0;
-    private double closePrice=0;
-    private double highPrice=0;
-    private double lowPrice=0;
-    private int openTime=0;
-    private static double volume=0;
-    private double averagePrice=0;
-    private double volumeWeightedAveragePrice=0;
-    private boolean placeHolder=false;
 
-    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime,
-                      double volume) {
+    @Column(name = "volume", nullable = false)
+    private static double volume = 0;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", updatable = false, nullable = false)
+    private Long id;
+    @Column(name = "open_price", nullable = false)
+    private double openPrice = 0;
+    @Column(name = "close_price", nullable = false)
+    private double closePrice = 0;
+    @Column(name = "high_price", nullable = false)
+    private double highPrice = 0;
+    @Column(name = "low_price", nullable = false)
+    private double lowPrice = 0;
+    @Column(name = "open_time", nullable = false)
+    private int openTime = 0;
+    @Column(name = "average_price")
+    private double averagePrice = 0;
+
+    @Column(name = "volume_weighted_average_price")
+    private double volumeWeightedAveragePrice = 0;
+
+    @Transient
+    private boolean placeHolder = false;
+
+    public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime, double volume) {
         this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
                 volume * ((highPrice + lowPrice) / 2), false);
     }
@@ -40,7 +58,6 @@ public class CandleData {
         this.placeHolder = placeHolder;
     }
 
-
     public CandleData(double aDouble, double aDouble1, double aDouble2, double aDouble3, int anInt, int closeTime, double volume) {
         this(aDouble, aDouble1, aDouble2, aDouble3, anInt, volume, (aDouble + aDouble1 + aDouble2 + aDouble3) / 4,
                 volume * ((aDouble + aDouble1 + aDouble2 + aDouble3) / 4), false);
@@ -53,16 +70,14 @@ public class CandleData {
         this.highPrice = highPrice;
         this.lowPrice = lowPrice;
         CandleData.volume = volume;
-        this.averagePrice = (openPrice +  highPrice+ lowPrice+ closePrice) / 4;
-        this.volumeWeightedAveragePrice = volume * ((openPrice+lowPrice+closePrice+highPrice) / 4);
+        this.averagePrice = (openPrice + highPrice + lowPrice + closePrice) / 4;
+        this.volumeWeightedAveragePrice = volume * ((openPrice + lowPrice + closePrice + highPrice) / 4);
         this.placeHolder = false;
 
     }
 
     public CandleData() {
-
     }
-
 
     @Contract("_, _, _, _, _ -> new")
     public static @NotNull CandleData of(long timestamp, double open, double high, double low, double close) {
@@ -110,7 +125,7 @@ public class CandleData {
     public boolean equals(Object object) {
         if (object == this) {
             return true;
-        }else if (object == null || object.getClass() != getClass()) {
+        } else if (object == null || object.getClass() != getClass()) {
             return false;
         }
         CandleData other = (CandleData) object;
@@ -136,5 +151,13 @@ public class CandleData {
         return String.format("CandleData [openPrice = %f, closePrice = %f, highPrice = %f, lowPrice = %f, " +
                         "openTime = %d, volume = %f, placeHolder = %b]", openPrice, closePrice, highPrice, lowPrice,
                 openTime, volume, placeHolder);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 }

@@ -1,13 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <persistence xmlns="https://jakarta.ee/xml/ns/persistence"
-             version="3.0">
-    <persistence-unit name="InvestPro">
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
+             version="3.1">
+
+    <persistence-unit name="default" transaction-type="RESOURCE_LOCAL">
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
-        <class>org.investpro.InvestPro</class>
+
+        <!-- List of entity classes -->
+        <class>org.investpro.Currency</class>
+        <class>org.investpro.User</class>
+        <class>org.investpro.PortfolioItem</class>
+        <class>org.investpro.Order</class>
+        <class>org.investpro.TradePair</class>
+        <class>org.investpro.CandleData</class>
+
         <properties>
-            <!-- SQLite specific configuration -->
-            <property name="jakarta.persistence.jdbc.url" value="jdbc:sqlite:InvestPro"/>
+            <!-- Database connection settings -->
+            <property name="jakarta.persistence.jdbc.url" value="jdbc:sqlite:InvestPro.db"/>
             <property name="jakarta.persistence.jdbc.driver" value="org.sqlite.JDBC"/>
-            <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
+            <property name="jakarta.persistence.jdbc.user" value="root"/>
+            <property name="jakarta.persistence.jdbc.password" value="root000"/>
+
+            <!-- Hibernate-specific properties -->
+            <property name="hibernate.dialect" value="org.hibernate.dialect.SQLServerDialect"/>
+            <property name="hibernate.show_sql" value="true"/>
+            <property name="hibernate.format_sql" value="true"/>
             <property name="hibernate.hbm2ddl.auto" value="update"/>
 
 
