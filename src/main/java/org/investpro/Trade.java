@@ -74,7 +74,7 @@ public class Trade {
         this.timestamp = time;
     }
 
-    public Trade(double price, double qty, Instant time) throws SQLException, ClassNotFoundException {
+    public Trade(double price, double qty, Instant time) throws Exception {
         this.price =Money.of(BigDecimal.valueOf(price));
         this.amount = Money.of(BigDecimal.valueOf(qty));
         this.timestamp = time;

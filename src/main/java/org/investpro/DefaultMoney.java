@@ -63,8 +63,20 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     public static Money of(BigDecimal amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return switch (currencyType) {
-            case FIAT -> new DefaultMoney(amount, Currency.ofFiat(currencyCode));
-            case CRYPTO -> new DefaultMoney(amount, Currency.ofCrypto(currencyCode));
+            case FIAT -> {
+                try {
+                    yield new DefaultMoney(amount, Currency.ofFiat(currencyCode));
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            case CRYPTO -> {
+                try {
+                    yield new DefaultMoney(amount, Currency.ofCrypto(currencyCode));
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
             default -> throw new IllegalArgumentException("unknown currency type: %s".formatted(currencyType));
         };
     }

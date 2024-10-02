@@ -3,7 +3,8 @@ package org.investpro;
 import java.util.List;
 import java.util.Locale;
 
-import static org.investpro.InvestPro.db1;
+import static org.investpro.Currency.db1;
+
 
 /**
  * Provides data for fiat currencies (actual paper money currencies provided by
@@ -56,7 +57,7 @@ public class FiatCurrencyDataProvider extends CurrencyDataProvider {
 
         for (FiatCurrency c : list) {
 
-            db1.getConn().createStatement().executeUpdate(STR."INSERT INTO currencies (currency_type, full_display_name, short_display_name, code, fractional_digits, symbol, image ) VALUES ('FIAT', '\{c.getFullDisplayName()}', '\{c.getShortDisplayName()}', '\{c.getCode()}', \{c.getFractionalDigits()}, '\{c.getSymbol()}', '\{c.getCode()}.png')");
+            db1.entityManager.createNativeQuery(STR."INSERT INTO currencies (currency_type, full_display_name, short_display_name, code, fractional_digits, symbol, image ) VALUES ('FIAT', '\{c.getFullDisplayName()}', '\{c.getShortDisplayName()}', '\{c.getCode()}', \{c.getFractionalDigits()}, '\{c.getSymbol()}', '\{c.getCode()}.png')");
         }
     }
 

@@ -12,7 +12,6 @@ public interface Db extends DataSource {
 
   void dropTables();
 
-  Connection getConn() throws SQLException;
 
 
   void createTables() throws SQLException;
@@ -39,7 +38,7 @@ public interface Db extends DataSource {
   void close();
 
   // Additional CRUD operations
-  Currency getCurrency(String code) throws SQLException;
+  Currency getCurrency(String code) throws Exception;
 
   void save(ArrayList<Currency> currency) throws SQLException;
 

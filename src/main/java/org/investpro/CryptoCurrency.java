@@ -29,6 +29,7 @@ public class CryptoCurrency extends Currency {
         this.fullDisplayName = fullDisplayName;
         this.shortDisplayName = shortDisplayName;
         this.image = image;
+        this.currencyType = CurrencyType.CRYPTO;
 
 
     }

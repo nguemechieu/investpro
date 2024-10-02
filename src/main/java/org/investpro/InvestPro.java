@@ -7,64 +7,47 @@ import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
-import java.sql.SQLException;
-import java.text.ParseException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
-//This is InvestPro's main class
+import static org.investpro.Exchange.logger;
+
 public class InvestPro extends Application {
 
-
-    static final DbHibernate db1;
-
-    static {
-        db1 = new DbHibernate();
-    }
-
-
-    public InvestPro() throws SQLException {
-        super();
-
-
-
-
-
-    }
-
-    public static void main(String[] args) throws SQLException {
-        InvestPro app = new InvestPro();
-        app.executeTransaction();
-        launch(args);
-    }
-
-    public void executeTransaction() throws SQLException {
-
-        // Perform your database operations here.
-
-        db1.createTables();// create all required tab
-
+    public static void main(String[] args) {
+        launch(args);  // JavaFX will handle the application lifecycle
     }
 
     @Override
-    public void start(@NotNull Stage primaryStage) throws SQLException, ClassNotFoundException, ParseException, IOException, InterruptedException {
-        Scene scene = new Scene(new TradingWindow());
-        primaryStage.setResizable(true);
-        primaryStage.setOnCloseRequest(_ -> Platform.exit());
-        primaryStage.setTitle("InvestPro                  --------- Copyright 2020-%s".formatted(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
-        primaryStage.setScene(scene);
+    public void start(@NotNull Stage primaryStage) {
+        try {
+            // Set window icon
+            Image icon = new Image(Objects.requireNonNull(InvestPro.class.getResource("/investpro.png")).toExternalForm());
+            primaryStage.getIcons().add(icon);
 
-        primaryStage.fullScreenProperty().addListener((_, _, newValue) -> primaryStage.setFullScreen(newValue));
-        scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
-        Image icon = new Image(
-                Objects.requireNonNull(InvestPro.class.getResource("/investpro.png")).toExternalForm()
-        );
-        primaryStage.getIcons().add(icon);
-        primaryStage.show();
+            // Setup the primary scene
+            Scene scene = new Scene(new TradingWindow(), 1540, 780);
+            scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
 
+            // Setup the stage
+            primaryStage.setTitle(String.format("InvestPro - Copyright 2020-%s",
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy"))));
+            primaryStage.setResizable(true);
+            primaryStage.setOnCloseRequest(event -> Platform.exit());
+
+            // Optional fullscreen listener
+            primaryStage.fullScreenProperty().addListener((observable, oldValue, newValue) ->
+                    primaryStage.setFullScreen(newValue));
+
+            // Set the scene and display the stage
+            primaryStage.setScene(scene);
+            primaryStage.show();
+
+        } catch (Exception e) {
+            // Handle exception in the JavaFX start process
+            logger.error(e.getMessage(), e);
+            Platform.exit();  // Exit the application if initialization fails
+        }
     }
-
-
 }

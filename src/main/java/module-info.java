@@ -30,9 +30,8 @@ module investpro {
 
     requires jcip.annotations;
 
-    requires jakarta.inject;
-
     requires io.ebean.annotation;
+
 
 
     opens org.investpro to javafx.fxml, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, org.json, io.github.cdimascio.dotenv.java, bounce, jakarta.persistence, org.hibernate.orm.core, weka.stable, javafx.swing;

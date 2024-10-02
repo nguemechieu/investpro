@@ -14,21 +14,6 @@ public class FiatCurrency extends Currency {
     String centralBank;
     int numericCode;
 
-    protected FiatCurrency() throws Exception {
-        super(
-                CurrencyType.FIAT,
-                "United States Dollar",
-                "USD",
-                "USD",
-                2,
-                "$",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/320px-Flag_of_the_United_States.svg.png"
-        );
-        locale = Locale.US;
-        centralBank = "XXX";
-        numericCode = -1;
-    }
-
     protected FiatCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
                            String symbol, Locale locale, String centralBank, int numericCode) throws Exception {
         super(CurrencyType.FIAT, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4");
@@ -43,6 +28,8 @@ public class FiatCurrency extends Currency {
         this.locale = locale;
         this.centralBank = centralBank;
         this.numericCode = numericCode;
+
+        this.currencyType = CurrencyType.FIAT;
     }
 
     public Locale getLocale() {

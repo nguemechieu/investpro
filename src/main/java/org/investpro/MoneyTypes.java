@@ -4,4 +4,5 @@ public interface MoneyTypes {
     int[] sqlTypes();
 
     String getCurrencyCode();
+
 }

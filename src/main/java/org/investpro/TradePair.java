@@ -1,23 +1,43 @@
 package org.investpro;
 
+import jakarta.persistence.*;
 import javafx.util.Pair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@Entity
+@Table(name = "trade_pairs")
 public class TradePair extends Pair<Currency, Currency> {
 
     private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
-    private final Currency baseCurrency;
-    private final Currency counterCurrency;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "base_currency_id", referencedColumnName = "id")
+    private Currency baseCurrency;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "counter_currency_id", referencedColumnName = "id")
+    private Currency counterCurrency;
+
+
+
+
+    @Column(name = "bid", nullable = false)
     private double bid;
+
+    @Column(name = "ask", nullable = false)
     private double ask;
 
     public TradePair(@NotNull Currency baseCurrency, @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {
@@ -33,12 +53,24 @@ public class TradePair extends Pair<Currency, Currency> {
         logger.debug("TradePair created: {} / {}", baseCurrency.getCode(), counterCurrency.getCode());
     }
 
-    public TradePair(@NotNull String baseCurrency, @NotNull String counterCurrency) throws SQLException, ClassNotFoundException {
-        this(Objects.requireNonNull(Currency.of(baseCurrency)), Objects.requireNonNull(Currency.of(counterCurrency)));
+
+
+    public TradePair(
+            @NotNull String baseCurrencyCode,
+            @NotNull String counterCurrencyCode
+    ) throws Exception {
+        super(
+                Currency.of(baseCurrencyCode),
+                Currency.of(counterCurrencyCode)
+        );
+    }
+
+    public TradePair() throws Exception {
+        super(new NullCryptoCurrency(),new NullFiatCurrency());
     }
 
     @Contract("_, _ -> new")
-    public static @NotNull TradePair of(@NotNull String baseCurrencyCode, @NotNull String counterCurrencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull TradePair of(@NotNull String baseCurrencyCode, @NotNull String counterCurrencyCode) throws Exception {
         return new TradePair(baseCurrencyCode, counterCurrencyCode);
     }
 
@@ -52,7 +84,7 @@ public class TradePair extends Pair<Currency, Currency> {
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
 
-    public static <T extends Currency, V extends Currency> @NotNull TradePair parse(@NotNull String tradePair, @NotNull String separator, @NotNull Pair<Class<T>, Class<V>> pairType) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
+    public static <T extends Currency, V extends Currency> @NotNull TradePair parse(@NotNull String tradePair, @NotNull String separator, @NotNull Pair<Class<T>, Class<V>> pairType) throws CurrencyNotFoundException, Exception {
         Objects.requireNonNull(tradePair, "TradePair must not be null");
         Objects.requireNonNull(pairType, "PairType must not be null");
 

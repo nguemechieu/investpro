@@ -54,50 +54,50 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return new FastMoney(amount, currency, precision);
     }
 
-    public static @NotNull Money of(final double amount, final @NotNull Currency currency) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(final double amount, final @NotNull Currency currency) throws Exception {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static @NotNull Money of(final double amount, final @NotNull Currency currency, int precision) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(final double amount, final @NotNull Currency currency, int precision) throws Exception {
         return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
     }
 
-    public static @NotNull Money ofFiat(long amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(long amount, final String currencyCode) throws Exception {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         return ofFiat(amount, currencyCode, Currency.ofFiat(currencyCode).getFractionalDigits());
     }
 
-//    @Contract("_, _, _ -> new")
-//    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
-//        Objects.requireNonNull(currencyCode, "currencyCode must not be null");
-//        Currency currency = Currency.ofFiat(currencyCode);
-//        amount *= (long) Math.pow(10, precision);
-//        return new FastMoney(amount, currency, precision);
-//    }
+    @Contract("_, _, _ -> new")
+    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) throws Exception {
+        Objects.requireNonNull(currencyCode, "currencyCode must not be null");
+        Currency currency = Currency.ofFiat(currencyCode);
+        amount *= (long) Math.pow(10, precision);
+        return new FastMoney(amount, currency, precision);
+    }
 
-    public static @NotNull Money ofFiat(double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(double amount, final String currencyCode) throws Exception {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.FIAT);
     }
 
-    public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) throws Exception {
         return fromDouble(amount, precision, currencyCode, CurrencyType.FIAT);
     }
 
 
     @Contract("_, _, _ -> new")
-    public static @NotNull Money ofCrypto(double amount, final String currencyCode, int precision) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofCrypto(double amount, final String currencyCode, int precision) throws Exception {
         Currency currency = Currency.ofCrypto(currencyCode);
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
-    public static @NotNull Money ofCrypto(final double amount, final String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money ofCrypto(final double amount, final String currencyCode) throws Exception {
         return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.CRYPTO);
     }
 
 
     private static @NotNull Money fromDouble(final double value, final int precision, final String currencyCode,
-                                             final CurrencyType currencyType) throws SQLException, ClassNotFoundException {
+                                             final CurrencyType currencyType) throws Exception {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         Objects.requireNonNull(currencyType, "currencyType must not be null");
         Utils.checkPrecision(precision);
@@ -242,7 +242,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Money plus(double summand) throws SQLException, ClassNotFoundException {
+    public Money plus(double summand) throws Exception {
         return plus(FastMoney.of(summand, currency));
     }
 
@@ -303,7 +303,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Money multiply(double multiplicand) throws SQLException, ClassNotFoundException {
+    public Money multiply(double multiplicand) throws Exception {
         return fromDouble(amount * multiplicand / Utils.MULTIPLIERS[precision], precision, currency.getCode(), currency.getCurrencyType());
     }
 
@@ -318,7 +318,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Money divide(double divisor) throws SQLException, ClassNotFoundException {
+    public Money divide(double divisor) throws Exception {
         return fromDouble(amount / divisor / Utils.MULTIPLIERS[precision], precision, currency.getCode(), currency.getCurrencyType());
     }
 

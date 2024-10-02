@@ -21,6 +21,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -30,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
+import static org.investpro.BinanceUtils.generateSignature;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
 public class BinanceUS extends Exchange {
@@ -451,32 +453,56 @@ public class BinanceUS extends Exchange {
 
 
     @Override
-    public CompletableFuture<ArrayList<TradePair>> getTradePairs() {
-        requestBuilder.uri(URI.create("%s/exchangeInfo".formatted(API_URL)));
+    public CompletableFuture<ArrayList<TradePair>> getTradePairs() throws Exception {
+        requestBuilder.uri(URI.create("https://api.binance.us/api/v3/exchangeInfo"));
+        //requestBuilder.header("X-MBX-APIKEY", apiKey);
+       // String dat = generateSignature(String.valueOf(timestamp), apiSecret);
+
+        //requestBuilder.method("GET", HttpRequest.BodyPublishers.ofString(dat));
 
         ArrayList<TradePair> tradePairs = new ArrayList<>();
-        try {
-            HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
-            JsonNode res = new ObjectMapper().readTree(response.body());
+
+            HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                logger.error("Error fetching trade pairs: HTTP status code %s", response.statusCode());
+                new Messages("Warning", "Error fetching trade pairs: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
+                throw new IllegalStateException(
+                        "Error fetching trade pairs: HTTP status code %s,/%s".formatted(response.statusCode(), response.body())
+                );
+            }
+
+
+
+            JsonNode res = OBJECT_MAPPER.readTree(response.body());
             logger.info("Binance US response: %s".formatted(res));
 
             JsonNode symbols = res.get("symbols");
             for (JsonNode symbol : symbols) {
                 String baseAsset = symbol.get("baseAsset").asText();
                 String quoteAsset = symbol.get("quoteAsset").asText();
-                TradePair tp = new TradePair(baseAsset, quoteAsset);
+                TradePair tp = new TradePair(Objects.requireNonNull(CryptoCurrency.of(baseAsset)),CryptoCurrency.ofCrypto( quoteAsset));
                 tradePairs.add(tp);
                 logger.info("Binance US trade pair: %s".formatted(tp));
+
             }
+            new DbHibernate().save((ArrayList<Currency>) tradePairs.stream().map(
 
-        } catch (Exception e) {
-            logger.error("Error fetching trade pairs: %s".formatted(e.getMessage()));
-            new Messages("Error fetching BINANCE US  trade pairs: ", e.getMessage());
-            throw new IllegalStateException(
-                    "Error fetching trade pairs: %s".formatted(e.getMessage())
-            );
+                    TradePair::getBaseCurrency
+            ).toList());
 
-        }
+        new DbHibernate().save((ArrayList<Currency>) tradePairs.stream().map(
+
+                TradePair::getCounterCurrency
+        ).toList());
+
+
+
+
+
+
+
+
         return CompletableFuture.completedFuture(tradePairs);
     }
 CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();

@@ -395,7 +395,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public CompletableFuture<ArrayList<TradePair>> getTradePairs() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
+    public CompletableFuture<ArrayList<TradePair>> getTradePairs() throws Exception {
 
         String urls = "%s/accounts/%s/instruments".formatted(API_URL, account_id);
         requestBuilder.uri(URI.create(urls));

@@ -4,35 +4,45 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.investpro.Coinbase.client;
-import static org.investpro.Coinbase.requestBuilder;
 
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(CryptoCurrencyDataProvider.class);
     private static final ArrayList<CoinInfo> coinInfoList = new ArrayList<>();
     private final ArrayList<Currency> coinsToRegister = new ArrayList<>();
+    private static final int REQUEST_DELAY = 1000 * 60 * 6; // 2000 ms delay between requests
 
     public CryptoCurrencyDataProvider() {
         logger.info("CryptoCurrencyDataProvider initialized.");
     }
 
-    @Contract("_ -> new")
-    private static HttpResponse<String> fetchJsonResponse(String jsonUrl) throws IOException, InterruptedException {
-        requestBuilder.uri(URI.create(jsonUrl)).header("Accept", "application/json").GET();
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+    private static @NotNull HttpResponse<String> fetchJsonResponse(String jsonUrl) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(jsonUrl))
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new IOException(String.format("Failed to fetch data: HTTP error code %d", response.statusCode()));
+
+            logger.error("Error fetching response:%s".formatted(response.body())
+            );
         }
 
         return response;
@@ -43,73 +53,100 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
     }
 
     public String getCurrencyImage(String baseCurrency) throws Exception {
-        baseCurrency = "BTC";
         String jsonUrl = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=%s".formatted(baseCurrency);
 
-        // Fetch and parse JSON response
-        requestBuilder.uri(URI.create(jsonUrl));
         HttpResponse<String> jsonResponse = null;
-
-        // Add a retry mechanism with delay
         int retries = 3;
-        int delay = 2000; // delay in milliseconds
+        int delay = 1000 * 60 * 6; // 6 minutes
+
+
+
         while (retries > 0) {
             try {
-                jsonResponse = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(jsonUrl))
+                        .header("Accept", "application/json")
+                        .GET()
+                        .build();
 
-                if (jsonResponse.statusCode() != 200) {
-                    throw new IOException(String.format("Failed to fetch data: HTTP error code %d", jsonResponse.statusCode()));
-                }
+                jsonResponse = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-                // Process the response here
-                break; // Exit loop on successful response
-            } catch (IOException e) {
-                if (jsonResponse != null && jsonResponse.statusCode() == 429) {
-                    logger.warn("Rate limit hit, retrying in %d seconds...".formatted(delay / 1000));
-                    Thread.sleep(delay); // Sleep before retry
+                if (jsonResponse.statusCode() == 200) {
+                    logger.info("Image fetched successfully for base currency: {}", baseCurrency);
+                    break;
                 } else {
-                    throw e;
+                    logger.error("Failed to fetch data: HTTP error code {}", jsonResponse.statusCode());
+                }
+            } catch (IOException e) {
+                logger.error("Error fetching currency image: {}", e.getMessage());
+                if (jsonResponse != null && jsonResponse.statusCode() == 429) {
+                    logger.warn("Rate limit hit, retrying in {} seconds...", delay / 1000);
+                    Thread.sleep(delay);
+                } else {
+                    throw e; // Throw exception for other IOExceptions
                 }
             }
             retries--;
         }
 
         if (retries == 0) {
-            throw new IOException("Failed to fetch data after retries.");
+            logger.error("Failed to fetch image after retries.");
+            return "N/A"; // Fallback
         }
 
-        // Continue processing the response...
-        return "Processed Image URL"; // Placeholder
+        JsonArray jsonArray = new Gson().fromJson(jsonResponse.body(), JsonArray.class);
+        if (!jsonArray.isEmpty()) {
+            JsonObject coinData = jsonArray.get(0).getAsJsonObject();
+            return coinData.get("image").getAsString(); // Assuming the API returns an "image" field
+        }
+
+        return "N/A"; // Fallback if no image is found
     }
 
     public void registerCurrencies() throws Exception {
         String jsonUrl = "https://api.coingecko.com/api/v3/coins/list";
 
-        HttpResponse<String> response = null;
-        try {
-            response = fetchJsonResponse(jsonUrl);
-            // Process the response here
-        } catch (IOException e) {
-            if (e.getMessage().contains("429")) {
-                logger.error("Rate limit exceeded: {}", e.getMessage());
-            } else {
-                logger.error("Failed to fetch data: {}", e.getMessage());
-            }
-        }
-
-        assert response != null;
-
+        HttpResponse<String> response = fetchJsonResponse(jsonUrl);
         Gson gson = new Gson();
         JsonArray coinArray = gson.fromJson(response.body(), JsonArray.class);
 
-        for (JsonElement element : coinArray) {
-            JsonObject coinJson = element.getAsJsonObject();
+        for (JsonElement coinElement : coinArray) {
+            JsonObject coinJson = coinElement.getAsJsonObject();
             String id = coinJson.get("id").getAsString();
             String symbol = coinJson.get("symbol").getAsString().toUpperCase();
+            String name = coinJson.get("name").getAsString();
 
-            String image = getCurrencyImage(id);
+            CryptoCurrency coin = new CryptoCurrency(name, id, id, 8, symbol, name);
+            coinsToRegister.add(coin);
 
-            logger.info("Currency: {}, Image: {}", symbol, image);
+            logger.info("Registered currency: {}", coin);
         }
+
+        // Schedule requests with a delay of 2000 ms between them
+        ScheduledExecutorService scheduler = newScheduledThreadPool(1);
+        Runnable task = new Runnable() {
+            int index = 0;
+
+            @Override
+            public void run() {
+                if (index < coinsToRegister.size()) {
+                    Currency coin = coinsToRegister.get(index);
+                    try {
+                        coin.image = getCurrencyImage(coin.code);
+                        logger.info("Updated currency {} with image URL: {}", coin.code, coin.image);
+                    } catch (Exception e) {
+                        logger.error("Failed to update image for currency {}: {}", coin.code, e.getMessage());
+                        coin.image = "N/A"; // Set fallback if image fetching fails
+                    }
+                    index++;
+                } else {
+                    // Shut down the scheduler once all coins are processed
+                    scheduler.shutdown();
+                }
+            }
+        };
+
+        // Schedule the task with a fixed delay between executions
+        scheduler.scheduleWithFixedDelay(task, 0, REQUEST_DELAY, TimeUnit.MILLISECONDS);
     }
 }

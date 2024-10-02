@@ -22,10 +22,16 @@ public class MoneyType implements UserType<Money>, MoneyTypes {
         return new int[]{Types.DECIMAL};
     }
 
+    /**
+     * @return
+     */
     @Override
     public String getCurrencyCode() {
-        return "";
+        return
+                // Replace this with your actual currency code
+                "USD";
     }
+
 
     @Override
     public int getSqlType() {
@@ -65,7 +71,7 @@ public class MoneyType implements UserType<Money>, MoneyTypes {
     public Money deepCopy(Money value) {
         try {
             return value != null ? Money.of(value.toBigDecimal()) : null;
-        } catch (SQLException | ClassNotFoundException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -77,7 +83,7 @@ public class MoneyType implements UserType<Money>, MoneyTypes {
 
     @Override
     public Serializable disassemble(Money value) {
-        return value != null ? value.toBigDecimal() : null;
+        return value != null ? value.toBigDecimal() : 0;
 
     }
 

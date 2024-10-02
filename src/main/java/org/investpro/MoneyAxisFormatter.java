@@ -36,13 +36,13 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
         if (currency.getCurrencyType() == CurrencyType.FIAT) {
             try {
                 return format.format(FastMoney.ofFiat(number.doubleValue(), currency.getCode(), precision));
-            } catch (SQLException | ClassNotFoundException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         } else {
             try {
                 return format.format(FastMoney.ofCrypto(number.doubleValue(), currency.getCode(), precision));
-            } catch (SQLException | ClassNotFoundException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }

@@ -18,8 +18,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import static org.investpro.InvestPro.db1;
-
 
 /**
  * An abstract base class for {@code Exchange} implementations without WebSocket.
@@ -173,24 +171,5 @@ public abstract class Exchange {
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
 
 
-    public Image getChartImage(TradePair selectedPair) throws SQLException {
 
-        // Get the currency image name from the data source
-        String currency = selectedPair.getCounterCurrency().image;
-        byte[] imageBytes = new byte[0];
-        // Load the image from the database
-        try (Connection conn = db1.getConnection()) {
-            PreparedStatement stmt = conn.prepareStatement("SELECT image FROM currencies WHERE image =?");
-            stmt.setString(1, currency);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                imageBytes = rs.getBytes("image");
-                return new Image(Arrays.toString(imageBytes));
-            }
-        } catch (SQLException e) {
-            logger.error("Error retrieving chart image for currency: {}", currency, e);
-        }
-        return null;
-
-    }
 }

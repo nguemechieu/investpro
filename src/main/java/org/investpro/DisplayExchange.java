@@ -79,8 +79,12 @@ public class DisplayExchange extends Region {
         Tab positionTab = createPositionTab();
         Tab orderTab = createOrderTab();
 
+        Tab coinInfoTab = new CoinInfoTab();
+
+
+
         // Adding all tabs to the main TabPane
-        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, positionTab, newsTab);
+        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, positionTab, newsTab, coinInfoTab);
         tradingTabPane.setPrefSize(1540, 780);
         tradingTabPane.setSide(Side.LEFT);
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
@@ -197,15 +201,7 @@ public class DisplayExchange extends Region {
         exchange.tradePair = selectedPair;
 
         Tab chartTab = new Tab(selectedPair.toString('-'));
-        chartTab.setGraphic(
-                new ImageView(
 
-
-                        exchange.getChartImage(selectedPair)
-
-
-                )
-        );
         CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange);
         chartDisplay.setPrefSize(1440, 700);
         chartTab.setContent(chartDisplay);

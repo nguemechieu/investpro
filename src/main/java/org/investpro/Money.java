@@ -14,7 +14,7 @@ import java.sql.SQLException;
 public interface Money {
     @Contract("_ -> new")
     @NotNull
-    static Money of(BigDecimal bd) throws SQLException, ClassNotFoundException {
+    static Money of(BigDecimal bd) throws Exception {
 
         return new DefaultMoney(bd, Currency.ofFiat("USD"));
 
@@ -29,17 +29,17 @@ public interface Money {
 
     Money plus(long summand);
 
-    Money plus(double summand) throws SQLException, ClassNotFoundException;
+    Money plus(double summand) throws Exception;
 
     Money multiply(long multiplicand);
 
-    Money multiply(double multiplicand) throws SQLException, ClassNotFoundException;
+    Money multiply(double multiplicand) throws Exception;
 
     Money multiply(BigDecimal multiplicand);
 
     Money divide(long divisor);
 
-    Money divide(double divisor) throws SQLException, ClassNotFoundException;
+    Money divide(double divisor) throws Exception;
 
     Money divide(BigDecimal divisor);
 
