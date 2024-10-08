@@ -118,7 +118,7 @@ public class DisplayExchange extends Region {
 
 
         acc.setContent(        new VBox(
-                new Label("Account ID: %s".formatted(account_details.get().getFirst().getAccountId())),
+                new Label("Account ID: %s".formatted(account_details.get().getFirst().getId())),
                 new Label("Balance: %s %s".formatted(account_details.get().getFirst().getBalance(), account_details.get().getFirst().getBalance())),
                 new Label("Created: %s".formatted(account_details.get().getFirst().getCreated())),
                 new Label("Guaranteed Stop Loss:  %s".formatted(account_details.get().getFirst().getGuaranteedStopLoss())),

@@ -87,7 +87,7 @@ import static org.investpro.CandleStickChartUtils.*;
  */
 public class CandleStickChart extends Region {
 
-    private static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
+    public static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
 
     private final CandleDataPager candleDataPager;
     private final CandleStickChartOptions chartOptions;
@@ -544,7 +544,7 @@ public class CandleStickChart extends Region {
                         (((int) currZoomLevel.getNumVisibleCandles()) * secondsPerCandle), true,
                 ((int) xAxis.getUpperBound() - secondsPerCandle) - (numCandlesToSkip * secondsPerCandle), true);
 
-        logger.info(STR."Drawing \{candlesToDraw.size()} candles.");
+        logger.info("Drawing " + candlesToDraw.size() + " candles.");
         if (chartOptions.isHorizontalGridLinesVisible()) {
             // Draw horizontal grid lines aligned with y-axis major tick marks
             for (Axis.TickMark<Number> tickMark : yAxis.getTickMarks()) {
@@ -741,23 +741,17 @@ public class CandleStickChart extends Region {
         // between candles and very few candles are on-screen).
         boolean skipLowMark = lowMarkYPos - highMarkYPos < canvasNumberFont.getSize() &&
                 candleIndexOfHighest == candleIndexOfLowest;
-        // TODO(mike): In addition to drawing the high/low markers to the left or right of the extrema, we should
-        //  also (or maybe instead) factor in how visible the marker will be. This can be determined by seeing
-        //  if it will be obscured by neighboring candles (if there is very low volatility, for example). See
-        //  obscure.png for an example of where the marker is obscured by neighboring candles. Also, when the
-        //  upper bound is past the highest x-value (and we draw less than numVisibleCandles on the chart),
-        //  we need to shift the candle indices to see which "side" of chart the extrema is (this might not be
-        //  necessary).
+
         if (candleIndexOfHighest > currZoomLevel.getNumVisibleCandles() * 0.5) {
             // draw high marker to the right of the candle (arrow points to the left)
             double xPos = ((canvas.getWidth() - (candleIndexOfHighest * candleWidth)) + halfCandleWidth) + 2;
             graphicsContext.setTextAlign(TextAlignment.LEFT);
-            graphicsContext.fillText(STR."← \{MARKER_FORMAT.format(highestCandleValue)}", xPos, highMarkYPos);
+            graphicsContext.fillText("← " + MARKER_FORMAT.format(highestCandleValue), xPos, highMarkYPos);
         } else {
             // draw high marker to the left of the candle (arrow points to the right)
             double xPos = ((canvas.getWidth() - (candleIndexOfHighest * candleWidth)) + halfCandleWidth) - 3;
             graphicsContext.setTextAlign(TextAlignment.RIGHT);
-            graphicsContext.fillText(STR."\{MARKER_FORMAT.format(highestCandleValue)} -→", xPos, highMarkYPos);
+            graphicsContext.fillText(MARKER_FORMAT.format(highestCandleValue) + " -→", xPos, highMarkYPos);
         }
         graphicsContext.setFill(Color.WHITE);
         graphicsContext.fillText(tradePair.toString(), canvas.getWidth() / 2, canvas.getHeight() / 3);
@@ -769,12 +763,12 @@ public class CandleStickChart extends Region {
                 // draw a low marker to the right of the candle (arrow points to the left)
                 double xPos = ((canvas.getWidth() - (candleIndexOfLowest * candleWidth)) + halfCandleWidth) + 2;
                 graphicsContext.setTextAlign(TextAlignment.LEFT);
-                graphicsContext.fillText(STR."← \{MARKER_FORMAT.format(lowestCandleValue)}", xPos, lowMarkYPos);
+                graphicsContext.fillText("← " + MARKER_FORMAT.format(lowestCandleValue), xPos, lowMarkYPos);
             } else {
                 // draw a low marker to the left of the candle (arrow points to the right)
                 double xPos = ((canvas.getWidth() - (candleIndexOfLowest * candleWidth)) + halfCandleWidth) - 3;
                 graphicsContext.setTextAlign(TextAlignment.RIGHT);
-                graphicsContext.fillText(STR."\{MARKER_FORMAT.format(lowestCandleValue)} →", xPos, lowMarkYPos);
+                graphicsContext.fillText(MARKER_FORMAT.format(lowestCandleValue) + " →", xPos, lowMarkYPos);
             }
         }
     }

@@ -3,6 +3,8 @@ package org.investpro;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.investpro.CandleStickChart.logger;
+
 public class DataSet {
     private final Map<String, Double> data; // To store investment data (e.g., stock symbol -> price)
 
@@ -43,7 +45,8 @@ public class DataSet {
     // Print the dataset (for debugging purposes)
     public void printDataSet() {
         for (Map.Entry<String, Double> entry : data.entrySet()) {
-            System.out.println(STR."\{entry.getKey()} -> \{entry.getValue()}");
+
+            logger.info("Key: " + entry.getKey() + ", Value: " + entry.getValue());
         }
     }
 }

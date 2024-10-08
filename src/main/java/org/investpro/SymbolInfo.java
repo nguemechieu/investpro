@@ -5,6 +5,11 @@ public record SymbolInfo(String symbol, String baseAsset, String quoteAsset, Str
 
     @Override
     public String toString() {
-        return STR."SymbolInfo{symbol='\{symbol}', baseAsset='\{baseAsset}', quoteAsset='\{quoteAsset}', status='\{status}'}";
+        return "SymbolInfo{" +
+                "symbol='" + symbol + '\'' +
+                ", baseAsset='" + baseAsset + '\'' +
+                ", quoteAsset='" + quoteAsset + '\'' +
+                ", status='" + status + '\'' +
+                '}';
     }
 }

@@ -48,14 +48,14 @@ public class NotificationService {
     // Notify all subscribers about a trade event
     public void notifyTrade(Trade trade) {
         for (String subscriber : subscribers) {
-            sendNotification(subscriber, STR."Trade executed: \{trade.toString()}");
+            sendNotification(subscriber, "Trade executed: " + trade.toString());
         }
     }
 
     // Notify all subscribers about a system alert or error
     public void notifySystemAlert(String message) {
         for (String subscriber : subscribers) {
-            sendNotification(subscriber, STR."System Alert: \{message}");
+            sendNotification(subscriber, "System Alert: " + message);
         }
     }
 

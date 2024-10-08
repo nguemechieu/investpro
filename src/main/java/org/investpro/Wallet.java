@@ -48,7 +48,7 @@ public class Wallet extends AnchorPane {
             canvas.getGraphicsContext2D().fillRect(0, 0, 600, 400);
             canvas.getGraphicsContext2D().strokeText("Welcome to InvestPro", 10, 30);
             canvas.getGraphicsContext2D().strokeText("InvestPro", 10, 60);
-            canvas.getGraphicsContext2D().strokeText("Account ID: %s".formatted(df.format(dataAccount.get().getFirst().getAccountId())), 10, 90);
+        canvas.getGraphicsContext2D().strokeText("Account ID: %s".formatted(df.format(dataAccount.get().getFirst().getId())), 10, 90);
             canvas.getGraphicsContext2D().strokeText("Balance: %%s %s".formatted(dataAccount.get().getFirst().getBalance()), 10, 120);
             canvas.getGraphicsContext2D().strokeText("Tags: %s".formatted(dataAccount.get().getFirst().getCurrency().formatted(df.format(dataAccount.get().getFirst().getTags()))), 10, 120);
 

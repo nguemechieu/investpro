@@ -3,6 +3,7 @@ package org.investpro;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.NoResultException;
+import jakarta.persistence.Query;
 import org.jetbrains.annotations.NotNull;
 import weka.gui.beans.DataSourceListener;
 import weka.gui.beans.InstanceListener;
@@ -41,95 +42,95 @@ public class DbHibernate implements Db {
         try {
             entityManager.getTransaction().begin();
 
-            // Create users table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS users (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "username VARCHAR(255) NOT NULL UNIQUE," +
-                            "password VARCHAR(255) NOT NULL," +
-                            "email VARCHAR(255) NOT NULL UNIQUE" +
-                            ")"
-            ).executeUpdate();
-
-            // Create currencies table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS currencies (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "currencyType VARCHAR(255) NOT NULL," +
-                            "fullDisplayName VARCHAR(255) NOT NULL," +
-                            "shortDisplayName VARCHAR(255)," +
-                            "code VARCHAR(5) NOT NULL," +
-                            "fractionalDigits INTEGER NOT NULL," +
-                            "symbol VARCHAR(10) NOT NULL," +
-                            "image VARCHAR(255) NOT NULL" +
-                            ")"
-            ).executeUpdate();
-
-            // Create portfolio_items table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS portfolio_items (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "user_id INTEGER NOT NULL," +
-                            "currency_id INTEGER NOT NULL," +
-                            "amount DECIMAL(10, 2) NOT NULL," +
-                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
-                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
-                            ")"
-            ).executeUpdate();
-
-            // Create trades table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS trades (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "user_id INTEGER NOT NULL," +
-                            "currency_id INTEGER NOT NULL," +
-                            "price DECIMAL(10, 2) NOT NULL," +
-                            "volume DECIMAL(10, 2) NOT NULL," +
-                            "timestamp DATETIME NOT NULL," +
-                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
-                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
-                            ")"
-            ).executeUpdate();
-
-            // Create portfolio_history table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS portfolio_history (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "user_id INTEGER NOT NULL," +
-                            "currency_id INTEGER NOT NULL," +
-                            "amount DECIMAL(10, 2) NOT NULL," +
-                            "timestamp DATETIME NOT NULL," +
-                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
-                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
-                            ")"
-            ).executeUpdate();
-
-            // Create accounts table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS accounts (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "user_id INTEGER NOT NULL," +
-                            "currency_id INTEGER NOT NULL," +
-                            "balance DECIMAL(10, 2) NOT NULL," +
-                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
-                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
-                            ")"
-            ).executeUpdate();
-
-            // Create candle_data table
-            entityManager.createNativeQuery(
-                    "CREATE TABLE IF NOT EXISTS candle_data (" +
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "timestamp DATETIME NOT NULL," +
-                            "open DECIMAL(10, 2) NOT NULL," +
-                            "high DECIMAL(10, 2) NOT NULL," +
-                            "low DECIMAL(10, 2) NOT NULL," +
-                            "close DECIMAL(10, 2) NOT NULL," +
-                            "volume DECIMAL(10, 2) NOT NULL," +
-                            "currency_id INTEGER NOT NULL," +
-                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
-                            ")"
-            ).executeUpdate();
+//            // Create users table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS users (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+//                            "username VARCHAR(255) NOT NULL UNIQUE," +
+//                            "password VARCHAR(255) NOT NULL," +
+//                            "email VARCHAR(255) NOT NULL UNIQUE" +
+//                            ")"
+//            ).executeUpdate();
+//
+//            // Create currencies table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS currencies (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+//                            "currencyType VARCHAR(255) NOT NULL," +
+//                            "fullDisplayName VARCHAR(255) NOT NULL," +
+//                            "shortDisplayName VARCHAR(255)," +
+//                            "code VARCHAR(5) NOT NULL," +
+//                            "fractionalDigits INTEGER NOT NULL," +
+//                            "symbol VARCHAR(10) NOT NULL," +
+//                            "image VARCHAR(255) NOT NULL" +
+//                            ")"
+//            ).executeUpdate();
+//
+//            // Create portfolio_items table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS portfolio_items (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT  NOT NULL," +
+//                            "user_id INTEGER NOT NULL," +
+//                            "currency_id INTEGER NOT NULL," +
+//                            "amount DECIMAL(10, 2) NOT NULL," +
+//                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
+//                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
+//                            ")"
+//            ).executeUpdate();
+//
+//            // Create trades table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS trades (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+//                            "user_id INTEGER NOT NULL," +
+//                            "currency_id INTEGER NOT NULL," +
+//                            "price DECIMAL(10, 2) NOT NULL," +
+//                            "volume DECIMAL(10, 2) NOT NULL," +
+//                            "timestamp DATETIME NOT NULL," +
+//                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
+//                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
+//                            ")"
+//            ).executeUpdate();
+//
+//            // Create portfolio_history table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS portfolio_history (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT  NOT NULL," +
+//                            "user_id INTEGER NOT NULL," +
+//                            "currency_id INTEGER NOT NULL," +
+//                            "amount DECIMAL(10, 2) NOT NULL," +
+//                            "timestamp DATETIME NOT NULL," +
+//                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
+//                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
+//                            ")"
+//            ).executeUpdate();
+//
+//            // Create accounts table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS accounts (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT  NOT NULL," +
+//                            "user_id INTEGER NOT NULL," +
+//                            "currency_id INTEGER NOT NULL," +
+//                            "balance DECIMAL(10, 2) NOT NULL," +
+//                            "FOREIGN KEY (user_id) REFERENCES users(id)," +
+//                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
+//                            ")"
+//            ).executeUpdate();
+//
+//            // Create candle_data table
+//            entityManager.createNativeQuery(
+//                    "CREATE TABLE IF NOT EXISTS candle_data (" +
+//                            "id INTEGER PRIMARY KEY AUTOINCREMENT  NOT NULL," +
+//                            "timestamp DATETIME NOT NULL," +
+//                            "open DECIMAL(10, 2) NOT NULL," +
+//                            "high DECIMAL(10, 2) NOT NULL," +
+//                            "low DECIMAL(10, 2) NOT NULL," +
+//                            "close DECIMAL(10, 2) NOT NULL," +
+//                            "volume DECIMAL(10, 2) NOT NULL," +
+//                            "currency_id INTEGER NOT NULL," +
+//                            "FOREIGN KEY (currency_id) REFERENCES currencies(id)" +
+//                            ")"
+//            ).executeUpdate();
 
             entityManager.getTransaction().commit();
             logger.info("All tables created successfully");
@@ -140,6 +141,15 @@ public class DbHibernate implements Db {
                 entityManager.getTransaction().rollback();
             }
         }
+
+
+    }
+
+    private void enableSQLiteForeignKeys(EntityManager entityManager) {
+        entityManager.getTransaction().begin();
+        Query query = entityManager.createNativeQuery("PRAGMA foreign_keys = ON;");
+        query.executeUpdate();
+        entityManager.getTransaction().commit();
     }
 
     @Override

@@ -8,8 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -18,8 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 abstract
 class Currency implements Comparable<Currency> {
     private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
-static
-    DbHibernate   db1= new DbHibernate();
+    static final DbHibernate db1 = new DbHibernate();
 
     public void setCurrencyType(CurrencyType currencyType) {
         this.currencyType = currencyType;
@@ -58,8 +57,7 @@ static
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-
-    private Long id;
+    protected Long id;
 
 
 
@@ -96,7 +94,7 @@ static
         Objects.requireNonNull(code, "code must not be null");
 
         if (fractionalDigits < 0) {
-            throw new IllegalArgumentException(STR."fractional digits must be non-negative, was: \{fractionalDigits}");
+            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
         }
         Objects.requireNonNull(symbol, "symbol must not be null");
 
@@ -107,6 +105,7 @@ static
         this.fractionalDigits = fractionalDigits;
         this.symbol = symbol;
         this.image = image;
+        this.id = (long) UUID.randomUUID().hashCode();
 
 
         logger.info("currency registered: {}", this);

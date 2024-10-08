@@ -23,29 +23,29 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
     private Long id;
-    @ManyToOne
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;  // Foreign key reference to Account
+    //    @ManyToOne
+//    @JoinColumn(name = "account_id", nullable = false)
+//    Account account;  // Foreign key reference to Account
     @Column(name = "side", nullable = false)
     @Enumerated(EnumType.STRING)
-    private Side side;
+    Side side;
     @Column(name = "order_type", nullable = false)
     @Enumerated(EnumType.STRING)
-    private ENUM_ORDER_TYPE orderType;
+    ENUM_ORDER_TYPE orderType;
     @Column(name = "price", nullable = false)
-    private double price;
+    double price;
     @Column(name = "size", nullable = false)
-    private double size;
+    double size;
     @Column(name = "timestamp", nullable = false)
     @Temporal(TemporalType.TIMESTAMP)
-    private Date timestamp;
+    Date timestamp;
     @Column(name = "stop_loss")
-    private double stopLoss;
+    double stopLoss;
     @Column(name = "take_profit")
-    private double takeProfit;
+    double takeProfit;
     @Column(name = "order_status", nullable = false)
     @Enumerated(EnumType.STRING)
-    private ENUM_ORDER_STATUS orderStatus;
+    ENUM_ORDER_STATUS orderStatus;
 
     // Constructor
     public Order(@NotNull String symbol, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) {
@@ -89,13 +89,7 @@ public class Order {
         this.id = id;
     }
 
-    public Account getAccount() {
-        return account;
-    }
 
-    public void setAccount(Account account) {
-        this.account = account;
-    }
 
     public String getSymbol() {
         return symbol;
@@ -204,7 +198,7 @@ public class Order {
 
     @Override
     public String toString() {
-        return "Order{id=%d, account=%s, symbol=%s, side=%s, orderType=%s, price=%s, size=%s, timestamp=%s, stopLoss=%s, takeProfit=%s, orderStatus=%s}".formatted(id, account, symbol, side, orderType, price, size, timestamp, stopLoss, takeProfit, orderStatus);
+        return "Order{id=%d,  symbol=%s, side=%s, orderType=%s, price=%s, size=%s, timestamp=%s, stopLoss=%s, takeProfit=%s, orderStatus=%s}".formatted(id, symbol, side, orderType, price, size, timestamp, stopLoss, takeProfit, orderStatus);
     }
 
     public long getTime() {

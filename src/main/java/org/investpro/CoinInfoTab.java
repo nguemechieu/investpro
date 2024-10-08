@@ -45,7 +45,7 @@ public class CoinInfoTab extends Tab {
         tableView.getColumns().add(lastUpdatedColumn);
 
         // Set the table to grow with the window
-        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         // Add the TableView to the VBox
         VBox vBox = new VBox(tableView);

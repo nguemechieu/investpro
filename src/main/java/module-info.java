@@ -13,8 +13,7 @@ module investpro {
     requires org.json;
     requires io.github.cdimascio.dotenv.java;
     requires bounce;
-    requires jakarta.persistence;
-
+    requires net.bytebuddy.agent;
     requires org.hibernate.orm.core;
     requires weka.stable;
     requires javafx.swing;
@@ -25,16 +24,17 @@ module investpro {
     requires org.slf4j;
     requires org.junit.jupiter.api;
 
-    requires docker.java.transport.zerodep;
     requires com.jfoenix;
 
     requires jcip.annotations;
 
     requires io.ebean.annotation;
+    requires netlib.java;
 
 
-
-    opens org.investpro to javafx.fxml, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, org.json, io.github.cdimascio.dotenv.java, bounce, jakarta.persistence, org.hibernate.orm.core, weka.stable, javafx.swing;
+    requires org.hibernate.commons.annotations;
+    requires jakarta.persistence;
+    opens org.investpro to net.bytebuddy.agent, org.hibernate.orm.core, javafx.fxml, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, org.json, io.github.cdimascio.dotenv.java, bounce, jakarta.persistence, weka.stable, javafx.swing;
     exports org.investpro;
 
 }

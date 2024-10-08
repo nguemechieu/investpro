@@ -32,7 +32,7 @@ public class TradingAI {
             if (!f.exists()) f.createNewFile();
 
         } catch (Exception e) {
-            logger.severe(STR."Error building classifier: \{e.getMessage()}");
+            logger.severe("Error building classifier: " + e.getMessage());
         }
     }
 
@@ -50,7 +50,7 @@ public class TradingAI {
                 return SIGNAL.HOLD;
 
         } catch (Exception e) {
-            logger.severe(STR."Error creating instance or predicting signal: \{e.getMessage()}");
+            logger.severe("Error creating instance or predicting signal: " + e.getMessage());
             return SIGNAL.HOLD;
         }
     }
@@ -148,7 +148,7 @@ public class TradingAI {
             logger.info("Training completed.");
 
         } catch (Exception e) {
-            logger.severe(STR."Error building classifier: \{e.getMessage()}");
+            logger.severe("Error building classifier: " + e.getMessage());
         }
     }
 }

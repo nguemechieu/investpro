@@ -20,7 +20,7 @@ public class SignedJWTT extends SignedJWT {
 
     @Override
     public String toString() {
-        return STR."SignedJWTT{jwsHeader=\{jwsHeader}, claimsSet=\{claimsSet}}";
+        return "SignedJWTT{jwsHeader=" + jwsHeader + "--" + " claimsSet=" + claimsSet;
     }
 
     @Override

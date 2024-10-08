@@ -18,7 +18,7 @@ public class PropertyLoader {
         Properties properties = new Properties();
         try (InputStream input = PropertyLoader.class.getClassLoader().getResourceAsStream(fileName)) {
             if (input == null) {
-                throw new IllegalArgumentException(STR."Sorry, unable to find \{fileName}");
+                throw new IllegalArgumentException("Sorry, unable to find " + fileName);
             }
             // Load the properties file
             properties.load(input);

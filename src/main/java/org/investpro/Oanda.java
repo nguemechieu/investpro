@@ -108,7 +108,7 @@ public class Oanda extends Exchange {
             for (int i = 0; i < accountsArray.length(); i++) {
                 JSONObject accountObject = accountsArray.getJSONObject(i);
                 Account account0 = new Account();
-                account0.setAccountId(accountObject.getString("id"));
+                account0.setMt4AccountID(accountObject.getString("id"));
 
                 if (account.has("balance")) {
                 account0.setBalance(accountObject.getDouble("balance"));}
@@ -122,7 +122,7 @@ public class Oanda extends Exchange {
                     account0.setCreated(String.valueOf(LocalDateTime.ofInstant(Instant.ofEpochMilli(accountObject.getLong("createdTime")), ZoneOffset.UTC)));
                 }
                 if (account.has("mt4AccountID")) {
-                    account0.setMt4AccountID(accountObject.getInt("mt4AccountID"));
+                    account0.setMt4AccountID(accountObject.getString("mt4AccountID"));
                 }
                 if (account.has("tags")){
                     JSONArray tagsArray = accountObject.getJSONArray("tags");
@@ -539,7 +539,7 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
         public static int getTimeFromString(@NotNull String timeString) {
 
             int tim = (int) Instant.parse(timeString).getEpochSecond();
-            logger.info(STR."Created timestamp: \{timeString + tim}");
+            logger.info("Created timestamp: {}{}", timeString, tim);
             return tim;
         }
 
@@ -556,7 +556,7 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
             String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                     .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
            // "https://api-fxtrade.oanda.com/v3/instruments/USD_CAD/candles?price=BA&from=2016-10-17T15%3A00%3A00.000000000Z&granularity=M1"
-            String uriStr = STR."https://api-fxtrade.oanda.com/v3/instruments/\{tradePair.toString('_')}/candles?count=200&price=M&from="+startDateString+"&granularity="+granularityToString(secondsPerCandle);
+            String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') + "/candles?count=200&price=M&from=" + startDateString + "&granularity=" + granularityToString(secondsPerCandle);
 
             if (startTime == EARLIEST_DATA) {
                 // signal more data is false
@@ -575,11 +575,11 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
                         JsonNode res;
                         try {
                             res = OBJECT_MAPPER.readTree(response);
-                            logger.info(STR."OANDA response: \{res}");
+
                         } catch (JsonProcessingException ex) {
 
-                             logger.error(STR."Failed to parse OANDA response: \{response}");
-                             new Messages(
+
+                            new Messages(
 
                                      "Error",
                                      ex.getMessage()
@@ -592,7 +592,8 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
                         if (!res.get("candles").isEmpty()) {
 
 
-                            logger.info(STR."Response\{res.get("candles")}");
+                            logger.info("Response {}", res.get("candles"));
+
                             // Remove the current in-progress candle
 
                             for (JsonNode candle : res.get("candles")) {

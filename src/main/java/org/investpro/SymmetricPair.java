@@ -51,6 +51,14 @@ public record SymmetricPair<F, S>(F first, S second) {
 
     }
 
+    @Override
+    public String toString() {
+        return "SymmetricPair{" +
+                "first=" + first +
+                ", second=" + second +
+                '}';
+    }
+
     /**
      * Compute a hash code using the hash codes of the underlying objects
      *
@@ -61,9 +69,5 @@ public record SymmetricPair<F, S>(F first, S second) {
         return (first == null ? 0 : first.hashCode()) ^ (second == null ? 0 : second.hashCode());
     }
 
-    @Override
-    public String toString() {
-        return STR."SymmetricPair [\{first}, \{second}]";
-    }
 
 }

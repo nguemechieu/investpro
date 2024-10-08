@@ -13,31 +13,24 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-@Entity
-@Table(name = "trade_pairs")
+
 public class TradePair extends Pair<Currency, Currency> {
 
     private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "base_currency_id", referencedColumnName = "id")
+
     private Currency baseCurrency;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "counter_currency_id", referencedColumnName = "id")
+
     private Currency counterCurrency;
 
 
 
 
-    @Column(name = "bid", nullable = false)
     private double bid;
 
-    @Column(name = "ask", nullable = false)
     private double ask;
 
     public TradePair(@NotNull Currency baseCurrency, @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {

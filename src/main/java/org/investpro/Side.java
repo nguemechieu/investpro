@@ -15,7 +15,7 @@ public enum Side {
         } else if (type.equalsIgnoreCase("SELL")) {
             return SELL;
         } else {
-            throw new IllegalArgumentException(STR."unknown trade type: \{type}");
+            throw new IllegalArgumentException("unknown trade type: " + type);
         }
     }
 

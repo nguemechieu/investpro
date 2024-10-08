@@ -13,11 +13,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String username;
-    private String email;
-    private String password;
-    @OneToMany(mappedBy = "user")
-    private Set<PortfolioItem> portfolioItems = new HashSet<>();
+    protected String username;
+    protected String email;
+    protected String password;
 
     public User() {
     }
@@ -62,13 +60,6 @@ public class User {
         this.password = password;
     }
 
-    public Set<PortfolioItem> getPortfolioItems() {
-        return portfolioItems;
-    }
-
-    public void setPortfolioItems(Set<PortfolioItem> portfolioItems) {
-        this.portfolioItems = portfolioItems;
-    }
 
 
     // Getters and setters

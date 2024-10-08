@@ -77,10 +77,6 @@ public class OrderCreateTransaction {
         }
     }
 
-    @Override
-    public String toString() {
-        return STR."OrderCreateTransaction{id='\{id}\{'\''}, orderID='\{orderID}\{'\''}, requestID='\{requestID}\{'\''}, time='\{time}\{'\''}, batchID='\{batchID}\{'\''}, type='\{type}\{'\''}, userID='\{userID}\{'\''}, timeInForce='\{timeInForce}\{'\''}, positionFill='\{positionFill}\{'\''}, reason='\{reason}\{'\''}, instrument='\{instrument}\{'\''}\{'}'}";
-    }
 
     public String getOrderID() {
         return orderID;

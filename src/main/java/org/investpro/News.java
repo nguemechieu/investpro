@@ -24,9 +24,6 @@ public class News {
         this.country = country;
 
 
-        logger.debug(
-                STR."News: \{this.title} \{this.impact} \{this.country} \{this.date} \{this.forecast} \{this.previous}"
-        );
     }
 
     public String getImpact() {
@@ -64,7 +61,15 @@ public class News {
 
     @Override
     public String toString() {
-        return STR."News{impact='\{impact}\{'\''}, country='\{country}\{'\''}, offset=\{offset}, title='\{title}\{'\''}, date=\{date}, forecast='\{forecast}\{'\''}, previous='\{previous}\{'\''}\{'}'}";
+        return "News{" +
+                "impact='" + impact + '\'' +
+                ", date=" + date +
+                ", forecast='" + forecast + '\'' +
+                ", previous='" + previous + '\'' +
+                ", country='" + country + '\'' +
+                ", offset=" + offset +
+                ", title='" + title + '\'' +
+                '}';
     }
 
     public int getOffset() {

@@ -55,10 +55,7 @@ public class FiatCurrencyDataProvider extends CurrencyDataProvider {
                         "South African Reserve Bank", 710)
         );
 
-        for (FiatCurrency c : list) {
-
-            db1.entityManager.createNativeQuery(STR."INSERT INTO currencies (currency_type, full_display_name, short_display_name, code, fractional_digits, symbol, image ) VALUES ('FIAT', '\{c.getFullDisplayName()}', '\{c.getShortDisplayName()}', '\{c.getCode()}', \{c.getFractionalDigits()}, '\{c.getSymbol()}', '\{c.getCode()}.png')");
-        }
+        //   db1.save(list);
     }
 
 }

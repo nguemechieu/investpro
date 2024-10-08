@@ -12,23 +12,21 @@ public class Account {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private long id;
+    @Column(name = "account_id")
+    long id;
 
-
-    private String accountId;
 
     @Column(name = "currency")
     private String currency;
 
     @Column(name = "balance")
-    private double balance;
+    double balance;
 
     @Column(name = "created")
-    private String created;
+    String created;
 
     @Column(name = "guaranteed_stop_loss")
-    private double guaranteedStopLoss;
+    double guaranteedStopLoss;
 
     @Column(name = "free_margin")
     private double free_margin;
@@ -40,7 +38,7 @@ public class Account {
     private double marginCall;
 
     @Column(name = "guaranteed_execution_price")
-    private double guaranteedExecutionPrice;
+    double guaranteedExecutionPrice;
 
     @Column(name = "margin_rate")
     private double marginRate;
@@ -49,20 +47,17 @@ public class Account {
     private double unrealizedPL;
 
     @Column(name = "locked_balance")
-    private double lockedBalance;
-    private int mt4AccountID;
+    double lockedBalance;
+    @Column(name = "offset")
+    String offset;
     @Column(name = "margin_used")
     private double marginUsed;
-    @Column(name = "offset")
-    private String offset;
+    @ElementCollection
+    @CollectionTable(name = "account_tags", joinColumns = @JoinColumn(name = "account_id"))
+    @Column(name = "tag")
+    List<String> tags = new ArrayList<>();
 
-    public String getAccountId() {
-        return accountId;
-    }
 
-    public void setAccountId(String accountId) {
-        this.accountId = accountId;
-    }
 
     public String getCurrency() {
         return currency;
@@ -89,21 +84,21 @@ public class Account {
     public double getGuaranteedStopLoss() {
         return guaranteedStopLoss;
     }
-    @ElementCollection
-    @CollectionTable(name = "account_tags", joinColumns = @JoinColumn(name = "account_id"))
-    @Column(name = "tag")
-    private List<String> tags = new ArrayList<>();
     // Commission fields
     @Column(name = "maker_commission")
-    private int makerCommission;
+    int makerCommission;
     @Column(name = "taker_commission")
-    private int takerCommission;
+    int takerCommission;
+    @Column(name = "seller_commission")
+    int sellerCommission;
     @Column(name = "buyer_commission")
     private int buyerCommission;
-    @Column(name = "seller_commission")
-    private int sellerCommission;
     @Embedded
-    private CommissionRates commissionRates;
+    CommissionRates commissionRates;
+    @ElementCollection
+    @CollectionTable(name = "account_permissions", joinColumns = @JoinColumn(name = "account_id"))
+    @Column(name = "permission")
+    List<String> permissions = new ArrayList<>();
     // Permissions and trading flags
     @Column(name = "can_trade")
     private boolean canTrade;
@@ -119,19 +114,12 @@ public class Account {
     private long updateTime;
     @Column(name = "account_type")
     private String accountType;
-    @ElementCollection
-    @CollectionTable(name = "account_permissions", joinColumns = @JoinColumn(name = "account_id"))
-    @Column(name = "permission")
-    private List<String> permissions = new ArrayList<>();
+    private String mt4AccountID;
 
     public long getId() {
         return id;
     }
 
-    public void setId(String id) {
-        accountId = id;
-        this.id = Long.parseLong(id);
-    }
 
     public void setCreated(String created) {
         this.created = created;
@@ -349,27 +337,27 @@ public class Account {
         return Objects.hash(id, tags);
     }
 
-    public int getMt4AccountID() {
+    public String getMt4AccountID() {
         return mt4AccountID;
     }
 
-    public void setMt4AccountID(int mt4AccountID) {
+    public void setMt4AccountID(String mt4AccountID) {
         this.mt4AccountID = mt4AccountID;
     }
 
     @Embeddable
     public static class CommissionRates {
         @Column(name = "maker_rate")
-        private String maker;
+        String maker;
 
         @Column(name = "taker_rate")
-        private String taker;
+        String taker;
 
         @Column(name = "buyer_rate")
-        private String buyer;
+        String buyer;
 
         @Column(name = "seller_rate")
-        private String seller;
+        String seller;
 
         public String getMaker() {
             return maker;
@@ -408,13 +396,13 @@ public class Account {
     @Embeddable
     public static class Balance {
         @Column(name = "asset")
-        private String asset;
+        String asset;
 
         @Column(name = "free")
-        private double free;
+        double free;
 
         @Column(name = "locked")
-        private double locked;
+        double locked;
 
         public String getAsset() {
             return asset;

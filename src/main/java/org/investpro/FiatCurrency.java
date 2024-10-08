@@ -22,7 +22,7 @@ public class FiatCurrency extends Currency {
         Objects.requireNonNull(centralBank, "centralBank must not be null");
 
         if (numericCode < 0 || numericCode > 999) {
-            throw new IllegalArgumentException(STR."numeric code must be in range [0, 999] in accordance with ISO-4217, but was: \{numericCode}");
+            throw new IllegalArgumentException("numeric code must be in range [0, 999] in accordance with ISO-4217, but was: " + numericCode);
         }
 
         this.locale = locale;

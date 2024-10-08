@@ -12,6 +12,7 @@ public class CurrencyNotFoundException extends Throwable {
     private static final long serialVersionUID = -5029723281334525952L;
 
     public CurrencyNotFoundException(@NotNull CurrencyType type, String symbol) {
-        super(STR."\{type.name().toLowerCase()} currency not found for symbol: \{symbol}");
+
+        super(String.format("Currency '%s' with symbol '%s' not found.", type, symbol));
     }
 }

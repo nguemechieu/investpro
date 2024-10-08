@@ -97,11 +97,11 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private static double calculateTickSpacing(double delta, int maxTicks) {
         if (delta <= 0.0) {
             delta = 1.0;
-            throw new IllegalArgumentException(STR."delta (\{delta}) must be positive");
+            throw new IllegalArgumentException("delta " + delta + "must be positive");
 
         }
         if (maxTicks < 1) {
-            throw new IllegalArgumentException(STR."maxTicks (\{maxTicks}) must be >= 1");
+            throw new IllegalArgumentException("maxTicks " + maxTicks + " must be >= 1");
 
         }
 
@@ -164,7 +164,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     @SuppressWarnings("fallthrough")
     public static int log10(int x, RoundingMode mode) {
         if (x <= 0) {
-            throw new IllegalArgumentException(STR."x must be positive but was: \{x}");
+            throw new IllegalArgumentException("x must be positive but was: " + x);
         }
         int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
         int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
@@ -412,18 +412,23 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getUpperBound();
     }
 
+    @Override
+    public String toString() {
+        return "StableTicksAxis{" +
+                "animationTimeline=" + animationTimeline +
+                ", minorTicks=" + minorTicks +
+                ", forceZeroInRange=" + forceZeroInRange +
+                ", labelSize=" + labelSize +
+                ", scaleValue=" + scaleValue +
+                '}';
+    }
+
     private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
 
             if (high - low < 0) return 0;
             return high - low;
-        }
-
-        @Contract(pure = true)
-        @Override
-        public @NotNull String toString() {
-            return STR."Range{low=\{low}, high=\{high}, tickSpacing=\{tickSpacing}, scale=\{scale}}";
         }
 
     }
