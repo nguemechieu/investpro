@@ -9,7 +9,6 @@ import javafx.util.Duration;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Date;
 import java.util.Objects;
 
 /**
@@ -104,8 +103,8 @@ public class ChartContainer extends Region {
         }
         candleStickChart = new CandleStickChart(
 
-                exchange,
-                exchange.getCandleDataSupplier(secondsPerCandle, exchange.tradePair),
+                exchange, tradePair,
+                exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
 
                 liveSyncing,
                 secondsPerCandle,

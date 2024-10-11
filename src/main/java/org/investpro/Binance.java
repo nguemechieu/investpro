@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Alert;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Fee>> getTradingFee() throws IOException, InterruptedException {
+    public CompletableFuture<List<Fee>> getTradingFee() {
         return null;
     }
 
@@ -68,10 +69,6 @@ public class Binance extends Exchange {
 
     }
 
-    @Override
-    public String getSymbol() {
-        return tradePair.toString('/');
-    }
 
     @Override
     public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
@@ -102,7 +99,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException {
 
         requestBuilder.uri(URI.create(
                 API_URL + "/api/v3/order?orderId=" + orderId
@@ -220,12 +217,12 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public List<Order> getPendingOrders() throws IOException, InterruptedException {
+    public List<Order> getPendingOrders() {
         return List.of(); // Binance doesn't have a specific endpoint for pending orders
     }
 
     @Override
-    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+    public CompletableFuture<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
         requestBuilder.uri(URI.create(API_URL + "/api/v3/depth?symbol=" + tradePair.toString('-')));
         HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("Binance response: " + response.body());
@@ -235,7 +232,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public Position getPositions() throws IOException, InterruptedException, ExecutionException {
+    public Position getPositions() {
         return null;
     }
 
@@ -251,7 +248,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public ObservableList<Order> getOrders() throws IOException, InterruptedException {
+    public ObservableList<Order> getOrders() {
         return null; // Implementation depends on the use of ObservableList
     }
 
@@ -306,7 +303,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException {
+    public CompletableFuture<String> cancelAllOrders() {
         return null; // Implement if Binance supports cancelling all orders at once
     }
 
@@ -316,12 +313,12 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
+    public ArrayList<CryptoDeposit> getCryptosDeposit() {
         return null;
     }
 
     @Override
-    public ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
+    public ArrayList<CryptoWithdraw> getCryptosWithdraw() {
         return null;
     }
 
@@ -331,9 +328,6 @@ public class Binance extends Exchange {
     }
 
     // Binance supported granularity (intervals)
-    private static final Set<String> SUPPORTED_GRANULARITIES = Set.of(
-            "1m", "5m", "15m", "1h", "6h", "1d"
-    );
 
     /**
      * Returns the closest supported granularity (time interval) for Binance.
@@ -342,62 +336,16 @@ public class Binance extends Exchange {
      * @return the granularity in Binance format (e.g., "1m", "5m")
      */
     public String getBinanceGranularity(int secondsPerCandle) {
-        switch (secondsPerCandle) {
-            case 60:
-                return "1m";
-            case 300:
-                return "5m";
-            case 900:
-                return "15m";
-            case 3600:
-                return "1h";
-            case 21600:
-                return "6h";
-            case 86400:
-                return "1d";
-            default:
-                throw new IllegalArgumentException("Unsupported granularity: " + secondsPerCandle);
-        }
+        return switch (secondsPerCandle) {
+            case 60 -> "1m";
+            case 300 -> "5m";
+            case 900 -> "15m";
+            case 3600 -> "1h";
+            case 21600 -> "6h";
+            case 86400 -> "1d";
+            default -> throw new IllegalArgumentException("Unsupported granularity: " + secondsPerCandle);
+        };
     }
-
- //   Get Crypto Deposit History
-//    Example
-//
-//# Get HMAC SHA256 signature
-//
-//    timestamp=`date +%s000`
-//
-//    api_key=<your_api_key>
-//    secret_key=<your_secret_key>
-//    coin=<coin>
-//
-//    api_url="https://api.binance.us"
-//
-//    signature=`echo -n "coin=$coin&timestamp=$timestamp" | openssl dgst -sha256 -hmac $secret_key`
-//
-//    curl -X "GET" "$api_url/sapi/v1/capital/deposit/hisrec?coin=$coin&timestamp=$timestamp&signature=$signature" \
-//            -H "X-MBX-APIKEY: $api_key"
-//    Response
-//
-//[
-//    {
-//        "amount": "8.73234",
-//            "coin": "BNB",
-//            "network": "BSC",
-//            "status": 1,
-//            "address": "0xd709f9d0bbc6b0e746a13142dfe353086edf87c2",
-//            "addressTag": "",
-//            "txId": "0xa9ebf3f4f60bc18bd6bdf4616ff8ffa14ef93a08fe79cad40519b31ea1044290",
-//            "insertTime": 1638342348000,
-//            "transferType": 0,
-//            "confirmTimes": "0/0"
-//    }
-
-   // GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
-    // coin: The asset to get deposit history for (e.g., "BTC", "ETH", "BNB")
-    // timestamp: UTC timestamp in milliseconds
-    // signature: HMAC SHA256 signature of the parameters (coin, timestamp)
-    // X-MBX-APIKEY: Binance API key
 
 
     private static class BinanceCandleDataSupplier extends CandleDataSupplier {
@@ -465,7 +413,7 @@ public class Binance extends Exchange {
                         if (response.statusCode() != 200) {
                             logger.error("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair.toString('/')));
 
-                            new Messages("Error", "Failed to fetch candle data\n%s".formatted(response));
+                            new Messages(Alert.AlertType.ERROR, "Failed to fetch candle data\n%s".formatted(response));
                             throw new RuntimeException("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair.toString('/')));
                         }
 

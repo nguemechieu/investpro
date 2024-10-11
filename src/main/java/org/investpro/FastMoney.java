@@ -7,7 +7,6 @@ import org.jetbrains.annotations.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
-import java.sql.SQLException;
 import java.util.Objects;
 
 /**
@@ -24,7 +23,6 @@ import java.util.Objects;
  * can fail.
  */
 public final class FastMoney implements Money, Comparable<FastMoney> {
-
 
     private double amount;
     private int precision;
@@ -55,28 +53,24 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     public static @NotNull Money of(final double amount, final @NotNull Currency currency) throws Exception {
-        return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), currency.getCurrencyType());
+        return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 
     public static @NotNull Money of(final double amount, final @NotNull Currency currency, int precision) throws Exception {
-        return fromDouble(amount, precision, currency.getCode(), currency.getCurrencyType());
+        return fromDouble(amount, precision, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 
     public static @NotNull Money ofFiat(long amount, final String currencyCode) throws Exception {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
-        return ofFiat(amount, currencyCode, Currency.ofFiat(currencyCode).getFractionalDigits());
+        return ofFiat(amount, currencyCode, Objects.requireNonNull(Currency.of(currencyCode)).getFractionalDigits());
     }
 
     @Contract("_, _, _ -> new")
     public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) throws Exception {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
-        Currency currency = Currency.ofFiat(currencyCode);
+        Currency currency = Currency.of(currencyCode);
         amount *= (long) Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
-    }
-
-    public static @NotNull Money ofFiat(double amount, final String currencyCode) throws Exception {
-        return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.FIAT);
     }
 
     public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) throws Exception {
@@ -86,13 +80,9 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Contract("_, _, _ -> new")
     public static @NotNull Money ofCrypto(double amount, final String currencyCode, int precision) throws Exception {
-        Currency currency = Currency.ofCrypto(currencyCode);
+        Currency currency = Currency.of(currencyCode);
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
-    }
-
-    public static @NotNull Money ofCrypto(final double amount, final String currencyCode) throws Exception {
-        return fromDouble(amount, Utils.MAX_ALLOWED_PRECISION, currencyCode, CurrencyType.CRYPTO);
     }
 
 
@@ -103,21 +93,13 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         Utils.checkPrecision(precision);
         final FastMoney direct;
         // attempt direct
-        if (currencyType == CurrencyType.FIAT) {
-            direct = fromDoubleNoFallback(value, precision, Currency.ofFiat(currencyCode));
-        } else {
-            direct = fromDoubleNoFallback(value, precision, Currency.ofCrypto(currencyCode));
-        }
+        direct = fromDoubleNoFallback(value, precision, Currency.of(currencyCode));
 
         if (direct != null) {
             return direct;
         }
 
-        if (currencyType == CurrencyType.FIAT) {
-            return DefaultMoney.of(value, Currency.ofFiat(currencyCode));
-        } else {
-            return DefaultMoney.of(value, Currency.ofCrypto(currencyCode));
-        }
+        return DefaultMoney.of(value, Currency.of(currencyCode));
     }
 
     private static @Nullable FastMoney fromDoubleNoFallback(final double value, final int precision, final Currency currency) {
@@ -147,8 +129,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     private static @NotNull Money fromBigDecimal(final @NotNull BigDecimal value, Currency currency) {
         final BigDecimal cleaned = value.stripTrailingZeros();
-
-        // try to convert to double using a fixed precision = 3, which will cover most currencies
+        // try to convert to double using fixed precision = 3, which will cover most currencies
         // it is required to get rid of rounding issues
         final double dbl = value.doubleValue();
         final Money res = fromDoubleNoFallback(dbl, currency.getFractionalDigits(), currency);
@@ -168,11 +149,11 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         if (!BigInteger.valueOf(unscaledAmount).equals(unscaledBigInt)) {
             return new DefaultMoney(cleaned, currency);
         }
-        // scale could be negative here - we must multiply in that case
+        // The Scale could be negative here - we must multiply in that case
         if (scale >= 0) {
             return new FastMoney(unscaledAmount, currency, scale);
         }
-        // multiply by 10 and each time check that sign did not change
+        // multiply by 10, and each time check that sign did not change
         // scale is negative
         long amount = unscaledAmount;
         for (int i = 0; i < -scale; ++i) {
@@ -182,7 +163,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
             }
         }
 
-        return new FastMoney(amount, currency, 0);
+        return new FastMoney(amount, currency, 8);
     }
 
     @Override
@@ -207,19 +188,19 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
             result = amount + other.amount;
         } else if (precision > precisionOther) {
             long multiplier = Utils.MULTIPLIERS[precision - precisionOther];
-            double mult = other.amount * multiplier;
+            double multi = other.amount * multiplier;
             // overflow check, alternative is double multiplication and compare with Long.MAX_VALUE.
-            if (mult / multiplier != other.amount) {
+            if (multi / multiplier != other.amount) {
                 return other.plus(new DefaultMoney(toBigDecimal(), currency));
             }
-            result = amount + mult;
+            result = amount + multi;
         } else {
             long multiplier = Utils.MULTIPLIERS[precisionOther - precision];
-            double mult = amount * multiplier;
-            if (mult / multiplier != amount) {
+            double multi = amount * multiplier;
+            if (multi / multiplier != amount) {
                 return other.plus(new DefaultMoney(toBigDecimal(), currency));
             }
-            result = mult + other.amount;
+            result = multi + other.amount;
             precision = precisionOther;
         }
         return new FastMoney(result, currency, precision);
@@ -259,41 +240,49 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
     @Override
     public Money minus(long subtrahend) {
-        return null;
+
+        return minus(FastMoney.of(subtrahend, currency));
     }
 
     @Override
-    public Money minus(double subtrahend) {
-        return null;
+    public Money minus(double subtrahend) throws Exception {
+
+        return minus(FastMoney.of(subtrahend, currency));
     }
 
     @Override
     public Money multipliedBy(long multiplier) {
-        return null;
+
+        return new FastMoney(amount * multiplier, currency, precision).normalize();
     }
 
     @Override
     public Money multipliedBy(double multiplier) {
-        return null;
+
+        return new FastMoney(amount * multiplier, currency, precision).normalize();
     }
 
     @Override
-    public Money multipliedBy(BigDecimal multiplier, MathContext mathContext) {
-        return null;
+    public Money multipliedBy(@NotNull BigDecimal multiplier, MathContext mathContext) {
+
+        return new FastMoney(amount * multiplier.doubleValue(), currency, precision).normalize();
     }
 
     @Override
     public Money dividedBy(long divisor) {
-        return null;
+
+        return new FastMoney(amount / divisor, currency, precision).normalize();
     }
 
     @Override
     public Money dividedBy(double divisor) {
-        return null;
+
+        return new FastMoney(amount / divisor, currency, precision).normalize();
     }
 
+    @Contract(pure = true)
     @Override
-    public Money dividedBy(BigDecimal divisor, MathContext mathContext) {
+    public @Nullable Money dividedBy(BigDecimal divisor, MathContext mathContext) {
         return null;
     }
 
@@ -303,12 +292,12 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Money multiply(double multiplicand) throws Exception {
-        return fromDouble(amount * multiplicand / Utils.MULTIPLIERS[precision], precision, currency.getCode(), currency.getCurrencyType());
+    public @NotNull Money multiply(double multiplicand) throws Exception {
+        return fromDouble(amount * multiplicand / Utils.MULTIPLIERS[precision], precision, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 
     @Override
-    public Money multiply(BigDecimal multiplicand) {
+    public @NotNull Money multiply(BigDecimal multiplicand) {
         return fromBigDecimal(toBigDecimal().multiply(multiplicand, MathContext.DECIMAL128), currency);
     }
 
@@ -318,8 +307,8 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public Money divide(double divisor) throws Exception {
-        return fromDouble(amount / divisor / Utils.MULTIPLIERS[precision], precision, currency.getCode(), currency.getCurrencyType());
+    public @NotNull Money divide(double divisor) throws Exception {
+        return fromDouble(amount / divisor / Utils.MULTIPLIERS[precision], precision, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 
     @Override
@@ -335,7 +324,8 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     @Contract(pure = true)
     @Override
     public @Nullable Money abs() {
-        return null;
+
+        return new FastMoney(Math.abs(amount), currency, precision).normalize();
     }
 
     @Contract(" -> new")
@@ -424,7 +414,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         return "%s %s".formatted(toBigDecimal().toPlainString(), currency.getCode());
     }
 

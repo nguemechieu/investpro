@@ -1,7 +1,6 @@
 package org.investpro;
 
 import javafx.collections.ObservableList;
-import javafx.scene.image.Image;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,9 +8,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
@@ -31,7 +27,6 @@ public abstract class Exchange {
     protected String apiKey;
     protected static String apiSecret;
     public LiveTradesConsumer liveTradesConsumer;
-    protected TradePair tradePair;
     protected String message;
 
     /**
@@ -50,10 +45,6 @@ public abstract class Exchange {
      */
     public abstract CompletableFuture<List<Account>> getAccounts() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
-    /**
-     * Retrieve the symbol of the exchange (e.g., "BTC-USD").
-     */
-    public abstract String getSymbol();
 
     /**
      * Create an order on the exchange.
@@ -98,8 +89,6 @@ public abstract class Exchange {
      * Fetch the order book for a specific trade pair.
      */
     public abstract CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
-
-
     public abstract Position getPositions() throws IOException, InterruptedException, ExecutionException;
 
     /**
@@ -144,7 +133,7 @@ public abstract class Exchange {
      */
     public abstract void stopStreamLiveTrades(TradePair tradePair);
 
-
+    // Get candlestick data
     // WebSocket client for live updates
     // Stream live prices
     public abstract List<PriceData> streamLivePrices(@NotNull TradePair symbol);
@@ -154,22 +143,25 @@ public abstract class Exchange {
 
     // Stream live order book
     public abstract List<OrderBook> streamOrderBook(@NotNull TradePair tradePair);
-
     // Cancel all orders
-    public abstract CompletableFuture<String> cancelAllOrders()
-            throws InvalidKeyException, NoSuchAlgorithmException, IOException;
+    public abstract CompletableFuture<String> cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException;
 
     public abstract boolean supportsStreamingTrades(TradePair tradePair);
 
-    //  Get Crypto Deposit History  GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
+    //  Get Crypto Deposit History GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
     public abstract ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
-    //  Get Crypto Withdraw History  GET /sapi/v1/capital/withdraw/history (HMAC SHA256)
+    //  Get Crypto Withdraw History GET /sapi/v1/capital/withdraw/history (HMAC SHA256)
     public abstract ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
-
-
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
 
 
-
+    public boolean isTradePairAvailable(TradePair tradePair) {
+        try {
+            return getTradePairs().get().contains(tradePair);
+        } catch (Exception e) {
+            logger.error("Error checking if trade pair {} is available", tradePair, e);
+            return false;
+        }
+    }
 }

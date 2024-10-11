@@ -25,9 +25,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.Currency.db1;
 
 public  class Coinbase extends Exchange {
 
@@ -77,21 +80,18 @@ public  class Coinbase extends Exchange {
         }
         ObjectMapper objectMapper = new ObjectMapper();
         List<Account> accounts = objectMapper.readValue(response.body(), objectMapper.getTypeFactory().constructCollectionType(List.class, Account.class));
-        return CompletableFuture.completedFuture(accounts);
+        return completedFuture(accounts);
 
     }
 
-    @Override
-    public String getSymbol() {
-        return tradePair.toString('/');
-    }
+
 
     @Override
     public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException {
 
         requestBuilder.uri(URI.create(
                 "%s/orders".formatted(API_URL)
-        )) ;
+        ));
 
         requestBuilder.method("POST", HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(new CreateOrderRequest(
                 tradePair.toString('/'),
@@ -101,10 +101,11 @@ public  class Coinbase extends Exchange {
                 size,timestamp
                 ,
                 stopLoss,
-                takeProfit))))
-                ;
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
-                ;
+                takeProfit))));
+
+
+        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
         if (response.statusCode()!= 200) {
             throw new RuntimeException("Error creating order: %d".formatted(response.statusCode()));
         }
@@ -126,7 +127,7 @@ public  class Coinbase extends Exchange {
             throw new RuntimeException("Error cancelling order: %d".formatted(response.statusCode()));
         }
         logger.info("Order cancelled: {}", orderId);
-        return CompletableFuture.completedFuture(orderId);
+        return completedFuture(orderId);
     }
 
     @Override
@@ -152,7 +153,7 @@ public  class Coinbase extends Exchange {
         Objects.requireNonNull(stopAt);
 
         if (stopAt.isAfter(Instant.now())) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
+            return completedFuture(Collections.emptyList());
         }
 
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
@@ -232,7 +233,7 @@ public  class Coinbase extends Exchange {
                 currentCandleStartedAt, ZoneOffset.UTC));
         long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
         // Get the closest supported granularity to the ideal granularity.
-        int actualGranularity = getSupportedGranularities(secondsPerCandle);
+        int actualGranularity = getSupportedGranularity(secondsPerCandle);
 
 
         return client.sendAsync(
@@ -306,25 +307,25 @@ public  class Coinbase extends Exchange {
     }
 
     @Override
-    public List<Order> getPendingOrders() throws IOException, InterruptedException {
+    public List<Order> getPendingOrders() {
         return List.of();
     }
 
     @Override
-    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+    public CompletableFuture<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
 
         requestBuilder.uri(URI.create("%s/products/%s/book".formatted(API_URL, tradePair.toString('-'))));
         HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("coinbase response: " + response.body());
         ObjectMapper objectMapper = new ObjectMapper();
         OrderBook orderBook = objectMapper.readValue(response.body(), OrderBook.class);
-        return CompletableFuture.completedFuture(orderBook);
+        return completedFuture(orderBook);
 
 
     }
 
     @Override
-    public Position getPositions() throws IOException, InterruptedException, ExecutionException {
+    public Position getPositions() {
         return null;
     }
 
@@ -384,7 +385,7 @@ public  class Coinbase extends Exchange {
 
             //coinbase response: [{"id":"DOGE-BTC","base_currency":"DOGE","quote_currency":"BTC","quote_increment":"0.00000001","base_increment":"0.1","display_name":"DOGE-BTC","min_market_funds":"0.000016","margin_enabled":false,"post_only":false,"limit_only":false,"cancel_only":false,"status":"online","status_message":"","trading_disabled":false,"fx_stablecoin":false,"max_slippage_percentage":"0.03000000","auction_mode":false,
             for (JsonNode rate : res) {
-                CryptoCurrency baseCurrency, counterCurrency;
+                Currency baseCurrency, counterCurrency;
 
 
                 String fullDisplayName = rate.get("base_currency").asText();
@@ -394,14 +395,14 @@ public  class Coinbase extends Exchange {
                 String code = rate.get("base_currency").asText();
                 int fractionalDigits = 8;
                 String symbol = rate.get("base_currency").asText();
-                baseCurrency = new CryptoCurrency(fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol);
+                baseCurrency = new Currency(UUID.randomUUID().hashCode(), CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol);
                 String fullDisplayName2 = rate.get("quote_currency").asText();
                 String shortDisplayName2 = rate.get("quote_currency").asText();
                 String code2 = rate.get("quote_currency").asText();
                 int fractionalDigits2 = 8;
                 String symbol2 = rate.get("quote_currency").asText();
 
-                counterCurrency = new CryptoCurrency(
+                counterCurrency = new Currency(UUID.randomUUID().hashCode(), CurrencyType.CRYPTO,
                         fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2
                         , symbol);
 
@@ -414,12 +415,19 @@ public  class Coinbase extends Exchange {
 
 
             }
+            db1.save((ArrayList<Currency>) tradePairs.stream().map(
+                    TradePair::getCounterCurrency
+            ).collect(Collectors.toList()));
+
+            db1.save((ArrayList<Currency>) tradePairs.stream().map(
+                    TradePair::getBaseCurrency
+            ).collect(Collectors.toList()));
 
 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return CompletableFuture.completedFuture(tradePairs);
+        return completedFuture(tradePairs);
 
 
 
@@ -432,9 +440,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         message =
                 "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
         CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-
-
-        logger.info("WebSocket",dat);
+        logger.info("WebSocket :{}", dat);
     }
 
 
@@ -445,31 +451,28 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         message =
                 "{\"type\": \"unsubscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
         CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket", dat);
+        logger.info("WebSocket {}", dat);
+
 
     }
 
     @Override
     public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-
         String urls = websocketURL + "://" + symbol.toString('-') + ":" + 20;
-        message =
-                "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"ticker\",\"product_id\": \"%s\"}]}".formatted(symbol);
+        message = "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"ticker\",\"product_id\": \"%s\"}]}".formatted(symbol);
         CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket", dat);
+        logger.info("WebSocket {}", dat);
         return Collections.emptyList();
-
-
     }
 
     @Override
     public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
 
-        String urls= websocketURL+ "://"+symbol + ":"+intervalSeconds ;
+        String urls = websocketURL + "://" + symbol + ":" + intervalSeconds;
         message =
                 "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(symbol);
         CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket",dat);
+        logger.info("WebSocket  {}", dat);
         return Collections.emptyList();
 
     }
@@ -480,7 +483,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     }
 
     @Override
-    public CompletableFuture<String> cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException {
+    public CompletableFuture<String> cancelAllOrders() {
         return null;
     }
 
@@ -490,12 +493,12 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     }
 
     @Override
-    public ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
+    public ArrayList<CryptoDeposit> getCryptosDeposit() {
         return null;
     }
 
     @Override
-    public ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
+    public ArrayList<CryptoWithdraw> getCryptosWithdraw() {
         return null;
     }
 
@@ -526,11 +529,13 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     }
 
     /**
-     * Returns the set of supported granularities for Coinbase.
+     * Returns the set of supported granularity for Coinbase.
      *
      * @return Set of supported granularity values in seconds.
      */
-    public int  getSupportedGranularities(int secondsPerCandle) {
+
+
+    public int getSupportedGranularity(int secondsPerCandle) {
 
         // If the given secondsPerCandle is supported, return the exact granularity.
         if (isSupportedGranularity(secondsPerCandle)) {

@@ -14,30 +14,33 @@ import java.util.Objects;
 @Table(name = "candle_data")
 public class CandleData {
 
+
     @Column(name = "volume", nullable = false)
-    private static double volume = 0;
+    static double volume = 0;
+    int closeTime;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
-    private Long id;
+    Long id;
     @Column(name = "open_price", nullable = false)
-    private double openPrice = 0;
+    double openPrice = 0;
     @Column(name = "close_price", nullable = false)
-    private double closePrice = 0;
+    double closePrice = 0;
     @Column(name = "high_price", nullable = false)
-    private double highPrice = 0;
+    double highPrice = 0;
     @Column(name = "low_price", nullable = false)
-    private double lowPrice = 0;
+    double lowPrice = 0;
     @Column(name = "open_time", nullable = false)
-    private int openTime = 0;
+    int openTime = 0;
     @Column(name = "average_price")
-    private double averagePrice = 0;
+    double averagePrice = 0;
 
     @Column(name = "volume_weighted_average_price")
-    private double volumeWeightedAveragePrice = 0;
+    double volumeWeightedAveragePrice = 0;
 
     @Transient
-    private boolean placeHolder = false;
+    boolean placeHolder = false;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime, double volume) {
         this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
@@ -61,14 +64,18 @@ public class CandleData {
     public CandleData(double aDouble, double aDouble1, double aDouble2, double aDouble3, int anInt, int closeTime, double volume) {
         this(aDouble, aDouble1, aDouble2, aDouble3, anInt, volume, (aDouble + aDouble1 + aDouble2 + aDouble3) / 4,
                 volume * ((aDouble + aDouble1 + aDouble2 + aDouble3) / 4), false);
+
+        this.closeTime = closeTime;
+        CandleData.volume = volume;
     }
 
-    public CandleData(Instant instant, double closePrice, double highPrice, double lowPrice, double v, long volume) {
+    public CandleData(@NotNull Instant instant, double closePrice, double highPrice, double lowPrice, double v, long volume) {
 
         this.openTime = instant.getNano();
         this.closePrice = closePrice;
         this.highPrice = highPrice;
         this.lowPrice = lowPrice;
+
         CandleData.volume = volume;
         this.averagePrice = (openPrice + highPrice + lowPrice + closePrice) / 4;
         this.volumeWeightedAveragePrice = volume * ((openPrice + lowPrice + closePrice + highPrice) / 4);
@@ -159,5 +166,13 @@ public class CandleData {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public int getCloseTime() {
+        return closeTime;
+    }
+
+    public void setCloseTime(int closeTime) {
+        this.closeTime = closeTime;
     }
 }

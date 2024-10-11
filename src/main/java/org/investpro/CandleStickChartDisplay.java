@@ -12,19 +12,19 @@ public class CandleStickChartDisplay extends StackPane {
 
     private static final Logger logger = LoggerFactory.getLogger(CandleStickChartDisplay.class);
 
-    public CandleStickChartDisplay( @NotNull Exchange exchange) {
+    public CandleStickChartDisplay(@NotNull Exchange exchange, TradePair selectedPair) {
         super();
         logger.info(
                 "CandleStickChartDisplay: exchange={}",
                 exchange
         );
         CandleStickChartContainer candleStickChartContainer = new CandleStickChartContainer(
-                exchange,  true
+                exchange, selectedPair, true
 
         );
         candleStickChartContainer.setPrefSize(
-                Double.MAX_VALUE,
-                Double.MAX_VALUE
+                1543,
+                780
         );
         AnchorPane.setTopAnchor(candleStickChartContainer, 30.0);
         AnchorPane.setLeftAnchor(candleStickChartContainer, 30.0);

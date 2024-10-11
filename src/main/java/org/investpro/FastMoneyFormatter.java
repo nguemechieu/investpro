@@ -1,5 +1,7 @@
 package org.investpro;
 
+import java.util.Objects;
+
 /**
  * @author Michael Ennen
  */
@@ -8,7 +10,7 @@ public class FastMoneyFormatter implements MoneyFormatter<Money> {
     public String format(Money money) {
         if (money instanceof DefaultMoney) {
             DefaultMoneyFormatter defaultMoneyFormatter;
-            if (money.currency().getCurrencyType() == CurrencyType.FIAT) {
+            if (Objects.equals(money.currency().getCurrencyType(), CurrencyType.FIAT.name())) {
                 defaultMoneyFormatter = DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER;
             } else {
                 defaultMoneyFormatter = DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER;
@@ -25,7 +27,7 @@ public class FastMoneyFormatter implements MoneyFormatter<Money> {
     private String format(FastMoney money) {
         if (money.getPrecision() == 0) {
             // but that is not yet how it's working
-            if (money.currency().getCurrencyType() == CurrencyType.FIAT) {
+            if (Objects.equals(money.currency().getCurrencyType(), CurrencyType.FIAT.name())) {
                 return money.currency().getSymbol() + "\\" + money.amount() + ".00";
             } else {
                 return Long.toString(money.amount()) + ' ' + money.currency().getCode();
@@ -69,7 +71,7 @@ public class FastMoneyFormatter implements MoneyFormatter<Money> {
         }
 
         // add symbol/code depending on type
-        if (money.currency().getCurrencyType() == CurrencyType.FIAT) {
+        if (Objects.equals(money.currency().getCurrencyType(), CurrencyType.FIAT.name())) {
             buf[--p] = money.currency().getSymbol().charAt(0);
         }
 
@@ -80,7 +82,7 @@ public class FastMoneyFormatter implements MoneyFormatter<Money> {
             result += '0';
         }
 
-        if (money.currency().getCurrencyType() == CurrencyType.CRYPTO) {
+        if (Objects.equals(money.currency().getCurrencyType(), CurrencyType.CRYPTO.name())) {
             result += ' ' + money.currency().getCode();
         }
         return result;

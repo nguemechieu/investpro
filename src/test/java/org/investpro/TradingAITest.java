@@ -78,7 +78,7 @@ public class TradingAITest {
         assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
 
         // Print the result
-        logger.info(STR."Candle Data Signal: \{signal}");
+        logger.info("Candle Data Signal: " + signal);
     }
 
     @Test
@@ -101,7 +101,7 @@ public class TradingAITest {
             assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
 
             // Print the result
-            logger.info(STR."Moving Average Signal: \{signal}");
+            logger.info("Moving Average Signal: " + signal);
 
             Thread.sleep(1000);
         }

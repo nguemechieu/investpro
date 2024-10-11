@@ -27,7 +27,7 @@ public class Wallet extends AnchorPane {
     private double balanceBTC; // Bitcoin balance
     private static final String walletAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"; // Example Bitcoin wallet address
 
-    private CompletableFuture<List<Account>> accounts;
+
 
     public Wallet(@NotNull CompletableFuture<List<Account>> dataAccount) throws ExecutionException, InterruptedException {
 
@@ -48,11 +48,9 @@ public class Wallet extends AnchorPane {
             canvas.getGraphicsContext2D().fillRect(0, 0, 600, 400);
             canvas.getGraphicsContext2D().strokeText("Welcome to InvestPro", 10, 30);
             canvas.getGraphicsContext2D().strokeText("InvestPro", 10, 60);
-        canvas.getGraphicsContext2D().strokeText("Account ID: %s".formatted(df.format(dataAccount.get().getFirst().getId())), 10, 90);
-            canvas.getGraphicsContext2D().strokeText("Balance: %%s %s".formatted(dataAccount.get().getFirst().getBalance()), 10, 120);
-            canvas.getGraphicsContext2D().strokeText("Tags: %s".formatted(dataAccount.get().getFirst().getCurrency().formatted(df.format(dataAccount.get().getFirst().getTags()))), 10, 120);
 
-            getChildren().add(canvas);
+
+        getChildren().add(canvas);
         // Buttons for Deposit and Withdraw
         Button depositButton = new Button("Deposit BTC");
         Button withdrawButton = new Button("Withdraw BTC");
@@ -100,7 +98,7 @@ public class Wallet extends AnchorPane {
         if (!accounts.isEmpty()) {
             Account primaryAccount = accounts.get(0);
             balanceBTC = primaryAccount.getBalance();
-            balanceLabel.setText("Balance: " + df.format(balanceBTC) + " " + primaryAccount.getCurrency());
+            balanceLabel.setText("Balance: $" + df.format(balanceBTC));
         } else {
             balanceLabel.setText("Balance: 0.00 BTC");
         }

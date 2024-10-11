@@ -4,7 +4,6 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -15,7 +14,7 @@ public class LiveTradesConsumer {
 
     private static final Logger logger = LoggerFactory.getLogger(LiveTradesConsumer.class);
     private final List<TradePair> tradePairs = new ArrayList<>();
-    private final Portfolio portfolio = new Portfolio(BigDecimal.ONE);
+
     public Account account;
     List<Trade> livesTrades;
     private boolean ready;
@@ -62,7 +61,7 @@ public class LiveTradesConsumer {
 
         // Calculate statistics, perform calculations, and update relevant data structures
         updateTradeStatistics(tradeQueue);
-        updatePortfolio(tradeQueue);
+
     }
 
     // Helper method to validate a trade
@@ -140,39 +139,7 @@ public class LiveTradesConsumer {
         // Update your trade statistics data structure (e.g., database, in-memory store)
     }
 
-    // Update the portfolio or account based on trades
-    private void updatePortfolio(@NotNull List<Trade> tradeQueue) {
-        for (Trade trade : tradeQueue) {
-            // Log the current trade being processed
-            logger.debug("Updating portfolio for trade: {}", trade);
 
-            // Update portfolio balance or holdings based on the trade type (buy/sell)
-            if (trade.isBuy()) {
-                // Handle buy trades: Add the asset to the portfolio or increase the position
-                logger.info("Processing buy trade for: {} with amount: {}", trade.getTradePair(), trade.getAmount());
-
-                // For example, update the asset position (add amount to the current holding)
-                portfolio.addPosition(trade.getTradePair().getBaseCurrency(), BigDecimal.valueOf(trade.getAmount()));
-
-                // Deduct the cost from the portfolio's cash balance
-                portfolio.decreaseCash(BigDecimal.valueOf(trade.getAmount()));
-            } else if (trade.isSell()) {
-                // Handle sell trades: Remove the asset from the portfolio or decrease the position
-                logger.info("Processing sell trade for: {} with amount: {}", trade.getTradePair(), trade.getAmount());
-
-                // For example, update the asset position (subtract amount from the current holding)
-                portfolio.subtractPosition(trade.getTradePair().getBaseCurrency(), BigDecimal.valueOf(trade.getAmount()));
-
-                // Add the proceeds to the portfolio's cash balance
-                portfolio.increaseCash(BigDecimal.valueOf(trade.getAmount()));
-            } else {
-                logger.warn("Unknown trade type: {}", trade);
-            }
-
-            // Additional updates, like logging or recalculating portfolio metrics (e.g., value, P&L, etc.)
-            portfolio.updateMetrics();
-        }
-    }
 
 
     public void run() {
@@ -307,7 +274,7 @@ public class LiveTradesConsumer {
         processTrade(liveTrade);
         // Update trade statistics, portfolio, and notify users
         updateTradeStatistics(this.tradeQueue);
-        updatePortfolio(this.tradeQueue);
+
         notifyUsers(liveTrade.getTrade());
     }
 

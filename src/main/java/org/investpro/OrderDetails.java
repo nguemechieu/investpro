@@ -8,51 +8,134 @@ import jakarta.persistence.*;
 public class OrderDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
+    Long id;
 
     @Column(name = "create_time", nullable = false)
-    private String createTime;
+    String createTime;
 
     @Column(name = "instrument", nullable = false)
-    private String instrument;
+    String instrument;
 
     @Column(name = "partial_fill")
-    private String partialFill;
+    String partialFill;
 
     @Column(name = "position_fill")
-    private String positionFill;
+    String positionFill;
 
     @Column(name = "price", nullable = false)
-    private String price;
+    String price;
 
     @Column(name = "replaces_order_id")
-    private String replacesOrderID;
+    String replacesOrderID;
 
     @Column(name = "state", nullable = false)
-    private String state;
+    String state;
 
     @Column(name = "time_in_force", nullable = false)
-    private String timeInForce;
+    String timeInForce;
 
     @Column(name = "trigger_condition", nullable = false)
-    private String triggerCondition;
-
+    String triggerCondition;
     @Column(name = "type", nullable = false)
-    private String type;
-
+    String type;
     @Column(name = "units", nullable = false)
-    private String units;
+    String units;
 
-    @ManyToOne
-    @JoinColumn(name = "order_id")
-    private Order order;
-
-    // Getters and setters...
-    public Order getOrder() {
-        return order;
+    public String getType() {
+        return type;
     }
 
-    public void setOrder(Order order) {
-        this.order = order;
+    public void setType(String type) {
+        this.type = type;
     }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(String createTime) {
+        this.createTime = createTime;
+    }
+
+    public String getInstrument() {
+        return instrument;
+    }
+
+    public void setInstrument(String instrument) {
+        this.instrument = instrument;
+    }
+
+    public String getPartialFill() {
+        return partialFill;
+    }
+
+    public void setPartialFill(String partialFill) {
+        this.partialFill = partialFill;
+    }
+
+    public String getPositionFill() {
+        return positionFill;
+    }
+
+    public void setPositionFill(String positionFill) {
+        this.positionFill = positionFill;
+    }
+
+    public String getPrice() {
+        return price;
+    }
+
+    public void setPrice(String price) {
+        this.price = price;
+    }
+
+    public String getReplacesOrderID() {
+        return replacesOrderID;
+    }
+
+    public void setReplacesOrderID(String replacesOrderID) {
+        this.replacesOrderID = replacesOrderID;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getTimeInForce() {
+        return timeInForce;
+    }
+
+    public void setTimeInForce(String timeInForce) {
+        this.timeInForce = timeInForce;
+    }
+
+    public String getTriggerCondition() {
+        return triggerCondition;
+    }
+
+    public void setTriggerCondition(String triggerCondition) {
+        this.triggerCondition = triggerCondition;
+    }
+
+    public String getUnits() {
+        return units;
+    }
+
+    public void setUnits(String units) {
+        this.units = units;
+    }
+
+
 }

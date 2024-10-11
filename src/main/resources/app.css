@@ -1,4 +1,13 @@
-
+.tradingWindow{
+-fx-background-color: #072333;
+    -fx-text-fill: #57af71;
+    -fx-text-align: center;
+    -fx-background-color: #116798;
+    -fx-background-radius: 5.0;
+    -fx-background-insets: 0;
+    -fx-border-color: #ac7446;
+    -fx-border-width: 2.0;
+}
 .chart-container {
     -fx-background-color: #072333;
     -fx-background-radius: 10.0;
@@ -16,8 +25,6 @@
     -fx-background-insets: 0;
     -fx-border-color: #ac7446;
     -fx-border-width: 2.0;
-
-
 }
 
 .account-tab {
@@ -427,7 +434,10 @@
 .tab-pane-selected {
     -fx-background-color: rgb(69, 209, 111);
     -fx-border-color: rgba(175, 195, 32, 0.7);
+    -fx-text-fill-color: #ffffff;
 
 }
+
+
 
 

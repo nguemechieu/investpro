@@ -6,7 +6,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.sql.SQLException;
 
 /**
  * @author NOEL NGUEMECHIEU
@@ -16,7 +15,7 @@ public interface Money {
     @NotNull
     static Money of(BigDecimal bd) throws Exception {
 
-        return new DefaultMoney(bd, Currency.ofFiat("USD"));
+        return new DefaultMoney(bd, Currency.of("USD"));
 
 
     }
@@ -51,7 +50,7 @@ public interface Money {
 
     Money minus(long subtrahend);
 
-    Money minus(double subtrahend);
+    Money minus(double subtrahend) throws Exception;
 
     Money multipliedBy(long multiplier);
 

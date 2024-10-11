@@ -1,5 +1,12 @@
 package org.investpro;
 
+import javafx.animation.FadeTransition;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.util.Duration;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -7,15 +14,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
-import java.util.Date;
 import java.util.Objects;
-
-import javafx.animation.FadeTransition;
-import javafx.beans.property.SimpleIntegerProperty;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
-import javafx.util.Duration;
 
 /**
  * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
@@ -36,11 +35,11 @@ public class CandleStickChartContainer extends Region {
     private CandleStickChart candleStickChart;
 
 
-    public CandleStickChartContainer(Exchange exchange,  boolean liveSyncing) {
+    public CandleStickChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
         Objects.requireNonNull(exchange, "exchange must not be null");
 
         this.exchange = exchange;
-        this.tradePair = exchange.tradePair;
+        this.tradePair = tradePair;
 
 
         this.candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
@@ -86,7 +85,7 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        //secondsPerCandle.set(300);
+        secondsPerCandle.set(300);
     }
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException {
@@ -117,10 +116,10 @@ public class CandleStickChartContainer extends Region {
 
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle, tradePair);
 
-        new ReverseRawTradeDataProcessor(path,
-          secondsPerCandle,exchange.tradePair);
+//        new ReverseRawTradeDataProcessor(path,
+//          secondsPerCandle,tradePair);
 
-        candleStickChart = new CandleStickChart(exchange, candleDataSupplier,  liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        candleStickChart = new CandleStickChart(exchange, tradePair, candleDataSupplier, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
     private void animateInNewChart(CandleStickChart newChart) {

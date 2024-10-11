@@ -41,38 +41,31 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(new BigDecimal(Double.valueOf(amount).toString()), currency);
     }
 
-    public static Money of(int amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(int amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(BigDecimal.valueOf(amount), currencyType, currencyCode);
     }
 
-    public static Money of(long amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(long amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(BigDecimal.valueOf(amount), currencyType, currencyCode);
     }
 
-    public static Money of(float amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(float amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(new BigDecimal(Float.valueOf(amount).toString()), currencyType, currencyCode);
     }
 
-    public static Money of(double amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(double amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(new BigDecimal(Double.valueOf(amount).toString()), currencyType, currencyCode);
     }
 
-    public static Money of(String amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(String amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return of(new BigDecimal(amount), currencyType, currencyCode);
     }
 
-    public static Money of(BigDecimal amount, CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
+    public static @NotNull Money of(BigDecimal amount, @NotNull CurrencyType currencyType, String currencyCode) throws SQLException, ClassNotFoundException {
         return switch (currencyType) {
-            case FIAT -> {
+            case FIAT, CRYPTO -> {
                 try {
-                    yield new DefaultMoney(amount, Currency.ofFiat(currencyCode));
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            case CRYPTO -> {
-                try {
-                    yield new DefaultMoney(amount, Currency.ofCrypto(currencyCode));
+                    yield new DefaultMoney(amount, Currency.of(currencyCode));
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -87,26 +80,19 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
     }
 
 
-    public static @NotNull Money ofFiat(BigDecimal amount, String currencyCode) throws SQLException, ClassNotFoundException {
-        return of(amount, CurrencyType.FIAT, currencyCode);
-    }
-
-
-    public static @NotNull Money ofFiat(BigDecimal amount, Currency currency) {
-        return of(amount, currency);
-    }
-
     @Contract("_, _ -> new")
     public static @NotNull Money ofFiat(String amount, Currency currency) {
         return of(new BigDecimal(amount), currency);
     }
 
 
-    public static Money ofCrypto(String amount, Currency currency) {
+    @Contract("_, _ -> new")
+    public static @NotNull Money ofCrypto(String amount, Currency currency) {
         return of(new BigDecimal(amount), currency);
     }
 
-    public Money plus(DefaultMoney defaultMoney) {
+    @Contract("_ -> new")
+    public @NotNull Money plus(DefaultMoney defaultMoney) {
         checkCurrenciesEqual(defaultMoney);
         return new DefaultMoney(this.amount.add(defaultMoney.amount), currency);
     }
@@ -122,12 +108,14 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
-    public Money plus(float amount) {
+    @Contract("_ -> new")
+    public @NotNull Money plus(float amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money plus(double amount) {
+    public @NotNull Money plus(double amount) {
         return new DefaultMoney(this.amount.add(BigDecimal.valueOf(amount)), currency);
     }
 
@@ -291,8 +279,9 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         }
     }
 
+    @Contract(" -> new")
     @Override
-    public Money negate() {
+    public @NotNull Money negate() {
         return new DefaultMoney(amount.negate(), currency);
     }
 
@@ -314,13 +303,15 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return new DefaultMoney(amount.multiply(BigDecimal.valueOf(multiplier)), currency);
     }
 
+    @Contract("_, _ -> new")
     @Override
-    public Money multipliedBy(BigDecimal multiplier, MathContext mathContext) {
+    public @NotNull Money multipliedBy(BigDecimal multiplier, MathContext mathContext) {
         return new DefaultMoney(amount.multiply(multiplier, mathContext), currency);
     }
 
+    @Contract("_ -> new")
     @Override
-    public Money dividedBy(long divisor) {
+    public @NotNull Money dividedBy(long divisor) {
         return new DefaultMoney(amount.divide(BigDecimal.valueOf(divisor), RoundingMode.HALF_UP), currency);
     }
 
@@ -380,8 +371,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
     }
 
     @Override
-    public String toString() {
-        if (Objects.requireNonNull(currency.getCurrencyType()) == CurrencyType.FIAT) {
+    public @NotNull String toString() {
+        if (Objects.requireNonNull(currency.getCurrencyType()).equals(CurrencyType.FIAT.name())) {
             return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
         }
         return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);

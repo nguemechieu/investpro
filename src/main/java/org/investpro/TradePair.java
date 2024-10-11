@@ -1,12 +1,10 @@
 package org.investpro;
 
-import jakarta.persistence.*;
 import javafx.util.Pair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -59,7 +57,7 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     public TradePair() throws Exception {
-        super(new NullCryptoCurrency(),new NullFiatCurrency());
+        super(Currency.of("EUR"), Currency.of("USD"));
     }
 
     @Contract("_, _ -> new")
@@ -86,10 +84,12 @@ public class TradePair extends Pair<Currency, Currency> {
         Currency base = Currency.of(split[0]);
         Currency counter = Currency.of(split[1]);
 
+        assert base != null;
         if (base.equals(counter)) {
             throw new CurrencyNotFoundException(CurrencyType.valueOf(base.getCode()), counter.getCode());
         }
 
+        assert counter != null;
         return new TradePair(base, counter);
     }
 
@@ -109,11 +109,11 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public String toString(@NotNull Character separator) {
         if (separator.equals('_')) {
-            return String.format("%s_%s", baseCurrency.getCode().toUpperCase(), counterCurrency.getCode().toUpperCase());
+            return String.format("%s_%s", getBaseCurrency().getCode().toUpperCase(), getCounterCurrency().getCode().toUpperCase());
         } else if (separator.equals('-')) {
-            return String.format("%s-%s", baseCurrency.getCode().toUpperCase(), counterCurrency.getCode().toUpperCase());
+            return String.format("%s-%s", getBaseCurrency().getCode().toUpperCase(), getCounterCurrency().getCode().toUpperCase());
         } else if (separator.equals('/')) {
-            return String.format("%s%s", baseCurrency.getCode().toUpperCase(), counterCurrency.getCode().toUpperCase());
+            return String.format("%s%s", getBaseCurrency().getCode().toUpperCase(), getCounterCurrency().getCode().toUpperCase());
         } else {
             throw new IllegalArgumentException("Invalid separator: %s".formatted(separator));
         }

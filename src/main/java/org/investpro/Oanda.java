@@ -11,6 +11,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Alert;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -24,7 +25,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -33,8 +33,10 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.Currency.db1;
 
 public class Oanda extends Exchange {
 
@@ -68,7 +70,7 @@ public class Oanda extends Exchange {
         // Handle non-200 status codes by showing an error message and throwing a RuntimeException
         if (response.statusCode() != 200) {
             new Messages(
-                    "Error",  // Error type
+                    Alert.AlertType.ERROR,  // Error type
                     "Failed to fetch trading fee: %s".formatted(response.body())  // Error message from the response
             );
             throw new RuntimeException("Error fetching trading fee: %d".formatted(response.statusCode()));
@@ -95,7 +97,7 @@ public class Oanda extends Exchange {
         // Handle non-200 status codes by showing an error message and throwing a RuntimeException
         if (response.statusCode() != 200) {
             new Messages(
-                    "Error",  // Error type
+                    Alert.AlertType.ERROR,  // Error type
                     "Failed to fetch accounts: %s".formatted(response.body())  // Error message from the response
             );
             throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
@@ -115,9 +117,7 @@ public class Oanda extends Exchange {
                 if (account.has("marginRate")) {
                     account0.setMarginRate(accountObject.getDouble("marginRate"));
                 }
-                if (account.has("currency")) {
-                    account0.setCurrency(accountObject.getString("currency"));
-                }
+
                 if (account.has("created")) {
                     account0.setCreated(String.valueOf(LocalDateTime.ofInstant(Instant.ofEpochMilli(accountObject.getLong("createdTime")), ZoneOffset.UTC)));
                 }
@@ -150,10 +150,6 @@ public class Oanda extends Exchange {
         // Return the list of accounts
 
 
-    @Override
-    public String getSymbol() {
-        return tradePair.toString('/');
-    }
 
     @Override
     public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException{
@@ -279,7 +275,7 @@ public class Oanda extends Exchange {
                     } catch (JsonProcessingException ex) {
 
                         new  Messages(
-                                "Warning", "Failed to parse OANDA candles response. The response was: %%s%s".formatted(ex.getMessage()));
+                                Alert.AlertType.ERROR, "Failed to parse OANDA candles response. The response was: %%s%s".formatted(ex.getMessage()));
 
 
                         throw new RuntimeException(ex);
@@ -314,7 +310,7 @@ public class Oanda extends Exchange {
 
         if ( response.statusCode()!=200){
 
-            new Messages("Error", response.body());
+            new Messages(Alert.AlertType.WARNING, response.body());
             throw new RuntimeException("Error fetching pending orders: %d".formatted(response.statusCode()));
         }
 
@@ -349,7 +345,7 @@ public class Oanda extends Exchange {
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
        if ( response.statusCode()!=200)
        {
-           new Messages("Error", "Error fetching positions: %s".formatted(response.body()));
+           new Messages(Alert.AlertType.ERROR, "Error fetching positions: %s".formatted(response.body()));
            throw new RuntimeException("Error fetching positions: %d".formatted(response.statusCode()));
        }
 
@@ -383,7 +379,7 @@ public class Oanda extends Exchange {
 
         if (response.statusCode()!= 200) {
 
-            new Messages("Error", "%d\n\n%s".formatted(response.statusCode(), response.body()));
+            new Messages(Alert.AlertType.ERROR, "%d\n\n%s".formatted(response.statusCode(), response.body()));
             throw new RuntimeException("ORDER HTTP error response: %d".formatted(response.statusCode()));
         }
 
@@ -403,9 +399,8 @@ public class Oanda extends Exchange {
 
             HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode()!= 200) {
-
-                new  Messages("Error", "%d\n\n%s".formatted(response.statusCode(), response.body()));
-throw new RuntimeException("HTTP error response: %d".formatted(response.statusCode()));
+                new Messages(Alert.AlertType.ERROR, "%d\n\n%s".formatted(response.statusCode(), response.body()));
+                throw new RuntimeException("HTTP error response: %d".formatted(response.statusCode()));
             }
 
 
@@ -420,6 +415,18 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
                 tradePairs.add(tp);
                 logger.info("OANDA trade pair: %s".formatted(tp));
             }
+        logger.info("OANDA trade pairs: %s".formatted(tradePairs));
+
+        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+                TradePair::getCounterCurrency
+        ).collect(Collectors.toList()));
+
+        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+                TradePair::getBaseCurrency
+        ).collect(Collectors.toList()));
+
+
+
 
 
         return CompletableFuture.completedFuture(tradePairs);
@@ -581,7 +588,7 @@ throw new RuntimeException("HTTP error response: %d".formatted(response.statusCo
 
                             new Messages(
 
-                                     "Error",
+                                    Alert.AlertType.ERROR,
                                      ex.getMessage()
 
                              );

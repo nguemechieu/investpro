@@ -5,26 +5,27 @@
 
 <hibernate-mapping>
 
-    <class name="org.investpro.Currency" table="currencies">
+    <class name="org.investpro.User" table="users">
 
         <!-- Primary key definition -->
-        <id name="id" type="string" column="id">
+        <id name="id" type="long" column="id">
             <generator class="assigned"/> <!-- If id is generated externally, otherwise use native for numeric keys -->
         </id>
 
         <!-- Currency code -->
-        <property name="code" type="string">
-            <column name="code" length="10" not-null="true"/> <!-- Assuming code is mandatory -->
+        <property name="username" type="string">
+            <column name="username" length="100" not-null="true"/> <!-- Assuming code is mandatory -->
         </property>
 
         <!-- Currency type -->
-        <property name="currencyType" type="string">
-            <column name="currency_type" length="50" not-null="true"/> <!-- Adjust length and nullability as per requirement -->
+        <property name="password" type="string">
+            <column name="password" length="100"
+                    not-null="true"/> <!-- Adjust length and nullability as per requirement -->
         </property>
 
         <!-- Currency symbol -->
-        <property name="symbol" type="string">
-            <column name="symbol" length="10" not-null="true"/> <!-- Assuming symbol is also mandatory -->
+        <property name="email" type="string">
+            <column name="email" length="100" not-null="true"/> <!-- Assuming symbol is also mandatory -->
         </property>
 
     </class>

@@ -1,15 +1,16 @@
 package org.investpro;
 
+import javafx.scene.control.Alert;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
-
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Pages new candle data in chronological order to a {@code CandleStickChart} on-demand.
@@ -66,7 +67,7 @@ public class CandleDataPager {
                         if (count == candleData.size()) {
                             logger.info("No non-placeholder candles found in the data");
 
-                            new  Messages("Warning",
+                            new Messages(Alert.AlertType.WARNING,
                                     "No non-placeholder candles found in the data"
                             );
                             break;

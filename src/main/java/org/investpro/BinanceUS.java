@@ -10,6 +10,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Alert;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +23,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -29,10 +30,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
-import static org.investpro.BinanceUtils.generateSignature;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.Currency.db1;
 
 public class BinanceUS extends Exchange {
 
@@ -47,6 +49,8 @@ public class BinanceUS extends Exchange {
     static {
         serverTime = Date.from(Instant.now()).getTime();//-1000 is the gap between server and client
     }
+
+    private TradePair tradePair;
 
     public BinanceUS(String apikey, String apiSecret) throws NoSuchAlgorithmException, InvalidKeyException, IOException, InterruptedException {
         super(apikey, apiSecret);
@@ -127,7 +131,7 @@ public class BinanceUS extends Exchange {
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
+            new Messages(Alert.AlertType.ERROR, "Error fetching accounts: %d".formatted(response.statusCode()));
         }
         Account acc = OBJECT_MAPPER.readValue(response.body(), Account.class);
 
@@ -137,10 +141,6 @@ public class BinanceUS extends Exchange {
 
     }
 
-    @Override
-    public String getSymbol() {
-        return tradePair.toString('/');
-    }
 
     @Override
     public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException {
@@ -166,8 +166,7 @@ public class BinanceUS extends Exchange {
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
 
-            new Messages("Error", "%d\n%s".formatted(response.statusCode(), response.body()));
-            throw new RuntimeException("Error creating order: %d".formatted(response.statusCode()));
+            new Messages(Alert.AlertType.ERROR, "%d\n%s".formatted(response.statusCode(), response.body()));
         }
         logger.info("Order created: {}", response.body());
     }
@@ -184,8 +183,7 @@ public class BinanceUS extends Exchange {
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
 
-            new Messages("Error", "%d\n%s".formatted(response.statusCode(), response.body()));
-            throw new RuntimeException("Error cancelling order: %d".formatted(response.statusCode()));
+            new Messages(Alert.AlertType.ERROR, "%d\n%s".formatted(response.statusCode(), response.body()));
         }
         logger.info("Order cancelled: {}", orderId);
         return CompletableFuture.completedFuture(orderId);
@@ -265,14 +263,14 @@ public class BinanceUS extends Exchange {
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(response -> {
-                    logger.info("Binance response: " + response);
+
                     JsonNode res;
                     try {
                         res = OBJECT_MAPPER.readTree(response);
                     } catch (JsonProcessingException ex) {
                         logger.error("Error parsing JSON: %s".formatted(ex.getMessage()));
 
-                        new  Messages("Error parsing JSON: " , ex.getMessage());
+                        new Messages(Alert.AlertType.ERROR, ex.getMessage());
                         return Optional.empty();
 
                     }
@@ -319,13 +317,12 @@ public class BinanceUS extends Exchange {
         );
 
         if (response.statusCode() != 200) {
-            new Messages("Error", "%d\n%s".formatted(response.statusCode(), response.body()));
+            new Messages(Alert.AlertType.ERROR, "%d\n%s".formatted(response.statusCode(), response.body()));
             throw new RuntimeException("Error fetching open orders: %d".formatted(response.statusCode()));
         }
-        List<Order> orders = OBJECT_MAPPER.readValue(response.body(), new TypeReference<List<Order>>() {
-        });
 
-        return orders;
+        return OBJECT_MAPPER.readValue(response.body(), new TypeReference<>() {
+        });
 
 
 
@@ -389,11 +386,8 @@ public class BinanceUS extends Exchange {
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            logger.error("Error fetching open orders: HTTP status code %s", response.statusCode());
-            new Messages("Warning", "Error fetching open orders: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
-            throw new IllegalStateException(
-                    "Error fetching open orders: HTTP status code %s".formatted(response.statusCode())
-            );
+            new Messages(Alert.AlertType.ERROR, "Error fetching open orders: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
+
         }
 
 
@@ -422,10 +416,8 @@ public class BinanceUS extends Exchange {
         // Handle non-200 status codes by logging and showing an error message
         if (response.statusCode() != 200) {
             logger.error("Error fetching orders: HTTP status code %s".formatted(response.statusCode()));
-            new Messages("Warning", "Error fetching orders: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
-            throw new IllegalStateException(
-                    "Error fetching orders: HTTP status code %s".formatted(response.statusCode())
-            );
+            new Messages(Alert.AlertType.ERROR, "Error fetching orders: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
+
         }
 
         // Parse the response body into JSON
@@ -462,11 +454,11 @@ public class BinanceUS extends Exchange {
 
         ArrayList<TradePair> tradePairs = new ArrayList<>();
 
-            HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                logger.error("Error fetching trade pairs: HTTP status code %s", response.statusCode());
-                new Messages("Warning", "Error fetching trade pairs: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
+                logger.error("Error fetching trade pairs: HTTP status code %s{}", response.statusCode());
+                //  new Messages(Alert.AlertType.ERROR, "Error fetching trade pairs: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
                 throw new IllegalStateException(
                         "Error fetching trade pairs: HTTP status code %s,/%s".formatted(response.statusCode(), response.body())
                 );
@@ -481,20 +473,23 @@ public class BinanceUS extends Exchange {
             for (JsonNode symbol : symbols) {
                 String baseAsset = symbol.get("baseAsset").asText();
                 String quoteAsset = symbol.get("quoteAsset").asText();
-                TradePair tp = new TradePair(Objects.requireNonNull(CryptoCurrency.of(baseAsset)),CryptoCurrency.ofCrypto( quoteAsset));
+                TradePair tp = new TradePair(baseAsset, quoteAsset);
                 tradePairs.add(tp);
                 logger.info("Binance US trade pair: %s".formatted(tp));
 
+
             }
-            new DbHibernate().save((ArrayList<Currency>) tradePairs.stream().map(
-
-                    TradePair::getBaseCurrency
-            ).toList());
-
-        new DbHibernate().save((ArrayList<Currency>) tradePairs.stream().map(
-
+        db1.save((ArrayList<Currency>) tradePairs.stream().map(
                 TradePair::getCounterCurrency
-        ).toList());
+        ).collect(Collectors.toList()));
+
+        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+                TradePair::getBaseCurrency
+        ).collect(Collectors.toList()));
+
+
+
+
 
 
 
@@ -520,7 +515,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                 liveTradesConsumer.accept(liveTrade.getTrade());
             } catch (JsonProcessingException e) {
                 logger.error("Error parsing JSON: %s".formatted(e.getMessage()));
-                new Messages("Error parsing JSON: ", e.getMessage());
+                new Messages(Alert.AlertType.ERROR, e.getMessage());
                 throw new IllegalStateException(
                         "Error parsing JSON: %s".formatted(e.getMessage())
                 );
@@ -551,7 +546,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
             } catch (JsonProcessingException e) {
                 logger.error("Error parsing JSON: %s".formatted(e.getMessage()));
-                new Messages("Error parsing JSON: ", e.getMessage());
+                new Messages(Alert.AlertType.ERROR, e.getMessage());
                 return List.of();
             }
             return  new ArrayList< >((Collection) pricedata);
@@ -580,7 +575,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                 orderBook = OBJECT_MAPPER.readValue(message, OrderBook.class);
             } catch (JsonProcessingException e) {
                 logger.error("Error parsing JSON: %s".formatted(e.getMessage()));
-                new Messages("Error parsing JSON: ", e.getMessage());
+                new Messages(Alert.AlertType.ERROR, e.getMessage());
                 return List.of();
             }
             return new ArrayList<>((Collection) orderBook);
@@ -639,7 +634,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
       HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if ( response.statusCode()!=200 ){
-            new  Messages("Error", response.body());
+            new Messages(Alert.AlertType.ERROR, response.body());
             throw new RuntimeException("HTTP error response: " + response.body());
         }
         logger.info("Binance response: " + response.body());
@@ -675,10 +670,10 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
         if ( response.statusCode()!=200 ){
-            new  Messages("Error", response.body());
+            new Messages(Alert.AlertType.ERROR, response.body());
             throw new RuntimeException("HTTP error response: " + response.body());
         }
-        logger.info("Binance response: " , response.body());
+        logger.info("Binance response: " + response.body());
 
         ArrayList<CryptoWithdraw> withdraws = new ArrayList<>();
         CryptoWithdraw withdraw = OBJECT_MAPPER.readValue(response.body(), CryptoWithdraw.class);
@@ -705,15 +700,17 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
             super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         }
 
+        @Contract(" -> new")
         @Override
-        public Set<Integer> getSupportedGranularity() {
+        public @NotNull Set<Integer> getSupportedGranularity() {
             // Binance uses fixed time intervals (1m, 3m, 5m, etc.)
             // Here we map them to seconds
             return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400));
         }
 
+        @Contract("_, _ -> new")
         @Override
-        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        public @NotNull CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
             return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair);
         }
 
@@ -759,7 +756,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                     .thenApply(response -> {
                         if (response.statusCode() != 200) {
                             logger.error("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair.toString('/')));
-                            new Messages("Error", "Failed to fetch candle data\n%s".formatted(response));
+                            new Messages(Alert.AlertType.ERROR, "Failed to fetch candle data\n%s".formatted(response));
                             throw new RuntimeException("Failed to fetch candle data: %s for trade pair: %s".formatted(response.body(), tradePair.toString('/')));
                         }
 

@@ -12,7 +12,7 @@ public class BinanceUtils {
     private static final String HMAC_SHA256 = "HmacSHA256";
 
     // Method to create the HMAC SHA256 signature
-    public static String generateSignature(String data, String apiSecret) throws NoSuchAlgorithmException, InvalidKeyException {
+    public static @NotNull String generateSignature(@NotNull String data, @NotNull String apiSecret) throws NoSuchAlgorithmException, InvalidKeyException {
         Mac hmacSha256 = Mac.getInstance(HMAC_SHA256);
         SecretKeySpec secretKeySpec = new SecretKeySpec(apiSecret.getBytes(StandardCharsets.UTF_8), HMAC_SHA256);
         hmacSha256.init(secretKeySpec);

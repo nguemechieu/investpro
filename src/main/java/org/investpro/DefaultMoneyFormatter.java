@@ -117,7 +117,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
                 !displayAtLeastAllFractionalDigits) {
             // the number has no fractional digits
             if (forceDecimalPoint) {
-                if (defaultMoney.currency().getCurrencyType() == CurrencyType.FIAT) {
+                if (Objects.equals(defaultMoney.currency().getCurrencyType(), CurrencyType.FIAT.name())) {
                     if (locale == null) {
                         decimalPointSeparator = ".";
                     } else {

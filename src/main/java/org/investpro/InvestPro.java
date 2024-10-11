@@ -23,21 +23,21 @@ public class InvestPro extends Application {
     public void start(@NotNull Stage primaryStage) {
         try {
             // Set window icon
-            Image icon = new Image(Objects.requireNonNull(InvestPro.class.getResource("/investpro.png")).toExternalForm());
+            Image icon = new Image(Objects.requireNonNull(InvestPro.class.getResource("/img/investpro.png")).toExternalForm());
             primaryStage.getIcons().add(icon);
 
-            // Setup the primary scene
+            // Set up the primary scene
             Scene scene = new Scene(new TradingWindow(), 1540, 780);
             scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
 
-            // Setup the stage
+            // Set up the stage
             primaryStage.setTitle(String.format("InvestPro - Copyright 2020-%s",
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy"))));
             primaryStage.setResizable(true);
-            primaryStage.setOnCloseRequest(event -> Platform.exit());
+            primaryStage.setOnCloseRequest(_ -> Platform.exit());
 
             // Optional fullscreen listener
-            primaryStage.fullScreenProperty().addListener((observable, oldValue, newValue) ->
+            primaryStage.fullScreenProperty().addListener((_, _, newValue) ->
                     primaryStage.setFullScreen(newValue));
 
             // Set the scene and display the stage

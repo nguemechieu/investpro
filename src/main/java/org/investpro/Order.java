@@ -17,15 +17,12 @@ public class Order {
     String lastTransactionID;  // Not mapped to database
     @Transient
     Order[] orders;  // Not mapped to database
-    private long orderId;
-    private long time;
+    long orderId;
+    long time;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
     private Long id;
-    //    @ManyToOne
-//    @JoinColumn(name = "account_id", nullable = false)
-//    Account account;  // Foreign key reference to Account
     @Column(name = "side", nullable = false)
     @Enumerated(EnumType.STRING)
     Side side;

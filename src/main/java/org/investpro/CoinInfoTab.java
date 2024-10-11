@@ -66,7 +66,7 @@ public class CoinInfoTab extends Tab {
     private void addSampleData(TableView<CoinInfo> tableView) {
         // Normally, you would load this from a live API, but we'll add static data for now
 
-        tableView.getItems().addAll(CryptoCurrencyDataProvider.getCoinInfoList());
+        tableView.getItems().addAll(CurrencyDataProvider.getCoinInfoList());
     }
 
 

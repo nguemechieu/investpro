@@ -1,14 +1,13 @@
 package org.investpro;
 
-import java.sql.SQLException;
+import javafx.util.StringConverter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Locale;
 import java.util.Objects;
-
-import javafx.util.StringConverter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author NOEL NGUEMECHIEU
@@ -33,7 +32,7 @@ public class MoneyAxisFormatter extends StringConverter<Number> {
 
     @Override
     public String toString(Number number) {
-        if (currency.getCurrencyType() == CurrencyType.FIAT) {
+        if (Objects.equals(currency.getCurrencyType(), CurrencyType.FIAT.name())) {
             try {
                 return format.format(FastMoney.ofFiat(number.doubleValue(), currency.getCode(), precision));
             } catch (Exception e) {

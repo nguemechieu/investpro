@@ -8,8 +8,7 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Side;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.Region;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import org.jetbrains.annotations.NotNull;
@@ -25,41 +24,38 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.*;
 
-public class DisplayExchange extends Region {
+public class DisplayExchange extends AnchorPane {
 
     private static final Logger logger = LoggerFactory.getLogger(DisplayExchange.class);
-    private final Exchange exchange;
-    private final ObservableList<Order> ordersData;
-    private final ObservableList<Position> positionsData;
-    private final TreeTableView<News> newsTreeTableView;
-    private final Canvas upcomingNewsBox;
+    final ObservableList<Order> ordersData = FXCollections.observableArrayList();
+    final ObservableList<Position> positionsData = FXCollections.observableArrayList();
+    final TreeTableView<News> newsTreeTableView = createNewsTreeTableView();
+    final Canvas upcomingNewsBox = new Canvas();
+    Exchange exchange;
 
     // Executor for periodic updates
     private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
+
     public DisplayExchange(@NotNull Exchange exchange) throws Exception {
         this.exchange = exchange;
-
-        ordersData = FXCollections.observableArrayList();
-        positionsData = FXCollections.observableArrayList();
-
         // Create the ComboBox for Trade Pairs
         ComboBox<TradePair> tradePairsCombo = new ComboBox<>();
-        tradePairsCombo.setCellFactory(_ -> new ListCell<>() {
-            @Override
-            protected void updateItem(TradePair tradePair, boolean empty) {
-                super.updateItem(tradePair, empty);
-                setText(empty ? "Select Trade Pair" : tradePair.toString('/'));
-            }
-        });
+
 
         // Populate trade pairs asynchronously
-        tradePairsCombo.getItems().addAll(exchange.getTradePairs().get());
+        tradePairsCombo.getItems().addAll(exchange.getTradePairs().get().stream().filter(exchange::isTradePairAvailable).toList());
+        logger.info("Trade pairs {}", tradePairsCombo.getItems());
+
+
+
         tradePairsCombo.setPromptText("Select TradePair");
 
         // Create toolbar and buttons
         Button autoTradeBtn = new Button("AUTO TRADE");
         Button addChartBtn = new Button("ADD CHART");
+
+
         ToolBar tradeToolBar = new ToolBar(tradePairsCombo, addChartBtn, autoTradeBtn);
 
         // Tab pane for the main sections
@@ -68,12 +64,11 @@ public class DisplayExchange extends Region {
 
         // News section
         Tab newsTab = new Tab("FOREX NEWS");
-        newsTreeTableView = createNewsTreeTableView();
-        upcomingNewsBox = createUpcomingNewsBox();
+
         newsTab.setContent(new VBox(upcomingNewsBox, new Separator(Orientation.HORIZONTAL), newsTreeTableView));
 
         // Other Tabs (Trade, Account, Orders, Positions)
-        Tab tradeTab = new Tab("->LIVE TRADING<-");
+        Tab tradeTab = new Tab("LIVE TRADING");
         Tab accountTab = createAccountTab();
 
         Tab positionTab = createPositionTab();
@@ -109,7 +104,7 @@ public class DisplayExchange extends Region {
         startDataUpdates();
     }
 
-    private Tab createAccountTab() throws IOException, InterruptedException, ExecutionException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException {
+    private @NotNull Tab createAccountTab() throws IOException, InterruptedException, ExecutionException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException {
         Tab acc = new Tab("Account Details");
 
         // Add account details here
@@ -118,22 +113,9 @@ public class DisplayExchange extends Region {
 
 
         acc.setContent(        new VBox(
-                new Label("Account ID: %s".formatted(account_details.get().getFirst().getId())),
-                new Label("Balance: %s %s".formatted(account_details.get().getFirst().getBalance(), account_details.get().getFirst().getBalance())),
-                new Label("Created: %s".formatted(account_details.get().getFirst().getCreated())),
-                new Label("Guaranteed Stop Loss:  %s".formatted(account_details.get().getFirst().getGuaranteedStopLoss())),
-                new Label("Margin Call: %s".formatted(account_details.get().getFirst().getMarginCall())),
+                new Label("Account ID: %s".formatted(account_details.get().getFirst()
 
-
-
-                new Label("Margin Used: %s".formatted(account_details.get().getFirst().getMarginUsed())),
-
-                new Label("Open Orders: %d".formatted(exchange.getOrders().size())),
-                new Label("Profit: %s".formatted(account_details.get().getFirst().getProfit()))
-
-
-
-        ));
+                ))));
 
 
 
@@ -193,16 +175,16 @@ public class DisplayExchange extends Region {
 
     private void addChart(@NotNull ComboBox<TradePair> tradePairsCombo, TabPane chartradeTabPane) throws SQLException {
         if (tradePairsCombo.getSelectionModel().isEmpty()) {
-            new Alert(Alert.AlertType.ERROR, "Please select a Trade Pair").showAndWait();
+            new Messages(Alert.AlertType.ERROR, "Please select a Trade Pair");
             return;
         }
 
         TradePair selectedPair = tradePairsCombo.getSelectionModel().getSelectedItem();
-        exchange.tradePair = selectedPair;
+
 
         Tab chartTab = new Tab(selectedPair.toString('-'));
 
-        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange);
+        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange, selectedPair);
         chartDisplay.setPrefSize(1440, 700);
         chartTab.setContent(chartDisplay);
         chartradeTabPane.getTabs().add(chartTab);
@@ -265,5 +247,11 @@ public class DisplayExchange extends Region {
 
     private void updateUpcomingNewsBox(List<News> newsList) {
         upcomingNewsBox.getGraphicsContext2D().clearRect(0, 0, 1500, 300);
+        newsList.subList(0, Math.min(5, newsList.size())).forEach(news -> {
+            upcomingNewsBox.getGraphicsContext2D().strokeText(news.getTitle(), 20, 30 + (newsList.indexOf(news) * 20));
+        });
 
-    }}
+    }
+
+
+}

@@ -140,13 +140,13 @@ public class CandleStickChart extends Region {
     private InProgressCandle inProgressCandle = new InProgressCandle();
     List<Trade> currentCandleTrades;
 
-    CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier,
+    CandleStickChart(Exchange exchange, TradePair tradePair, CandleDataSupplier candleDataSupplier,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
                      ObservableNumberValue containerHeight) throws IOException {
         logger.debug(String.valueOf(this));
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
-        this.tradePair=exchange.tradePair;
+        this.tradePair = tradePair;
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         if (!Platform.isFxApplicationThread()) {
