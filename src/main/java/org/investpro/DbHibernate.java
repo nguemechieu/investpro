@@ -11,7 +11,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Properties;
-import java.util.UUID;
 
 import static jakarta.persistence.Persistence.createEntityManagerFactory;
 import static org.investpro.Currency.db1;
@@ -53,7 +52,7 @@ public class DbHibernate implements Db {
             // Create currency table
             entityManager.createNativeQuery(
                     "CREATE TABLE IF NOT EXISTS currencies (" +
-                            "currency_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                            "currency_id INTEGER PRIMARY KEY AUTOINCREMENT ," +
                             "currencyType VARCHAR(255) NOT NULL," +
                             "fullDisplayName VARCHAR(255) NOT NULL," +
                             "shortDisplayName VARCHAR(255)," +
@@ -104,7 +103,7 @@ public class DbHibernate implements Db {
                             ")"
             ).executeUpdate();
 
-            // Create accounts table
+            // Create account table
             entityManager.createNativeQuery(
                     "CREATE TABLE IF NOT EXISTS accounts (" +
                             "id INTEGER PRIMARY KEY AUTOINCREMENT  NOT NULL," +
@@ -205,10 +204,10 @@ public class DbHibernate implements Db {
 
     @Override
     public void update(String tableName, String columnName, String value) throws SQLException {
-        String sql = String.format("UPDATE %s SET %s = ? WHERE id = ?", tableName, columnName);
+        String sql = String.format("UPDATE %s SET %s = ? WHERE " + columnName + " = ?", tableName, columnName);
         entityManager.getTransaction().begin();
         entityManager.createNativeQuery(sql)
-                .setParameter(1, value)
+                .setParameter(columnName, value)
                 .executeUpdate();
         entityManager.getTransaction().commit();
     }
@@ -244,14 +243,19 @@ public class DbHibernate implements Db {
             // Show an error message if the currency is not found
 
             Currency currency = new Currency();
+
+
             currency.setCurrencyType(CurrencyType.CRYPTO);
-            currency.setCurrencyId((long) UUID.randomUUID().hashCode());
             currency.setFullDisplayName(code);
             currency.setShortDisplayName(code);
             currency.setCode(code);
             currency.setFractionalDigits(8);
             currency.setSymbol(code);
             currency.setImage(code + ".png");
+            ArrayList<Currency> currencyArrayList = new ArrayList<>();
+            currencyArrayList.add(currency);
+
+            save(currencyArrayList);
             return currency;
 
         } catch (Exception e) {
@@ -269,10 +273,11 @@ public class DbHibernate implements Db {
             transaction.begin();
 
             for (Currency currency : currencyList) {
+
+
                 // Check if the currency already exists
                 Query query = db1.entityManager.createNativeQuery("SELECT * FROM currencies WHERE code = :code");
                 query.setParameter("code", currency.getCode());
-
                 if (!query.getResultList().isEmpty()) {
                     logger.error("{} already exists.", currency.getCode());
                     continue; // Skip this currency but continue with others
@@ -280,9 +285,10 @@ public class DbHibernate implements Db {
 
                 // Insert the currency using parameterized queries
                 entityManager.createNativeQuery(
-                                "INSERT INTO currencies (currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image) " +
-                                        "VALUES (:currencyType, :fullDisplayName, :shortDisplayName, :code, :fractionalDigits, :symbol, :image)"
+                                "INSERT INTO currencies (currency_id,currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image) " +
+                                        "VALUES (:currency_id,:currencyType, :fullDisplayName, :shortDisplayName, :code, :fractionalDigits, :symbol, :image)"
                         )
+                        .setParameter("currency_id", currency.getCurrencyId())
                         .setParameter("currencyType", currency.getCurrencyType())
                         .setParameter("fullDisplayName", currency.getFullDisplayName())
                         .setParameter("shortDisplayName", currency.getShortDisplayName())
@@ -291,11 +297,10 @@ public class DbHibernate implements Db {
                         .setParameter("symbol", currency.getSymbol())
                         .setParameter("image", currency.getImage())
                         .executeUpdate();
+
+                transaction.commit();
+                logger.info("Currencies saved successfully");
             }
-
-            transaction.commit();
-            logger.info("Currencies saved successfully");
-
             // Enable SQLite foreign keys after saving currencies
             enableSQLiteForeignKeys(entityManager);
 
@@ -307,14 +312,6 @@ public class DbHibernate implements Db {
         }
     }
 
-
-    @Override
-    public int find(String table, String column, String value) {
-        String sql = String.format("SELECT  FROM %s WHERE %s = ?", table, column);
-        return entityManager.createNativeQuery(sql)
-                .setParameter(column, value)
-                .executeUpdate();
-    }
 
     /**
      */

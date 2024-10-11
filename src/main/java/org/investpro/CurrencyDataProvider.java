@@ -12,7 +12,6 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
-import java.util.UUID;
 
 import static org.investpro.Coinbase.client;
 import static org.investpro.Currency.db1;
@@ -98,20 +97,20 @@ public class CurrencyDataProvider {
                 logger.info("Added coin: {}", coinInfo);
 
 
-                Currency coin = new Currency(UUID.randomUUID().hashCode(), CurrencyType.CRYPTO, name, id, symbol, fractional_digit, symbol, image);
+                Currency coin = new Currency(CurrencyType.CRYPTO, name, id, symbol, fractional_digit, symbol, image);
 
 
                 coinsToRegister.add(coin);
 
-                logger.info("Registered currency:{}", coin);
+
             }
             for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-                Currency coin = new Currency(UUID.randomUUID().hashCode(), CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 2, currency.getSymbol(), currency.getDisplayName());
+                Currency coin = new Currency(CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 2, currency.getSymbol(), currency.getDisplayName());
 
 
                 coinsToRegister.add(coin);
 
-                logger.info("Registered currency:{}", coin);
+
             }
 
             db1.save(coinsToRegister);

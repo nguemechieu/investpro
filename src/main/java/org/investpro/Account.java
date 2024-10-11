@@ -3,6 +3,18 @@ package org.investpro;
 import java.util.List;
 
 public class Account {
+    @Override
+    public String toString() {
+        return "Account{" +
+                "balance=" + balance +
+                ", account_id=" + account_id +
+                ", mt4_account_id='" + mt4_account_id + '\'' +
+                ", marginRate=" + marginRate +
+                ", created='" + created + '\'' +
+                ", tags=" + tags +
+                '}';
+    }
+
     private double balance;
     private Long account_id;
     private String mt4_account_id;

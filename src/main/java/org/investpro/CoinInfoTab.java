@@ -1,10 +1,12 @@
 package org.investpro;
 
+import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.AnchorPane;
+import org.jetbrains.annotations.NotNull;
 
 public class CoinInfoTab extends Tab {
 
@@ -47,11 +49,25 @@ public class CoinInfoTab extends Tab {
         // Set the table to grow with the window
         tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
+        tableView.setPlaceholder(
+                new Label("No data available")
+        );
+        tableView.setPrefSize(
+                1543,
+                780
+        );
+        AnchorPane.setTopAnchor(tableView, 30.0);
+        AnchorPane.setLeftAnchor(tableView, 30.0);
+        AnchorPane.setRightAnchor(tableView, 30.0);
+        AnchorPane.setBottomAnchor(tableView, 30.0);
+
+
+
         // Add the TableView to the VBox
-        VBox vBox = new VBox(tableView);
+
 
         // Add VBox to Tab
-        setContent(vBox);
+        setContent(tableView);
 
 
         // Show the Scene
@@ -63,7 +79,7 @@ public class CoinInfoTab extends Tab {
     }
 
     // A method to add sample data
-    private void addSampleData(TableView<CoinInfo> tableView) {
+    private void addSampleData(@NotNull TableView<CoinInfo> tableView) {
         // Normally, you would load this from a live API, but we'll add static data for now
 
         tableView.getItems().addAll(CurrencyDataProvider.getCoinInfoList());

@@ -2,12 +2,13 @@ package org.investpro;
 
 
 import jakarta.persistence.*;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -44,16 +45,24 @@ public class Currency {
     String symbol;
     @Column(name = "fractionalDigits")
     int fractionalDigits;
+    static {
+        try {
+            new CurrencyDataProvider().registerCurrencies();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // This will auto-generate the ID
 
-    @Column(name = "currency_id", updatable = false)
-    private Long currency_id;
+    @Column(name = "currency_id", nullable = false, updatable = false)
+    private long currency_id;
 
     /**
      * Protected constructor, called only by CurrencyDataProvider's.
      */
-    public Currency(long currency_id, CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code,
+    public Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code,
                        int fractionalDigits, String symbol, String image) throws Exception {
         Objects.requireNonNull(currencyType, "currencyType must not be null");
         Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
@@ -72,28 +81,51 @@ public class Currency {
         this.fractionalDigits = fractionalDigits;
         this.symbol = symbol;
         this.image = image;
-        this.currency_id = currency_id;
+        this.currency_id = UUID.randomUUID().hashCode();
 
         logger.info("currency registered: {}", this);
     }
 
-    public static @Nullable Currency of(String code) throws Exception {
+    public static @NotNull Currency of(String code) throws Exception {
         Objects.requireNonNull(code, "code must not be null");
 
-            return db1.getCurrency(code);
+        db1.entityManager.getTransaction().begin();
+        Query result = db1.entityManager.createNativeQuery(
+                "SELECT * FROM currencies WHERE code = :code", Currency.class
+        ).setParameter("code", code);
 
-    }
+        Currency currency;
 
-    // Getter and Setter for currencyId
-    public Long getCurrencyId() {
-        return currency_id;
+        try {
+            if (result.getResultList().isEmpty()) {
+                // Register the current currency as it's not found
+                currency = new Currency(
+                        CurrencyType.CRYPTO, code, code, code, 8, code, code + ".png"
+                );
+                CURRENCIES.put(new SymmetricPair<>(CurrencyType.CRYPTO, currency), currency);
+                logger.info("Currency registered: {}", currency);
+            } else {
+                // Retrieve the result and cast it to Currency
+                currency = (Currency) result.getSingleResult();
+            }
+            db1.entityManager.getTransaction().commit();
+        } catch (Exception e) {
+            db1.entityManager.getTransaction().rollback();
+            throw new Exception("Error fetching currency with code: " + code, e);
+        }
+
+        logger.info("Currency retrieved: {}", currency);
+        return currency;
     }
 
     public Currency() {
 
     }
 
-
+    // Getter and Setter for currencyId
+    public long getCurrencyId() {
+        return currency_id;
+    }
 
     public void setCode(String code) {
         this.code = code;

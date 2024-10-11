@@ -156,12 +156,4 @@ public abstract class Exchange {
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
 
 
-    public boolean isTradePairAvailable(TradePair tradePair) {
-        try {
-            return getTradePairs().get().contains(tradePair);
-        } catch (Exception e) {
-            logger.error("Error checking if trade pair {} is available", tradePair, e);
-            return false;
-        }
-    }
 }

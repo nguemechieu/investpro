@@ -52,7 +52,7 @@ public class BinanceUS extends Exchange {
 
     private TradePair tradePair;
 
-    public BinanceUS(String apikey, String apiSecret) throws NoSuchAlgorithmException, InvalidKeyException, IOException, InterruptedException {
+    public BinanceUS(String apikey, String apiSecret) {
         super(apikey, apiSecret);
 
 
@@ -66,7 +66,7 @@ public class BinanceUS extends Exchange {
 
         // Adjust timestamp with server time
         requestBuilder.setHeader("Content-Type", "application/json");
-        timestamp = System.currentTimeMillis() + serverTime - System.currentTimeMillis();
+        timestamp = System.currentTimeMillis();
 
 
 
@@ -74,23 +74,7 @@ public class BinanceUS extends Exchange {
 
     }
 
-    // Helper method to get Binance server time
-    private static long getServerTime() throws IOException, InterruptedException {
-        requestBuilder
-                .uri(URI.create("%s/time".formatted(API_URL)))
-                .GET()
-        ;
 
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to get Binance server time");
-        }
-
-
-        JsonNode jsonNode = OBJECT_MAPPER.readTree(response.body());
-        return jsonNode.get("serverTime").asLong();
-    }
 
     //GET /sapi/v1/asset/query/trading-fee (HMAC SHA256)
 
@@ -143,8 +127,7 @@ public class BinanceUS extends Exchange {
 
 
     @Override
-    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException {
-
+    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
         requestBuilder.uri(URI.create(
                 "%s/api/v3/order".formatted(API_URL)
         ));
@@ -172,7 +155,7 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException {
 
         requestBuilder.uri(URI.create(
                 API_URL + "/api/v3/order?orderId=" + orderId
@@ -357,14 +340,14 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public Position getPositions() throws IOException, InterruptedException, ExecutionException {
+    public Position getPositions() {
         return null;
     }
 
 
 
     @Override
-    public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException {
+    public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
 
         // Step 2: Create query string with timestamp and recvWindow
         String queryString = "timestamp=%d&recvWindow=10000".formatted(serverTime);  // Adjust timestamp and recvWindow as required
@@ -396,7 +379,7 @@ public class BinanceUS extends Exchange {
 
     @Override
     public ObservableList<Order> getOrders() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
-        timestamp = getServerTime();
+
         // Create the message for HMAC SHA256 signature
         String message = "timestamp=%s".formatted(timestamp);
 

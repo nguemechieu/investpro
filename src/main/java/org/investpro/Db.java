@@ -42,8 +42,6 @@ public interface Db extends DataSource {
 
   void save(ArrayList<Currency> currency) throws SQLException;
 
-  int find(String table, String column, String value) throws SQLException;
-
 
   Connection getConnection() throws SQLException;
 }

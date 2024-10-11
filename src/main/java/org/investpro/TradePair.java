@@ -7,10 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-
 
 public class TradePair extends Pair<Currency, Currency> {
 
@@ -18,19 +14,7 @@ public class TradePair extends Pair<Currency, Currency> {
 
     private long id;
 
-
-    private Currency baseCurrency;
-
-
-    private Currency counterCurrency;
-
-
-
-
-    private double bid;
-
-    private double ask;
-
+    // Constructor that takes two currencies
     public TradePair(@NotNull Currency baseCurrency, @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {
         super(baseCurrency, counterCurrency);
 
@@ -44,97 +28,96 @@ public class TradePair extends Pair<Currency, Currency> {
         logger.debug("TradePair created: {} / {}", baseCurrency.getCode(), counterCurrency.getCode());
     }
 
+    // Constructor that takes currency codes
+    public TradePair(@NotNull String baseCurrencyCode, @NotNull String counterCurrencyCode) throws Exception {
+        super(Currency.of(baseCurrencyCode), Currency.of(counterCurrencyCode));
 
+        if (baseCurrencyCode.equalsIgnoreCase(counterCurrencyCode)) {
+            throw new IllegalArgumentException("Base currency and counter currency cannot be the same.");
+        }
 
-    public TradePair(
-            @NotNull String baseCurrencyCode,
-            @NotNull String counterCurrencyCode
-    ) throws Exception {
-        super(
-                Currency.of(baseCurrencyCode),
-                Currency.of(counterCurrencyCode)
-        );
+        this.baseCurrency = Currency.of(baseCurrencyCode);
+        this.counterCurrency = Currency.of(counterCurrencyCode);
     }
 
-    public TradePair() throws Exception {
-        super(Currency.of("EUR"), Currency.of("USD"));
-    }
+    private Currency baseCurrency;
 
+    private Currency counterCurrency;
+
+    private double bid;
+
+    private double ask;
+
+    // Factory method for TradePair using currency codes
     @Contract("_, _ -> new")
     public static @NotNull TradePair of(@NotNull String baseCurrencyCode, @NotNull String counterCurrencyCode) throws Exception {
         return new TradePair(baseCurrencyCode, counterCurrencyCode);
     }
 
+    // Factory method for TradePair using Currency objects
     @Contract("_, _ -> new")
     public static @NotNull TradePair of(@NotNull Currency baseCurrency, @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {
         return new TradePair(baseCurrency, counterCurrency);
     }
 
+    // Factory method for TradePair using a Pair of currencies
     @Contract("_ -> new")
     public static @NotNull TradePair of(@NotNull Pair<Currency, Currency> currencyPair) throws SQLException, ClassNotFoundException {
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
 
-    public static <T extends Currency, V extends Currency> @NotNull TradePair parse(@NotNull String tradePair, @NotNull String separator, @NotNull Pair<Class<T>, Class<V>> pairType) throws CurrencyNotFoundException, Exception {
-        Objects.requireNonNull(tradePair, "TradePair must not be null");
-        Objects.requireNonNull(pairType, "PairType must not be null");
-
-        String[] split = separator.isEmpty() ? new String[]{tradePair.substring(0, 3), tradePair.substring(3)} : tradePair.split(separator);
-
-        Currency base = Currency.of(split[0]);
-        Currency counter = Currency.of(split[1]);
-
-        assert base != null;
-        if (base.equals(counter)) {
-            throw new CurrencyNotFoundException(CurrencyType.valueOf(base.getCode()), counter.getCode());
-        }
-
-        assert counter != null;
-        return new TradePair(base, counter);
-    }
-
-    public @NotNull List<String> getTradePairs() {
-        List<String> tradePairs = new ArrayList<>();
-        tradePairs.add(toString('-')); // Default separator is '-'
-        return tradePairs;
-    }
-
+    // Getter for base currency
     public Currency getBaseCurrency() {
         return baseCurrency;
     }
 
+    public void setBaseCurrency(Currency baseCurrency) {
+        this.baseCurrency = baseCurrency;
+    }
+
+    // Getter for counter currency
     public Currency getCounterCurrency() {
         return counterCurrency;
     }
 
-    public String toString(@NotNull Character separator) {
-        if (separator.equals('_')) {
-            return String.format("%s_%s", getBaseCurrency().getCode().toUpperCase(), getCounterCurrency().getCode().toUpperCase());
-        } else if (separator.equals('-')) {
-            return String.format("%s-%s", getBaseCurrency().getCode().toUpperCase(), getCounterCurrency().getCode().toUpperCase());
-        } else if (separator.equals('/')) {
-            return String.format("%s%s", getBaseCurrency().getCode().toUpperCase(), getCounterCurrency().getCode().toUpperCase());
-        } else {
-            throw new IllegalArgumentException("Invalid separator: %s".formatted(separator));
-        }
+    public void setCounterCurrency(Currency counterCurrency) {
+        this.counterCurrency = counterCurrency;
     }
 
+    // String representation of the TradePair with a given separator
+    public String toString(@NotNull Character separator) {
+        String baseCode = getBaseCurrency().getCode().toUpperCase();
+        String counterCode = getCounterCurrency().getCode().toUpperCase();
+
+        return switch (separator) {
+            case '_' -> String.format("%s_%s", baseCode, counterCode);
+            case '-' -> String.format("%s-%s", baseCode, counterCode);
+            case '/' -> String.format("%s/%s", baseCode, counterCode);
+            default -> throw new IllegalArgumentException("Invalid separator: " + separator);
+        };
+    }
+
+    // Getter for TradePair ID
     public long getId() {
         return id;
     }
 
+    // Setter for TradePair ID
     public void setId(long id) {
         this.id = id;
     }
 
+    // Get the symbol of the trade pair, e.g., USD/EUR
     public String getSymbol() {
         return String.format("%s/%s", baseCurrency.getSymbol(), counterCurrency.getSymbol());
     }
 
+    // Getter for bid price
     public double getBid() {
         return bid;
     }
 
+    // Setter for bid price with validation
     public void setBid(double bid) {
         if (bid < 0) {
             throw new IllegalArgumentException("Bid price must be positive.");
@@ -142,10 +125,12 @@ public class TradePair extends Pair<Currency, Currency> {
         this.bid = bid;
     }
 
+    // Getter for ask price
     public double getAsk() {
         return ask;
     }
 
+    // Setter for ask price with validation
     public void setAsk(double ask) {
         if (ask < 0) {
             throw new IllegalArgumentException("Ask price must be positive.");

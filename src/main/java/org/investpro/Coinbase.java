@@ -395,14 +395,14 @@ public  class Coinbase extends Exchange {
                 String code = rate.get("base_currency").asText();
                 int fractionalDigits = 8;
                 String symbol = rate.get("base_currency").asText();
-                baseCurrency = new Currency(UUID.randomUUID().hashCode(), CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol);
+                baseCurrency = new Currency(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol);
                 String fullDisplayName2 = rate.get("quote_currency").asText();
                 String shortDisplayName2 = rate.get("quote_currency").asText();
                 String code2 = rate.get("quote_currency").asText();
                 int fractionalDigits2 = 8;
                 String symbol2 = rate.get("quote_currency").asText();
 
-                counterCurrency = new Currency(UUID.randomUUID().hashCode(), CurrencyType.CRYPTO,
+                counterCurrency = new Currency(CurrencyType.CRYPTO,
                         fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2
                         , symbol);
 
@@ -527,12 +527,6 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     public boolean isSupportedGranularity(int secondsPerCandle) {
         return SUPPORTED_GRANULARITIES.contains(secondsPerCandle);
     }
-
-    /**
-     * Returns the set of supported granularity for Coinbase.
-     *
-     * @return Set of supported granularity values in seconds.
-     */
 
 
     public int getSupportedGranularity(int secondsPerCandle) {

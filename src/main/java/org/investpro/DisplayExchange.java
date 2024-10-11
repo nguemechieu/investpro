@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -30,6 +29,7 @@ public class DisplayExchange extends AnchorPane {
     final ObservableList<Order> ordersData = FXCollections.observableArrayList();
     final ObservableList<Position> positionsData = FXCollections.observableArrayList();
     final TreeTableView<News> newsTreeTableView = createNewsTreeTableView();
+
     final Canvas upcomingNewsBox = new Canvas();
     Exchange exchange;
 
@@ -40,20 +40,24 @@ public class DisplayExchange extends AnchorPane {
     public DisplayExchange(@NotNull Exchange exchange) throws Exception {
         this.exchange = exchange;
         // Create the ComboBox for Trade Pairs
-        ComboBox<TradePair> tradePairsCombo = new ComboBox<>();
+        ComboBox<String> tradePairsCombo = new ComboBox<>();
 
 
         // Populate trade pairs asynchronously
-        tradePairsCombo.getItems().addAll(exchange.getTradePairs().get().stream().filter(exchange::isTradePairAvailable).toList());
-        logger.info("Trade pairs {}", tradePairsCombo.getItems());
 
+        ArrayList<TradePair> data = exchange.getTradePairs().get();
+
+        for (TradePair pair : data) {
+            logger.info("Trade pair: {}", pair);
+            tradePairsCombo.getItems().add(pair.toString('/'));
+        }
 
 
         tradePairsCombo.setPromptText("Select TradePair");
 
         // Create toolbar and buttons
-        Button autoTradeBtn = new Button("AUTO TRADE");
-        Button addChartBtn = new Button("ADD CHART");
+        Button autoTradeBtn = new Button("AUTO-TRADE");
+        Button addChartBtn = new Button("ADD-CHART");
 
 
         ToolBar tradeToolBar = new ToolBar(tradePairsCombo, addChartBtn, autoTradeBtn);
@@ -63,23 +67,42 @@ public class DisplayExchange extends AnchorPane {
         chartradeTabPane.setPrefSize(1540, 780);
 
         // News section
-        Tab newsTab = new Tab("FOREX NEWS");
+        Tab newsTab = new Tab("FOREX- NEWS");
 
-        newsTab.setContent(new VBox(upcomingNewsBox, new Separator(Orientation.HORIZONTAL), newsTreeTableView));
+        newsTab.setContent(new VBox(upcomingNewsBox, new Separator(Orientation.HORIZONTAL), createUpcomingNewsCanvas(), new Separator(Orientation.HORIZONTAL), newsTreeTableView));
 
         // Other Tabs (Trade, Account, Orders, Positions)
-        Tab tradeTab = new Tab("LIVE TRADING");
+        Tab tradeTab = new Tab("LIVE - TRADING");
         Tab accountTab = createAccountTab();
 
         Tab positionTab = createPositionTab();
-        Tab orderTab = createOrderTab();
 
         Tab coinInfoTab = new CoinInfoTab();
+        coinInfoTab.setText("COINS-INFO");
+
+        Tab orderTab = createOrderTab();
 
 
+        // Browser Tab
+        Tab browser = new Tab("WEB-BROWSER");
+        browser.setContent(new Browser());
+        browser.setClosable(false);
+
+
+        // Add Chart Button Action
+        addChartBtn.setOnAction(_ -> {
+            try {
+                addChart(tradePairsCombo.getSelectionModel().getSelectedItem(), chartradeTabPane);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // Start periodic data updates
+        startDataUpdates();
 
         // Adding all tabs to the main TabPane
-        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, positionTab, newsTab, coinInfoTab);
+        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, positionTab, newsTab, coinInfoTab, browser);
         tradingTabPane.setPrefSize(1540, 780);
         tradingTabPane.setSide(Side.LEFT);
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
@@ -94,9 +117,9 @@ public class DisplayExchange extends AnchorPane {
         // Add Chart Button Action
         addChartBtn.setOnAction(_ -> {
             try {
-                addChart(tradePairsCombo, chartradeTabPane);
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
+                addChart(tradePairsCombo.getSelectionModel().getSelectedItem(), chartradeTabPane);
+            } catch (Exception e) {
+                new Messages(Alert.AlertType.ERROR, e.getMessage());
             }
         });
 
@@ -104,18 +127,25 @@ public class DisplayExchange extends AnchorPane {
         startDataUpdates();
     }
 
-    private @NotNull Tab createAccountTab() throws IOException, InterruptedException, ExecutionException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException {
-        Tab acc = new Tab("Account Details");
+    private @NotNull Tab createAccountTab() throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException {
+        Tab acc = new Tab("Account ");
 
         // Add account details here
 
         CompletableFuture<List<Account>> account_details = exchange.getAccounts();
 
+        ListView<Account> viewAccount = new ListView<>();
+        account_details.thenAccept(accounts -> {
+            for (Account account : accounts) {
+                viewAccount.getItems().add(account);
+            }
+        });
 
         acc.setContent(        new VBox(
-                new Label("Account ID: %s".formatted(account_details.get().getFirst()
+                new Label("Account ID: %s".formatted(account_details.get().getFirst())), new Separator(Orientation.HORIZONTAL), viewAccount
 
-                ))));
+
+        ));
 
 
 
@@ -150,7 +180,7 @@ public class DisplayExchange extends AnchorPane {
         return newsTableView;
     }
 
-    private Canvas createUpcomingNewsBox() {
+    private Canvas createUpcomingNewsCanvas() {
         Canvas newsBox = new Canvas(1500, 300);
         newsBox.getGraphicsContext2D().setFill(Color.BLACK);
         newsBox.getGraphicsContext2D().fillRect(0, 0, 1500, 300);
@@ -173,19 +203,14 @@ public class DisplayExchange extends AnchorPane {
         return positionTab;
     }
 
-    private void addChart(@NotNull ComboBox<TradePair> tradePairsCombo, TabPane chartradeTabPane) throws SQLException {
-        if (tradePairsCombo.getSelectionModel().isEmpty()) {
-            new Messages(Alert.AlertType.ERROR, "Please select a Trade Pair");
-            return;
-        }
-
-        TradePair selectedPair = tradePairsCombo.getSelectionModel().getSelectedItem();
+    private void addChart(String tradePairsCombo, @NotNull TabPane chartradeTabPane) throws Exception {
 
 
-        Tab chartTab = new Tab(selectedPair.toString('-'));
+        Tab chartTab = new Tab(tradePairsCombo);
+        TradePair tradePairsCombo0 = new TradePair(tradePairsCombo.split("/")[0], tradePairsCombo.split("/")[1]);
 
-        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange, selectedPair);
-        chartDisplay.setPrefSize(1440, 700);
+        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange, tradePairsCombo0);
+        chartDisplay.setPrefSize(1540, 780);
         chartTab.setContent(chartDisplay);
         chartradeTabPane.getTabs().add(chartTab);
         chartradeTabPane.getSelectionModel().select(chartTab);
@@ -247,9 +272,7 @@ public class DisplayExchange extends AnchorPane {
 
     private void updateUpcomingNewsBox(List<News> newsList) {
         upcomingNewsBox.getGraphicsContext2D().clearRect(0, 0, 1500, 300);
-        newsList.subList(0, Math.min(5, newsList.size())).forEach(news -> {
-            upcomingNewsBox.getGraphicsContext2D().strokeText(news.getTitle(), 20, 30 + (newsList.indexOf(news) * 20));
-        });
+        newsList.subList(0, Math.min(5, newsList.size())).forEach(news -> upcomingNewsBox.getGraphicsContext2D().strokeText(news.getTitle(), 20, 30 + (newsList.indexOf(news) * 20)));
 
     }
 
