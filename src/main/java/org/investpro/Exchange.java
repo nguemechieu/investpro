@@ -1,6 +1,5 @@
 package org.investpro;
 
-import javafx.collections.ObservableList;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +9,10 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -38,12 +40,12 @@ public abstract class Exchange {
         logger.info("Exchange initialized with API key and secret.");
     }
 
-    public abstract CompletableFuture<List<Fee>> getTradingFee() throws IOException, InterruptedException;
+    public abstract List<Fee> getTradingFee() throws IOException, InterruptedException;
 
     /**
      * Fetch user accounts asynchronously.
      */
-    public abstract CompletableFuture<List<Account>> getAccounts() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
+    public abstract List<Account> getAccounts() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
 
     /**
@@ -56,7 +58,7 @@ public abstract class Exchange {
     /**
      * Cancel an order on the exchange.
      */
-    public abstract CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
+    public abstract void cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
     /**
      * Get exchange message or status.
@@ -88,8 +90,9 @@ public abstract class Exchange {
     /**
      * Fetch the order book for a specific trade pair.
      */
-    public abstract CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
-    public abstract Position getPositions() throws IOException, InterruptedException, ExecutionException;
+    public abstract List<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
+
+    public abstract List<Position> getPositions() throws IOException, InterruptedException, ExecutionException;
 
     /**
      * Retrieve open orders for a specific trade pair.
@@ -99,12 +102,12 @@ public abstract class Exchange {
     /**
      * Retrieve a list of orders from the exchange.
      */
-    public abstract ObservableList<Order> getOrders() throws IOException, InterruptedException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
+    public abstract List<Order> getOrders() throws IOException, InterruptedException, SQLException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
 
     /**
      * Retrieve the available trade pairs from the exchange.
      */
-    public abstract CompletableFuture<ArrayList<TradePair>> getTradePairs() throws Exception;
+    public abstract List<TradePair> getTradePairs() throws Exception;
 
     /**
      * Clear live trades consumer data.
@@ -141,18 +144,17 @@ public abstract class Exchange {
     // Stream live candlestick data
     public abstract List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds);
 
-    // Stream live order book
-    public abstract List<OrderBook> streamOrderBook(@NotNull TradePair tradePair);
+
     // Cancel all orders
-    public abstract CompletableFuture<String> cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException;
+    public abstract void cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException;
 
     public abstract boolean supportsStreamingTrades(TradePair tradePair);
 
-    //  Get Crypto Deposit History GET /sapi/v1/capital/deposit/hisrec (HMAC SHA256)
-    public abstract ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
-    //  Get Crypto Withdraw History GET /sapi/v1/capital/withdraw/history (HMAC SHA256)
-    public abstract ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
+    public abstract List<Deposit> Deposit() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
+
+    public abstract List<Withdrawal> Withdraw() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
+
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
 
 

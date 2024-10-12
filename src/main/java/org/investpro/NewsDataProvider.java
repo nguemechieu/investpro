@@ -1,8 +1,11 @@
 package org.investpro;
 
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -14,102 +17,128 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class NewsDataProvider {
 
+    private static final Logger logger = LoggerFactory.getLogger(NewsDataProvider.class);
+    private static final String NEWS_API_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
+    // Fetch news every 10 minutes
+    private static final long FETCH_INTERVAL = 10; // in minutes
+    private final HttpClient client;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private ArrayList<News> newsList = new ArrayList<>();
+
     public NewsDataProvider() {
+        // Initialize HTTP client
+        this.client = HttpClient.newHttpClient();
 
+        // Schedule periodic fetching of news data
+        scheduler.scheduleAtFixedRate(
+                () -> fetchNewsData()
+                        .thenAccept(news -> {
+                            try {
+                                this.newsList = parseNews(news);
+                                logger.info("News data successfully parsed and loaded.");
+                            } catch (ParseException e) {
+                                logger.error("Error parsing news data: {}", e.getMessage());
+                            }
+                        })
+                        .exceptionally(e -> {
+                            logger.error("Error fetching news data: {}", e.getMessage());
+                            return null;
+                        }),
+                0, FETCH_INTERVAL, TimeUnit.MINUTES
+        );
+        shutdownScheduler();
 
     }
 
+    /**
+     * Converts a date string into a Date object.
+     *
+     * @param dateStr The date string in ISO 8601 format.
+     * @return The corresponding Date object.
+     * @throws ParseException If the date string cannot be parsed.
+     */
     @Contract("null -> fail")
-    public static Date StringToDate(String str) throws ParseException {//TODO implement date
-        if (str == null) throw new IllegalArgumentException("Invalid date string");
-        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(str);
+    private static Date convertStringToDate(String dateStr) throws ParseException {
+        if (dateStr == null) throw new IllegalArgumentException("Invalid date string");
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+        return dateFormat.parse(dateStr);
     }
 
-
-    HttpRequest.Builder request = HttpRequest.newBuilder();
-    HttpClient client = HttpClient.newHttpClient();
-
-    public CompletableFuture<String> getNewsData(String url) {
-        request.uri(URI.create(url))
+    /**
+     * Fetches news data from the provided URL asynchronously.
+     *
+     * @return A CompletableFuture containing the response body as a String.
+     */
+    private CompletableFuture<String> fetchNewsData() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(NewsDataProvider.NEWS_API_URL))
                 .header("Content-Type", "application/json")
                 .GET()
                 .build();
 
-        return client
-                .sendAsync(request.GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body).exceptionally(throwable -> {
-                    throw new RuntimeException(throwable);
-                }).thenApply(response -> response).completeOnTimeout(
-                        "REQUEST TIMEOUT ", 5000, TimeUnit.MILLISECONDS
-                );
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body)
+                .completeOnTimeout("REQUEST TIMEOUT", 5000, TimeUnit.MILLISECONDS)
+                .exceptionally(throwable -> {
+                    logger.error("Error during HTTP request: {}", throwable.getMessage());
+                    return null;
+                });
     }
 
-    List<News> getNews() throws ParseException, InterruptedException {
-        String url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1bed8a31256f1525dbb0b6daf6898823";
-        //Checking internet connexion first before request
-        ArrayList<News> news = new ArrayList<>();//
-        String data;
+    /**
+     * Parses the news data from the JSON string response.
+     *
+     * @param jsonResponse The JSON response containing news data.
+     * @return A list of parsed News objects.
+     * @throws ParseException If the date parsing fails.
+     */
+    private @NotNull ArrayList<News> parseNews(String jsonResponse) throws ParseException {
+        JSONArray jsonArray = new JSONArray(jsonResponse);
+        ArrayList<News> parsedNewsList = new ArrayList<>();
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject jsonObject = jsonArray.getJSONObject(i);
+            News news = new News(
+                    jsonObject.getString("title"),
+                    jsonObject.getString("country"),
+                    jsonObject.getString("impact"),
+                    convertStringToDate(jsonObject.getString("date")),
+                    jsonObject.optString("forecast", String.valueOf(0)),
+                    jsonObject.optString("previous", String.valueOf(0))
+            );
+            parsedNewsList.add(news);
+        }
+
+        return parsedNewsList;
+    }
+
+    /**
+     * Returns the list of news items.
+     *
+     * @return A list of news items.
+     */
+    public List<News> getNewsList() {
+        return newsList;
+    }
+
+    /**
+     * Shuts down the scheduler gracefully.
+     */
+    public void shutdownScheduler() {
         try {
-            data = getNewsData(url).get();
-            if (data == null || !data.contains("[")) {
-                news.add(new News("No news available", "N/A", "N/A", new Date(), "N/A", "N/A"));
-                return news;
+            scheduler.shutdown();
+            if (!scheduler.awaitTermination(1, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
             }
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            logger.error("Scheduler shutdown interrupted: {}", e.getMessage());
         }
-        JSONArray jsonArray = new JSONArray(data);
-        News news1;
-        int length = jsonArray.length();
-        for (int i = 0; i < length; i++) {
-            JSONObject json = jsonArray.getJSONObject(i);
-            String title = "";
-            news1 = new News("N/A", "N/A", "N/A",
-                    new Date(), "N/A", "N/A");
-            if (json.has("title")) {
-                title = json.getString("title");
-                news1.setTitle(title);
-            }
-            String country = "";
-            if (json.has("country")) {
-                country = json.getString("country");
-                news1.setCountry(country);
-            }
-
-            String impact = "";
-            if (json.has("impact")) {
-                impact = json.getString("impact");
-                news1.setImpact(impact);
-            }
-            String date = "";
-            if (json.has("date")) {
-                date = json.getString("date");
-
-                news1.setOffset(date.codePointCount(16, 19));
-                news1.setDate(StringToDate(date));
-            }
-            String forecast = "";
-            if (json.has("forecast")) {
-                forecast = json.getString("forecast");
-                news1.setForecast(forecast);
-            }
-            String previous = "01";
-            if (json.has("previous")) {
-                previous = json.getString("previous");
-                news1.setPrevious(previous);
-                news.add(i, new News(title, country, impact, StringToDate(date), forecast, previous));
-            } else {
-                news.add(i, new News(title, country, impact, StringToDate(date), forecast, previous));
-            }
-
-
-        }
-        return news;
     }
-
 }

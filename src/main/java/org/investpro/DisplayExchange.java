@@ -2,11 +2,10 @@ package org.investpro;
 
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.Orientation;
 import javafx.geometry.Side;
 import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
@@ -18,34 +17,41 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class DisplayExchange extends AnchorPane {
 
     private static final Logger logger = LoggerFactory.getLogger(DisplayExchange.class);
-    final ObservableList<Order> ordersData = FXCollections.observableArrayList();
-    final ObservableList<Position> positionsData = FXCollections.observableArrayList();
+
+
     final TreeTableView<News> newsTreeTableView = createNewsTreeTableView();
 
-    final Canvas upcomingNewsBox = new Canvas();
+
     Exchange exchange;
 
     // Executor for periodic updates
     private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
-
+    private final List<Order> ordersData = new ArrayList<>();
+    Label accountDetailsLabel = new Label("Account Details");
 
     public DisplayExchange(@NotNull Exchange exchange) throws Exception {
         this.exchange = exchange;
         // Create the ComboBox for Trade Pairs
         ComboBox<String> tradePairsCombo = new ComboBox<>();
 
+        ordersData.addAll(exchange.getOrders());
+
 
         // Populate trade pairs asynchronously
 
-        ArrayList<TradePair> data = exchange.getTradePairs().get();
+        List<TradePair> data = exchange.getTradePairs();
 
         for (TradePair pair : data) {
             logger.info("Trade pair: {}", pair);
@@ -56,8 +62,8 @@ public class DisplayExchange extends AnchorPane {
         tradePairsCombo.setPromptText("Select TradePair");
 
         // Create toolbar and buttons
-        Button autoTradeBtn = new Button("AUTO-TRADE");
-        Button addChartBtn = new Button("ADD-CHART");
+        Button autoTradeBtn = new Button("Auto Trade");
+        Button addChartBtn = new Button("Add Chart");
 
 
         ToolBar tradeToolBar = new ToolBar(tradePairsCombo, addChartBtn, autoTradeBtn);
@@ -66,25 +72,35 @@ public class DisplayExchange extends AnchorPane {
         TabPane chartradeTabPane = new TabPane();
         chartradeTabPane.setPrefSize(1540, 780);
 
-        // News section
-        Tab newsTab = new Tab("FOREX- NEWS");
+        Canvas upcomingNewsBox = new Canvas();
+        upcomingNewsBox.setWidth(1540);
+        upcomingNewsBox.setHeight(300);
+        upcomingNewsBox.getGraphicsContext2D().setFill(Color.web("#212121"));
+        upcomingNewsBox.getGraphicsContext2D().fillRect(0, 0, 1540, 300);
+        upcomingNewsBox.getGraphicsContext2D().setStroke(Color.WHITE);
+        upcomingNewsBox.getGraphicsContext2D().strokeText("Upcoming News " + (((newsTreeTableView.getRoot().getValue().getDate().getTime()) >= new Date().getTime()) ? "N/A" : newsTreeTableView.getRoot().getValue().getTitle()), 20, 20);
 
-        newsTab.setContent(new VBox(upcomingNewsBox, new Separator(Orientation.HORIZONTAL), createUpcomingNewsCanvas(), new Separator(Orientation.HORIZONTAL), newsTreeTableView));
+
+        // News section
+        Tab newsTab = new Tab("Forex News");
+
+        newsTab.setContent(new VBox(
+
+                upcomingNewsBox, new Separator(Orientation.HORIZONTAL), newsTreeTableView));
 
         // Other Tabs (Trade, Account, Orders, Positions)
-        Tab tradeTab = new Tab("LIVE - TRADING");
+        Tab tradeTab = new Tab("Trading");
         Tab accountTab = createAccountTab();
 
-        Tab positionTab = createPositionTab();
 
         Tab coinInfoTab = new CoinInfoTab();
-        coinInfoTab.setText("COINS-INFO");
+        coinInfoTab.setText("Coin Information");
 
         Tab orderTab = createOrderTab();
 
 
         // Browser Tab
-        Tab browser = new Tab("WEB-BROWSER");
+        Tab browser = new Tab("Web Browser");
         browser.setContent(new Browser());
         browser.setClosable(false);
 
@@ -102,7 +118,7 @@ public class DisplayExchange extends AnchorPane {
         startDataUpdates();
 
         // Adding all tabs to the main TabPane
-        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, positionTab, newsTab, coinInfoTab, browser);
+        TabPane tradingTabPane = new TabPane(tradeTab, accountTab, orderTab, newsTab, coinInfoTab, browser);
         tradingTabPane.setPrefSize(1540, 780);
         tradingTabPane.setSide(Side.LEFT);
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
@@ -125,33 +141,6 @@ public class DisplayExchange extends AnchorPane {
 
         // Start periodic data updates
         startDataUpdates();
-    }
-
-    private @NotNull Tab createAccountTab() throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException {
-        Tab acc = new Tab("Account ");
-
-        // Add account details here
-
-        CompletableFuture<List<Account>> account_details = exchange.getAccounts();
-
-        ListView<Account> viewAccount = new ListView<>();
-        account_details.thenAccept(accounts -> {
-            for (Account account : accounts) {
-                viewAccount.getItems().add(account);
-            }
-        });
-
-        acc.setContent(        new VBox(
-                new Label("Account ID: %s".formatted(account_details.get().getFirst())), new Separator(Orientation.HORIZONTAL), viewAccount
-
-
-        ));
-
-
-
-
-
-        return acc;
     }
 
     private @NotNull TreeTableView<News> createNewsTreeTableView() {
@@ -180,28 +169,17 @@ public class DisplayExchange extends AnchorPane {
         return newsTableView;
     }
 
-    private Canvas createUpcomingNewsCanvas() {
-        Canvas newsBox = new Canvas(1500, 300);
-        newsBox.getGraphicsContext2D().setFill(Color.BLACK);
-        newsBox.getGraphicsContext2D().fillRect(0, 0, 1500, 300);
-        newsBox.getGraphicsContext2D().setStroke(Color.WHITE);
-        newsBox.getGraphicsContext2D().strokeText("Upcoming News", 20, 20);
-        return newsBox;
+    private @NotNull Tab createAccountTab() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+        Tab acc = new Tab("Account ");
+
+        // Add account details here
+
+        acc.setContent(
+                new AccountAnchor(exchange)
+        );
+        return acc;
     }
 
-    private Tab createOrderTab() {
-        Tab orderTab = new Tab("ORDERS");
-        ListView<Order> orderView = new ListView<>(ordersData);
-        orderTab.setContent(new VBox(new Label("Orders:"), new Separator(Orientation.HORIZONTAL), orderView));
-        return orderTab;
-    }
-
-    private @NotNull Tab createPositionTab() {
-        Tab positionTab = new Tab("POSITIONS");
-        ListView<Position> positionView = new ListView<>(positionsData);
-        positionTab.setContent(new VBox(new Label("Positions:"), new Separator(Orientation.HORIZONTAL), positionView));
-        return positionTab;
-    }
 
     private void addChart(String tradePairsCombo, @NotNull TabPane chartradeTabPane) throws Exception {
 
@@ -216,19 +194,96 @@ public class DisplayExchange extends AnchorPane {
         chartradeTabPane.getSelectionModel().select(chartTab);
     }
 
+    private @NotNull Tab createOrderTab() {
+
+
+        Tab orderTab = new Tab("Orders");
+        TreeTableView<Order> orderTableView = new TreeTableView<>();
+        TreeItem<Order> root = new TreeItem<>(new Order()); // Placeholder root
+        TreeTableColumn<Order, String> typeCol = new TreeTableColumn<>("Type");
+        typeCol.setPrefWidth(100);
+        typeCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getOrderType().toString()));
+
+        TreeTableColumn<Order, String> sideCol = new TreeTableColumn<>("Side");
+        sideCol.setPrefWidth(100);
+        sideCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getSide().toString()));
+
+        TreeTableColumn<Order, String> priceCol = new TreeTableColumn<>("Price");
+        priceCol.setPrefWidth(100);
+        priceCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(String.format("%.2f", param.getValue().getValue().getPrice())));
+
+        TreeTableColumn<Order, String> sizeCol = new TreeTableColumn<>("Size");
+        sizeCol.setPrefWidth(100);
+        sizeCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(String.format("%.2f", param.getValue().getValue().getSize())));
+
+        TreeTableColumn<Order, String> timeCol = new TreeTableColumn<>("Time");
+        timeCol.setPrefWidth(100);
+        timeCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(Date.from(Instant.ofEpochMilli(param.getValue().getValue().getTime())).toString()));
+
+        TreeTableColumn<Order, String> isWorkingCol = new TreeTableColumn<>("Working");
+        isWorkingCol.setPrefWidth(100);
+        isWorkingCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().isWorking() ? "Yes" : "No"));
+
+        TreeTableColumn<Order, String> orderStatusCol = new TreeTableColumn<>("Status");
+        orderStatusCol.setPrefWidth(100);
+        orderStatusCol.setCellValueFactory(param -> new ReadOnlyStringWrapper(param.getValue().getValue().getOrderStatus().toString()));
+        TreeTableColumn<Order, String> stopLoss = new TreeTableColumn<>("SL");
+        stopLoss.setPrefWidth(100);
+        stopLoss.setCellValueFactory(param -> new ReadOnlyStringWrapper(String.format("%.2f", param.getValue().getValue().getStopLoss())));
+        TreeTableColumn<Order, String> takeProfit = new TreeTableColumn<>("TP");
+        takeProfit.setPrefWidth(100);
+        takeProfit.setCellValueFactory(param -> new ReadOnlyStringWrapper(String.format("%.2f", param.getValue().getValue().getTakeProfit())));
+        orderTableView.getColumns().addAll(typeCol, sideCol, priceCol, stopLoss, takeProfit, sizeCol, timeCol, isWorkingCol, orderStatusCol);
+
+
+        orderTableView.setRoot(root);
+        root.setExpanded(true);
+        orderTab.setContent(new VBox(new Label("================== Orders Details ================"), new Separator(Orientation.HORIZONTAL), orderTableView));
+        return orderTab;
+
+    }
+
     private void startDataUpdates() {
         executorService.scheduleAtFixedRate(() -> Platform.runLater(() -> {
             updateOrders();
-            updatePositions();
+            updateAccount();
+
             updateNews();
         }), 0, 10, TimeUnit.SECONDS); // Update every 10 seconds
     }
+
+    private void updateAccount() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<Account> account = exchange.getAccounts();
+                Platform.runLater(() -> account.stream().peek(c -> accountDetailsLabel.setText(
+                        "Account Balance: " + c.balance.getFree() + "\n" +
+                                "Free Margin: " + c.getFreeMargin() + "\n" +
+                                "Equity: " + c.getEquity() + "\n" +
+                                "Available Balance: " + c.getAvailableBalance() + "\n" +
+                                "Unrealized PnL: " + c.getUnrealizedProfitLoss() + "\n" +
+                                "Margin Level: " + c.getMarginLevel() + "\n" +
+                                "Margin Call: " + (c.isMarginCall() ? "Yes" : "No") + "\n" +
+                                "Position Margin: " + c.getPosition() + "\n" +
+                                "Leverage: " + c.getLeverage() + "\n" +
+                                "Position Size: " + c.getPositionSize() + "\n" +
+                                "Realised PnL: " + c.getRealizedProfitLoss() + "\n")));
+            } catch (Exception e) {
+                logger.error(
+                        "Error updating account: %s".formatted(e.getMessage()),
+                        e
+                );
+            }
+        });
+    }
+
+
 
     private void updateOrders() {
         CompletableFuture.runAsync(() -> {
             try {
                 List<Order> updatedOrders = exchange.getOrders();
-                Platform.runLater(() -> ordersData.setAll(updatedOrders));
+                Platform.runLater(() -> ordersData.addAll(updatedOrders));
             } catch (Exception e) {
                 logger.error(
                         "Error updating orders: %s".formatted(e.getMessage()),
@@ -238,23 +293,12 @@ public class DisplayExchange extends AnchorPane {
         });
     }
 
-    private void updatePositions() {
-        CompletableFuture.runAsync(() -> {
-            try {
-                ArrayList<Position> updatedPositions =new ArrayList<>();
-                updatedPositions.add(exchange.getPositions());
-                Platform.runLater(() -> positionsData.setAll(updatedPositions));
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
 
-            }
-        });
-    }
 
     private void updateNews() {
         CompletableFuture.runAsync(() -> {
             try {
-                List<News> updatedNews = new NewsDataProvider().getNews();
+                List<News> updatedNews = new NewsDataProvider().getNewsList();
                 Platform.runLater(() -> {
                     newsTreeTableView.getRoot().getChildren().clear();
                     updatedNews.forEach(news -> newsTreeTableView.getRoot().getChildren().add(new TreeItem<>(news)));
@@ -271,8 +315,27 @@ public class DisplayExchange extends AnchorPane {
     }
 
     private void updateUpcomingNewsBox(List<News> newsList) {
-        upcomingNewsBox.getGraphicsContext2D().clearRect(0, 0, 1500, 300);
-        newsList.subList(0, Math.min(5, newsList.size())).forEach(news -> upcomingNewsBox.getGraphicsContext2D().strokeText(news.getTitle(), 20, 30 + (newsList.indexOf(news) * 20)));
+
+        for (News news : newsList) {
+
+            Canvas newsBox = new Canvas();
+            if (news.getDate().getTime() >= new Date().getTime()) {
+                GraphicsContext graphicsContext2D = newsBox.getGraphicsContext2D();
+                graphicsContext2D.setFill(Color.web(news.getCountry().equals("USD") ? "#0076a3" : "#ff9800"));
+                graphicsContext2D.fillRect(0, 0, 1500, 300);
+                graphicsContext2D.setStroke(Color.BLACK);
+                graphicsContext2D.strokeText(news.getDate().toString(), 20, 20);
+                graphicsContext2D.setFill(Color.GREEN);
+                graphicsContext2D.fillText(news.getTitle(), 20, 50);
+                graphicsContext2D.setFill(Color.WHITE);
+                graphicsContext2D.fillText(news.getCountry(), 20, 80);
+                graphicsContext2D.setFill(Color.WHITE);
+                graphicsContext2D.fillText(news.getImpact(), 20, 110);
+                newsBox.setLayoutX(1500 - newsBox.getWidth());
+                newsBox.setLayoutY(300 - newsBox.getHeight());
+
+            }
+        }
 
     }
 

@@ -38,6 +38,9 @@ public class DbHibernate implements Db {
 
         try {
             entityManager.getTransaction().begin();
+
+
+            enableSQLiteForeignKeys(entityManager);
             // dropTables();
             // Create users' table
             entityManager.createNativeQuery(
@@ -133,7 +136,6 @@ public class DbHibernate implements Db {
             entityManager.getTransaction().commit();
             logger.info("All tables created successfully");
 
-            enableSQLiteForeignKeys(entityManager);
         } catch (Exception e) {
             logger.error("Error during table creation", e);
             if (entityManager.getTransaction().isActive()) {
@@ -282,7 +284,10 @@ public class DbHibernate implements Db {
                     logger.error("{} already exists.", currency.getCode());
                     continue; // Skip this currency but continue with others
                 }
-
+                // Enable SQLite foreign keys after saving currencies
+                enableSQLiteForeignKeys(entityManager);
+                entityManager.getTransaction().commit();
+                entityManager.getTransaction().begin();
                 // Insert the currency using parameterized queries
                 entityManager.createNativeQuery(
                                 "INSERT INTO currencies (currency_id,currencyType, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image) " +
@@ -295,14 +300,13 @@ public class DbHibernate implements Db {
                         .setParameter("code", currency.getCode())
                         .setParameter("fractionalDigits", currency.getFractionalDigits())
                         .setParameter("symbol", currency.getSymbol())
-                        .setParameter("image", currency.getImage())
-                        .executeUpdate();
+                        .setParameter("image", currency.getImage()).executeUpdate()
+                ;
 
                 transaction.commit();
                 logger.info("Currencies saved successfully");
             }
-            // Enable SQLite foreign keys after saving currencies
-            enableSQLiteForeignKeys(entityManager);
+
 
         } catch (Exception e) {
             logger.error("Error saving currencies", e);

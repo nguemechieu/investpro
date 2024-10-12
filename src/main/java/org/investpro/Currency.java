@@ -136,10 +136,6 @@ public class Currency {
         this.symbol = symbol;
     }
 
-    public void setCurrencyId(Long currencyId) {
-        this.currency_id = currencyId;
-    }
-
     @Override
     public String toString() {
         return "Currency{" +

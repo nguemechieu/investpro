@@ -34,6 +34,7 @@ module investpro {
 
     requires org.hibernate.commons.annotations;
     requires jakarta.persistence;
+    requires com.github.dockerjava.transport.zerodep;
     opens org.investpro to net.bytebuddy.agent, org.hibernate.orm.core, javafx.fxml, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, org.json, io.github.cdimascio.dotenv.java, bounce, jakarta.persistence, weka.stable, javafx.swing;
     exports org.investpro;
 

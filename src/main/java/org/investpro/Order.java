@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Date;
+import java.util.Objects;
 
 @Entity
 @Table(name = "orders")
@@ -13,6 +14,34 @@ public class Order {
     String symbol;
     @Column(name = "is_working", nullable = false)
     boolean isWorking;
+
+    public Order() {
+        this.orderId = -1;
+        this.side = Side.UNKNOWN;
+        this.orderType = ENUM_ORDER_TYPE.NONE;
+        this.price = 0.0;
+        this.size = 0.0;
+        this.time = 0L;
+        this.isWorking = false;
+        this.orderStatus = ENUM_ORDER_STATUS.UNKNOWN;
+    }
+
+    public Order(String symbol, long orderId, String side, String type, double price, double origQty, long time, String status, boolean isWorking) {
+
+        this.symbol = symbol;
+        this.orderId = orderId;
+        this.side = Side.getSide(side);
+        this.orderType = (Objects.equals(type, "")) ? ENUM_ORDER_TYPE.NONE : ENUM_ORDER_TYPE.valueOf(type);
+        this.price = price;
+        this.size = origQty;
+        this.time = time;
+
+        this.isWorking = isWorking;
+        this.orderStatus = ENUM_ORDER_STATUS.valueOf(status);
+
+
+    }
+
     @Transient
     String lastTransactionID;  // Not mapped to database
     @Transient
@@ -58,23 +87,12 @@ public class Order {
         this.isWorking = true;
     }
 
-    public Order() {
+    public String getLastTransactionID() {
+        return lastTransactionID;
     }
 
-    public Order(String symbol, long orderId, String side, String type, double price, double origQty, long time, boolean equals) {
-        this.id = orderId;  // Placeholder for account reference
-
-        this.side = Side.getSide(side);
-        this.orderType = ENUM_ORDER_TYPE.valueOf(type);
-        this.orderId = orderId; // Placeholder
-        this.price = price;
-        this.size = origQty;
-        this.time = time;
-        this.isWorking = equals;
-        this.symbol = symbol;
-        //... more fields...
-        setPrice(price);
-        //... more fields...
+    public void setLastTransactionID(String lastTransactionID) {
+        this.lastTransactionID = lastTransactionID;
     }
 
     // Getters and Setters

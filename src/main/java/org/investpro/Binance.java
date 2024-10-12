@@ -29,8 +29,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import static org.investpro.BinanceUS.timestamp;
 import static org.investpro.BinanceUtils.HmacSHA256;
+import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
 public class Binance extends Exchange {
 
@@ -39,6 +39,23 @@ public class Binance extends Exchange {
     private static final Logger logger = LoggerFactory.getLogger(Binance.class);
     public static final String API_URL = "https://api.binance.com/api/v3";  // Use Binance.com API
     String apiKey;
+    static long timestamp = fetchServerTime();
+
+    private static long fetchServerTime() {
+        try {
+            requestBuilder.uri(URI.create(
+                    "%s/api/v3/time".formatted(API_URL)
+            ));
+            HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Error fetching server time: %d".formatted(response.statusCode()));
+            }
+
+            return Long.parseLong(response.body());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Error fetching server time", e);
+        }
+    }
 
     public Binance(String apikey, String apiSecret) {
         super(apikey, apiSecret);
@@ -47,12 +64,12 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Fee>> getTradingFee() {
+    public List<Fee> getTradingFee() {
         return null;
     }
 
     @Override
-    public CompletableFuture<List<Account>> getAccounts() throws IOException, InterruptedException {
+    public List<Account> getAccounts() throws IOException, InterruptedException {
 
         requestBuilder.uri(URI.create(
                 "%s/api/v3/account".formatted(API_URL)
@@ -62,9 +79,9 @@ public class Binance extends Exchange {
         if (response.statusCode() != 200) {
             throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
         }
-        ObjectMapper objectMapper = new ObjectMapper();
-        List<Account> accounts = objectMapper.readValue(response.body(), objectMapper.getTypeFactory().constructCollectionType(List.class, Account.class));
-        return CompletableFuture.completedFuture(accounts);
+
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, Account[].class)));
+
 
 
     }
@@ -99,7 +116,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException {
+    public void cancelOrder(String orderId) throws IOException, InterruptedException {
 
         requestBuilder.uri(URI.create(
                 API_URL + "/api/v3/order?orderId=" + orderId
@@ -112,7 +129,7 @@ public class Binance extends Exchange {
             throw new RuntimeException("Error cancelling order: %d".formatted(response.statusCode()));
         }
         logger.info("Order cancelled: {}", orderId);
-        return CompletableFuture.completedFuture(orderId);
+
     }
 
     @Override
@@ -222,17 +239,16 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+    public List<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
         requestBuilder.uri(URI.create(API_URL + "/api/v3/depth?symbol=" + tradePair.toString('-')));
         HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("Binance response: " + response.body());
-        ObjectMapper objectMapper = new ObjectMapper();
-        OrderBook orderBook = objectMapper.readValue(response.body(), OrderBook.class);
-        return CompletableFuture.completedFuture(orderBook);
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OrderBook[].class));
+
     }
 
     @Override
-    public Position getPositions() {
+    public List<Position> getPositions() {
         return null;
     }
 
@@ -253,7 +269,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<ArrayList<TradePair>> getTradePairs() {
+    public List<TradePair> getTradePairs() {
         requestBuilder.uri(URI.create(API_URL + "/api/v3/exchangeInfo"));
 
         ArrayList<TradePair> tradePairs = new ArrayList<>();
@@ -274,7 +290,7 @@ public class Binance extends Exchange {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return CompletableFuture.completedFuture(tradePairs);
+        return tradePairs;
     }
 
     @Override
@@ -297,28 +313,22 @@ public class Binance extends Exchange {
         return List.of(); // WebSocket streaming for candlestick not implemented here
     }
 
-    @Override
-    public List<OrderBook> streamOrderBook(@NotNull TradePair tradePair) {
-        return List.of(); // WebSocket streaming for order book not implemented here
-    }
 
     @Override
-    public CompletableFuture<String> cancelAllOrders() {
-        return null; // Implement if Binance supports cancelling all orders at once
+    public void cancelAllOrders() {
     }
-
     @Override
     public boolean supportsStreamingTrades(TradePair tradePair) {
         return false; // WebSocket support for trades can be added if needed
     }
 
     @Override
-    public ArrayList<CryptoDeposit> getCryptosDeposit() {
+    public List<Deposit> Deposit() {
         return null;
     }
 
     @Override
-    public ArrayList<CryptoWithdraw> getCryptosWithdraw() {
+    public List<Withdrawal> Withdraw() {
         return null;
     }
 

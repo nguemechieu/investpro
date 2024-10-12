@@ -1,7 +1,6 @@
 package org.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,12 +8,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.SimpleIntegerProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.scene.control.Alert;
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,8 +18,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -58,7 +51,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Fee>> getTradingFee() throws IOException, InterruptedException {
+    public List<Fee> getTradingFee() throws IOException, InterruptedException {
         // Build the URI for the request
         requestBuilder.uri(URI.create(
                 "%s/accounts/%s/trades/fee".formatted(API_URL, account_id)
@@ -81,66 +74,25 @@ public class Oanda extends Exchange {
         if (fee == null) {
             throw new RuntimeException("Failed to parse trading fee from response.\n" + response.body());
         }
-        return CompletableFuture.completedFuture(Collections.singletonList(fee));
+        return Collections.singletonList(fee);
 
     }
 
 
     @Override
-    public CompletableFuture<List<Account>> getAccounts() throws IOException, InterruptedException {
+    public List<Account> getAccounts() throws IOException, InterruptedException {
         // Build the URI for the request
         requestBuilder.uri(URI.create("%s/accounts".formatted(API_URL)));
-
         // Send the GET request and capture the response
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        // Handle non-200 status codes by showing an error message and throwing a RuntimeException
         if (response.statusCode() != 200) {
-            new Messages(
-                    Alert.AlertType.ERROR,  // Error type
-                    "Failed to fetch accounts: %s".formatted(response.body())  // Error message from the response
-            );
+            new Messages(Alert.AlertType.ERROR, "Failed to fetch accounts: %s".formatted(response.body()));
             throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
         }
-        List<Account> accounts = new ArrayList<>();
-        logger.info("account "+response.body());
-        JSONObject account = new JSONObject(response.body());
-        if (account.has("accounts")) {
-            JSONArray accountsArray = account.getJSONArray("accounts");
-            for (int i = 0; i < accountsArray.length(); i++) {
-                JSONObject accountObject = accountsArray.getJSONObject(i);
-                Account account0 = new Account();
-                account0.setMt4AccountID(accountObject.getString("id"));
 
-                if (account.has("balance")) {
-                account0.setBalance(accountObject.getDouble("balance"));}
-                if (account.has("marginRate")) {
-                    account0.setMarginRate(accountObject.getDouble("marginRate"));
-                }
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Account[].class));
 
-                if (account.has("created")) {
-                    account0.setCreated(String.valueOf(LocalDateTime.ofInstant(Instant.ofEpochMilli(accountObject.getLong("createdTime")), ZoneOffset.UTC)));
-                }
-                if (account.has("mt4AccountID")) {
-                    account0.setMt4AccountID(accountObject.getString("mt4AccountID"));
-                }
-                if (account.has("tags")){
-                    JSONArray tagsArray = accountObject.getJSONArray("tags");
-                    List<String> tags = new ArrayList<>();
-                    for (int j = 0; j < tagsArray.length(); j++) {
-                        tags.add(tagsArray.getString(j));
-                    }
-                    account0.setTags(tags);
-
-                }
-
-                accounts.add(account0);
-            }
-        } else {
-            throw new RuntimeException("Failed to parse accounts from response.\n%s".formatted(response.body()));
-        }
-
-        return CompletableFuture.completedFuture(accounts);
     }
 
 
@@ -172,13 +124,13 @@ public class Oanda extends Exchange {
         requestBuilder.method("POST", HttpRequest.BodyPublishers.ofString(new ObjectMapper().writeValueAsString(orderRequest)));
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 201) { // OANDA uses 201 for successful order creation
-            throw new RuntimeException("Error creating order: %d".formatted(response.statusCode()));
+            new Messages(Alert.AlertType.ERROR, "Error creating order: %d".formatted(response.statusCode()));
         }
         logger.info("Order created: {}", response.body());
     }
 
     @Override
-    public CompletableFuture<String> cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException {
+    public void cancelOrder(String orderId) throws IOException, InterruptedException {
 
         requestBuilder.uri(URI.create(
                 API_URL + "/accounts/%s/orders/%s".formatted(account_id, orderId) // OANDA requires account ID and order ID
@@ -187,10 +139,11 @@ public class Oanda extends Exchange {
 
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
+            new Messages(Alert.AlertType.ERROR, "Error cancelling order: %d".formatted(response.statusCode()));
             throw new RuntimeException("Error cancelling order: %d".formatted(response.statusCode()));
         }
         logger.info("Order cancelled: {}", orderId);
-        return CompletableFuture.completedFuture(orderId);
+
     }
 
     @Override
@@ -220,7 +173,7 @@ public class Oanda extends Exchange {
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
 
-                JsonNode tradesResponse = new ObjectMapper().readTree(response.body());
+                JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
                 if (!tradesResponse.isArray() || tradesResponse.isEmpty()) {
                     futureResult.completeExceptionally(new RuntimeException("OANDA trades response was empty or not an array"));
                 } else {
@@ -315,30 +268,22 @@ public class Oanda extends Exchange {
         }
 
 
-
-
-
-
-
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.readValue(response.body(), new TypeReference<>() {
-        });
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Order[].class));
     }
 
     @Override
-    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+    public List<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
         requestBuilder.uri(URI.create("%s/instruments/%s/orderBook".formatted(API_URL, tradePair.toString('_'))));
 
         HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
-        logger.info("OANDA response: " , response.body());
-        ObjectMapper objectMapper = new ObjectMapper();
-        OrderBook orderBook = objectMapper.readValue(response.body(), OrderBook.class);
-        return CompletableFuture.completedFuture(orderBook);
+        logger.info("OANDA response: {}", response.body());
+
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OrderBook[].class));
+
     }
 
     @Override
-    public Position getPositions() throws IOException, InterruptedException {
+    public List<Position> getPositions() throws IOException, InterruptedException {
         // OANDA position book can be fetched if needed
 
         requestBuilder.uri(URI.create("%s/accounts/%s/positions".formatted(API_URL, account_id)));
@@ -351,8 +296,8 @@ public class Oanda extends Exchange {
 
         logger.info("OANDA response: %s".formatted(response.body()));
 
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Position[].class));
 
-        return OBJECT_MAPPER.readValue(response.body(), Position.class);
 
 
 
@@ -370,32 +315,37 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public ObservableList<Order> getOrders() throws IOException, InterruptedException {
+    public List<Order> getOrders() throws IOException, InterruptedException {
 
         requestBuilder.uri(
                 URI.create(API_URL + "/accounts/%s/orders".formatted(account_id))
         );
+
+        // Send the request
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode()!= 200) {
-
-            new Messages(Alert.AlertType.ERROR, "%d\n\n%s".formatted(response.statusCode(), response.body()));
-            throw new RuntimeException("ORDER HTTP error response: %d".formatted(response.statusCode()));
+        // Handle non-200 responses
+        if (response.statusCode() != 200) {
+            new Messages(Alert.AlertType.ERROR, String.format("%d\n\n%s", response.statusCode(), response.body()));
+            throw new RuntimeException(String.format("ORDER HTTP error response: %d", response.statusCode()));
         }
 
+        // Deserialize the JSON response into a list of orders
+        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Order[].class));
 
-        Order orders = OBJECT_MAPPER.readValue(response.body(), Order.class);
-        return FXCollections.observableArrayList((orders));
+        // Convert the List<Order> to an ObservableList<Order>
 
+        // Return the ObservableList
 
     }
 
+
     @Override
-    public CompletableFuture<ArrayList<TradePair>> getTradePairs() throws Exception {
+    public List<TradePair> getTradePairs() throws Exception {
 
         String urls = "%s/accounts/%s/instruments".formatted(API_URL, account_id);
         requestBuilder.uri(URI.create(urls));
-        ArrayList<TradePair> tradePairs = new ArrayList<>();
+        List<TradePair> tradePairs = new ArrayList<>();
 
             HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode()!= 200) {
@@ -412,6 +362,8 @@ public class Oanda extends Exchange {
                 String baseCurrency = instrument.get("name").asText().split("_")[0];
                 String counterCurrency = instrument.get("name").asText().split("_")[1];
                 TradePair tp = new TradePair(baseCurrency, counterCurrency);
+                tp.getBaseCurrency().setCurrencyType(CurrencyType.FIAT);
+                tp.getCounterCurrency().setCurrencyType(CurrencyType.FIAT);
                 tradePairs.add(tp);
                 logger.info("OANDA trade pair: %s".formatted(tp));
             }
@@ -426,10 +378,7 @@ public class Oanda extends Exchange {
         ).collect(Collectors.toList()));
 
 
-
-
-
-        return CompletableFuture.completedFuture(tradePairs);
+        return tradePairs;
     }
 
     @Override
@@ -453,14 +402,12 @@ public class Oanda extends Exchange {
         return List.of(); // WebSocket streaming for candlestick not implemented here
     }
 
-    @Override
-    public List<OrderBook> streamOrderBook(@NotNull TradePair tradePair) {
-        return List.of(); // WebSocket streaming for order book not implemented here
-    }
 
     @Override
-    public CompletableFuture<String> cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException {
-        return null; // Implement if OANDA supports cancelling all orders at once
+    public void cancelAllOrders() {
+
+
+
     }
 
     @Override
@@ -469,12 +416,12 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public ArrayList<CryptoDeposit> getCryptosDeposit() throws IOException, InterruptedException {
+    public ArrayList<Deposit> Deposit() {
         return null;
     }
 
     @Override
-    public ArrayList<CryptoWithdraw> getCryptosWithdraw() throws IOException, InterruptedException {
+    public ArrayList<Withdrawal> Withdraw() {
         return null;
     }
 

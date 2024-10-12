@@ -30,11 +30,6 @@ public class Position {
         this.shortPosition = shortPosition;
     }
 
-    @Override
-    public String toString() {
-        return "Position{lastTransactionID='%s', positions=%s, instrument='%s', units=%d, pl=%s, financing=%s, dividendAdjustment=%s, guaranteedExecutionFees=%s, longPosition='%s', shortPosition='%s'}".formatted(lastTransactionID, positions, instrument, units, pl, financing, dividendAdjustment, guaranteedExecutionFees, longPosition, shortPosition);
-    }
-
     public double getFinancing() {
         return financing;
     }
@@ -96,6 +91,22 @@ public class Position {
         this.lastTransactionID = lastTransactionID;
     }
 
+    @Override
+    public String toString() {
+        return "Position{" +
+                "lastTransactionID='" + lastTransactionID + '\'' +
+                ", positions=" + positions +
+                ", instrument='" + instrument + '\'' +
+                ", units=" + units +
+                ", pl=" + pl +
+                ", financing=" + financing +
+                ", dividendAdjustment=" + dividendAdjustment +
+                ", guaranteedExecutionFees=" + guaranteedExecutionFees +
+                ", longPosition='" + longPosition + '\'' +
+                ", shortPosition='" + shortPosition + '\'' +
+                '}';
+    }
+
     String longPosition;
     String shortPosition;
 
@@ -115,6 +126,18 @@ public class Position {
         private double pl;
         private double resettablePL;
         private double unrealizedPL;
+
+        @Override
+        public String toString() {
+            return "PositionDetails{" +
+                    "instrument='" + instrument + '\'' +
+                    ", longPosition=" + longPosition +
+                    ", shortPosition=" + shortPosition +
+                    ", pl=" + pl +
+                    ", resettablePL=" + resettablePL +
+                    ", unrealizedPL=" + unrealizedPL +
+                    '}';
+        }
 
         // Getters and Setters
         public String getInstrument() {

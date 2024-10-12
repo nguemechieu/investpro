@@ -1,8 +1,9 @@
 package org.investpro;
 
+import java.util.Date;
 import java.util.List;
 
-public class CryptoDeposit {
+public class Deposit {
 
     private String orderId;
     private String paymentAccount;
@@ -103,15 +104,20 @@ public class CryptoDeposit {
                 '}';
     }
 
+    public Date getCreatedAt() {
+
+        return new Date();
+    }
+
     // Inner class to represent a list of AssetLogRecords
     public static class AssetLogRecordList {
-        private List<CryptoDeposit> assetLogRecordList;
+        private List<Deposit> assetLogRecordList;
 
-        public List<CryptoDeposit> getAssetLogRecordList() {
+        public List<Deposit> getAssetLogRecordList() {
             return assetLogRecordList;
         }
 
-        public void setAssetLogRecordList(List<CryptoDeposit> assetLogRecordList) {
+        public void setAssetLogRecordList(List<Deposit> assetLogRecordList) {
             this.assetLogRecordList = assetLogRecordList;
         }
     }

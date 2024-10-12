@@ -62,7 +62,7 @@ public class Browser extends AnchorPane {
             }
         });
 
-        toolbar.getItems().addAll(btnAdd, btnRemove);
+        toolbar.getItems().addAll(btnAdd, new Separator(Orientation.VERTICAL), btnRemove);
         toolbar.setTranslateY(0);
         tabPane.setTranslateY(40);
 
