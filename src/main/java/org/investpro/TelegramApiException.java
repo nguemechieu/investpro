@@ -1,8 +1,11 @@
 package org.investpro;
 
 
+import lombok.Getter;
+
 import java.io.Serial;
 
+@Getter
 public class TelegramApiException extends Throwable {
     @Serial
     private static final long serialVersionUID = 1L;
@@ -17,7 +20,4 @@ public class TelegramApiException extends Throwable {
         logger.error((String) exception);
     }
 
-    public Object getException() {
-        return exception;
-    }
 }

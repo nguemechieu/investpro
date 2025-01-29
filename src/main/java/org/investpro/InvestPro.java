@@ -27,7 +27,7 @@ public class InvestPro extends Application {
             primaryStage.getIcons().add(icon);
 
             // Set up the primary scene
-            Scene scene = new Scene(new TradingWindow(), 1540, 780);
+            Scene scene = new Scene(new TradingWindow(), 1530, 780);
             scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
 
             // Set up the stage

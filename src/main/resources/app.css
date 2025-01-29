@@ -1,6 +1,5 @@
 .tradingWindow{
--fx-background-color: #072333;
-    -fx-text-fill: #57af71;
+    -fx-text-fill: #1d79e1;
     -fx-text-align: center;
     -fx-background-color: #116798;
     -fx-background-radius: 5.0;
@@ -9,7 +8,7 @@
     -fx-border-width: 2.0;
 }
 .chart-container {
-    -fx-background-color: #072333;
+    -fx-background-color: #28b612;
     -fx-background-radius: 10.0;
     -fx-background-insets: 0;
     -fx-border-color: #466fac;

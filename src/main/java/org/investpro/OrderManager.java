@@ -1,5 +1,10 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
 public class OrderManager {
 
     long Placed;
@@ -16,75 +21,4 @@ public class OrderManager {
     public OrderManager() {
     }
 
-    public long getPlaced() {
-        return Placed;
-    }
-
-    public void setPlaced(long placed) {
-        Placed = placed;
-    }
-
-    public TradePair getPair() {
-        return Pair;
-    }
-
-    public void setPair(TradePair pair) {
-        Pair = pair;
-    }
-
-    public Side getType() {
-        return Type;
-    }
-
-    public void setType(Side type) {
-        Type = type;
-    }
-
-    public double getPrice() {
-        return Price;
-    }
-
-    public void setPrice(double price) {
-        Price = price;
-    }
-
-    public double getAmount() {
-        return Amount;
-    }
-
-    public void setAmount(double amount) {
-        Amount = amount;
-    }
-
-    public Boolean getFills() {
-        return Fills;
-    }
-
-    public void setFills(Boolean fills) {
-        Fills = fills;
-    }
-
-    public boolean isFilled() {
-        return Filled;
-    }
-
-    public void setFilled(boolean filled) {
-        Filled = filled;
-    }
-
-    public long getTotal() {
-        return Total;
-    }
-
-    public void setTotal(long total) {
-        Total = total;
-    }
-
-    public String getStatus() {
-        return Status;
-    }
-
-    public void setStatus(String status) {
-        Status = status;
-    }
 }

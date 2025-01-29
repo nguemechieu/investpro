@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
@@ -19,8 +18,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -29,7 +26,7 @@ import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
-import static org.investpro.Currency.db1;
+
 
 public class Oanda extends Exchange {
 
@@ -44,7 +41,7 @@ public class Oanda extends Exchange {
         super(accountId, apiSecret); // OANDA uses only an API key for authentication, no secret required
         this.account_id = accountId;
 
-        logger.info("SECRET RECEIVED: %s".formatted(apiSecret));
+        logger.info("SECRET RECEIVED: {}", apiSecret);
         requestBuilder.header("Authorization", "Bearer " + apiSecret);
         requestBuilder.setHeader("Accept", "application/json");
         requestBuilder.setHeader("Content-Type", "application/json");
@@ -62,10 +59,7 @@ public class Oanda extends Exchange {
 
         // Handle non-200 status codes by showing an error message and throwing a RuntimeException
         if (response.statusCode() != 200) {
-            new Messages(
-                    Alert.AlertType.ERROR,  // Error type
-                    "Failed to fetch trading fee: %s".formatted(response.body())  // Error message from the response
-            );
+
             throw new RuntimeException("Error fetching trading fee: %d".formatted(response.statusCode()));
         }
 
@@ -83,24 +77,44 @@ public class Oanda extends Exchange {
     public List<Account> getAccounts() throws IOException, InterruptedException {
         // Build the URI for the request
         requestBuilder.uri(URI.create("%s/accounts".formatted(API_URL)));
+
         // Send the GET request and capture the response
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            new Messages(Alert.AlertType.ERROR, "Failed to fetch accounts: %s".formatted(response.body()));
-            throw new RuntimeException("Error fetching accounts: %d".formatted(response.statusCode()));
+            // Display error message and throw an exception
+            throw new RuntimeException("Error fetching accounts: %s".formatted(response.body()));
         }
 
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Account[].class));
+        // Parse the response body as a JSON object
+        JsonNode rootNode = OBJECT_MAPPER.readTree(response.body());
 
+        // Extract the "accounts" array from the JSON object
+        JsonNode accountsNode = rootNode.get("accounts");
+        if (accountsNode == null || !accountsNode.isArray()) {
+            throw new RuntimeException("Invalid JSON response: 'accounts' field is missing or not an array");
+        }
+
+        // Convert the accounts array into a list of Account objects
+        List<Account> accounts = new ArrayList<>();
+        for (JsonNode accountNode : accountsNode) {
+            Account account = OBJECT_MAPPER.treeToValue(accountNode, Account.class); // Corrected method call
+            accounts.add(account);
+
+        }
+        logger.info("Found {} accounts", accounts);
+
+        return accounts;
     }
 
 
 
-    // Extract and set other account details if necessary (e.g., margin rate, trading permissions, etc.)
 
-        // Return the list of accounts
-
+    /*
+     Extract and set other account details if necessary (e.g., margin rajava:97)
+    	at investpro/org.investpro.DisplayExchange.lambda$updateAccount$19te, trading permissions, etc.)
+     Return the list of accounts
+    */
 
 
     @Override
@@ -124,7 +138,7 @@ public class Oanda extends Exchange {
         requestBuilder.method("POST", HttpRequest.BodyPublishers.ofString(new ObjectMapper().writeValueAsString(orderRequest)));
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 201) { // OANDA uses 201 for successful order creation
-            new Messages(Alert.AlertType.ERROR, "Error creating order: %d".formatted(response.statusCode()));
+            throw new RuntimeException("Error creating order: %s".formatted(response.body()));
         }
         logger.info("Order created: {}", response.body());
     }
@@ -164,12 +178,18 @@ public class Oanda extends Exchange {
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
 
         CompletableFuture.runAsync(() -> {
-            String uriStr = API_URL + "/accounts/%s/trades".formatted(account_id);
+            String uriStr = API_URL;
+            uriStr += "/accounts/%s/pricing/stream?instruments=" + tradePair.toString('-');
+
+
+            requestBuilder.uri(URI.create(uriStr));
+            requestBuilder.header("Accept", "application/json");
+            requestBuilder.header("Content-Type", "application/octet-stream");
 
             try {
                 HttpResponse<String> response = client.send(
                         requestBuilder
-                                .uri(URI.create(uriStr))
+
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
 
@@ -202,57 +222,61 @@ public class Oanda extends Exchange {
 
         return futureResult;
     }
-
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-                currentCandleStartedAt, ZoneOffset.UTC));
+        String startDateString = DateTimeFormatter.ISO_INSTANT.format(currentCandleStartedAt);
+
+        URI uri = URI.create(String.format(
+                "%s/instruments/%s/candles?granularity=%s&from=%s", API_URL,
+                tradePair.toString('_'), getOandaGranularity(secondsPerCandle), startDateString
+        ));
 
         return client.sendAsync(
-                        requestBuilder.uri(URI.create(String.format(
-                                        "%s/instruments/%s/candles?granularity=%s&from=%s", API_URL,
-                                        tradePair.toString('_'),
-                                        getOandaGranularity(secondsPerCandle),
-                                        startDateString
-                                )))
-
+                        requestBuilder.uri(uri)
                                 .GET().build(),
                         HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(response -> {
-                    logger.info("OANDA response: %s".formatted(response));
+                    logger.info("OANDA response: {}", response);
+
                     JsonNode res;
                     try {
-                        res = new ObjectMapper().readTree(response);
+                        res = OBJECT_MAPPER.readTree(response);
                     } catch (JsonProcessingException ex) {
-
-                        new  Messages(
-                                Alert.AlertType.ERROR, "Failed to parse OANDA candles response. The response was: %%s%s".formatted(ex.getMessage()));
-
-
-                        throw new RuntimeException(ex);
-
+                        logger.error("Failed to parse OANDA response", ex);
+                        throw new RuntimeException("Failed to parse JSON", ex);
                     }
 
-                    if (res.isEmpty()) {
+                    JsonNode candles = res.get("candles");
+                    if (candles == null || !candles.isArray() || candles.isEmpty()) {
+                        logger.warn("No candles data found in the response");
                         return Optional.empty();
                     }
 
-                    JsonNode currCandle = res.get("candles").get(0);
-                    Instant openTime = Instant.parse(currCandle.get("time").asText());
-
-                    return Optional.of(new InProgressCandleData(
-                            (int) openTime.getEpochSecond(),
-                            currCandle.get("mid").get("o").asDouble(),
-                            currCandle.get("mid").get("h").asDouble(),
-                            currCandle.get("mid").get("l").asDouble(),
-                            (int)currentCandleStartedAt.getEpochSecond(),
-                            currCandle.get("mid").get("c").asDouble(),
-                            currCandle.get("volume").asDouble()
-                    ));
+                    return parseCandleData(candles.get(0));
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error fetching or processing candle data", ex);
+                    return Optional.empty();
                 });
     }
+
+    private Optional<InProgressCandleData> parseCandleData(JsonNode candleNode) {
+        if (candleNode == null) return Optional.empty();
+
+        long openTime = Instant.parse(candleNode.get("time").asText()).getEpochSecond();
+        return Optional.of(new InProgressCandleData(
+
+                candleNode.get("mid").get("o").asDouble(),
+                candleNode.get("mid").get("h").asDouble(),
+                candleNode.get("mid").get("l").asDouble(),
+                candleNode.get("mid").get("c").asDouble(),
+                (int) openTime,
+                candleNode.get("volume").asLong()
+        ));
+    }
+
 
     @Override
     public List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException {
@@ -261,14 +285,34 @@ public class Oanda extends Exchange {
         HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
 
 
-        if ( response.statusCode()!=200){
+        if (response.statusCode() != 200) {
 
-            new Messages(Alert.AlertType.WARNING, response.body());
-            throw new RuntimeException("Error fetching pending orders: %d".formatted(response.statusCode()));
+
+            throw new RuntimeException("Error fetching pending orders: %s".formatted(response.body()));
         }
 
+        List<Order> orders = new ArrayList<>();
 
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Order[].class));
+        JsonNode ordersJson = OBJECT_MAPPER.readTree(response.body());
+        if (!ordersJson.isArray() || ordersJson.isEmpty()) {
+
+            for (JsonNode order : ordersJson) {
+
+                Order orderObj = new Order();
+                if (order.has("lastTransactionID")) {
+                    orderObj.setLastTransactionID(order.get("lastTransactionID").asText());
+
+                }
+                if (order.has("orders")) {
+                    orderObj = OBJECT_MAPPER.convertValue(order.get("orders"), Order.class);
+                    orders.add(orderObj);
+                }
+
+            }
+        }
+        return orders;
+
+
     }
 
     @Override
@@ -290,18 +334,21 @@ public class Oanda extends Exchange {
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
        if ( response.statusCode()!=200)
        {
-           new Messages(Alert.AlertType.ERROR, "Error fetching positions: %s".formatted(response.body()));
            throw new RuntimeException("Error fetching positions: %d".formatted(response.statusCode()));
        }
 
         logger.info("OANDA response: %s".formatted(response.body()));
 
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Position[].class));
+        List<Position> positions = new ArrayList<>();
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode res = mapper.readTree(response.body());
 
+        for (JsonNode position : res.get("positions")) {
 
-
-
-
+            Position p = mapper.readValue(position.toString(), Position.class);
+            positions.add(p);
+        }
+        return positions;
     }
 
     @Override
@@ -311,7 +358,14 @@ public class Oanda extends Exchange {
         HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("OANDA response: %s".formatted(response.body()));
         ObjectMapper objectMapper = new ObjectMapper();
-        return Arrays.asList(objectMapper.readValue(response.body(), Order[].class));
+
+        JsonNode res = objectMapper.readTree(response.body());
+        List<Order> orders = new ArrayList<>();
+        for (JsonNode order : res.get("orders")) {
+            Order o = objectMapper.readValue(order.toString(), Order.class);
+            orders.add(o);
+        }
+        return orders;
     }
 
     @Override
@@ -326,12 +380,24 @@ public class Oanda extends Exchange {
 
         // Handle non-200 responses
         if (response.statusCode() != 200) {
-            new Messages(Alert.AlertType.ERROR, String.format("%d\n\n%s", response.statusCode(), response.body()));
-            throw new RuntimeException(String.format("ORDER HTTP error response: %d", response.statusCode()));
+
+            throw new RuntimeException(String.format("ORDER HTTP error response: %s", response));
         }
 
         // Deserialize the JSON response into a list of orders
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), Order[].class));
+        JsonNode or = OBJECT_MAPPER.readValue(response.body(), JsonNode.class);
+        List<Order> orders = new ArrayList<>();
+        if (or.has("orders")) {
+            for (JsonNode order : or.get("orders")) {
+                Order orderObj = OBJECT_MAPPER.readValue(order.toString(), Order.class);
+
+                orderObj.setLastTransactionID(or.get("lastTransactionID").asText());
+                orders.add(orderObj);
+
+            }
+        }
+
+        return orders;
 
         // Convert the List<Order> to an ObservableList<Order>
 
@@ -362,18 +428,17 @@ public class Oanda extends Exchange {
                 String baseCurrency = instrument.get("name").asText().split("_")[0];
                 String counterCurrency = instrument.get("name").asText().split("_")[1];
                 TradePair tp = new TradePair(baseCurrency, counterCurrency);
-                tp.getBaseCurrency().setCurrencyType(CurrencyType.FIAT);
-                tp.getCounterCurrency().setCurrencyType(CurrencyType.FIAT);
+                tp.getBaseCurrency().setCurrencyType(CurrencyType.FIAT.name());
+                tp.getCounterCurrency().setCurrencyType(CurrencyType.FIAT.name());
                 tradePairs.add(tp);
-                logger.info("OANDA trade pair: %s".formatted(tp));
-            }
-        logger.info("OANDA trade pairs: %s".formatted(tradePairs));
-
-        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+                Currency.save((ArrayList<Currency>) tradePairs.stream().map(
                 TradePair::getCounterCurrency
         ).collect(Collectors.toList()));
+                logger.info("OANDA trade pair: %s".formatted(tp));
+            }
 
-        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+
+        Currency.save((ArrayList<Currency>) tradePairs.stream().map(
                 TradePair::getBaseCurrency
         ).collect(Collectors.toList()));
 
@@ -430,10 +495,6 @@ public class Oanda extends Exchange {
         return List.of();
     }
 
-    // OANDA supported granularity (intervals)
-    private static final Set<String> SUPPORTED_GRANULARITIES = Set.of(
-            "S5", "M1", "M5", "M15", "H1", "D"
-    );
 
     /**
      * Returns the closest supported granularity (time interval) for OANDA.
@@ -472,7 +533,7 @@ public class Oanda extends Exchange {
 
 
         OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            super(240, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
 
 
         }
@@ -482,112 +543,86 @@ public class Oanda extends Exchange {
         @Override
         public Set<Integer> getSupportedGranularity() {
             // https://docs.pro.coinbase.com/#get-historic-rates
-            return new TreeSet<>(Set.of(60, 300, 900, 3600, 21600, 86400));
+            return new TreeSet<>(Set.of(60,
+                    60 * 5, 60 * 15, 60 * 30, 3600,
+                    3600 * 2, 3600 * 4, 3600 * 6, 3600 * 24, 3600 * 24 * 7, 3600 * 24 * 7 * 4
+
+            ));
         }
 
         @Override
         public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
             return null;
         }
-
-        public static int getTimeFromString(@NotNull String timeString) {
-
-            int tim = (int) Instant.parse(timeString).getEpochSecond();
-            logger.info("Created timestamp: {}{}", timeString, tim);
-            return tim;
-        }
-
         @Override
         public Future<List<CandleData>> get() {
             if (endTime.get() == -1) {
-                endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
+                endTime.set((int) (Instant.now().getEpochSecond())); // Fix: Use seconds instead of milliseconds
             }
-
-            String endDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                    .format(LocalDateTime.ofEpochSecond(endTime.get(), 0, ZoneOffset.UTC));
 
             int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
-            String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
-                    .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
-           // "https://api-fxtrade.oanda.com/v3/instruments/USD_CAD/candles?price=BA&from=2016-10-17T15%3A00%3A00.000000000Z&granularity=M1"
-            String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/" + tradePair.toString('_') + "/candles?count=200&price=M&from=" + startDateString + "&granularity=" + granularityToString(secondsPerCandle);
+            String startDateString = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(startTime));
 
-            if (startTime == EARLIEST_DATA) {
-                // signal more data is false
-                return CompletableFuture.completedFuture(Collections.emptyList());
-            }
-
-
+            String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/"
+                    + tradePair.toString('_')
+                    + "/candles?count=" + numCandles
+                    + "&price=M&from=" + startDateString
+                    + "&granularity=" + granularityToString(secondsPerCandle);
 
             return client.sendAsync(
-                            requestBuilder
-                                    .uri(URI.create(uriStr)).build(),
+                            requestBuilder.uri(URI.create(uriStr)).build(),
                             HttpResponse.BodyHandlers.ofString())
                     .thenApply(HttpResponse::body)
                     .thenApply(response -> {
-
                         JsonNode res;
                         try {
                             res = OBJECT_MAPPER.readTree(response);
-
+                            logger.info("OANDA trade pair: {}", tradePair);
+                            logger.info("OANDA res: {}", res);
                         } catch (JsonProcessingException ex) {
-
-
-                            new Messages(
-
-                                    Alert.AlertType.ERROR,
-                                     ex.getMessage()
-
-                             );
-                            throw new RuntimeException(ex);
+                            logger.error("Error parsing JSON response", ex);
+                            throw new RuntimeException("Failed to parse JSON", ex);
                         }
+
                         List<CandleData> candleData = new ArrayList<>();
 
-                        if (!res.get("candles").isEmpty()) {
+                        JsonNode candlesNode = res.get("candles");
+                        if (candlesNode != null && candlesNode.isArray()) {
+                            logger.info("Response {}", candlesNode);
 
-
-                            logger.info("Response {}", res.get("candles"));
-
-                            // Remove the current in-progress candle
-
-                            for (JsonNode candle : res.get("candles")) {
-
-                                int time;
-                                if (candle.has("time")) {
-
-                                    time = getTimeFromString(candle.get("time").asText());
-
-                                    if (time + secondsPerCandle > endTime.get()) {
-                                        ((ArrayNode) candle.get("candles")).remove(0);
-                                    }
-                                    endTime.set(startTime);
-                                    int closeTime = 0;
-
-                                    if ((-time + (System.currentTimeMillis() / 1000)) == secondsPerCandle) {
-                                        closeTime = (candle.get("time").asInt());
+                            for (JsonNode candle : candlesNode) {
+                                if (!candle.has("time") || !candle.has("mid")) {
+                                    logger.warn("Skipping invalid candle data: {}", candle);
+                                    continue;
                                 }
-                                    candleData.add(new CandleData(
-                                            candle.get("mid").get("o").asDouble(),  // open price
-                                            candle.get("mid").get("c").asDouble(),  // close price
-                                            candle.get("mid").get("h").asDouble(),  // high price
-                                            candle.get("mid").get("l").asDouble(),  // low price
-                                            candle.get("mid").get("o").asInt(),     // open time.
-                                        closeTime,  // close time
-                                            candle.get("volume").asDouble()   // volume
+
+                                int time = (int) Instant.parse(candle.get("time").asText()).getEpochSecond();
+
+                                // Skip the in-progress candle
+                                if (time + secondsPerCandle > endTime.get()) {
+                                    continue;
+                                }
+
+                                candleData.add(new CandleData(
+                                        candle.get("mid").get("o").asDouble(),  // open price
+                                        candle.get("mid").get("c").asDouble(),  // close price
+                                        candle.get("mid").get("h").asDouble(),  // high price
+                                        candle.get("mid").get("l").asDouble(),  // low price
+                                        time,
+                                        candle.get("volume").asLong()  // volume
                                 ));
-
-
-                                }
-                                candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
-
-                                logger.info(candleData.toString());
-                                return candleData;
                             }
+
+                            // Ensure candles are sorted before returning
+                            candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
+
+                            logger.info("Processed candles: {}", candleData);
+                            endTime.set(startTime); // Update only once after processing all candles
+
+                            return candleData;
                         }
 
-
-                            return Collections.emptyList();
-
+                        return Collections.emptyList();
                     });
         }
 

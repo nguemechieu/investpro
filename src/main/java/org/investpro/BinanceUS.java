@@ -10,6 +10,7 @@ import com.github.dockerjava.zerodep.shaded.org.apache.hc.client5.http.HttpRespo
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.scene.control.Alert;
+import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -34,7 +35,7 @@ import java.util.stream.Collectors;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
-import static org.investpro.Currency.db1;
+
 
 public class BinanceUS extends Exchange {
 
@@ -56,6 +57,7 @@ public class BinanceUS extends Exchange {
     private static String apiKey;
 
 
+    @Setter
     private TradePair tradePair;
 
     public BinanceUS(String apikey, String apiSecret) {
@@ -209,9 +211,9 @@ public class BinanceUS extends Exchange {
         Objects.requireNonNull(stopAt);
 
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
-
+        //api.binance.us/api/v3/trades?symbol=LTCBTC"
         CompletableFuture.runAsync(() -> {
-            String uriStr = API_URL + "/api/v3/trades?symbol=" + tradePair.toString('/');
+            String uriStr = "https://api.binance.us/api/v3/trades?symbol=" + tradePair.toString('/');
 
             try {
                 HttpResponse<String> response = client.send(
@@ -251,7 +253,7 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
                 currentCandleStartedAt, ZoneOffset.UTC));
@@ -283,13 +285,14 @@ public class BinanceUS extends Exchange {
                     Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
 
                     return Optional.of(new InProgressCandleData(
-                            (int) openTime.getEpochSecond(),
+
                             currCandle.get(1).asDouble(),
                             currCandle.get(2).asDouble(),
                             currCandle.get(3).asDouble(),
-                            (int) currCandle.get(6).asLong(),
+
                             currCandle.get(4).asDouble(),
-                            currCandle.get(5).asDouble()
+                            (int) currCandle.get(6).asLong(),
+                            currCandle.get(5).asLong()
                     ));
                 });
     }
@@ -555,11 +558,11 @@ public class BinanceUS extends Exchange {
 
 
             }
-        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+        Currency.save((ArrayList<Currency>) tradePairs.stream().map(
                 TradePair::getCounterCurrency
         ).collect(Collectors.toList()));
 
-        db1.save((ArrayList<Currency>) tradePairs.stream().map(
+        Currency.save((ArrayList<Currency>) tradePairs.stream().map(
                 TradePair::getBaseCurrency
         ).collect(Collectors.toList()));
 
@@ -721,10 +724,6 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         return List.of();
     }
 
-    public void setTradePair(TradePair tradePair) {
-        this.tradePair = tradePair;
-    }
-
 
     private static class BinanceUsCandleDataSupplier extends CandleDataSupplier {
 
@@ -754,79 +753,87 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
         @Override
         public CompletableFuture<List<CandleData>> get() {
-            if (endTime.get() == -1) {
-                endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
-            }
-
-            long endTimeMillis = (long) endTime.get() * 1000;
-            long startTimeMillis = Math.max(endTimeMillis - (numCandles * secondsPerCandle * 1000L), 1422144000000L); // earliest timestamp
-
-            // Binance uses string intervals for granularity like "1m", "5m", etc.
-            String interval = getBinanceInterval(secondsPerCandle);
-
-            // Construct the URL
-            String url = String.format("%s/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d",
-                    API_URL, tradePair.toString('/'), interval, startTimeMillis, endTimeMillis, numCandles);
-
-            logger.info("Fetching candle data for trade pair: {} from {} to {}", tradePair.toString('/'), startTimeMillis, endTimeMillis);
-
-            // Generate the correct signature for the request
-
-            String queryString = String.format("symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d&timestamp=%d",
-                    tradePair.toString('/'), interval, startTimeMillis, endTimeMillis, numCandles, timestamp);
-
-            @NotNull String signature;
             try {
-                signature = HmacSHA256(apiSecret, queryString); // Generate the signature using HmacSHA256
-            } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-                throw new RuntimeException(e);
-            }
+                // Set end time to current timestamp if not already set
+                if (endTime.get() == -1) {
+                    endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
+                }
 
-            // Append signature to the query string
-            String signedUrl = "%s&signature=%s".formatted(url, signature);
+                long endTimeMillis = endTime.get() * 1000L;
+                long startTimeMillis = Math.max(endTimeMillis - (numCandles * secondsPerCandle * 1000L), 1422144000000L); // Earliest timestamp
 
-            // Prepare the request with headers and API key
-            requestBuilder.uri(URI.create(signedUrl));
-            requestBuilder.setHeader("X-MBX-APIKEY", apiKey); // Set API key in the header
-            requestBuilder.GET(); // Use GET method as required for klines
+                // Determine Binance interval based on seconds per candle
+                String interval = getBinanceInterval(secondsPerCandle);
 
-            return client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
-                    .thenApply(response -> {
-                        if (response.statusCode() != 200) {
+                // Construct URL for the API request
+
+                String url = "https://api.binance.us/api/v3/klines?symbol=" + tradePair.toString('/') + "&interval=" + getBinanceInterval(secondsPerCandle);
+
+                logger.info("Fetching candle data for trade pair: {} from {} to {}",
+                        tradePair.toString('/'), interval, startTimeMillis, endTimeMillis);
+
+
+                // Generate signature for the query string
+                String signature = HmacSHA256(apiSecret, url);
+
+                // Append signature to the query string
+
+                // Prepare HTTP request
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .header("X-MBX-APIKEY", apiKey)
+                        .GET()
+                        .build();
+
+                // Send asynchronous request and process the response
+                return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                        .thenApply(response -> {
+                            // Handle non-200 HTTP responses
+                            if (response.statusCode() != 200) {
+                                String errorMessage = String.format("Failed to fetch candle data. Status code: %d, Response: %s",
+                                        response.statusCode(), response.body());
+                                logger.error(errorMessage);
+                                throw new RuntimeException(errorMessage);
+                            }
+
+                            // Parse response body into JSON
+                            JsonNode responseBody;
                             try {
-                                throw new HttpResponseException(response.statusCode(), "Failed to fetch candle data:" + response.body());
-                            } catch (HttpResponseException e) {
-                                throw new RuntimeException(e);
+                                responseBody = OBJECT_MAPPER.readTree(response.body());
+                            } catch (JsonProcessingException e) {
+                                throw new RuntimeException("Failed to parse candle data response: " + e.getMessage(), e);
                             }
-                        }
 
-                        JsonNode res;
-                        try {
-                            res = OBJECT_MAPPER.readTree(response.body());
-                        } catch (JsonProcessingException ex) {
-                            throw new RuntimeException(ex);
-                        }
+                            // Process JSON response and map to CandleData
+                            if (responseBody.isArray() && !responseBody.isEmpty()) {
+                                List<CandleData> candleDataList = new ArrayList<>();
+                                for (JsonNode candle : responseBody) {
+                                    candleDataList.add(new CandleData(
+                                            candle.get(1).asDouble(),  // Open price
+                                            candle.get(4).asDouble(),  // Close price
+                                            candle.get(2).asDouble(),  // High price
+                                            candle.get(3).asDouble(),  // Low price
+                                            (int) candle.get(0).asLong(),  // Open time (convert ms to seconds)
+                                            candle.get(5).asLong()   // Volume
+                                    ));
+                                }
 
-                        if (!res.isEmpty()) {
-                            List<CandleData> candleData = new ArrayList<>();
-                            for (JsonNode candle : res) {
-                                candleData.add(new CandleData(
-                                        candle.get(1).asDouble(),  // open price
-                                        candle.get(4).asDouble(),  // close price
-                                        candle.get(2).asDouble(),  // high price
-                                        candle.get(3).asDouble(),  // low price
-                                        (int) (candle.get(0).asLong() / 1000L),  // open time (convert ms to seconds)
-                                        candle.get(5).asDouble()   // volume
-                                ));
+                                // Sort by open time
+                                candleDataList.sort(Comparator.comparingLong(CandleData::getOpenTime));
+
+                                // Update endTime for pagination
+                                endTime.set((int) (startTimeMillis / 1000L));
+
+                                return candleDataList;
+                            } else {
+                                logger.info("No candle data found for trade pair: {}", tradePair);
+                                return Collections.emptyList();
                             }
-                            candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
-                            endTime.set((int) (startTimeMillis / 1000));  // Update endTime for pagination
-                            return candleData;
-                        } else {
-                            logger.info("No candle data found for trade pair: %s".formatted(tradePair));
-                            return Collections.emptyList();
-                        }
-                    });
+                        });
+            } catch (Exception e) {
+                logger.error("An error occurred while fetching candle data: ", e);
+                throw new RuntimeException("Failed to fetch candle data.", e);
+            }
         }
 
 

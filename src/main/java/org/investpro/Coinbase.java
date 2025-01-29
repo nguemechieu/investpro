@@ -19,9 +19,6 @@ import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -30,7 +27,7 @@ import java.util.stream.Collectors;
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
-import static org.investpro.Currency.db1;
+
 
 public  class Coinbase extends Exchange {
 
@@ -220,10 +217,12 @@ public  class Coinbase extends Exchange {
      * This method only needs to be implemented to support live syncing.
      */
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-                currentCandleStartedAt, ZoneOffset.UTC));
+        String startDateString = "2016-10-17T15%3A00%3A00.000000000Z";
+
+        //DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+        //currentCandleStartedAt, ZoneOffset.UTC));
         long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
         // Get the closest supported granularity to the ideal granularity.
         int actualGranularity = getSupportedGranularity(secondsPerCandle);
@@ -255,8 +254,8 @@ public  class Coinbase extends Exchange {
                     int currentTill = -1;
                     double openPrice = -1;
                     double highSoFar = -1;
-                    double lowSoFar = Double.MAX_VALUE;
-                    double volumeSoFar = 0;
+                    double lowSoFar = 0;
+                    long volumeSoFar = 0;
                     double lastTradePrice = -1;
                     boolean foundFirst = false;
                     while (candleItr.hasNext()) {
@@ -289,13 +288,12 @@ public  class Coinbase extends Exchange {
                             lowSoFar = currCandle.get(1).asDouble();
                         }
 
-                        volumeSoFar += currCandle.get(5).asDouble();
+                        volumeSoFar += currCandle.get(5).asLong();
                     }
 
-                    int openTime = (int) (currentCandleStartedAt.toEpochMilli() / 1000L);
 
-                    return Optional.of(new InProgressCandleData(openTime, openPrice, highSoFar, lowSoFar,
-                            currentTill, lastTradePrice, volumeSoFar));
+                    return Optional.of(new InProgressCandleData(openPrice, highSoFar, lowSoFar, lastTradePrice,
+                            currentTill, volumeSoFar));
                 });
     }
 
@@ -462,11 +460,11 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
 
             }
-            db1.save((ArrayList<Currency>) tradePairs.stream().map(
+            Currency.save((ArrayList<Currency>) tradePairs.stream().map(
                     TradePair::getCounterCurrency
             ).collect(Collectors.toList()));
 
-            db1.save((ArrayList<Currency>) tradePairs.stream().map(
+            Currency.save((ArrayList<Currency>) tradePairs.stream().map(
                     TradePair::getBaseCurrency
             ).collect(Collectors.toList()));
 

@@ -1,21 +1,22 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Getter
+@Setter
 public class Ticker {
 
     private static final Logger logger = LoggerFactory.getLogger(Ticker.class);
     private String symbol;
     private double bidPrice;
     private double volume;
+
     private double askPrice;
     private long timestamp;
 
-
-    public double getAskPrice() {
-        return askPrice;
-    }
 
     public Ticker() {
 
@@ -32,22 +33,11 @@ public class Ticker {
         this.bidPrice = bid;
     }
 
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
-    }
 
     public void setAskPrice(double ask) {
         logger.info("{}: Ask price set to {}", symbol, ask);
         // Update the ask price in the relevant data structures or send an event
         this.askPrice = ask;
-    }
-
-    public double getVolume() {
-        return volume;
     }
 
     public void setVolume(double volume) {
@@ -56,9 +46,6 @@ public class Ticker {
         this.volume = volume;
     }
 
-    public long getTimestamp() {
-        return timestamp;
-    }
 
     public void setTimestamp(long timestamp) {
         logger.info("{}: Timestamp set to {}", symbol, timestamp);

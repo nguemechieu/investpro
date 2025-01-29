@@ -4,14 +4,11 @@
              xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
              version="3.1">
 
-    <persistence-unit name="User" transaction-type="RESOURCE_LOCAL">
-        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+    <persistence-unit name="User" transaction-type="JTA">
 
-
-        <class>org.investpro.User</class>
         <!-- List of entity classes -->
+        <class>org.investpro.User</class>
         <class>org.investpro.Currency</class>
-        <class>org.investpro.PortfolioItem</class>
         <class>org.investpro.Order</class>
         <class>org.investpro.TradePair</class>
         <class>org.investpro.CandleData</class>
@@ -28,8 +25,6 @@
             <property name="hibernate.show_sql" value="true"/>
             <property name="hibernate.format_sql" value="true"/>
             <property name="hibernate.hbm2ddl.auto" value="update"/>
-
-
         </properties>
     </persistence-unit>
 </persistence>

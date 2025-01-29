@@ -3,10 +3,13 @@ package org.investpro;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import lombok.Getter;
+import lombok.Setter;
 
-import java.text.ParseException;
 import java.util.Objects;
 
+@Setter
+@Getter
 public class SignedJWTT extends SignedJWT {
     JWSHeader jwsHeader;
     JWTClaimsSet claimsSet;
@@ -34,22 +37,6 @@ public class SignedJWTT extends SignedJWT {
     @Override
     public int hashCode() {
         return Objects.hash(jwsHeader, claimsSet);
-    }
-
-    public JWSHeader getJwsHeader() {
-        return jwsHeader;
-    }
-
-    public void setJwsHeader(JWSHeader jwsHeader) {
-        this.jwsHeader = jwsHeader;
-    }
-
-    public JWTClaimsSet getClaimsSet() {
-        return claimsSet;
-    }
-
-    public void setClaimsSet(JWTClaimsSet claimsSet) {
-        this.claimsSet = claimsSet;
     }
 
 }

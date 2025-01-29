@@ -190,7 +190,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
                 currentCandleStartedAt, ZoneOffset.UTC));
@@ -219,16 +219,17 @@ public class Binance extends Exchange {
                     }
 
                     JsonNode currCandle = res.get(0);
-                    Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
+                    //  Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
 
                     return Optional.of(new InProgressCandleData(
-                            (int) openTime.getEpochSecond(),
+
                             currCandle.get(1).asDouble(),
                             currCandle.get(2).asDouble(),
                             currCandle.get(3).asDouble(),
-                            (int)currCandle.get(6).asLong(),
+
                             currCandle.get(4).asDouble(),
-                            currCandle.get(5).asDouble()
+                            (int) currCandle.get(6).asLong(),
+                            currCandle.get(5).asLong()
                     ));
                 });
     }

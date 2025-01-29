@@ -1,8 +1,5 @@
 package org.investpro;
 
-import java.util.List;
-import java.util.Objects;
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
@@ -10,9 +7,14 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
+import lombok.Getter;
+
+import java.util.List;
+import java.util.Objects;
 
 
 public class CandleStickChartOptions {
+    @Getter
     private final VBox optionsPane;
 
     public CandleStickChartOptions() {
@@ -31,10 +33,6 @@ public class CandleStickChartOptions {
         }
         optionsPane.getChildren().setAll(optionsGrid);
         optionsPane.setPadding(new Insets(20, 5, 20, 5));
-    }
-
-    public VBox getOptionsPane() {
-        return optionsPane;
     }
 
     /**

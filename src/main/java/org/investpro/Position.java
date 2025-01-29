@@ -1,191 +1,55 @@
 package org.investpro;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
+@Setter
+@Getter
+@ToString
 public class Position {
+
+    // Getters and setters
+    private String instrument;
+    @JsonProperty("long")
+    private SubPosition longPosition;
+    @JsonProperty("short")
+    private SubPosition shortPosition;
+
+    private String commission;
     private String lastTransactionID;
-    private List<PositionDetails> positions;
 
+    private int units;
+    private double pl;
+    private double resettablePL;
+    private double financing;
+    private double dividendAdjustment;
+    private double guaranteedExecutionFees;
+    private double unrealizedPL;
 
-    String instrument;
-    int units;
-    double pl;
+    public double getProfitOrLoss() {
 
-    public Position() {
+        return pl + resettablePL + financing + dividendAdjustment;
     }
 
-    public String getLongPosition() {
-        return longPosition;
+    public double getValue() {
+        return pl + resettablePL + financing + dividendAdjustment;
     }
 
-    public void setLongPosition(String longPosition) {
-        this.longPosition = longPosition;
-    }
-
-    public String getShortPosition() {
-        return shortPosition;
-    }
-
-    public void setShortPosition(String shortPosition) {
-        this.shortPosition = shortPosition;
-    }
-
-    public double getFinancing() {
-        return financing;
-    }
-
-    public void setFinancing(double financing) {
-        this.financing = financing;
-    }
-
-    public String getInstrument() {
-        return instrument;
-    }
-
-    public void setInstrument(String instrument) {
-        this.instrument = instrument;
-    }
-
-    public int getUnits() {
-        return units;
-    }
-
-    public void setUnits(int units) {
-        this.units = units;
-    }
-
-    public double getPl() {
-        return pl;
-    }
-
-    public void setPl(double pl) {
-        this.pl = pl;
-    }
-
-    public double getDividendAdjustment() {
-        return dividendAdjustment;
-    }
-
-    public void setDividendAdjustment(double dividendAdjustment) {
-        this.dividendAdjustment = dividendAdjustment;
-    }
-
-    public double getGuaranteedExecutionFees() {
-        return guaranteedExecutionFees;
-    }
-
-    public void setGuaranteedExecutionFees(double guaranteedExecutionFees) {
-        this.guaranteedExecutionFees = guaranteedExecutionFees;
-    }
-
-    double financing;
-    double dividendAdjustment;
-    double guaranteedExecutionFees;
-
-    // Getters and Setters
-    public String getLastTransactionID() {
-        return lastTransactionID;
-    }
-
-    public void setLastTransactionID(String lastTransactionID) {
-        this.lastTransactionID = lastTransactionID;
-    }
-
-    @Override
-    public String toString() {
-        return "Position{" +
-                "lastTransactionID='" + lastTransactionID + '\'' +
-                ", positions=" + positions +
-                ", instrument='" + instrument + '\'' +
-                ", units=" + units +
-                ", pl=" + pl +
-                ", financing=" + financing +
-                ", dividendAdjustment=" + dividendAdjustment +
-                ", guaranteedExecutionFees=" + guaranteedExecutionFees +
-                ", longPosition='" + longPosition + '\'' +
-                ", shortPosition='" + shortPosition + '\'' +
-                '}';
-    }
-
-    String longPosition;
-    String shortPosition;
-
-    public List<PositionDetails> getPositions() {
-        return positions;
-    }
-
-    public void setPositions(List<PositionDetails> positions) {
-        this.positions = positions;
-    }
-
-    // Inner class to represent position details
-    public static class PositionDetails {
-        private String instrument;
-        private PLDetails longPosition;
-        private PLDetails shortPosition;
+    // SubPosition class
+    @Setter
+    @Getter
+    @ToString
+    public static class SubPosition {
+        // Getters and setters
+        private int units;
         private double pl;
         private double resettablePL;
+        private double financing;
+        private double dividendAdjustment;
+        private double guaranteedExecutionFees;
         private double unrealizedPL;
 
-        @Override
-        public String toString() {
-            return "PositionDetails{" +
-                    "instrument='" + instrument + '\'' +
-                    ", longPosition=" + longPosition +
-                    ", shortPosition=" + shortPosition +
-                    ", pl=" + pl +
-                    ", resettablePL=" + resettablePL +
-                    ", unrealizedPL=" + unrealizedPL +
-                    '}';
-        }
-
-        // Getters and Setters
-        public String getInstrument() {
-            return instrument;
-        }
-
-        public void setInstrument(String instrument) {
-            this.instrument = instrument;
-        }
-
-        public PLDetails getLongPosition() {
-            return longPosition;
-        }
-
-        public void setLongPosition(PLDetails longPosition) {
-            this.longPosition = longPosition;
-        }
-
-        public PLDetails getShortPosition() {
-            return shortPosition;
-        }
-
-        public void setShortPosition(PLDetails shortPosition) {
-            this.shortPosition = shortPosition;
-        }
-
-        public double getPl() {
-            return pl;
-        }
-
-        public void setPl(double pl) {
-            this.pl = pl;
-        }
-
-        public double getResettablePL() {
-            return resettablePL;
-        }
-
-        public void setResettablePL(double resettablePL) {
-            this.resettablePL = resettablePL;
-        }
-
-        public double getUnrealizedPL() {
-            return unrealizedPL;
-        }
-
-        public void setUnrealizedPL(double unrealizedPL) {
-            this.unrealizedPL = unrealizedPL;
-        }
     }
 }

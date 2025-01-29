@@ -78,7 +78,7 @@ public abstract class Exchange {
     /**
      * Fetch candle data for the current in-progress candle, used for live syncing.
      */
-    public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
+    public abstract CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
 
 

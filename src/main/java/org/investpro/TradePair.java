@@ -1,6 +1,8 @@
 package org.investpro;
 
 import javafx.util.Pair;
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -8,10 +10,14 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 
+@Getter
 public class TradePair extends Pair<Currency, Currency> {
 
     private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
 
+    // Getter for TradePair ID
+    // Setter for TradePair ID
+    @Setter
     private long id;
 
     // Constructor that takes two currencies
@@ -40,12 +46,18 @@ public class TradePair extends Pair<Currency, Currency> {
         this.counterCurrency = Currency.of(counterCurrencyCode);
     }
 
+    // Getter for base currency
+    @Setter
     private Currency baseCurrency;
 
+    // Getter for counter currency
+    @Setter
     private Currency counterCurrency;
 
+    // Getter for bid price
     private double bid;
 
+    // Getter for ask price
     private double ask;
 
     // Factory method for TradePair using currency codes
@@ -66,24 +78,6 @@ public class TradePair extends Pair<Currency, Currency> {
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
 
-    // Getter for base currency
-    public Currency getBaseCurrency() {
-        return baseCurrency;
-    }
-
-    public void setBaseCurrency(Currency baseCurrency) {
-        this.baseCurrency = baseCurrency;
-    }
-
-    // Getter for counter currency
-    public Currency getCounterCurrency() {
-        return counterCurrency;
-    }
-
-    public void setCounterCurrency(Currency counterCurrency) {
-        this.counterCurrency = counterCurrency;
-    }
-
     // String representation of the TradePair with a given separator
     public String toString(@NotNull Character separator) {
         String baseCode = getBaseCurrency().getCode().toUpperCase();
@@ -97,24 +91,9 @@ public class TradePair extends Pair<Currency, Currency> {
         };
     }
 
-    // Getter for TradePair ID
-    public long getId() {
-        return id;
-    }
-
-    // Setter for TradePair ID
-    public void setId(long id) {
-        this.id = id;
-    }
-
     // Get the symbol of the trade pair, e.g., USD/EUR
     public String getSymbol() {
         return String.format("%s/%s", baseCurrency.getSymbol(), counterCurrency.getSymbol());
-    }
-
-    // Getter for bid price
-    public double getBid() {
-        return bid;
     }
 
     // Setter for bid price with validation
@@ -123,11 +102,6 @@ public class TradePair extends Pair<Currency, Currency> {
             throw new IllegalArgumentException("Bid price must be positive.");
         }
         this.bid = bid;
-    }
-
-    // Getter for ask price
-    public double getAsk() {
-        return ask;
     }
 
     // Setter for ask price with validation

@@ -1,6 +1,5 @@
 package org.investpro;
 
-import jakarta.persistence.Query;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -22,7 +21,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.investpro.Currency.db1;
+
 
 public class TradingWindow extends Region {
 
@@ -212,39 +211,39 @@ public class TradingWindow extends Region {
 
     private void handlePasswordReset(@NotNull String email, String newPassword) {
         if (email.isEmpty() || newPassword.isEmpty()) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Email and New Password cannot be empty.");
+            showAlert("Email and New Password cannot be empty.");
             return;
         }
 
         if (!isValidEmail(email)) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Please enter a valid email address.");
+            showAlert("Please enter a valid email address.");
             return;
         }
 
         try {
-            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE email = :email");
-            query.setParameter("email", email);
-
-            if (query.getResultList().isEmpty()) {
-                showAlert(Alert.AlertType.WARNING, "Error", "Email not found.");
-                return;
-            }
-
-            db1.entityManager.getTransaction().begin();
-            db1.entityManager.createNativeQuery(
-                            "UPDATE users SET password = :password WHERE email = :email")
-                    .setParameter("password", newPassword)
-                    .setParameter("email", email)
-                    .executeUpdate();
-            db1.entityManager.getTransaction().commit();
-            showAlert(Alert.AlertType.INFORMATION, "Success", "Password reset successfully. Please log in.");
-            loginPage();
+//            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE email = :email");
+//            query.setParameter("email", email);
+//
+//            if (query.getResultList().isEmpty()) {
+//                showAlert(Alert.AlertType.WARNING, "Error", "Email not found.");
+//                return;
+//            }
+//
+//            db1.entityManager.getTransaction().begin();
+//            db1.entityManager.createNativeQuery(
+//                            "UPDATE users SET password = :password WHERE email = :email")
+//                    .setParameter("password", newPassword)
+//                    .setParameter("email", email)
+//                    .executeUpdate();
+//            db1.entityManager.getTransaction().commit();
+//            showAlert(Alert.AlertType.INFORMATION, "Success", "Password reset successfully. Please log in.");
+//            loginPage();
         } catch (Exception e) {
-            logger.error("Error resetting password", e);
-            if (db1.entityManager.getTransaction().isActive()) {
-                db1.entityManager.getTransaction().rollback();
-            }
-            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred during password reset.");
+//            logger.error("Error resetting password", e);
+//            if (db1.entityManager.getTransaction().isActive()) {
+//                db1.entityManager.getTransaction().rollback();
+//            }
+//            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred during password reset.");
         }
     }
 
@@ -258,59 +257,59 @@ public class TradingWindow extends Region {
         return matcher.matches();
     }
 
-    private void showAlert(Alert.AlertType alertType, String error, String s) {
-        Alert alert = new Alert(alertType);
-        alert.setHeaderText(error);
+    private void showAlert(String s) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setHeaderText("Error");
         alert.setContentText(s);
         alert.showAndWait();
     }
 
     private boolean handleSignUp(@NotNull String username, @NotNull String password, @NotNull String email) {
         if (username.isEmpty() || password.isEmpty() || email.isEmpty()) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Username, Password, and Email cannot be empty.");
+            showAlert("Username, Password, and Email cannot be empty.");
             return false;
         }
-
-        try {
-            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username");
-            query.setParameter("username", username);
-
-            if (!query.getResultList().isEmpty()) {
-                new Messages(Alert.AlertType.WARNING, "Username already exists.");
-                return false;
-            }
-
-            db1.entityManager.getTransaction().begin();
-            db1.entityManager.createNativeQuery(
-                            "INSERT INTO users (username, password, email) VALUES (:username, :password, :email)")
-                    .setParameter("username", username)
-                    .setParameter("password", password)
-                    .setParameter("email", email)
-                    .executeUpdate();
-            db1.entityManager.getTransaction().commit();
-
-            showAlert(Alert.AlertType.INFORMATION, "Success", "Registration successful. Please log in.");
-            return true;
-        } catch (Exception e) {
-            logger.error("Error during sign-up", e);
-            if (db1.entityManager.getTransaction().isActive()) {
-                db1.entityManager.getTransaction().rollback();
-            }
-            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred during sign-up.");
-            return false;
-        }
+//
+//        try {
+//            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username");
+//            query.setParameter("username", username);
+//
+//            if (!query.getResultList().isEmpty()) {
+//                new Messages(Alert.AlertType.WARNING, "Username already exists.");
+//                return false;
+//            }
+//
+//            db1.entityManager.getTransaction().begin();
+//            db1.entityManager.createNativeQuery(
+//                            "INSERT INTO users (username, password, email) VALUES (:username, :password, :email)")
+//                    .setParameter("username", username)
+//                    .setParameter("password", password)
+//                    .setParameter("email", email)
+//                    .executeUpdate();
+//            db1.entityManager.getTransaction().commit();
+//
+//            showAlert(Alert.AlertType.INFORMATION, "Success", "Registration successful. Please log in.");
+//            return true;
+//        } catch (Exception e) {
+//            logger.error("Error during sign-up", e);
+//            if (db1.entityManager.getTransaction().isActive()) {
+//                db1.entityManager.getTransaction().rollback();
+//            }
+//            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred during sign-up.");
+        return false;
+//        }
     }
 
     private void handleLogin(@NotNull String username, String password) {
         try {
-            Query res = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
-            res.setParameter("username", username);
-            res.setParameter("password", password);
-
-            if (res.getResultList().isEmpty()) {
-                new Messages(Alert.AlertType.WARNING, "Invalid credentials.");
-                return;
-            }
+//            Query res = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
+//            res.setParameter("username", username);
+//            res.setParameter("password", password);
+//
+//            if (res.getResultList().isEmpty()) {
+//                new Messages(Alert.AlertType.WARNING, "Invalid credentials.");
+//                return;
+//            }
 
             launchTradingWindow();
         } catch (Exception e) {
@@ -371,6 +370,7 @@ public class TradingWindow extends Region {
                 apiKeyLabel.setText("API KEY :");
                 secretKeyLabel.setText("SECRET KEY :");
             }
+
         });
 
         Label rememberMeLabel = new Label("Remember Me :");
@@ -388,8 +388,13 @@ public class TradingWindow extends Region {
                         "LAST_USED_EXCHANGE", selectedExchange
                 );
 
-                props.setProperty("EXCHANGE_" + selectedExchange + "_API_KEY", apiKeyTextField.getText());
-                props.setProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY", secretKeyTextField.getText());
+                props.setProperty("EXCHANGE_" + selectedExchange + "_API_KEY",
+
+                        (!Objects.equals(apiKeyTextField.getText(), "")) ? apiKeyTextField.getText() : props.getProperty("EXCHANGE_" + selectedExchange + "_API_KEY")
+
+                );
+                props.setProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY", (!Objects.equals(secretKeyTextField.getText(), "") ?
+                        secretKeyTextField.getText() : props.getProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY")));
 
                 saveProperties2(props);
                 logger.info("Settings saved for {}", selectedExchange);
@@ -414,12 +419,12 @@ public class TradingWindow extends Region {
             }
 
             if (apiKeyTextField.getText().isEmpty() || secretKeyTextField.getText().isEmpty()) {
-                showAlert(Alert.AlertType.ERROR, "Error", "Please enter your API KEY and SECRET KEY");
+                showAlert("Please enter your API KEY and SECRET KEY");
                 return;
             }
 
             if (comboBox.getValue() == null || Objects.equals(comboBox.getValue(), "Select your exchange")) {
-                showAlert(Alert.AlertType.ERROR, "Error", "Please select your exchange");
+                showAlert("Please select your exchange");
                 return;
             }
 

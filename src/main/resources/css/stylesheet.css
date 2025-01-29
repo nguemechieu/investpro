@@ -10,7 +10,7 @@
 .button {
 	-fx-text-fill-color:white;
 	-fx-border-radius: 5.0 5.0 5.0 5.0, 5.0 5.0 5.0 5.0;
-    -fx-border-color: #2959ea;
+	-fx-border-color: #4cea29;
     -fx-border-width: 2.0;
     -fx-background-radius: 0.0;
     -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
@@ -33,8 +33,7 @@
  ******************************************************************************/
 
 
-
-#tabadded
+#tabadded,
 .tab-header-background{
     -fx-background-color:white;
     -fx-background-radius: 5;
@@ -95,7 +94,7 @@
  	-fx-opacity:0.9;
  }
 
-#settingTabPane
+#settingTabPane,
 .tab-header-background{
 		-fx-background-color:derive(#2959ea,20.0%);
 		-fx-opacity:0.9;
@@ -108,7 +107,8 @@
 	-fx-text-fill-color: white;
  
 }
-#settingTabPane
+
+#settingTabPane,
  .tab:focused,
 #settingTabPane  .tab:default:focused{
  	-fx-background-color:derive(#2959ea,20.0%);

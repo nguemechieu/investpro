@@ -84,6 +84,12 @@
             <artifactId>jakarta.xml.bind-api</artifactId>
             <version>4.0.2</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-commons</artifactId>
+            <version>1.11.4</version>
+        </dependency>
 
         <!-- JavaFX and UI Dependencies -->
         <dependency>
@@ -279,6 +285,12 @@
             <artifactId>hibernate-commons-annotations</artifactId>
             <version>6.0.6.Final</version>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>provided</scope>
         </dependency>
 
     </dependencies>

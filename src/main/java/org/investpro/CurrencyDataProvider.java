@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,13 +15,13 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 
 import static org.investpro.Coinbase.client;
-import static org.investpro.Currency.db1;
 
 /**
  * @author NOEL NGUEMECHIEU
  */
 public class CurrencyDataProvider {
     private static final Logger logger = LoggerFactory.getLogger(CurrencyDataProvider.class);
+    @Getter
     private static final ArrayList<CoinInfo> coinInfoList = new ArrayList<>();
     private final ArrayList<Currency> coinsToRegister = new ArrayList<>();
 
@@ -28,8 +29,8 @@ public class CurrencyDataProvider {
         logger.info("CryptoCurrencyDataProvider initialized.");
     }
 
-    public static ArrayList<CoinInfo> getCoinInfoList() {
-        return coinInfoList;
+    public static void save(ArrayList<Currency> collect) {
+
     }
 
 
@@ -105,15 +106,13 @@ public class CurrencyDataProvider {
 
             }
             for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-                Currency coin = new Currency(CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 2, currency.getSymbol(), currency.getDisplayName());
-
-
+                Currency coin = new Currency(CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 3, currency.getSymbol(), currency.getDisplayName());
                 coinsToRegister.add(coin);
 
 
             }
 
-            db1.save(coinsToRegister);
+            save(coinsToRegister);
 
 
         } catch (IOException | InterruptedException e) {

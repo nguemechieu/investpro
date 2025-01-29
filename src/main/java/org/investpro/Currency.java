@@ -1,50 +1,49 @@
 package org.investpro;
 
-
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-
+@Getter
+@Setter
 @Entity
 @Table(name = "currencies")
 public class Currency {
-    private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
-    static final DbHibernate db1 = new DbHibernate();
+    static final ConcurrentHashMap<String, Currency> CURRENCIES = new ConcurrentHashMap<String, Currency>();
+    private static final Logger logger = LoggerFactory.getLogger(Currency.class);
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "currency_id", nullable = false, updatable = false)
+    private long currency_id;
 
-    static ConcurrentHashMap<SymmetricPair<CurrencyType, Currency>, Currency> CURRENCIES = new ConcurrentHashMap<>();
+    @Column(name = "code", nullable = false, unique = true)
+    private String code;
 
-    public void setShortDisplayName(String shortDisplayName) {
-        this.shortDisplayName = shortDisplayName;
-    }
+    @Column(name = "currencyType", nullable = false)
+    private String currencyType;
 
-    public void setFullDisplayName(String fullDisplayName) {
-        this.fullDisplayName = fullDisplayName;
-    }
+    @Column(name = "fullDisplayName", nullable = false)
+    private String fullDisplayName;
 
-    public void setFractionalDigits(int fractionalDigits) {
-        this.fractionalDigits = fractionalDigits;
-    }
-    @Column(name = "code")
-    String code;
-    @Column(name = "currencyType")
-    String currencyType;
-    @Column(name = "fullDisplayName")
-    String fullDisplayName;
     @Column(name = "image")
-    String image;
-    @Column(name = "shortDisplayName")
-    String shortDisplayName;
-    @Column(name = "symbol")
-    String symbol;
-    @Column(name = "fractionalDigits")
-    int fractionalDigits;
+    private String image;
+
+    @Column(name = "shortDisplayName", nullable = false)
+    private String shortDisplayName;
+
+    @Column(name = "symbol", nullable = false)
+    private String symbol;
+
+    @Column(name = "fractionalDigits", nullable = false)
+    private int fractionalDigits;
+
     static {
         try {
             new CurrencyDataProvider().registerCurrencies();
@@ -53,87 +52,90 @@ public class Currency {
         }
     }
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // This will auto-generate the ID
+    // Default constructor
+    public Currency() {
+    }
 
-    @Column(name = "currency_id", nullable = false, updatable = false)
-    private long currency_id;
-
-    /**
-     * Protected constructor, called only by CurrencyDataProvider's.
-     */
-    public Currency(CurrencyType currencyType, String fullDisplayName, String shortDisplayName, String code,
-                       int fractionalDigits, String symbol, String image) throws Exception {
-        Objects.requireNonNull(currencyType, "currencyType must not be null");
-        Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
-        Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
-        Objects.requireNonNull(code, "code must not be null");
+    // Parameterized constructor
+    public Currency(
+            @NotNull CurrencyType currencyType,
+            String fullDisplayName,
+            String shortDisplayName,
+            String code,
+            int fractionalDigits,
+            String symbol,
+            String image) {
+        this.currencyType = currencyType.name();
+        this.fullDisplayName = Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
+        this.shortDisplayName = Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
+        this.code = Objects.requireNonNull(code, "code must not be null");
 
         if (fractionalDigits < 0) {
             throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
         }
-        Objects.requireNonNull(symbol, "symbol must not be null");
-
-        this.currencyType = String.valueOf(currencyType);
-        this.fullDisplayName = fullDisplayName;
-        this.shortDisplayName = shortDisplayName;
-        this.code = code;
         this.fractionalDigits = fractionalDigits;
-        this.symbol = symbol;
+        this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.image = image;
-        this.currency_id = UUID.randomUUID().hashCode();
 
-        logger.info("currency registered: {}", this);
+        logger.info("Currency registered: {}", this);
     }
 
+    // Factory method
     public static @NotNull Currency of(String code) throws Exception {
         Objects.requireNonNull(code, "code must not be null");
-
-        db1.entityManager.getTransaction().begin();
-        Query result = db1.entityManager.createNativeQuery(
-                "SELECT * FROM currencies WHERE code = :code", Currency.class
-        ).setParameter("code", code);
-
-        Currency currency;
-
-        try {
-            if (result.getResultList().isEmpty()) {
-                // Register the current currency as it's not found
-                currency = new Currency(
-                        CurrencyType.CRYPTO, code, code, code, 8, code, code + ".png"
-                );
-                CURRENCIES.put(new SymmetricPair<>(CurrencyType.CRYPTO, currency), currency);
-                logger.info("Currency registered: {}", currency);
-            } else {
-                // Retrieve the result and cast it to Currency
-                currency = (Currency) result.getSingleResult();
+        if (CURRENCIES.isEmpty() || CURRENCIES.containsKey(code)) {
+            for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
+                Currency curr = new Currency();
+                curr.code = currency.getCurrencyCode();
+                curr.currencyType = CurrencyType.FIAT.name();
+                curr.fullDisplayName = currency.getDisplayName();
+                curr.shortDisplayName = currency.getCurrencyCode();
+                curr.symbol = currency.getSymbol() + ".png";
+                curr.image = currency.getCurrencyCode();
+                curr.fractionalDigits = currency.getDefaultFractionDigits();
+                CURRENCIES.put(curr.currencyType, curr);
             }
-            db1.entityManager.getTransaction().commit();
-        } catch (Exception e) {
-            db1.entityManager.getTransaction().rollback();
-            throw new Exception("Error fetching currency with code: " + code, e);
         }
 
-        logger.info("Currency retrieved: {}", currency);
-        return currency;
+        Currency cur = CURRENCIES.get(code);
+
+        if (cur == null) {
+            cur = new Currency();
+            cur.code = code;
+            cur.currencyType = CurrencyType.FIAT.name();
+            cur.shortDisplayName = code;
+            cur.symbol = code;
+            cur.image = code + ".png";
+            cur.fractionalDigits = 3;
+            return cur;
+        }
+
+        return CURRENCIES.get(code);
+
     }
 
-    public Currency() {
+    public static void save(ArrayList<Currency> collect) {
 
-    }
-
-    // Getter and Setter for currencyId
-    public long getCurrencyId() {
-        return currency_id;
-    }
-
-    public void setCode(String code) {
-        this.code = code;
-    }
+        for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
 
 
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
+            Currency curr = new Currency();
+            curr.code = currency.getCurrencyCode();
+            curr.currencyType = CurrencyType.FIAT.name();
+            curr.fullDisplayName = currency.getDisplayName();
+            curr.shortDisplayName = currency.getCurrencyCode();
+            curr.symbol = currency.getSymbol() + ".png";
+            curr.image = currency.getCurrencyCode();
+            curr.fractionalDigits = currency.getDefaultFractionDigits();
+            CURRENCIES.put(curr.currencyType, curr);
+        }
+
+        for (Currency currency : collect) {
+            CURRENCIES.putIfAbsent(
+                    currency.currencyType,
+                    currency
+            );
+        }
     }
 
     @Override
@@ -150,94 +152,16 @@ public class Currency {
                 '}';
     }
 
-    /**
-     * Get the cryptocurrency that has a currency code equal to the
-     * given {@code}. Using {@literal "¤¤¤"} as the currency code
-     * returns {@literal NULL_CRYPTO_CURRENCY}.
-     *
-     * @return the cryptocurrency
-     */
-
-
-    public String getCurrencyType() {
-        return this.currencyType;
-    }
-
-    public String getFullDisplayName() {
-        return this.fullDisplayName;
-    }
-
-    public String getShortDisplayName() {
-        return this.shortDisplayName;
-    }
-
-    public String getCode() {
-        return this.code;
-    }
-
-    public int getFractionalDigits() {
-        return this.fractionalDigits;
-    }
-
-    public String getSymbol() {
-        return this.symbol;
-    }
-
-    public void setCurrencyType(CurrencyType currencyType) {
-        this.currencyType = String.valueOf(currencyType);
-    }
-
-    /**
-     * The finality of {@code hashCode()} ensures that the equality
-     * contract for subclasses must be based on currency
-     * type and code alone.
-     *
-     * @return the result
-     */
     @Override
     public final int hashCode() {
         return Objects.hash(currencyType, code);
     }
 
-
-
-    public String getImage() {
-        return image;
-    }
-
-    public void setImage(String image) {
-        this.image = image;
-    }
-
-
-    public BigDecimal getCurrentPrice() {
-        // implement logic to fetch current price from external API
-        //...
-        return BigDecimal.ZERO;
-    }
-
-    /**
-     * The finality of {@code equals(...)} ensures that the equality
-     * contract for subclasses must be based on currency type and code alone.
-     *
-     * @param object the object to compare to
-     * @return the result
-     */
     @Override
     public final boolean equals(Object object) {
-        if (object == null) {
-            return false;
-        }
-
-        if (!(object instanceof Currency other)) {
-            return false;
-        }
-
-        if (object == this) {
-            return true;
-        }
-
-        return Objects.equals(currencyType, other.currencyType) && code.equals(other.code);
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+        Currency currency = (Currency) object;
+        return Objects.equals(currencyType, currency.currencyType) && Objects.equals(code, currency.code);
     }
-
 }

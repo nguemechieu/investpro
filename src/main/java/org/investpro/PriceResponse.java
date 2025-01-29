@@ -1,12 +1,11 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
 public class PriceResponse {
     private Price price;
 
-    public Price getPrice() {
-        return price;
-    }
-    public void setPrice(Price price) {
-        this.price = price;
-    }
 }

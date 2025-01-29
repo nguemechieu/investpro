@@ -1,6 +1,7 @@
 package org.investpro;
 
 import javafx.scene.control.Alert;
+import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,7 @@ import java.util.function.Consumer;
  * @author  <a href="mailto: nguemechieu@live.com">nguem</a>
  */
 public class CandleDataPager {
+    @Getter
     private final CandleDataSupplier candleDataSupplier;
     private final CandleDataPreProcessor candleDataPreProcessor;
     private static final Logger logger = LoggerFactory.getLogger(CandleDataPager.class);
@@ -27,10 +29,6 @@ public class CandleDataPager {
         Objects.requireNonNull(candleDataSupplier);
         this.candleDataSupplier = candleDataSupplier;
         candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
-    }
-
-    public CandleDataSupplier getCandleDataSupplier() {
-        return candleDataSupplier;
     }
 
     public Consumer<Future<List<CandleData>>> getCandleDataPreProcessor() {

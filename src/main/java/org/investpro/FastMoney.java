@@ -1,5 +1,6 @@
 package org.investpro;
 
+import lombok.Getter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,6 +26,7 @@ import java.util.Objects;
 public final class FastMoney implements Money, Comparable<FastMoney> {
 
     private double amount;
+    @Getter
     private int precision;
     private Currency currency;
 
@@ -174,10 +176,6 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     @Override
     public Currency currency() {
         return currency;
-    }
-
-    public int getPrecision() {
-        return precision;
     }
 
     private Money plus(@NotNull FastMoney other) {

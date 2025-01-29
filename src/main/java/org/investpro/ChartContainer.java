@@ -6,6 +6,7 @@ import javafx.geometry.Pos;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -24,12 +25,9 @@ public class ChartContainer extends Region {
    final CandleStickChartToolbar toolbar;
    final VBox candleChartContainer = new VBox();
     private final Exchange exchange;
+    @Getter
     private TradePair tradePair;
    final SimpleIntegerProperty secondsPerCandle;
-
-    public TradePair getTradePair() {
-        return tradePair;
-    }
 
     /**
      * Construct a new {@code CandleStickChartContainer} with liveSyncing mode off.
