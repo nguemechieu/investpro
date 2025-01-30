@@ -9,9 +9,10 @@ import javafx.scene.layout.VBox;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
+
 
 public class PositionView extends AnchorPane {
 
@@ -19,13 +20,15 @@ public class PositionView extends AnchorPane {
         List<Position> positionList = exchange.getPositions();
 
         // Separate long and short positions using streams
-        List<Position.SubPosition> longPositions = positionList.stream()
-                .map(Position::getLongPosition)
-                .collect(Collectors.toList());
+        List<Position.SubPosition> longPositions = new ArrayList<>();
+        List<Position.SubPosition> shortPositions = new ArrayList<>();
 
-        List<Position.SubPosition> shortPositions = positionList.stream()
-                .map(Position::getShortPosition)
-                .collect(Collectors.toList());
+
+        for (Position position : positionList) {
+
+            longPositions.add(position.getLongPosition());
+            shortPositions.add(position.getShortPosition());
+        }
 
         // Create ListViews
         ListView<Position.SubPosition> longPositionView = new ListView<>();
@@ -62,7 +65,7 @@ public class PositionView extends AnchorPane {
         setPrefWidth(1500);
     }
 
-    private @NotNull String getStatistics(@NotNull List<Position> allPositions, List<Position.SubPosition> longPositions, List<Position.SubPosition> shortPositions) {
+    private @NotNull String getStatistics(@NotNull List<Position> allPositions, @NotNull List<Position.SubPosition> longPositions, @NotNull List<Position.SubPosition> shortPositions) {
         int totalPositions = allPositions.size();
         int longCount = longPositions.size();
         int shortCount = shortPositions.size();

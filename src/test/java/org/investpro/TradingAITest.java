@@ -68,7 +68,7 @@ public class TradingAITest {
         double high = open + random.nextDouble() * 10;
         double low = open - random.nextDouble() * 10;
         double close = random.nextDouble() * (high - low) + low;
-        double volume = random.nextDouble() * 1000;
+        long volume = random.nextLong() * 1000;
 
         // Call the getSignal method with the random candle data
         SIGNAL signal = tradingAI.getSignal(open, high, low, close, volume);
@@ -78,32 +78,40 @@ public class TradingAITest {
         assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
 
         // Print the result
-        logger.info("Candle Data Signal: " + signal);
+        logger.info("Candle Data Signal: {}", signal);
     }
 
     @Test
-    public void testGetMovingAverageSignal() throws InterruptedException {
+    public void testGetMovingAverageSignal() {
         Random random = new Random();
         List<Double> prices = new ArrayList<>();
         while (true) {
-            // Generate random price data for the moving average test
-            for (int i = 0; i < 100; i++) {
-                prices.add(100.0 + random.nextDouble() * 100.0);  // Random prices between 100 and 200
+
+            try {
+
+
+                // Generate random price data for the moving average test
+                for (int i = 0; i < 100; i++) {
+                    prices.add(100.0 + random.nextDouble() * 100.0);  // Random prices between 100 and 200
+                }
+
+                double currentPrice = prices.getLast();  // The Current price is the last in the list
+
+                // Call the getMovingAverageSignal method with the random price data
+                SIGNAL signal = tradingAI.getMovingAverageSignal(prices, currentPrice);
+
+                // Ensure that the result is not null and that it's a valid signal
+                assertNotNull(signal);
+                assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
+
+                // Print the result
+                logger.info("Moving Average Signal: {}", signal);
+
+
+                Thread.sleep(1000);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-
-            double currentPrice = prices.getLast();  // The Current price is the last in the list
-
-            // Call the getMovingAverageSignal method with the random price data
-            SIGNAL signal = tradingAI.getMovingAverageSignal(prices, currentPrice);
-
-            // Ensure that the result is not null and that it's a valid signal
-            assertNotNull(signal);
-            assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
-
-            // Print the result
-            logger.info("Moving Average Signal: " + signal);
-
-            Thread.sleep(1000);
         }
 
     }

@@ -1,13 +1,13 @@
 package org.investpro;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 
 @Setter
 @Getter
 @ToString
+@NoArgsConstructor
 public class Position {
 
     // Getters and setters
@@ -41,6 +41,9 @@ public class Position {
     @Setter
     @Getter
     @ToString
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class SubPosition {
         // Getters and setters
         private int units;

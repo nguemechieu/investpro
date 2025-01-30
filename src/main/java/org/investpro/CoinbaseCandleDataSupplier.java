@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import static org.investpro.Coinbase.*;
@@ -60,10 +59,10 @@ class CoinbaseCandleDataSupplier extends CandleDataSupplier {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
 
-        if (startTime == EARLIEST_DATA) {
-            // signal more data is false
-            return CompletableFuture.completedFuture(Collections.emptyList());
-        }
+//        if (startTime == EARLIEST_DATA) {
+//            // signal more data is false
+//            return CompletableFuture.completedFuture(Collections.emptyList());
+//        }
 
 
         return client.sendAsync(

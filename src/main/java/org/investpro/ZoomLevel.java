@@ -1,33 +1,41 @@
 package org.investpro;
 
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.util.Pair;
+import lombok.Getter;
+import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import javafx.beans.binding.Bindings;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.util.Pair;
-import org.jetbrains.annotations.NotNull;
+
+@Getter
+@Setter
 
 
 public class ZoomLevel {
     private final int zoomLevelId;
+
     private final int candleWidth;
+    @Getter
     private final double xAxisRangeInSeconds;
-    private final DoubleProperty numVisibleCandles;
+    private final IntegerProperty numVisibleCandles;
     private final double secondsPerPixel;
     private final double pixelsPerSecond;
     private final InstantAxisFormatter xAxisFormatter;
-    private int minXValue;
-
-    private final Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extremaForCandleRangeMap;
+    private final Map<Integer, Pair<Extrema, Extrema>> extremaForCandleRangeMap;
+    private double minXValue;
 
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
               final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
-              final int minXValue) {
+              final double minXValue) {
         this.zoomLevelId = zoomLevelId;
         this.candleWidth = candleWidth;
-        numVisibleCandles = new SimpleDoubleProperty(plotAreaWidthProperty.doubleValue() / candleWidth);
+        numVisibleCandles = new SimpleIntegerProperty((int) (plotAreaWidthProperty.doubleValue() / candleWidth));
         numVisibleCandles.bind(Bindings.createDoubleBinding(() -> plotAreaWidthProperty.doubleValue() / candleWidth,
                 plotAreaWidthProperty));
         this.secondsPerPixel = (double) secondsPerCandle / candleWidth;
@@ -38,41 +46,14 @@ public class ZoomLevel {
         extremaForCandleRangeMap = new ConcurrentHashMap<>();
     }
 
-    public int getCandleWidth() {
-        return candleWidth;
-    }
-
-    public double getxAxisRangeInSeconds() {
-        return xAxisRangeInSeconds;
-    }
-
     public double getNumVisibleCandles() {
         return numVisibleCandles.get();
-    }
-
-    public double getSecondsPerPixel() {
-        return secondsPerPixel;
-    }
-
-    public double getPixelsPerSecond() {
-        return pixelsPerSecond;
-    }
-
-    public Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> getExtremaForCandleRangeMap() {
-        return extremaForCandleRangeMap;
     }
 
     public InstantAxisFormatter getXAxisFormatter() {
         return xAxisFormatter;
     }
 
-    public int getMinXValue() {
-        return minXValue;
-    }
-
-    public void setMinXValue(int minXValue) {
-        this.minXValue = minXValue;
-    }
 
     static int getNextZoomLevelId(ZoomLevel zoomLevel, ZoomDirection zoomDirection) {
         if (zoomDirection == ZoomDirection.IN) {
@@ -114,7 +95,7 @@ public class ZoomLevel {
     @Override
     public String toString() {
         return String.format("ZoomLevel [id = %d, numVisibleCandles = %s, secondsPerPixel = %f, pixelsPerSecond = " +
-                        "%f, candleWidth = %d, minXValue = %d", zoomLevelId, numVisibleCandles, secondsPerPixel,
+                        "%f, candleWidth = %d, minXValue = %f", zoomLevelId, numVisibleCandles, secondsPerPixel,
                 pixelsPerSecond, candleWidth, minXValue);
     }
 }

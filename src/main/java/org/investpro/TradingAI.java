@@ -1,10 +1,5 @@
 package org.investpro;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Logger;
-
 import org.jetbrains.annotations.NotNull;
 import weka.classifiers.Classifier;
 import weka.classifiers.trees.J48;
@@ -12,6 +7,13 @@ import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instance;
 import weka.core.Instances;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
 
 public class TradingAI {
 
@@ -27,10 +29,15 @@ public class TradingAI {
         this.model = new J48();
 
         try {
-            this.model.buildClassifier(trainingData);  // Train the model
+            logger.info(trainingData.toString());
+
+            model.buildClassifier(trainingData);  // Train the model
             File f = new File("trainingData.pkl");
             if (!f.exists()) f.createNewFile();
-
+            FileWriter fw = new FileWriter(f);
+            BufferedWriter bw = new BufferedWriter(fw);
+            bw.write(trainingData.attribute(0).toString());
+            bw.close();  // Ensure to close the writer
         } catch (Exception e) {
             logger.severe("Error building classifier: " + e.getMessage());
         }
@@ -43,8 +50,10 @@ public class TradingAI {
             double prediction = model.classifyInstance(instance);
 
             if (prediction == 0.0)
-                return SIGNAL.BUY;
+                return SIGNAL.HOLD;
             else if (prediction == 1.0)
+                return SIGNAL.BUY;
+            else if (prediction == -1.0)
                 return SIGNAL.SELL;
             else
                 return SIGNAL.HOLD;
@@ -67,11 +76,11 @@ public class TradingAI {
 
         // Generate signal based on moving averages
         if (shortTermMA > longTermMA && currentPrice > support) {
-            return SIGNAL.BUY;
+            return SIGNAL.BUY;  // Use SIGNAL enum here
         } else if (shortTermMA < longTermMA && currentPrice < resistance) {
-            return SIGNAL.SELL;
+            return SIGNAL.SELL;  // Use SIGNAL enum here
         } else {
-            return SIGNAL.HOLD;
+            return SIGNAL.HOLD;  // Use SIGNAL enum here
         }
     }
 
@@ -117,7 +126,7 @@ public class TradingAI {
         instance.setValue(attributes.get(2), low);
         instance.setValue(attributes.get(3), close);
         instance.setValue(attributes.get(4), volume);
-        instance.setMissing(attributes.get(5));
+        instance.setMissing(attributes.get(5));  // Make sure to handle missing values appropriately
         return instance;
     }
 
@@ -130,6 +139,7 @@ public class TradingAI {
         attributes.add(new Attribute("close"));
         attributes.add(new Attribute("volume"));
 
+        // Define the class attribute (signal labels)
         ArrayList<String> classValues = new ArrayList<>();
         classValues.add("BUY");
         classValues.add("SELL");
@@ -139,16 +149,16 @@ public class TradingAI {
         return attributes;
     }
 
-
     public void train() {
         try {
             model.buildClassifier(trainingData);  // Train the model
             File f = new File("trainingData.pkl");
             if (!f.exists()) f.createNewFile();
             logger.info("Training completed.");
-
         } catch (Exception e) {
             logger.severe("Error building classifier: " + e.getMessage());
         }
     }
+
+
 }

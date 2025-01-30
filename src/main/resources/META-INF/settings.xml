@@ -22,9 +22,8 @@
     <servers>
         <server>
             <id>github</id>
-            <username>nguemechieu</username>
-            <password>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
-            </password>
+            <username>GITHUB_USERNAME</username>
+            <password>GITHUB_PASSWORD</password>
         </server>
     </servers>
 

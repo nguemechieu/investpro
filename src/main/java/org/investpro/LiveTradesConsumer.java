@@ -1,5 +1,7 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +10,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
+
+@Getter
+@Setter
 
 public class LiveTradesConsumer {
 
@@ -18,6 +23,7 @@ public class LiveTradesConsumer {
     public Account account;
     List<Trade> livesTrades;
     private boolean ready;
+
     private InProgressCandle inProgressCandle;
     private Exchange exchange;
     private List<Trade> tradeQueue;
@@ -67,7 +73,7 @@ public class LiveTradesConsumer {
     // Helper method to validate a trade
     private boolean isValidTrade(Trade trade) {
         // Implement trade validation logic (e.g., check if trade has valid IDs, currency pair, amounts, etc.)
-        return trade != null && trade.getTradePair() != null;//&& trade.getAmount()>0;
+        return (trade != null) && (trade.getTradePair() != null && trade.getAmount() > 0);
     }
 
     // Process each trade
@@ -175,12 +181,6 @@ public class LiveTradesConsumer {
         logger.info("Live trading started for exchange: {}.", exchange);
     }
 
-    public void stop() {
-        // Stop live trade processing
-
-        this.setReady(false); // Stop live trade processing
-        this.setCandlePageConsumer(null); // Stop listening to candle page consumer
-    }
 
     public void setTradePairs(List<TradePair> tradePairs) {
         // Set trade pairs for live trade processing
@@ -275,30 +275,10 @@ public class LiveTradesConsumer {
         // Update trade statistics, portfolio, and notify users
         updateTradeStatistics(this.tradeQueue);
 
-        notifyUsers(liveTrade.getTrade());
+        notifyUsers(liveTrade);
     }
 
-    public InProgressCandle getInProgressCandle() {
-        return inProgressCandle;
-    }
 
-    public void setInProgressCandle(CandleData inProgressCandle) {
-        // Set in-progress candle for live trade processing
-
-    }
-
-    public void setTradeQueue(List<Trade> tradeQueue) {
-        this.tradeQueue = tradeQueue;
-    }
-
-    public boolean isReady() {
-        return ready;
-    }
-
-    public void setReady(boolean ready) {
-        // Set ready status for live trade processing
-        this.ready = ready;
-    }
 
     public Collection<? extends Trade> get(TradePair tradePair) {
 

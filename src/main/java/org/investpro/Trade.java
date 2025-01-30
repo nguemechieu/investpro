@@ -2,10 +2,10 @@ package org.investpro;
 
 
 import jakarta.persistence.*;
-import org.jetbrains.annotations.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -15,7 +15,10 @@ import java.util.Objects;
  *
  * @author Noel Nguemechieu
  */
+@Getter
+@Setter
 
+@NoArgsConstructor
 public class Trade {
 
 
@@ -32,15 +35,10 @@ public class Trade {
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
-    @Column(name = "price", nullable = false)
-    @Convert(converter = MoneyConverter.class)
-    private Money price;
+    private double price;
 
-    @Column(name = "amount", nullable = false)
-    @Convert(converter = MoneyConverter.class)
-    private Money amount;
-    @Enumerated(EnumType.STRING)
-    @Column(name = "transaction_type", nullable = false)
+    private double amount;
+
     private Side transactionType;
 
     @Column(name = "timestamp", nullable = false)
@@ -49,7 +47,7 @@ public class Trade {
 
     // Constructors, getters, and other methods...
 
-    public Trade(Exchange exchange, TradePair tradePair, Money price, Money amount, Side transactionType,
+    public Trade(Exchange exchange, TradePair tradePair, double price, double amount, Side transactionType,
                  long localTradeId, Instant timestamp, Money fee) {
         this.tradePair = tradePair;
         this.price = price;
@@ -61,11 +59,8 @@ public class Trade {
         this.exchange = exchange;
     }
 
-    public Trade() {
 
-    }
-
-    public Trade(TradePair tradePair, Money price, Money size, Side side, long tradeId, Instant time) {
+    public Trade(TradePair tradePair, double price, double size, Side side, long tradeId, Instant time) {
         this.tradePair = tradePair;
         this.price = price;
         this.amount = size;
@@ -75,35 +70,14 @@ public class Trade {
     }
 
     public Trade(double price, double qty, Instant time) throws Exception {
-        this.price =Money.of(BigDecimal.valueOf(price));
-        this.amount = Money.of(BigDecimal.valueOf(qty));
+        this.price = price;
+        this.amount = qty;
         this.timestamp = time;
     }
 
 
-    public TradePair getTradePair() {
-        return tradePair;
-    }
 
-    public double getPrice() {
-        return price.toDouble();
-    }
 
-    public void setPrice(Money price) {
-        this.price = price;
-    }
-
-    public double getAmount() {
-        return amount.toDouble();
-    }
-
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    public void setAmount(Money amount) {
-        this.amount = amount;
-    }
 
     @Override
     public String toString() {
@@ -136,40 +110,5 @@ public class Trade {
         return Objects.hash(tradePair, price, amount, transactionType, localTradeId, timestamp);
     }
 
-    public Account getAccount() {
-        return account;
-    }
 
-    public void setAccount(Account account) {
-        this.account = account;
-    }
-
-    public @NotNull Trade getTrade() {
-        return this;
-    }
-
-    public boolean isSell() {
-        return transactionType == Side.SELL;
-    }
-
-    public void setTimestamp(Instant timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public boolean isBuy() {
-        return transactionType == Side.BUY;
-    }
-
-    public void setTradePair(TradePair tradePair) {
-        this.tradePair = tradePair;
-    }
-
-
-    public Exchange getExchange() {
-        return exchange;
-    }
-
-    public void setExchange(Exchange exchange) {
-        this.exchange = exchange;
-    }
 }

@@ -17,14 +17,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 
+
 /**
  * An abstract base class for {@code Exchange} implementations without WebSocket.
  * Provides common methods and behaviors for HTTP-based communication.
  */
 public abstract class Exchange {
 
-    protected static final Logger logger = LoggerFactory.getLogger(Exchange.class);
-
+    protected static final Logger logger = LoggerFactory.getLogger(
+            Exchange.class
+    );
 
     protected String apiKey;
     protected static String apiSecret;

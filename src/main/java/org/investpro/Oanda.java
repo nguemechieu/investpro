@@ -110,13 +110,6 @@ public class Oanda extends Exchange {
 
 
 
-    /*
-     Extract and set other account details if necessary (e.g., margin rajava:97)
-    	at investpro/org.investpro.DisplayExchange.lambda$updateAccount$19te, trading permissions, etc.)
-     Return the list of accounts
-    */
-
-
     @Override
     public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException{
 
@@ -179,12 +172,10 @@ public class Oanda extends Exchange {
 
         CompletableFuture.runAsync(() -> {
             String uriStr = API_URL;
-            uriStr += "/accounts/%s/pricing/stream?instruments=" + tradePair.toString('-');
+            uriStr += "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
 
 
             requestBuilder.uri(URI.create(uriStr));
-            requestBuilder.header("Accept", "application/json");
-            requestBuilder.header("Content-Type", "application/octet-stream");
 
             try {
                 HttpResponse<String> response = client.send(
@@ -193,28 +184,40 @@ public class Oanda extends Exchange {
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
 
-                JsonNode tradesResponse = OBJECT_MAPPER.readTree(response.body());
-                if (!tradesResponse.isArray() || tradesResponse.isEmpty()) {
-                    futureResult.completeExceptionally(new RuntimeException("OANDA trades response was empty or not an array"));
-                } else {
+                JsonNode tradesResponse = OBJECT_MAPPER.readValue(response.body(), JsonNode.class);
+
                     List<Trade> trades = new ArrayList<>();
-                    for (JsonNode trade : tradesResponse) {
-                        Instant time = Instant.parse(trade.get("openTime").asText());
-                        if (time.compareTo(stopAt) <= 0) {
-                            futureResult.complete(trades);
-                            break;
-                        } else {
-                            trades.add(new Trade(
+                for (JsonNode trade : tradesResponse.get("prices")) {
+
+                    logger.info("Found trade {}", trade);
+
+
+                    logger.info("My Time :{}", trade.get("time").asText());
+
+
+                    Instant time = Instant.parse(trade.get("time").asText());
+
+                    double price = trade.get("price").asDouble();
+                    double size = trade.get("liquidity").asDouble();
+                    Trade tr = new Trade(
                                     tradePair,
-                                    DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
-                                    DefaultMoney.ofCrypto(trade.get("units").asText(), tradePair.getBaseCurrency()),
-                                    Side.getSide(trade.get("side").asText()),
-                                    trade.get("tradeID").asLong(),
+                            price,
+                            size,
+                            Side.getSide("SELL"),
+                            UUID.randomUUID().timestamp(),
                                     time
-                            ));
-                        }
-                    }
+                    );
+                    trades.add(tr);
+
+                    logger.info("My Trade :{}", trades);
                 }
+                futureResult.complete(trades);
+
+
+
+
+
+
             } catch (IOException | InterruptedException e) {
                 futureResult.completeExceptionally(e);
             }
@@ -224,20 +227,28 @@ public class Oanda extends Exchange {
     }
     @Override
     public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
-            @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+            @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle,
+            int secondsPerCandle) {
+
         String startDateString = DateTimeFormatter.ISO_INSTANT.format(currentCandleStartedAt);
+        List<InProgressCandleData> allCandles = new ArrayList<>();
+
+        return fetchCandlesRecursive(tradePair, startDateString, secondsPerCandle, secondsPerCandle, allCandles)
+                .thenApply(candles -> candles.isEmpty() ? Optional.empty() : Optional.of(candles));
+    }
+
+    private CompletableFuture<List<InProgressCandleData>> fetchCandlesRecursive(
+            TradePair tradePair, String startDateString, int secondsPerCandle,
+            int limit, List<InProgressCandleData> allCandles) {
 
         URI uri = URI.create(String.format(
-                "%s/instruments/%s/candles?granularity=%s&from=%s", API_URL,
-                tradePair.toString('_'), getOandaGranularity(secondsPerCandle), startDateString
-        ));
+                "%s/instruments/%s/candles?granularity=%s&to=%s&count=%d",
+                API_URL, tradePair.toString('_'), getOandaGranularity(secondsPerCandle),
+                startDateString, limit));
 
-        return client.sendAsync(
-                        requestBuilder.uri(uri)
-                                .GET().build(),
-                        HttpResponse.BodyHandlers.ofString())
+        return client.sendAsync(requestBuilder.uri(uri).GET().build(), HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
-                .thenApply(response -> {
+                .thenCompose(response -> {
                     logger.info("OANDA response: {}", response);
 
                     JsonNode res;
@@ -245,20 +256,31 @@ public class Oanda extends Exchange {
                         res = OBJECT_MAPPER.readTree(response);
                     } catch (JsonProcessingException ex) {
                         logger.error("Failed to parse OANDA response", ex);
-                        throw new RuntimeException("Failed to parse JSON", ex);
+                        return CompletableFuture.completedFuture(allCandles);
                     }
 
                     JsonNode candles = res.get("candles");
                     if (candles == null || !candles.isArray() || candles.isEmpty()) {
                         logger.warn("No candles data found in the response");
-                        return Optional.empty();
+                        return CompletableFuture.completedFuture(allCandles);
                     }
 
-                    return parseCandleData(candles.get(0));
+                    // Parse and store candles
+                    for (JsonNode candleNode : candles) {
+                        parseCandleData(candleNode).ifPresent(allCandles::add);
+                    }
+
+                    // Determine if pagination is needed (fetch next batch)
+                    if (candles.size() == limit) {
+                        String lastCandleTime = candles.get(candles.size() - 1).get("time").asText();
+                        return fetchCandlesRecursive(tradePair, lastCandleTime, secondsPerCandle, limit, allCandles);
+                    } else {
+                        return CompletableFuture.completedFuture(allCandles);
+                    }
                 })
                 .exceptionally(ex -> {
                     logger.error("Error fetching or processing candle data", ex);
-                    return Optional.empty();
+                    return allCandles;
                 });
     }
 
@@ -276,7 +298,6 @@ public class Oanda extends Exchange {
                 candleNode.get("volume").asLong()
         ));
     }
-
 
     @Override
     public List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException {
@@ -322,8 +343,19 @@ public class Oanda extends Exchange {
         HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("OANDA response: {}", response.body());
 
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OrderBook[].class));
+        List<OrderBook> orderBooks = new ArrayList<>();
+        JsonNode orderBooksJson = OBJECT_MAPPER.readTree(response.body());
+        if (!orderBooksJson.isArray() || orderBooksJson.isEmpty()) {
 
+            for (JsonNode orderBook : orderBooksJson) {
+
+                if (orderBook.has("lastTransactionID")) {
+
+                    orderBooks.add(OBJECT_MAPPER.convertValue(orderBook.get("lastTransactionID"), OrderBook.class));
+                }
+            }
+        }
+        return orderBooks;
     }
 
     @Override

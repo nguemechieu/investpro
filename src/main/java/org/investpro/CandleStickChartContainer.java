@@ -6,13 +6,10 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import lombok.Getter;
+import lombok.Setter;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Objects;
 
@@ -25,6 +22,8 @@ import java.util.Objects;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Getter
+@Setter
 public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
     private final CandleStickChartToolbar toolbar;
@@ -92,32 +91,9 @@ public class CandleStickChartContainer extends Region {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }
-        Path path = Paths.get("trade_data.csv");
-        File file = path.toFile();
-        if (!file.exists()) {
-            file.createNewFile();
-        }
 
-
-        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] values = line.split(",");
-                if (values.length >= 4) {
-                    double open = Double.parseDouble(values[0]);
-                    double high = Double.parseDouble(values[1]);
-                    double low = Double.parseDouble(values[2]);
-                    double close = Double.parseDouble(values[3]);
-                    long timestamp = Long.parseLong(values[4]);
-                    candleDataSupplier.add(CandleData.of(timestamp, open, high, low, close));
-                }
-            }
-        }
 
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle, tradePair);
-
-//        new ReverseRawTradeDataProcessor(path,
-//          secondsPerCandle,tradePair);
 
         candleStickChart = new CandleStickChart(exchange, tradePair, candleDataSupplier, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
@@ -132,6 +108,7 @@ public class CandleStickChartContainer extends Region {
             fadeTransitionOut.setOnFinished(event -> {
                 candleStickChart = newChart;
                 candleChartContainer.getChildren().setAll(newChart);
+                event.consume();
                 FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(500), candleStickChart);
                 fadeTransitionIn.setFromValue(0.0);
                 fadeTransitionIn.setToValue(1.0);

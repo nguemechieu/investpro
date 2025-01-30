@@ -345,7 +345,7 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public int compareTo(@NotNull DefaultMoney other) {
-              // checkCurrenciesEqual(other);
+        // checkCurrenciesEqual(other);
 
         return amount.compareTo(other.amount);
     }

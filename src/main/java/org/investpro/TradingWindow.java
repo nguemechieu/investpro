@@ -107,6 +107,11 @@ public class TradingWindow extends Region {
                 properties.setProperty("LOGIN_USERNAME", loginUsernameField.getText());
                 properties.setProperty("LOGIN_PASSWORD", loginPasswordField.getText());
                 saveProperties(properties);
+            } else {
+                Properties properties = loadProperties();
+                properties.setProperty("LOGIN_USERNAME", "");
+                properties.setProperty("LOGIN_PASSWORD", "");
+                saveProperties(properties);
             }
         });
 
@@ -390,12 +395,10 @@ public class TradingWindow extends Region {
 
                 props.setProperty("EXCHANGE_" + selectedExchange + "_API_KEY",
 
-                        (!Objects.equals(apiKeyTextField.getText(), "")) ? apiKeyTextField.getText() : props.getProperty("EXCHANGE_" + selectedExchange + "_API_KEY")
+                        apiKeyTextField.getText()
 
                 );
-                props.setProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY", (!Objects.equals(secretKeyTextField.getText(), "") ?
-                        secretKeyTextField.getText() : props.getProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY")));
-
+                props.setProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY", secretKeyTextField.getText());
                 saveProperties2(props);
                 logger.info("Settings saved for {}", selectedExchange);
             }
@@ -411,7 +414,7 @@ public class TradingWindow extends Region {
 
         startBtn.setOnAction(_ -> {
             Properties properties = loadProperties2();
-            String lastUsedExchange = properties.getProperty("LAST_USED_EXCHANGE", "");
+            String lastUsedExchange = comboBox.getValue();
 
             if (!lastUsedExchange.isEmpty() && properties.getProperty("EXCHANGE_" + lastUsedExchange + "_API_KEY") != null) {
                 apiKeyTextField.setText(properties.getProperty("EXCHANGE_" + lastUsedExchange + "_API_KEY"));

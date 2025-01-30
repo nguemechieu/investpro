@@ -1,32 +1,78 @@
 package org.investpro;
 
-import java.time.Instant;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
+import java.util.List;
+
+@Setter
+@Getter
+@ToString
+@NoArgsConstructor
 public class PriceData {
-     Instant time;
-    String symbol;
+    private List<PriceEntry> prices;
 
-    public PriceData(Instant now, double lastPrice) {
-        this.now = now;
-        this.price = new Price(lastPrice,0,0);
+    @Setter
+    @Getter
+    @NoArgsConstructor
+
+    public static class PriceEntry {
+        private List<AskBidEntry> asks;
+        private List<AskBidEntry> bids;
+        private double closeoutAsk;
+        private double closeoutBid;
+        private String instrument;
+        private QuoteHomeConversionFactors quoteHomeConversionFactors;
+        private String status;
+
+
+        private String time;
+
+
+        private UnitsAvailable unitsAvailable;
+    }
+
+
+    @Setter
+    @Getter
+    @ToString
+    public static class AskBidEntry {
+        private long liquidity;
+        private double price;
 
     }
-    Instant now;
-     Price price;
 
-    @Override
-    public String toString() {
-        return "PriceData{" +
-                "time=" + time +
-                ", symbol='" + symbol + '\'' +
-                ", now=" + now +
-                ", price=" + price +
-                '}';
+    @Setter
+    @Getter
+    @ToString
+    @NoArgsConstructor
+    public static class QuoteHomeConversionFactors {
+        private double negativeUnits;
+        private double positiveUnits;
+
     }
 
-    public PriceData(String symbol, double lastPrice, double bidPrice, double askPrice, Instant time) {
-        this.symbol = symbol;
-        this.price = new Price(lastPrice, bidPrice, askPrice);
-        this.time = time;
+    @Setter
+    @Getter
+    @ToString
+    @NoArgsConstructor
+    public static class UnitsAvailable {
+        private UnitDetails defaultUnits;
+        private UnitDetails openOnly;
+        private UnitDetails reduceFirst;
+        private UnitDetails reduceOnly;
+
+    }
+
+    @Setter
+    @Getter
+    @ToString
+    @NoArgsConstructor
+    public static class UnitDetails {
+        private String longValue;
+        private String shortValue;
+
     }
 }

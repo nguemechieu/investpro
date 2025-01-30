@@ -6,6 +6,8 @@ import org.jetbrains.annotations.NotNull;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static org.investpro.Exchange.logger;
+
 /**
  * @author Noel Nguemechieu
  */
@@ -24,17 +26,17 @@ public final class CandleStickChartUtils {
      * Adds the sliding-window extrema (maps candle x-values to a pair of extrema for volume and high-low candle price)
      * to the given {@code extrema} map.
      */
-    public static void putSlidingWindowExtrema(Map<Integer, Pair<Extrema<Integer>, Extrema<Integer>>> extrema,
+    public static void putSlidingWindowExtrema(Map<Integer, Pair<Extrema, Extrema>> extrema,
                                                List<CandleData> candleData, int windowSize) {
         Objects.requireNonNull(extrema, "extrema map must not be null");
         Objects.requireNonNull(candleData, "candleData must not be null");
 
         if (candleData.isEmpty()) {
-            throw new IllegalArgumentException("candleData must not be empty");
+            throw new RuntimeException("candleData must not be empty");
         }
         if (windowSize > candleData.size()) {
-            throw new IllegalArgumentException(
-                    String.format("windowSize (%d) must be less than size of candleData (%d)", windowSize, candleData.size()));
+            logger.error("windowSize ({}) must be less than size of candleData ({})", windowSize, candleData.size());
+            return;
         }
 
         final Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
@@ -49,11 +51,13 @@ public final class CandleStickChartUtils {
         for (int i = windowSize; i < candleData.size(); i++) {
             // Store extrema for previous window
             if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty() && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
+
+
                 extrema.put(candleData.get(i - windowSize).getOpenTime(), new Pair<>(
-                        new Extrema<>((int) candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                                (int) Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                        new Extrema<>((int) candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                                (int) Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+                        new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
+                                Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
+                        new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
+                                Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
             }
 
             removeOutdatedElements(volumeMinWindow, i - windowSize);
@@ -67,10 +71,10 @@ public final class CandleStickChartUtils {
         // Store extrema for the last window
         if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty() && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
             extrema.put(candleData.get(candleData.size() - windowSize).getOpenTime(), new Pair<>(
-                    new Extrema<>((int) candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                            (int) Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                    new Extrema<>((int) candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                            (int) Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+                    new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
+                            Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
+                    new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
+                            Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
         }
     }
 

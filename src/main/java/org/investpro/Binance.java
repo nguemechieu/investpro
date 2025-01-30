@@ -172,8 +172,8 @@ public class Binance extends Exchange {
                         } else {
                             trades.add(new Trade(
                                     tradePair,
-                                    DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
-                                    DefaultMoney.ofCrypto(trade.get("qty").asText(), tradePair.getBaseCurrency()),
+
+                                    trade.get("price").asDouble(), trade.get("qty").asLong(),
                                     Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY"),
                                     trade.get("id").asLong(),
                                     time

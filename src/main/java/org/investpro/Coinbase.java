@@ -62,17 +62,18 @@ public  class Coinbase extends Exchange {
     // Set of supported granularity in seconds for Coinbase
     private static final Set<Integer> SUPPORTED_GRANULARITY = new TreeSet<>(Set.of(
             60,     // 1 minute
-            300,    // 5 minutes
-            900,    // 15 minutes,
+            60 * 5,    // 5 minutes
+            60 * 15,    // 15 minutes,
 
-            1800,   // 30 minutes,
+            60 * 30,   // 30 minutes,
             3600,   // 1 hour
             21600,  // 6 hours
-            86400   // 1 day
+            86400,  // 1 day,
+            86400 * 7
     ));
 
     @Override
-    public List<Fee> getTradingFee() throws IOException, InterruptedException {
+    public List<Fee> getTradingFee() {
         return null;
     }
 
@@ -197,9 +198,8 @@ public  class Coinbase extends Exchange {
                                 futureResult.complete(tradesBeforeStopTime);
                                 break;
                             } else {
-                                tradesBeforeStopTime.add(new Trade(tradePair,
-                                        DefaultMoney.ofFiat(trade.get("price").asText(), tradePair.getCounterCurrency()),
-                                        DefaultMoney.ofCrypto(trade.get("size").asText(), tradePair.getBaseCurrency()),
+                                tradesBeforeStopTime.add(new Trade(tradePair, trade.get("price").asDouble(),
+                                        trade.get("size").asLong(),
                                         Side.getSide(trade.get("side").asText()), trade.get("trade_id").asLong(), time));
                             }
                         }
