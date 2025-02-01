@@ -81,4 +81,13 @@ public class CandleDataPager {
             }
         }
     }
+
+    private void accept(List<CandleData> candleData) {
+        try {
+            getCandleDataSupplier().get().get().addAll(candleData);
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

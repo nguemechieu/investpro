@@ -11,6 +11,7 @@ import weka.core.Instances;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -18,7 +19,6 @@ import java.util.logging.Logger;
 public class TradingAI {
 
     private static final Logger logger = Logger.getLogger(TradingAI.class.getName());
-
     private final Classifier model;
     private final Instances trainingData;
     private final List<Attribute> attributes;
@@ -26,24 +26,23 @@ public class TradingAI {
     public TradingAI(Instances trainingData) {
         this.trainingData = trainingData;
         this.attributes = createAttributes();
-        this.model = new J48();
+        this.model = new J48();  // Decision Tree Classifier
 
         try {
-            logger.info(trainingData.toString());
+            logger.info("Training data: " + trainingData);
 
-            model.buildClassifier(trainingData);  // Train the model
-            File f = new File("trainingData.pkl");
-            if (!f.exists()) f.createNewFile();
-            FileWriter fw = new FileWriter(f);
-            BufferedWriter bw = new BufferedWriter(fw);
-            bw.write(trainingData.attribute(0).toString());
-            bw.close();  // Ensure to close the writer
+            model.buildClassifier(trainingData); // Train the model
+
+            saveTrainingData(trainingData); // Save training data
+
         } catch (Exception e) {
             logger.severe("Error building classifier: " + e.getMessage());
         }
     }
 
-    // Existing method for getting signal based on candle data
+    /**
+     * Generate a trading signal using the trained classifier.
+     */
     public SIGNAL getSignal(double open, double high, double low, double close, double volume) {
         try {
             Instance instance = createInstance(open, high, low, close, volume);
@@ -53,40 +52,39 @@ public class TradingAI {
                 return SIGNAL.HOLD;
             else if (prediction == 1.0)
                 return SIGNAL.BUY;
-            else if (prediction == -1.0)
+            else if (prediction == 2.0)  // Fix: Weka does not support negative labels (-1.0)
                 return SIGNAL.SELL;
-            else
-                return SIGNAL.HOLD;
 
         } catch (Exception e) {
             logger.severe("Error creating instance or predicting signal: " + e.getMessage());
+        }
+        return SIGNAL.HOLD;
+    }
+
+    /**
+     * Generate a trading signal based on moving averages.
+     */
+    public SIGNAL getMovingAverageSignal(List<Double> prices, double currentPrice) {
+        double shortTermMA = calculateMovingAverage(prices, 20);
+        double longTermMA = calculateMovingAverage(prices, 50);
+
+        double support = calculateSupport(prices);
+        double resistance = calculateResistance(prices);
+
+        if (shortTermMA > longTermMA && currentPrice > support) {
+            return SIGNAL.BUY;
+        } else if (shortTermMA < longTermMA && currentPrice < resistance) {
+            return SIGNAL.SELL;
+        } else {
             return SIGNAL.HOLD;
         }
     }
 
-    // New method for generating a signal based on moving averages and support/resistance
-    public SIGNAL getMovingAverageSignal(List<Double> prices, double currentPrice) {
-        // Calculate moving averages (e.g., 20-period and 50-period)
-        double shortTermMA = calculateMovingAverage(prices, 20);
-        double longTermMA = calculateMovingAverage(prices, 50);
-
-        // Calculate support and resistance (recent lows and highs)
-        double support = calculateSupport(prices);
-        double resistance = calculateResistance(prices);
-
-        // Generate signal based on moving averages
-        if (shortTermMA > longTermMA && currentPrice > support) {
-            return SIGNAL.BUY;  // Use SIGNAL enum here
-        } else if (shortTermMA < longTermMA && currentPrice < resistance) {
-            return SIGNAL.SELL;  // Use SIGNAL enum here
-        } else {
-            return SIGNAL.HOLD;  // Use SIGNAL enum here
-        }
-    }
-
-    // Helper method to calculate moving average over a specified period
+    /**
+     * Calculate Moving Average.
+     */
     private double calculateMovingAverage(@NotNull List<Double> prices, int period) {
-        if (prices.size() < period) return 0.0;  // Not enough data
+        if (prices.size() < period) return 0.0;
 
         double sum = 0.0;
         for (int i = prices.size() - period; i < prices.size(); i++) {
@@ -95,29 +93,33 @@ public class TradingAI {
         return sum / period;
     }
 
-    // Helper method to calculate support level (lowest price in recent period)
+    /**
+     * Calculate Support Level (Lowest price in recent period).
+     */
     private double calculateSupport(@NotNull List<Double> prices) {
         double support = Double.MAX_VALUE;
-        for (int i = prices.size() - 20; i < prices.size(); i++) {
-            if (prices.get(i) < support) {
-                support = prices.get(i);
-            }
+        int size = prices.size();
+        for (int i = Math.max(0, size - 20); i < size; i++) {
+            support = Math.min(support, prices.get(i));
         }
         return support;
     }
 
-    // Helper method to calculate resistance level (the highest price in a recent period)
+    /**
+     * Calculate Resistance Level (Highest price in recent period).
+     */
     private double calculateResistance(@NotNull List<Double> prices) {
         double resistance = Double.MIN_VALUE;
-        for (int i = prices.size() - 20; i < prices.size(); i++) {
-            if (prices.get(i) > resistance) {
-                resistance = prices.get(i);
-            }
+        int size = prices.size();
+        for (int i = Math.max(0, size - 20); i < size; i++) {
+            resistance = Math.max(resistance, prices.get(i));
         }
         return resistance;
     }
 
-    // Create an instance based on candle data
+    /**
+     * Create an instance for prediction.
+     */
     private @NotNull Instance createInstance(double open, double high, double low, double close, double volume) {
         Instance instance = new DenseInstance(attributes.size());
         instance.setDataset(trainingData);
@@ -126,11 +128,13 @@ public class TradingAI {
         instance.setValue(attributes.get(2), low);
         instance.setValue(attributes.get(3), close);
         instance.setValue(attributes.get(4), volume);
-        instance.setMissing(attributes.get(5));  // Make sure to handle missing values appropriately
+        instance.setMissing(attributes.get(5)); // Ensure class is missing for prediction
         return instance;
     }
 
-    // Define the candle data attributes (Open, High, Low, Close, Volume) and class labels
+    /**
+     * Define trading attributes (OHLCV + class labels).
+     */
     private @NotNull List<Attribute> createAttributes() {
         List<Attribute> attributes = new ArrayList<>();
         attributes.add(new Attribute("open"));
@@ -139,26 +143,42 @@ public class TradingAI {
         attributes.add(new Attribute("close"));
         attributes.add(new Attribute("volume"));
 
-        // Define the class attribute (signal labels)
+        // Class Attribute (BUY, SELL, HOLD)
         ArrayList<String> classValues = new ArrayList<>();
-        classValues.add("BUY");
-        classValues.add("SELL");
-        classValues.add("HOLD");
+        classValues.add("HOLD");  // 0.0
+        classValues.add("BUY");   // 1.0
+        classValues.add("SELL");  // 2.0
         attributes.add(new Attribute("class", classValues));
 
         return attributes;
     }
 
+    /**
+     * Train and Save Model.
+     */
     public void train() {
         try {
-            model.buildClassifier(trainingData);  // Train the model
-            File f = new File("trainingData.pkl");
-            if (!f.exists()) f.createNewFile();
+            model.buildClassifier(trainingData);
+            saveTrainingData(trainingData);
             logger.info("Training completed.");
         } catch (Exception e) {
             logger.severe("Error building classifier: " + e.getMessage());
         }
     }
 
-
+    /**
+     * Save training data to a file.
+     */
+    private void saveTrainingData(Instances data) {
+        try {
+            File file = new File("trainingData.pkl");
+            if (!file.exists()) file.createNewFile();
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+                bw.write(data.toString());
+            }
+            logger.info("Training data saved.");
+        } catch (IOException e) {
+            logger.severe("Error saving training data: " + e.getMessage());
+        }
+    }
 }

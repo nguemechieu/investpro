@@ -20,6 +20,7 @@ import java.util.concurrent.Future;
 
 import static org.investpro.Coinbase.*;
 import static org.investpro.Exchange.logger;
+import static org.investpro.Oanda.numCandles;
 
 class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
@@ -29,7 +30,7 @@ class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     private static final int EARLIEST_DATA = 1422144000; // roughly the first tra
 
     CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
 
     }
 

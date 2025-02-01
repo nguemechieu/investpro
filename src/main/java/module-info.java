@@ -12,7 +12,7 @@ module investpro {
     requires io.github.cdimascio.dotenv.java;
     requires bounce;
 
-    requires net.bytebuddy.agent;
+
     requires org.hibernate.orm.core;
     requires weka.stable;
     requires javafx.swing;
@@ -20,14 +20,14 @@ module investpro {
     requires com.google.gson;
     requires testcontainers;
     requires org.xerial.sqlitejdbc;
+    requires netlib.java;
 
-    requires org.junit.jupiter.api;
 
     requires com.jfoenix;
     requires jcip.annotations;
 
     requires io.ebean.annotation;
-    requires netlib.java;
+
 
     requires org.hibernate.commons.annotations;
     requires jakarta.persistence;
@@ -36,9 +36,11 @@ module investpro {
     requires org.slf4j;
 
     opens org.investpro to
-            net.bytebuddy.agent,
+
+
             org.hibernate.orm.core,
 
+            netlib.java,
             com.fasterxml.jackson.databind,
             com.fasterxml.jackson.datatype.jsr310,
             com.google.gson,

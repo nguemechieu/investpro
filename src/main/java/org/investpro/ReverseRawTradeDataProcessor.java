@@ -1,5 +1,10 @@
 package org.investpro;
 
+import javafx.beans.property.SimpleIntegerProperty;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -9,10 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import javafx.beans.property.SimpleIntegerProperty;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.investpro.Oanda.numCandles;
 
 /**
  * @author NOEL NGUEMECHIEU
@@ -25,7 +27,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
 
     public ReverseRawTradeDataProcessor(Path rawTradeData, int secondsPerCandle, TradePair tradePair)
             throws IOException {
-        super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         fileReader = new ReversedLinesFileReader(rawTradeData, StandardCharsets.UTF_8);
     }
 

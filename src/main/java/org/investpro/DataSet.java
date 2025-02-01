@@ -1,11 +1,16 @@
 package org.investpro;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.investpro.CandleStickChart.logger;
+
 
 public class DataSet {
+
+    private static final Logger logger = LoggerFactory.getLogger(DataSet.class);
     private final Map<String, Double> data; // To store investment data (e.g., stock symbol -> price)
 
     public DataSet() {
@@ -46,7 +51,7 @@ public class DataSet {
     public void printDataSet() {
         for (Map.Entry<String, Double> entry : data.entrySet()) {
 
-            logger.info("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+            logger.info("Key: {}, Value: {}", entry.getKey(), entry.getValue());
         }
     }
 }

@@ -36,7 +36,7 @@ public class Oanda extends Exchange {
     public static final String API_URL = "https://api-fxtrade.oanda.com/v3";  // OANDA API URL
     private final String account_id;
 
-
+    static int numCandles = 1000;
     public Oanda(String accountId, String apiSecret) {
         super(accountId, apiSecret); // OANDA uses only an API key for authentication, no secret required
         this.account_id = accountId;
@@ -448,7 +448,7 @@ public class Oanda extends Exchange {
             HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode()!= 200) {
                 new Messages(Alert.AlertType.ERROR, "%d\n\n%s".formatted(response.statusCode(), response.body()));
-                throw new RuntimeException("HTTP error response: %d".formatted(response.statusCode()));
+
             }
 
 
@@ -527,6 +527,14 @@ public class Oanda extends Exchange {
         return List.of();
     }
 
+    /**
+     * @return
+     */
+    @Override
+    public CustomWebSocketClient getWebsocketClient() {
+        return null;
+    }
+
 
     /**
      * Returns the closest supported granularity (time interval) for OANDA.
@@ -563,9 +571,8 @@ public class Oanda extends Exchange {
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
 
-
         OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+            super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
 
 
         }
@@ -598,7 +605,7 @@ public class Oanda extends Exchange {
             String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/"
                     + tradePair.toString('_')
                     + "/candles?count=" + numCandles
-                    + "&price=M&from=" + startDateString
+                    + "&price=M&to=" + startDateString
                     + "&granularity=" + granularityToString(secondsPerCandle);
 
             return client.sendAsync(

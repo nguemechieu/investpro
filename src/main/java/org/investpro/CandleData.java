@@ -1,6 +1,8 @@
 package org.investpro;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,6 +12,7 @@ import java.util.Objects;
 /**
  * @author Noel Nguemechieu
  */
+@Getter
 @Entity
 @Table(name = "candle_data")
 public class CandleData {
@@ -17,8 +20,10 @@ public class CandleData {
 
     @Column(name = "volume", nullable = false)
     static double volume = 0;
+    @Setter
     int closeTime;
 
+    @Setter
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
@@ -41,6 +46,8 @@ public class CandleData {
 
     @Transient
     boolean placeHolder = false;
+    @Setter
+    private SIGNAL signal;
 
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime, double volume) {
         this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice) / 2,
@@ -92,40 +99,8 @@ public class CandleData {
                 (open + high + low + close) / 4 * volume, false);
     }
 
-    public double getOpenPrice() {
-        return openPrice;
-    }
-
-    public double getClosePrice() {
-        return closePrice;
-    }
-
-    public double getHighPrice() {
-        return highPrice;
-    }
-
-    public double getLowPrice() {
-        return lowPrice;
-    }
-
-    public int getOpenTime() {
-        return openTime;
-    }
-
     public double getVolume() {
         return volume;
-    }
-
-    public double getAveragePrice() {
-        return averagePrice;
-    }
-
-    public double getVolumeWeightedAveragePrice() {
-        return volumeWeightedAveragePrice;
-    }
-
-    public boolean isPlaceHolder() {
-        return placeHolder;
     }
 
     @Override
@@ -160,19 +135,8 @@ public class CandleData {
                 openTime, volume, placeHolder);
     }
 
-    public Long getId() {
-        return id;
-    }
+    public String getTimeLabel() {
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public int getCloseTime() {
-        return closeTime;
-    }
-
-    public void setCloseTime(int closeTime) {
-        this.closeTime = closeTime;
+        return "Time";
     }
 }

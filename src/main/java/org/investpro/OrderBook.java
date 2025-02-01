@@ -1,9 +1,14 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
+@Setter
 public class OrderBook {
 
      Instant now;
@@ -28,21 +33,7 @@ public class OrderBook {
         this.askEntries = askEntries;
     }
 
-    public ArrayList<Double> getBids() {
-        return bids;
-    }
 
-    public void setBids(ArrayList<Double> bids) {
-        this.bids = bids;
-    }
-
-    public ArrayList<Double> getAsks() {
-        return asks;
-    }
-
-    public void setAsks(ArrayList<Double> asks) {
-        this.asks = asks;
-    }
 
     public OrderBook(double asks, double bids) {
 
@@ -60,11 +51,4 @@ public class OrderBook {
     ArrayList<Double> asks = new ArrayList<>();
 
 
-    public void setTradePair(TradePair tradePair) {
-            this.tradePair = tradePair;
-    }
-    TradePair tradePair;
-    public TradePair getTradePair() {
-        return tradePair;
-    }
 }

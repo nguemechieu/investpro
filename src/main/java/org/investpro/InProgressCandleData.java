@@ -38,4 +38,7 @@ public record InProgressCandleData(double openPrice, double highPriceSoFar, doub
                 volumeSoFar == other.volumeSoFar;
     }
 
+    public long currentTill() {
+        return System.currentTimeMillis() - openTime;
+    }
 }

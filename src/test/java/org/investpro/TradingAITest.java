@@ -23,7 +23,7 @@ public class TradingAITest {
 
     @Before
     public void setUp() throws Exception {
-        // Set up the attributes for the Instances (Open, High, Low, Close, Volume)
+        // Set up attributes for the dataset: Open, High, Low, Close, Volume, and Class
         ArrayList<Attribute> attributes = new ArrayList<>();
         attributes.add(new Attribute("open"));
         attributes.add(new Attribute("high"));
@@ -31,6 +31,7 @@ public class TradingAITest {
         attributes.add(new Attribute("close"));
         attributes.add(new Attribute("volume"));
 
+        // Define class attribute with categorical values
         ArrayList<String> classValues = new ArrayList<>();
         classValues.add("BUY");
         classValues.add("SELL");
@@ -39,23 +40,26 @@ public class TradingAITest {
 
         // Create an empty dataset with these attributes
         Instances trainingData = new Instances("MarketData", attributes, 0);
-        trainingData.setClassIndex(Math.max((trainingData.numAttributes() - 1), 0));
+        trainingData.setClassIndex(attributes.size() - 1); // Ensure class attribute is properly set
 
-        // Add some random data points to the training set
+        // Generate random training data
         Random random = new Random();
         for (int i = 0; i < 100; i++) {
             DenseInstance instance = new DenseInstance(attributes.size());
+            instance.setDataset(trainingData);
             instance.setValue(attributes.get(0), random.nextDouble() * 100 + 100); // open
             instance.setValue(attributes.get(1), random.nextDouble() * 100 + 150); // high
             instance.setValue(attributes.get(2), random.nextDouble() * 100 + 50);  // low
             instance.setValue(attributes.get(3), random.nextDouble() * 100 + 100); // close
             instance.setValue(attributes.get(4), random.nextDouble() * 1000);      // volume
-            instance.setValue(attributes.get(5), random.nextInt(3));               // class: BUY, SELL, HOLD
+
+            // Assign a random class label (BUY = 0, SELL = 1, HOLD = 2)
+            instance.setValue(attributes.get(5), random.nextInt(3));
 
             trainingData.add(instance);
         }
 
-        // Initialize TradingAI with the training data
+        // Initialize TradingAI with the training dataset
         tradingAI = new TradingAI(trainingData);
     }
 
@@ -63,21 +67,21 @@ public class TradingAITest {
     public void testGetSignal() {
         Random random = new Random();
 
-        // Generate random candle data for the test
+        // Generate random candle data for testing
         double open = random.nextDouble() * 100 + 100;
         double high = open + random.nextDouble() * 10;
         double low = open - random.nextDouble() * 10;
         double close = random.nextDouble() * (high - low) + low;
-        long volume = random.nextLong() * 1000;
+        double volume = Math.abs(random.nextDouble() * 1000); // Ensure non-negative volume
 
-        // Call the getSignal method with the random candle data
+        // Call the getSignal method
         SIGNAL signal = tradingAI.getSignal(open, high, low, close, volume);
 
-        // Ensure that the result is not null and that it's a valid signal
+        // Validate the output
         assertNotNull(signal);
         assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
 
-        // Print the result
+        // Log the result
         logger.info("Candle Data Signal: {}", signal);
     }
 
@@ -85,34 +89,30 @@ public class TradingAITest {
     public void testGetMovingAverageSignal() {
         Random random = new Random();
         List<Double> prices = new ArrayList<>();
-        while (true) {
 
-            try {
-
-
-                // Generate random price data for the moving average test
-                for (int i = 0; i < 100; i++) {
-                    prices.add(100.0 + random.nextDouble() * 100.0);  // Random prices between 100 and 200
-                }
-
-                double currentPrice = prices.getLast();  // The Current price is the last in the list
-
-                // Call the getMovingAverageSignal method with the random price data
-                SIGNAL signal = tradingAI.getMovingAverageSignal(prices, currentPrice);
-
-                // Ensure that the result is not null and that it's a valid signal
-                assertNotNull(signal);
-                assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
-
-                // Print the result
-                logger.info("Moving Average Signal: {}", signal);
-
-
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+        // Generate random price data for moving average test
+        for (int i = 0; i < 100; i++) {
+            prices.add(100.0 + random.nextDouble() * 100.0);  // Random prices between 100 and 200
         }
 
+
+        double currentPrice = prices.getLast();  // Last price is the current price
+
+
+        // Call the getMovingAverageSignal method
+        SIGNAL signalValue = tradingAI.getMovingAverageSignal(prices, currentPrice);
+
+        // Convert to SIGNAL enum
+        SIGNAL signal = SIGNAL.values()[signalValue.ordinal()];
+
+        // Validate the output
+        assertNotNull(signal);
+        assertTrue(signal == SIGNAL.BUY || signal == SIGNAL.SELL || signal == SIGNAL.HOLD);
+
+        // Log the result
+        logger.info("Moving Average Signal: {}", signal);
+
+        // Retrain the model after prediction (optional)
+        tradingAI.retrainModel();
     }
 }

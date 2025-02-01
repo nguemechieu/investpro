@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.Oanda.numCandles;
 
 
 public class BinanceUS extends Exchange {
@@ -724,6 +725,14 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         return List.of();
     }
 
+    /**
+     * @return
+     */
+    @Override
+    public CustomWebSocketClient getWebsocketClient() {
+        return null;
+    }
+
 
     private static class BinanceUsCandleDataSupplier extends CandleDataSupplier {
 
@@ -734,7 +743,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
 
         BinanceUsCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+            super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         }
 
         @Contract(" -> new")

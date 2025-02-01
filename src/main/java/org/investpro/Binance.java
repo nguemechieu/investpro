@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.Oanda.numCandles;
 
 public class Binance extends Exchange {
 
@@ -338,6 +339,14 @@ public class Binance extends Exchange {
         return List.of();
     }
 
+    /**
+     * @return
+     */
+    @Override
+    public CustomWebSocketClient getWebsocketClient() {
+        return null;
+    }
+
     // Binance supported granularity (intervals)
 
     /**
@@ -368,7 +377,7 @@ public class Binance extends Exchange {
 
 
         BinanceCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+            super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         }
 
         @Override

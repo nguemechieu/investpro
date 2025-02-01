@@ -164,6 +164,20 @@
             <artifactId>hibernate-core</artifactId>
             <version>6.2.0.Final</version>
         </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>arpack-ng</artifactId>
+            <version>3.8.0-1.5.8</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.github.fommil.netlib/all -->
+        <dependency>
+            <groupId>com.github.fommil.netlib</groupId>
+            <artifactId>all</artifactId>
+            <version>1.1.2</version>
+            <type>pom</type>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.github.fommil.netlib/all -->
+
 
         <!-- ByteBuddy Dependencies -->
         <dependency>
@@ -171,11 +185,7 @@
             <artifactId>byte-buddy</artifactId>
             <version>1.12.23</version>
         </dependency>
-        <dependency>
-            <groupId>net.bytebuddy</groupId>
-            <artifactId>byte-buddy-agent</artifactId>
-            <version>1.12.23</version>
-        </dependency>
+
 
         <!-- Other Dependencies -->
         <dependency>
@@ -250,6 +260,11 @@
             <artifactId>hibernate-core</artifactId>
             <version>6.2.0.Final</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.fommil.netlib</groupId>
+            <artifactId>all</artifactId>
+            <version>1.1.2</version>
+        </dependency>
 
         <!-- SQLite JDBC -->
         <dependency>
@@ -280,12 +295,22 @@
             <version>7.0.3.Final</version>
             <scope>compile</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/net.bytebuddy/byte-buddy-agent -->
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <version>1.17.0</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-transport-zerodep</artifactId>
             <version>3.4.0</version>
             <scope>compile</scope>
         </dependency>
+
+
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
@@ -297,6 +322,33 @@
             <artifactId>junit-jupiter-api</artifactId>
             <version>5.11.4</version>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.fommil.netlib</groupId>
+            <artifactId>core</artifactId>
+            <version>1.1.2</version>
+        </dependency>
+        <!-- Jakarta WebSocket API -->
+        <!-- https://mvnrepository.com/artifact/jakarta.websocket/jakarta.websocket-api -->
+        <dependency>
+            <groupId>jakarta.websocket</groupId>
+            <artifactId>jakarta.websocket-api</artifactId>
+            <version>2.2.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <!-- Tyrus WebSocket Client (Glassfish) -->
+        <dependency>
+            <groupId>org.glassfish.tyrus</groupId>
+            <artifactId>tyrus-client</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.glassfish.tyrus</groupId>
+            <artifactId>tyrus-container-grizzly-client</artifactId>
+            <version>2.1.0</version>
         </dependency>
 
     </dependencies>
@@ -330,12 +382,12 @@
                 </executions>
                 <configuration>
                     <mainClass>org.investpro.InvestPro</mainClass>
-                    <arguments>
-                        <argument>--module-path</argument>
-                        <argument>${javafx.version}/lib</argument>
-                        <argument>--add-modules</argument>
-                        <argument>javafx.controls,javafx.fxml</argument>
-                    </arguments>
+                    <!--                    <arguments>-->
+                    <!--                        <argument>&#45;&#45;module-path</argument>-->
+                    <!--                        <argument>${javafx.version}/lib</argument>-->
+                    <!--                        <argument>&#45;&#45;add-modules</argument>-->
+                    <!--                        <argument>javafx.controls,javafx.fxml</argument>-->
+                    <!--                    </arguments>-->
                 </configuration>
             </plugin>
 

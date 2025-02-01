@@ -1,5 +1,6 @@
 package org.investpro;
 
+
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,4 +161,5 @@ public abstract class Exchange {
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
 
 
+    public abstract CustomWebSocketClient getWebsocketClient();
 }

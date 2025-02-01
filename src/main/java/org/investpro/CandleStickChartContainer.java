@@ -3,6 +3,7 @@ package org.investpro;
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -12,6 +13,7 @@ import lombok.Setter;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 
 /**
  * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
@@ -25,7 +27,7 @@ import java.util.Objects;
 @Getter
 @Setter
 public class CandleStickChartContainer extends Region {
-    private final VBox candleChartContainer;
+    private final BorderPane candleChartContainer;
     private final CandleStickChartToolbar toolbar;
     private final Exchange exchange;
     private final TradePair tradePair;
@@ -56,7 +58,7 @@ public class CandleStickChartContainer extends Region {
         AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
         AnchorPane.setRightAnchor(toolbarContainer, 0.0);
 
-        candleChartContainer = new VBox();
+        candleChartContainer = new BorderPane();
         candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
         AnchorPane.setTopAnchor(candleChartContainer, 46.0);
         AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
@@ -74,7 +76,8 @@ public class CandleStickChartContainer extends Region {
             if (!oldDurationValue.equals(newDurationValue)) {
                 try {
                     createNewChart(newDurationValue.intValue(), liveSyncing);
-                } catch (SQLException | ClassNotFoundException | IOException e) {
+                } catch (SQLException | ClassNotFoundException | IOException | ExecutionException |
+                         InterruptedException e) {
                     throw new RuntimeException(e);
                 }
                 toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -84,18 +87,16 @@ public class CandleStickChartContainer extends Region {
             }
         });
 
-        secondsPerCandle.set(300);
+        secondsPerCandle.set(60);
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException, ExecutionException, InterruptedException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }
 
 
-        CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle, tradePair);
-
-        candleStickChart = new CandleStickChart(exchange, tradePair, candleDataSupplier, liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        candleStickChart = new CandleStickChart(exchange, tradePair, exchange.getCandleDataSupplier(secondsPerCandle, tradePair), liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
     }
 
     private void animateInNewChart(CandleStickChart newChart) {

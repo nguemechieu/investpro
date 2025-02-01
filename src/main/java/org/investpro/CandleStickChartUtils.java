@@ -70,7 +70,7 @@ public final class CandleStickChartUtils {
 
         // Store extrema for the last window
         if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty() && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
-            extrema.put(candleData.get(candleData.size() - windowSize).getOpenTime(), new Pair<>(
+            extrema.put(candleData.get(candleData.size() + 1 - windowSize).getOpenTime(), new Pair<>(
                     new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
                             Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
                     new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
@@ -123,6 +123,38 @@ public final class CandleStickChartUtils {
             return new InstantAxisFormatter(DateTimeFormatter.ofPattern("dd MMM"));
         } else {
             return new InstantAxisFormatter(DateTimeFormatter.ofPattern("HH:mm"));
+        }
+    }
+
+
+    public static void putExtremaForRemainingElements(Map<Integer, Pair<Extrema, Extrema>> extrema,
+                                                      final List<CandleData> candleData) {
+        Objects.requireNonNull(extrema, "extrema must not be null");
+        Objects.requireNonNull(candleData, "candleData must not be null");
+
+        int prevMinVolume = Integer.MAX_VALUE;
+        int prevMaxVolume = Integer.MIN_VALUE;
+        int prevMinCandle = Integer.MAX_VALUE;
+        int prevMaxCandle = Integer.MIN_VALUE;
+
+        int currMinVolume;
+        int currMaxVolume;
+        int currMinCandle;
+        int currMaxCandle;
+        for (int i = candleData.size() - 1; i >= 0; i--) {
+            currMinVolume = Math.min((int) candleData.get(i).getVolume(), prevMinVolume);
+            currMaxVolume = Math.max((int) Math.ceil(candleData.get(i).getVolume()), prevMaxVolume);
+
+            currMinCandle = Math.min((int) candleData.get(i).getLowPrice(), prevMinCandle);
+            currMaxCandle = Math.max((int) Math.ceil(candleData.get(i).getHighPrice()), prevMaxCandle);
+
+            extrema.put(candleData.get(i).getOpenTime(), new Pair<>(new Extrema((double) currMinVolume, (double) currMaxVolume),
+                    new Extrema((double) currMinCandle, (double) currMaxCandle)));
+
+            prevMinVolume = currMinVolume;
+            prevMaxVolume = currMaxVolume;
+            prevMinCandle = currMinCandle;
+            prevMaxCandle = currMaxCandle;
         }
     }
 }

@@ -1,6 +1,8 @@
 package org.investpro;
 
 
+import lombok.Getter;
+import lombok.Setter;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -8,13 +10,21 @@ import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 
 import static org.investpro.Exchange.logger;
 
-
+@Getter
+@Setter
 public class CustomWebSocketClient {
 
     private WebSocket webSocket;
+
+    private URI uri;
+
+    public CustomWebSocketClient() {
+        this.uri = URI.create("ws://localhost:8080/investpro");
+    }
 
     // Function to establish a WebSocket connection based on the given URL and send a message
     public CompletableFuture<String> sendWebSocketRequest(String url, String message) {
@@ -92,6 +102,24 @@ public class CustomWebSocketClient {
 
                     logger.info("WebSocket connection closed."));
         }
+    }
+
+    public boolean supportsStreamingTrades(TradePair tradePair) {
+
+        return false;
+
+
+    }
+
+    public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+    }
+
+    public CountDownLatch getInitializationLatch() {
+        return new CountDownLatch(1);
+    }
+
+    public URI getURI() {
+        return uri;
     }
 
     // Main method for testing the WebSocket client

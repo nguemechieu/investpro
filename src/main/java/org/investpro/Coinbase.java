@@ -498,6 +498,14 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         return List.of();
     }
 
+    /**
+     * @return
+     */
+    @Override
+    public CustomWebSocketClient getWebsocketClient() {
+        return null;
+    }
+
     @Override
     public List<Withdrawal> Withdraw() {
         return null;
