@@ -1,5 +1,6 @@
 package org.investpro;
 
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -7,12 +8,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 
-@Setter
 @Getter
+@Setter
 public class Withdrawal {
 
 
         private String id;
+    @Getter
         private double amount;
         private double transactionFee;
         private String coin;

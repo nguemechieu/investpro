@@ -1,56 +1,21 @@
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
+          http://maven.apache.org/xsd/settings-1.2.0.xsd">
 
-    <proxies>
-        <!-- Example proxy configuration (if needed) -->
-        <!--
-        <proxy>
-            <id>example-proxy</id>
-            <active>true</active>
-            <protocol>http</protocol>
-            <host>proxy.example.com</host>
-            <port>8080</port>
-            <username>proxy-user</username>
-            <password>proxy-password</password>
-            <nonProxyHosts>www.google.com|*.example.com</nonProxyHosts>
-        </proxy>
-        -->
-    </proxies>
+    <localRepository>${user.home}/.m2/repository</localRepository>
 
-    <servers>
-        <server>
-            <id>github</id>
-            <username>GITHUB_USERNAME</username>
-            <password>GITHUB_PASSWORD</password>
-        </server>
-    </servers>
+    <interactiveMode>true</interactiveMode>
+
+    <offline>false</offline>
 
     <mirrors>
-        <!-- Mirror configuration -->
         <mirror>
-            <id>investpro-mirror</id>
-            <url>https://repo.investpro.com/maven</url>
+            <id>central</id>
             <mirrorOf>central</mirrorOf>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <layout>default</layout>
         </mirror>
     </mirrors>
-
-    <profiles>
-        <profile>
-            <id>default</id>
-            <repositories>
-                <repository>
-                    <id>github</id>
-                    <name>GitHub nguemechieu Apache Maven Packages</name>
-                    <url>https://maven.pkg.github.com/nguemechieu/investpro</url>
-                </repository>
-            </repositories>
-        </profile>
-    </profiles>
-
-    <activeProfiles>
-        <activeProfile>default</activeProfile>
-    </activeProfiles>
 
 </settings>

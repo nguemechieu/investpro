@@ -8,13 +8,15 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.List;
 import java.util.Objects;
 
-
+@Getter
+@Setter
 public class CandleStickChartOptions {
-    @Getter
+
     private final VBox optionsPane;
 
     public CandleStickChartOptions() {

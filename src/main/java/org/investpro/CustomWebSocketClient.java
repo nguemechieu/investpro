@@ -1,153 +1,150 @@
 package org.investpro;
 
-
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 
-import static org.investpro.Exchange.logger;
-
 @Getter
 @Setter
-public class CustomWebSocketClient {
+public abstract class CustomWebSocketClient implements WebSocket.Listener {
 
+    private static final Logger logger = LoggerFactory.getLogger(CustomWebSocketClient.class);
     private WebSocket webSocket;
+    private final URI uri;
+    private final CountDownLatch initializationLatch = new CountDownLatch(1);
+    private final HttpClient httpClient;
 
-    private URI uri;
-
-    public CustomWebSocketClient() {
-        this.uri = URI.create("ws://localhost:8080/investpro");
+    public CustomWebSocketClient(String url) {
+        this.uri = URI.create(url);
+        this.httpClient = HttpClient.newHttpClient();
     }
 
-    // Function to establish a WebSocket connection based on the given URL and send a message
-    public CompletableFuture<String> sendWebSocketRequest(String url, String message) {
-        CompletableFuture<String> responseFuture = new CompletableFuture<>();
-
-        // Create an HTTP client
-        HttpClient client = HttpClient.newHttpClient();
-
-        // Create and connect the WebSocket
-        webSocket = client.newWebSocketBuilder()
-                .buildAsync(URI.create(url), new WebSocket.Listener() {
-
-                    // Method called when the WebSocket is opened
-                    @Override
-                    public void onOpen(WebSocket webSocket) {
-                        logger.debug(
-                                "Connected to WebSocket server at URL: {}", url);
-
-                        webSocket.sendText(message, true);  // Send the request message
-                        WebSocket.Listener.super.onOpen(webSocket);
-                    }
-
-
-                    // Method called when a text message is received from the server
-                    @Override
-                    public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                      logger.info(
-                               "Received text data: {}", data.toString()
-
-                      );
-                        responseFuture.complete(data.toString());  // Complete the future with the response data
-                        return WebSocket.Listener.super.onText(webSocket, data, last);
-                    }
-
-                    // Method called when a binary message is received from the server (e.g., for non-text data)
-                    @Override
-                    public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
-
-                         logger.debug(
-                                 "Received binary data: {}", data.toString()
-                         );
-                        return WebSocket.Listener.super.onBinary(webSocket, data, last);
-                    }
-
-                    // Method called if the connection is closed
-                    @Override
-                    public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-
-                        logger.info(
-                                "WebSocket closed: " + reason
-
-                        );
-                        responseFuture.completeExceptionally(new RuntimeException("WebSocket closed unexpectedly."));
-                        return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
-                    }
-
-                    // Method called if an error occurs
-                    @Override
-                    public void onError(WebSocket webSocket, Throwable error) {
-
-                         logger.error(
-                                 "WebSocket error: " + error.getMessage(), error
-                         );
-                        responseFuture.completeExceptionally(error);  // Complete the future with an exception
-                    }
-                }).join();  // Join to wait for connection completion
-
-        return responseFuture;  // Return the future which will be completed when a response is received
-    }
-
-    // Method to close the WebSocket connection
-    public void closeWebSocket() {
-        if (webSocket != null) {
-            webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Closing WebSocket").thenRun(() ->
-
-                    logger.info("WebSocket connection closed."));
+    // Establish a WebSocket or HTTPS connection based on the URL scheme
+    public void connect(@NotNull Map<String, String> headers) {
+        if (uri.getScheme().equalsIgnoreCase("wss") || uri.getScheme().equalsIgnoreCase("ws")) {
+            connectWebSocket(headers);
+        } else if (uri.getScheme().equalsIgnoreCase("https") || uri.getScheme().equalsIgnoreCase("http")) {
+            sendHttpRequest(headers);
+        } else {
+            logger.error("Unsupported URL scheme: {}", uri.getScheme());
+            throw new IllegalArgumentException("Unsupported protocol: " + uri.getScheme());
         }
     }
 
-    public boolean supportsStreamingTrades(TradePair tradePair) {
+    // WebSocket Connection
+    private void connectWebSocket(Map<String, String> headers) {
+        WebSocket.Builder webSocketBuilder = httpClient.newWebSocketBuilder();
+        headers.forEach(webSocketBuilder::header);
 
-        return false;
-
-
+        webSocketBuilder.buildAsync(uri, this)
+                .thenApply(webSocket -> {
+                    this.webSocket = webSocket;
+                    logger.info("Connected to WebSocket server: {}", uri);
+                    onOpen();
+                    return webSocket;
+                })
+                .exceptionally(ex -> {
+                    logger.error("WebSocket connection failed: {}", ex.getMessage(), ex);
+                    return null;
+                });
     }
 
-    public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+    // HTTPS Request Handler (Used when URL starts with https://)
+    private void sendHttpRequest(Map<String, String> headers) {
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(uri);
+        headers.forEach(requestBuilder::header);
+
+        HttpRequest request = requestBuilder.GET().build();
+
+        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body)
+                .thenAccept(response -> {
+                    logger.info("Received HTTP response: {}", response);
+                    onMessage(response);
+                })
+                .exceptionally(ex -> {
+                    logger.error("HTTP request failed: {}", ex.getMessage(), ex);
+                    return null;
+                });
     }
 
-    public CountDownLatch getInitializationLatch() {
-        return new CountDownLatch(1);
+    // Send a message to the WebSocket server
+    public CompletableFuture<WebSocket> sendMessage(String message) {
+        if (webSocket == null) {
+            logger.warn("WebSocket is not connected!");
+            return CompletableFuture.failedFuture(new IllegalStateException("WebSocket not connected"));
+        }
+        logger.info("Sending WebSocket message: {}", message);
+        return webSocket.sendText(message, true);
     }
 
-    public URI getURI() {
-        return uri;
+    // WebSocket listener methods
+    @Override
+    public void onOpen(WebSocket webSocket) {
+        logger.info("WebSocket connection established.");
+        initializationLatch.countDown();
     }
 
-    // Main method for testing the WebSocket client
-//    public static void main(String[] args) {
-//        CustomWebSocketClient client = new CustomWebSocketClient();
-//
-//
-//        // Example WebSocket URL (replace with the appropriate WebSocket server URL)
-//        String url = "wss://stream.binance.us:9443/ws";
-//
-//        // Example message to send (adjust according to your use case)
-//        String message = "{\"method\": \"SUBSCRIBE\", \"params\": [\"ethusdt@kline_1d\"], \"id\": 1}";
-//
-//        // Send a WebSocket request and listen for the response
-//        client.sendWebSocketRequest(url, message).thenAccept(response -> System.out.println("Final response received: " + response)).exceptionally(ex -> {
-//            logger.error(
-//                    "Error: %s".formatted(ex.getMessage()), ex
-//            );
-//            return null;
-//        });
-//
-//        // To close the WebSocket connection after some time (optional)
-//        // Example: close after 10 seconds (can be adjusted as per requirement)
-//        try {
-//            Thread.sleep(10000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//        client.closeWebSocket();
-//    }
+    @Override
+    public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+        logger.info("Received WebSocket message: {}", data);
+        onMessage(data.toString());
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+        logger.warn("Received unexpected binary data.");
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        logger.info("WebSocket closed with status: {} Reason: {}", statusCode, reason);
+        onClose(statusCode, reason, true);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public void onError(WebSocket webSocket, Throwable error) {
+        logger.error("WebSocket error: {}", error.getMessage(), error);
+        onError(new Exception(error));
+    }
+
+    // Close WebSocket connection
+    public void closeWebSocket() {
+        if (webSocket != null) {
+            webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client requested closure")
+                    .thenRun(() -> logger.info("WebSocket connection closed."));
+        }
+    }
+
+    // Abstract methods for custom implementation
+    public abstract void onMessage(String message);
+
+    public abstract void onOpen();
+
+    public abstract void onClose(int code, String reason, boolean remote);
+
+    public abstract void onError(Exception ex);
+
+
+    public abstract boolean supportsStreamingTrades(TradePair tradePair);
+
+    public abstract void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask updateInProgressCandleTask);
 }
+
+

@@ -12,6 +12,7 @@ import lombok.Setter;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.text.ParseException;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
@@ -77,7 +78,7 @@ public class CandleStickChartContainer extends Region {
                 try {
                     createNewChart(newDurationValue.intValue(), liveSyncing);
                 } catch (SQLException | ClassNotFoundException | IOException | ExecutionException |
-                         InterruptedException e) {
+                         InterruptedException | TelegramApiException | ParseException e) {
                     throw new RuntimeException(e);
                 }
                 toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -90,13 +91,15 @@ public class CandleStickChartContainer extends Region {
         secondsPerCandle.set(60);
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException, ExecutionException, InterruptedException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException, ExecutionException, InterruptedException, TelegramApiException, ParseException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }
 
 
-        candleStickChart = new CandleStickChart(exchange, tradePair, exchange.getCandleDataSupplier(secondsPerCandle, tradePair), liveSyncing, secondsPerCandle, widthProperty(), heightProperty());
+        String telegram_token = "2032573404:AAGnxJpNMJBKqLzvE5q4kGt1cCGF632bP7A";
+        candleStickChart = new CandleStickChart(exchange, exchange.getCandleDataSupplier(secondsPerCandle, tradePair)
+                , tradePair, liveSyncing, secondsPerCandle, widthProperty(), heightProperty(), telegram_token);
     }
 
     private void animateInNewChart(CandleStickChart newChart) {

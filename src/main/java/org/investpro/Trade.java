@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -34,7 +36,7 @@ public class Trade {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
-
+    List<Trade> tradeList = new ArrayList<>();
     private double price;
 
     private double amount;
@@ -74,9 +76,7 @@ public class Trade {
         this.amount = qty;
         this.timestamp = time;
     }
-
-
-
+    SIGNAL signal;
 
 
     @Override
@@ -111,4 +111,21 @@ public class Trade {
     }
 
 
+    public Trade(TradePair tradePair, double price, double size, Side side, Instant timestamp) {
+        this.tradePair = tradePair;
+        this.price = price;
+        this.amount = size;
+        this.timestamp = timestamp;
+
+    }
+
+    public void put(TradePair tradePair, SIGNAL signal) {
+
+        Trade trad = new Trade();
+        trad.setTradePair(tradePair);
+        trad.setSignal(signal);
+
+        tradeList.add(trad);
+
+    }
 }

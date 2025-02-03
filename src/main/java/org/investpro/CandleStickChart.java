@@ -1,57 +1,62 @@
 package org.investpro;
 
+import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
+import javafx.event.EventHandler;
 import javafx.geometry.Side;
+import javafx.geometry.*;
 import javafx.scene.Cursor;
+import javafx.scene.Parent;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.chart.Axis;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.ScrollEvent;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.*;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
-import javafx.scene.text.Text;
+import javafx.util.Duration;
+
 import javafx.util.Pair;
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import weka.core.Attribute;
+import weka.core.DenseInstance;
+import weka.core.Instances;
 
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.text.DecimalFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.investpro.CandleStickChartUtils.getXAxisFormatterForRange;
-import static org.investpro.CandleStickChartUtils.putSlidingWindowExtrema;
-import static org.investpro.ChartColors.DarkTheme.BEAR_CANDLE_BORDER_COLOR;
-import static org.investpro.ChartColors.DarkTheme.BULL_CANDLE_BORDER_COLOR;
-import static org.investpro.ChartColors.LightTheme.BEAR_CANDLE_FILL_COLOR;
-import static org.investpro.ChartColors.LightTheme.BULL_CANDLE_FILL_COLOR;
+import static org.investpro.CandleStickChartUtils.*;
 import static org.investpro.Side.BUY;
-
+import static org.investpro.Side.SELL;
+import static org.investpro.TradeHistory.tradeHistory;
 
 /**
  * A resizable chart that allows for analyzing the trading activity of a commodity over time. The chart is made up of
@@ -63,7 +68,7 @@ import static org.investpro.Side.BUY;
  * duration of the candle, if the price of the commodity increased during the duration, the candle is colored
  * green and represents a "bullish" trading period. Conversely, if the price decreased then the candle is colored
  * red which represents a "bearish" period. To display a {@code CandleStickChart} in a scene one must use
- * a {@link }. To enforce this usage, the constructors for this class are package-private.
+ * a {@link CandleStickChartContainer}. To enforce this usage, the constructors for this class are package-private.
  * <p>
  * JavaFX offers various charts in it's javafx.scene.chart package, but does not offer a candle-stick
  * chart out-of-the-box. It does however offer an XYChart which could be used as a starting-point for a candle-stick
@@ -76,41 +81,58 @@ import static org.investpro.Side.BUY;
  * <p>
  * The main reason for choosing a Canvas-based implementation is that by using a Canvas we obtain pixel-perfect
  * drawing capabilities and precise control over what should be displayed in response to panning and zooming. With the
- * old approach, the drawing of the volume bars and the panning and zooming capabilities were all extremely ad-hoc and
- * buggy. For example, the panning was simulated by using a ScrollPane which functioned very poorly when paging in
- * new candles (as the bounds of the pane were changing while scrolling was happening, so "jumps" would occur).
- * Also, to implement panning and zooming, we needed access to all the chart's internal data (and then some),
+ * old approach the drawing of the volume bars and the panning and zooming capabilities were all extremely ad-hoc and
+ * buggy. For example the panning was simulated by using a ScrollPane which functioned very poorly when paging in
+ * new candles (as the bounds of the pane were changing while scrolling was happening so "jumps" would occur).
+ * Also in order to implement panning and zooming we needed access to all the chart's internal data (and then some)
  * and so the encapsulation of the chart's data by the Chart class was being completely bypassed.
  *
  * @author NOEL NGUEMECHIEU
  */
 @Getter
 @Setter
-public class CandleStickChart extends Region {
+public class CandleStickChart extends AnchorPane {
 
-    public static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
+
 
     private final CandleDataPager candleDataPager;
-    private final CandleStickChartOptions chartOptions;
-
-    static {
-        new DecimalFormat("#.0000");
-    }
-
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-            .withZone(ZoneId.of("UTC"));
-
+    private static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
+    /**
+     * Draws the chart contents on the canvas ensuring the latest data is always displayed first.
+     * It also informs the user when no data is available or when an error occurs.
+     */
+    private static final int MAX_RETRIES = 3;
+    private static final int RETRY_DELAY_MS = 2000; // 2 seconds
     private final Exchange exchange;
     private final TradePair tradePair;
     private final boolean liveSyncing;
     private final Map<Integer, ZoomLevel> zoomLevelMap;
-    private final ScheduledExecutorService updateInProgressCandleExecutor;
-    private final UpdateInProgressCandleTask updateInProgressCandleTask;
+    private final KeyEventHandler keyHandler;
+    private final Consumer<List<CandleData>> candlePageConsumer;
+    private final EventHandler<MouseEvent> mouseDraggedHandler;
+    private final EventHandler<ScrollEvent> scrollHandler;
+    private final String chatId;
+    Label progressIndLbl = new Label();
+    String tradeMode = "Auto";
+    DateTimeFormatter formatter;
+    TradingType sessionType;
+    private CandleStickChartOptions chartOptions;
+    /**
+     * Maps an open time (as a Unix timestamp) to the computed candle data (high price, low price, etc.) for a trading
+     * period beginning with that opening time. Thus, the key "1601798498" would be mapped to the candle data for trades
+     * from the period of 1601798498 to 1601798498 + secondsPerCandle.
+     */
+    private NavigableMap<Integer, CandleData> data;
+    private List<Trade> prices;
+
     private final StableTicksAxis xAxis;
     private final StableTicksAxis yAxis;
     private final StableTicksAxis extraAxis;
     private final ProgressIndicator progressIndicator;
+    private ScheduledExecutorService updateInProgressCandleExecutor;
     private final Line extraAxisExtension;
+    private InProgressCandle inProgressCandle;
+    private boolean autoTrading;
 
     private final Font canvasNumberFont;
     private final int secondsPerCandle;
@@ -120,163 +142,117 @@ public class CandleStickChart extends Region {
     private double mousePrevX = -1;
     private double mousePrevY = -1;
     private double scrollDeltaXSum;
-
-
-    private final NavigableMap<Integer, CandleData> data;
-    private int inProgressCandleLastDraw = -1;
+    private UpdateInProgressCandleTask updateInProgressCandleTask;
+    private List<OrderBook> prices1;
+    private CandleDataSupplier candleDataSupplier;
     private volatile ZoomLevel currZoomLevel;
     private volatile boolean paging;
-    Button zoomInBtn = new Button("Zoom In");
-
-    TradingAI tradingAI;
-    TradeHistory tradeHistory;
-    List<Trade> currentCandleTrades;
-    private double chartWidth = 1000;
-    private double chartHeight = 600;
-    Button zoomOutBtn = new Button("Zoom Out");
-    int panX;
-    int panY;
-    private InProgressCandle inProgressCandle;
-    private boolean showTrades = true;
-    // Track zoom & pan levels
-    private double zoomFactor = 1.0;
-    private double panOffset = 0;
-    private boolean showGrid = true;  // Toggle grid on/off
-
-    CandleStickChart(Exchange exchange, TradePair tradePair, CandleDataSupplier candleDataSupplier,
+    private double initialLowerBound = 0;
+    private double initialUpperBound = 1000000;
+    private ZoomDirection zoomDirection;
+    private double chartWidth = 900;
+    private double chartHeight = 700;
+    private long inProgressCandleLastDraw = -1;
+    private TelegramClient telegramBot;
+    // Variables to track drag speed
+    private double lastMouseX = 0;
+    private double velocityX = 0;
+    private Instant lastDragTime;
+    /**
+     * Creates a new {@code CandleStickChart}. This constructor is package-private because it should only
+     * be instantiated by a {@link CandleStickChartContainer}.
+     *
+     * @param exchange           the {@code Exchange} object on which the trades represented by candles happened on
+     * @param candleDataSupplier the {@code CandleDataSupplier} that will supply contiguous chunks of
+     *                           candle data, where successive supplies will be farther back in time
+     * @param tradePair          the {@code TradePair} that this chart displays trading data for (the base (first) currency
+     *                           will be the unit of the volume axis and the counter (second) currency will be the unit of the y-axis)
+     * @param liveSyncing        if {@literal true} the chart will be updated in real-time to reflect ongoing trading
+     *                           activity
+     * @param secondsPerCandle   the duration in seconds each candle represents
+     * @param containerWidth     the width property of the parent node that contains the chart
+     * @param containerHeight    the height property of the parent node that contains the chart
+     */
+    CandleStickChart(Exchange exchange, CandleDataSupplier candleDataSupplier, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
-                     ObservableNumberValue containerHeight) throws IOException {
-        logger.debug(String.valueOf(this));
+                     ObservableNumberValue containerHeight, String telegramBotToken) throws IOException, TelegramApiException, InterruptedException, ParseException {
         Objects.requireNonNull(exchange);
         Objects.requireNonNull(candleDataSupplier);
-        this.tradePair = tradePair;
+        Objects.requireNonNull(tradePair);
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
         if (!Platform.isFxApplicationThread()) {
-            throw new IllegalArgumentException("CandleStickChart must be constructed on the JavaFX Application Thread but was called from %s".formatted(Thread.currentThread()));
+            throw new IllegalArgumentException("CandleStickChart must be constructed on the JavaFX Application " +
+                    "Thread but was called from \"" + Thread.currentThread() + "\".");
         }
+
+        autoTrading = true;
+        this.telegramBot = new TelegramClient(telegramBotToken);
+        this.chatId = telegramBot.getChatId();
+        this.chartOptions = new CandleStickChartOptions();
         this.exchange = exchange;
-
-
+        this.tradePair = tradePair;
         this.secondsPerCandle = secondsPerCandle;
         this.liveSyncing = liveSyncing;
-        zoomLevelMap = new ConcurrentHashMap<>();
+        this.zoomLevelMap = new ConcurrentHashMap<>();
+
+
+        this.candleDataSupplier = candleDataSupplier;
         candleDataPager = new CandleDataPager(this, candleDataSupplier);
         data = Collections.synchronizedNavigableMap(new TreeMap<>(Integer::compare));
-        try {
-            for (CandleData candleData : candleDataSupplier.get().get()) {
-                data.put(data.size(), candleData);
-            }
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
-        chartOptions = new CandleStickChartOptions();
-        canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 15);
 
+
+
+
+        chartOptions = new CandleStickChartOptions();
+        canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 11);
         progressIndicator = new ProgressIndicator(-1);
         getStyleClass().add("candle-chart");
-        xAxis = new StableTicksAxis(
-                0,
-                secondsPerCandle
-        );
-        yAxis = new StableTicksAxis(0, 1000000);
-        yAxis.setSide(Side.RIGHT);
-        extraAxis = new StableTicksAxis(0, 1000000);
+        xAxis = new StableTicksAxis();
+        yAxis = new StableTicksAxis();
+        extraAxis = new StableTicksAxis();
         xAxis.setAnimated(false);
         yAxis.setAnimated(false);
         extraAxis.setAnimated(false);
         xAxis.setAutoRanging(false);
-        xAxis.setForceZeroInRange(false);
         yAxis.setAutoRanging(false);
-        xAxis.setForceZeroInRange(false);
         extraAxis.setAutoRanging(false);
         xAxis.setSide(Side.BOTTOM);
+        yAxis.setSide(Side.RIGHT);
         extraAxis.setSide(Side.LEFT);
         xAxis.setForceZeroInRange(false);
         yAxis.setForceZeroInRange(false);
-        xAxis.setTickLabelFormatter(
-                new InstantAxisFormatter(formatter)
-        );
-        xAxis.setForceZeroInRange(true);
+        updateXAxisFormat(secondsPerCandle, ZoneId.systemDefault());
         yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
-        yAxis.setForceZeroInRange(true);
-
         extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getBaseCurrency()));
-        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 14);
+        Font axisFont = Font.font(FXUtils.getMonospacedFont(), 15);
         yAxis.setTickLabelFont(axisFont);
         xAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
-        Text loadingText = new Text("");
-        loadingText.setFill(Color.BLUE);
-
-        VBox loadingIndicatorContainer = new VBox(progressIndicator);
-        loadingIndicatorContainer.setPadding(new Insets(20));
-        loadingIndicatorContainer.setAlignment(Pos.CENTER);
+        VBox loadingIndicatorContainer = new VBox(progressIndLbl, progressIndicator);
         progressIndicator.setPrefSize(40, 40);
+        progressIndLbl.setText("Loading market data " + tradePair.toString('/') + " ...");
         loadingIndicatorContainer.setAlignment(Pos.CENTER);
         loadingIndicatorContainer.setMouseTransparent(true);
-        loadingText.setFont(axisFont);
-        loadingText.setFill(Color.WHITE);
-        loadingText.setMouseTransparent(true);
 
         // We want to extend the extra axis (volume) visually so that it encloses the chart area.
         extraAxisExtension = new Line();
-
-        Paint lineColor = Color.rgb(95, 195, 195);
+        Paint lineColor = Color.rgb(15, 195, 195);
         extraAxisExtension.setFill(lineColor);
         extraAxisExtension.setStroke(lineColor);
         extraAxisExtension.setSmooth(false);
-        extraAxisExtension.setStrokeWidth(2);
+        extraAxisExtension.setStrokeWidth(1);
 
-        extraAxisExtension.setStartX(0);
-        extraAxisExtension.setStartY(0);
-        extraAxisExtension.setEndX(0);
-        extraAxisExtension.setEndY(chartHeight);
-        extraAxisExtension.setStrokeWidth(2);
-
-        if (liveSyncing) {
-            inProgressCandle = new InProgressCandle();
-            updateInProgressCandleTask = new UpdateInProgressCandleTask();
-            updateInProgressCandleExecutor = Executors.newSingleThreadScheduledExecutor(
-                    new LogOnExceptionThreadFactory("UPDATE-CURRENT-CANDLE"));
-
-            CompletableFuture.runAsync(() -> {
-                boolean websocketInitialized = false;
-                try {
-                    websocketInitialized = exchange.getWebsocketClient().getInitializationLatch().await(
-                            10, SECONDS);
-                } catch (InterruptedException ex) {
-                    logger.error("Interrupted while waiting for websocket client to be initialized: ", ex);
-                }
-
-                if (!websocketInitialized) {
-                    logger.error("websocket client: " + exchange.getWebsocketClient().getURI().getHost() +
-                            " was not initialized after 10 seconds");
-                } else {
-                    if (exchange.getWebsocketClient().supportsStreamingTrades(tradePair)) {
-                        exchange.getWebsocketClient().streamLiveTrades(tradePair, updateInProgressCandleTask);
-                    }
-
-                    updateInProgressCandleExecutor.scheduleAtFixedRate(updateInProgressCandleTask, 5, 5, SECONDS);
-                }
-            });
-        } else {
-            inProgressCandle = null;
-            updateInProgressCandleTask = null;
-            updateInProgressCandleExecutor = null;
-        }
+        getChildren().addAll(xAxis, yAxis, extraAxis, extraAxisExtension);
         BooleanProperty gotFirstSize = new SimpleBooleanProperty(false);
-        final ChangeListener<Number> sizeListener = new SizeChangeListener(gotFirstSize, containerWidth,
-                containerHeight);
+        final ChangeListener<Number> sizeListener = new SizeChangeListener(gotFirstSize, containerWidth, containerHeight);
         containerWidth.addListener(sizeListener);
         containerHeight.addListener(sizeListener);
 
-
-
-
-
-
-
+        candlePageConsumer = new CandlePageConsumer();
+        mouseDraggedHandler = new MouseDraggedHandler();
+        scrollHandler = new ScrollEventHandler();
+        keyHandler = new KeyEventHandler();
 
         // When the application starts up and tries to initialize a candle stick chart the size can
         // fluctuate. So we wait to get the "final" size before laying out the chart. After we get
@@ -285,267 +261,513 @@ public class CandleStickChart extends Region {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
                 double numberOfVisibleWholeCandles = Math.floor(containerWidth.getValue().doubleValue() / candleWidth);
-                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 60 + ((double) candleWidth / 2);
+                chartWidth = (numberOfVisibleWholeCandles * candleWidth) - 60 + (((double) candleWidth) / 2);
                 chartWidth = (Math.floor(containerWidth.getValue().doubleValue() / candleWidth) * candleWidth) - 60 +
-                        ((double) candleWidth / 2);
+                        ((double) (candleWidth) / 2);
                 chartHeight = containerHeight.getValue().doubleValue();
                 canvas = new Canvas(chartWidth - 100, chartHeight - 100);
-
-                canvas.setLayoutY(
-                        (containerHeight.getValue().doubleValue() - chartHeight) / 2);
-                canvas.setLayoutX((containerWidth.getValue().doubleValue() - chartWidth) / 2);
-                canvas.widthProperty().addListener(sizeListener);
-                canvas.heightProperty().addListener(sizeListener);
-                extraAxisExtension.setTranslateX(-chartWidth + 37.8 + 70);
-                extraAxis.setTranslateX(-chartWidth + 37.8 + 10);
-                yAxis.setTranslateX(chartWidth - 37.8);
+                currZoomLevel = new ZoomLevel(0, candleWidth, secondsPerCandle, canvas.widthProperty(), new InstantAxisFormatter(DateTimeFormatter.ISO_INSTANT), candleWidth);
                 StackPane chartStackPane = new StackPane(canvas, loadingIndicatorContainer);
                 chartStackPane.setTranslateX(64); // Only necessary when wrapped in StackPane...why?
                 getChildren().addFirst(chartStackPane);
+
+                graphicsContext = canvas.getGraphicsContext2D();
+                layoutChart();
+
+
+                initWebSocket();
+                CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(
+                        candleDataPager.getCandleDataPreProcessor());
+
+
                 canvas.setOnMouseEntered(_ -> canvas.getScene().setCursor(Cursor.HAND));
                 canvas.setOnMouseExited(_ -> canvas.getScene().setCursor(Cursor.DEFAULT));
 
-
-                layoutChart();
-
-                CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(candleDataPager.getCandleDataPreProcessor());
-
-                drawChart();
-
-
-// Zoom Handling (Mouse Scroll)
-                canvas.setOnScroll(event -> {
-                    double zoomAmount = event.getDeltaY() > 0 ? 1.1 : 0.9;
-                    zoomFactor *= zoomAmount;
-                    zoomFactor = Math.max(0.5, Math.min(3, zoomFactor));  // Limit zoom range
-                    drawChart();
+                AtomicBoolean isDragging = new AtomicBoolean(false);
+                canvas.setOnMousePressed(event -> {
+                    isDragging.set(true);
+                    canvas.getScene().setCursor(Cursor.CLOSED_HAND);
+                    event.consume();
                 });
 
-// Panning (Dragging)
-                canvas.setOnMousePressed(event -> mousePrevX = event.getX());
                 canvas.setOnMouseDragged(event -> {
-                    double dx = event.getX() - mousePrevX;
-                    mousePrevX = event.getX();
-                    panOffset -= dx / canvas.getWidth();
-                    panOffset = Math.max(0, Math.min(1, panOffset));  // Keep within bounds
-                    drawChart();
-                });
-
-                // Toolbar Buttons
-                Button panLeftBtn = new Button("←");
-                panLeftBtn.setOnAction(e -> panX -= 20);
-
-                Button panRightBtn = new Button("→");
-                panRightBtn.setOnAction(e -> panX += 20);
-
-                Button panUpBtn = new Button("↑");
-                panUpBtn.setOnAction(e -> panY -= 20);
-
-                Button panDownBtn = new Button("↓");
-                panDownBtn.setOnAction(e -> panY += 20);
-
-                Button toggleGridBtn = new Button("Toggle Grid");
-                toggleGridBtn.setOnAction(e -> {
-                    showGrid = !showGrid;
-                    drawChart();
-                });
-
-                ToolBar toolbar = new ToolBar(zoomInBtn, zoomOutBtn, panLeftBtn, panRightBtn, panUpBtn, panDownBtn, toggleGridBtn);
-
-                toolbar.setTranslateX(500);
-                getChildren().addAll(toolbar);
-// Toggle Grid with KeyPress
-                canvas.setOnKeyPressed(event -> {
-                    if (event.getCode() == KeyCode.G) {
-                        showGrid = !showGrid;
-                        drawChart();
+                    if (isDragging.get()) {
+                        canvas.getScene().setCursor(Cursor.HAND);
+                        mouseDraggedHandler.handle(event);
                     }
                 });
-                // Event Listeners
-                canvas.setOnScroll(this::handleZoom);
-                canvas.setOnKeyPressed(e -> handleKeyPress(e.getCode()));
+
+                canvas.setOnMouseReleased(event -> {
+                    isDragging.set(false);
+                    canvas.getScene().setCursor(Cursor.DEFAULT);
+                    event.consume();
+                });
+
+                canvas.setOnKeyPressed(keyHandler);
+                initializeEventHandlers();
+                initializeMomentumScrolling(); // Enable momentum scrolling
+
 
                 gotFirstSize.removeListener(this);
-            }
-
-            private void handleZoom(@NotNull ScrollEvent event) {
-
-                if (event.getDeltaY() > 0) {
-
-                    changeZoom(ZoomDirection.IN);
-                } else {
-                    changeZoom(ZoomDirection.OUT);
-                }
             }
         };
 
         gotFirstSize.addListener(gotFirstSizeChangeListener);
 
-        zoomOutBtn.setOnAction(e -> changeZoom(ZoomDirection.IN));
-
-        zoomInBtn.setOnAction(e -> changeZoom(ZoomDirection.OUT));
-        // Layout
-
-
-        getChildren().addAll(xAxis, yAxis, extraAxis, extraAxisExtension);
+        chartOptions.horizontalGridLinesVisibleProperty().addListener((_, _, _) ->
+                drawChartContents());
+        chartOptions.verticalGridLinesVisibleProperty().addListener((_, _, _) ->
+                drawChartContents());
+        chartOptions.showVolumeProperty().addListener((_, _, _) -> drawChartContents());
+        chartOptions.alignOpenCloseProperty().addListener((_, _, _) -> drawChartContents());
 
 
     }
 
-    private void handleKeyPress(KeyCode key) {
+    private void initWebSocket() {
 
-        ZoomDirection zoomDirection = ZoomDirection.values()[key.ordinal()];
-        switch (key) {
 
-            case LEFT -> panX -= 20;
-            case RIGHT -> panX += 20;
-            case UP -> panY -= 20;
-            case DOWN -> panY += 20;
+        inProgressCandle = new InProgressCandle();
+        updateInProgressCandleTask = new UpdateInProgressCandleTask(exchange, secondsPerCandle, tradePair, data);
+        updateInProgressCandleExecutor = Executors.newSingleThreadScheduledExecutor(
+                new LogOnExceptionThreadFactory("UPDATE-CURRENT-CANDLE"));
 
-            case PLUS, EQUALS, MINUS -> changeZoom(zoomDirection);
-            case G -> showGrid = !showGrid;
-        }
-        drawChart();
-    }
+        CompletableFuture.runAsync(() -> {
+            boolean websocketInitialized = true;
 
-    public void updateChart(List<CandleData> newCandles) {
-        Platform.runLater(() -> {
-            for (CandleData candle : newCandles) {
-                data.put(candle.getOpenTime(), candle);
-                SIGNAL signal = tradingAI.getSignal(
-                        candle.getOpenPrice(), candle.getHighPrice(),
-                        candle.getLowPrice(), candle.getClosePrice(), candle.getVolume()
-                );
-                candle.setSignal(signal);
+
+            try {
+                prices = exchange.fetchRecentTradesUntil(tradePair, Instant.now()).get();
+                prices1 = exchange.fetchOrderBook(tradePair).get();
+
+                if (!exchange.getWebsocketClient().getInitializationLatch().await(
+                        10, SECONDS)) {
+                    websocketInitialized = false;
+                } else {
+                    if (exchange.getWebsocketClient().supportsStreamingTrades(tradePair)) {
+                        exchange.getWebsocketClient().streamLiveTrades(tradePair, updateInProgressCandleTask);
+                    }
+                }
+
+
+                ArrayList<Attribute> attributes = new ArrayList<>();
+                attributes.add(new Attribute("open"));
+                attributes.add(new Attribute("high"));
+                attributes.add(new Attribute("low"));
+                attributes.add(new Attribute("close"));
+                attributes.add(new Attribute("volume"));
+
+                // Class Attribute (BUY, SELL, HOLD)
+                ArrayList<String> classValues = new ArrayList<>();
+                classValues.add("HOLD");
+                classValues.add("BUY");
+                classValues.add("SELL");
+                attributes.add(new Attribute("class", classValues));
+
+                // Create an empty dataset
+                Instances trainingData = new Instances("MarketData", attributes, 0);
+                trainingData.setClassIndex(attributes.size() - 1);
+
+                // Generate some sample data
+                for (int i = 0; i < 100; i++) {
+                    DenseInstance instance = new DenseInstance(attributes.size());
+                    instance.setDataset(trainingData);
+                    instance.setValue(attributes.get(0), Math.random() * 100 + 100); // Open
+                    instance.setValue(attributes.get(1), Math.random() * 100 + 150); // High
+                    instance.setValue(attributes.get(2), Math.random() * 100 + 50);  // Low
+                    instance.setValue(attributes.get(3), Math.random() * 100 + 100); // Close
+                    instance.setValue(attributes.get(4), Math.random() * 1000);      // Volume
+                    instance.setValue(attributes.get(5), (int) (Math.random() * 3)); // Class (BUY, SELL, HOLD)
+
+                    trainingData.add(instance);
+                }
+
+                // Train the AI model
+                TradingAI tradingAI = new TradingAI(trainingData);
+                tradingAI.trainModel();
+                SIGNAL signal = tradingAI.getMovingAverageSignal(prices1, prices.stream().findFirst().get().getPrice());
+
+
+                if (autoTrading) executeTrade(signal);
+
+
+            } catch (InterruptedException | ExecutionException | InvalidKeyException | NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
             }
-            drawChart();
-        });
-    }
-
-    private void drawChart() {
 
 
-        graphicsContext.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        graphicsContext.setFill(Color.BLACK);
-        graphicsContext.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
-
-        if (showGrid) drawGrid();
-
-        drawChartContents(); // Call the modular functio
-        if (showTrades) drawTradeMarkers();
-    }
-
-    private void drawGrid() {
-
-        graphicsContext.setStroke(Color.DARKGRAY);
-        graphicsContext.setLineWidth(0.5);
-        double chartWidth = canvas.getWidth();
-        double chartHeight = canvas.getHeight();
-        // X-Axis (Time-Based Grid)
-        double timeStep = 10 * zoomFactor; // Dynamic spacing based on zoom
-        for (double x = xAxis.getMax() % timeStep; x < chartWidth; x += timeStep) {
-            graphicsContext.strokeLine(x, 0, x, chartHeight);
-        }
-        xAxis.setTickLabelGap(timeStep);
-        xAxis.setUpperBound(chartHeight * timeStep);
-        // Y-Axis (Price-Based Grid)
-        double maxPrice = data.values().stream().mapToDouble(CandleData::getHighPrice).max().orElse(1);
-        double minPrice = data.values().stream().mapToDouble(CandleData::getLowPrice).min().orElse(0);
-        double priceStep = (maxPrice - minPrice) / 10; // 10 horizontal divisions
-
-        yAxis.setUpperBound(chartHeight * priceStep);
-        yAxis.setTickLabelGap(priceStep);
-        for (double price = minPrice; price <= maxPrice; price += priceStep) {
-            double y = mapPriceToY(price, minPrice, maxPrice - minPrice);
-            graphicsContext.strokeLine(0, y, chartWidth, y);
-        }
-    }
-
-    // Function to map price to screen Y-coordinate
-    private double mapPriceToY(double price, double minPrice, double priceRange) {
-        return canvas.getHeight() - ((price - minPrice) / priceRange * canvas.getHeight());
-    }
-
-
-    private void drawCandles(CandleData candle, int candleIndex, double halfCandleWidth, double pixelsPerMonetaryUnit, double lastClose) {
-        if (data.isEmpty()) {
-            graphicsContext.strokeText(
-                    "NO DATA FOUND!",
-                    canvas.getWidth() / 2, canvas.getHeight() / 2
-            );
-            return;
-        }
-
-        candleWidth = (int) (2 * halfCandleWidth);
-
-        // **Ensure Latest Data is Displayed First**
-        List<CandleData> candleList = new ArrayList<>(data.values());
-        Collections.reverse(candleList); // Newest candles appear first
-
-        // **Determine Price Range for Scaling**
-        double maxPrice = candleList.stream().mapToDouble(CandleData::getHighPrice).max().orElse(100);
-        double minPrice = candleList.stream().mapToDouble(CandleData::getLowPrice).min().orElse(0);
-        double pixelsPerUnit = canvas.getHeight() / (maxPrice - minPrice);
-
-        // **Align X-Axis: Most Recent on Right, Scroll Left for Older Data**
-        double x = canvas.getWidth() - ((candleIndex + 1) * candleWidth);
-
-        // **Candle Properties**
-        boolean isBullish = candle.getClosePrice() >= candle.getOpenPrice();
-        Color candleColor = isBullish ? Color.GREEN : Color.RED;
-
-        // **Map Prices to Screen Coordinates**
-        double openY = (maxPrice - candle.getOpenPrice()) * pixelsPerUnit;
-        double closeY = (maxPrice - candle.getClosePrice()) * pixelsPerUnit;
-        double highY = (maxPrice - candle.getHighPrice()) * pixelsPerUnit;
-        double lowY = (maxPrice - candle.getLowPrice()) * pixelsPerUnit;
-
-        // **Draw Candle Wick**
-        graphicsContext.setStroke(candleColor);
-        graphicsContext.setLineWidth(2);
-        graphicsContext.strokeLine(x + halfCandleWidth, highY, x + halfCandleWidth, lowY);
-
-        // **Draw Candle Body**
-        graphicsContext.setFill(candleColor);
-        graphicsContext.fillRect(x, Math.min(openY, closeY), candleWidth - 1, Math.abs(openY - closeY));
-
-        // **Draw Trading Signals (Optional)**
-        if (candle.getSignal() == SIGNAL.BUY) {
-            graphicsContext.setFill(Color.YELLOW);
-            graphicsContext.fillText("BUY", x, lowY - 5);
-        } else if (candle.getSignal() == SIGNAL.SELL) {
-            graphicsContext.setFill(Color.PURPLE);
-            graphicsContext.fillText("SELL", x, highY + 15);
-        }
-
-
-    }
-
-
-    private void drawTradeMarkers() {
-
-        graphicsContext.setFill(Color.WHITE);
-        graphicsContext.setFont(new Font(12));
-
-        if (currentCandleTrades == null) return;
-        for (Trade trade : currentCandleTrades) {
-            double priceY = (data.lastEntry().getValue().getHighPrice() - trade.getPrice()) * 10;
-            double x = canvas.getWidth() - 50;
-
-            if (trade.getTransactionType() == BUY) {
-                graphicsContext.setFill(Color.GREEN);
-                graphicsContext.fillText("BUY", x, priceY);
+            if (!websocketInitialized) {
+                logger.error("websocket client: {} was not initialized after 10 seconds", exchange.getWebsocketClient().getUri().getHost());
             } else {
-                graphicsContext.setFill(Color.RED);
-                graphicsContext.fillText("SELL", x, priceY);
+                if (exchange.getWebsocketClient().supportsStreamingTrades(tradePair)) {
+                    exchange.getWebsocketClient().streamLiveTrades(tradePair, updateInProgressCandleTask);
+                }
+
+                updateInProgressCandleExecutor.scheduleAtFixedRate(updateInProgressCandleTask, 5, 10, SECONDS);
+
+
             }
+            trainAIWithHistoricalData();
+        });
+
+    }
+
+    private void trainAIWithHistoricalData() {
+        try {
+            // Fetch historical market data
+            List<CandleData> historicalData = new ArrayList<>(data.values());// Example: 500 candles
+
+            // Define attributes
+            ArrayList<Attribute> attributes = new ArrayList<>();
+            attributes.add(new Attribute("open"));
+            attributes.add(new Attribute("high"));
+            attributes.add(new Attribute("low"));
+            attributes.add(new Attribute("close"));
+            attributes.add(new Attribute("volume"));
+
+            // Define class labels
+            ArrayList<String> classValues = new ArrayList<>();
+            classValues.add("HOLD");
+            classValues.add("BUY");
+            classValues.add("SELL");
+            attributes.add(new Attribute("class", classValues));
+
+            // Create training dataset
+            Instances trainingData = new Instances("MarketData", attributes, 0);
+            trainingData.setClassIndex(attributes.size() - 1);
+
+            // Populate dataset with historical data
+            for (CandleData candle : historicalData) {
+                DenseInstance instance = new DenseInstance(attributes.size());
+                instance.setDataset(trainingData);
+                instance.setValue(attributes.get(0), candle.getOpenPrice());
+                instance.setValue(attributes.get(1), candle.getHighPrice());
+                instance.setValue(attributes.get(2), candle.getLowPrice());
+                instance.setValue(attributes.get(3), candle.getClosePrice());
+                instance.setValue(attributes.get(4), candle.getVolume());
+
+                // Assign class label based on simple strategy (e.g., breakout trading)
+                String signal = determineSignal(candle);
+                instance.setValue(attributes.get(5), classValues.indexOf(signal));
+
+                trainingData.add(instance);
+            }
+
+            // Train AI model
+            TradingAI tradingAI = new TradingAI(trainingData);
+            tradingAI.trainModel();
+            logger.info("AI Model successfully trained with historical market data.");
+
+        } catch (Exception e) {
+            logger.error("Error training AI with historical data: ", e);
+        }
+    }
+
+    private void sendTelegramAlert(String message) {
+        try {
+            TelegramClient.sendMessage(chatId, "📈 Trade Alert: " + message);
+            logger.info("Telegram Alert Sent: {}", message);
+        } catch (Exception e) {
+            logger.error("Failed to send Telegram alert: ", e);
+        }
+    }
+
+    private void executeTrade(SIGNAL signal) {
+        try {
+            // Fetch live bid/ask prices
+
+            double price = prices1.stream().toList().getFirst().getAskEntries().getFirst().getPrice();// Execute at bid price
+
+            // Trade execution parameters
+            double amount = 0.02;  // Lot size
+            double stopLoss = price * 0.99;  // 1% SL
+            double takeProfit = price * 1.02; // 2% TP
+
+            // Check if trade already exists to prevent duplication
+            if (tradeHistory.stream().toList().stream().map(c -> c.tradePair).toList().getLast() == tradePair && tradeHistory.getFirst().getSignal() == signal) {
+                logger.info("Skipping duplicate {} trade for {}", signal, tradePair);
+                return;
+            }
+
+            switch (signal) {
+                case BUY -> {
+                    exchange.createOrder(tradePair, BUY, ENUM_ORDER_TYPE.STOP_LOSS, price, amount, new Date(), stopLoss, takeProfit);
+                    sendTelegramAlert("BUY order executed at $" + price);
+                }
+                case SELL -> {
+                    exchange.createOrder(tradePair, SELL, ENUM_ORDER_TYPE.STOP_LOSS, price, amount, new Date(), stopLoss, takeProfit);
+                    sendTelegramAlert("SELL order executed at $" + price);
+                }
+                default -> {
+                    logger.info("No trade executed.");
+                    sendTelegramAlert(
+                            "No trade executed for " + tradePair + ". Current price: $" + price
+                    );
+                }
+            }
+
+            // Store trade signal to prevent unnecessary repeats
+            tradeHistory.getFirst().put(tradePair, signal);
+
+        } catch (Exception e) {
+            logger.error("Trade execution failed: ", e);
+            sendTelegramAlert(
+                    "Failed to execute trade for " + tradePair + ". Error: " + e.getMessage()
+            );
+        }
+    }
+
+    // Define a simple trading signal for training labels
+    private @NotNull String determineSignal(@NotNull CandleData candle) {
+        double momentum = candle.getClosePrice() - candle.getOpenPrice();
+        if (momentum > 5) return "BUY";  // Example condition
+        if (momentum < -5) return "SELL";
+        return "HOLD";
+    }
+
+    private void updateXAxisFormat(int secondsPerCandle, ZoneId timeZone) {
+
+
+        if (secondsPerCandle <= 60) {
+            // 1-minute and below (Intraday Trading)
+
+            formatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(timeZone);
+        } else if (secondsPerCandle <= 14400) {
+            // 1-minute to 4-hour timeframe
+
+            formatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm").withZone(timeZone);
+        } else if (secondsPerCandle <= 86400) {
+            // Daily timeframe
+            formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy").withZone(timeZone);
+        } else {
+            // Weekly, Monthly, or higher
+            formatter = DateTimeFormatter.ofPattern("MMM yyyy").withZone(timeZone);
+        }
+
+        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(formatter));
+    }
+
+    private void initializeEventHandlers() {
+        if (canvas.getParent() != null) {
+            addEventFilters(canvas.getParent());
+        } else {
+            canvas.parentProperty().addListener((_, _, newValue) -> {
+                if (newValue != null) {
+                    addEventFilters(newValue);
+                }
+            });
         }
 
     }
 
     /**
+     * Adds event filters to the parent container of the canvas.
+     */
+    private void addEventFilters(@NotNull Parent parent) {
+        parent.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+            mousePrevX = -1;
+            mousePrevY = -1;
+        });
+
+        parent.addEventFilter(MouseEvent.MOUSE_DRAGGED, mouseDraggedHandler);
+        parent.addEventFilter(ScrollEvent.SCROLL, scrollHandler);
+        parent.addEventFilter(KeyEvent.KEY_PRESSED, keyHandler);
+
+        // 🚀 New Features
+        parent.addEventFilter(MouseEvent.MOUSE_CLICKED, this::handleMouseClick);
+        parent.addEventFilter(MouseEvent.MOUSE_MOVED, this::handleMouseMove);
+        parent.addEventFilter(KeyEvent.KEY_RELEASED, this::handleKeyRelease);
+    }
+
+    /**
+     * Handles mouse clicks for double-click zoom reset and right-click context menu.
+     */
+    private void handleMouseClick(@NotNull MouseEvent event) {
+        if (event.getClickCount() == 2) { // Double-click to reset zoom
+            resetZoom();
+        }
+
+        if (event.getButton() == MouseButton.SECONDARY) { // Right-click for context menu
+            showContextMenu(event);
+        }
+    }
+
+    /**
+     * Handles mouse movements to display crosshair or tooltip.
+     */
+    private void handleMouseMove(@NotNull MouseEvent event) {
+        double mouseX = event.getX();
+        double mouseY = event.getY();
+        updateCrosshair(mouseX, mouseY);
+    }
+
+    /**
+     * Handles key releases for additional actions.
+     */
+    private void handleKeyRelease(@NotNull KeyEvent event) {
+        switch (event.getCode()) {
+            case PLUS, ADD -> zoomIn();
+            case MINUS, SUBTRACT -> zoomOut();
+            case LEFT -> moveAlongX(-1);
+            case RIGHT -> moveAlongX(1);
+            case R -> resetZoom();
+        }
+    }
+
+    /**
+     * Resets zoom to the default level.
+     */
+    private void resetZoom() {
+        xAxis.setLowerBound(initialLowerBound);
+        xAxis.setUpperBound(initialUpperBound);
+        setYAndExtraAxisBounds();
+        drawChartContents();
+    }
+
+    /**
+     * Zooms in the chart.
+     */
+    private void zoomIn() {
+        updateChartWithZoom((int) (candleWidth * 0.8), ZoomDirection.IN);
+    }
+
+    /**
+     * Zooms out the chart.
+     */
+    private void zoomOut() {
+        updateChartWithZoom((int) (candleWidth * 1.2), ZoomDirection.OUT);
+    }
+
+    /**
+     * Displays a right-click context menu with options.
+     */
+    private void showContextMenu(@NotNull MouseEvent event) {
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem resetZoomItem = new MenuItem("Reset Zoom");
+        resetZoomItem.setOnAction(e -> resetZoom());
+
+        MenuItem zoomInItem = new MenuItem("Zoom In");
+        zoomInItem.setOnAction(e -> zoomIn());
+
+        MenuItem zoomOutItem = new MenuItem("Zoom Out");
+        zoomOutItem.setOnAction(e -> zoomOut());
+
+        contextMenu.getItems().addAll(resetZoomItem, zoomInItem, zoomOutItem);
+        contextMenu.setAutoHide(true);
+        contextMenu.show(canvas, event.getScreenX(), event.getScreenY());
+        progressIndLbl.setVisible(false);
+
+
+    }
+
+    /**
+     * Updates crosshair position for better UX.
+     */
+    private void updateCrosshair(double x, double y) {
+        graphicsContext.setStroke(Color.GRAY);
+        graphicsContext.setLineWidth(1);
+        graphicsContext.clearRect(0, 0, chartWidth, chartHeight);
+
+
+        graphicsContext.strokeLine(x, 0, x, chartHeight);
+        graphicsContext.strokeLine(0, y, chartWidth, y);
+        drawChartContents();
+    }
+
+    private void moveAlongX(int deltaX) {
+        if (deltaX != 1 && deltaX != -1) {
+            logger.warn("Invalid deltaX value: {}. Allowed values are -1 or 1.", deltaX);
+            return;
+        }
+        adjustXAxisScaling();
+
+        // Check if progress indicator is already visible
+        if (Platform.isFxApplicationThread()) {
+            if (progressIndicator.isVisible()) return;
+        } else {
+            Platform.runLater(() -> {
+                if (progressIndicator.isVisible()) {
+                    progressIndLbl.setVisible(true);
+                    progressIndLbl.setText("Loading...");
+
+                }
+            });
+        }
+
+        int direction = (deltaX == 1) ? 1 : -1;
+        int desiredXLowerBound = (int) xAxis.getLowerBound() + (direction * secondsPerCandle);
+
+        int minCandlesRemaining = Math.max(3, currZoomLevel.getNumVisibleCandles() / 10);
+
+        // Prevent moving too far ahead
+        if (desiredXLowerBound <= data.lastEntry().getValue().getOpenTime() -
+                (minCandlesRemaining - 1) * secondsPerCandle) {
+
+            if (desiredXLowerBound <= currZoomLevel.getMinXValue()) {
+                CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier())
+                        .thenApply(data -> {
+                            try {
+                                if (data == null || data.get().isEmpty()) {
+                                    throw new RuntimeException("Candle data is empty or null.");
+                                }
+                            } catch (InterruptedException | ExecutionException e) {
+                                throw new RuntimeException(e);
+                            }
+                            return data;
+                        })
+                        .thenAccept(candleDataPager.getCandleDataPreProcessor())
+                        .exceptionally(throwable -> {
+                            logger.error("Error loading additional candle data: ", throwable);
+                            Platform.runLater(() -> {
+                                progressIndLbl.setVisible(true);
+                                progressIndLbl.setText("Error: " + throwable.getMessage());
+                            });
+                            return null;
+                        })
+                        .thenRun(() -> Platform.runLater(() -> {
+                            paging = true;
+                            progressIndicator.setVisible(true);
+                            progressIndLbl.setVisible(true);
+
+                            setAxisBoundsForMove(deltaX);
+                            setYAndExtraAxisBounds();
+
+                            progressIndicator.setVisible(false);
+                            progressIndLbl.setVisible(false);
+                            paging = false;
+
+                            drawChartContents();
+                        }));
+            } else {
+                setAxisBoundsForMove(deltaX);
+                setYAndExtraAxisBounds();
+                drawChartContents();
+            }
+        }
+    }
+
+    private void adjustXAxisScaling() {
+        double xAxisRange = xAxis.getUpperBound() - xAxis.getLowerBound();
+
+        // Adjust the boundaries by reducing 10% of the range on both sides
+        double newUpperBound = xAxis.getUpperBound() - (xAxisRange * 0.1);
+        double newLowerBound = xAxis.getLowerBound() + (xAxisRange * 0.1);
+
+        // Ensure the bounds are valid (new lower should be less than new upper)
+        if (newLowerBound < newUpperBound) {
+            xAxis.setUpperBound(newUpperBound);
+            xAxis.setLowerBound(newLowerBound);
+        } else {
+            logger.warn("Invalid xAxis bounds: newLowerBound={} newUpperBound={}", newLowerBound, newUpperBound);
+        }
+
+        logger.info("xAxis adjusted: Lower={} Upper={}", xAxis.getLowerBound(), xAxis.getUpperBound());
+    }
+
+    /**
      * Sets the bounds of the x-axis either one full candle to the right or left, depending on the sign
-     * of deltaX. Currently, the size of deltaX does not matter (each call this method only moves
+     * of deltaX. Currently, the magnitude of deltaX does not matter (each call to this method only moves
      * the duration of one full candle).
      *
      * @param deltaX set the bounds either one candle over to the right or left from the current position
@@ -558,40 +780,49 @@ public class CandleStickChart extends Region {
             xAxis.setUpperBound(xAxis.getUpperBound() - secondsPerCandle);
             xAxis.setLowerBound(xAxis.getLowerBound() - secondsPerCandle);
         } else {
-            throw new IllegalArgumentException("deltaX must be 1 or -1 but was: %d".formatted(deltaX));
+            throw new IllegalArgumentException("deltaX must be 1 or -1 but was: " + deltaX);
         }
     }
 
-    public static void putExtremaForRemainingElements(Map<Integer, Pair<Extrema, Extrema>> extrema,
-                                                      final List<CandleData> candleData) {
-        Objects.requireNonNull(extrema, "extrema map must not be null");
-        Objects.requireNonNull(candleData, "candleData list must not be null");
+    /**
+     * Sets the y-axis and extra axis bounds using only the x-axis lower bound.
+     */
+    private void setYAndExtraAxisBounds() {
+        logger.info("xAxis lower bound: {}", (int) xAxis.getLowerBound());
+        final double idealBufferSpaceMultiplier = 0.35;
+        if (!currZoomLevel.getExtremaForCandleRangeMap().containsKey((int) xAxis.getLowerBound())) {
 
-        if (candleData.isEmpty()) {
-            throw new IllegalArgumentException("candleData must not be empty");
+            // normal chart functioning, and could we handle it more gracefully?
+            logger.info("The extrema map did not contain extrema for x-value: {}", (int) xAxis.getLowerBound());
+            logger.info("extrema map: {}", new TreeMap<>(currZoomLevel.getExtremaForCandleRangeMap()));
+            currZoomLevel.setMinXValue(xAxis.getLowerBound());
         }
 
-        double minVolume = Integer.MAX_VALUE;
-        double maxVolume = Integer.MIN_VALUE;
-        double minPrice = Integer.MAX_VALUE;
-        double maxPrice = Integer.MIN_VALUE;
+        // The y-axis and extra axis extrema are obtained using a key offset by minus one candle duration. This makes
+        // the chart work correctly. I don't fully understand the logic behind it, so I am leaving a note for
+        // my future self.
+        Pair<Extrema, Extrema> extremaForRange = currZoomLevel.getExtremaForCandleRangeMap().get(
+                (int) xAxis.getLowerBound() - secondsPerCandle);
 
-        // Iterate from the last element to the first
-        for (int i = candleData.size() - 1; i >= 0; i--) {
-            CandleData candle = candleData.get(i);
+        if (extremaForRange == null) {
+            logger.error("extremaForRange was null!");
 
-            // Update extrema
-            minVolume = Math.min(candle.getVolume(), minVolume);
-            maxVolume = Math.max(Math.ceil(candle.getVolume()), maxVolume);
-            minPrice = Math.min(candle.getLowPrice(), minPrice);
-            maxPrice = Math.max(Math.ceil(candle.getHighPrice()), maxPrice);
 
-            // Store extrema for this open time
-            extrema.put(candle.getOpenTime(), new Pair<>(
-                    new Extrema(minVolume, maxVolume),
-                    new Extrema(minPrice, maxPrice)
-            ));
+            return;
         }
+
+        Double yAxisMax = extremaForRange.getValue().getMax();
+        Double yAxisMin = extremaForRange.getValue().getMin();
+        final double yAxisDelta = yAxisMax - yAxisMin;
+        yAxis.setUpperBound(yAxisMax + (yAxisDelta * idealBufferSpaceMultiplier));
+        yAxis.setLowerBound(Math.max(0, yAxisMin - (yAxisDelta * idealBufferSpaceMultiplier)));
+
+        extraAxis.setUpperBound(currZoomLevel.getExtremaForCandleRangeMap().get(
+                (int) xAxis.getLowerBound() - secondsPerCandle).getKey().getMax());
+
+        List<CandleData> pair = data.values().stream().toList();
+        Map<Integer, Pair<Extrema, Extrema>> extrema = new HashMap<>();
+        putExtremaForRemainingElements(extrema, pair);
     }
 
     private void layoutChart() {
@@ -600,7 +831,6 @@ public class CandleStickChart extends Region {
         extraAxisExtension.setEndX(chartWidth - 37.5);
         extraAxisExtension.setStartY(0);
         extraAxisExtension.setEndY((chartHeight - 100) * 0.75);
-        graphicsContext = canvas.getGraphicsContext2D();
 
         graphicsContext.setFill(Color.BLACK);
         graphicsContext.fillRect(0, 0, chartWidth - 100, chartHeight - 100);
@@ -611,7 +841,7 @@ public class CandleStickChart extends Region {
 
         // try and work out width and height of axes
         double xAxisWidth;
-        double xAxisHeight = 25; // guess x axis height to start with
+        double xAxisHeight = 25; // guess x-axis height to start with
         double yAxisWidth = 0;
         double yAxisHeight;
         for (int count = 0; count < 3; count++) {
@@ -646,6 +876,10 @@ public class CandleStickChart extends Region {
         yAxis.setLayoutY(top);
         extraAxis.setLayoutX(chartWidth - 38);
         extraAxis.setLayoutY((chartHeight - 100) * 0.75);
+        yAxis.setTranslateX(chartWidth - 38);
+        extraAxis.setTranslateX(-chartWidth + 38);
+        extraAxisExtension.setTranslateX(-chartWidth + 38);
+
         xAxis.requestAxisLayout();
         xAxis.layout();
         yAxis.requestAxisLayout();
@@ -657,355 +891,457 @@ public class CandleStickChart extends Region {
         logger.info("CandleStickChart.layoutChart end");
     }
 
-    /**
-     * Draws the chart contents on the canvas corresponding to the current x-axis, y-axis, and extra (volume) axis bounds.
-     */
     private void drawChartContents() {
-        int lastEntryTime = data.lastEntry().getValue().getOpenTime();
-        int upperBound = (int) xAxis.getUpperBound();
-        int numCandlesToSkip = Math.max((upperBound - lastEntryTime) / secondsPerCandle, 0);
+        int attempts = 0;
 
-        // Optimize live syncing logic
-        if (liveSyncing && inProgressCandleLastDraw != inProgressCandle.getOpenTime()) {
-            if (upperBound >= inProgressCandleLastDraw && upperBound < inProgressCandleLastDraw + (canvas.getWidth() * secondsPerCandle)) {
-                moveAlongX(numCandlesToSkip == 0 ? 1 : 0); // Only move forward if new candle appears
+        while (attempts < MAX_RETRIES) {
+
+
+            if (data != null && !data.isEmpty()) {
+                break;
             }
-            inProgressCandleLastDraw = inProgressCandle.getOpenTime();
+
+            logger.warn("No market data available. Retrying... Attempt {}", attempts + 1);
+            attempts++;
+
+            try {
+                Thread.sleep(RETRY_DELAY_MS); // Wait before retrying
+                List<CandleData> data0 = candleDataPager.getCandleDataSupplier().get().get(); // Replace with the actual method to refresh/retrieve data
+
+                for (CandleData candleData : data0) {
+                    data.put(data.size(), candleData);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.error("Retry interrupted", e);
+                return;
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);
+            }
         }
 
-        double monetaryUnitsPerPixel = (yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight();
-        double pixelsPerMonetaryUnit = 1d / monetaryUnitsPerPixel;
+        if (data == null || data.isEmpty()) {
+            // Display message when no data is available
+            graphicsContext.clearRect(0, 0, chartWidth, chartHeight);
+            graphicsContext.setFill(Color.RED);
+            graphicsContext.setFont(new Font("Arial", 20));
+            graphicsContext.fillText("NO MARKET DATA AVAILABLE", chartWidth / 2 - 100, chartHeight / 2);
+            logger.error("No market data available to draw.");
 
-        if (currZoomLevel == null) {
-            currZoomLevel = new ZoomLevel(0, candleWidth, secondsPerCandle, canvas.widthProperty(), new InstantAxisFormatter(DateTimeFormatter.ISO_INSTANT), monetaryUnitsPerPixel);
         }
 
-        // Get only visible candles
-        int lowerBound = (int) (upperBound - (currZoomLevel.getNumVisibleCandles() * secondsPerCandle));
-        NavigableMap<Integer, CandleData> candlesToDraw = data.subMap(lowerBound, true, upperBound - (numCandlesToSkip * secondsPerCandle), true);
-        logger.info("Drawing " + candlesToDraw.size() + " candles.");
+        // Draw grid lines
+        drawGridLines();
 
-        // Draw Grid Lines (only if visible)
-        if (chartOptions.isHorizontalGridLinesVisible() || chartOptions.isVerticalGridLinesVisible()) {
-            drawGrid();
-        }
 
-        // Initialize candle drawing variables
-        int candleIndex = numCandlesToSkip;
+        // Initialize variables
         double highestCandleValue = Double.MIN_VALUE;
         double lowestCandleValue = Double.MAX_VALUE;
-        int volumeBarMaxHeight = 150;
-        double volumeScale = volumeBarMaxHeight / extraAxis.getUpperBound();
-
-
-        double halfCandleWidth = (double) candleWidth / 2;
+        double halfCandleWidth = candleWidth * 0.5;
         double lastClose = -1;
+        int candleIndex = 0;
 
-        // Iterate through candles efficiently
-        for (CandleData candle : candlesToDraw.descendingMap().values()) {
+        // Ensure latest data is displayed first
+        double pixelsPerMonetaryUnit = 1d / ((yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight());
+        if (xAxis.getLowerBound() >= xAxis.getUpperBound()) {
+            logger.error("Invalid xAxis bounds: Lower={} Upper={}", xAxis.getLowerBound(), xAxis.getUpperBound());
+            return;
+        }
+// Display OHLCV similar to TradingView
+        displayOHLCVInfo(data.lastEntry().getValue());
+
+
+        // Draw candles
+        for (CandleData candle : data.values()) {
             if (candleIndex < currZoomLevel.getNumVisibleCandles() + 2) {
                 highestCandleValue = Math.max(highestCandleValue, candle.getHighPrice());
                 lowestCandleValue = Math.min(lowestCandleValue, candle.getLowPrice());
             }
 
-            //  drawSingleCandle(candle, candleIndex, halfCandleWidth, pixelsPerMonetaryUnit, lastClose);
-            drawCandles(candle, candleIndex, halfCandleWidth, pixelsPerMonetaryUnit, lastClose);
+            drawCandle(candle, candleIndex, halfCandleWidth, pixelsPerMonetaryUnit, lastClose);
             lastClose = candle.getClosePrice();
-
-
             candleIndex++;
         }
 
-        // Adjust Y-Axis Scaling Smoothly
+        // Smooth Y-Axis scaling based on the highest and lowest visible prices
         smoothYAxisScaling(highestCandleValue, lowestCandleValue);
 
-        // Draw bid/ask price lines
-        drawBidAskLines();
-    }
 
-    /**
-     * Smoothly adjusts the Y-axis to prevent excessive zoom-out on price spikes.
-     */
-    private void smoothYAxisScaling(double highest, double lowest) {
-        double currentUpper = yAxis.getUpperBound();
-        double currentLower = yAxis.getLowerBound();
-        double margin = (highest - lowest) * 0.05; // 5% margin for smoother transitions
-
-        double newUpper = highest + margin;
-        double newLower = lowest - margin;
-
-        if (Math.abs(newUpper - currentUpper) > 0.01 || Math.abs(newLower - currentLower) > 0.01) {
-            yAxis.setUpperBound(newUpper);
-            yAxis.setLowerBound(newLower);
-        }
+        logger.info("Chart drawing completed.");
+        // drawChartContents();
     }
 
     /**
      * Draws a single candle on the chart.
      */
-    private void drawSingleCandle(@NotNull CandleData candle, int candleIndex, double halfCandleWidth, double pixelsPerMonetaryUnit, double lastClose) {
-        Paint candleBorderColor;
-        Paint candleFillColor;
-        double candleOpenPrice = candle.getOpenPrice();
-        if (chartOptions.isAlignOpenClose() && lastClose != -1) {
-            candleOpenPrice = lastClose;
+    private void drawCandle(@NotNull CandleData candle, int candleIndex, double halfCandleWidth,
+                            double pixelsPerMonetaryUnit, double lastClose) {
+        boolean isBullish = candle.getClosePrice() >= candle.getOpenPrice();
+        Color candleColor = isBullish ? Color.GREEN : Color.RED;
+
+        double x = canvas.getWidth() - ((candleIndex + 1) * candleWidth);
+        double openY = cartesianToScreenCords((candle.getOpenPrice() - yAxis.getLowerBound()) * pixelsPerMonetaryUnit);
+        double closeY = cartesianToScreenCords((candle.getClosePrice() - yAxis.getLowerBound()) * pixelsPerMonetaryUnit);
+        double highY = cartesianToScreenCords((candle.getHighPrice() - yAxis.getLowerBound()) * pixelsPerMonetaryUnit);
+        double lowY = cartesianToScreenCords((candle.getLowPrice() - yAxis.getLowerBound()) * pixelsPerMonetaryUnit);
+
+        // Draw wick (high to low)
+        graphicsContext.setStroke(candleColor);
+        graphicsContext.setLineWidth(2);
+        graphicsContext.strokeLine(x + halfCandleWidth, highY, x + halfCandleWidth, lowY);
+
+        // Draw candle body
+        graphicsContext.setFill(candleColor);
+        graphicsContext.fillRect(x, Math.min(openY, closeY), candleWidth - 1, Math.abs(openY - closeY));
+
+        // Draw volume bar
+        if (!chartOptions.isShowVolume()) {
+            double volumeHeight = (candle.getVolume() / extraAxis.getUpperBound()) * 100;
+            double volumeY = canvas.getHeight() - volumeHeight;
+            graphicsContext.setFill(candleColor);
+            graphicsContext.fillRect(x, volumeY, candleWidth - 1, volumeHeight);
+        }
+        // Draw open/close lines
+        if (chartOptions.isAlignOpenClose()) {
+            graphicsContext.setStroke(Color.BLACK);
+            graphicsContext.setLineWidth(1);
+            graphicsContext.strokeLine(x, openY, x, closeY);
+        }
+        // Draw candle border
+        graphicsContext.setStroke(Color.BLACK);
+        graphicsContext.setLineWidth(1);
+        graphicsContext.strokeRect(x, Math.min(openY, closeY), candleWidth - 1, Math.abs(openY - closeY));
+
+
+        // Draw candle label
+        if (candleIndex >= currZoomLevel.getNumVisibleCandles() && candleIndex < currZoomLevel.getNumVisibleCandles() + 2) {
+            double labelX = x + halfCandleWidth - 10;
+            double labelY = (openY + closeY) / 2;
+            graphicsContext.setFill(Color.BLACK);
+            graphicsContext.setFont(new Font("Arial", 10));
+            graphicsContext.fillText(String.format("%.2f", candle.getClosePrice()), labelX, labelY - 5);
         }
 
-        boolean openAboveClose = candleOpenPrice > candle.getClosePrice();
-        candleBorderColor = openAboveClose ? BEAR_CANDLE_BORDER_COLOR : BULL_CANDLE_BORDER_COLOR;
-        candleFillColor = openAboveClose ? BEAR_CANDLE_FILL_COLOR : BULL_CANDLE_FILL_COLOR;
-
-        double candleYOrigin = cartesianToScreenCoords((openAboveClose ? candleOpenPrice : candle.getClosePrice()) - yAxis.getLowerBound()) * pixelsPerMonetaryUnit;
-        double candleHeight = Math.abs(candleOpenPrice - candle.getClosePrice()) * pixelsPerMonetaryUnit;
-
-        // Draw the candle body
-        graphicsContext.setFill(candleFillColor);
-        graphicsContext.fillRect(canvas.getWidth() - (candleIndex * candleWidth), candleYOrigin, candleWidth - 2, candleHeight);
-        graphicsContext.setStroke(candleBorderColor);
-        graphicsContext.strokeRect(canvas.getWidth() - (candleIndex * candleWidth), candleYOrigin, candleWidth - 2, candleHeight);
-
-        // Draw wicks
-        double candleHighValue = cartesianToScreenCoords((candle.getHighPrice() - yAxis.getLowerBound()) * pixelsPerMonetaryUnit);
-        double candleLowValue = cartesianToScreenCoords((candle.getLowPrice() - yAxis.getLowerBound()) * pixelsPerMonetaryUnit);
-        graphicsContext.setStroke(candleBorderColor);
-        graphicsContext.strokeLine(canvas.getWidth() - (candleIndex * candleWidth) + halfCandleWidth, candleYOrigin, canvas.getWidth() - (candleIndex * candleWidth) + halfCandleWidth, candleHighValue);
-        graphicsContext.strokeLine(canvas.getWidth() - (candleIndex * candleWidth) + halfCandleWidth, candleYOrigin + candleHeight, canvas.getWidth() - (candleIndex * candleWidth) + halfCandleWidth, candleLowValue);
+        try {
+            drawBidAskLines();
+        } catch (ExecutionException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
-     * Draws the live market price lines for bid and ask.
+     * Draws bid/ask price lines on the chart.
      */
-    private void drawBidAskLines() {
-        Random random = new Random();
+    private void drawBidAskLines() throws ExecutionException, InterruptedException {
 
 
-        double bidPrice = data.lastEntry().getValue().getClosePrice() - random.nextDouble() * 0.05;
-        double askPrice = data.lastEntry().getValue().getClosePrice() + random.nextDouble() * 0.05;
+        if (prices == null) return;
 
-        double bidY = cartesianToScreenCoords((bidPrice - yAxis.getLowerBound()) * (1d / ((yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight())));
-        double askY = cartesianToScreenCoords((askPrice - yAxis.getLowerBound()) * (1d / ((yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight())));
+        List<Double> bidPrice = Collections.singletonList(prices.stream().toList().getFirst().getPrice());
+        List<Double> askPrice = Collections.singletonList(prices.stream().toList().getFirst().getPrice());
 
-        graphicsContext.setStroke(Color.WHITE);
-        graphicsContext.setLineWidth(1.5);
+        double bidY = cartesianToScreenCords((bidPrice.getLast() - yAxis.getLowerBound()) *
+                (1d / ((yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight())));
+        double askY = cartesianToScreenCords((askPrice.getLast() - 0.01 - yAxis.getLowerBound()) *
+                (1d / ((yAxis.getUpperBound() - yAxis.getLowerBound()) / canvas.getHeight())));
+
+        graphicsContext.setStroke(Color.BLUE);
+        graphicsContext.setLineWidth(1);
         graphicsContext.strokeLine(0, bidY, canvas.getWidth(), bidY);
-        graphicsContext.strokeText("BID: " + String.format("%.5f", bidPrice), 10, bidY - 5);
+        graphicsContext.fillText("Bid: " + bidPrice, 10, bidY - 5);
 
-        graphicsContext.setStroke(Color.YELLOW);
-        graphicsContext.setLineWidth(1.5);
+        graphicsContext.setStroke(Color.RED);
         graphicsContext.strokeLine(0, askY, canvas.getWidth(), askY);
-        graphicsContext.strokeText("ASK: " + String.format("%.5f", askPrice), 10, askY - 5);
+        graphicsContext.fillText("Ask: " + askPrice, 10, askY - 5);
     }
 
+    /**
+     * Smoothly adjusts the Y-axis scaling based on the highest and lowest visible prices.
+     * Ensures price action remains visible and prevents sudden jumps in scaling.
+     *
+     * @param highestCandleValue The highest price within the visible range.
+     * @param lowestCandleValue  The lowest price within the visible range.
+     */
+    private void smoothYAxisScaling(double highestCandleValue, double lowestCandleValue) {
+        if (highestCandleValue == Double.MIN_VALUE || lowestCandleValue == Double.MAX_VALUE) {
+            logger.error("No valid price data found for Y-axis scaling.");
+            new Messages(Alert.AlertType.ERROR, "No valid price data found for Y-axis scaling.");
+            return;
+        }
 
-    private double cartesianToScreenCoords(double yCoordinate) {
+        // Define a small margin to prevent candles from touching the top/bottom
+        double marginFactor = 0.05; // 5% margin above and below
+        double priceRange = highestCandleValue - lowestCandleValue;
+        double upperBound = highestCandleValue + (priceRange * marginFactor);
+        double lowerBound = lowestCandleValue - (priceRange * marginFactor);
+
+        // Ensure bounds remain valid and avoid negative or zero scaling
+        if (lowerBound < 0) {
+            lowerBound = 0;
+        }
+
+        if (upperBound == lowerBound) {
+            // If there's no price difference, add a small range to avoid flatlining
+            upperBound += 1;
+            lowerBound -= 1;
+        }
+
+        // Animate Y-axis scaling for smooth transitions
+        Timeline yAxisScaleAnimation = new Timeline(
+                new KeyFrame(Duration.millis(500), // Smooth transition in 500ms
+                        new KeyValue(yAxis.lowerBoundProperty(), lowerBound, Interpolator.EASE_BOTH),
+                        new KeyValue(yAxis.upperBoundProperty(), upperBound, Interpolator.EASE_BOTH)
+                )
+        );
+
+        double finalLowerBound = lowerBound;
+        double finalUpperBound = upperBound;
+        yAxisScaleAnimation.setOnFinished(_ -> logger.info("Y-axis scaling updated: [{} - {}]", finalLowerBound, finalUpperBound));
+        yAxisScaleAnimation.play();
+    }
+
+    private void updateXAxisBoundsWithAnimation() {
+        if (data.isEmpty()) {
+            logger.warn("No data available to update xAxis bounds.");
+            return;
+        }
+
+        double latestTimestamp = data.lastEntry().getValue().getOpenTime();
+        double earliestTimestamp = data.firstEntry().getValue().getOpenTime();
+
+        double targetUpperBound = latestTimestamp + secondsPerCandle;
+        double targetLowerBound = targetUpperBound - (currZoomLevel.getNumVisibleCandles() * secondsPerCandle);
+
+        // Animate transition if bounds are changing
+        if (xAxis.getUpperBound() < targetUpperBound) {
+            animateXAxisTransition(targetLowerBound, targetUpperBound);
+        }
+    }
+
+    /**
+     * Smoothly animates xAxis transition when new data arrives.
+     */
+    private void animateXAxisTransition(double newLowerBound, double newUpperBound) {
+        Timeline timeline = new Timeline();
+
+        // Animate lower bound
+        KeyValue keyValueLower = new KeyValue(xAxis.lowerBoundProperty(), newLowerBound, Interpolator.EASE_BOTH);
+        KeyFrame keyFrameLower = new KeyFrame(Duration.millis(500), keyValueLower);
+
+        // Animate upper bound
+        KeyValue keyValueUpper = new KeyValue(xAxis.upperBoundProperty(), newUpperBound, Interpolator.EASE_BOTH);
+        KeyFrame keyFrameUpper = new KeyFrame(Duration.millis(500), keyValueUpper);
+
+        timeline.getKeyFrames().addAll(keyFrameLower, keyFrameUpper);
+        timeline.play();
+    }
+
+    /**
+     * Displays OHLCV data in a format similar to TradingView.
+     */
+    private void displayOHLCVInfo(@NotNull CandleData latestCandle) {
+        graphicsContext.setFill(Color.WHITE);
+        graphicsContext.setFont(new Font("Arial", 16));
+
+        double textX = 20;
+        double textY = 20;
+
+        // Display Symbol and Timeframe
+        graphicsContext.fillText("Symbol: " + tradePair.toString('/') + "  Time: " + new SimpleDateFormat("HH:mm:ss").format(new Date()) +
+                "  TimeFrame: " + granularityToString(secondsPerCandle), textX, textY);
+
+        // OHLC Data
+
+        textX += 150;
+        textY += 20;
+        // Reset X position for new line
+        graphicsContext.fillText("O: " + formatPrice(latestCandle.getOpenPrice()), textX, textY);
+        textX += 150;
+        graphicsContext.fillText("H: " + formatPrice(latestCandle.getHighPrice()), textX, textY);
+        textX += 150;
+        graphicsContext.fillText("L: " + formatPrice(latestCandle.getLowPrice()), textX, textY);
+        textX += 150;
+        graphicsContext.fillText("C: " + formatPrice(latestCandle.getClosePrice()), textX, textY);
+        textX += 150;
+        graphicsContext.fillText("V: " + formatVolume(latestCandle.getVolume()), textX, textY);
+
+        // Percentage Change Calculation
+        double percentageChange = ((latestCandle.getClosePrice() - latestCandle.getOpenPrice()) / latestCandle.getOpenPrice()) * 100;
+        textY += 20;
+        textX = 20;
+        graphicsContext.fillText("%Change: " + String.format("%.2f", percentageChange) + "%", textX, textY);
+
+        // Spread Calculation (Bid-Ask)
+        double bidPrice = latestCandle.getClosePrice() - 0.0001; // Example bid
+        double askPrice = latestCandle.getClosePrice() + 0.0001; // Example ask
+        double spread = askPrice - bidPrice;
+        textY += 150;
+        graphicsContext.fillText("Spread: " + formatPrice(spread), 20, textY);
+
+        // Bot & Trading Session Information
+        textY = 80;
+        graphicsContext.fillText(" Bot: " + telegramBot.getUsername(), textX, textY);
+        textX += 150;
+        graphicsContext.fillText(" Session: " + getSessionType(secondsPerCandle), textX, textY);
+        textX += 200;
+        graphicsContext.fillText(" Mode: " + tradeMode, textX, textY);
+
+        // Trading Signal
+        textX += 200;
+        graphicsContext.fillText("Signal: " + determineSignal(latestCandle), textX, textY);
+    }
+
+    /**
+     * Formats the price to 4 decimal places.
+     */
+    @Contract(pure = true)
+    private @NotNull String formatPrice(double price) {
+        return String.format("%.4f", price);
+    }
+
+    /**
+     * Formats volume in 'K' or 'M' for large numbers.
+     */
+    private @NotNull String formatVolume(double volume) {
+        if (volume >= 1_000_000) return String.format("%.2fM", volume / 1_000_000);
+        if (volume >= 1_000) return String.format("%.2fK", volume / 1_000);
+        return String.format("%.2f", volume);
+    }
+
+    private @NotNull String getSessionType(int secondsPerCandle) {
+        return switch (secondsPerCandle) {
+            case 60 -> TradingType.SCALPING.name();  // 1-minute candles
+            case 300 -> TradingType.DAY_TRADING.name();  // 5-minute candles
+            case 900 -> TradingType.SWING_TRADING.name();  // 15-minute candles
+            case 1800 -> TradingType.SWING_TRADING.name(); // 30-minute candles
+            case 3600 -> TradingType.POSITION_TRADING.name(); // 1-hour candles
+            case 14400 -> TradingType.TREND_TRADING.name(); // 4-hour candles
+            case 86400 -> TradingType.POSITION_TRADING.name(); // 1-day candles
+            case 604800 -> TradingType.POSITION_TRADING.name(); // 1-week candles
+            default -> "Unknown";
+        };
+    }
+
+    private void initializeMomentumScrolling() {
+        // Track mouse drag start
+        canvas.setOnMousePressed(event -> {
+            lastMouseX = event.getX();
+            velocityX = 0; // Reset velocity
+            lastDragTime = Instant.now();
+        });
+
+        // Track mouse movement and calculate velocity
+        canvas.setOnMouseDragged(event -> {
+            double currentX = event.getX();
+            Instant currentTime = Instant.now();
+
+            // Calculate time difference in seconds
+            double timeDiff = Duration.millis(lastDragTime.toEpochMilli() - currentTime.toEpochMilli()).toMillis() / 1000.0;
+            if (timeDiff > 0) {
+                velocityX = (currentX - lastMouseX) / timeDiff; // Speed = Distance / Time
+            }
+
+            lastMouseX = currentX;
+            lastDragTime = currentTime;
+
+            // Move the chart as the user drags
+            moveXAxisByPixels(currentX - lastMouseX);
+        });
+
+        // Apply momentum scrolling on release
+        canvas.setOnMouseReleased(event -> applyMomentumScrolling(velocityX));
+    }
+
+    /**
+     * Moves the xAxis based on user dragging.
+     */
+    private void moveXAxisByPixels(double deltaX) {
+        double shiftAmount = deltaX * (xAxis.getUpperBound() - xAxis.getLowerBound()) / canvas.getWidth();
+        xAxis.setLowerBound(xAxis.getLowerBound() - shiftAmount);
+        xAxis.setUpperBound(xAxis.getUpperBound() - shiftAmount);
+        drawChartContents();
+    }
+
+    /**
+     * Applies a smooth momentum effect when the user releases the drag.
+     */
+    private void applyMomentumScrolling(double initialVelocity) {
+        if (Math.abs(initialVelocity) < 1) return; // Stop if velocity is too low
+
+        Timeline timeline = new Timeline();
+        double deceleration = 0.95; // Factor to slow down velocity
+        DoubleProperty velocityProperty = new SimpleDoubleProperty(initialVelocity);
+
+        KeyFrame keyFrame = new KeyFrame(Duration.millis(16), event -> {
+            double newVelocity = velocityProperty.get() * deceleration;
+            if (Math.abs(newVelocity) < 1) {
+                timeline.stop(); // Stop when speed is too low
+            } else {
+                velocityProperty.set(newVelocity);
+                moveXAxisByPixels(newVelocity * 0.016); // Apply movement per frame (60 FPS)
+            }
+        });
+
+        timeline.getKeyFrames().add(new KeyFrame(Duration.millis(16), String.valueOf(keyFrame)));
+        timeline.setCycleCount(Animation.INDEFINITE);
+        timeline.play();
+    }
+
+    private void drawGridLines() {
+
+        graphicsContext.setFill(Color.BLACK);
+        graphicsContext.fillRect(0, 0, chartWidth, chartHeight);
+        graphicsContext.setStroke(Color.rgb(189, 189, 189, 0.6));
+        graphicsContext.setLineWidth(1.5);
+
+        // Ensure xAxis includes latest data before drawing
+
+        updateXAxisBoundsWithAnimation();
+        // Draw horizontal grid lines (y-axis)
+        for (Axis.TickMark<Number> tickMark : yAxis.getTickMarks()) {
+            graphicsContext.strokeLine(0, tickMark.getPosition(), canvas.getWidth(), tickMark.getPosition());
+        }
+
+        // Draw vertical grid lines (x-axis)
+        for (Axis.TickMark<Number> tickMark : xAxis.getTickMarks()) {
+            double tickX = tickMark.getPosition();
+            graphicsContext.strokeLine(tickX, 0, tickX, canvas.getHeight());
+        }
+
+        logger.info("Grid lines drawn with updated xAxis bounds.");
+    }
+
+    private double cartesianToScreenCords(double yCoordinate) {
         return -yCoordinate + canvas.getHeight();
     }
 
-
-    private void moveAlongX(int deltaX) {
-        if (deltaX != 1 && deltaX != -1) {
-            throw new RuntimeException("deltaX must be 1 or -1 but was: %d".formatted(deltaX));
-        }
-
-        CompletableFuture<Boolean> progressIndicatorVisibleFuture = new CompletableFuture<>();
-        Platform.runLater(() -> progressIndicatorVisibleFuture.complete(progressIndicator.isVisible()));
-
-        progressIndicatorVisibleFuture.thenAccept(progressIndicatorVisible -> {
-            // Run on JavaFX thread
-            if (!progressIndicatorVisible) {
-                int desiredXLowerBound = (int) xAxis.getLowerBound() + (deltaX == 1 ? secondsPerCandle : -secondsPerCandle);
-
-                // Prevent moving too far forward if only a few candles remain on the left
-                int minCandlesRemaining = 3;
-                if (desiredXLowerBound <= data.lastEntry().getValue().getOpenTime() - (minCandlesRemaining - 1) * secondsPerCandle) {
-                    if (desiredXLowerBound <= currZoomLevel.getMinXValue()) {
-                        // Request more data asynchronously
-                        CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier())
-                                .thenAccept(candleDataPager.getCandleDataPreProcessor())
-                                .whenComplete((_, throwable) -> {
-                                    if (throwable != null) {
-                                        logger.error("Exception: ", throwable);
-                                        return;
-                                    }
-                                    paging = true;
-                                    Platform.runLater(() -> {
-                                        progressIndicator.setVisible(true);
-                                        setAxisBoundsForMove(deltaX);
-                                        setYAndExtraAxisBounds();
-                                        drawChart(); // **Redraw the chart after panning**
-                                        progressIndicator.setVisible(false);
-                                        paging = false;
-                                    });
-                                });
-                    } else {
-                        // No need to fetch more data, just adjust axis bounds and redraw
-                        Platform.runLater(() -> {
-                            setAxisBoundsForMove(deltaX);
-                            setYAndExtraAxisBounds();
-                            drawChart(); // **Redraw the chart after scrolling**
-                        });
-                    }
-                }
-            }
-        });
+    private void adjustYAxisScaling() {
+        double yAxisRange = yAxis.getUpperBound() - yAxis.getLowerBound();
+        double newUpperBound = yAxis.getUpperBound() - (yAxisRange * 0.1);
+        double newLowerBound = yAxis.getLowerBound() + (yAxisRange * 0.1);
+        yAxis.setUpperBound(newUpperBound);
+        yAxis.setLowerBound(newLowerBound);
     }
 
-
-    /**
-     * Sets the y-axis and extra axis bounds using only the x-axis lower bound.
-     */
-    private void setYAndExtraAxisBounds() {
-        logger.info("xAxis lower bound:%d".formatted((int) xAxis.getLowerBound()));
-        final double idealBufferSpaceMultiplier = 0.35;
-
-
-        if (currZoomLevel == null) {
-            InstantAxisFormatter yformat = new InstantAxisFormatter(formatter);
-            currZoomLevel = new ZoomLevel(0, secondsPerCandle, candleWidth, canvas.widthProperty(), yformat, 0);
-        }
-
-        if (!currZoomLevel.getExtremaForCandleRangeMap().containsKey((int) xAxis.getLowerBound())) {
-            //  Does this *always* represent a coding error on our end, or can this happen during
-            // normal chart functioning, and could we handle it more gracefully?
-            logger.error("The extrema map did not contain extrema for x-value: %d".formatted((int) xAxis.getLowerBound()));
-            logger.error("extrema map: %s".formatted(new TreeMap<>(currZoomLevel.getExtremaForCandleRangeMap())));
-            return;
-
-        }
-
-        // The y-axis and extra axis extrema are obtained using a key offset by minus one candle duration. This makes
-        // the chart work correctly. I don't fully understand the logic behind it, so I am leaving a note for
-        // my future self.
-        Pair<Extrema, Extrema> extremaForRange = currZoomLevel.getExtremaForCandleRangeMap().get(
-                (int) xAxis.getLowerBound() - secondsPerCandle);
-        if (extremaForRange == null) {
-            logger.error("extremaForRange was null!%d".formatted(secondsPerCandle));
-
-            return;
-
-        }
-        Double yAxisMax = extremaForRange.getValue().getMax();
-        Double yAxisMin = extremaForRange.getValue().getMin();
-        double yAxisDelta = yAxisMax - yAxisMin;
-        yAxis.setUpperBound(yAxisMax + (yAxisDelta * idealBufferSpaceMultiplier));
-        yAxis.setLowerBound(Math.max(0, yAxisMin - (yAxisDelta * idealBufferSpaceMultiplier)));
-
-        extraAxis.setUpperBound(currZoomLevel.getExtremaForCandleRangeMap().get(
-                (int) xAxis.getLowerBound() - secondsPerCandle).getKey().getMax());
-    }
-
-
-    protected void changeZoom(ZoomDirection zoomDirection) {
-        final int multiplier = zoomDirection == ZoomDirection.IN ? -1 : 1;
-        if (currZoomLevel == null) {
-            logger.error("currZoomLevel was null!");
-
-            return;
-        }
-        int newCandleWidth = currZoomLevel.getCandleWidth() - multiplier;
-        if (newCandleWidth <= 1) {
-            // Can't go below one pixel for candle width.
-            Alert dat = new Alert(Alert.AlertType.ERROR, " Can't go below one pixel for candle width.");
-
-            dat.showAndWait();
-            return;
-        }
-
-        int newLowerBoundX = (int) (xAxis.getUpperBound() - ((int) (canvas.getWidth() /
-                newCandleWidth) * secondsPerCandle));
-        if (newLowerBoundX > data.lastEntry().getValue().getOpenTime() - (2 * secondsPerCandle)) {
-            // We've reached the end of the data. We can't go back further without having more data.
-            Alert dat = new Alert(Alert.AlertType.ERROR, " Can't go back further without having more data.");
-            dat.showAndWait();
-            return;
-        }
-
-        final int nextZoomLevelId = ZoomLevel.getNextZoomLevelId(currZoomLevel, zoomDirection);
-        double currMinXValue = currZoomLevel.getMinXValue();
-
-        if (!zoomLevelMap.containsKey(nextZoomLevelId)) {
-            // We can use the minXValue of the current zoom level here because, given a sequence of zoom-levels
-            // z(0), z(1), ... z(n) that the chart has gone through, z(x).minXValue <= z(y).minXValue for all x > y.
-            // That is, if we are currently at a max/min zoom-level in zoomLevelMap, there is no other zoom-level that
-            // has a lower minXValue (assuming we did not start at the maximum or minimum zoom level).
-            ZoomLevel newZoomLevel = new ZoomLevel(nextZoomLevelId, newCandleWidth, secondsPerCandle,
-                    canvas.widthProperty(), getXAxisFormatterForRange(xAxis.getUpperBound() - newLowerBoundX),
-                    currMinXValue);
-
-            int numCandlesToSkip = Math.max((((int) xAxis.getUpperBound()) -
-                    data.lastEntry().getValue().getOpenTime()) / secondsPerCandle, 0);
-
-            // If there is less than numVisibleCandles on the screen, we want to be sure and check against what the
-            // lower bound *would be* if we had the full amount. Otherwise, we won't be able to calculate the correct
-            // extrema because the window size will be greater than the number of candles we have data for.
-            if (newLowerBoundX - (numCandlesToSkip * secondsPerCandle) < currZoomLevel.getMinXValue()) {
-                // We need to try and request more data so that we can properly zoom out to this level.
-                paging = true;
-                progressIndicator.setVisible(true);
-                CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(
-                        candleDataPager.getCandleDataPreProcessor()).whenComplete((_, _) -> {
-                    List<CandleData> candleData = new ArrayList<>(data.values());
-                    putSlidingWindowExtrema(newZoomLevel.getExtremaForCandleRangeMap(),
-                            candleData, (int) newZoomLevel.getNumVisibleCandles());
-                    putExtremaForRemainingElements(newZoomLevel.getExtremaForCandleRangeMap(),
-                            candleData.subList(candleData.size() - (int) Math.floor(
-                                    newZoomLevel.getNumVisibleCandles()), candleData.size()));
-                    zoomLevelMap.put(nextZoomLevelId, newZoomLevel);
-                    currZoomLevel = newZoomLevel;
-                    Platform.runLater(() -> {
-                        xAxis.setTickLabelFormatter(currZoomLevel.getXAxisFormatter());
-                        candleWidth = currZoomLevel.getCandleWidth();
-                        xAxis.setLowerBound(newLowerBoundX);
-                        setYAndExtraAxisBounds();
-
-                        progressIndicator.setVisible(false);
-                        paging = false;
-                    });
-                });
-                return;
-            } else {
-                List<CandleData> candleData = new ArrayList<>(data.values());
-                if (!zoomLevelMap.containsKey(nextZoomLevelId)) {
-
-                    return;
-                }
-
-                putSlidingWindowExtrema(newZoomLevel.getExtremaForCandleRangeMap(),
-                        candleData, (int) newZoomLevel.getNumVisibleCandles());
-                putExtremaForRemainingElements(newZoomLevel.getExtremaForCandleRangeMap(), candleData.subList(
-                        candleData.size() - (int) Math.floor(newZoomLevel.getNumVisibleCandles()),
-                        candleData.size()));
-                zoomLevelMap.put(nextZoomLevelId, newZoomLevel);
-                currZoomLevel = newZoomLevel;
-            }
-        } else {
-            //  In this case, we only need to compute the extrema for any new live syncing data that has
-            //  happened since the last time we were at this zoom level.
-            currZoomLevel = zoomLevelMap.get(nextZoomLevelId);
-            List<CandleData> candleData = new ArrayList<>(data.values());
-            putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(), candleData,
-                    (int) currZoomLevel.getNumVisibleCandles());
-            putExtremaForRemainingElements(currZoomLevel.getExtremaForCandleRangeMap(), candleData.subList(
-                    candleData.size() - (int) Math.floor(currZoomLevel.getNumVisibleCandles()), candleData.size()));
-            xAxis.setTickLabelFormatter(currZoomLevel.getXAxisFormatter());
-            candleWidth = currZoomLevel.getCandleWidth();
-            xAxis.setLowerBound(newLowerBoundX);
-        }
-
-        xAxis.setTickLabelFormatter(currZoomLevel.getXAxisFormatter());
-        candleWidth = currZoomLevel.getCandleWidth();
+    private void updateChartWithZoom(int newCandleWidth, ZoomDirection zoomDirection) {
+        this.zoomDirection = zoomDirection;
+        int newLowerBoundX = (int) (xAxis.getUpperBound() - ((int) (canvas.getWidth() / newCandleWidth) * secondsPerCandle));
         xAxis.setLowerBound(newLowerBoundX);
+        candleWidth = newCandleWidth;
         setYAndExtraAxisBounds();
-
-
+        drawChartContents();
     }
 
+    Consumer<List<CandleData>> getCandlePageConsumer() {
+        return candlePageConsumer;
+    }
     CandleStickChartOptions getChartOptions() {
         return chartOptions;
     }
 
-    Consumer<List<CandleData>> getCandlePageConsumer() {
-        return new CandlePageConsumer();
+    @Override
+    protected double computePrefWidth(double height) {
+        return chartWidth;
     }
 
     @Override
@@ -1019,13 +1355,8 @@ public class CandleStickChart extends Region {
     }
 
     @Override
-    protected double computePrefWidth(double height) {
-        return widthProperty().get();
-    }
-
-    @Override
     protected double computePrefHeight(double width) {
-        return heightProperty().get();
+        return chartHeight;
     }
 
     private void setInitialState(List<CandleData> candleData) {
@@ -1033,8 +1364,8 @@ public class CandleStickChart extends Region {
             candleData.add(candleData.size(), inProgressCandle.snapshot());
         }
 
-        xAxis.setUpperBound(candleData.getLast().getOpenTime());
-        xAxis.setLowerBound((candleData.getLast().getOpenTime()) -
+        xAxis.setUpperBound(candleData.getLast().getOpenTime() + secondsPerCandle);
+        xAxis.setLowerBound((candleData.getLast().getOpenTime() + secondsPerCandle) -
                 (int) (Math.floor(canvas.getWidth() / candleWidth) * secondsPerCandle));
 
         currZoomLevel = new ZoomLevel(0, candleWidth, secondsPerCandle, canvas.widthProperty(),
@@ -1042,16 +1373,94 @@ public class CandleStickChart extends Region {
                 candleData.getFirst().getOpenTime());
         zoomLevelMap.put(0, currZoomLevel);
         xAxis.setTickLabelFormatter(currZoomLevel.getXAxisFormatter());
-        putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(), candleData,
-                (int) Math.round(currZoomLevel.getNumVisibleCandles()));
+
+        if (currZoomLevel.getExtremaForCandleRangeMap() == null) {
+            return;
+        }
+        putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(),
+                candleData,
+                currZoomLevel.getNumVisibleCandles());
         putExtremaForRemainingElements(currZoomLevel.getExtremaForCandleRangeMap(), candleData.subList(
-                candleData.size() - (int) Math.floor(currZoomLevel.getNumVisibleCandles() - (liveSyncing ? 1 : 0)),
+                (candleData.size() - currZoomLevel.getNumVisibleCandles() - (liveSyncing ? 1 : 0)),
                 candleData.size()));
         setYAndExtraAxisBounds();
         data.putAll(candleData.stream().collect(Collectors.toMap(CandleData::getOpenTime, Function.identity())));
-        drawChart();
+        drawChartContents();
         progressIndicator.setVisible(false);
         updateInProgressCandleTask.setReady(true);
+    }
+
+    private void initializeZoomLevel() {
+        if (currZoomLevel == null) {
+            logger.info("Initializing currZoomLevel with default values...");
+            currZoomLevel = new ZoomLevel(
+                    0, // Default zoom level
+                    candleWidth, // Current candle width
+                    secondsPerCandle, // Current seconds per candle
+                    canvas.widthProperty(), // Canvas width
+                    new InstantAxisFormatter(formatter), // Axis formatter
+                    candleWidth // Default candle width
+            );
+        }
+    }
+
+    private @NotNull String granularityToString(int actualGranularity) {
+
+        String x;
+        String str;
+        if (actualGranularity < 3600) {
+            x = String.valueOf(actualGranularity / 60);
+            str = "M";
+        } else if (actualGranularity < 86400) {
+            x = String.valueOf((actualGranularity / 3600));
+            str = "H";
+        } else if (actualGranularity < 604800) {
+            x = String.valueOf(actualGranularity / 86400);
+            str = "D";
+        } else if (actualGranularity < 2592000) {
+            x = String.valueOf((actualGranularity / 604800));
+            str = "W";
+        } else {
+            x = String.valueOf((actualGranularity * 7 / 2592000 / 7));
+            str = "M";
+        }
+        return str + x;
+
+    }
+
+
+    @Getter
+    public enum TradingType {
+
+        SCALPING("Seconds to Minutes", "Fast executions, small profits", "High"),
+        DAY_TRADING("Intraday", "Momentum, Breakouts", "High"),
+        SWING_TRADING("Days to Weeks", "Trend Following", "Medium"),
+        POSITION_TRADING("Weeks to Years", "Buy & Hold, Long-Term Trends", "Low"),
+        TREND_TRADING("Varies", "Follows Market Trends", "Medium"),
+        BREAKOUT_TRADING("Varies", "Entry on Support/Resistance Breaks", "Medium"),
+        ARBITRAGE_TRADING("Milliseconds to Seconds", "Price Differences Across Markets", "Low"),
+        ALGORITHMIC_TRADING("Automated", "AI, Quantitative Strategies", "Medium"),
+        FOREX_TRADING("Varies", "Currencies (EUR/USD, GBP/JPY)", "Medium"),
+        CRYPTO_TRADING("24/7", "Bitcoin, Altcoins", "High"),
+        STOCK_TRADING("Varies", "Equities", "Medium"),
+        COMMODITIES_TRADING("Varies", "Gold, Oil, Silver", "Medium"),
+        HIGH_FREQUENCY_TRADING("Milliseconds", "Algo Trading, AI", "High");
+
+        private final String timeframe;
+        private final String strategyFocus;
+        private final String riskLevel;
+
+        TradingType(String timeframe, String strategyFocus, String riskLevel) {
+            this.timeframe = timeframe;
+            this.strategyFocus = strategyFocus;
+            this.riskLevel = riskLevel;
+        }
+
+        @Override
+        public @NotNull String toString() {
+            return String.format("%s: Timeframe = %s, Strategy Focus = %s, Risk Level = %s",
+                    name(), timeframe, strategyFocus, riskLevel);
+        }
     }
 
     private class SizeChangeListener extends DelayedSizeChangeListener {
@@ -1063,34 +1472,33 @@ public class CandleStickChart extends Region {
         @Override
         public void resize() {
             chartWidth = Math.max(300, Math.floor(containerWidth.getValue().doubleValue() / candleWidth) *
-                    candleWidth - 60 + ((double) candleWidth / 2));
+                    candleWidth - 60 + (((double) candleWidth) / 2));
             chartHeight = Math.max(300, containerHeight.getValue().doubleValue());
             canvas.setWidth(chartWidth - 100);
             canvas.setHeight(chartHeight - 100);
 
-            // Because the chart has been resized, the number of visible candles has changed and thus we must
+            // Because the chart has been resized, the number of visible candles has changed, and thus we must
             // recompute the sliding window extrema where the size of the sliding window is the new number of
             // visible candles.
-            int newLowerBoundX = (int) (xAxis.getUpperBound() - ((int) currZoomLevel.getNumVisibleCandles() *
+            int newLowerBoundX = (int) (xAxis.getUpperBound() - (currZoomLevel.getNumVisibleCandles() *
                     secondsPerCandle));
             if (newLowerBoundX < currZoomLevel.getMinXValue()) {
                 // We need to try and request more data so that we can properly resize the chart.
                 paging = true;
                 progressIndicator.setVisible(true);
                 CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier()).thenAccept(
-                        candleDataPager.getCandleDataPreProcessor()).whenComplete((_, _) -> {
+                        candleDataPager.getCandleDataPreProcessor()).whenComplete((result, throwable) -> {
                     currZoomLevel.getExtremaForCandleRangeMap().clear();
                     List<CandleData> candleData = new ArrayList<>(data.values());
                     putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(),
-                            candleData, (int) Math.round(currZoomLevel.getNumVisibleCandles()));
+                            candleData, currZoomLevel.getNumVisibleCandles());
                     putExtremaForRemainingElements(currZoomLevel.getExtremaForCandleRangeMap(),
-                            candleData.subList(candleData.size() - (int) Math.floor(
-                                    currZoomLevel.getNumVisibleCandles()), candleData.size()));
+                            candleData.subList(candleData.size() - currZoomLevel.getNumVisibleCandles(), candleData.size()));
                     Platform.runLater(() -> {
                         xAxis.setLowerBound(newLowerBoundX);
                         setYAndExtraAxisBounds();
                         layoutChart();
-                        drawChart();
+                        drawChartContents();
                         progressIndicator.setVisible(false);
                         paging = false;
                     });
@@ -1099,130 +1507,30 @@ public class CandleStickChart extends Region {
                 currZoomLevel.getExtremaForCandleRangeMap().clear();
                 List<CandleData> candleData = new ArrayList<>(data.values());
                 putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(),
-                        candleData, (int) Math.round(currZoomLevel.getNumVisibleCandles()));
+                        candleData, currZoomLevel.getNumVisibleCandles());
                 putExtremaForRemainingElements(currZoomLevel.getExtremaForCandleRangeMap(),
-                        candleData.subList(candleData.size() - (int) Math.floor(
-                                currZoomLevel.getNumVisibleCandles()), candleData.size()));
+                        candleData.subList(candleData.size() -
+                                currZoomLevel.getNumVisibleCandles(), candleData.size()));
                 xAxis.setLowerBound(newLowerBoundX);
                 setYAndExtraAxisBounds();
                 layoutChart();
-                drawChart();
+                drawChartContents();
             }
         }
     }
-
-    @Getter
-    @Setter
-    protected class UpdateInProgressCandleTask extends LiveTradesConsumer implements Runnable {
-        private final BlockingQueue<Trade> liveTradesQueue;
-
-        private boolean ready;
-
-        UpdateInProgressCandleTask() {
-            liveTradesQueue = new LinkedBlockingQueue<>();
-        }
-
-
-        @Override
-        public void accept(Trade trade) {
-            liveTradesQueue.add(trade);
-        }
-
-        @Override
-        public void acceptTrades(@NotNull List<Trade> trades) {
-            liveTradesQueue.addAll(trades);
-        }
-
-        Label infos = new Label();
-        @Override
-        public void run() {
-            if (!ready) {
-                logger.info("No live trades received not updating in-progress candle!");
-                return;
-            }
-
-
-            int currentTill = (int) Instant.now().getEpochSecond();
-            List<Trade> liveTrades = new ArrayList<>();
-            liveTradesQueue.drainTo(liveTrades);
-
-
-
-            // Get rid of trades we already know about
-            List<Trade> newTrades = liveTrades.stream().filter(trade -> trade.getTimestamp().getEpochSecond() >
-                    inProgressCandle.getCurrentTill()).toList();
-            currentCandleTrades = newTrades;
-
-            // Partition the trades between the current in-progress candle and the candle after that (which we may
-            // have entered after the last update).
-            Map<Boolean, List<Trade>> candlePartitionedNewTrades = newTrades.stream().collect(
-                    Collectors.partitioningBy(trade -> trade.getTimestamp().getEpochSecond() >=
-                            inProgressCandle.getOpenTime() + secondsPerCandle));
-
-            // Update the in-progress candle with new trades partitioned in the in-progress candle's duration
-            currentCandleTrades = candlePartitionedNewTrades.get(false);
-
-            if (!currentCandleTrades.isEmpty()) {
-                inProgressCandle.setHighPriceSoFar(Math.max(currentCandleTrades.stream().mapToDouble(Trade::getPrice).max().getAsDouble(),
-                        inProgressCandle.getHighPriceSoFar()));
-                inProgressCandle.setLowPriceSoFar(Math.max(currentCandleTrades.stream().mapToDouble(Trade::getPrice).min().stream().sum(),
-                        inProgressCandle.getLowPriceSoFar()));
-                inProgressCandle.setVolumeSoFar(inProgressCandle.getVolumeSoFar() +
-                        currentCandleTrades.stream().mapToDouble(Trade::getAmount).sum());
-                inProgressCandle.setCloseTime(currentTill);
-                inProgressCandle.setLastPrice(currentCandleTrades.getLast()
-                        .getPrice());
-                data.put(inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
-            }
-
-            graphicsContext.setFill(Color.WHITE);
-            List<Trade> nextCandleTrades = candlePartitionedNewTrades.get(true);
-            if (Instant.now().getEpochSecond() >= inProgressCandle.getOpenTime() + secondsPerCandle) {
-                // Reset in-progress candle
-                inProgressCandle.setOpenTime(inProgressCandle.getOpenTime() + secondsPerCandle);
-                inProgressCandle.setOpenPrice(inProgressCandle.getLastPrice());
-
-                if (!nextCandleTrades.isEmpty()) {
-                    inProgressCandle.setIsPlaceholder(false);
-                    inProgressCandle.setHighPriceSoFar(nextCandleTrades.stream().mapToDouble(Trade::getPrice).max().stream().sum());
-                    inProgressCandle.setLowPriceSoFar(currentCandleTrades.stream().mapToDouble(Trade::getPrice).min().stream().sum());
-                    inProgressCandle.setVolumeSoFar(nextCandleTrades.stream().mapToDouble(Trade::getAmount).sum());
-                    inProgressCandle.setLastPrice(nextCandleTrades.getFirst().getPrice());
-                    inProgressCandle.setCloseTime((int) nextCandleTrades.getFirst().getTimestamp().getEpochSecond());
-                } else {
-                    inProgressCandle.setIsPlaceholder(true);
-                    inProgressCandle.setHighPriceSoFar(inProgressCandle.getLastPrice());
-                    inProgressCandle.setLowPriceSoFar(inProgressCandle.getLastPrice());
-                    inProgressCandle.setVolumeSoFar(nextCandleTrades.stream().mapToDouble(Trade::getAmount).sum());
-                    inProgressCandle.setLastPrice(nextCandleTrades.getFirst().getPrice());
-                    inProgressCandle.setCloseTime((int) nextCandleTrades.getFirst().getTimestamp().getEpochSecond());
-                }
-
-                data.put(inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
-            }
-            drawChart();
-
-
-
-
-
-        }
-    }
-
 
     private class CandlePageConsumer implements Consumer<List<CandleData>> {
+
         @Override
         public void accept(List<CandleData> candleData) {
-
-
             if (Platform.isFxApplicationThread()) {
-
+                logger.error("candle data paging must not happen on FX thread!");
                 throw new IllegalStateException("candle data paging must not happen on FX thread!");
             }
 
             if (candleData.isEmpty()) {
                 logger.warn("candleData was empty");
-                throw new IllegalStateException("candleData was empty");
+                return;
             }
 
             if (candleData.getFirst().getOpenTime() >= candleData.get(1).getOpenTime()) {
@@ -1232,8 +1540,11 @@ public class CandleStickChart extends Region {
 
             if (data.isEmpty()) {
                 if (liveSyncing) {
-                    // We got the first page of candle data which does *not* include the current in-progress
-                    // candle. Since we are live-syncing, we need to fetch the data for what has occurred so far in
+                    if (inProgressCandle == null) {
+                        throw new RuntimeException("inProgressCandle was null in live syncing mode.");
+                    }
+                    // We obtained the first page of candle data which does *not* include the current in-progress
+                    // candle. Since we are live-syncing we need to fetch the data for what has occurred so far in
                     // the current candle.
                     long secondsIntoCurrentCandle = (Instant.now().toEpochMilli() / 1000L) -
                             (candleData.getLast().getOpenTime() + secondsPerCandle);
@@ -1245,7 +1556,7 @@ public class CandleStickChart extends Region {
                     // would request candles starting from when the current in-progress candle started but with
                     // a supported duration closest to, but less than the current duration, 1800/200 (as 200 is the
                     // limit of candles per page). This would give us 9 second candles that we can then sum. This will
-                    // catch the data up to within 9 seconds of current time (or in this case, roughly within 0.25% of
+                    // catch the data up to within 9 seconds of current time (or in this case roughly within 0.25% of
                     // current time).
                     CompletableFuture<Optional<?>> inProgressCandleDataOptionalFuture = exchange
                             .fetchCandleDataForInProgressCandle(tradePair, Instant.ofEpochSecond(
@@ -1261,52 +1572,79 @@ public class CandleStickChart extends Region {
                                 // get us caught up to the current time. The reason we don't use the more simple
                                 // approach of requesting all the trades that have happened in the current candle to
                                 // begin with is that this can take a prohibitively long time if the candle duration
-                                // is too large. (Some exchanges have multiple trades every second.)
+                                // is too large (some exchanges have multiple trades every second).
                                 int currentTill = (int) Instant.now().getEpochSecond();
                                 CompletableFuture<List<Trade>> tradesFuture;
                                 try {
                                     tradesFuture = exchange.fetchRecentTradesUntil(
-                                            tradePair, Instant.ofEpochSecond(inProgressCandleData.openTime()));
+                                            tradePair, Instant.ofEpochSecond(inProgressCandleData.getCurrentTill()));
                                 } catch (NoSuchAlgorithmException | InvalidKeyException e) {
                                     throw new RuntimeException(e);
                                 }
 
                                 tradesFuture.whenComplete((trades, exception) -> {
                                     if (exception == null) {
-                                        inProgressCandle.setOpenPrice(inProgressCandleData.openPrice());
-                                        inProgressCandle.setCloseTime(currentTill);
+                                        inProgressCandle.setOpenPrice(inProgressCandleData.getOpenPrice());
+                                        inProgressCandle.setCurrentTill(currentTill);
 
                                         if (trades.isEmpty()) {
                                             // No trading activity happened in addition to the sub-candles from above.
+
+
+                                            logger.info(
+                                                    "No trades have happened in addition to the sub-candles from above. " +
+                                                            "This is likely due to an exchange having multiple trades every second. " +
+                                                            "This is likely due to the candle duration being too large. "
+                                            );
+
+                                            TelegramClient.sendMessage(chatId,
+                                                    "No trades have happened in addition to the sub-candles from above. " +
+                                                            "This is likely due to an exchange having multiple trades every second. " +
+                                                            "This is likely due to the candle duration being too large. "
+                                            );
+                                            inProgressCandle.setIsPlaceholder(true);
                                             inProgressCandle.setHighPriceSoFar(
-                                                    inProgressCandleData.highPriceSoFar());
-                                            inProgressCandle.setLowPriceSoFar(inProgressCandleData.lowPriceSoFar());
-                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.volumeSoFar());
-                                            inProgressCandle.setLastPrice(inProgressCandleData.closePrice());
+                                                    inProgressCandleData.getHighPriceSoFar());
+                                            inProgressCandle.setLowPriceSoFar(inProgressCandleData.getLowPriceSoFar());
+                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.getVolumeSoFar());
+                                            inProgressCandle.setClosePriceSoFar(inProgressCandleData.getLastPrice());
                                         } else {
                                             // We need to factor in the trades that have happened after the
                                             // "currentTill" time of the in-progress candle.
                                             inProgressCandle.setHighPriceSoFar(Math.max(trades.stream().mapToDouble(
                                                             Trade::getPrice).max().getAsDouble(),
-                                                    inProgressCandleData.highPriceSoFar()));
+                                                    inProgressCandleData.getHighPriceSoFar()));
                                             inProgressCandle.setLowPriceSoFar(Math.max(trades.stream().mapToDouble(
                                                             Trade::getPrice).min().stream().sum(),
-                                                    inProgressCandleData.lowPriceSoFar()));
-                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.volumeSoFar() +
+                                                    inProgressCandleData.getLowPriceSoFar()));
+                                            inProgressCandle.setVolumeSoFar(inProgressCandleData.getVolumeSoFar() +
                                                     trades.stream().mapToDouble(
                                                             Trade::getAmount).sum());
-                                            inProgressCandle.setLastPrice(trades.getLast().getPrice());
+                                            inProgressCandle.setClosePriceSoFar(trades.getLast().getPrice());
                                         }
                                         Platform.runLater(() -> setInitialState(candleData));
                                     } else {
-                                        logger.error("error fetching recent trades until: %s".formatted(inProgressCandleData), exception);
+                                        logger.error("error fetching recent trades until: {}", inProgressCandleData.getCurrentTill(), exception);
+
                                     }
                                 });
                             } else {
                                 // No trades have happened during the current candle so far.
+
+                                logger.info(
+                                        "No trades have happened during the current candle so far. " +
+                                                "This is likely due to an exchange having multiple trades every second. " +
+                                                "This is likely due to the candle duration being too large. "
+                                );
+                                TelegramClient.sendMessage(chatId,
+                                        "No trades have happened during the current candle so far. " +
+                                                "This is likely due to an exchange having multiple trades every second. " +
+                                                "This is likely due to the candle duration being too large. "
+                                );
                                 inProgressCandle.setIsPlaceholder(true);
                                 inProgressCandle.setVolumeSoFar(0);
-
+                                inProgressCandle.setCurrentTill((int) (secondsIntoCurrentCandle +
+                                        (candleData.getLast().getOpenTime() + secondsPerCandle)));
                                 Platform.runLater(() -> setInitialState(candleData));
                             }
                         } else {
@@ -1317,14 +1655,13 @@ public class CandleStickChart extends Region {
                     setInitialState(candleData);
                 }
             } else {
-                int slidingWindowSize = (int) currZoomLevel.getNumVisibleCandles();
+                int slidingWindowSize = currZoomLevel.getNumVisibleCandles();
 
-                // To compute the y-axis extrema for the new data in the page, we have to include the
+                // In order to compute the y-axis extrema for the new data in the page, we have to include the
                 // first numVisibleCandles from the previous page (otherwise the sliding window will not be able
                 // to reach all the way).
-                Map<Integer, CandleData> extremaData = new TreeMap<>(data.subMap((int) currZoomLevel.getMinXValue(),
-                        (int) (currZoomLevel.getMinXValue() + (currZoomLevel.getNumVisibleCandles() *
-                                secondsPerCandle))));
+                Map<Integer, CandleData> extremaData = new TreeMap<>(data.subMap((int) currZoomLevel.getMinXValue(), (int) (currZoomLevel.getMinXValue() + ((long) currZoomLevel.getNumVisibleCandles() *
+                        secondsPerCandle))));
                 List<CandleData> newDataPlusOffset = new ArrayList<>(candleData);
                 newDataPlusOffset.addAll(extremaData.values());
                 putSlidingWindowExtrema(currZoomLevel.getExtremaForCandleRangeMap(), newDataPlusOffset,
@@ -1336,4 +1673,149 @@ public class CandleStickChart extends Region {
         }
     }
 
+    private class MouseDraggedHandler implements EventHandler<MouseEvent> {
+        @Override
+        public void handle(MouseEvent event) {
+            if (paging) {
+                event.consume();
+                return;
+            }
+
+            if (event.getButton() != MouseButton.PRIMARY) {
+                return;
+            }
+
+            if (mousePrevX == -1 && mousePrevY == -1) {
+                mousePrevX = event.getScreenX();
+                mousePrevY = event.getScreenY();
+                return;
+            }
+
+            double dx = event.getScreenX() - mousePrevX;
+
+            scrollDeltaXSum += dx;
+
+            if (Math.abs(scrollDeltaXSum) >= 10) {
+                int deltaX = (int) -Math.signum(scrollDeltaXSum);
+                moveAlongX(deltaX);
+                scrollDeltaXSum = 0;
+            }
+            mousePrevX = event.getScreenX();
+            mousePrevY = event.getScreenY();
+        }
+    }
+
+    protected class KeyEventHandler implements EventHandler<KeyEvent> {
+
+
+        @Override
+        public void handle(KeyEvent event) {
+            if (paging) {
+                event.consume();
+                return;
+            }
+
+            boolean consume = false;
+            if (event.isControlDown() && event.getCode() == KeyCode.PLUS) {
+                changeZoom(ZoomDirection.IN);
+                consume = true;
+            } else if (event.isControlDown() && event.getCode() == KeyCode.MINUS) {
+                changeZoom(ZoomDirection.OUT);
+                consume = true;
+            }
+
+            int deltaX = 0;
+            if (event.getCode() == KeyCode.LEFT) {
+                deltaX = -1;
+                consume = true;
+            } else if (event.getCode() == KeyCode.RIGHT) {
+                deltaX = 1;
+                consume = true;
+            }
+
+            if (deltaX != 0) {
+                moveAlongX(deltaX);
+            }
+
+            if (consume) {
+                event.consume();
+            }
+        }
+
+
+        public void changeZoom(ZoomDirection zoomDirection) {
+            final int multiplier = zoomDirection == ZoomDirection.IN ? -1 : 1;
+            int attempts = 0;
+            final int MAX_RETRIES = 3;
+            final int RETRY_DELAY_MS = 2000; // 2 seconds
+
+            while (currZoomLevel == null && attempts < MAX_RETRIES) {
+                logger.warn("currZoomLevel is null! Retrying... Attempt {}", attempts + 1);
+                attempts++;
+
+                try {
+                    Thread.sleep(RETRY_DELAY_MS); // Wait before retrying
+                    initializeZoomLevel(); // Replace with your actual initialization method
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.error("Retry interrupted while initializing zoom level", e);
+                    return;
+                }
+            }
+
+            if (currZoomLevel == null) {
+                logger.error("Failed to initialize currZoomLevel after " + MAX_RETRIES + " attempts.");
+                return;
+            }
+
+            int newCandleWidth = currZoomLevel.getCandleWidth() - multiplier;
+            if (newCandleWidth <= 1) {
+                new Messages(Alert.AlertType.ERROR, "Can't go below one pixel for candle width.");
+                return;
+            }
+
+            adjustYAxisScaling();
+            updateChartWithZoom(newCandleWidth, zoomDirection);
+        }
+
+
+    }
+
+    private class ScrollEventHandler implements EventHandler<ScrollEvent> {
+        @Override
+        public void handle(ScrollEvent event) {
+            if (paging) {
+                event.consume();
+                return;
+            }
+
+            if (event.getDeltaY() != 0 && event.getTouchCount() == 0 && !event.isInertia()) {
+                final double direction = -Math.signum(event.getDeltaY());
+
+                if (direction == 1.0d) {
+                    changeZoom(ZoomDirection.OUT);
+                } else if (direction == -1.0d) {
+                    changeZoom(ZoomDirection.IN);
+                }
+            }
+            event.consume();
+        }
+
+        public void changeZoom(ZoomDirection zoomDirection) {
+            final int multiplier = zoomDirection == ZoomDirection.IN ? -1 : 1;
+            if (currZoomLevel == null) {
+                logger.error("currZoomLevel was null!");
+                currZoomLevel = new ZoomLevel(0, candleWidth, secondsPerCandle, canvas.widthProperty(), new InstantAxisFormatter(formatter), candleWidth);
+                return;
+            }
+            int newCandleWidth = currZoomLevel.getCandleWidth() - multiplier;
+            if (newCandleWidth <= 1) {
+                new Messages(Alert.AlertType.ERROR, "Can't go below one pixel for candle width.");
+                return;
+            }
+            adjustYAxisScaling();
+            updateChartWithZoom(newCandleWidth, zoomDirection);
+        }
+
+    }
 }

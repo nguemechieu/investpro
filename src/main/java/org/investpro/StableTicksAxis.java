@@ -1,5 +1,5 @@
 /*
- * Copyright [2024] [TradeAdviser .LLC]
+ * Copyright 2013 Jason Winnebeck
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@
 
 package org.investpro;
 
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -26,26 +30,22 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.WritableValue;
 import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
-import javafx.scene.chart.ValueAxis;
 import javafx.util.Duration;
+import javafx.scene.chart.ValueAxis;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
  * makes the axis major tick marks (the labeled tick marks) have nice, rounded numbers.
  *
- *
+ * @author Jason Winnebeck
  */
 public class StableTicksAxis extends ValueAxis<Number> {
     /**
      * Possible tick spacing at the 10^1 level. These numbers must be {@literal >= 1 and < 10}.
      */
-    private static final double[] dividers = new double[]{1.0, 2.5, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0};
+    private static final double[] dividers = new double[]{1.0, 2.5, 5.0};
 
     /**
      * How many negatives powers of ten we have in the powersOfTen array.
@@ -59,15 +59,12 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private static final int numMinorTicks = 3;
 
     private final Timeline animationTimeline = new Timeline();
-
-    /**
-     * Amount of padding to add on the end of the axis when auto ranging.
-     */
-    private static final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
-
-    private List<Number> minorTicks;
     private static final int[] powersOf10 = {
-            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 1000000000
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
+    };
+    private List<Number> minorTicks;
+    private static final int[] halfPowersOf10 = {
+            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
     };
 
     /**
@@ -76,33 +73,35 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private final BooleanProperty forceZeroInRange = new SimpleBooleanProperty(true);
 
     private double labelSize = -1;
-
-
-
-    public StableTicksAxis(double lowerBound, double upperBound) {
-
-        super(lowerBound, upperBound);
-        minorTicks = new ArrayList<>((int) (upperBound - lowerBound));
-        for (int i = 0; i < numMinorTicks; i++) {
-            minorTicks.add(lowerBound + (upperBound - lowerBound) / (numMinorTicks - 1) * i);
+    private final WritableValue<Double> scaleValue = new WritableValue<>() {
+        @Override
+        public Double getValue() {
+            return getScale();
         }
-        animationTimeline.setAutoReverse(true);
 
-    }
+        @Override
+        public void setValue(Double value) {
+            setScale(value);
+        }
+    };
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    private final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
 
     public StableTicksAxis() {
+    }
 
+    public StableTicksAxis(double lowerBound, double upperBound) {
+        super(lowerBound, upperBound);
     }
 
     private static double calculateTickSpacing(double delta, int maxTicks) {
         if (delta <= 0.0) {
-            delta = 1.0;
-            throw new IllegalArgumentException("delta " + delta + "must be positive");
-
+            throw new IllegalArgumentException("delta (" + delta + ") must be positive");
         }
         if (maxTicks < 1) {
-            throw new IllegalArgumentException("maxTicks " + maxTicks + " must be >= 1");
-
+            throw new IllegalArgumentException("maxTicks (" + maxTicks + ") must be >= 1");
         }
 
         int factor;
@@ -153,6 +152,41 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public double getAutoRangePadding() {
+        return autoRangePadding.get();
+    }
+
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public void setAutoRangePadding(double autoRangePadding) {
+        this.autoRangePadding.set(autoRangePadding);
+    }
+
+    /**
+     * Amount of padding to add on the each end of the axis when auto ranging.
+     */
+    public DoubleProperty autoRangePaddingProperty() {
+        return autoRangePadding;
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public boolean isForceZeroInRange() {
+        return forceZeroInRange.get();
+    }
+
+    /**
+     * If true, when auto-ranging, force 0 to be the min or max end of the range.
+     */
+    public void setForceZeroInRange(boolean forceZeroInRange) {
+        this.forceZeroInRange.set(forceZeroInRange);
+    }
+
+    /**
      * Returns the base-10 logarithm of {@code x}, rounded according to the specified rounding mode.
      * <p>
      * From Guava's IntMath.java.
@@ -191,25 +225,15 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
     }
 
-    /**
-     * Amount of padding to add on the end of the axis when auto ranging.
-     */
-    public static DoubleProperty autoRangePaddingProperty() {
-        return autoRangePadding;
-    }
-
     static int lessThanBranchFree(int x, int y) {
         // The double negation is optimized away by normal Java, but is necessary for GWT
         // to make sure bit twiddling works as expected.
         return (x - y) >>> (Integer.SIZE - 1);
     }
 
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public boolean isForceZeroInRange() {
-        return forceZeroInRange.get();
-    }
+    private static final byte[] maxLog10ForLeadingZeros = {
+            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
+    };
 
     /**
      * If true, when auto-ranging, force 0 to be the min or max end of the range.
@@ -218,49 +242,9 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return forceZeroInRange;
     }
 
-    /**
-     * If true, when auto-ranging, force 0 to be the min or max end of the range.
-     */
-    public void setForceZeroInRange(boolean forceZeroInRange) {
-        this.forceZeroInRange.set(forceZeroInRange);
-    }
-
-    private static final int[] halfPowersOf10 = {
-            3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766,
-            Integer.MAX_VALUE
-    };
-    private static final byte[] maxLog10ForLeadingZeros = {
-            9, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0
-    };
-    private final WritableValue<Double> scaleValue = new WritableValue<>() {
-        @Override
-        public @NotNull Double getValue() {
-            return getScale();
-        }
-
-        @Override
-        public void setValue(Double value) {
-            setScale(value);
-        }
-    };
-
-    /**
-     * Amount of padding to add on the end of the axis when auto ranging.
-     */
-    public double getAutoRangePadding() {
-        return autoRangePadding.get();
-    }
-
-    /**
-     * Amount of padding to add on the end of the axis when auto ranging.
-     */
-    public void setAutoRangePadding(double autoRangePadding) {
-        StableTicksAxis.autoRangePadding.set(autoRangePadding);
-    }
-
     @Override
     protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
-        // NOTE(dwell): if the range is very small, display it like a flat line, the scaling doesn't work very well at
+        // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
         // these values. 1e-300 was chosen arbitrarily.
         if (Math.abs(minValue - maxValue) < 1e-300) {
             // Normally this is the case for all points with the same value
@@ -270,17 +254,17 @@ public class StableTicksAxis extends ValueAxis<Number> {
             // Add padding
             double delta = maxValue - minValue;
             double paddedMin = minValue - delta * autoRangePadding.get();
-            // If we've crossed line 0, clamp to 0.
+            // If we've crossed the 0 line, clamp to 0.
             // noinspection FloatingPointEquality
             if (Math.signum(paddedMin) != Math.signum(minValue)) {
-                paddedMin = 0.00000;
+                paddedMin = 0.0;
             }
 
             double paddedMax = maxValue + delta * autoRangePadding.get();
-            // If we've crossed line 0, clamp to 0.
+            // If we've crossed the 0 line, clamp to 0.
             // noinspection FloatingPointEquality
             if (Math.signum(paddedMax) != Math.signum(maxValue)) {
-                paddedMax = 0.000000000;
+                paddedMax = 0.0;
             }
 
             minValue = paddedMin;
@@ -301,20 +285,6 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(minValue, maxValue);
     }
 
-    private double getLabelSize() {
-        if (labelSize == -1) {
-            Dimension2D dim = measureTickMarkLabelSize("-888.88E-88", getTickLabelRotation());
-            if (getSide().isHorizontal()) {
-                labelSize = dim.getWidth();
-            } else {
-                // Adjusted label size calculation for vertical axes
-                labelSize = dim.getHeight();
-            }
-        }
-
-        return labelSize;
-    }
-
     @Override
     protected List<Number> calculateMinorTickMarks() {
         return minorTicks;
@@ -323,7 +293,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     @Override
     protected void setRange(Object range, boolean animate) {
         Range rangeVal = (Range) range;
-        setAutoRangePadding(((Range) range).low);
+
         if (animate) {
             animationTimeline.stop();
             ObservableList<KeyFrame> keyFrames = animationTimeline.getKeyFrames();
@@ -339,8 +309,6 @@ public class StableTicksAxis extends ValueAxis<Number> {
         } else {
             currentLowerBound.set(rangeVal.low);
             setScale(rangeVal.scale);
-            setLowerBound(rangeVal.low);
-            setUpperBound(rangeVal.high);
         }
 
         setLowerBound(rangeVal.low);
@@ -352,7 +320,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(getLowerBound(), getUpperBound());
     }
 
-    private @NotNull Range getRange(double minValue, double maxValue) {
+    private Range getRange(double minValue, double maxValue) {
         double length = getLength();
         double delta = maxValue - minValue;
         double scale = calculateNewScale(length, minValue, maxValue);
@@ -360,31 +328,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return new Range(minValue, maxValue, calculateTickSpacing(delta, maxTicks), scale);
     }
 
-    @Override
-    protected List<Number> calculateTickValues(double length, Object range) {
-        Range rangeVal = (Range) range;
 
-        // Use a floor so we start generating ticks before the axis starts -- this is really only relevant
-        // because of the minor ticks before the first visible major tick. We'll generate a first
-        // invisible major tick, but the ValueAxis seems to filter it out.
-        double firstTick = Math.floor(rangeVal.low / rangeVal.tickSpacing) * rangeVal.tickSpacing;
-
-        // Generate one more tick than we expect, for "overlap" to get minor ticks on both sides of the
-        // first and last major tick.
-        int numTicks = (int) (rangeVal.getDelta() / rangeVal.tickSpacing) + 1;
-        List<Number> ret = new ArrayList<>(numTicks + 1);
-        minorTicks = new ArrayList<>((numTicks + 2) * numMinorTicks);
-        double minorTickSpacing = rangeVal.tickSpacing / (numMinorTicks + 1);
-        for (int i = 0; i <= numTicks; ++i) {
-            double majorTick = firstTick + rangeVal.tickSpacing * i;
-            ret.add(majorTick);
-            for (int j = 1; j <= numMinorTicks; ++j) {
-                minorTicks.add(majorTick + minorTickSpacing * j);
-            }
-        }
-
-        return ret;
-    }
 
     @Override
     protected String getTickMarkLabel(Number number) {
@@ -404,32 +348,65 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
     }
 
-    public double getMin() {
-        return getLowerBound();
-    }
+    private double getLabelSize() {
+        if (labelSize == -1) {
+            Dimension2D dim = measureTickMarkLabelSize("-888.88E-88", getTickLabelRotation());
+            if (getSide().isHorizontal()) {
+                labelSize = dim.getWidth();
+            } else {
+                // TODO: May want to tweak this value so the axis labels are not so closely packed together.
+                labelSize = dim.getHeight();
+            }
+        }
 
-    public double getMax() {
-        return getUpperBound();
+        return labelSize;
     }
 
     @Override
-    public String toString() {
-        return "StableTicksAxis{" +
-                "animationTimeline=" + animationTimeline +
-                ", minorTicks=" + minorTicks +
-                ", forceZeroInRange=" + forceZeroInRange +
-                ", labelSize=" + labelSize +
-                ", scaleValue=" + scaleValue +
-                '}';
+    protected List<Number> calculateTickValues(double length, Object range) {
+        if (!(range instanceof Range rangeVal)) {
+            return List.of();
+        }
+
+        if (rangeVal.tickSpacing == 0) {
+            return List.of();
+        }
+
+        double firstTick = Math.floor(rangeVal.low / rangeVal.tickSpacing) * rangeVal.tickSpacing;
+        int numTicks = (int) (rangeVal.getDelta() / rangeVal.tickSpacing) + 1;
+
+        List<Number> majorTicks = new ArrayList<>(numTicks + 1);
+        minorTicks = new ArrayList<>((numTicks + 2) * numMinorTicks);
+
+        double minorTickSpacing = rangeVal.tickSpacing / (numMinorTicks + 1);
+
+        for (int i = 0; i <= numTicks; ++i) {
+            double majorTick = firstTick + rangeVal.tickSpacing * i;
+            majorTicks.add(majorTick);
+
+            for (int j = 1; j <= numMinorTicks; ++j) {
+                minorTicks.add(majorTick + minorTickSpacing * j);
+            }
+        }
+        return majorTicks;
     }
 
     private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
-
-            if (high - low < 0) return 0;
             return high - low;
         }
 
+        @Contract(pure = true)
+        @Override
+        public @NotNull String toString() {
+            return "Range{" +
+                    "low=" + low +
+                    ", high=" + high +
+                    ", tickSpacing=" + tickSpacing +
+                    ", scale=" + scale +
+                    '}';
+        }
     }
+
 }

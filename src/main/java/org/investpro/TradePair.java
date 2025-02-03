@@ -11,13 +11,12 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 
 @Getter
+@Setter
 public class TradePair extends Pair<Currency, Currency> {
 
     private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
 
-    // Getter for TradePair ID
-    // Setter for TradePair ID
-    @Setter
+
     private long id;
 
     // Constructor that takes two currencies

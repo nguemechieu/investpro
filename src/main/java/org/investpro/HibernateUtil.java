@@ -1,5 +1,6 @@
 package org.investpro;
 
+import lombok.Getter;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
@@ -7,13 +8,14 @@ import org.hibernate.service.ServiceRegistry;
 
 import static org.investpro.Exchange.logger;
 
+@Getter
 public class HibernateUtil {
 
+    // Provide access to the SessionFactory
     // The single instance of the SessionFactory (thread-safe)
-    private static final SessionFactory sessionFactory;
+    private static SessionFactory sessionFactory;
 
-    // Static block for initialization
-    static {
+    public HibernateUtil() {
         try {
             // Create Configuration instance
             Configuration configuration = new Configuration();
@@ -26,22 +28,14 @@ public class HibernateUtil {
                     .applySettings(configuration.getProperties()).build();
 
             // Build session factory
-            sessionFactory = configuration.buildSessionFactory(serviceRegistry);
+            this.sessionFactory = configuration.buildSessionFactory(serviceRegistry);
         } catch (Exception ex) {
-            logger.error("Failed to build session factory" + ex);
+            logger.error("Failed to build session factory{}", String.valueOf(ex));
             throw new ExceptionInInitializerError("Initial SessionFactory creation failed: " + ex.getMessage());
         }
     }
 
-    // Provide access to the SessionFactory
-    public static SessionFactory getSessionFactory() {
-        return sessionFactory;
-    }
+    // Static block for initialization
 
-    // Close the SessionFactory, ideally called on application shutdown
-    public static void shutdown() {
-        if (sessionFactory != null) {
-            sessionFactory.close();
-        }
-    }
+
 }

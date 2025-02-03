@@ -1,4 +1,4 @@
-package org.investpro;
+package org.investpro.exchanges;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -9,6 +9,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Alert;
+import org.investpro.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,7 @@ import java.util.concurrent.Future;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
-import static org.investpro.Oanda.numCandles;
+import static org.investpro.exchanges.Oanda.numCandles;
 
 public class Binance extends Exchange {
 
@@ -133,6 +134,15 @@ public class Binance extends Exchange {
 
     }
 
+    /**
+     * @param tradePair
+     * @return
+     */
+    @Override
+    public CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
+        return null;
+    }
+
     @Override
     public String getExchangeMessage() {
         return message;
@@ -220,16 +230,17 @@ public class Binance extends Exchange {
                     }
 
                     JsonNode currCandle = res.get(0);
-                    //  Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
+                    // Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
 
                     return Optional.of(new InProgressCandleData(
-
+                            currCandle.get(6).asLong(),
                             currCandle.get(1).asDouble(),
                             currCandle.get(2).asDouble(),
                             currCandle.get(3).asDouble(),
+                            Instant.now().toEpochMilli(),
 
                             currCandle.get(4).asDouble(),
-                            (int) currCandle.get(6).asLong(),
+
                             currCandle.get(5).asLong()
                     ));
                 });
@@ -240,14 +251,6 @@ public class Binance extends Exchange {
         return List.of(); // Binance doesn't have a specific endpoint for pending orders
     }
 
-    @Override
-    public List<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
-        requestBuilder.uri(URI.create(API_URL + "/api/v3/depth?symbol=" + tradePair.toString('-')));
-        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
-        logger.info("Binance response: " + response.body());
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OrderBook[].class));
-
-    }
 
     @Override
     public List<Position> getPositions() {
@@ -339,9 +342,12 @@ public class Binance extends Exchange {
         return List.of();
     }
 
-    /**
-     * @return
-     */
+
+    @Override
+    public List<PriceData> fetchLivesBidAsk(TradePair tradePair) {
+        return null;
+    }
+
     @Override
     public CustomWebSocketClient getWebsocketClient() {
         return null;
@@ -452,11 +458,12 @@ public class Binance extends Exchange {
                                         candle.get(4).asDouble(),  // close price
                                         candle.get(2).asDouble(),  // high price
                                         candle.get(3).asDouble(),  // low price
-                                        candle.get(0).asInt() / 1000,  // open time (convert ms to seconds)
-                                        candle.get(5).asDouble()   // volume
+                                        (int) candle.get(0).asLong(),  // open time (convert ms to seconds)
+                                        0,
+                                        candle.get(5).asLong()   // volume
                                 ));
                             }
-                            candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
+                            candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
                             endTime.set((int) (startTimeMillis / 1000));  // Update endTime for pagination
                             return candleData;
                         } else {

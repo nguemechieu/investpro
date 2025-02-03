@@ -9,22 +9,20 @@ module investpro {
     requires java.net.http;
     requires javafx.web;
     requires org.json;
-    requires io.github.cdimascio.dotenv.java;
+
     requires bounce;
 
 
     requires org.hibernate.orm.core;
-    requires weka.stable;
+
     requires javafx.swing;
-    requires com.nimbusds.jose.jwt;
+
     requires com.google.gson;
     requires testcontainers;
-    requires org.xerial.sqlitejdbc;
-    requires netlib.java;
 
 
     requires com.jfoenix;
-    requires jcip.annotations;
+
 
     requires io.ebean.annotation;
 
@@ -32,8 +30,15 @@ module investpro {
     requires org.hibernate.commons.annotations;
     requires jakarta.persistence;
     requires com.github.dockerjava.transport.zerodep;
-    requires static lombok;
+
     requires org.slf4j;
+    requires com.github.dockerjava.api;
+    requires static lombok;
+    requires weka.stable;
+    requires com.nimbusds.jose.jwt;
+    requires mysql.connector.j;
+    requires jakarta.transaction;
+    requires java.compiler;
 
     opens org.investpro to
 
@@ -49,7 +54,11 @@ module investpro {
             bounce,
             jakarta.persistence,
             weka.stable,
-            javafx.swing;
+            javafx.swing
+            ;
+
 
     exports org.investpro;
+    exports org.investpro.exchanges;
+    opens org.investpro.exchanges to bounce, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, io.github.cdimascio.dotenv.java, jakarta.persistence, javafx.swing, netlib.java, org.hibernate.orm.core, org.json, weka.stable;
 }

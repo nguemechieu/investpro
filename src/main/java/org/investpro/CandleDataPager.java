@@ -6,7 +6,6 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -14,80 +13,118 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 /**
- * Pages new candle data in chronological order to a {@code CandleStickChart} on-demand.
+ * Handles paginated fetching of new candle data in chronological order to a {@code CandleStickChart}.
  *
- * @author  <a href="mailto: nguemechieu@live.com">nguem</a>
+ * @author <a href="mailto: nguemechieu@live.com">nguem</a>
  */
 public class CandleDataPager {
     @Getter
     private final CandleDataSupplier candleDataSupplier;
     private final CandleDataPreProcessor candleDataPreProcessor;
     private static final Logger logger = LoggerFactory.getLogger(CandleDataPager.class);
+    private volatile boolean running = true; // Flag to manage the pager's state
 
     public CandleDataPager(CandleStickChart candleStickChart, CandleDataSupplier candleDataSupplier) {
-        Objects.requireNonNull(candleStickChart);
-        Objects.requireNonNull(candleDataSupplier);
+        Objects.requireNonNull(candleStickChart, "CandleStickChart cannot be null.");
+        Objects.requireNonNull(candleDataSupplier, "CandleDataSupplier cannot be null.");
         this.candleDataSupplier = candleDataSupplier;
-        candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
+        this.candleDataPreProcessor = new CandleDataPreProcessor(candleStickChart);
     }
 
     public Consumer<Future<List<CandleData>>> getCandleDataPreProcessor() {
         return candleDataPreProcessor;
     }
 
-    private static final class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
-      final   CandleStickChart candleStickChart;
-        private boolean hitFirstNonPlaceHolder;
+    /**
+     * Stops fetching new candle data.
+     */
+    public void stop() {
+        running = false;
+        logger.info("CandleDataPager has been stopped.");
+    }
 
+    /**
+     * Accepts new candle data and updates the data supplier.
+     */
+    private void accept(List<CandleData> candleData) {
+        if (!running) {
+            logger.info("CandleDataPager is stopped. Ignoring new data.");
+            candleData.clear();
+            return;
+        }
+
+        try {
+            getCandleDataSupplier().get().get().addAll(candleData);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Thread interrupted while accepting new candle data.", e);
+        } catch (ExecutionException e) {
+            logger.error("Error fetching candle data from supplier.", e);
+        }
+    }
+
+    /**
+     * Preprocesses incoming candle data before updating the chart.
+     */
+    private static final class CandleDataPreProcessor implements Consumer<Future<List<CandleData>>> {
+        private final CandleStickChart candleStickChart;
+        private boolean hitFirstNonPlaceHolder = false;
 
         CandleDataPreProcessor(CandleStickChart candleStickChart) {
             this.candleStickChart = candleStickChart;
         }
 
-        List<CandleData> candleData = new ArrayList<>();
         @Override
         public void accept(@NotNull Future<List<CandleData>> futureCandleData) {
-
-            try {
-                candleData = futureCandleData.get();
-            } catch (InterruptedException | ExecutionException ex) {
-                logger.error("exception during accepting futureCandleData: ", ex);
+            if (!futureCandleData.isDone()) {
+                logger.warn("Candle data is not yet available.");
                 return;
             }
 
-            if (!candleData.isEmpty()) {
-                if (hitFirstNonPlaceHolder) {
-                    candleStickChart.getCandlePageConsumer().accept(candleData);
-                } else {
-                    int count = 0;
-                    while (candleData.get(count).isPlaceHolder()) {
-                        count++;
-                        if (count == candleData.size()) {
-                            logger.info("No non-placeholder candles found in the data");
-
-                            new Messages(Alert.AlertType.WARNING,
-                                    "No non-placeholder candles found in the data"
-                            );
-                            break;
-                        }
-                    }
-                    List<CandleData> nonPlaceHolders = candleData.subList(count, candleData.size());
-                    if (!nonPlaceHolders.isEmpty()) {
-                        hitFirstNonPlaceHolder = true;
-                        candleStickChart.getCandlePageConsumer().accept( nonPlaceHolders);
-                    }
-
-                }
+            List<CandleData> candleData;
+            try {
+                candleData = futureCandleData.get();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt(); // Preserve interrupted state
+                logger.error("Candle data processing was interrupted.", ex);
+                return;
+            } catch (ExecutionException ex) {
+                logger.error("Error during candle data processing: ", ex.getCause());
+                return;
             }
+
+            if (candleData == null || candleData.isEmpty()) {
+                logger.warn("Received empty candle data.");
+                return;
+            }
+
+            processCandleData(candleData);
+        }
+
+        /**
+         * Processes the received candle data.
+         */
+        private void processCandleData(List<CandleData> candleData) {
+            if (hitFirstNonPlaceHolder) {
+                candleStickChart.getCandlePageConsumer().accept(candleData);
+                return;
+            }
+
+            // Find the first non-placeholder candle
+            int firstValidIndex = 0;
+            while (firstValidIndex < candleData.size() && candleData.get(firstValidIndex).isPlaceHolder()) {
+                firstValidIndex++;
+            }
+
+            if (firstValidIndex == candleData.size()) {
+                logger.info("No valid trading candles found.");
+                new Messages(Alert.AlertType.WARNING, "No non-placeholder candles found in the data.");
+                return;
+            }
+
+            List<CandleData> validCandleData = candleData.subList(firstValidIndex, candleData.size());
+            hitFirstNonPlaceHolder = true;
+            candleStickChart.getCandlePageConsumer().accept(validCandleData);
         }
     }
-
-    private void accept(List<CandleData> candleData) {
-        try {
-            getCandleDataSupplier().get().get().addAll(candleData);
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 }

@@ -1,5 +1,5 @@
 .tradingWindow{
-    -fx-text-fill: #1d79e1;
+    -fx-text-fill: #ffffff;
     -fx-text-align: center;
     -fx-background-color: #116798;
     -fx-background-radius: 5.0;
@@ -148,9 +148,9 @@
     -fx-background-color: rgba(46, 86, 161, 0.31);
 }
 
-/*.chart{*/
-/*    -fx-background-color: #0a325e*/
-/*}*/
+.chart {
+    -fx-background-color: #0a325e
+}
 
 
 
@@ -399,6 +399,10 @@
     -fx-font-family: "Segoe UI Light";
     -fx-tick-length: 20;
     -fx-minor-tick-length: 10;
+}
+
+.toggle-switch {
+    -fx-skin: "com.sun.javafx.scene.control.skin.ToggleButtonSkin";
 }
 
 .chart-title {

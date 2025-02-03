@@ -3,15 +3,9 @@ package org.investpro;
 import org.jetbrains.annotations.NotNull;
 import weka.classifiers.Classifier;
 import weka.classifiers.trees.J48;
-import weka.core.Attribute;
-import weka.core.DenseInstance;
-import weka.core.Instance;
-import weka.core.Instances;
+import weka.core.*;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -23,20 +17,18 @@ public class TradingAI {
     private final Instances trainingData;
     private final List<Attribute> attributes;
 
-    public TradingAI(Instances trainingData) {
+    public TradingAI(@NotNull Instances trainingData) {
         this.trainingData = trainingData;
         this.attributes = createAttributes();
         this.model = new J48();  // Decision Tree Classifier
 
         try {
-            logger.info("Training data: " + trainingData);
-
-            model.buildClassifier(trainingData); // Train the model
-
-            saveTrainingData(trainingData); // Save training data
-
+            logger.info("Training AI with provided data...");
+            model.buildClassifier(trainingData);  // Train using training data
+            saveTrainingData(trainingData);
+            
         } catch (Exception e) {
-            logger.severe("Error building classifier: " + e.getMessage());
+            logger.severe("❌ Error building classifier: " + e.getMessage());
         }
     }
 
@@ -48,15 +40,13 @@ public class TradingAI {
             Instance instance = createInstance(open, high, low, close, volume);
             double prediction = model.classifyInstance(instance);
 
-            if (prediction == 0.0)
-                return SIGNAL.HOLD;
-            else if (prediction == 1.0)
-                return SIGNAL.BUY;
-            else if (prediction == 2.0)  // Fix: Weka does not support negative labels (-1.0)
-                return SIGNAL.SELL;
-
+            return switch ((int) prediction) {
+                case 1 -> SIGNAL.BUY;
+                case 2 -> SIGNAL.SELL;
+                default -> SIGNAL.HOLD;
+            };
         } catch (Exception e) {
-            logger.severe("Error creating instance or predicting signal: " + e.getMessage());
+            logger.severe("❌ Prediction error: " + e.getMessage());
         }
         return SIGNAL.HOLD;
     }
@@ -64,7 +54,9 @@ public class TradingAI {
     /**
      * Generate a trading signal based on moving averages.
      */
-    public SIGNAL getMovingAverageSignal(List<Double> prices, double currentPrice) {
+    public SIGNAL getMovingAverageSignal(List<OrderBook> prices, double currentPrice) {
+        if (prices.isEmpty()) return SIGNAL.HOLD;
+
         double shortTermMA = calculateMovingAverage(prices, 20);
         double longTermMA = calculateMovingAverage(prices, 50);
 
@@ -83,42 +75,44 @@ public class TradingAI {
     /**
      * Calculate Moving Average.
      */
-    private double calculateMovingAverage(@NotNull List<Double> prices, int period) {
-        if (prices.size() < period) return 0.0;
+    private double calculateMovingAverage(List<OrderBook> prices, int period) {
+        if (prices.size() < period) return prices.stream().findFirst().get().getBidEntries().getFirst().getPrice();
 
-        double sum = 0.0;
-        for (int i = prices.size() - period; i < prices.size(); i++) {
-            sum += prices.get(i);
-        }
-        return sum / period;
+        return prices.subList(prices.size() - period, prices.size())
+                .stream()
+                .mapToDouble(
+                        c -> c.getBidEntries().getFirst().getPrice()
+                )
+                .average()
+                .orElse(0.0);
     }
 
     /**
      * Calculate Support Level (Lowest price in recent period).
      */
-    private double calculateSupport(@NotNull List<Double> prices) {
-        double support = Double.MAX_VALUE;
-        int size = prices.size();
-        for (int i = Math.max(0, size - 20); i < size; i++) {
-            support = Math.min(support, prices.get(i));
-        }
-        return support;
+    private double calculateSupport(List<OrderBook> prices) {
+        return prices.subList(Math.max(0, prices.size() - 20), prices.size())
+                .stream()
+                .mapToDouble(c -> c.getBidEntries().getFirst().getPrice()
+                )
+                .min()
+                .orElse(Double.MAX_VALUE);
     }
 
     /**
      * Calculate Resistance Level (Highest price in recent period).
      */
-    private double calculateResistance(@NotNull List<Double> prices) {
-        double resistance = Double.MIN_VALUE;
-        int size = prices.size();
-        for (int i = Math.max(0, size - 20); i < size; i++) {
-            resistance = Math.max(resistance, prices.get(i));
-        }
-        return resistance;
+    private double calculateResistance(List<OrderBook> prices) {
+        return prices.subList(Math.max(0, prices.size() - 20), prices.size())
+                .stream()
+                .mapToDouble(c -> c.getBidEntries().getFirst().getPrice()
+                )
+                .max()
+                .orElse(Double.MIN_VALUE);
     }
 
     /**
-     * Create an instance for prediction.
+     * Create an instance for prediction based on trained data.
      */
     private @NotNull Instance createInstance(double open, double high, double low, double close, double volume) {
         Instance instance = new DenseInstance(attributes.size());
@@ -128,7 +122,7 @@ public class TradingAI {
         instance.setValue(attributes.get(2), low);
         instance.setValue(attributes.get(3), close);
         instance.setValue(attributes.get(4), volume);
-        instance.setMissing(attributes.get(5)); // Ensure class is missing for prediction
+        instance.setMissing(attributes.get(5)); // Class attribute for prediction
         return instance;
     }
 
@@ -145,40 +139,45 @@ public class TradingAI {
 
         // Class Attribute (BUY, SELL, HOLD)
         ArrayList<String> classValues = new ArrayList<>();
-        classValues.add("HOLD");  // 0.0
-        classValues.add("BUY");   // 1.0
-        classValues.add("SELL");  // 2.0
+        classValues.add("HOLD");  // 0
+        classValues.add("BUY");   // 1
+        classValues.add("SELL");  // 2
         attributes.add(new Attribute("class", classValues));
 
         return attributes;
     }
 
     /**
-     * Train and Save Model.
+     * Save training data to a file.
      */
-    public void train() {
-        try {
-            model.buildClassifier(trainingData);
-            saveTrainingData(trainingData);
-            logger.info("Training completed.");
-        } catch (Exception e) {
-            logger.severe("Error building classifier: " + e.getMessage());
+    private void saveTrainingData(@NotNull Instances data) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("trainingData.arff"))) {
+            writer.write(data.toString());
+            logger.info("✅ Training data saved successfully.");
+        } catch (IOException e) {
+            logger.severe("❌ Error saving training data: " + e.getMessage());
         }
     }
 
-    /**
-     * Save training data to a file.
-     */
-    private void saveTrainingData(Instances data) {
+    public void trainModel() {
         try {
-            File file = new File("trainingData.pkl");
-            if (!file.exists()) file.createNewFile();
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
-                bw.write(data.toString());
+            logger.info("🔄 Training AI model...");
+
+            // Ensure training data is not empty
+            if (trainingData.numInstances() == 0) {
+                logger.warning("⚠ No training data available. Cannot train model.");
+                return;
             }
-            logger.info("Training data saved.");
-        } catch (IOException e) {
-            logger.severe("Error saving training data: " + e.getMessage());
+
+
+            // Save training data
+            saveTrainingData(trainingData);
+
+            logger.info("✅ Model training completed successfully!");
+
+        } catch (Exception e) {
+            logger.severe("❌ Error training model: " + e.getMessage());
         }
     }
+
 }

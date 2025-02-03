@@ -10,8 +10,8 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.investpro.Coinbase.client;
-import static org.investpro.Coinbase.requestBuilder;
+import static org.investpro.exchanges.Coinbase.client;
+import static org.investpro.exchanges.Coinbase.requestBuilder;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 import static org.investpro.Exchange.logger;
 

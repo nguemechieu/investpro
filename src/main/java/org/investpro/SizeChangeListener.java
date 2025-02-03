@@ -4,10 +4,15 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
+import javafx.geometry.Insets;
+import javafx.scene.text.Font;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * A listener that handles changes in the width and height of the container that holds the chart.
- * Once the chart's size stabilizes (after fluctuating during initialization), the chart layout is updated accordingly.
+ * 📌 **SizeChangeListener**
+ * - Monitors changes in container **width** and **height**.
+ * - Ensures layout updates only when the size is stable.
  */
 public class SizeChangeListener implements ChangeListener<Number> {
 
@@ -15,34 +20,56 @@ public class SizeChangeListener implements ChangeListener<Number> {
     private final ObservableNumberValue containerWidth;
     private final ObservableNumberValue containerHeight;
     private boolean sizeUpdated = false;
-
+    private final CandleStickChartToolbar chart;
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
-     * Constructs a SizeChangeListener that listens for changes in the container's width and height.
-     *
-     * @param gotFirstSize  a boolean property indicating if the size has stabilized.
-     * @param containerWidth  the width of the container.
-     * @param containerHeight the height of the container.
+     * **Constructor**
+     * @param gotFirstSize  Indicates if the size has stabilized.
+     * @param containerWidth  The observable width of the container.
+     * @param containerHeight The observable height of the container.
+     * @param chart The chart instance to be resized.
      */
-    public SizeChangeListener(BooleanProperty gotFirstSize, ObservableNumberValue containerWidth, ObservableNumberValue containerHeight) {
+    public SizeChangeListener(BooleanProperty gotFirstSize, ObservableNumberValue containerWidth,
+                              ObservableNumberValue containerHeight, CandleStickChartToolbar chart) {
         this.gotFirstSize = gotFirstSize;
         this.containerWidth = containerWidth;
         this.containerHeight = containerHeight;
+        this.chart = chart;
     }
 
     /**
-     * Invoked when the observed size property changes. Once the size stabilizes (doesn't fluctuate),
-     * it updates the chart layout and disables further size updates.
+     * **Handles Size Changes**
+     * - Ensures the chart resizes only after it stabilizes.
+     * - Prevents excessive updates to improve performance.
      *
-     * @param observable the observed size property (width or height).
-     * @param oldValue the previous size value.
-     * @param newValue the new size value.
+     * @param observable The observed size property (width or height).
+     * @param oldValue The previous size.
+     * @param newValue The new size.
      */
     @Override
     public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
-        // Prevent unnecessary updates if the size has already been set once.
         if (!sizeUpdated && containerWidth.doubleValue() > 0 && containerHeight.doubleValue() > 0) {
             sizeUpdated = true;
-            gotFirstSize.set(true);  // Signals that the size is now stable.
+            gotFirstSize.set(true);  // Size has now stabilized.
+
         }
     }
+
+    public void resize() {
+
+    }
+
+
+    /**
+     * **Resizes the Chart Layout**
+     * - Dynamically adjusts chart elements when the container size changes.
+     * - Updates fonts, paddings, and element positions.
+     * - Ensures responsiveness and scalability.
+     */
+
+
+
+
+
+
 }

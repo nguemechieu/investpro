@@ -21,7 +21,7 @@ public class ZoomLevel {
     private final int zoomLevelId;
 
     private final int candleWidth;
-    @Getter
+
     private final double xAxisRangeInSeconds;
     private final IntegerProperty numVisibleCandles;
     private final double secondsPerPixel;
@@ -46,7 +46,7 @@ public class ZoomLevel {
         extremaForCandleRangeMap = new ConcurrentHashMap<>();
     }
 
-    public double getNumVisibleCandles() {
+    public int getNumVisibleCandles() {
         return numVisibleCandles.get();
     }
 

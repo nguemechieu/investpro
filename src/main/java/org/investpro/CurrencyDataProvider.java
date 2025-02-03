@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 
-import static org.investpro.Coinbase.client;
+import static org.investpro.exchanges.Coinbase.client;
 
 /**
  * @author NOEL NGUEMECHIEU
@@ -34,7 +35,7 @@ public class CurrencyDataProvider {
     }
 
 
-    public void registerCurrencies() throws Exception {
+    public void registerCurrencies() {
         String jsonUrl = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=BTC";
 
         HttpResponse<String> jsonResponse;
@@ -98,7 +99,25 @@ public class CurrencyDataProvider {
                 logger.info("Added coin: {}", coinInfo);
 
 
-                Currency coin = new Currency(CurrencyType.CRYPTO, name, id, symbol, fractional_digit, symbol, image);
+                Currency coin = new Currency(CurrencyType.CRYPTO, name, id, symbol, fractional_digit, symbol, image) {
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(@NotNull Currency o) {
+                        return 0;
+                    }
+
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(java.util.@NotNull Currency o) {
+                        return 0;
+                    }
+                };
 
 
                 coinsToRegister.add(coin);
@@ -106,7 +125,25 @@ public class CurrencyDataProvider {
 
             }
             for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-                Currency coin = new Currency(CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 3, currency.getSymbol(), currency.getDisplayName());
+                Currency coin = new Currency(CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 3, currency.getSymbol(), currency.getDisplayName()) {
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(@NotNull Currency o) {
+                        return 0;
+                    }
+
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(java.util.@NotNull Currency o) {
+                        return 0;
+                    }
+                };
                 coinsToRegister.add(coin);
 
 

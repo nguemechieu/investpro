@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import static org.investpro.Oanda.numCandles;
+import static org.investpro.exchanges.Oanda.numCandles;
 
 /**
  * @author NOEL NGUEMECHIEU
@@ -77,15 +77,16 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         double lastClose = -1;
         for (int i = 0; i < numCandles; i++) {
             int openTime = (start - secondsPerCandle) - (i * secondsPerCandle);
+            double volume = i;
             if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
                 // no trades occurred during this candle
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, 0, 0, 0, true));
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, 0, volume));
             } else {
                 double open = 0;
                 double high = -1;
                 double low = Double.MAX_VALUE;
                 double close = 0;
-                double volume = 0;
+                volume = 0;
                 double priceTotal = 0;
                 double volumeWeightedPriceTotal = 0;
                 int tradeIndex = 0;
@@ -117,7 +118,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
                 double volumeWeightedAveragePrice = volumeWeightedPriceTotal / volume;
 
                 CandleData datum = new CandleData(open, close, Math.max(open, high), Math.min(open, low), openTime,
-                        volume, averagePrice, volumeWeightedAveragePrice, false);
+                        0, volume);
                 candleData.add(datum);
             }
         }

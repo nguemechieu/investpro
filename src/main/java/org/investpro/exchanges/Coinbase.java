@@ -1,4 +1,4 @@
-package org.investpro;
+package org.investpro.exchanges;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -7,6 +7,8 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.investpro.*;
+import org.investpro.Currency;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +21,12 @@ import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -31,11 +35,10 @@ import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
 public  class Coinbase extends Exchange {
 
-    CustomWebSocketClient webSocketClient=new CustomWebSocketClient();
 
     String websocketURL="wss://advanced-trade-ws.coinbase.com";
-    static  HttpClient client = HttpClient.newHttpClient();
-    static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+    public static HttpClient client = HttpClient.newHttpClient();
+    public static HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     private static final Logger logger = LoggerFactory.getLogger(Coinbase.class);
     public static final String API_URL = "https://api.coinbase.com/api/v3/brokerage";
     String apiKey;
@@ -80,7 +83,7 @@ public  class Coinbase extends Exchange {
 
 
     @Override
-    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException {
+    public void createOrder(@NotNull TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
 
         requestBuilder.uri(URI.create(
                 "%s/orders".formatted(API_URL)
@@ -221,8 +224,8 @@ public  class Coinbase extends Exchange {
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         String startDateString = "2016-10-17T15%3A00%3A00.000000000Z";
 
-        //DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
-        //currentCandleStartedAt, ZoneOffset.UTC));
+        DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
+                currentCandleStartedAt, ZoneOffset.UTC));
         long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
         // Get the closest supported granularity to the ideal granularity.
         int actualGranularity = getSupportedGranularity(secondsPerCandle);
@@ -292,8 +295,8 @@ public  class Coinbase extends Exchange {
                     }
 
 
-                    return Optional.of(new InProgressCandleData(openPrice, highSoFar, lowSoFar, lastTradePrice,
-                            currentTill, volumeSoFar));
+                    return Optional.of(new InProgressCandleData(currentTill, openPrice, highSoFar, lowSoFar,
+                            Instant.now().getEpochSecond(), lastTradePrice, volumeSoFar));
                 });
     }
 
@@ -321,16 +324,60 @@ public  class Coinbase extends Exchange {
     }
 
     @Override
-    public List<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+    public CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
+        Objects.requireNonNull(tradePair, "TradePair cannot be null");
 
-        requestBuilder.uri(URI.create("%s/products/%s/book".formatted(API_URL, tradePair.toString('-'))));
-        HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
-        logger.info("coinbase response: " + response.body());
+        CompletableFuture<List<OrderBook>> futureResult = new CompletableFuture<>();
 
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OrderBook[].class));
+        CompletableFuture.runAsync(() -> {
+            try {
+                String uriStr = API_URL + "/products/" + tradePair.toString('-') + "/book?level=2";
+                requestBuilder.uri(URI.create(uriStr));
 
+                HttpResponse<String> response = client.send(
+                        requestBuilder.build(),
+                        HttpResponse.BodyHandlers.ofString());
 
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException("Failed to fetch order book: " + response.body());
+                }
 
+                JsonNode rootNode = OBJECT_MAPPER.readTree(response.body());
+                Instant timestamp = Instant.now();
+
+                List<OrderBookEntry> bidEntries = new ArrayList<>();
+                List<OrderBookEntry> askEntries = new ArrayList<>();
+
+                // Process bids
+                JsonNode bidsNode = rootNode.get("bids");
+                if (bidsNode != null && bidsNode.isArray()) {
+                    for (JsonNode bid : bidsNode) {
+                        double price = bid.get(0).asDouble();
+                        double size = bid.get(1).asDouble();
+                        bidEntries.add(new OrderBookEntry(price, size));
+                    }
+                }
+
+                // Process asks
+                JsonNode asksNode = rootNode.get("asks");
+                if (asksNode != null && asksNode.isArray()) {
+                    for (JsonNode ask : asksNode) {
+                        double price = ask.get(0).asDouble();
+                        double size = ask.get(1).asDouble();
+                        askEntries.add(new OrderBookEntry(price, size));
+                    }
+                }
+
+                // Create and complete the OrderBook result
+                OrderBook orderBook = new OrderBook(timestamp, bidEntries, askEntries);
+                futureResult.complete(List.of(orderBook));
+
+            } catch (IOException | InterruptedException e) {
+                futureResult.completeExceptionally(e);
+            }
+        });
+
+        return futureResult;
     }
 
 
@@ -368,15 +415,14 @@ public  class Coinbase extends Exchange {
     public List<Position> getPositions() {
         return null;
     }
-CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     @Override
     public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
 
         String urls= "%s://%s:%d".formatted(websocketURL, tradePair.toString('-'), 20);
         message =
                 "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
-        CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket :{}", dat);
+
+
     }
 
 
@@ -386,8 +432,6 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         String urls = websocketURL + "://" + tradePair.toString('-') + ":" + 20;
         message =
                 "{\"type\": \"unsubscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
-        CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket {}", dat);
 
 
     }
@@ -396,8 +440,8 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
     public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
         String urls = websocketURL + "://" + symbol.toString('-') + ":" + 20;
         message = "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"ticker\",\"product_id\": \"%s\"}]}".formatted(symbol);
-        CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket {}", dat);
+
+
         return Collections.emptyList();
     }
 
@@ -407,8 +451,8 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         String urls = websocketURL + "://" + symbol + ":" + intervalSeconds;
         message =
                 "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(symbol);
-        CompletableFuture<String> dat = webSocketClient.sendWebSocketRequest(urls, message);
-        logger.info("WebSocket  {}", dat);
+
+
         return Collections.emptyList();
 
     }
@@ -430,7 +474,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
             //coinbase response: [{"id":"DOGE-BTC","base_currency":"DOGE","quote_currency":"BTC","quote_increment":"0.00000001","base_increment":"0.1","display_name":"DOGE-BTC","min_market_funds":"0.000016","margin_enabled":false,"post_only":false,"limit_only":false,"cancel_only":false,"status":"online","status_message":"","trading_disabled":false,"fx_stablecoin":false,"max_slippage_percentage":"0.03000000","auction_mode":false,
             for (JsonNode rate : res) {
-                Currency baseCurrency, counterCurrency;
+                org.investpro.Currency baseCurrency, counterCurrency;
 
 
                 String fullDisplayName = rate.get("base_currency").asText();
@@ -440,7 +484,25 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                 String code = rate.get("base_currency").asText();
                 int fractionalDigits = 8;
                 String symbol = rate.get("base_currency").asText();
-                baseCurrency = new Currency(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol);
+                baseCurrency = new Currency(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol) {
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(@NotNull Currency o) {
+                        return 0;
+                    }
+
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(java.util.@NotNull Currency o) {
+                        return 0;
+                    }
+                };
                 String fullDisplayName2 = rate.get("quote_currency").asText();
                 String shortDisplayName2 = rate.get("quote_currency").asText();
                 String code2 = rate.get("quote_currency").asText();
@@ -449,7 +511,25 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
                 counterCurrency = new Currency(CurrencyType.CRYPTO,
                         fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2
-                        , symbol);
+                        , symbol) {
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(@NotNull Currency o) {
+                        return 0;
+                    }
+
+                    /**
+                     * @param o
+                     * @return
+                     */
+                    @Override
+                    public int compareTo(java.util.@NotNull Currency o) {
+                        return 0;
+                    }
+                };
 
 
                 TradePair tp = new TradePair(
@@ -458,15 +538,10 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                 tradePairs.add(tp);
                 logger.info("coinbase trade pair: %s".formatted(tp));
 
-
+                Currency.save(tp.getBaseCurrency());
+                Currency.save(tp.getCounterCurrency());
             }
-            Currency.save((ArrayList<Currency>) tradePairs.stream().map(
-                    TradePair::getCounterCurrency
-            ).collect(Collectors.toList()));
 
-            Currency.save((ArrayList<Currency>) tradePairs.stream().map(
-                    TradePair::getBaseCurrency
-            ).collect(Collectors.toList()));
 
 
         } catch (Exception e) {
@@ -498,9 +573,12 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         return List.of();
     }
 
-    /**
-     * @return
-     */
+
+    @Override
+    public List<PriceData> fetchLivesBidAsk(TradePair tradePair) {
+        return null;
+    }
+
     @Override
     public CustomWebSocketClient getWebsocketClient() {
         return null;

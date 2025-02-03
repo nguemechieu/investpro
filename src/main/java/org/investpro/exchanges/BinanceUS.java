@@ -1,4 +1,4 @@
-package org.investpro;
+package org.investpro.exchanges;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -10,7 +10,10 @@ import com.github.dockerjava.zerodep.shaded.org.apache.hc.client5.http.HttpRespo
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.scene.control.Alert;
+import lombok.Getter;
 import lombok.Setter;
+import org.investpro.*;
+import org.investpro.Currency;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -30,14 +33,13 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
-import static org.investpro.Oanda.numCandles;
+import static org.investpro.exchanges.Oanda.numCandles;
 
-
+@Getter
+@Setter
 public class BinanceUS extends Exchange {
 
     static HttpClient client = HttpClient.newHttpClient();
@@ -58,7 +60,6 @@ public class BinanceUS extends Exchange {
     private static String apiKey;
 
 
-    @Setter
     private TradePair tradePair;
 
     public BinanceUS(String apikey, String apiSecret) {
@@ -195,6 +196,64 @@ public class BinanceUS extends Exchange {
         logger.info("Order cancelled: {}", orderId);
     }
 
+    @Override
+    public CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
+        Objects.requireNonNull(tradePair, "TradePair cannot be null");
+
+        CompletableFuture<List<OrderBook>> futureResult = new CompletableFuture<>();
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                String uriStr = "https://api.binance.us/api/v3/depth?symbol=" + tradePair.toString().replace("/", "") + "&limit=100";
+                requestBuilder.uri(URI.create(uriStr));
+
+                HttpResponse<String> response = client.send(
+                        requestBuilder.build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException("Failed to fetch order book: " + response.body());
+                }
+
+                JsonNode rootNode = OBJECT_MAPPER.readTree(response.body());
+                Instant timestamp = Instant.now();
+
+                List<OrderBookEntry> bidEntries = new ArrayList<>();
+                List<OrderBookEntry> askEntries = new ArrayList<>();
+
+                // Process bids
+                JsonNode bidsNode = rootNode.get("bids");
+                if (bidsNode != null && bidsNode.isArray()) {
+                    for (JsonNode bid : bidsNode) {
+                        double price = bid.get(0).asDouble();
+                        double size = bid.get(1).asDouble();
+                        bidEntries.add(new OrderBookEntry(price, size));
+                    }
+                }
+
+                // Process asks
+                JsonNode asksNode = rootNode.get("asks");
+                if (asksNode != null && asksNode.isArray()) {
+                    for (JsonNode ask : asksNode) {
+                        double price = ask.get(0).asDouble();
+                        double size = ask.get(1).asDouble();
+                        askEntries.add(new OrderBookEntry(price, size));
+                    }
+                }
+
+                // Create and complete the OrderBook result
+                OrderBook orderBook = new OrderBook(timestamp, bidEntries, askEntries);
+                futureResult.complete(List.of(orderBook));
+
+            } catch (IOException | InterruptedException e) {
+                futureResult.completeExceptionally(e);
+            }
+        });
+
+        return futureResult;
+    }
+
+
 
     @Override
     public String getExchangeMessage() {
@@ -286,13 +345,13 @@ public class BinanceUS extends Exchange {
                     Instant openTime = Instant.ofEpochMilli(currCandle.get(0).asLong());
 
                     return Optional.of(new InProgressCandleData(
-
+                            openTime.getEpochSecond(),
                             currCandle.get(1).asDouble(),
                             currCandle.get(2).asDouble(),
                             currCandle.get(3).asDouble(),
-
+                            Instant.now().toEpochMilli(),
                             currCandle.get(4).asDouble(),
-                            (int) currCandle.get(6).asLong(),
+
                             currCandle.get(5).asLong()
                     ));
                 });
@@ -336,32 +395,6 @@ public class BinanceUS extends Exchange {
 
     }
 
-    @Override
-    public List<OrderBook> getOrderBook(@NotNull TradePair tradePair) throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException {
-
-        // Step 2: Create query string with timestamp and recvWindow
-        String queryString = "timestamp=%d&recvWindow=10000".formatted(timestamp);  // Adjust timestamp and recvWindow as required
-
-        // Step 3: Generate HMAC SHA256 signature using the API secret and query string
-        String signature = HmacSHA256(apiSecret, queryString);
-
-        // Step 4: Append the signature to the query string
-        queryString += "&signature=%s".formatted(signature);
-
-
-        // Step 6: Set the headers with the API key
-        requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
-
-        String url0 = "%s/api/v3/depth?symbol=%s".formatted(API_URL, tradePair.toString('/'));
-        requestBuilder.uri(URI.create(
-                "%s?%s".formatted(url0, queryString)
-        ));
-        HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
-
-
-        return Arrays.asList(OBJECT_MAPPER.readValue(response.body(), OrderBook[].class));
-
-    }
 
     @Override
     public List<Position> getPositions() {
@@ -556,28 +589,23 @@ public class BinanceUS extends Exchange {
                 TradePair tp = new TradePair(baseAsset, quoteAsset);
                 tradePairs.add(tp);
                 logger.info("Binance US trade pair: %s".formatted(tp));
-
+                Currency.save(tp.getBaseCurrency());
+                Currency.save(tp.getCounterCurrency());
 
             }
-        Currency.save((ArrayList<Currency>) tradePairs.stream().map(
-                TradePair::getCounterCurrency
-        ).collect(Collectors.toList()));
 
-        Currency.save((ArrayList<Currency>) tradePairs.stream().map(
-                TradePair::getBaseCurrency
-        ).collect(Collectors.toList()));
 
 
         return tradePairs;
     }
-CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
+
     @Override
     public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
 
         // WebSocket connection and handling for live trade streams
         String url = "wss://stream.binance.us:9443/ws/%s@trade".formatted(tradePair.toString('/'));
         String message = "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@trade\"],\"id\": 1}".formatted(tradePair.toString('-'));
-        CompletableFuture<String> res = customWebSocketClient.sendWebSocketRequest(url, message);
+        CompletableFuture<String> res = null;
         res.thenAccept(msg -> {
             try {
 
@@ -595,8 +623,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
 
     @Override
     public void stopStreamLiveTrades(TradePair tradePair) {
-        // Implement WebSocket closing if needed for live trade streams
-         customWebSocketClient.closeWebSocket();
+
     }
 
     @Override
@@ -607,7 +634,6 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                 "wss://stream.binance.us:9443/ws/" + symbol.toString('/') + "@depth";
         message =
                 "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@depth\"],\"id\": 1}".formatted(symbol.toString('-'));
-        customWebSocketClient.sendWebSocketRequest(urls, message);
 
 
         return new ArrayList<>();
@@ -725,9 +751,12 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
         return List.of();
     }
 
-    /**
-     * @return
-     */
+
+    @Override
+    public List<PriceData> fetchLivesBidAsk(TradePair tradePair) {
+        return null;
+    }
+
     @Override
     public CustomWebSocketClient getWebsocketClient() {
         return null;
@@ -823,6 +852,7 @@ CustomWebSocketClient customWebSocketClient = new CustomWebSocketClient();
                                             candle.get(2).asDouble(),  // High price
                                             candle.get(3).asDouble(),  // Low price
                                             (int) candle.get(0).asLong(),  // Open time (convert ms to seconds)
+                                            0,
                                             candle.get(5).asLong()   // Volume
                                     ));
                                 }

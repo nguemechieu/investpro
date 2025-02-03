@@ -17,27 +17,16 @@ import java.util.function.Consumer;
 public class LiveTradesConsumer {
 
 
-    private static final Logger logger = LoggerFactory.getLogger(LiveTradesConsumer.class);
+    protected static final Logger logger = LoggerFactory.getLogger(LiveTradesConsumer.class);
     private final List<TradePair> tradePairs = new ArrayList<>();
 
     public Account account;
     List<Trade> livesTrades;
     private boolean ready;
 
-    private InProgressCandle inProgressCandle;
-    private Exchange exchange;
+    protected InProgressCandle inProgressCandle;
+    protected Exchange exchange;
     private List<Trade> tradeQueue;
-
-    public LiveTradesConsumer(Exchange exchange, @NotNull Account account) {
-        this.exchange = exchange;
-        // Initialize consumer with a default account
-        this.account = account;
-        this.inProgressCandle = new InProgressCandle();
-        this.ready = false;
-        this.tradeQueue = new ArrayList<>();
-        this.livesTrades = new ArrayList<>();
-
-    }
 
 
     public LiveTradesConsumer() {
@@ -148,106 +137,10 @@ public class LiveTradesConsumer {
 
 
 
-    public void run() {
-        // Implement live trade processing
-        this.acceptTrades(
-                getExchange().getLiveTrades(this.tradePairs) // Get live trades from exchange and
-        ); // Get live trades from exchange and
-
-    }
-
-    private Exchange getExchange() {
-
-        return this.exchange; // Replace this with actual exchange implementation
-
-    }
-
-    public void setExchange(Exchange exchange) {
-        // Set exchange for live trade processing
-        if (exchange == null) {
-            logger.warn("No exchange provided. Unable to set exchange for live trading.");
-            return;
-        }
-
-        // Clear any existing exchange if necessary (depends on your logic)
-        this.exchange.clear();
-
-        // Implement exchange selection and processing logic
-        this.exchange.add(exchange);
-        logger.info("Added exchange: {} to live trading.", exchange);
-
-        // Further processing, e.g., start listening to live market data for this exchange
-        startLiveTrading(this.tradePairs);
-        logger.info("Live trading started for exchange: {}.", exchange);
-    }
 
 
-    public void setTradePairs(List<TradePair> tradePairs) {
-        // Set trade pairs for live trade processing
-        if (tradePairs == null || tradePairs.isEmpty()) {
-            logger.warn("No trade pairs provided. Unable to set trade pairs for live trading.");
-            return;
-        }
-
-        // Clear any existing trade pairs if necessary (depends on your logic)
-        this.tradePairs.clear();
-
-        // Implement trade pair selection and processing logic
-        for (TradePair pair : tradePairs) {
-            if (pair != null) {
-                // Perform validation on the TradePair, e.g., check if base and counter-currencies are valid
-                if (isValidTradePair(pair)) {
-                    // Add the valid trade pair to the list for further processing
-                    this.tradePairs.add(pair);
-                    logger.info("Added trade pair: {} to live trading.", pair);
-                } else {
-                    logger.error("Invalid trade pair: {}", pair);
-                }
-            }
-        }
-
-        // Further processing, e.g., start listening to live market data for these pairs
-        if (!this.tradePairs.isEmpty()) {
-            startLiveTrading(this.tradePairs);
-            logger.info("Live trading started for {} pairs.", this.tradePairs.size());
-        } else {
-            logger.warn("No valid trade pairs to process for live trading.");
-        }
-    }
-
-    // Helper method to validate a TradePair
-    private boolean isValidTradePair(@NotNull TradePair pair) {
-        return pair.getBaseCurrency() != null && pair.getCounterCurrency() != null;
-    }
-
-    // Example method to start live trading for selected pairs
-    private void startLiveTrading(@NotNull List<TradePair> tradePairs) {
-        // Implement logic to start live trading or listen to live market data for these pairs
-        for (TradePair pair : tradePairs) {
-            logger.debug("Starting live trade processing for pair: {}", pair);
-            // Subscribe to market data feed, execute trades, etc.
-        }
-    }
-
-    public void setAccount(Account account) {
-        // Set account for live trade processing
-        if (account == null) {
-            logger.warn("No account provided. Unable to set account for live trading.");
-            return;
-        }
 
 
-        logger.info("Added account: {} to live trading.", account);
-
-        // Further processing, e.g., starts listening to live market data for this account
-        startLiveTrading(this.tradePairs);
-        logger.info("Live trading started for account: {}.", account);
-    }
-
-    public void setCandlePageConsumer(Consumer<List<CandleData>> candlePageConsumer) {
-        // Set candle page consumer for live trade processing
-
-    }
 
     public void clear() {
         // Clear live trade processing data structure (e.g., database, in-memory store)

@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.Instant;
 import java.util.List;
 
 @Setter
@@ -12,7 +13,20 @@ import java.util.List;
 @ToString
 @NoArgsConstructor
 public class PriceData {
+    private String instrument;
+    private double price;
+    private Instant timestamp;
+    private double ask;
+    private double bid;
+
     private List<PriceEntry> prices;
+
+    public PriceData(String instrument, double bid, double ask, Instant time) {
+        this.instrument = instrument;
+        this.bid = bid;
+        this.ask = ask;
+        this.timestamp = time;
+    }
 
     @Setter
     @Getter

@@ -16,7 +16,8 @@
     -fx-padding: 5.0 10.0 5.0 10.0;
 }
 .candle-chart-toolbar-button.active{
-    -fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, #64B5F6;
+    -fx-background-color: -fx-shadow-highlight-color,
+    -fx-outer-border, -fx-inner-border, #64B5F6;
 }
 .candle-chart .axis {
     -fx-background-color: BLACK;

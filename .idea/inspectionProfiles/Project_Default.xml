@@ -39,6 +39,14 @@
         </set>
       </option>
     </inspection_tool>
+    <inspection_tool class="InnerClassMayBeStatic" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignorableAnnotations">
+        <set>
+          <option value="lombok.Getter" />
+          <option value="org.junit.jupiter.api.Nested" />
+        </set>
+      </option>
+    </inspection_tool>
     <inspection_tool class="JavadocDeclaration" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ADDITIONAL_TAGS" value="Noel,Author" />
     </inspection_tool>

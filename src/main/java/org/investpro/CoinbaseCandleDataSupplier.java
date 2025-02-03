@@ -16,20 +16,21 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
-import static org.investpro.Coinbase.*;
+import static org.investpro.exchanges.Coinbase.*;
 import static org.investpro.Exchange.logger;
-import static org.investpro.Oanda.numCandles;
+import static org.investpro.exchanges.Oanda.numCandles;
 
-class CoinbaseCandleDataSupplier extends CandleDataSupplier {
-    protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
+    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final int EARLIEST_DATA = 1422144000; // roughly the first tra
 
-    CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+    public CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
 
     }
@@ -60,10 +61,10 @@ class CoinbaseCandleDataSupplier extends CandleDataSupplier {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME
                 .format(LocalDateTime.ofEpochSecond(startTime, 0, ZoneOffset.UTC));
 
-//        if (startTime == EARLIEST_DATA) {
-//            // signal more data is false
-//            return CompletableFuture.completedFuture(Collections.emptyList());
-//        }
+        if (startTime == EARLIEST_DATA) {
+            // signal more data is false
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
 
         return client.sendAsync(
@@ -109,11 +110,11 @@ class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                                     candle.get(4).asDouble(),  // close price
                                     candle.get(2).asDouble(),  // high price
                                     candle.get(1).asDouble(),  // low price
-                                    candle.get(0).asInt(),     // open time
+                                    candle.get(0).asInt(), 0,     // open time
                                     candle.get(5).asDouble()   // volume
                             ));
                         }
-                        candleData.sort(Comparator.comparingInt(CandleData::getOpenTime));
+                        candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
                         return candleData;
                     } else {
 

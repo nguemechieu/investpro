@@ -63,6 +63,8 @@ public abstract class Exchange {
      */
     public abstract void cancelOrder(String orderId) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
+    public abstract CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair);
+
     /**
      * Get exchange message or status.
      */
@@ -89,11 +91,6 @@ public abstract class Exchange {
      * Retrieve the list of pending orders.
      */
     public abstract List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException, NoSuchAlgorithmException, InvalidKeyException;
-
-    /**
-     * Fetch the order book for a specific trade pair.
-     */
-    public abstract List<OrderBook> getOrderBook(TradePair tradePair) throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
 
     public abstract List<Position> getPositions() throws IOException, InterruptedException, ExecutionException;
 
@@ -160,6 +157,8 @@ public abstract class Exchange {
 
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
 
+
+    public abstract List<PriceData> fetchLivesBidAsk(TradePair tradePair);
 
     public abstract CustomWebSocketClient getWebsocketClient();
 }

@@ -1,35 +1,46 @@
+/* 🔹 Toggle Switch Root */
 .toggle-switch {
-    -thumb-move-animation-time: 300;
+    -thumb-move-animation-time: 300ms;
 }
+
+/* 🔹 Text Inside Toggle */
 .toggle-switch .text {
     -fx-font-size: 1em;
     -fx-text-fill: -fx-text-base-color;
 }
+
+/* 🔹 Toggle Thumb */
 .toggle-switch .thumb {
-    -fx-background-color:#008b8b,
-                            -fx-inner-border,
-                            -fx-body-color;
+    -fx-background-color: #008b8b, -fx-inner-border, -fx-body-color;
     -fx-background-insets: 0, 1, 2;
-    -fx-background-radius: 1.0em; /* large value to make sure this remains circular */
+    -fx-background-radius: 1.0em; /* Ensures circular thumb */
     -fx-padding: 0.75em;
     -fx-alignment: CENTER;
     -fx-content-display: LEFT;
+    -fx-transition: all 0.3s ease-in-out; /* Smooth animation */
 }
+
+/* 🔹 Toggle Thumb Area (Track) */
 .toggle-switch .thumb-area {
     -fx-background-radius: 1em;
     -fx-background-color: #008b8b;
     -fx-background-insets: 0, 1;
-}
-.toggle-switch:hover .thumb {
-    -fx-color: -fx-hover-base
-}
-.toggle-switch:selected .thumb-area {
-    -fx-background-color:#008b8b;
-}
-.toggle-switch .thumb-area {
     -fx-padding: 0.75em 1.333333em 0.75em 1.333333em; /* 7 16 7 16 */
     -fx-alignment: CENTER;
+    -fx-transition: background-color 0.3s ease-in-out;
 }
+
+/* 🔹 Hover Effect */
+.toggle-switch:hover .thumb {
+    -fx-background-color: #00a3a3; /* Lighter color on hover */
+}
+
+/* 🔹 Selected (ON) State */
+.toggle-switch:selected .thumb-area {
+    -fx-background-color: #00a3a3; /* Slightly lighter color when active */
+}
+
+/* 🔹 Disabled State */
 .toggle-switch:disabled {
     -fx-opacity: 0.4;
 }

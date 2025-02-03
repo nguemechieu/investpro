@@ -3,6 +3,7 @@
   <component name="EntryPointsManager">
     <writeAnnotations>
       <writeAnnotation name="com.fasterxml.jackson.annotation.JsonProperty" />
+      <writeAnnotation name="jakarta.persistence.Transient" />
     </writeAnnotations>
   </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />

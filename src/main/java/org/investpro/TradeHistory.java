@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class TradeHistory {
@@ -53,5 +54,14 @@ public class TradeHistory {
     // Get the size of the trade history
     public int getTradeHistorySize() {
         return tradeHistory.size();
+    }
+
+    ConcurrentHashMap<TradePair, SIGNAL> signalConcurrentHashMap = new ConcurrentHashMap<>();
+
+    public void put(TradePair tradePair, SIGNAL signal) {
+        signalConcurrentHashMap.put(tradePair, signal);
+
+
+
     }
 }

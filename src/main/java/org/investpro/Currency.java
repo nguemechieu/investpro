@@ -7,141 +7,109 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.sql.SQLException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static org.investpro.TradingWindow.db1;
 
 @Getter
 @Setter
 @Entity
+
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)  // or
 @Table(name = "currencies")
-public class Currency {
-    static final ConcurrentHashMap<String, Currency> CURRENCIES = new ConcurrentHashMap<String, Currency>();
+public abstract class Currency implements Comparable<Currency> {  // ✅ Remove "abstract"
+    static final ConcurrentHashMap<String, Currency> CURRENCIES = new ConcurrentHashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(Currency.class);
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "currency_id", nullable = false, updatable = false)
-    private long currency_id;
+    private long currencyId;  // Use wrapper class `Long` to handle null values
 
     @Column(name = "code", nullable = false, unique = true)
     private String code;
 
-    @Column(name = "currencyType", nullable = false)
+    @Column(name = "currency_type", nullable = false)
     private String currencyType;
 
-    @Column(name = "fullDisplayName", nullable = false)
+    @Column(name = "full_display_name", nullable = false)
     private String fullDisplayName;
 
     @Column(name = "image")
     private String image;
 
-    @Column(name = "shortDisplayName", nullable = false)
+    @Column(name = "short_display_name", nullable = false)
     private String shortDisplayName;
 
     @Column(name = "symbol", nullable = false)
     private String symbol;
 
-    @Column(name = "fractionalDigits", nullable = false)
+    @Column(name = "fractional_digits", nullable = false)
     private int fractionalDigits;
 
-    static {
-        try {
-            new CurrencyDataProvider().registerCurrencies();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
-    // Default constructor
+    // ✅ Default constructor required by JPA
     public Currency() {
     }
 
-    // Parameterized constructor
-    public Currency(
-            @NotNull CurrencyType currencyType,
-            String fullDisplayName,
-            String shortDisplayName,
-            String code,
-            int fractionalDigits,
-            String symbol,
-            String image) {
+    // ✅ Parameterized constructor
+    public Currency(@NotNull CurrencyType currencyType, String fullDisplayName, String shortDisplayName,
+                    String code, int fractionalDigits, String symbol, String image) {
         this.currencyType = currencyType.name();
         this.fullDisplayName = Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
         this.shortDisplayName = Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
-
-        if (fractionalDigits < 0) {
-            throw new IllegalArgumentException("fractional digits must be non-negative, was: " + fractionalDigits);
-        }
-        this.fractionalDigits = fractionalDigits;
+        this.fractionalDigits = Math.max(0, fractionalDigits);
         this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.image = image;
 
-        logger.info("Currency registered: {}", this);
+        logger.info("✅ Currency registered: {}", this);
     }
 
-    // Factory method
-    public static @NotNull Currency of(String code) throws Exception {
-        Objects.requireNonNull(code, "code must not be null");
-        if (CURRENCIES.isEmpty() || CURRENCIES.containsKey(code)) {
-            for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-                Currency curr = new Currency();
-                curr.code = currency.getCurrencyCode();
-                curr.currencyType = CurrencyType.FIAT.name();
-                curr.fullDisplayName = currency.getDisplayName();
-                curr.shortDisplayName = currency.getCurrencyCode();
-                curr.symbol = currency.getSymbol() + ".png";
-                curr.image = currency.getCurrencyCode();
-                curr.fractionalDigits = currency.getDefaultFractionDigits();
-                CURRENCIES.put(curr.currencyType, curr);
+    public static void save(Currency currency) {
+
+
+        CURRENCIES.put(currency.getCode(), currency);
+        //db1.save(currency);
+
+
+    }
+
+    public static Currency of(@NotNull String baseCurrencyCode) {
+
+
+        // Return if already cached
+        if (CURRENCIES.containsKey(baseCurrencyCode)) {
+            return CURRENCIES.get(baseCurrencyCode);
+        }
+
+        // Fetch from DB if not in cache
+        try {
+            Currency cur = db1.getCurrency(baseCurrencyCode);
+            if (cur != null) {
+                CURRENCIES.put(baseCurrencyCode, cur);
+                return cur;
             }
+        } catch (SQLException e) {
+            throw new RuntimeException("❌ Database error while fetching currency: " + baseCurrencyCode, e);
         }
 
-        Currency cur = CURRENCIES.get(code);
-
-        if (cur == null) {
-            cur = new Currency();
-            cur.code = code;
-            cur.currencyType = CurrencyType.FIAT.name();
-            cur.shortDisplayName = code;
-            cur.symbol = code;
-            cur.image = code + ".png";
-            cur.fractionalDigits = 3;
-            return cur;
-        }
-
-        return CURRENCIES.get(code);
-
+        // Return a fallback empty Currency object
+        return new Currency() {
+            @Override
+            public int compareTo(java.util.@NotNull Currency o) {
+                return 0;
+            }
+        };
     }
 
-    public static void save(ArrayList<Currency> collect) {
-
-        for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-
-
-            Currency curr = new Currency();
-            curr.code = currency.getCurrencyCode();
-            curr.currencyType = CurrencyType.FIAT.name();
-            curr.fullDisplayName = currency.getDisplayName();
-            curr.shortDisplayName = currency.getCurrencyCode();
-            curr.symbol = currency.getSymbol() + ".png";
-            curr.image = currency.getCurrencyCode();
-            curr.fractionalDigits = currency.getDefaultFractionDigits();
-            CURRENCIES.put(curr.currencyType, curr);
-        }
-
-        for (Currency currency : collect) {
-            CURRENCIES.putIfAbsent(
-                    currency.currencyType,
-                    currency
-            );
-        }
-    }
 
     @Override
     public String toString() {
         return "Currency{" +
-                "currency_id=" + currency_id +
+                "currencyId=" + currencyId +
                 ", code='" + code + '\'' +
                 ", currencyType='" + currencyType + '\'' +
                 ", fullDisplayName='" + fullDisplayName + '\'' +
@@ -164,4 +132,11 @@ public class Currency {
         Currency currency = (Currency) object;
         return Objects.equals(currencyType, currency.currencyType) && Objects.equals(code, currency.code);
     }
+
+    @Override
+    public int compareTo(@NotNull Currency o) {
+        return this.code.compareTo(o.code);
+    }
+
+    public abstract int compareTo(java.util.@NotNull Currency o);
 }

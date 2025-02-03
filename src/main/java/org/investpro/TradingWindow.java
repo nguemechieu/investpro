@@ -1,5 +1,6 @@
 package org.investpro;
 
+import jakarta.persistence.Query;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -8,6 +9,10 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import org.investpro.exchanges.Binance;
+import org.investpro.exchanges.BinanceUS;
+import org.investpro.exchanges.Coinbase;
+import org.investpro.exchanges.Oanda;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,20 +27,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-
 public class TradingWindow extends Region {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
-    private static final String CONFIG_FILE = "config.properties";
-    private static final String CONFIG_FILE2 = "config2.properties";
+    static final Db1 db1 = new Db1();
+    private static final String CONFIG_FILE = "src/main/resources/config.properties";
+    private static final String CONFIG_FILE2 = "src/main/resources/config2.properties";
 
     private Exchange exchange;
     private final ComboBox<String> comboBox = new ComboBox<>();
     private final TextField apiKeyTextField = new TextField();
     private final TextField secretKeyTextField = new TextField();
-
+    Properties properties = loadProperties();
     public TradingWindow() {
+
         setPadding(new Insets(10));
+
         loginPage();
         setStyle(
                 "-fx-background-color: #333333;" +
@@ -45,6 +52,8 @@ public class TradingWindow extends Region {
                         "-fx-border-color: #555555;" +
                         "-fx-border-radius: 5;"
         );
+
+
     }
 
     private static void saveProperties2(@NotNull Properties properties) {
@@ -79,6 +88,8 @@ public class TradingWindow extends Region {
     }
 
     private void loginPage() {
+
+
         getChildren().forEach(child -> child.setVisible(false));
         GridPane loginGrid = new GridPane();
         loginGrid.setPadding(new Insets(10));
@@ -103,15 +114,20 @@ public class TradingWindow extends Region {
 
         rememberMeCheck.setOnAction(_ -> {
             if (rememberMeCheck.isSelected()) {
-                Properties properties = loadProperties();
+
                 properties.setProperty("LOGIN_USERNAME", loginUsernameField.getText());
                 properties.setProperty("LOGIN_PASSWORD", loginPasswordField.getText());
                 saveProperties(properties);
             } else {
-                Properties properties = loadProperties();
+
                 properties.setProperty("LOGIN_USERNAME", "");
                 properties.setProperty("LOGIN_PASSWORD", "");
                 saveProperties(properties);
+                try {
+                    new CurrencyDataProvider().registerCurrencies();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
             }
         });
 
@@ -126,7 +142,7 @@ public class TradingWindow extends Region {
         loginGrid.add(signUpButton, 0, 3);
         loginGrid.add(forgotPasswordButton, 1, 4);
 
-        Properties properties = loadProperties();
+
         if (!properties.getProperty("LOGIN_USERNAME", "").isEmpty() && !properties.getProperty("LOGIN_PASSWORD", "").isEmpty()) {
             loginUsernameField.setText(properties.getProperty("LOGIN_USERNAME"));
             loginPasswordField.setText(properties.getProperty("LOGIN_PASSWORD"));
@@ -226,29 +242,29 @@ public class TradingWindow extends Region {
         }
 
         try {
-//            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE email = :email");
-//            query.setParameter("email", email);
-//
-//            if (query.getResultList().isEmpty()) {
-//                showAlert(Alert.AlertType.WARNING, "Error", "Email not found.");
-//                return;
-//            }
-//
-//            db1.entityManager.getTransaction().begin();
-//            db1.entityManager.createNativeQuery(
-//                            "UPDATE users SET password = :password WHERE email = :email")
-//                    .setParameter("password", newPassword)
-//                    .setParameter("email", email)
-//                    .executeUpdate();
-//            db1.entityManager.getTransaction().commit();
-//            showAlert(Alert.AlertType.INFORMATION, "Success", "Password reset successfully. Please log in.");
-//            loginPage();
+            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE email = :email");
+            query.setParameter("email", email);
+
+            if (query.getResultList().isEmpty()) {
+                showAlert("Email not found.");
+                return;
+            }
+
+            db1.entityManager.getTransaction().begin();
+            db1.entityManager.createNativeQuery(
+                            "UPDATE users SET password = :password WHERE email = :email")
+                    .setParameter("password", newPassword)
+                    .setParameter("email", email)
+                    .executeUpdate();
+            db1.entityManager.getTransaction().commit();
+            showAlert("Password reset successfully. Please log in.");
+            loginPage();
         } catch (Exception e) {
-//            logger.error("Error resetting password", e);
-//            if (db1.entityManager.getTransaction().isActive()) {
-//                db1.entityManager.getTransaction().rollback();
-//            }
-//            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred during password reset.");
+            logger.error("Error resetting password", e);
+            if (db1.entityManager.getTransaction().isActive()) {
+                db1.entityManager.getTransaction().rollback();
+            }
+            showAlert("An error occurred during password reset.");
         }
     }
 
@@ -274,47 +290,47 @@ public class TradingWindow extends Region {
             showAlert("Username, Password, and Email cannot be empty.");
             return false;
         }
-//
-//        try {
-//            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username");
-//            query.setParameter("username", username);
-//
-//            if (!query.getResultList().isEmpty()) {
-//                new Messages(Alert.AlertType.WARNING, "Username already exists.");
-//                return false;
-//            }
-//
-//            db1.entityManager.getTransaction().begin();
-//            db1.entityManager.createNativeQuery(
-//                            "INSERT INTO users (username, password, email) VALUES (:username, :password, :email)")
-//                    .setParameter("username", username)
-//                    .setParameter("password", password)
-//                    .setParameter("email", email)
-//                    .executeUpdate();
-//            db1.entityManager.getTransaction().commit();
-//
-//            showAlert(Alert.AlertType.INFORMATION, "Success", "Registration successful. Please log in.");
-//            return true;
-//        } catch (Exception e) {
-//            logger.error("Error during sign-up", e);
-//            if (db1.entityManager.getTransaction().isActive()) {
-//                db1.entityManager.getTransaction().rollback();
-//            }
-//            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred during sign-up.");
+
+        try {
+            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username");
+            query.setParameter("username", username);
+
+            if (!query.getResultList().isEmpty()) {
+                new Messages(Alert.AlertType.WARNING, "Username already exists.");
+                return false;
+            }
+
+            db1.entityManager.getTransaction().begin();
+            db1.entityManager.createNativeQuery(
+                            "INSERT INTO users (username, password, email) VALUES (:username, :password, :email)")
+                    .setParameter("username", username)
+                    .setParameter("password", password)
+                    .setParameter("email", email)
+                    .executeUpdate();
+            db1.entityManager.getTransaction().commit();
+
+            showAlert("Registration successful. Please log in.");
+            return true;
+        } catch (Exception e) {
+            logger.error("Error during sign-up", e);
+            if (db1.entityManager.getTransaction().isActive()) {
+                db1.entityManager.getTransaction().rollback();
+            }
+            showAlert("An error occurred during sign-up.");
         return false;
-//        }
+        }
     }
 
     private void handleLogin(@NotNull String username, String password) {
         try {
-//            Query res = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
-//            res.setParameter("username", username);
-//            res.setParameter("password", password);
-//
-//            if (res.getResultList().isEmpty()) {
-//                new Messages(Alert.AlertType.WARNING, "Invalid credentials.");
-//                return;
-//            }
+            Query res = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
+            res.setParameter("username", username);
+            res.setParameter("password", password);
+
+            if (res.getResultList().isEmpty()) {
+                new Messages(Alert.AlertType.WARNING, "Invalid credentials.");
+                return;
+            }
 
             launchTradingWindow();
         } catch (Exception e) {
@@ -446,7 +462,7 @@ public class TradingWindow extends Region {
 
                 DisplayExchange display = new DisplayExchange(exchange);
                 StackPane root = new StackPane(display);
-                Scene scene = new Scene(root, 1540, 780);
+                Scene scene = new Scene(root, 1530, 780);
                 scene.getStylesheets().add(Objects.requireNonNull(TradingWindow.class.getResource("/app.css")).toExternalForm());
                 Stage stage = new Stage();
                 stage.setTitle("Trading Window - " + comboBox.getValue());
