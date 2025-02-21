@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
@@ -154,7 +155,8 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+                                       Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -174,21 +176,25 @@ public class Binance extends Exchange {
                 if (!tradesResponse.isArray() || tradesResponse.isEmpty()) {
                     futureResult.completeExceptionally(new RuntimeException("Binance trades response was empty or not an array"));
                 } else {
-                    List<Trade> trades = new ArrayList<>();
+
                     for (JsonNode trade : tradesResponse) {
                         Instant time = Instant.ofEpochMilli(trade.get("time").asLong());
                         if (time.compareTo(stopAt) <= 0) {
-                            futureResult.complete(trades);
+                            futureResult.complete(Collections.emptyList());
+
                             break;
                         } else {
-                            trades.add(new Trade(
+                            List<Trade> tr = new ArrayList<>();
+                            Trade tradex = new Trade(
                                     tradePair,
 
                                     trade.get("price").asDouble(), trade.get("qty").asLong(),
                                     Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY"),
                                     trade.get("id").asLong(),
                                     time
-                            ));
+                            );
+                            tr.add(tradex);
+                            trades.accept(tr);
                         }
                     }
                 }
@@ -197,7 +203,7 @@ public class Binance extends Exchange {
             }
         });
 
-        return futureResult;
+
     }
 
     @Override
@@ -344,13 +350,18 @@ public class Binance extends Exchange {
 
 
     @Override
-    public List<PriceData> fetchLivesBidAsk(TradePair tradePair) {
-        return null;
+    public double fetchLivesBidAsk(TradePair tradePair) {
+        return 0;
     }
 
     @Override
     public CustomWebSocketClient getWebsocketClient() {
         return null;
+    }
+
+    @Override
+    public List<Account> getAccountSummary() {
+        return List.of();
     }
 
     // Binance supported granularity (intervals)

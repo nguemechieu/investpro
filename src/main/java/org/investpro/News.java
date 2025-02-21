@@ -1,10 +1,14 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 
+@Getter
+@Setter
 public class News {
     private static final Logger logger = LoggerFactory.getLogger(News.class);
     String impact;
@@ -15,6 +19,9 @@ public class News {
     private int offset;
     private String title;
 
+    private String content;
+    private String publishedDate;
+
     public News(String title, String impact, String country, Date date, String forecast, String previous) {
         this.title = title;
         this.impact = impact;
@@ -22,41 +29,14 @@ public class News {
         this.forecast = forecast;
         this.previous = previous;
         this.country = country;
+        this.offset = calculateOffset(date);
 
+        logger.debug("News created: {}", this);
 
     }
 
-    public String getImpact() {
-        return impact;
-    }
+    public News() {
 
-    public void setImpact(String impact) {
-        this.impact = impact;
-    }
-
-    public Date getDate() {
-        return date;
-    }
-
-    public void setDate(Date date) {
-        this.date = date;
-    }
-
-    public String getForecast() {
-        return forecast;
-    }
-
-    public void setForecast(String forecast) {
-
-        this.forecast = forecast;
-    }
-
-    public String getPrevious() {
-        return previous;
-    }
-
-    public void setPrevious(String previous) {
-        this.previous = previous;
     }
 
     @Override
@@ -72,27 +52,14 @@ public class News {
                 '}';
     }
 
-    public int getOffset() {
-        return offset;
+    private int calculateOffset(Date date) {
+        long currentMilliseconds = new Date().getTime();
+        long newsMilliseconds = date.getTime();
+        long offsetMilliseconds = currentMilliseconds - newsMilliseconds;
+        return (int) (offsetMilliseconds / 1000); // Convert milliseconds to seconds
     }
 
-    public void setOffset(int i) {
-        this.offset = i;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getCountry() {
-        return country;
-    }
-
-    public void setCountry(String country) {
-        this.country = country;
+    public String getContent() {
+        return "Title: " + title + "\nImpact: " + impact + "\nDate: " + date + "\nForecast: " + forecast + "\nPrevious: " + previous + "\nCountry: " + country + "\nOffset: " + offset;
     }
 }

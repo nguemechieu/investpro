@@ -27,20 +27,10 @@ package org.investpro;//CHECKSTYLE:OFF
  */
 
 
-import static java.util.Objects.requireNonNull;
-import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
-
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.event.EventHandler;
@@ -54,6 +44,9 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
+
+import static java.util.Objects.requireNonNull;
+import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
 
 /**
  * The PopOver control provides detailed information about an owning node in a
@@ -86,7 +79,7 @@ public class PopOver extends PopupControl {
         getStyleClass().add(DEFAULT_STYLE_CLASS);
 
         getRoot().getStylesheets().add(
-                PopOver.class.getResource("/css/popover.css").toExternalForm()); //$NON-NLS-1$
+                requireNonNull(PopOver.class.getResource("/css/popover.css")).toExternalForm()); //$NON-NLS-1$
 
         setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
         setOnHiding(evt -> setDetached(false));
@@ -115,19 +108,13 @@ public class PopOver extends PopupControl {
         /*
          * A detached popover should of course not automatically hide itself.
          */
-        detached.addListener(it -> {
-            if (isDetached()) {
-                setAutoHide(false);
-            } else {
-                setAutoHide(true);
-            }
-        });
+        detached.addListener(_ -> setAutoHide(!isDetached()));
 
-        setAutoHide(true);
+        //  setAutoHide(true);
     }
 
     /**
-     * Creates a pop over with the given node as the content node.
+     * Creates a pop-over with the given node as the content node.
      *
      * @param content The content shown by the pop over
      */
@@ -400,7 +387,6 @@ public class PopOver extends PopupControl {
              */
             adjustWindowLocation();
         });
-
         super.show(owner, x, y);
 
         showFadeInAnimation(fadeInDuration);
@@ -499,41 +485,27 @@ public class PopOver extends PopupControl {
     }
 
     private double computeXOffset() {
-        switch (getArrowLocation()) {
-            case TOP_LEFT:
-            case BOTTOM_LEFT:
-                return getCornerRadius() + getArrowIndent() + getArrowSize();
-            case TOP_CENTER:
-            case BOTTOM_CENTER:
-                return getContentNode().prefWidth(-1) / 2;
-            case TOP_RIGHT:
-            case BOTTOM_RIGHT:
-                return getContentNode().prefWidth(-1) - getArrowIndent()
-                        - getCornerRadius() - getArrowSize();
-            default:
-                return 0;
-        }
+        return switch (getArrowLocation()) {
+            case TOP_LEFT, BOTTOM_LEFT -> getCornerRadius() + getArrowIndent() + getArrowSize();
+            case TOP_CENTER, BOTTOM_CENTER -> getContentNode().prefWidth(-1) / 2;
+            case TOP_RIGHT, BOTTOM_RIGHT -> getContentNode().prefWidth(-1) - getArrowIndent()
+                    - getCornerRadius() - getArrowSize();
+            default -> 0;
+        };
     }
 
     private double computeYOffset() {
         double prefContentHeight = getContentNode().prefHeight(-1);
 
-        switch (getArrowLocation()) {
-            case LEFT_TOP:
-            case RIGHT_TOP:
-                return getCornerRadius() + getArrowIndent() + getArrowSize();
-            case LEFT_CENTER:
-            case RIGHT_CENTER:
-                return Math.max(prefContentHeight, 2 * (getCornerRadius()
-                        + getArrowIndent() + getArrowSize())) / 2;
-            case LEFT_BOTTOM:
-            case RIGHT_BOTTOM:
-                return Math.max(prefContentHeight - getCornerRadius()
-                        - getArrowIndent() - getArrowSize(), getCornerRadius()
-                        + getArrowIndent() + getArrowSize());
-            default:
-                return 0;
-        }
+        return switch (getArrowLocation()) {
+            case LEFT_TOP, RIGHT_TOP -> getCornerRadius() + getArrowIndent() + getArrowSize();
+            case LEFT_CENTER, RIGHT_CENTER -> Math.max(prefContentHeight, 2 * (getCornerRadius()
+                    + getArrowIndent() + getArrowSize())) / 2;
+            case LEFT_BOTTOM, RIGHT_BOTTOM -> Math.max(prefContentHeight - getCornerRadius()
+                    - getArrowIndent() - getArrowSize(), getCornerRadius()
+                    + getArrowIndent() + getArrowSize());
+            default -> 0;
+        };
     }
 
     /**

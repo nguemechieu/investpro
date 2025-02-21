@@ -1,24 +1,6 @@
-/*
- * Copyright 2013 Jason Winnebeck
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
 
 package org.investpro;
-
-import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -30,10 +12,14 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.WritableValue;
 import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
-import javafx.util.Duration;
 import javafx.scene.chart.ValueAxis;
+import javafx.util.Duration;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A {@code StableTicksAxis} places tick marks at consistent (axis value rather than graphical) locations. This
@@ -152,21 +138,21 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
     public double getAutoRangePadding() {
         return autoRangePadding.get();
     }
 
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
     public void setAutoRangePadding(double autoRangePadding) {
         this.autoRangePadding.set(autoRangePadding);
     }
 
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
     public DoubleProperty autoRangePaddingProperty() {
         return autoRangePadding;
@@ -320,12 +306,12 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return getRange(getLowerBound(), getUpperBound());
     }
 
-    private Range getRange(double minValue, double maxValue) {
+    private @NotNull Range getRange(double minValue, double maxValue) {
         double length = getLength();
         double delta = maxValue - minValue;
         double scale = calculateNewScale(length, minValue, maxValue);
         int maxTicks = Math.max(1, (int) (length / getLabelSize()));
-        return new Range(minValue, maxValue, calculateTickSpacing(delta, maxTicks), scale);
+        return new Range(minValue, maxValue, calculateTickSpacing(Math.abs(delta), maxTicks), scale);
     }
 
 
@@ -354,7 +340,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
             if (getSide().isHorizontal()) {
                 labelSize = dim.getWidth();
             } else {
-                // TODO: May want to tweak this value so the axis labels are not so closely packed together.
+
                 labelSize = dim.getHeight();
             }
         }
@@ -394,7 +380,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private record Range(double low, double high, double tickSpacing, double scale) {
 
         public double getDelta() {
-            return high - low;
+            return (high - low);
         }
 
         @Contract(pure = true)

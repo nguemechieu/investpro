@@ -16,8 +16,6 @@ import java.io.PrintWriter;
 import java.sql.*;
 import java.util.Properties;
 
-import static org.investpro.InvestPro.*;
-
 @Getter
 @Setter
 public class Db1 implements Db {
@@ -26,56 +24,63 @@ public class Db1 implements Db {
     private static final String CONFIG_FILE = "src/main/resources/config.properties";
 
     private static Db1 instance;
+    private static final Properties PROPERTIES = new Properties();
+    private static EntityManagerFactory entityManagerFactory;
 
     protected EntityManager entityManager;
     private Connection conn;
+    private Class<Object> iface;
 
     /**
      * **Singleton Constructor for Db1**
      */
     protected Db1() {
-
+        loadProperties();
         initializeConnection();
         initializeEntityManager();
-    }
-
-    public static EntityManagerFactory getEntityManagerFactory() {
-        Properties hibernateProps = new Properties();
-        hibernateProps.setProperty("jakarta.persistence.jdbc.url",
-                "jdbc:mysql://" + PROPERTIES.getProperty("DB_HOST") + ":" +
-                        PROPERTIES.getProperty("DB_PORT") + "/" +
-                        PROPERTIES.getProperty("DB_NAME") +
-                        "?useSSL=false&serverTimezone=UTC");
-
-        hibernateProps.setProperty("jakarta.persistence.jdbc.user", PROPERTIES.getProperty("DB_USER"));
-        hibernateProps.setProperty("jakarta.persistence.jdbc.password", PROPERTIES.getProperty("DB_PASSWORD"));
-        hibernateProps.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
-
-        return Persistence.createEntityManagerFactory("User", hibernateProps);
     }
 
     /**
      * **Singleton Accessor**
      */
-    public synchronized Db1 getInstance() throws SQLException {
-        if (instance == unwrap(null)) {
+    public static synchronized Db1 getInstance() {
+        if (instance == null) {
             instance = new Db1();
         }
         return instance;
     }
 
     /**
+     * **Get EntityManagerFactory Singleton**
+     */
+    public static EntityManagerFactory getEntityManagerFactory() {
+        if (entityManagerFactory == null) {
+            Properties hibernateProps = new Properties();
+            hibernateProps.setProperty("jakarta.persistence.jdbc.url",
+                    "jdbc:mysql://" + PROPERTIES.getProperty("DB_HOST", "localhost") + ":" +
+                            PROPERTIES.getProperty("DB_PORT", "3306") + "/" +
+                            PROPERTIES.getProperty("DB_NAME", "InvestPro") +
+                            "?useSSL=false&serverTimezone=UTC");
+
+            hibernateProps.setProperty("jakarta.persistence.jdbc.user", PROPERTIES.getProperty("DB_USER", "root"));
+            hibernateProps.setProperty("jakarta.persistence.jdbc.password", PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
+            hibernateProps.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
+
+            entityManagerFactory = Persistence.createEntityManagerFactory("User", hibernateProps);
+        }
+        return entityManagerFactory;
+    }
+
+    /**
      * **Loads database properties from config.properties**
      */
-    private Properties loadProperties() {
-        Properties props = new Properties();
+    private void loadProperties() {
         try (FileInputStream fileInputStream = new FileInputStream(CONFIG_FILE)) {
-            props.load(fileInputStream);
+            PROPERTIES.load(fileInputStream);
             logger.info("✅ Database properties loaded successfully.");
         } catch (IOException e) {
             logger.error("❌ Failed to load properties: {}", e.getMessage(), e);
         }
-        return props;
     }
 
     /**
@@ -83,10 +88,13 @@ public class Db1 implements Db {
      */
     private void initializeConnection() {
         try {
-            String url =
+            String url = "jdbc:mysql://" + PROPERTIES.getProperty("DB_HOST", "localhost") + ":" +
+                    PROPERTIES.getProperty("DB_PORT", "3306") + "/" +
+                    PROPERTIES.getProperty("DB_NAME", "InvestPro") + "?useSSL=false";
 
-                    "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME + "?useSSL=false";
-            this.conn = DriverManager.getConnection(url, DB_USER, DB_PASSWORD);
+            this.conn = DriverManager.getConnection(url,
+                    PROPERTIES.getProperty("DB_USER", "root"),
+                    PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
             logger.info("✅ Connected to MySQL database successfully!");
         } catch (SQLException e) {
             logger.error("❌ Database connection error: {}", e.getMessage(), e);
@@ -98,9 +106,7 @@ public class Db1 implements Db {
      */
     private void initializeEntityManager() {
         try {
-
-
-            setEntityManager(getEntityManagerFactory().createEntityManager());
+            this.entityManager = getEntityManagerFactory().createEntityManager();
             logger.info("✅ Hibernate EntityManager initialized successfully.");
         } catch (Exception e) {
             logger.error("❌ Error initializing EntityManager: {}", e.getMessage(), e);
@@ -162,9 +168,10 @@ public class Db1 implements Db {
             entityManager.getTransaction().begin();
             entityManager.merge(currency);
             entityManager.getTransaction().commit();
-
+            logger.info("✅ Currency data saved successfully.");
         } catch (Exception e) {
-            logger.error("Transaction failed: ", e);
+            entityManager.getTransaction().rollback();
+            logger.error("❌ Transaction failed: ", e);
             throw new RuntimeException(e);
         }
     }
@@ -173,7 +180,7 @@ public class Db1 implements Db {
      * **Retrieve Currency by Code**
      */
     @Override
-    public Currency getCurrency(String code) throws SQLException {
+    public Currency getCurrency(String code) {
         String sql = "SELECT * FROM currencies WHERE code = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, code);
@@ -201,42 +208,17 @@ public class Db1 implements Db {
                 };
             } else {
                 logger.warn("⚠ Currency with code '{}' not found in database.", code);
-                return unwrap(null);
+                return null;
             }
         } catch (SQLException e) {
             logger.error("❌ Error retrieving currency '{}': {}", code, e.getMessage(), e);
-            return unwrap(null);
+            return null;
         }
     }
 
-    /**
-     * **Delete Data from Table**
-     */
-    @Override
-    public void delete(String table, String column, String value) {
-        String sql = "DELETE FROM " + table + " WHERE " + column + " = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, value);
-            int rowsAffected = stmt.executeUpdate();
-            if (rowsAffected > 0) {
-                logger.info("✅ Deleted {} row(s) from table '{}'", rowsAffected, table);
-            } else {
-                logger.warn("⚠ No rows found for deletion in table '{}'", table);
-            }
-        } catch (SQLException e) {
-            logger.error("❌ Error deleting from table '{}': {}", table, e.getMessage(), e);
-        }
-    }
 
-    @Override
-    public void create(String table, String column, String value) {
 
-    }
 
-    @Override
-    public void findById(String table, String column, String value) {
-
-    }
 
     /**
      * **Close Database Connection**
@@ -244,14 +226,13 @@ public class Db1 implements Db {
     @Override
     public void close() {
         try {
-            if (conn != unwrap(null)) {
+            if (conn != null) {
                 conn.close();
                 logger.info("✅ Database connection closed.");
             }
-            if (entityManager != unwrap(null)) {
+            if (entityManager != null) {
                 entityManager.close();
             }
-
         } catch (SQLException e) {
             logger.error("❌ Error closing database connection: {}", e.getMessage(), e);
         }
@@ -342,26 +323,43 @@ public class Db1 implements Db {
 
     }
 
-    /**
-     * **Get Database Connection**
-     */
     @Override
-    public Connection getConnection() {
-        return conn;
+    public void delete(String table, String column, String value) {
+
+    }
+
+    @Override
+    public void create(String table, String column, String value) {
+
+    }
+
+    @Override
+    public void findById(String table, String column, String value) {
+
+    }
+
+    @Override
+    public Connection getConnection() throws SQLException {
+        return null;
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-        return unwrap(null);
+        return null;
     }
 
     @Override
     public PrintWriter getLogWriter() throws SQLException {
-        return unwrap(null);
+        return null;
     }
 
     @Override
     public void setLogWriter(PrintWriter out) throws SQLException {
+
+    }
+
+    @Override
+    public void setLoginTimeout(int seconds) throws SQLException {
 
     }
 
@@ -371,36 +369,28 @@ public class Db1 implements Db {
     }
 
     @Override
-    public void setLoginTimeout(int seconds) throws SQLException {
-
-    }
-
-    @Override
     public ConnectionBuilder createConnectionBuilder() throws SQLException {
         return Db.super.createConnectionBuilder();
     }
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        try {
-            return unwrap(null);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        return null;
     }
 
     @Override
     public ShardingKeyBuilder createShardingKeyBuilder() throws SQLException {
         return Db.super.createShardingKeyBuilder();
+
     }
 
 
-    public <T> T unwrap(Class<T> iface) throws SQLException {
+    public <T> T unwrap(Class<T> iface) {
         return null;
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
+    public boolean isWrapperFor(Class<?> iface) {
         return false;
     }
 }

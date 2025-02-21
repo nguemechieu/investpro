@@ -10,11 +10,7 @@ import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.io.IOException;
-import java.sql.SQLException;
-import java.text.ParseException;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 
 /**
  * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
@@ -77,8 +73,7 @@ public class CandleStickChartContainer extends Region {
             if (!oldDurationValue.equals(newDurationValue)) {
                 try {
                     createNewChart(newDurationValue.intValue(), liveSyncing);
-                } catch (SQLException | ClassNotFoundException | IOException | ExecutionException |
-                         InterruptedException | TelegramApiException | ParseException e) {
+                } catch (TelegramApiException | Exception e) {
                     throw new RuntimeException(e);
                 }
                 toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
@@ -91,7 +86,7 @@ public class CandleStickChartContainer extends Region {
         secondsPerCandle.set(60);
     }
 
-    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws SQLException, ClassNotFoundException, IOException, ExecutionException, InterruptedException, TelegramApiException, ParseException {
+    private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws Exception, TelegramApiException {
         if (secondsPerCandle <= 0) {
             throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(secondsPerCandle));
         }

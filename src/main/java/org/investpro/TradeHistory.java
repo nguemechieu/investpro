@@ -2,66 +2,126 @@ package org.investpro;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 public class TradeHistory {
-    static List<Trade> tradeHistory = new ArrayList<>();
 
-    // Constructor initializes the trade history
-    public TradeHistory() {
+    // Thread-safe list for storing trade history
+    private static final List<Trade> tradeHistory = new CopyOnWriteArrayList<>();
+
+    // Thread-safe map for storing trade signals
+    private final ConcurrentHashMap<TradePair, SIGNAL> signalMap = new ConcurrentHashMap<>();
+
+    // Constructor (optional, but kept for extensibility)
+    public TradeHistory() throws Exception {
+
+        // Initialize trade history with some sample data (optional)
+        // Example:
+        addTrade(new Trade(TradePair.of("BTC", "USD"), 10000, 0.01, Side.BUY, 1234567890L, Instant.now()));
+        addTrade(new Trade(TradePair.of("ETH", "USD"), 2000, 0.05, Side.SELL, 9876543210L, Instant.now().plusSeconds(3600)));
     }
 
-    public static void addTradeToHistory(@NotNull Trade trade) {
-        // Add trade to the history
-        TradeHistory.addTrade(trade);
-        // Alternatively, you could use a database to store the trade history
+    /**
+     * Add a trade to the history.
+     *
+     * @param trade The trade to be added.
+     */
+    public static void addTrade(@NotNull Trade trade) {
+        tradeHistory.add(trade);
     }
 
-    // Add a trade to the history
-    public static void addTrade(Trade trade) {
-
-        TradeHistory.tradeHistory.add(trade); // Add trade to the history
-
-    }
-
-    // Retrieve all trades in the history
+    /**
+     * Retrieve all trades in the history.
+     * @return A new list containing all trades (preserves encapsulation).
+     */
     public List<Trade> getAllTrades() {
-        return new ArrayList<>(tradeHistory); // Return a copy to preserve encapsulation
+        return List.copyOf(tradeHistory); // Immutable copy for thread safety
     }
 
-    // Retrieve trades for a specific TradePair
-    public List<Trade> getTradesByPair(TradePair tradePair) {
+    /**
+     * Retrieve trades for a specific TradePair.
+     *
+     * @param tradePair The trade pair to filter trades.
+     * @return A list of trades matching the given trade pair.
+     */
+    public List<Trade> getTradesByPair(@NotNull TradePair tradePair) {
         return tradeHistory.stream()
                 .filter(trade -> trade.getTradePair().equals(tradePair))
                 .collect(Collectors.toList());
     }
 
-    // Retrieve the most recent N trades
+    /**
+     * Retrieve the most recent N trades efficiently.
+     * @param count The number of most recent trades to retrieve.
+     * @return A list containing the most recent trades.
+     */
     public List<Trade> getRecentTrades(int count) {
-        return tradeHistory.stream()
-                .skip(Math.max(0, tradeHistory.size() - count)) // Skip older trades if there are more than "count"
-                .collect(Collectors.toList());
+        int size = tradeHistory.size();
+        if (size == 0) return List.of(); // Return empty list if no trades
+
+        return tradeHistory.subList(Math.max(0, size - count), size); // Efficient recent trades retrieval
     }
 
-    // Clear all trade history
+    /**
+     * Clear all trade history.
+     */
     public void clearHistory() {
         tradeHistory.clear();
     }
 
-    // Get the size of the trade history
+    /**
+     * Get the total number of trades stored.
+     * @return The trade history size.
+     */
     public int getTradeHistorySize() {
         return tradeHistory.size();
     }
 
-    ConcurrentHashMap<TradePair, SIGNAL> signalConcurrentHashMap = new ConcurrentHashMap<>();
+    /**
+     * Store a signal for a trade pair.
+     *
+     * @param tradePair The trade pair.
+     * @param signal    The signal to store.
+     */
+    public void putSignal(@NotNull TradePair tradePair, @NotNull SIGNAL signal) {
+        signalMap.put(tradePair, signal);
+    }
 
-    public void put(TradePair tradePair, SIGNAL signal) {
-        signalConcurrentHashMap.put(tradePair, signal);
+    /**
+     * Retrieve a signal for a trade pair.
+     *
+     * @param tradePair The trade pair.
+     * @return The signal associated with the trade pair or null if not found.
+     */
+    public SIGNAL getSignal(@NotNull TradePair tradePair) {
+        return signalMap.get(tradePair);
+    }
 
+    /**
+     * Check if a trade pair has an associated signal.
+     *
+     * @param tradePair The trade pair.
+     * @return True if a signal is stored, otherwise false.
+     */
+    public boolean hasSignal(@NotNull TradePair tradePair) {
+        return signalMap.containsKey(tradePair);
+    }
 
+    /**
+     * Remove a signal for a trade pair.
+     *
+     * @param tradePair The trade pair to remove.
+     */
+    public void removeSignal(@NotNull TradePair tradePair) {
+        signalMap.remove(tradePair);
+    }
 
+    public double getEndTime() {
+        if (tradeHistory.isEmpty()) return 0;
+        return tradeHistory.getLast().getTimestamp().toEpochMilli();
     }
 }

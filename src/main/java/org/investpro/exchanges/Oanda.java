@@ -11,8 +11,8 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.*;
 import org.investpro.Currency;
+import org.investpro.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,10 +27,8 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
@@ -38,19 +36,7 @@ import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 @Setter
 public class Oanda extends Exchange {
 
-    /**
-     * Oanda doesn't support wss (websocket )
-     */
-
-//    🎯 Recommended Default Number of Candles
-//    Use Case	Recommended Candles
-//    Scalping (Short-Term Trading, 1-5 min charts)	300-500
-//    Intraday Trading (5m - 1h charts)	500-1000
-//    Swing Trading (Daily/Weekly Charts)	1000-2000
-//    Long-Term Historical Analysis (Months/Years of Data)	2000-5000 (Chunked Loading Required)
-//
-
-    public static int numCandles = 500;
+    private static final int MAX_RETRIES = 5;
     private static final int MAX_CANDLES_PER_REQUEST = numCandles;
     static HttpClient client = HttpClient.newHttpClient();
     private static final HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
@@ -103,6 +89,8 @@ public class Oanda extends Exchange {
         return Collections.singletonList(fee);
 
     }
+    private static final long INITIAL_DELAY_MS = 500; // 500ms initial delay
+
 
 
     @Override
@@ -182,6 +170,40 @@ public class Oanda extends Exchange {
         logger.info("Order cancelled: {}", orderId);
 
     }
+    private static final long RATE_LIMIT_DELAY_MS = 1000; // 1 second between requests
+    /**
+     * Oanda doesn't support wss (websocket )
+     */
+
+//    🎯 Recommended Default Number of Candles
+//    Use Case	Recommended Candles
+//    Scalping (Short-Term Trading, 1-5 min charts)	300-500
+//    Intraday Trading (5m - 1h charts)	500-1000
+//    Swing Trading (Daily/Weekly Charts)	1000-2000
+//    Long-Term Historical Analysis (Months/Years of Data)	2000-5000 (Chunked Loading Required)
+//
+
+    public static int numCandles = 1000;
+    private final Map<String, OrderBook> orderBookCache = new ConcurrentHashMap<>();
+    private final Semaphore rateLimiter = new Semaphore(1); // Controls request flow
+
+    private static @NotNull String granularityToString(int actualGranularity) {
+
+        if (actualGranularity < 60) {
+            return "s" + actualGranularity;  // Seconds
+        } else if (actualGranularity < 3600) {
+            return "M" + (actualGranularity / 60);  // Minutes
+        } else if (actualGranularity < 86400) {
+            return "H" + (actualGranularity / 3600);  // Hours
+        } else if (actualGranularity < 604800) {
+            return "D";  // Days
+        } else if (actualGranularity < 2592000) {
+
+            return "W";  // Weeks (W1, W2, etc.)
+        } else {
+            return "Mo";
+        }
+    }
 
     @Override
     public CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
@@ -190,60 +212,92 @@ public class Oanda extends Exchange {
         CompletableFuture<List<OrderBook>> futureResult = new CompletableFuture<>();
 
         CompletableFuture.runAsync(() -> {
-            String uriStr = API_URL + "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
+            String cacheKey = tradePair.toString('_');
 
+            // Check Cache First to Reduce Requests
+            if (orderBookCache.containsKey(cacheKey)) {
+                logger.info("Using cached order book for {}", tradePair);
+                futureResult.complete(List.of(orderBookCache.get(cacheKey)));
+                return;
+            }
+
+            String uriStr = API_URL + "/accounts/" + account_id + "/pricing?instruments=" + cacheKey;
             requestBuilder.uri(URI.create(uriStr));
 
+            // Ensure Rate-Limiting
             try {
-                HttpResponse<String> response = client.send(
-                        requestBuilder.build(),
-                        HttpResponse.BodyHandlers.ofString());
+                rateLimiter.acquire();
+                Thread.sleep(RATE_LIMIT_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
-                if (response.statusCode() != 200) {
-                    logger.error("Error fetching order book: {}", response.body());
-                    futureResult.completeExceptionally(new RuntimeException("Failed to fetch order book"));
-                    return;
-                }
-
-                JsonNode orderBookResponse = OBJECT_MAPPER.readTree(response.body());
-                List<OrderBook> orderBooks = new ArrayList<>();
-
-                JsonNode pricesNode = orderBookResponse.get("prices");
-                if (pricesNode == null || !pricesNode.isArray()) {
-                    logger.warn("Invalid order book data received from OANDA");
-                    futureResult.complete(Collections.emptyList());
-                    return;
-                }
-
-                for (JsonNode priceEntry : pricesNode) {
-                    logger.info("Found order book entry: {}", priceEntry);
-
-                    Instant time = Instant.parse(priceEntry.get("time").asText());
-                    double bidPrice = priceEntry.get("bids").get(0).get("price").asDouble();
-                    double askPrice = priceEntry.get("asks").get(0).get("price").asDouble();
-                    double bidLiquidity = priceEntry.get("bids").get(0).get("liquidity").asDouble();
-                    double askLiquidity = priceEntry.get("asks").get(0).get("liquidity").asDouble();
-
-                    OrderBook orderBookEntry = new OrderBook(
-                            tradePair,
-                            bidPrice,
-                            askPrice,
-                            bidLiquidity,
-                            askLiquidity,
-                            time
-                    );
-                    orderBooks.add(orderBookEntry);
-                }
-
-                futureResult.complete(orderBooks);
-
-            } catch (IOException | InterruptedException e) {
-                logger.error("Error fetching order book from OANDA", e);
-                futureResult.completeExceptionally(e);
+            try {
+                fetchWithRetries(uriStr, tradePair, 0, futureResult);
+            } finally {
+                rateLimiter.release(); // Allow next request
             }
         });
 
         return futureResult;
+    }
+
+    private void fetchWithRetries(String uriStr, TradePair tradePair, int retryCount, CompletableFuture<List<OrderBook>> futureResult) {
+        try {
+            HttpResponse<String> response = client.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 429) {
+                // 429: Too Many Requests (Rate Limited) → Apply Exponential Backoff
+                if (retryCount < MAX_RETRIES) {
+                    long backoffTime = INITIAL_DELAY_MS * (1L << retryCount);
+                    logger.warn("Rate-limited. Retrying in {} ms...", backoffTime);
+                    Thread.sleep(backoffTime);
+                    fetchWithRetries(uriStr, tradePair, retryCount + 1, futureResult);
+                } else {
+                    logger.error("Max retries reached for fetching order book: {}", response.body());
+                    futureResult.completeExceptionally(new RuntimeException("Rate limit exceeded"));
+                }
+                return;
+            }
+
+            if (response.statusCode() != 200) {
+                logger.error("Error fetching order book: {}", response.body());
+                futureResult.completeExceptionally(new RuntimeException("Failed to fetch order book"));
+                return;
+            }
+
+            JsonNode orderBookResponse = OBJECT_MAPPER.readTree(response.body());
+            List<OrderBook> orderBooks = new ArrayList<>();
+            JsonNode pricesNode = orderBookResponse.get("prices");
+
+            if (pricesNode == null || !pricesNode.isArray()) {
+                logger.warn("Invalid order book data received from OANDA");
+                futureResult.complete(Collections.emptyList());
+                return;
+            }
+
+            for (JsonNode priceEntry : pricesNode) {
+                Instant time = Instant.parse(priceEntry.get("time").asText());
+                double bidPrice = priceEntry.get("bids").get(0).get("price").asDouble();
+                double askPrice = priceEntry.get("asks").get(0).get("price").asDouble();
+                double bidLiquidity = priceEntry.get("bids").get(0).get("liquidity").asDouble();
+                double askLiquidity = priceEntry.get("asks").get(0).get("liquidity").asDouble();
+
+                OrderBook orderBookEntry = new OrderBook(tradePair, bidPrice, askPrice, bidLiquidity, askLiquidity, time);
+                orderBooks.add(orderBookEntry);
+
+                // Cache the latest order book data
+                orderBookCache.put(tradePair.toString('_'), orderBookEntry);
+            }
+
+            futureResult.complete(orderBooks);
+
+        } catch (IOException | InterruptedException e) {
+            logger.error("Error fetching order book from OANDA", e);
+            futureResult.completeExceptionally(e);
+        }
     }
 
     @Override
@@ -258,65 +312,59 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
-
-        CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
+        Objects.requireNonNull(tradeConsumer);
 
         CompletableFuture.runAsync(() -> {
-            String uriStr = API_URL;
-            uriStr += "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
-
-
+            String uriStr = API_URL + "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
             requestBuilder.uri(URI.create(uriStr));
 
-            try {
-                HttpResponse<String> response = client.send(
-                        requestBuilder.build(),
-                        HttpResponse.BodyHandlers.ofString());
+            int retryCount = 0;
+            int maxRetries = 5;
+            long delayMillis = 500; // Initial delay (0.5 sec)
 
-                JsonNode tradesResponse = OBJECT_MAPPER.readValue(response.body(), JsonNode.class);
+            while (retryCount < maxRetries) {
+                try {
+                    HttpResponse<String> response = client.send(
+                            requestBuilder.build(),
+                            HttpResponse.BodyHandlers.ofString());
 
+                    if (response.statusCode() == 429) { // Rate limit hit
+                        logger.warn("Rate limit hit. Retrying in {} ms", delayMillis);
+                        Thread.sleep(delayMillis);
+                        retryCount++;
+                        delayMillis *= 2; // Exponential backoff
+                        continue;
+                    }
+
+                    JsonNode tradesResponse = OBJECT_MAPPER.readValue(response.body(), JsonNode.class);
                     List<Trade> trades = new ArrayList<>();
-                for (JsonNode trade : tradesResponse.get("prices")) {
 
-                    logger.info("Found trade {}", trade);
+                    for (JsonNode trade : tradesResponse.get("prices")) {
+                        logger.info("Found trade {}", trade);
+                        Instant time = Instant.parse(trade.get("time").asText());
+                        double price = trade.get("price").asDouble();
+                        double size = trade.get("liquidity").asDouble();
+                        Trade tr = new Trade(tradePair, price, size, Side.getSide("SELL"), UUID.randomUUID().timestamp(), time);
+                        trades.add(tr);
+                    }
 
+                    tradeConsumer.accept(trades); // Process trades using the provided consumer
+                    return; // Exit loop if successful
 
-                    logger.info("My Time :{}", trade.get("time").asText());
-
-
-                    Instant time = Instant.parse(trade.get("time").asText());
-
-                    double price = trade.get("price").asDouble();
-                    double size = trade.get("liquidity").asDouble();
-                    Trade tr = new Trade(
-                                    tradePair,
-                            price,
-                            size,
-                            Side.getSide("SELL"),
-                            UUID.randomUUID().timestamp(),
-                                    time
-                    );
-                    trades.add(tr);
-
-                    logger.info("My Trade :{}", trades);
+                } catch (IOException | InterruptedException e) {
+                    logger.error("Error fetching trades", e);
+                    return;
                 }
-                futureResult.complete(trades);
-
-
-
-
-
-
-            } catch (IOException | InterruptedException e) {
-                futureResult.completeExceptionally(e);
             }
-        });
 
-        return futureResult;
+            logger.error("Max retries exceeded due to rate limiting.");
+        });
     }
+
+
     @Override
     public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle,
@@ -337,7 +385,7 @@ public class Oanda extends Exchange {
             List<InProgressCandleData> allCandles) {
 
         String uri = "%s/instruments/%s/candles?granularity=%s&to=%s&count=%d"
-                .formatted(API_URL, tradePair.toString('_'), getOandaGranularity(secondsPerCandle), startDateString, MAX_CANDLES_PER_REQUEST);
+                .formatted(API_URL, tradePair.toString('_'), granularityToString(secondsPerCandle), startDateString, MAX_CANDLES_PER_REQUEST);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(uri))
@@ -640,7 +688,7 @@ public class Oanda extends Exchange {
 
     public CustomWebSocketClient getWebsocketClient() {
 
-        CustomWebSocketClient re = new CustomWebSocketClient(API_URL + "/v3/accounts/" + account_id + "/pricing/stream?instruments=" + tradePair) {
+        CustomWebSocketClient re = new CustomWebSocketClient(API_URL + "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_')) {
 
             @Override
             public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
@@ -719,11 +767,11 @@ public class Oanda extends Exchange {
 
             @Override
             public boolean supportsStreamingTrades(TradePair tradePair) {
-                return false;
+                return true;
             }
-
             @Override
             public void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask updateInProgressCandleTask) {
+
 
             }
         };
@@ -733,73 +781,106 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public List<PriceData> fetchLivesBidAsk(@NotNull TradePair tradePair) {
-        List<PriceData> priceDataList = new ArrayList<>();
+    public List<Account> getAccountSummary() {
+        List<Account> accounts = new ArrayList<>();
 
+        requestBuilder.uri(URI.create(API_URL + "/accounts/" + getAccount_id() + "/summary"));
         try {
-            // Construct the OANDA API URL for fetching pricing data
+            HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+
+            // Check for API errors
+            if (response.statusCode() == 429) {
+                logger.warn("⚠ Rate limit exceeded. Retrying after 5 seconds...");
+                Thread.sleep(5000);
+                return getAccountSummary();
+            }
+            if (response.statusCode() != 200) {
+                logger.error("🚨 Failed to fetch account summary from OANDA: {}", response.body());
+                throw new RuntimeException("Failed to fetch account summary: " + response.body());
+            }
+
+            // Log raw API response for debugging
+            logger.info("Raw API Response: {}", response.body());
+
+            // Parse JSON response
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode accountsJson = objectMapper.readTree(response.body());
+
+            // Ensure "account" field exists
+            JsonNode accountJson = accountsJson.get("account");
+            if (accountJson != null) {
+                Account account = objectMapper.readValue(accountJson.traverse(), Account.class);
+                accounts.add(account);
+            } else {
+                logger.error("⚠ No 'account' field found in API response: {}", response.body());
+            }
+
+        } catch (IOException | InterruptedException e) {
+            logger.error("❌ Exception while fetching account summary: ", e);
+            throw new RuntimeException(e);
+        }
+
+        logger.info("✅ Account summary: {}", accounts);
+        return accounts;
+    }
+
+
+    @Override
+    public double fetchLivesBidAsk(@NotNull TradePair tradePair) {
+        try {
+            // Construct OANDA API URL for fetching pricing data
             String url = String.format("%s/accounts/%s/pricing?instruments=%s",
                     API_URL, account_id, tradePair.toString('_')); // Convert trade pair format
             requestBuilder.uri(URI.create(url));
 
+            HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
-            HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 429) {
+                logger.warn("⚠️ Rate limit hit while fetching bid/ask prices. Consider implementing backoff.");
+                return 0;
+            }
 
             if (response.statusCode() != 200) {
                 logger.error("❌ Failed to fetch live bid/ask prices from OANDA: {}", response.body());
-                return Collections.emptyList();
+                return 0;
             }
 
             // Parse JSON response
-            JsonNode rootNode = new ObjectMapper().readTree(response.body());
-            JsonNode pricesNode = rootNode.get("prices");
+            JsonNode rootNode = OBJECT_MAPPER.readTree(response.body());
 
-            if (pricesNode == null || !pricesNode.isArray()) {
+            if (!rootNode.has("prices") || !rootNode.get("prices").isArray()) {
                 logger.error("❌ No valid price data received from OANDA.");
-                return Collections.emptyList();
+                return 0;
             }
 
+            JsonNode pricesNode = rootNode.get("prices");
             for (JsonNode priceNode : pricesNode) {
-                String instrument = priceNode.get("instrument").asText();
-                double bidPrice = priceNode.get("bids").get(0).get("price").asDouble();
-                double askPrice = priceNode.get("asks").get(0).get("price").asDouble();
-                long timestamp = Instant.parse(priceNode.get("time").asText()).getEpochSecond();
+                String instrument = priceNode.path("instrument").asText();
+                double bidPrice = priceNode.path("bids").get(0).path("price").asDouble(0);
+                double askPrice = priceNode.path("asks").get(0).path("price").asDouble(0);
+                Instant timestamp = Instant.parse(priceNode.path("time").asText());
+
+                // Validate retrieved values
+                if (bidPrice == 0 || askPrice == 0) {
+                    logger.warn("⚠️ Skipping invalid price data for {}: bid={}, ask={}", instrument, bidPrice, askPrice);
+                    continue;
+                }
 
                 // Convert OANDA instrument format (EUR_USD) to TradePair format (EUR/USD)
                 if (instrument.equalsIgnoreCase(tradePair.toString().replace("/", "_"))) {
-                    priceDataList.add(new PriceData(tradePair.toString('/'), bidPrice, askPrice, Instant.ofEpochMilli(timestamp)));
-                    logger.info("\uD83D\uDCC8 Live Price for {} | Bid: {} | Ask: {}", tradePair, bidPrice, askPrice);
+                    logger.info("📈 Live Price for {} | Bid: {} | Ask: {}", tradePair, bidPrice, askPrice);
+                    return (askPrice + bidPrice) / 2;
                 }
             }
+
+            logger.error("❌ No matching trade pair data found.");
         } catch (IOException | InterruptedException e) {
             logger.error("❌ Error fetching live bid/ask prices from OANDA: {}", e.getMessage());
         }
 
-        return priceDataList;
+        return 0;
     }
 
-
-    /**
-     * Returns the closest supported granularity (time interval) for OANDA.
-     *
-     * @param secondsPerCandle the candle duration in seconds
-     * @return the granularity in OANDA format (e.g., "M1", "M5")
-     */
-    public String getOandaGranularity(int secondsPerCandle) {
-        return switch (secondsPerCandle) {
-            case 60 -> "M1";
-            case 300 -> "M5";
-            case 900 -> "M15";
-            case 3600 -> "H1";
-            case 3600 * 2 -> "H2";
-            case 3600 * 3 -> "H3";
-            case 86400 -> "D";
-            case 604800 -> "W";
-            case 604800 * 4 -> "Mn";
-
-            default -> throw new IllegalArgumentException("Unsupported granularity: %d".formatted(secondsPerCandle));
-        };
-    }
 
     public static class OandaCandleDataSupplier extends CandleDataSupplier {
 
@@ -828,18 +909,33 @@ public class Oanda extends Exchange {
             ));
         }
 
+        private static final int MAX_RETRIES = 5;
+        private static final long INITIAL_DELAY_MS = 500; // 500ms initial delay
+        private static final long RATE_LIMIT_DELAY_MS = 1000; // 1 sec between requests
+        private static final Map<String, List<CandleData>> candleCache = new ConcurrentHashMap<>();
+        private final Semaphore rateLimiter = new Semaphore(1); // Prevents exceeding API limits
+
         @Override
         public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            return null;
+            return
+                    new OandaCandleDataSupplier(secondsPerCandle, tradePair);
         }
+
         @Override
         public Future<List<CandleData>> get() {
             if (endTime.get() == -1) {
-                endTime.set((int) (Instant.now().getEpochSecond())); // Fix: Use seconds instead of milliseconds
+                endTime.set((int) Instant.now().getEpochSecond()); // Ensures correct timestamp format
             }
 
             int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
             String startDateString = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(startTime));
+            String cacheKey = tradePair.toString('_') + "_" + startTime;
+
+            // 🔍 Check Cache First to Reduce API Calls
+            if (candleCache.containsKey(cacheKey)) {
+                logger.info("✅ Using cached candles for {}", tradePair);
+                return CompletableFuture.completedFuture(candleCache.get(cacheKey));
+            }
 
             String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/"
                     + tradePair.toString('_')
@@ -847,85 +943,107 @@ public class Oanda extends Exchange {
                     + "&price=M&to=" + startDateString
                     + "&granularity=" + granularityToString(secondsPerCandle);
 
-            return client.sendAsync(
-                            requestBuilder.uri(URI.create(uriStr)).build(),
-                            HttpResponse.BodyHandlers.ofString())
-                    .thenApply(HttpResponse::body)
-                    .thenApply(response -> {
-                        JsonNode res;
-                        try {
-                            res = OBJECT_MAPPER.readTree(response);
-                            logger.info("OANDA trade pair: {}", tradePair);
-                            logger.info("OANDA res: {}", res);
-                        } catch (JsonProcessingException ex) {
-                            logger.error("Error parsing JSON response", ex);
-                            throw new RuntimeException("Failed to parse JSON", ex);
-                        }
-
-                        List<CandleData> candleData = new ArrayList<>();
-
-                        JsonNode candlesNode = res.get("candles");
-                        if (candlesNode != null && candlesNode.isArray()) {
-                            logger.info("Response {}", candlesNode);
-
-                            for (JsonNode candle : candlesNode) {
-                                if (!candle.has("time") || !candle.has("mid")) {
-                                    logger.warn("Skipping invalid candle data: {}", candle);
-                                    continue;
-                                }
-
-                                int time = (int) Instant.parse(candle.get("time").asText()).getEpochSecond();
-
-                                // Skip the in-progress candle
-                                if (time + secondsPerCandle > endTime.get()) {
-                                    continue;
-                                }
-
-                                candleData.add(new CandleData(
-                                        candle.get("mid").get("o").asDouble(),  // open price
-                                        candle.get("mid").get("c").asDouble(),  // close price
-                                        candle.get("mid").get("h").asDouble(),  // high price
-                                        candle.get("mid").get("l").asDouble(),  // low price
-                                        time, (int) Instant.now().getEpochSecond(),
-                                        candle.get("volume").asLong()  // volume
-                                ));
-                            }
-
-                            // Ensure candles are sorted before returning
-                            candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
-
-                            logger.info("Processed candles: {}", candleData);
-                            endTime.set(startTime); // Update only once after processing all candles
-
-                            return candleData;
-                        }
-
-                        return Collections.emptyList();
-                    });
+            return fetchWithRetries(uriStr, cacheKey, tradePair, 0);
         }
 
-        private @NotNull String granularityToString(int actualGranularity) {
+        /**
+         * Handles fetching candle data with retries on OANDA rate-limiting (429 errors).
+         */
+        private CompletableFuture<List<CandleData>> fetchWithRetries(String uriStr, String cacheKey, TradePair tradePair, int retryCount) {
+            return CompletableFuture.runAsync(() -> {
+                try {
+                    // Apply OANDA Rate-Limit Throttling
+                    rateLimiter.acquire();
+                    Thread.sleep(RATE_LIMIT_DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).thenCompose(_ -> client.sendAsync(
+                    requestBuilder.uri(URI.create(uriStr)).build(),
+                    HttpResponse.BodyHandlers.ofString())
+            ).thenCompose(response -> {
+                if (response.statusCode() == 429) { // Too Many Requests (Rate-Limited)
+                    if (retryCount < MAX_RETRIES) {
+                        long backoffTime = INITIAL_DELAY_MS * (1L << retryCount); // Exponential Backoff
+                        logger.warn("⚠️ Rate-limited! Retrying in {} ms...", backoffTime);
 
-            String x;
-            String str;
-            if (actualGranularity < 3600) {
-                x = String.valueOf(actualGranularity / 60);
-                str = "M";
-            } else if (actualGranularity < 86400) {
-                x = String.valueOf((actualGranularity / 3600));
-                str = "H";
-            } else if (actualGranularity < 604800) {
-                x = "";//String.valueOf(secondsPerCandle / 86400);
-                str = "D";
-            } else if (actualGranularity < 2592000) {
-                x = String.valueOf((actualGranularity / 604800));
-                str = "W";
-            } else {
-                x = String.valueOf((actualGranularity * 7 / 2592000 / 7));
-                str = "M";
+                        return CompletableFuture.supplyAsync(() -> null,
+                                        CompletableFuture.delayedExecutor(backoffTime, TimeUnit.MILLISECONDS))
+                                .thenCompose(__ -> fetchWithRetries(uriStr, cacheKey, tradePair, retryCount + 1));
+
+                    } else {
+                        logger.error("🚨 Max retries reached for fetching candles.");
+                        return CompletableFuture.failedFuture(new RuntimeException("Rate limit exceeded"));
+                    }
+                }
+
+                if (response.statusCode() != 200) {
+                    logger.error("❌ Error fetching candles: {}", response.body());
+                    return CompletableFuture.failedFuture(new RuntimeException("Failed to fetch candles"));
+                }
+
+                return processCandleResponse(response.body(), cacheKey, tradePair);
+            }).whenComplete((__, throwable) -> rateLimiter.release()); // 🔓 Release the semaphore
+        }
+
+        /**
+         * Processes the OANDA API response, filters valid candles, and caches data.
+         */
+        private CompletableFuture<List<CandleData>> processCandleResponse(String responseBody, String cacheKey, TradePair tradePair) {
+            try {
+                JsonNode res = OBJECT_MAPPER.readTree(responseBody);
+                logger.info("📊 OANDA trade pair: {}", tradePair.toString('/'));
+                logger.info("📥 OANDA response: {}", res);
+
+                List<CandleData> candleData = new ArrayList<>();
+                JsonNode candlesNode = res.get("candles");
+
+                if (candlesNode != null && candlesNode.isArray()) {
+                    for (JsonNode candle : candlesNode) {
+                        if (!candle.has("time") || !candle.has("mid")) {
+                            logger.warn("⚠️ Skipping invalid candle data: {}", candle);
+                            continue;
+                        }
+
+                        int time = (int) Instant.parse(candle.get("time").asText()).getEpochSecond();
+
+                        // Skip in-progress candles
+                        if (time + secondsPerCandle > endTime.get()) {
+                            continue;
+                        }
+
+                        candleData.add(new CandleData(
+                                candle.get("mid").get("o").asDouble(),  // Open price
+                                candle.get("mid").get("c").asDouble(),  // Close price
+                                candle.get("mid").get("h").asDouble(),  // High price
+                                candle.get("mid").get("l").asDouble(),  // Low price
+                                time, (int) System.currentTimeMillis(),
+                                candle.get("volume").asLong()  // Volume
+                        ));
+                    }
+
+                    // Sort candles before returning
+                    candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
+                    logger.info("��� Received {} candles for {}.", candleData.size(),
+                            tradePair.toString('/'));
+                    int startTime = (int) System.currentTimeMillis();
+
+                    // 📌 Cache the latest candle data
+                    candleCache.put(cacheKey, candleData);
+                    endTime.set(candleData.isEmpty() ? startTime : candleData.getFirst().getOpenTime()); // ✅ Update endTime
+
+                    return CompletableFuture.completedFuture(candleData);
+                }
+
+                return CompletableFuture.completedFuture(Collections.emptyList());
+
+            } catch (JsonProcessingException ex) {
+                logger.error("🚨 JSON Parsing Error", ex);
+                return CompletableFuture.failedFuture(new RuntimeException("Failed to parse JSON", ex));
             }
-            return str + x;
-
         }
+
+
+
     }
 }

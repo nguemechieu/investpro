@@ -74,15 +74,6 @@
     -fx-background-insets: 0;
 }
 
-.upcoming-news-box_canvas {
-    -fx-background-color: #ffffff;
-    -fx-border-color: #181818;
-    -fx-text-fill-color: rgba(77, 200, 112, 0.7);
-    -fx-padding: 10px;
-    -fx-border-radius: 30px;
-    -fx-background-insets: 20;
-    -fx-background-radius: 20px;
-}
 
 .news_border_pane {
     -fx-background-color: #0a3936;
@@ -343,18 +334,6 @@
     -fx-padding: 2 5 2 0;
 }
 
-.account-canvas {
-    -fx-background-color: rgb(24, 24, 24);
-    -fx-text-fill: #19e052;
-    -fx-border-color: #ac7638;
-
-    -fx-background-insets: 1;
-    -fx-background-radius: 5px;
-    -fx-padding: 10px;
-    -fx-border-width: 16;
-    -fx-border-radius: 40px;
-
-}
 .candlestick-average-line {
     -fx-stroke: #106ece;
     -fx-stroke-width: 2px;

@@ -3,10 +3,12 @@ package org.investpro;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.ui.TradingWindow;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.FileInputStream;
@@ -31,9 +33,12 @@ public class InvestPro extends Application {
     protected static String DB_USER;
     protected static String DB_PASSWORD;
     protected static String DB_PORT;
-
+    public static Db1 db1 = new Db1();
     public static void main(String[] args) {
         loadProperties(); // Load properties at startup
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        logger.info("InvestPro started at {}", LocalDateTime.now().format(formatter));
+        // db1.createTables();
         launch(args); // Start JavaFX application
     }
 
@@ -45,7 +50,7 @@ public class InvestPro extends Application {
             PROPERTIES.load(fileInputStream);
             logger.info("✅ Configurations loaded successfully.");
         } catch (IOException e) {
-            logger.error("⚠ Failed to load properties: " + e.getMessage(), e);
+            logger.error("⚠ Failed to load properties: {}", e.getMessage(), e);
         }
     }
 
@@ -95,8 +100,8 @@ public class InvestPro extends Application {
             primaryStage.show();
 
         } catch (Exception e) {
-            logger.error("❌ Application failed to start: " + e.getMessage(), e);
-            Platform.exit();
+            logger.error("❌ Application failed to start: {}", e.getMessage(), e);
+            new Messages(Alert.AlertType.ERROR, e.getMessage());
         }
     }
 }

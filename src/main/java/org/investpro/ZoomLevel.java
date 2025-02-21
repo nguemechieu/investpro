@@ -13,10 +13,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+
 @Getter
 @Setter
-
-
 public class ZoomLevel {
     private final int zoomLevelId;
 
@@ -29,6 +28,7 @@ public class ZoomLevel {
     private final InstantAxisFormatter xAxisFormatter;
     private final Map<Integer, Pair<Extrema, Extrema>> extremaForCandleRangeMap;
     private double minXValue;
+    private double minYValue;
 
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
               final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
@@ -97,5 +97,40 @@ public class ZoomLevel {
         return String.format("ZoomLevel [id = %d, numVisibleCandles = %s, secondsPerPixel = %f, pixelsPerSecond = " +
                         "%f, candleWidth = %d, minXValue = %f", zoomLevelId, numVisibleCandles, secondsPerPixel,
                 pixelsPerSecond, candleWidth, minXValue);
+    }
+    private double maxYValue;
+
+    public double getLowerBound() {
+        return minXValue;
+    }
+
+    public double getUpperBound() {
+        return minXValue + xAxisRangeInSeconds;
+    }
+
+    public double getLength() {
+        return xAxisRangeInSeconds;
+    }
+
+    public double getMaxXValue() {
+        return minXValue + getLength();
+    }
+
+    public void setMaxXValue(double newMaxXValue) {
+        minXValue = newMaxXValue - getLength();
+    }
+
+    public double getMinYValue() {
+        return extremaForCandleRangeMap.values().stream()
+                .mapToDouble(Extrema::getMin)
+                .min()
+                .orElse(Double.NaN);
+    }
+
+    public double getMaxYValue() {
+        return extremaForCandleRangeMap.values().stream()
+                .mapToDouble(Extrema::getMax)
+                .max()
+                .orElse(Double.NaN);
     }
 }

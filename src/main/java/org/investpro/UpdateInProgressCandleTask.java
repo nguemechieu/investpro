@@ -5,15 +5,13 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Getter
@@ -22,11 +20,11 @@ public class UpdateInProgressCandleTask extends LiveTradesConsumer implements Ru
     private final BlockingQueue<Trade> liveTradesQueue;
 
     private boolean ready;
-    private NavigableMap<Integer, CandleData> data;
+    private List<CandleData> data;
     private TradePair tradePair;
     private long secondsPerCandle;
 
-    UpdateInProgressCandleTask(Exchange exchange, int secondsPerCandle, TradePair tradePair, NavigableMap<Integer, CandleData> data) {
+    UpdateInProgressCandleTask(Exchange exchange, int secondsPerCandle, TradePair tradePair, List<CandleData> data) {
         this.secondsPerCandle = secondsPerCandle;
         this.tradePair = tradePair;
         this.exchange = exchange;
@@ -48,14 +46,17 @@ public class UpdateInProgressCandleTask extends LiveTradesConsumer implements Ru
         }
 
         int currentTill = (int) Instant.now().getEpochSecond();
-        List<Trade> liveTrades;
-        try {
-            liveTrades = exchange.fetchRecentTradesUntil(tradePair, Instant.now()).get();
+
+        Consumer<List<Trade>> liveTradesConsumer = (trades -> Platform.runLater(() -> acceptTrades(trades)));
+
+
+        // Fetch recent trades from the exchange
+        List<Trade> liveTrades = new ArrayList<>();
+
+
+        exchange.fetchRecentTradesUntil(tradePair, Instant.now(), liveTradesConsumer);
             liveTradesQueue.drainTo(liveTrades);
-        } catch (NoSuchAlgorithmException | InvalidKeyException | ExecutionException | InterruptedException e) {
-            logger.error("Error fetching recent trades: ", e);
-            return;
-        }
+
 
         if (liveTrades.isEmpty()) {
             logger.warn("No new trades available.");
@@ -88,9 +89,11 @@ public class UpdateInProgressCandleTask extends LiveTradesConsumer implements Ru
             inProgressCandle.setClosePriceSoFar(closePrice);
             inProgressCandle.setCurrentTill(currentTill);
 
-            data.put((int) inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
+            data.add((int) inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
         } else {
             logger.info("No trades updated in the current candle.");
+
+            return;
         }
 
         // Handle new candle formation
@@ -98,7 +101,7 @@ public class UpdateInProgressCandleTask extends LiveTradesConsumer implements Ru
             inProgressCandle.setOpenTime(inProgressCandle.getOpenTime() + secondsPerCandle);
 
             if (!nextCandleTrades.isEmpty()) {
-                Trade firstTrade = nextCandleTrades.get(0);
+                Trade firstTrade = nextCandleTrades.getFirst();
 
                 inProgressCandle.setIsPlaceholder(false);
                 inProgressCandle.setOpenPrice(firstTrade.getPrice());
@@ -119,7 +122,7 @@ public class UpdateInProgressCandleTask extends LiveTradesConsumer implements Ru
                 logger.warn("New candle created as a placeholder (no trades in this period).");
             }
 
-            data.put((int) inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
+            data.add((int) inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
         }
 
         Platform.runLater(this);

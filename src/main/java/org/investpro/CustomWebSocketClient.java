@@ -145,6 +145,8 @@ public abstract class CustomWebSocketClient implements WebSocket.Listener {
     public abstract boolean supportsStreamingTrades(TradePair tradePair);
 
     public abstract void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask updateInProgressCandleTask);
+
+
 }
 
 

@@ -2,6 +2,8 @@ package org.investpro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,10 +12,10 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.investpro.exchanges.Coinbase.client;
-import static org.investpro.exchanges.Coinbase.requestBuilder;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 import static org.investpro.Exchange.logger;
+import static org.investpro.exchanges.Coinbase.client;
+import static org.investpro.exchanges.Coinbase.requestBuilder;
 
 public class ExchangeInfo {
 
@@ -104,38 +106,18 @@ public class ExchangeInfo {
     }
 
     // ExchangeData class to hold the extracted exchange information
+    @Getter
+    @Setter
     public static class ExchangeData {
+
         private String timezone;
+
         private long serverTime;
         private final List<RateLimit> rateLimits = new ArrayList<>();
         private final List<SymbolInfo> symbols = new ArrayList<>();
 
-        public String getTimezone() {
-            return timezone;
-        }
-
-        public void setTimezone(String timezone) {
-            this.timezone = timezone;
-        }
-
-        public long getServerTime() {
-            return serverTime;
-        }
-
-        public void setServerTime(long serverTime) {
-            this.serverTime = serverTime;
-        }
-
-        public List<RateLimit> getRateLimits() {
-            return rateLimits;
-        }
-
         public void addRateLimit(RateLimit rateLimit) {
             this.rateLimits.add(rateLimit);
-        }
-
-        public List<SymbolInfo> getSymbols() {
-            return symbols;
         }
 
         public void addSymbol(SymbolInfo symbolInfo) {

@@ -130,6 +130,7 @@ public class CandleStickChartOptions {
         return alignOpenClose.getReadOnlyProperty();
     }
 
+
     private static class ChartOption {
         private final ToggleSwitch optionSwitch;
         private final Label optionLabel;

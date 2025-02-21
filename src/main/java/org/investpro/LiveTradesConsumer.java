@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Consumer;
 
 @Getter
 @Setter
@@ -21,12 +20,12 @@ public class LiveTradesConsumer {
     private final List<TradePair> tradePairs = new ArrayList<>();
 
     public Account account;
-    List<Trade> livesTrades;
+    List<Trade> livesTrades = new ArrayList<>();
     private boolean ready;
 
     protected InProgressCandle inProgressCandle;
     protected Exchange exchange;
-    private List<Trade> tradeQueue;
+    private List<Trade> tradeQueue = new ArrayList<>();
 
 
     public LiveTradesConsumer() {
@@ -40,7 +39,7 @@ public class LiveTradesConsumer {
         }
 
         // Add trade data to a queue or buffer
-        List<Trade> tradeQueue = new ArrayList<>(trades); // You can use a concurrent queue if needed
+        tradeQueue.addAll(trades); // You can use a concurrent queue if needed
 
         logger.info("Received {} trades for processing.", trades.size());
 
@@ -108,7 +107,7 @@ public class LiveTradesConsumer {
 
     // Add the trade to the historical data for the trade pair
     private void updateTradeHistory(@NotNull Trade trade) {
-        TradeHistory.addTradeToHistory(trade); // Assuming TradeHistory class exists
+        TradeHistory.addTrade(trade); // Assuming TradeHistory class exists
         logger.info("Trade added to history: {}", trade);
     }
 

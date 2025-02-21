@@ -17,7 +17,7 @@ public class Position {
     @JsonProperty("short")
     private SubPosition shortPosition;
 
-    private String commission;
+    private double commission;
     private String lastTransactionID;
 
     private int units;

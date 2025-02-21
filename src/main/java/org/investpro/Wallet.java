@@ -97,7 +97,7 @@ public class Wallet extends AnchorPane {
         // Assuming the first account in the list is the primary one
         if (!accounts.isEmpty()) {
             Account primaryAccount = accounts.getFirst();
-            balanceBTC = primaryAccount.balance.getFree();
+            balanceBTC = primaryAccount.getBalance();
             balanceLabel.setText("Balance: $" + df.format(balanceBTC));
         } else {
             balanceLabel.setText("Balance: 0.00 ");

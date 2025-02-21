@@ -3,30 +3,32 @@ package org.investpro;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import org.jetbrains.annotations.NotNull;
 
 public class Messages extends Region {
 
     public Messages(@NotNull Alert.AlertType type, String message) {
-        Alert dialogPane = new Alert(type);
+        Alert alert = new Alert(type);
+        alert.setTitle("Notification");
+        alert.setHeaderText(null);  // No header text to keep it clean
 
-        dialogPane.setResizable(true);
-
-        // Create a TextArea for the message content to handle large or wrapped text
+        // Create a TextArea to display the message
         TextArea textArea = new TextArea(message);
-        textArea.setWrapText(true);  // Allows the text to wrap within the area
+        textArea.setWrapText(true);  // Wrap long text
+        textArea.setEditable(false); // Prevent editing
+        textArea.setPrefSize(500, 200);  // Set preferred size
 
-        textArea.setPrefHeight(Region.USE_COMPUTED_SIZE);
-        textArea.setPrefWidth(Region.USE_COMPUTED_SIZE);
-        // Set the preferred size of the dialog pane to avoid truncating the message
-        dialogPane.getDialogPane().setMinHeight(500);
-        dialogPane.getDialogPane().setMinWidth(400);
+        // Wrap textArea inside VBox for proper layout
+        VBox content = new VBox(textArea);
+        content.setPrefSize(500, 300);
 
-        dialogPane.getDialogPane().setPrefSize(500, 300);  // Customize this size as needed
-
-        dialogPane.getDialogPane().setContent(textArea);  // Set TextArea as the content of the dialog
+        // Set dialog size and content
+        alert.getDialogPane().setContent(content);
+        alert.getDialogPane().setMinSize(500, 300);
+        alert.getDialogPane().setPrefSize(600, 350);  // Customize this size as needed
 
         // Show the dialog and wait for user interaction
-        dialogPane.showAndWait();
+        alert.show();
     }
 }

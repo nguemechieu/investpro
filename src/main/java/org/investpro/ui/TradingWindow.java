@@ -1,4 +1,4 @@
-package org.investpro;
+package org.investpro.ui;
 
 import jakarta.persistence.Query;
 import javafx.application.Platform;
@@ -9,8 +9,10 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import org.investpro.CurrencyDataProvider;
+import org.investpro.Exchange;
+import org.investpro.Messages;
 import org.investpro.exchanges.Binance;
-import org.investpro.exchanges.BinanceUS;
 import org.investpro.exchanges.Coinbase;
 import org.investpro.exchanges.Oanda;
 import org.jetbrains.annotations.NotNull;
@@ -26,11 +28,13 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.investpro.InvestPro.db1;
+
 
 public class TradingWindow extends Region {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
-    static final Db1 db1 = new Db1();
+
     private static final String CONFIG_FILE = "src/main/resources/config.properties";
     private static final String CONFIG_FILE2 = "src/main/resources/config2.properties";
 
@@ -242,7 +246,7 @@ public class TradingWindow extends Region {
         }
 
         try {
-            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE email = :email");
+            Query query = db1.getEntityManager().createNativeQuery("SELECT * FROM users WHERE email = :email");
             query.setParameter("email", email);
 
             if (query.getResultList().isEmpty()) {
@@ -250,19 +254,19 @@ public class TradingWindow extends Region {
                 return;
             }
 
-            db1.entityManager.getTransaction().begin();
-            db1.entityManager.createNativeQuery(
+            db1.getEntityManager().getTransaction().begin();
+            db1.getEntityManager().createNativeQuery(
                             "UPDATE users SET password = :password WHERE email = :email")
                     .setParameter("password", newPassword)
                     .setParameter("email", email)
                     .executeUpdate();
-            db1.entityManager.getTransaction().commit();
+            db1.getEntityManager().getTransaction().commit();
             showAlert("Password reset successfully. Please log in.");
             loginPage();
         } catch (Exception e) {
             logger.error("Error resetting password", e);
-            if (db1.entityManager.getTransaction().isActive()) {
-                db1.entityManager.getTransaction().rollback();
+            if (db1.getEntityManager().getTransaction().isActive()) {
+                db1.getEntityManager().getTransaction().rollback();
             }
             showAlert("An error occurred during password reset.");
         }
@@ -292,7 +296,7 @@ public class TradingWindow extends Region {
         }
 
         try {
-            Query query = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username");
+            Query query = db1.getEntityManager().createNativeQuery("SELECT * FROM users WHERE username = :username");
             query.setParameter("username", username);
 
             if (!query.getResultList().isEmpty()) {
@@ -300,21 +304,21 @@ public class TradingWindow extends Region {
                 return false;
             }
 
-            db1.entityManager.getTransaction().begin();
-            db1.entityManager.createNativeQuery(
+            db1.getEntityManager().getTransaction().begin();
+            db1.getEntityManager().createNativeQuery(
                             "INSERT INTO users (username, password, email) VALUES (:username, :password, :email)")
                     .setParameter("username", username)
                     .setParameter("password", password)
                     .setParameter("email", email)
                     .executeUpdate();
-            db1.entityManager.getTransaction().commit();
+            db1.getEntityManager().getTransaction().commit();
 
             showAlert("Registration successful. Please log in.");
             return true;
         } catch (Exception e) {
             logger.error("Error during sign-up", e);
-            if (db1.entityManager.getTransaction().isActive()) {
-                db1.entityManager.getTransaction().rollback();
+            if (db1.getEntityManager().getTransaction().isActive()) {
+                db1.getEntityManager().getTransaction().rollback();
             }
             showAlert("An error occurred during sign-up.");
         return false;
@@ -323,7 +327,7 @@ public class TradingWindow extends Region {
 
     private void handleLogin(@NotNull String username, String password) {
         try {
-            Query res = db1.entityManager.createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
+            Query res = db1.getEntityManager().createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
             res.setParameter("username", username);
             res.setParameter("password", password);
 
@@ -449,10 +453,11 @@ public class TradingWindow extends Region {
 
             try {
                 switch (comboBox.getSelectionModel().getSelectedItem()) {
-                    case "BINANCE US" -> exchange = new BinanceUS(apiKeyTextField.getText(), secretKeyTextField.getText());
-                    case "BINANCE" -> exchange = new Binance(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    //   case "BINANCE US" -> exchange = new BinanceUS(apiKeyTextField.getText(), secretKeyTextField.getText());
                     case "OANDA" -> exchange = new Oanda(apiKeyTextField.getText(), secretKeyTextField.getText());
                     case "COINBASE" -> exchange = new Coinbase(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    case "BINANCE" -> exchange = new Binance(apiKeyTextField.getText(), secretKeyTextField.getText());
+
                     default ->
                             throw new RuntimeException("Unexpected value: %s".formatted(comboBox.getSelectionModel().getSelectedItem()));
                 }
@@ -460,7 +465,7 @@ public class TradingWindow extends Region {
                 logger.info("Starting trading window for {}", comboBox.getValue());
                 //  getChildren().forEach(child -> child.setVisible(false));
 
-                DisplayExchange display = new DisplayExchange(exchange);
+                DisplayExchangeUI display = new DisplayExchangeUI(exchange);
                 StackPane root = new StackPane(display);
                 Scene scene = new Scene(root, 1530, 780);
                 scene.getStylesheets().add(Objects.requireNonNull(TradingWindow.class.getResource("/app.css")).toExternalForm());

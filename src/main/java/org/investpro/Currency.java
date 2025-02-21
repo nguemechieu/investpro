@@ -7,11 +7,11 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.SQLException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.investpro.TradingWindow.db1;
+import static org.investpro.InvestPro.db1;
+
 
 @Getter
 @Setter
@@ -22,6 +22,7 @@ import static org.investpro.TradingWindow.db1;
 public abstract class Currency implements Comparable<Currency> {  // ✅ Remove "abstract"
     static final ConcurrentHashMap<String, Currency> CURRENCIES = new ConcurrentHashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(Currency.class);
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -86,14 +87,10 @@ public abstract class Currency implements Comparable<Currency> {  // ✅ Remove 
         }
 
         // Fetch from DB if not in cache
-        try {
-            Currency cur = db1.getCurrency(baseCurrencyCode);
-            if (cur != null) {
-                CURRENCIES.put(baseCurrencyCode, cur);
-                return cur;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("❌ Database error while fetching currency: " + baseCurrencyCode, e);
+        Currency cur = db1.getCurrency(baseCurrencyCode);
+        if (cur != null) {
+            CURRENCIES.put(baseCurrencyCode, cur);
+            return cur;
         }
 
         // Return a fallback empty Currency object

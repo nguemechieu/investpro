@@ -1,11 +1,19 @@
-package org.investpro;
+package org.investpro.ai;
 
+import org.investpro.OrderBook;
+import org.investpro.OrderBookEntry;
+import org.investpro.SIGNAL;
 import org.jetbrains.annotations.NotNull;
 import weka.classifiers.Classifier;
 import weka.classifiers.trees.J48;
-import weka.core.*;
+import weka.core.Attribute;
+import weka.core.DenseInstance;
+import weka.core.Instance;
+import weka.core.Instances;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -54,7 +62,7 @@ public class TradingAI {
     /**
      * Generate a trading signal based on moving averages.
      */
-    public SIGNAL getMovingAverageSignal(List<OrderBook> prices, double currentPrice) {
+    public SIGNAL getMovingAverageSignal(List<OrderBook> prices, List<OrderBookEntry> currentPrice) {
         if (prices.isEmpty()) return SIGNAL.HOLD;
 
         double shortTermMA = calculateMovingAverage(prices, 20);
@@ -63,9 +71,9 @@ public class TradingAI {
         double support = calculateSupport(prices);
         double resistance = calculateResistance(prices);
 
-        if (shortTermMA > longTermMA && currentPrice > support) {
+        if (shortTermMA > longTermMA && currentPrice.getFirst().getPrice() > support) {
             return SIGNAL.BUY;
-        } else if (shortTermMA < longTermMA && currentPrice < resistance) {
+        } else if (shortTermMA < longTermMA && currentPrice.getFirst().getPrice() < resistance) {
             return SIGNAL.SELL;
         } else {
             return SIGNAL.HOLD;

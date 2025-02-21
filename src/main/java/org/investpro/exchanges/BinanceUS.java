@@ -12,8 +12,8 @@ import javafx.collections.FXCollections;
 import javafx.scene.control.Alert;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.*;
 import org.investpro.Currency;
+import org.investpro.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -33,6 +33,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
@@ -266,18 +267,19 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+                                       Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
-        //api.binance.us/api/v3/trades?symbol=LTCBTC"
+
         CompletableFuture.runAsync(() -> {
-            String uriStr = "https://api.binance.us/api/v3/trades?symbol=" + tradePair.toString('/');
+            String uriStr = API_URL + "/api/v3/trades?symbol=" + tradePair.toString('-');
 
             try {
-                HttpResponse<String> response = client.send(
-                        requestBuilder
+                HttpResponse<String> response = HttpClient.newHttpClient().send(
+                        HttpRequest.newBuilder()
                                 .uri(URI.create(uriStr))
                                 .GET().build(),
                         HttpResponse.BodyHandlers.ofString());
@@ -286,21 +288,25 @@ public class BinanceUS extends Exchange {
                 if (!tradesResponse.isArray() || tradesResponse.isEmpty()) {
                     futureResult.completeExceptionally(new RuntimeException("Binance trades response was empty or not an array"));
                 } else {
-                    List<Trade> trades = new ArrayList<>();
+
                     for (JsonNode trade : tradesResponse) {
                         Instant time = Instant.ofEpochMilli(trade.get("time").asLong());
                         if (time.compareTo(stopAt) <= 0) {
-                            futureResult.complete(trades);
+                            futureResult.complete(Collections.emptyList());
+
                             break;
                         } else {
-                            trades.add(new Trade(
+                            List<Trade> tr = new ArrayList<>();
+                            Trade tradex = new Trade(
                                     tradePair,
-                                    trade.get("price").asDouble(),
-                                    trade.get("qty").asLong(),
+
+                                    trade.get("price").asDouble(), trade.get("qty").asLong(),
                                     Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY"),
                                     trade.get("id").asLong(),
                                     time
-                            ));
+                            );
+                            tr.add(tradex);
+                            trades.accept(tr);
                         }
                     }
                 }
@@ -308,10 +314,7 @@ public class BinanceUS extends Exchange {
                 futureResult.completeExceptionally(e);
             }
         });
-
-        return futureResult;
     }
-
     @Override
     public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
@@ -520,7 +523,7 @@ public class BinanceUS extends Exchange {
 
                 // Set other account properties, checking for nulls
                 account.setRequireSelfTradePrevention(res.get("requireSelfTradePrevention").asBoolean());
-                account.setBrokered(res.get("brokered").asBoolean());
+                account.setBrokered(String.valueOf(res.get("brokered").asBoolean()));
                 account.setPermissions(res.has("permissions") && !res.get("permissions").isNull() ? res.get("permissions").asText() : "");
                 account.setAccountType(res.has("accountType") && !res.get("accountType").isNull() ? res.get("accountType").asText() : "");
                 account.setCanTrade(res.has("canTrade") && !res.get("canTrade").isNull() && res.get("canTrade").asBoolean());
@@ -753,13 +756,18 @@ public class BinanceUS extends Exchange {
 
 
     @Override
-    public List<PriceData> fetchLivesBidAsk(TradePair tradePair) {
-        return null;
+    public double fetchLivesBidAsk(TradePair tradePair) {
+        return 0;
     }
 
     @Override
     public CustomWebSocketClient getWebsocketClient() {
         return null;
+    }
+
+    @Override
+    public List<Account> getAccountSummary() {
+        return List.of();
     }
 
 

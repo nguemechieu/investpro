@@ -1,5 +1,6 @@
 package org.investpro;
 
+import org.investpro.ai.TradingAI;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instances;

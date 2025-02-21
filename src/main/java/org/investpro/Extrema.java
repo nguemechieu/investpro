@@ -8,11 +8,12 @@ public class Extrema extends Pair<Double, Double> {
         super(min, max);
     }
 
-    public Double getMin() {
-        return getKey();
+    public static Double getMin(Pair<Extrema, Extrema> value) {
+        return value.getKey().getValue();
     }
 
-    public Double getMax() {
-        return getValue();
+    public static Double getMax(Pair<Extrema, Extrema> value) {
+
+        return value.getValue().getValue();
     }
 }

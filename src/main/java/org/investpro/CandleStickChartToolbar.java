@@ -75,7 +75,7 @@ public class CandleStickChartToolbar extends Region {
         boolean passedDayWeekBoundary = false;
         boolean passedWeekMonthBoundary = false;
 
-        // Ensure we only include supported granularities
+        // Ensure we only include supported granularity
         List<Integer> sortedGranularity = new ArrayList<>(granularities);
         sortedGranularity.retainAll(SUPPORTED_GRANULARITY);
         Collections.sort(sortedGranularity);
@@ -130,6 +130,8 @@ public class CandleStickChartToolbar extends Region {
 
 
                     if (optionsPopOver.isShowing() && toolbarButton.graphicLabel == null) {
+                        optionsPopOver.hide();
+
                         return;
                     }
                     optionsPopOver.show(toolbarButton);
@@ -200,22 +202,22 @@ public class CandleStickChartToolbar extends Region {
     /**
      * Converts OANDA-supported granularities into appropriate labels for UI.
      */
-    private String granularityToLabel(int granularity) {
-        if (granularity < 60) {  // Seconds
-            return granularity + "s";
-        } else if (granularity < 3600) { // Minutes
-            return (granularity / 60) + "m";
-        } else if (granularity < 86400) { // Hours
-            return (granularity / 3600) + "h";
-        } else if (granularity < 604800) { // Days
-            return (granularity / 86400) + "d";
-        } else if (granularity < 2592000) { // Weeks
-            return (granularity / 604800) + "w";
-        } else { // Months
-            return (granularity / 2592000) + "mo";
+
+    private static @NotNull String granularityToLabel(int actualGranularity) {
+        if (actualGranularity < 60) {
+            return "s" + actualGranularity;  // Seconds
+        } else if (actualGranularity < 3600) {
+            return "M" + (actualGranularity / 60);  // Minutes
+        } else if (actualGranularity < 86400) {
+            return "H" + (actualGranularity / 3600);  // Hours
+        } else if (actualGranularity < 604800) {
+            return "D";  // Days
+        } else if (actualGranularity < 2592000) {
+            return "W";  // Weeks (W1, W2, etc.)
+        } else {
+            return "Mo";  // Months
         }
     }
-
     enum Tool {
         ZOOM_IN("/img/search-plus-solid.png"),
         ZOOM_OUT("/img/search-minus-solid.png"),

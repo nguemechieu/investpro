@@ -7,8 +7,8 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import org.investpro.*;
 import org.investpro.Currency;
+import org.investpro.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +27,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
-import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 
 
@@ -142,12 +142,14 @@ public  class Coinbase extends Exchange {
      * This method only needs to be implemented to support live syncing.
      */
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+                                       Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
         if (stopAt.isAfter(Instant.now())) {
-            return completedFuture(Collections.emptyList());
+            logger.warn("fetchRecentTradesUntil: stopAt is in the future, ignoring");
+            return;
         }
 
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
@@ -213,7 +215,6 @@ public  class Coinbase extends Exchange {
             }
         });
 
-        return futureResult;
     }
 
     /**
@@ -486,7 +487,6 @@ public  class Coinbase extends Exchange {
                 String symbol = rate.get("base_currency").asText();
                 baseCurrency = new Currency(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol) {
                     /**
-                     * @param o
                      * @return
                      */
                     @Override
@@ -512,19 +512,13 @@ public  class Coinbase extends Exchange {
                 counterCurrency = new Currency(CurrencyType.CRYPTO,
                         fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2
                         , symbol) {
-                    /**
-                     * @param o
-                     * @return
-                     */
+
                     @Override
                     public int compareTo(@NotNull Currency o) {
                         return 0;
                     }
 
-                    /**
-                     * @param o
-                     * @return
-                     */
+
                     @Override
                     public int compareTo(java.util.@NotNull Currency o) {
                         return 0;
@@ -575,13 +569,18 @@ public  class Coinbase extends Exchange {
 
 
     @Override
-    public List<PriceData> fetchLivesBidAsk(TradePair tradePair) {
-        return null;
+    public double fetchLivesBidAsk(TradePair tradePair) {
+        return 0;
     }
 
     @Override
     public CustomWebSocketClient getWebsocketClient() {
         return null;
+    }
+
+    @Override
+    public List<Account> getAccountSummary() {
+        return List.of();
     }
 
     @Override
