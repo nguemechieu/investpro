@@ -33,7 +33,7 @@ public class InvestPro extends Application {
     protected static String DB_USER;
     protected static String DB_PASSWORD;
     protected static String DB_PORT;
-    public static Db1 db1 = new Db1();
+
     public static void main(String[] args) {
         loadProperties(); // Load properties at startup
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

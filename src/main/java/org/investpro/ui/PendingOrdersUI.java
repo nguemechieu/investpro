@@ -44,6 +44,8 @@ public class PendingOrdersUI extends Region {
 
         // **ListView for Orders**
         pendingOrdersView = new ListView<>();
+        pendingOrdersView.setPrefWidth(1400);
+        pendingOrdersView.setPrefHeight(700);
         pendingOrdersView.setPlaceholder(new Label("No pending orders available"));
         pendingOrdersView.setCellFactory(_ -> new OrderCell());
 

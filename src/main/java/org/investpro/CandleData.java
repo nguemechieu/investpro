@@ -1,6 +1,5 @@
 package org.investpro;
 
-import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
@@ -48,6 +47,16 @@ public class CandleData {
 
     // ✅ Default constructor (Required for JPA)
     public CandleData() {
+        this.id = UUID.randomUUID().getLeastSignificantBits();
+        this.openPrice = 0.0;
+        this.closePrice = 0.0;
+        this.highPrice = 0.0;
+        this.lowPrice = 0.0;
+        this.openTime = 0;
+        this.closeTime = 0;
+        this.volume = 0.0;
+        this.placeHolder = false;
+
 
     }
 
@@ -105,5 +114,9 @@ public class CandleData {
                 "CandleData [id=%d, open=%.2f, close=%.2f, high=%.2f, low=%.2f, openTime=%d, closeTime=%d, volume=%.2f]",
                 id, openPrice, closePrice, highPrice, lowPrice, openTime, closeTime, volume
         );
+    }
+
+    public Double getMax() {
+        return Double.max(openPrice, closePrice);
     }
 }

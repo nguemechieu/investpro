@@ -140,16 +140,18 @@ public  class Coinbase extends Exchange {
      * Fetches the recent trades for the given trade pair from  {@code stopAt} till now (the current time).
      * <p>
      * This method only needs to be implemented to support live syncing.
+     *
+     * @return
      */
     @Override
-    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
-                                       Consumer<List<Trade>> tradeConsumer) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+                                                                 Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
         if (stopAt.isAfter(Instant.now())) {
             logger.warn("fetchRecentTradesUntil: stopAt is in the future, ignoring");
-            return;
+            return null;
         }
 
         CompletableFuture<List<Trade>> futureResult = new CompletableFuture<>();
@@ -215,6 +217,7 @@ public  class Coinbase extends Exchange {
             }
         });
 
+        return futureResult;
     }
 
     /**
@@ -391,8 +394,18 @@ public  class Coinbase extends Exchange {
         HttpResponse<String> response = client.sendAsync(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("coinbase response: %s".formatted(response.body()));
         ObjectMapper objectMapper = new ObjectMapper();
-        Order[] ordersArray = objectMapper.readValue(response.body(), Order[].class);
-        Collections.addAll(orders, ordersArray);
+        JsonNode node = objectMapper.readTree(response.body());
+
+        if (node.has("orders")) {
+            for (JsonNode orderx : node.get("orders")) {
+                Order order = objectMapper.readValue(orderx.asText(), Order.class);
+                orders.add(order);
+            }
+        } else {
+            logger.info("No orders found");
+            return orders;
+        }
+
         return orders;
 
 
@@ -406,8 +419,22 @@ public  class Coinbase extends Exchange {
         HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
         logger.info("coinbase response: %s".formatted(response.body()));
         ObjectMapper objectMapper = new ObjectMapper();
-        Order[] ordersArray = objectMapper.readValue(response.body(), Order[].class);
-        Collections.addAll(orders, ordersArray);
+        JsonNode node = objectMapper.readTree(response.body());
+
+        if (node.has("orders")) {
+            for (JsonNode orderx : node.get("orders")) {
+                Order order = objectMapper.readValue(orderx.asText(), Order.class);
+                orders.add(order);
+            }
+
+
+        } else {
+            logger.info("No orders found");
+            return orders;
+        }
+
+
+
         return orders;
 
     }
@@ -470,7 +497,11 @@ public  class Coinbase extends Exchange {
 
 
             JsonNode res = OBJECT_MAPPER.readTree(response.body());
-            logger.info("coinbase response: %s".formatted(res));
+            logger.info("coinbase response:{}", (res));
+
+            if (!res.has("id"))
+                throw new IllegalStateException(res.asText());
+
 
 
             //coinbase response: [{"id":"DOGE-BTC","base_currency":"DOGE","quote_currency":"BTC","quote_increment":"0.00000001","base_increment":"0.1","display_name":"DOGE-BTC","min_market_funds":"0.000016","margin_enabled":false,"post_only":false,"limit_only":false,"cancel_only":false,"status":"online","status_message":"","trading_disabled":false,"fx_stablecoin":false,"max_slippage_percentage":"0.03000000","auction_mode":false,
@@ -487,7 +518,6 @@ public  class Coinbase extends Exchange {
                 String symbol = rate.get("base_currency").asText();
                 baseCurrency = new Currency(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol) {
                     /**
-                     * @return
                      */
                     @Override
                     public int compareTo(@NotNull Currency o) {
@@ -549,11 +579,12 @@ public  class Coinbase extends Exchange {
 
     @Override
     public boolean supportsStreamingTrades(TradePair tradePair) {
-        return false;
+        return true;
     }
 
     @Override
     public void cancelAllOrders() {
+
 
     }
 

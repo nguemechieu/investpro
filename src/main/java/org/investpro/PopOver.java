@@ -27,6 +27,7 @@ package org.investpro;//CHECKSTYLE:OFF
  */
 
 
+import com.jfoenix.controls.datamodels.treetable.RecursiveTreeObject;
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
@@ -41,6 +42,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PopupControl;
 import javafx.scene.control.Skin;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
@@ -69,6 +71,7 @@ public class PopOver extends PopupControl {
     private double targetX;
 
     private double targetY;
+    private final RecursiveTreeObject<Object> content = new RecursiveTreeObject<>();
 
     /**
      * Creates a pop over with a label as the content node.
@@ -786,6 +789,11 @@ public class PopOver extends PopupControl {
      */
     public final ArrowLocation getArrowLocation() {
         return arrowLocationProperty().get();
+    }
+
+    public void setContent(VBox options) {
+        this.content.getChildren().clear();
+        this.content.getChildren().add(options);
     }
 
     /**

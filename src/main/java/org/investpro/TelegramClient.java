@@ -3,9 +3,10 @@ package org.investpro;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONArray;
+import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -13,10 +14,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.logging.Logger;
 
 /**
- * TelegramClient for interacting with Telegram Bot API.
+ * Enhanced Telegram Bot Client with support for messages, media, files, chat actions, and status checks.
  */
 @Getter
 @Setter
@@ -26,10 +28,10 @@ public class TelegramClient {
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final String botToken;
-
     private String username;
     private String lastMessage;
     private boolean isOnline;
+
 
     /**
      * Constructor initializes the Telegram client with a bot token.
@@ -44,31 +46,88 @@ public class TelegramClient {
         }
     }
 
+    String chatId;
     /**
-     * Sends a message to a specific Telegram chat.
+     * Sends a text message (supports emojis).
      *
-     * @param chatId  The Telegram chat ID or username (e.g., @username)
+     * @param chatId  The chat ID or username
      * @param message The message to send
      */
     public void sendMessage(String chatId, String message) {
         try {
+            sendChatAction(chatId, ENUM_CHAT_ACTION.typing);
             String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-            String url = buildApiUrl("sendMessage", "chat_id=" + chatId, "text=" + encodedMessage);
+            String url = buildApiUrl("sendMessage", "chat_id=" + chatId, "text=" + encodedMessage, "parse_mode=Markdown");
 
             HttpResponse<String> response = sendRequest(url);
-
-            if (response.statusCode() == 200) {
-                logger.info("✅ Message sent successfully to chat ID: " + chatId);
-            } else {
-                logger.warning("❌ Failed to send message. Response Code: " + response.statusCode());
-            }
+            logResponse(response, "Message sent to chat ID: " + chatId);
         } catch (IOException | InterruptedException e) {
-            handleException("Error sending message to Telegram", e);
+            handleException("Error sending message", e);
         }
     }
 
     /**
-     * Checks if the bot is online by calling the getMe API.
+     * Sends a photo.
+     *
+     * @param chatId    The chat ID
+     * @param photoPath Path to the photo file
+     */
+    public void sendPhoto(String chatId, String photoPath) {
+        try {
+            sendChatAction(chatId, ENUM_CHAT_ACTION.upload_photo);
+            File photo = new File(photoPath);
+            if (!photo.exists()) {
+                logger.warning("Photo file not found: " + photoPath);
+                return;
+            }
+
+            HttpResponse<String> response = sendMultipartRequest("sendPhoto", chatId, "photo", photo);
+            logResponse(response, "Photo sent to chat ID: " + chatId);
+        } catch (IOException | InterruptedException e) {
+            handleException("Error sending photo", e);
+        }
+    }
+
+    /**
+     * Sends a document or file.
+     *
+     * @param chatId   The chat ID
+     * @param filePath Path to the document/file
+     */
+    public void sendDocument(String chatId, String filePath) {
+        try {
+            sendChatAction(chatId, ENUM_CHAT_ACTION.upload_document);
+            File file = new File(filePath);
+            if (!file.exists()) {
+                logger.warning("File not found: " + filePath);
+                return;
+            }
+
+            HttpResponse<String> response = sendMultipartRequest("sendDocument", chatId, "document", file);
+            logResponse(response, "Document sent to chat ID: " + chatId);
+        } catch (IOException | InterruptedException e) {
+            handleException("Error sending document", e);
+        }
+    }
+
+    /**
+     * Sends a chat action (e.g., "typing", "upload_photo").
+     *
+     * @param chatId The chat ID
+     * @param action The action type (e.g., "typing", "upload_photo", "record_video", etc.)
+     */
+    public void sendChatAction(String chatId, ENUM_CHAT_ACTION action) {
+        try {
+            String url = buildApiUrl("sendChatAction", "chat_id=" + chatId, "action=" + action);
+            HttpResponse<String> response = sendRequest(url);
+            logResponse(response, "Chat action '" + action + "' sent to chat ID: " + chatId);
+        } catch (IOException | InterruptedException e) {
+            handleException("Error sending chat action", e);
+        }
+    }
+
+    /**
+     * Checks if the bot is online.
      *
      * @return true if bot is online, false otherwise
      */
@@ -86,13 +145,12 @@ public class TelegramClient {
     /**
      * Retrieves the bot's username.
      *
-     * @return the bot's username or null if an error occurs
+     * @return The bot's username
      */
-    private String fetchBotUsername() {
+    private @Nullable String fetchBotUsername() {
         try {
             String url = buildApiUrl("getMe");
             HttpResponse<String> response = sendRequest(url);
-
             JSONObject jsonResponse = new JSONObject(response.body());
             return jsonResponse.optJSONObject("result").optString("username", null);
         } catch (IOException | InterruptedException e) {
@@ -102,67 +160,9 @@ public class TelegramClient {
     }
 
     /**
-     * Fetches the last received message.
-     *
-     * @return the last received message text or null if no messages exist
+     * Constructs an API URL with optional parameters.
      */
-    public String getLastMessage() {
-        try {
-            String url = buildApiUrl("getUpdates");
-            HttpResponse<String> response = sendRequest(url);
-
-            JSONArray updates = new JSONObject(response.body()).optJSONArray("result");
-            if (updates != null && !updates.isEmpty()) {
-                JSONObject lastUpdate = updates.getJSONObject(updates.length() - 1);
-                lastMessage = lastUpdate.optJSONObject("message").optString("text", null);
-                return lastMessage;
-            }
-        } catch (IOException | InterruptedException e) {
-            handleException("Error fetching last message", e);
-        }
-        return null;
-    }
-
-    /**
-     * Retrieves the latest chat ID that sent a message to the bot.
-     *
-     * @return The chat ID or null if no messages exist
-     */
-    public String getChatId() {
-        try {
-            String url = buildApiUrl("getUpdates");
-            HttpResponse<String> response = sendRequest(url);
-
-            JSONArray updates = new JSONObject(response.body()).optJSONArray("result");
-
-            if (updates != null && !updates.isEmpty()) {
-                JSONObject lastUpdate = updates.getJSONObject(updates.length() - 1);
-                return lastUpdate.optJSONObject("message").optJSONObject("chat").optString("id", null);
-            } else {
-                logger.warning("⚠ No messages found. Cannot determine chat ID.");
-                return null;
-            }
-        } catch (IOException | InterruptedException e) {
-            handleException("Error fetching chat ID", e);
-            return null;
-        }
-    }
-
-    /**
-     * Runs the Telegram bot (Placeholder for future enhancements).
-     */
-    public void run() {
-        logger.info("🤖 Telegram Bot is running...");
-    }
-
-    /**
-     * Constructs an API URL with the given endpoint and parameters.
-     *
-     * @param endpoint   The Telegram API method (e.g., "sendMessage")
-     * @param parameters Optional query parameters
-     * @return The full API URL as a String
-     */
-    private String buildApiUrl(String endpoint, String... parameters) {
+    private @NotNull String buildApiUrl(String endpoint, String @NotNull ... parameters) {
         StringBuilder url = new StringBuilder(TELEGRAM_API_URL).append(botToken).append("/").append(endpoint);
         if (parameters.length > 0) {
             url.append("?").append(String.join("&", parameters));
@@ -171,31 +171,92 @@ public class TelegramClient {
     }
 
     /**
-     * Sends an HTTP request to the given URL.
-     *
-     * @param url The API URL to send the request to.
-     * @return HttpResponse object containing the server response.
-     * @throws IOException          If an I/O error occurs.
-     * @throws InterruptedException If the request is interrupted.
+     * Sends a GET request.
      */
     private HttpResponse<String> sendRequest(String url) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     /**
-     * Handles exceptions by logging errors and ensuring thread safety.
-     *
-     * @param message The error message to log.
-     * @param e       The exception that occurred.
+     * Sends a multipart/form-data request (for files, images, etc.).
+     */
+    private HttpResponse<String> sendMultipartRequest(String method, String chatId, String fileType, @NotNull File file) throws IOException, InterruptedException {
+        String boundary = "------WebKitFormBoundary" + System.currentTimeMillis();
+        String url = TELEGRAM_API_URL + botToken + "/" + method;
+
+        byte[] fileBytes = Files.readAllBytes(file.toPath());
+        String fileName = file.getName();
+
+        String requestBody = "--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n" + chatId + "\r\n"
+                + "--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"" + fileType + "\"; filename=\"" + fileName + "\"\r\n"
+                + "Content-Type: application/octet-stream\r\n\r\n";
+
+        byte[] finalBody = (requestBody + new String(fileBytes, StandardCharsets.UTF_8) + "\r\n--" + boundary + "--").getBytes();
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(finalBody))
+                .build();
+
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    /**
+     * Logs the response from Telegram API.
+     */
+    private void logResponse(@NotNull HttpResponse<String> response, String successMessage) {
+        if (response.statusCode() == 200) {
+            logger.info("✅ " + successMessage);
+        } else {
+            logger.warning("❌ API call failed. Response: " + response.body());
+        }
+    }
+
+    /**
+     * Handles exceptions.
      */
     private void handleException(String message, @NotNull Exception e) {
         logger.severe("❌ " + message + ": " + e.getMessage());
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    public void run() {
+        while (!Thread.interrupted()) {
+            try {
+                // Example usage:
+                sendMessage(chatId,
+                        "Hello, this is a test message from your Java Telegram Bot API client.\n" +
+                                "You can customize this message according to your needs.");
+                sendLocation(chatId, 40.7128, -74.0060);
+                sendPhoto(chatId, "path/to/your/photo.jpg");
+                sendDocument(chatId, "path/to/your/document.pdf");
+                sendChatAction(chatId, ENUM_CHAT_ACTION.upload_photo);
+
+                if (!checkBotStatus()) {
+                    logger.severe("Bot is offline. Exiting...");
+                    break;
+                }
+
+                Thread.sleep(10000); // Sleep for 10 seconds before making another API call
+            } catch (InterruptedException e) {
+                handleException("Error in bot thread", e);
+            }
+        }
+    }
+
+    private void sendLocation(String chatId, double v, double v1) {
+        try {
+            String url = buildApiUrl("sendLocation", "chat_id=" + chatId, "latitude=" + v, "longitude=" + v1);
+            HttpResponse<String> response = sendRequest(url);
+            logResponse(response, "Location sent to chat ID: " + chatId);
+        } catch (IOException | InterruptedException e) {
+            handleException("Error sending location", e);
         }
     }
 }

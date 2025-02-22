@@ -133,4 +133,11 @@ public class ZoomLevel {
                 .max()
                 .orElse(Double.NaN);
     }
+
+
+    int duration = 1000;
+
+    public void decreaseDuration() {
+        duration /= 2;
+    }
 }

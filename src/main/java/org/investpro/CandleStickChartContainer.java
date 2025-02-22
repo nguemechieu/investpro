@@ -28,8 +28,8 @@ public class CandleStickChartContainer extends Region {
     private final CandleStickChartToolbar toolbar;
     private final Exchange exchange;
     private final TradePair tradePair;
-    private final CandleDataSupplier candleDataSupplier;
-    private SimpleIntegerProperty secondsPerCandle = new SimpleIntegerProperty(1);
+
+    private SimpleIntegerProperty secondsPerCandle;
     private CandleStickChart candleStickChart;
 
 
@@ -40,7 +40,7 @@ public class CandleStickChartContainer extends Region {
         this.tradePair = tradePair;
 
 
-        this.candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
+
         secondsPerCandle = new SimpleIntegerProperty(3600);
         getStyleClass().add("candle-chart-container");
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -82,8 +82,20 @@ public class CandleStickChartContainer extends Region {
                 animateInNewChart(candleStickChart);
             }
         });
+        secondsPerCandle.set(3600);
+        if (liveSyncing) {
+            try {
+                createNewChart(secondsPerCandle.get(), true);
+            } catch (Exception | TelegramApiException e) {
+                throw new RuntimeException(e);
+            }
+            animateInNewChart(candleStickChart);
+            toolbar.registerEventHandlers(candleStickChart, secondsPerCandle);
+            toolbar.setChartOptions(candleStickChart.getChartOptions());
+            toolbar.setActiveToolbarButton(secondsPerCandle);
+        }
 
-        secondsPerCandle.set(60);
+
     }
 
     private void createNewChart(int secondsPerCandle, boolean liveSyncing) throws Exception, TelegramApiException {
@@ -100,29 +112,14 @@ public class CandleStickChartContainer extends Region {
     private void animateInNewChart(CandleStickChart newChart) {
         Objects.requireNonNull(newChart, "newChart must not be null");
 
-        if (candleStickChart != null) {
-            FadeTransition fadeTransitionOut = new FadeTransition(Duration.millis(500), candleStickChart);
-            fadeTransitionOut.setFromValue(1.0);
-            fadeTransitionOut.setToValue(0.0);
-            fadeTransitionOut.setOnFinished(event -> {
-                candleStickChart = newChart;
-                candleChartContainer.getChildren().setAll(newChart);
-                event.consume();
-                FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(500), candleStickChart);
-                fadeTransitionIn.setFromValue(0.0);
-                fadeTransitionIn.setToValue(1.0);
-                fadeTransitionIn.play();
-            });
 
-            fadeTransitionOut.play();
-        } else {
             candleStickChart = newChart;
             candleChartContainer.getChildren().setAll(newChart);
             FadeTransition fadeTransitionIn = new FadeTransition(Duration.millis(500), candleStickChart);
             fadeTransitionIn.setFromValue(0.0);
             fadeTransitionIn.setToValue(1.0);
             fadeTransitionIn.play();
-        }
+
     }
 
     @Override

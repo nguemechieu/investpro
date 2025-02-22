@@ -8,6 +8,8 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.util.Duration;
 
+import java.util.concurrent.ExecutionException;
+
 /**
  * A {@code ChangeListener<Number>} implementation that calls the abstract {@code resize()} method
  * only after a delay has elapsed in which no further changes have occurred. If a change does occur
@@ -45,7 +47,7 @@ public abstract class DelayedSizeChangeListener implements ChangeListener<Number
         timeline.play();
     }
 
-    public abstract void resize();
+    public abstract void resize() throws ExecutionException, InterruptedException;
 
     @Override
     public void changed(ObservableValue<? extends Number> observable, Number oldValue, final Number newValue) {
@@ -56,7 +58,11 @@ public abstract class DelayedSizeChangeListener implements ChangeListener<Number
         if (gotFirstSize.get()) {
             timeline.getKeyFrames().clear();
             timeline.getKeyFrames().add(new KeyFrame(Duration.millis(subsequentDelay), event -> {
-                resize();
+                try {
+                    resize();
+                } catch (ExecutionException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
                 timeline.stop();
             }));
         }

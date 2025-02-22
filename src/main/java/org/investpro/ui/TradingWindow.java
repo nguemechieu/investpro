@@ -10,9 +10,11 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.investpro.CurrencyDataProvider;
+import org.investpro.Db1;
 import org.investpro.Exchange;
 import org.investpro.Messages;
 import org.investpro.exchanges.Binance;
+import org.investpro.exchanges.BinanceUS;
 import org.investpro.exchanges.Coinbase;
 import org.investpro.exchanges.Oanda;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +30,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.investpro.InvestPro.db1;
+
 
 
 public class TradingWindow extends Region {
@@ -37,7 +39,7 @@ public class TradingWindow extends Region {
 
     private static final String CONFIG_FILE = "src/main/resources/config.properties";
     private static final String CONFIG_FILE2 = "src/main/resources/config2.properties";
-
+    public static Db1 db1;
     private Exchange exchange;
     private final ComboBox<String> comboBox = new ComboBox<>();
     private final TextField apiKeyTextField = new TextField();
@@ -134,7 +136,7 @@ public class TradingWindow extends Region {
                 }
             }
         });
-
+        db1 = new Db1();
         Button loginSubmitButton = new Button("Login");
         Button signUpButton = new Button("Sign Up");
         signUpButton.setOnAction(_ -> createSignUpPage());
@@ -453,10 +455,14 @@ public class TradingWindow extends Region {
 
             try {
                 switch (comboBox.getSelectionModel().getSelectedItem()) {
-                    //   case "BINANCE US" -> exchange = new BinanceUS(apiKeyTextField.getText(), secretKeyTextField.getText());
+                    case "BINANCE US" ->
+                            exchange = new BinanceUS(apiKeyTextField.getText(), secretKeyTextField.getText());
                     case "OANDA" -> exchange = new Oanda(apiKeyTextField.getText(), secretKeyTextField.getText());
                     case "COINBASE" -> exchange = new Coinbase(apiKeyTextField.getText(), secretKeyTextField.getText());
                     case "BINANCE" -> exchange = new Binance(apiKeyTextField.getText(), secretKeyTextField.getText());
+//                    case "BITFINEX" -> exchange = new Bitfinex(apiKeyTextField.getText(), secretKeyTextField.getText());
+//                    case "BITMEX" -> exchange = new Bitmex(apiKeyTextField.getText(), secretKeyTextField.getText());
+//                    case "POLONIEX" -> exchange = new Poloniex(apiKeyTextField.getText(), secretKeyTextField.getText());
 
                     default ->
                             throw new RuntimeException("Unexpected value: %s".formatted(comboBox.getSelectionModel().getSelectedItem()));

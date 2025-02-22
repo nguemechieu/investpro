@@ -130,6 +130,19 @@ public class CandleStickChartOptions {
         return alignOpenClose.getReadOnlyProperty();
     }
 
+    public boolean isGridVisible() {
+        return verticalGridLinesVisible.get() || horizontalGridLinesVisible.get();
+    }
+
+    public void setGridVisible(boolean b) {
+        verticalGridLinesVisible.set(b);
+        horizontalGridLinesVisible.set(b);
+    }
+
+    public boolean isShowTooltip() {
+        return showVolume.get() || alignOpenClose.get();
+    }
+
 
     private static class ChartOption {
         private final ToggleSwitch optionSwitch;

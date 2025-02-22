@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Handles paginated fetching of new candle data in chronological order to a {@code CandleStickChart}.
@@ -61,6 +62,37 @@ public class CandleDataPager {
         } catch (ExecutionException e) {
             logger.error("Error fetching candle data from supplier.", e);
         }
+    }
+
+    public Function<? super Future<List<CandleData>>, ?> getCandleDataPreprocessor() {
+        return this::accept;
+    }
+
+    private Object accept(Future<List<CandleData>> listFuture) {
+        if (!listFuture.isDone()) {
+            logger.warn("Candle data is not yet available.");
+            return null;
+        }
+
+        List<CandleData> candleData;
+        try {
+            candleData = listFuture.get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt(); // Preserve interrupted state
+            logger.error("Candle data processing was interrupted.", ex);
+            return null;
+        } catch (ExecutionException ex) {
+            logger.error("Error during candle data processing: ", ex.getCause());
+            return null;
+        }
+
+        if (candleData == null || candleData.isEmpty()) {
+            logger.warn("Received empty candle data.");
+            return null;
+        }
+
+        candleDataPreProcessor.processCandleData(candleData);
+        return candleData;
     }
 
     /**

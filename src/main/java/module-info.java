@@ -1,10 +1,7 @@
 module investpro {
-    requires java.desktop;
 
-    requires com.fasterxml.jackson.core;
     requires org.jetbrains.annotations;
     requires Java.WebSocket;
-    requires com.fasterxml.jackson.databind;
     requires com.fasterxml.jackson.datatype.jsr310;
     requires java.net.http;
     requires javafx.web;
@@ -39,6 +36,8 @@ module investpro {
     requires mysql.connector.j;
     requires jakarta.transaction;
     requires java.compiler;
+    requires com.fasterxml.jackson.dataformat.csv;
+    requires com.fasterxml.jackson.databind;
 
     opens org.investpro to
 

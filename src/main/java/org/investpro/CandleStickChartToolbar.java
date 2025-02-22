@@ -24,6 +24,7 @@ import javafx.scene.text.Font;
 import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -187,9 +188,30 @@ public class CandleStickChartToolbar extends Region {
                 if (tool.duration != -1) {
                     tool.setOnAction(_ -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null && tool.tool.isZoomFunction()) {
-                    tool.setOnAction(_ -> candleStickChart.getKeyHandler().changeZoom(
+                    tool.setOnAction(_ -> candleStickChart.changeZoom(
                             tool.tool.getZoomDirection()));
+                } else if (
+                        tool.tool != null && tool.tool.isNavigationFunction()) {
+                    tool.setOnAction(_ -> candleStickChart.changeNavigation(tool.tool.getNavigationDirection()));
+                } else if (tool.tool != null && tool.tool.isDisplayFunction()) {
+                    tool.setOnAction(_ -> {
+                        tool.tool.displayChart(
+                                candleStickChart.getData(),
+                                candleStickChart.getXAxis(),
+                                candleStickChart.getYAxis(),
+                                candleStickChart.getYAxis2());
+
+                    });
+                } else if (tool.tool != null && tool.tool.isExportFunction()) {
+                    tool.setOnAction(_ -> tool.tool.exportChart(candleStickChart));
                 }
+
+
+                tool.setOnMouseEntered(_ -> {
+                    if (!mouseInsideOptionsButton) {
+                        optionsPopOver.hide();
+                    }
+                });
             }
 
         }
@@ -218,11 +240,19 @@ public class CandleStickChartToolbar extends Region {
             return "Mo";  // Months
         }
     }
-    enum Tool {
+
+    public enum Tool {
         ZOOM_IN("/img/search-plus-solid.png"),
         ZOOM_OUT("/img/search-minus-solid.png"),
         PRINT("/img/print-solid.png"),
-        OPTIONS("/img/cog-solid.png");
+        OPTIONS("/img/options-solid.png"),
+        REFRESH("/img/refresh-solid.png"),       // NEW: Refresh chart data
+        SCREENSHOT("/img/camera-solid.png"),     // NEW: Save chart as image
+        AUTO_SCROLL("/img/scroll-solid.png"),    // NEW: Toggle auto-scroll
+        GRID_TOGGLE("/img/grid-solid.png"),      // NEW: Toggle grid visibility
+        FULL_SCREEN("/img/fullscreen-solid.png"),// NEW: Toggle full-screen mode
+        EXPORT_PDF("/img/pdf-solid.png"),        // NEW: Export chart as PDF
+        SHARE("/img/share-solid.png");           // NEW: Share chart via link
 
         private final String img;
 
@@ -230,18 +260,103 @@ public class CandleStickChartToolbar extends Region {
             this.img = img;
         }
 
-        boolean isZoomFunction() {
+        public String getImgPath() {
+            return img;
+        }
+
+        public boolean isZoomFunction() {
             return this == ZOOM_IN || this == ZOOM_OUT;
         }
 
-        ZoomDirection getZoomDirection() {
+        public ZoomDirection getZoomDirection() {
             if (!isZoomFunction()) {
-                throw new IllegalArgumentException("cannot call getZoomDirection() on non-zoom function: " + name());
+                throw new IllegalArgumentException("Cannot call getZoomDirection() on non-zoom function: " + name());
             }
-
             return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;
         }
+
+        public boolean isNavigationFunction() {
+            return this == AUTO_SCROLL || this == REFRESH;
+        }
+
+        public boolean isExportFunction() {
+            return this == SCREENSHOT || this == EXPORT_PDF || this == PRINT || this == SHARE;
+        }
+
+        public boolean isDisplayFunction() {
+            return this == GRID_TOGGLE || this == FULL_SCREEN;
+        }
+
+
+        public void exportChart(CandleStickChart candleStickChart) {
+            // Export chart as specified in the enum
+            // Example usage:
+            if (this == EXPORT_PDF) {
+                //     // Export chart as PDF
+                //...
+                System.out.println("Export chart as PDF");
+                candleStickChart.exportAsPDF();
+            } else if (this == SCREENSHOT) {
+                //     // Save chart as image
+                //...
+                System.out.println("Save chart as image");
+                candleStickChart.captureScreenshot();
+            } else if (this == PRINT) {
+                //     // Print chart
+                //...
+                System.out.println("Print chart");
+                candleStickChart.print();
+            } else if (this == SHARE) {
+                //     // Share chart via link
+                //...
+                System.out.println("Share chart via link");
+                candleStickChart.shareLink();
+            } else {
+                throw new IllegalArgumentException("Cannot call exportChart() on non-export function: " + name());
+            }
+
+        }
+
+        public Object getNavigationDirection() {
+            if (!isNavigationFunction()) {
+                throw new IllegalArgumentException("Cannot call getNavigationDirection() on non-navigation function: " + name());
+            }
+            return this == AUTO_SCROLL ? ScrollDirection.UP : ScrollDirection.DOWN;
+        }
+
+        public void displayChart(NavigableMap<Integer, CandleData> data, StableTicksAxis xAxis, StableTicksAxis yAxis, Object yAxis2) {
+            // Display chart with provided data, xAxis, yAxis, and yAxis2 (optional)
+            // Example usage:
+            if (this == REFRESH) {
+                //     // Update chart with new data
+                //     //...
+                System.out.println("Update chart with new data");
+            } else if (this == EXPORT_PDF) {
+                //     // Export chart as PDF
+                //...
+                System.out.println("Export chart as PDF");
+            } else if (this == SCREENSHOT) {
+                //     // Save chart as image
+                //...
+                System.out.println("Save chart as image");
+            } else if (this == FULL_SCREEN) {
+                //     // Toggle full-screen mode
+                //...
+                System.out.println("Toggle full-screen mode");
+            } else if (this == GRID_TOGGLE) {
+                //     // Toggle grid visibility
+                //...
+                System.out.println("Toggle grid visibility");
+            } else if (this == AUTO_SCROLL) {
+                //     // Toggle auto-scroll
+                //...
+                System.out.println("Toggle auto-scroll");
+            } else {
+                throw new IllegalArgumentException("Unsupported function: " + name());
+            }
+        }
     }
+
 
     private static class ToolbarButton extends Button {
         private final String textLabel;
@@ -259,8 +374,9 @@ public class CandleStickChartToolbar extends Region {
                 return ToolbarButton.this;
             }
 
+            @Contract(pure = true)
             @Override
-            public String getName() {
+            public @NotNull String getName() {
                 return "active";
             }
         };
@@ -270,7 +386,7 @@ public class CandleStickChartToolbar extends Region {
         }
 
         ToolbarButton(Tool tool) {
-            this(null, tool, tool.img, -1);
+            this(tool.name(), tool, tool.img, -1);
         }
 
         private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
@@ -285,7 +401,9 @@ public class CandleStickChartToolbar extends Region {
                 graphicLabel = new ImageView(new Image(Objects.requireNonNull(ToolbarButton.class.getResourceAsStream(img))));
                 setGraphic(graphicLabel);
             } else {
-                graphicLabel = null;
+                graphicLabel = new ImageView(new Image(Objects.requireNonNull(
+                        ToolbarButton.class.getResourceAsStream("/img/refresh-solid.png"))));
+
             }
             setMinSize(5, 5);
             setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -360,4 +478,3 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 }
-

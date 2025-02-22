@@ -155,8 +155,8 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
-                                       Consumer<List<Trade>> trades) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+                                                                 Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -204,6 +204,7 @@ public class Binance extends Exchange {
         });
 
 
+        return futureResult;
     }
 
     @Override

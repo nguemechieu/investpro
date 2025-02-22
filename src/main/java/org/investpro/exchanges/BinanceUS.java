@@ -267,8 +267,8 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
-                                       Consumer<List<Trade>> trades) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+                                                                 Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
 
@@ -314,6 +314,7 @@ public class BinanceUS extends Exchange {
                 futureResult.completeExceptionally(e);
             }
         });
+        return futureResult;
     }
     @Override
     public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
@@ -574,8 +575,7 @@ public class BinanceUS extends Exchange {
 
             if (response.statusCode() != 200) {
                 logger.error("Error fetching trade pairs: HTTP status code %s{}", response.statusCode());
-                new Messages(Alert.AlertType.ERROR, "Error fetching trade pairs: HTTP status code %d, %s".formatted(response.statusCode(), response.body()));
-                throw new IllegalStateException(
+                throw new RuntimeException(
                         "Error fetching trade pairs: HTTP status code %s,/%s".formatted(response.statusCode(), response.body())
                 );
             }
@@ -584,6 +584,11 @@ public class BinanceUS extends Exchange {
 
             JsonNode res = OBJECT_MAPPER.readTree(response.body());
             logger.info("Binance US response: %s".formatted(res));
+        if (
+                res.has("symbols") && !res.get("symbols").isNull() && res.get("symbols").isArray()
+
+        ) {
+
 
             JsonNode symbols = res.get("symbols");
             for (JsonNode symbol : symbols) {
@@ -597,7 +602,9 @@ public class BinanceUS extends Exchange {
 
             }
 
-
+        } else {
+            logger.error("Binance US response does not contain trade pairs");
+        }
 
         return tradePairs;
     }
@@ -626,20 +633,20 @@ public class BinanceUS extends Exchange {
 
     @Override
     public void stopStreamLiveTrades(TradePair tradePair) {
+        // No WebSocket connection to stop live trade streams
+        // Implement WebSocket connection and handling for live trade streams
+        String url = "wss://stream.binance.us:9443/ws/%s@trade".formatted(tradePair.toString('/'));
+        String message = "{\"method\": \"UNSUBSCRIBE\",\"params\": [\"%s@trade\"],\"id\": 1}".formatted(tradePair.toString('-'));
+        // Implement WebSocket connection and handling for live trade streams
+
 
     }
 
     @Override
     public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-      // WebSocket streaming for live prices not implemented here
-
-        String urls=
-                "wss://stream.binance.us:9443/ws/" + symbol.toString('/') + "@depth";
-        message =
-                "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@depth\"],\"id\": 1}".formatted(symbol.toString('-'));
-
 
         return new ArrayList<>();
+
 
     }
 
@@ -815,7 +822,7 @@ public class BinanceUS extends Exchange {
 
                 String url = "https://api.binance.us/api/v3/klines?symbol=" + tradePair.toString('/') + "&interval=" + getBinanceInterval(secondsPerCandle);
 
-                logger.info("Fetching candle data for trade pair: {} from {} to {}",
+                logger.info("Fetching candle data for trade pair:{} {} from {} to {}",
                         tradePair.toString('/'), interval, startTimeMillis, endTimeMillis);
 
 

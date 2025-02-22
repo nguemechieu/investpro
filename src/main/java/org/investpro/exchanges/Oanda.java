@@ -37,7 +37,8 @@ import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 public class Oanda extends Exchange {
 
     private static final int MAX_RETRIES = 5;
-    private static final int MAX_CANDLES_PER_REQUEST = numCandles;
+    private static final int MAX_CANDLES_PER_REQUEST = 1000;
+
     static HttpClient client = HttpClient.newHttpClient();
     private static final HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
@@ -187,7 +188,7 @@ public class Oanda extends Exchange {
     private final Map<String, OrderBook> orderBookCache = new ConcurrentHashMap<>();
     private final Semaphore rateLimiter = new Semaphore(1); // Controls request flow
 
-    private static @NotNull String granularityToString(int actualGranularity) {
+    public static @NotNull String granularityToString(int actualGranularity) {
 
         if (actualGranularity < 60) {
             return "s" + actualGranularity;  // Seconds
@@ -233,7 +234,7 @@ public class Oanda extends Exchange {
             }
 
             try {
-                fetchWithRetries(uriStr, tradePair, 0, futureResult);
+                fetchWithRetries(tradePair, 0, futureResult);
             } finally {
                 rateLimiter.release(); // Allow next request
             }
@@ -242,7 +243,7 @@ public class Oanda extends Exchange {
         return futureResult;
     }
 
-    private void fetchWithRetries(String uriStr, TradePair tradePair, int retryCount, CompletableFuture<List<OrderBook>> futureResult) {
+    private void fetchWithRetries(TradePair tradePair, int retryCount, CompletableFuture<List<OrderBook>> futureResult) {
         try {
             HttpResponse<String> response = client.send(
                     requestBuilder.build(),
@@ -254,7 +255,7 @@ public class Oanda extends Exchange {
                     long backoffTime = INITIAL_DELAY_MS * (1L << retryCount);
                     logger.warn("Rate-limited. Retrying in {} ms...", backoffTime);
                     Thread.sleep(backoffTime);
-                    fetchWithRetries(uriStr, tradePair, retryCount + 1, futureResult);
+                    fetchWithRetries(tradePair, retryCount + 1, futureResult);
                 } else {
                     logger.error("Max retries reached for fetching order book: {}", response.body());
                     futureResult.completeExceptionally(new RuntimeException("Rate limit exceeded"));
@@ -312,7 +313,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public void fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, Consumer<List<Trade>> tradeConsumer) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
         Objects.requireNonNull(tradeConsumer);
@@ -362,6 +363,7 @@ public class Oanda extends Exchange {
 
             logger.error("Max retries exceeded due to rate limiting.");
         });
+        return null;
     }
 
 
@@ -495,7 +497,7 @@ public class Oanda extends Exchange {
            throw new RuntimeException("Error fetching positions: %d".formatted(response.statusCode()));
        }
 
-        logger.info("OANDA response: %s".formatted(response.body()));
+        logger.info("OANDA response2: {}", response.body());
 
         List<Position> positions = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
@@ -770,7 +772,7 @@ public class Oanda extends Exchange {
                 return true;
             }
             @Override
-            public void streamLiveTrades(TradePair tradePair, UpdateInProgressCandleTask updateInProgressCandleTask) {
+            public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
 
 
             }
@@ -858,7 +860,6 @@ public class Oanda extends Exchange {
                 String instrument = priceNode.path("instrument").asText();
                 double bidPrice = priceNode.path("bids").get(0).path("price").asDouble(0);
                 double askPrice = priceNode.path("asks").get(0).path("price").asDouble(0);
-                Instant timestamp = Instant.parse(priceNode.path("time").asText());
 
                 // Validate retrieved values
                 if (bidPrice == 0 || askPrice == 0) {
@@ -912,7 +913,7 @@ public class Oanda extends Exchange {
         private static final int MAX_RETRIES = 5;
         private static final long INITIAL_DELAY_MS = 500; // 500ms initial delay
         private static final long RATE_LIMIT_DELAY_MS = 1000; // 1 sec between requests
-        private static final Map<String, List<CandleData>> candleCache = new ConcurrentHashMap<>();
+        private static final Map<Integer, List<CandleData>> candleCache = new ConcurrentHashMap<>();
         private final Semaphore rateLimiter = new Semaphore(1); // Prevents exceeding API limits
 
         @Override
@@ -929,12 +930,11 @@ public class Oanda extends Exchange {
 
             int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
             String startDateString = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(startTime));
-            String cacheKey = tradePair.toString('_') + "_" + startTime;
 
             // 🔍 Check Cache First to Reduce API Calls
-            if (candleCache.containsKey(cacheKey)) {
+            if (candleCache.containsKey(startTime)) {
                 logger.info("✅ Using cached candles for {}", tradePair);
-                return CompletableFuture.completedFuture(candleCache.get(cacheKey));
+                return CompletableFuture.completedFuture(candleCache.get(startTime));
             }
 
             String uriStr = "https://api-fxtrade.oanda.com/v3/instruments/"
@@ -943,13 +943,13 @@ public class Oanda extends Exchange {
                     + "&price=M&to=" + startDateString
                     + "&granularity=" + granularityToString(secondsPerCandle);
 
-            return fetchWithRetries(uriStr, cacheKey, tradePair, 0);
+            return fetchWithRetries(uriStr, startTime, tradePair, 0);
         }
 
         /**
          * Handles fetching candle data with retries on OANDA rate-limiting (429 errors).
          */
-        private CompletableFuture<List<CandleData>> fetchWithRetries(String uriStr, String cacheKey, TradePair tradePair, int retryCount) {
+        private CompletableFuture<List<CandleData>> fetchWithRetries(String uriStr, int cacheKey, TradePair tradePair, int retryCount) {
             return CompletableFuture.runAsync(() -> {
                 try {
                     // Apply OANDA Rate-Limit Throttling
@@ -969,7 +969,7 @@ public class Oanda extends Exchange {
 
                         return CompletableFuture.supplyAsync(() -> null,
                                         CompletableFuture.delayedExecutor(backoffTime, TimeUnit.MILLISECONDS))
-                                .thenCompose(__ -> fetchWithRetries(uriStr, cacheKey, tradePair, retryCount + 1));
+                                .thenCompose(_ -> fetchWithRetries(uriStr, cacheKey, tradePair, retryCount + 1));
 
                     } else {
                         logger.error("🚨 Max retries reached for fetching candles.");
@@ -983,13 +983,13 @@ public class Oanda extends Exchange {
                 }
 
                 return processCandleResponse(response.body(), cacheKey, tradePair);
-            }).whenComplete((__, throwable) -> rateLimiter.release()); // 🔓 Release the semaphore
+            }).whenComplete((_, _) -> rateLimiter.release()); // 🔓 Release the semaphore
         }
 
         /**
          * Processes the OANDA API response, filters valid candles, and caches data.
          */
-        private CompletableFuture<List<CandleData>> processCandleResponse(String responseBody, String cacheKey, TradePair tradePair) {
+        private CompletableFuture<List<CandleData>> processCandleResponse(String responseBody, int cacheKey, TradePair tradePair) {
             try {
                 JsonNode res = OBJECT_MAPPER.readTree(responseBody);
                 logger.info("📊 OANDA trade pair: {}", tradePair.toString('/'));
@@ -1026,11 +1026,10 @@ public class Oanda extends Exchange {
                     candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
                     logger.info("��� Received {} candles for {}.", candleData.size(),
                             tradePair.toString('/'));
-                    int startTime = (int) System.currentTimeMillis();
 
                     // 📌 Cache the latest candle data
-                    candleCache.put(cacheKey, candleData);
-                    endTime.set(candleData.isEmpty() ? startTime : candleData.getFirst().getOpenTime()); // ✅ Update endTime
+                    candleCache.put(candleCache.size(), candleData);
+                    endTime.set(candleData.isEmpty() ? cacheKey : candleData.getFirst().getOpenTime()); // ✅ Update endTime
 
                     return CompletableFuture.completedFuture(candleData);
                 }

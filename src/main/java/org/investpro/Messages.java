@@ -17,18 +17,23 @@ public class Messages extends Region {
         TextArea textArea = new TextArea(message);
         textArea.setWrapText(true);  // Wrap long text
         textArea.setEditable(false); // Prevent editing
-        textArea.setPrefSize(500, 200);  // Set preferred size
+        textArea.setPrefSize(800, 300);  // Set preferred size
 
         // Wrap textArea inside VBox for proper layout
         VBox content = new VBox(textArea);
-        content.setPrefSize(500, 300);
+        content.setPrefSize(800, 300);
 
         // Set dialog size and content
         alert.getDialogPane().setContent(content);
-        alert.getDialogPane().setMinSize(500, 300);
-        alert.getDialogPane().setPrefSize(600, 350);  // Customize this size as needed
+        alert.getDialogPane().setMinSize(700, 300);
+        alert.getDialogPane().setPrefSize(800, 350);  // Customize this size as needed
+        alert.setResizable(true);
+        setPrefSize(
+                600, 600
+        );
 
         // Show the dialog and wait for user interaction
         alert.show();
+
     }
 }

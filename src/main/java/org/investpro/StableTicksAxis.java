@@ -32,6 +32,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
      * Possible tick spacing at the 10^1 level. These numbers must be {@literal >= 1 and < 10}.
      */
     private static final double[] dividers = new double[]{1.0, 2.5, 5.0};
+    private List<Number> minorTicks = new ArrayList<>();
 
     /**
      * How many negatives powers of ten we have in the powersOfTen array.
@@ -48,7 +49,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private static final int[] powersOf10 = {
             1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
     };
-    private List<Number> minorTicks;
+
     private static final int[] halfPowersOf10 = {
             3, 31, 316, 3162, 31622, 316227, 3162277, 31622776, 316227766, Integer.MAX_VALUE
     };
@@ -83,12 +84,10 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     private static double calculateTickSpacing(double delta, int maxTicks) {
-        if (delta <= 0.0) {
-            throw new IllegalArgumentException("delta (" + delta + ") must be positive");
-        }
-        if (maxTicks < 1) {
-            throw new IllegalArgumentException("maxTicks (" + maxTicks + ") must be >= 1");
-        }
+
+        delta = Math.abs(delta);
+
+
 
         int factor;
         if ((int) delta != 0) {
@@ -108,6 +107,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
                     --factor;
                     divider = dividers.length - 1;
                 }
+                divider = Math.abs(divider);
 
                 numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
             }
@@ -188,6 +188,12 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
         int y = maxLog10ForLeadingZeros[Integer.numberOfLeadingZeros(x)];
         int logFloor = y - lessThanBranchFree(x, powersOf10[y]);
+
+        // Ensure logFloor is within valid range
+        if (logFloor < 0 || logFloor >= powersOf10.length) {
+            throw new ArithmeticException("Calculated logFloor out of bounds: " + logFloor);
+        }
+
         int floorPow = powersOf10[logFloor];
         switch (mode) {
             case UNNECESSARY:
@@ -204,12 +210,12 @@ public class StableTicksAxis extends ValueAxis<Number> {
             case HALF_DOWN:
             case HALF_UP:
             case HALF_EVEN:
-                // sqrt(10) is irrational, so log10(x) - logFloor is never exactly 0.5
                 return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
             default:
-                throw new AssertionError();
+                throw new AssertionError("Unexpected RoundingMode: " + mode);
         }
     }
+
 
     static int lessThanBranchFree(int x, int y) {
         // The double negation is optimized away by normal Java, but is necessary for GWT
@@ -278,7 +284,9 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     @Override
     protected void setRange(Object range, boolean animate) {
-        Range rangeVal = (Range) range;
+        if (!(range instanceof Range rangeVal)) {
+            return; // Avoid NPE if range is null or incorrect type
+        }
 
         if (animate) {
             animationTimeline.stop();
@@ -301,6 +309,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         setUpperBound(rangeVal.high);
     }
 
+
     @Override
     protected Range getRange() {
         return getRange(getLowerBound(), getUpperBound());
@@ -318,6 +327,9 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     @Override
     protected String getTickMarkLabel(Number number) {
+        if (getTickLabelFormatter() == null) {
+            return number.toString(); // Fallback in case formatter is null
+        }
         return getTickLabelFormatter().toString(number);
     }
 
@@ -375,6 +387,19 @@ public class StableTicksAxis extends ValueAxis<Number> {
             }
         }
         return majorTicks;
+    }
+
+    public double getValue() {
+        return currentLowerBound.get();
+    }
+
+    public void setValue(double newX) {
+
+        setRange(newX, true);
+    }
+
+    public double getMaxValue() {
+        return getUpperBound();
     }
 
     private record Range(double low, double high, double tickSpacing, double scale) {

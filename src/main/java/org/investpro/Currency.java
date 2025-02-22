@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.investpro.InvestPro.db1;
+import static org.investpro.ui.TradingWindow.db1;
 
 
 @Getter
@@ -30,10 +30,10 @@ public abstract class Currency implements Comparable<Currency> {  // ✅ Remove 
     private long currencyId;  // Use wrapper class `Long` to handle null values
 
     @Column(name = "code", nullable = false, unique = true)
-    private String code;
+    protected String code;
 
     @Column(name = "currency_type", nullable = false)
-    private String currencyType;
+    protected String currencyType;
 
     @Column(name = "full_display_name", nullable = false)
     private String fullDisplayName;
@@ -92,6 +92,7 @@ public abstract class Currency implements Comparable<Currency> {  // ✅ Remove 
             CURRENCIES.put(baseCurrencyCode, cur);
             return cur;
         }
+
 
         // Return a fallback empty Currency object
         return new Currency() {

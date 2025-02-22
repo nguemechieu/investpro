@@ -34,7 +34,7 @@ public class Db1 implements Db {
     /**
      * **Singleton Constructor for Db1**
      */
-    protected Db1() {
+    public Db1() {
         loadProperties();
         initializeConnection();
         initializeEntityManager();
@@ -93,7 +93,7 @@ public class Db1 implements Db {
                     PROPERTIES.getProperty("DB_NAME", "InvestPro") + "?useSSL=false";
 
             this.conn = DriverManager.getConnection(url,
-                    PROPERTIES.getProperty("DB_USER", "root"),
+                    PROPERTIES.getProperty("DB_USER", "admin"),
                     PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
             logger.info("✅ Connected to MySQL database successfully!");
         } catch (SQLException e) {
@@ -331,21 +331,25 @@ public class Db1 implements Db {
     @Override
     public void create(String table, String column, String value) {
 
+
     }
 
     @Override
     public void findById(String table, String column, String value) {
 
+
     }
 
     @Override
     public Connection getConnection() throws SQLException {
-        return null;
+        return
+                DriverManager.getConnection(getJdbcUrl());
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-        return null;
+        return
+                DriverManager.getConnection(getJdbcUrl(), username, password);
     }
 
     @Override
@@ -360,6 +364,7 @@ public class Db1 implements Db {
 
     @Override
     public void setLoginTimeout(int seconds) throws SQLException {
+        throw new UnsupportedOperationException();
 
     }
 
