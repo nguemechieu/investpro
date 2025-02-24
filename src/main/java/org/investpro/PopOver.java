@@ -73,59 +73,10 @@ public class PopOver extends PopupControl {
     private double targetY;
     private final RecursiveTreeObject<Object> content = new RecursiveTreeObject<>();
 
-    /**
-     * Creates a pop over with a label as the content node.
-     */
-    public PopOver() {
-        super();
+    private final ChangeListener<Number> xListener = (_, oldX, newX) -> setAnchorX(
+            getAnchorX() + (newX.doubleValue() - oldX.doubleValue()));
 
-        getStyleClass().add(DEFAULT_STYLE_CLASS);
 
-        getRoot().getStylesheets().add(
-                requireNonNull(PopOver.class.getResource("/css/popover.css")).toExternalForm()); //$NON-NLS-1$
-
-        setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
-        setOnHiding(evt -> setDetached(false));
-
-        /*
-         * Create some initial content.
-         */
-        Label label = new Label("<No Content>"); //$NON-NLS-1$
-        label.setPrefSize(200, 200);
-        label.setPadding(new Insets(4));
-        setContentNode(label);
-
-        InvalidationListener repositionListener = observable -> {
-            if (isShowing() && !isDetached()) {
-                show(getOwnerNode(), targetX, targetY);
-                adjustWindowLocation();
-            }
-        };
-
-        arrowSize.addListener(repositionListener);
-        cornerRadius.addListener(repositionListener);
-        arrowLocation.addListener(repositionListener);
-        arrowIndent.addListener(repositionListener);
-        headerAlwaysVisible.addListener(repositionListener);
-
-        /*
-         * A detached popover should of course not automatically hide itself.
-         */
-        detached.addListener(_ -> setAutoHide(!isDetached()));
-
-        //  setAutoHide(true);
-    }
-
-    /**
-     * Creates a pop-over with the given node as the content node.
-     *
-     * @param content The content shown by the pop over
-     */
-    public PopOver(Node content) {
-        this();
-
-        setContentNode(content);
-    }
 
     @Override
     protected Skin<?> createDefaultSkin() {
@@ -193,8 +144,8 @@ public class PopOver extends PopupControl {
     public final void setContentNode(Node content) {
         contentNodeProperty().set(content);
     }
-
-    private final InvalidationListener hideListener = observable -> {
+    private final ChangeListener<Number> yListener = (_, oldY, newY) -> setAnchorY(
+            getAnchorY() + (newY.doubleValue() - oldY.doubleValue()));    private final InvalidationListener hideListener = _ -> {
         if (!isDetached()) {
             hide(Duration.ZERO);
         }
@@ -203,20 +154,51 @@ public class PopOver extends PopupControl {
     private final WeakInvalidationListener weakHideListener = new WeakInvalidationListener(
             hideListener);
 
-    private final ChangeListener<Number> xListener = (value, oldX, newX) -> setAnchorX(
-            getAnchorX() + (newX.doubleValue() - oldX.doubleValue()));
+    /**
+     * Creates a pop over with a label as the content node.
+     */
+    public PopOver() {
+        super();
+
+        getStyleClass().add(DEFAULT_STYLE_CLASS);
+
+        getRoot().getStylesheets().add(
+                requireNonNull(PopOver.class.getResource("/css/popover.css")).toExternalForm()); //$NON-NLS-1$
+
+        setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
+        setOnHiding(_ -> setDetached(false));
+
+        /*
+         * Create some initial content.
+         */
+        Label label = new Label("<No Content>"); //$NON-NLS-1$
+        label.setPrefSize(200, 200);
+        label.setPadding(new Insets(4));
+        setContentNode(label);
+
+        InvalidationListener repositionListener = observable -> {
+            if (isShowing() && !isDetached()) {
+                show(getOwnerNode(), targetX, targetY);
+                adjustWindowLocation();
+            }
+        };
+
+        arrowSize.addListener(repositionListener);
+        cornerRadius.addListener(repositionListener);
+        arrowLocation.addListener(repositionListener);
+        arrowIndent.addListener(repositionListener);
+        headerAlwaysVisible.addListener(repositionListener);
+
+        /*
+         * A detached popover should of course not automatically hide itself.
+         */
+        detached.addListener(_ -> setAutoHide(!isDetached()));
+
+
+    }
 
     private final WeakChangeListener<Number> weakXListener = new WeakChangeListener<>(
             xListener);
-
-    private final ChangeListener<Number> yListener = (value, oldY, newY) -> setAnchorY(
-            getAnchorY() + (newY.doubleValue() - oldY.doubleValue()));
-
-    private final WeakChangeListener<Number> weakYListener = new WeakChangeListener<>(
-            yListener);
-
-    private Window ownerWindow;
-    private final EventHandler<WindowEvent> closePopOverOnOwnerWindowClose = event -> ownerWindowClosing();
 
     /**
      * Shows the pop over in a position relative to the edges of the given owner
@@ -226,20 +208,25 @@ public class PopOver extends PopupControl {
      * below the given owner node. The arrow will slightly overlap with the
      * owner node.
      *
-     * @param owner the owner of the pop over
+     * @param owner the owner of the pop-over
      */
     public final void show(Node owner) {
         show(owner, 4);
     }
 
+    private final WeakChangeListener<Number> weakYListener = new WeakChangeListener<>(
+            yListener);
+
+    private Window ownerWindow;
+
     /**
-     * Shows the pop over in a position relative to the edges of the given owner
+     * Shows the pop-over in a position relative to the edges of the given owner
      * node. The position is dependent on the arrow location. If the arrow is
      * pointing to the right then the pop over will be placed to the left of the
      * given owner. If the arrow points up then the pop over will be placed
      * below the given owner node.
      *
-     * @param owner the owner of the pop over
+     * @param owner the owner of the pop-over
      * @param offset if negative specifies the distance to the owner node or when
      * positive specifies the number of pixels that the arrow will
      * overlap with the owner node (positive values are recommended)
@@ -277,35 +264,7 @@ public class PopOver extends PopupControl {
             default:
                 break;
         }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public final void show(Window owner) {
-        super.show(owner);
-        ownerWindow = owner;
-
-        showFadeInAnimation(DEFAULT_FADE_DURATION);
-
-        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
-                closePopOverOnOwnerWindowClose);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public final void show(Window ownerWindow, double anchorX, double anchorY) {
-        super.show(ownerWindow, anchorX, anchorY);
-        this.ownerWindow = ownerWindow;
-
-        showFadeInAnimation(DEFAULT_FADE_DURATION);
-
-        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
-                closePopOverOnOwnerWindowClose);
-    }
+    }    private final EventHandler<WindowEvent> closePopOverOnOwnerWindowClose = _ -> ownerWindowClosing();
 
     /**
      * Makes the pop over visible at the give location and associates it with
@@ -318,6 +277,8 @@ public class PopOver extends PopupControl {
      */
     @Override
     public final void show(Node owner, double x, double y) {
+
+        if (owner == null) return;
         show(owner, x, y, DEFAULT_FADE_DURATION);
     }
 
@@ -370,7 +331,7 @@ public class PopOver extends PopupControl {
         ownerWindow.widthProperty().addListener(weakHideListener);
         ownerWindow.heightProperty().addListener(weakHideListener);
 
-        setOnShown(evt -> {
+        setOnShown(_ -> {
 
             /*
              * The user clicked somewhere into the transparent background. If
@@ -399,29 +360,32 @@ public class PopOver extends PopupControl {
                 closePopOverOnOwnerWindowClose);
     }
 
-    private void showFadeInAnimation(Duration fadeInDuration) {
-        // Fade In
-        Node skinNode = getSkin().getNode();
-        skinNode.setOpacity(0);
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public final void show(Window owner) {
+        super.show(owner);
+        ownerWindow = owner;
 
-        FadeTransition fadeIn = new FadeTransition(fadeInDuration, skinNode);
-        fadeIn.setFromValue(0);
-        fadeIn.setToValue(1);
-        fadeIn.play();
-    }
+        showFadeInAnimation(DEFAULT_FADE_DURATION);
 
-    private void ownerWindowClosing() {
-        hide(Duration.ZERO);
+        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
+                closePopOverOnOwnerWindowClose);
     }
 
     /**
-     * Hides the pop over by quickly changing its opacity to 0.
-     *
-     * @see #hide(Duration)
+     * {@inheritDoc}
      */
     @Override
-    public final void hide() {
-        hide(DEFAULT_FADE_DURATION);
+    public final void show(Window ownerWindow, double anchorX, double anchorY) {
+        super.show(ownerWindow, anchorX, anchorY);
+        this.ownerWindow = ownerWindow;
+
+        showFadeInAnimation(DEFAULT_FADE_DURATION);
+
+        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
+                closePopOverOnOwnerWindowClose);
     }
 
     /**
@@ -451,10 +415,44 @@ public class PopOver extends PopupControl {
                     skinNode);
             fadeOut.setFromValue(skinNode.getOpacity());
             fadeOut.setToValue(0);
-            fadeOut.setOnFinished(event -> super.hide());
+            fadeOut.setOnFinished(_ -> super.hide());
             fadeOut.play();
         }
     }
+
+    /**
+     * Determines if the pop-over is detachable at all.
+     */
+    public final BooleanProperty detachableProperty() {
+        return detachable;
+    }
+
+    private void showFadeInAnimation(Duration fadeInDuration) {
+        // Fade In
+        Node skinNode = getSkin().getNode();
+        skinNode.setOpacity(0);
+
+        FadeTransition fadeIn = new FadeTransition(fadeInDuration, skinNode);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.play();
+    }
+
+    private void ownerWindowClosing() {
+        hide(Duration.ZERO);
+    }
+
+    /**
+     * Hides the pop over by quickly changing its opacity to 0.
+     *
+     * @see #hide(Duration)
+     */
+    @Override
+    public final void hide() {
+        hide(DEFAULT_FADE_DURATION);
+    }
+
+
 
     private void adjustWindowLocation() {
         Bounds bounds = PopOver.this.getSkin().getNode().getBoundsInParent();
@@ -558,12 +556,7 @@ public class PopOver extends PopupControl {
     private final BooleanProperty detachable = new SimpleBooleanProperty(this,
             "detachable", true); //$NON-NLS-1$
 
-    /**
-     * Determines if the pop over is detachable at all.
-     */
-    public final BooleanProperty detachableProperty() {
-        return detachable;
-    }
+
 
     /**
      * Sets the value of the detachable property.

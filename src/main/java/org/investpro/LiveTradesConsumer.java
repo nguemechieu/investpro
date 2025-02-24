@@ -95,11 +95,10 @@ public class LiveTradesConsumer {
     // Update market prices (bid/ask) for the trade pair based on the trade data
     private void updateMarketPrices(@NotNull Trade trade) {
         TradePair tradePair = trade.getTradePair();
-        double tradePrice = trade.getPrice();
 
         // Simulate updating bid and ask prices based on the trade
-        tradePair.setBid(tradePrice - 0.01); // Example bid price adjustment
-        tradePair.setAsk(tradePrice + 0.01); // Example ask price adjustment
+        tradePair.setBid(trade.getPrice() - 0.01); // Example bid price adjustment
+        tradePair.setAsk(trade.getPrice() + 0.01); // Example ask price adjustment
 
         logger.info("Updated market prices for pair: {} - Bid: {}, Ask: {}",
                 tradePair, tradePair.getBid(), tradePair.getAsk());

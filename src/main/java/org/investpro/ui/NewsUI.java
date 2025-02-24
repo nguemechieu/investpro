@@ -73,7 +73,7 @@ public class NewsUI extends Region {
         }, 5, 1000, TimeUnit.SECONDS);  // Fetch news every 60 seconds
     }
 
-    private void drawNews(GraphicsContext gc, List<News> news) {
+    private synchronized void drawNews(GraphicsContext gc, List<News> news) {
         if (gc == null) {
             logger.error("GraphicsContext is null!");
             return;
@@ -111,7 +111,12 @@ public class NewsUI extends Region {
             gc.setFill(impactColor);
             gc.fillRect(20, yOffset - 30, canvas.getWidth() - 40, 50);  // Highlight Box
             gc.setFill(Color.BLACK);
-            gc.fillText(n.getDate() + " | " + n.getCountry() + " | Impact: " + n.getImpact(), 30, yOffset + 20);
+            gc.fillText(n.getDate() + " | " + n.getTitle() + " | " + n.getCountry() + " | Impact: " + n.getImpact() +
+                            ", Forecast: " + n.getForecast() +
+                            ", Previous: " + n.getPrevious()
+
+
+                    , 30, yOffset + 20);
 
             // Draw border for each news entry
             gc.setStroke(Color.BLACK);

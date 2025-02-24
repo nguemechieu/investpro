@@ -165,7 +165,7 @@ public abstract class Exchange {
     public abstract CustomWebSocketClient getWebsocketClient();
     private long lastFetchTime = 0;
 
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, Consumer<List<Trade>> tradeConsumer);
+    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer);
 
     public abstract double fetchLivesBidAsk(TradePair tradePair);
 
@@ -257,4 +257,5 @@ public abstract class Exchange {
     }
 
 
+    public abstract Set<Integer> getSupportedGranularity();
 }

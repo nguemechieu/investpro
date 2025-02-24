@@ -140,4 +140,13 @@ public class ZoomLevel {
     public void decreaseDuration() {
         duration /= 2;
     }
+
+    public double calculateZoomFactor(double deltaY) {
+        double range = getMaxYValue() - getMinYValue();
+        double newMinYValue = getMaxYValue() - deltaY / pixelsPerSecond * range;
+        double newMaxYValue = getMinYValue() + deltaY / pixelsPerSecond * range;
+        double newRange = newMaxYValue - newMinYValue;
+        double newDuration = newRange / pixelsPerSecond * duration;
+        return newDuration / duration;
+    }
 }

@@ -43,6 +43,8 @@ public class CandleData {
 
 
     private boolean placeHolder = false;
+    @Setter
+    private boolean highlighted;
 
 
     // ✅ Default constructor (Required for JPA)
@@ -82,7 +84,7 @@ public class CandleData {
      * **Factory Method**
      * - Creates a CandleData instance based on a timestamp.
      */
-    @Contract("_, _, _, _, _ -> new")
+    @Contract("_, _, _, _, _, _ -> new")
     public static @NotNull CandleData of(int timestamp, double open, double high, double low, double close, double volume) {
         return new CandleData(open, close, high, low, timestamp, timestamp + 60, volume);
     }
@@ -118,5 +120,9 @@ public class CandleData {
 
     public Double getMax() {
         return Double.max(openPrice, closePrice);
+    }
+
+    public double getMin() {
+        return Double.min(openPrice, closePrice);
     }
 }

@@ -135,10 +135,7 @@ public class Binance extends Exchange {
 
     }
 
-    /**
-     * @param tradePair
-     * @return
-     */
+
     @Override
     public CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
         return null;
@@ -155,7 +152,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
@@ -185,13 +182,23 @@ public class Binance extends Exchange {
                             break;
                         } else {
                             List<Trade> tr = new ArrayList<>();
+
+                            OrderBook prices = new OrderBook();
+
+                            Side side = Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY");
+                            long qty;
+                            if (side == Side.BUY) {
+                                prices.getAskEntries().getLast().setPrice(trade.get("price").asDouble());
+                                qty = trade.get("id").asLong();
+                            } else {
+                                prices.getBidEntries().getLast().setPrice(trade.get("price").asDouble());
+                                qty = trade.get("qty").asLong();
+                            }
                             Trade tradex = new Trade(
                                     tradePair,
-
-                                    trade.get("price").asDouble(), trade.get("qty").asLong(),
-                                    Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY"),
-                                    trade.get("id").asLong(),
-                                    time
+                                    prices.getAskEntries().stream().findFirst().get().getPrice(), qty,
+                                    side,
+                                    qty, time
                             );
                             tr.add(tradex);
                             trades.accept(tr);
@@ -363,6 +370,21 @@ public class Binance extends Exchange {
     @Override
     public List<Account> getAccountSummary() {
         return List.of();
+    }
+
+    @Override
+    public Set<Integer> getSupportedGranularity() {
+        return Set.of(
+                CandlestickInterval.ONE_MINUTE.getSeconds(),
+                CandlestickInterval.FIVE_MINUTES.getSeconds(),
+                CandlestickInterval.THIRTY_MINUTES.getSeconds(),
+                CandlestickInterval.ONE_HOUR.getSeconds(),
+                CandlestickInterval.FOUR_HOURS.getSeconds(),
+                CandlestickInterval.SIX_HOURS.getSeconds(),
+                CandlestickInterval.DAY.getSeconds(),
+                CandlestickInterval.WEEK.getSeconds(),
+                CandlestickInterval.MONTH.getSeconds()
+        );
     }
 
     // Binance supported granularity (intervals)

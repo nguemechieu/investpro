@@ -2,6 +2,7 @@ package org.investpro;
 
 import lombok.Getter;
 import lombok.Setter;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,10 +13,15 @@ public class OrderBook {
 
     private TradePair tradePair;
     private Instant timestamp;
-    private List<OrderBookEntry> bidEntries = new ArrayList<>();
-    private List<OrderBookEntry> askEntries = new ArrayList<>();
+    private List<OrderBookEntry> bidEntries;
+    private List<OrderBookEntry> askEntries;
 
     public OrderBook() {
+        this.timestamp = Instant.now(); // Use current timestamp by default
+        this.bidEntries = new ArrayList<>();
+        bidEntries.add(new OrderBookEntry(0.05, 1.7));
+        this.askEntries = new ArrayList<>();
+        askEntries.add(new OrderBookEntry(0.06, 1.8));
 
     }
 

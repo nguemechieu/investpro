@@ -1,7 +1,6 @@
 package org.investpro.ai;
 
-import org.investpro.OrderBook;
-import org.investpro.OrderBookEntry;
+import org.investpro.CandleData;
 import org.investpro.SIGNAL;
 import org.jetbrains.annotations.NotNull;
 import weka.classifiers.Classifier;
@@ -24,6 +23,7 @@ public class TradingAI {
     private final Classifier model;
     private final Instances trainingData;
     private final List<Attribute> attributes;
+    private double currentPrice;
 
     public TradingAI(@NotNull Instances trainingData) {
         this.trainingData = trainingData;
@@ -62,7 +62,7 @@ public class TradingAI {
     /**
      * Generate a trading signal based on moving averages.
      */
-    public SIGNAL getMovingAverageSignal(List<OrderBook> prices, List<OrderBookEntry> currentPrice) {
+    public SIGNAL getMovingAverageSignal(List<CandleData> prices, double currentPrice) {
         if (prices.isEmpty()) return SIGNAL.HOLD;
 
         double shortTermMA = calculateMovingAverage(prices, 20);
@@ -71,9 +71,9 @@ public class TradingAI {
         double support = calculateSupport(prices);
         double resistance = calculateResistance(prices);
 
-        if (shortTermMA > longTermMA && currentPrice.getFirst().getPrice() > support) {
+        if (shortTermMA > longTermMA && currentPrice > support) {
             return SIGNAL.BUY;
-        } else if (shortTermMA < longTermMA && currentPrice.getFirst().getPrice() < resistance) {
+        } else if (shortTermMA < longTermMA && currentPrice < resistance) {
             return SIGNAL.SELL;
         } else {
             return SIGNAL.HOLD;
@@ -83,14 +83,10 @@ public class TradingAI {
     /**
      * Calculate Moving Average.
      */
-    private double calculateMovingAverage(List<OrderBook> prices, int period) {
-        if (prices.size() < period) return prices.stream().findFirst().get().getBidEntries().getFirst().getPrice();
-
-        return prices.subList(prices.size() - period, prices.size())
+    private double calculateMovingAverage(List<CandleData> prices, int period) {
+        return prices.subList(Math.max(0, prices.size() - period), prices.size())
                 .stream()
-                .mapToDouble(
-                        c -> c.getBidEntries().getFirst().getPrice()
-                )
+                .mapToDouble(CandleData::getClosePrice)
                 .average()
                 .orElse(0.0);
     }
@@ -98,25 +94,24 @@ public class TradingAI {
     /**
      * Calculate Support Level (Lowest price in recent period).
      */
-    private double calculateSupport(List<OrderBook> prices) {
+    private double calculateSupport(@NotNull List<CandleData> prices) {
         return prices.subList(Math.max(0, prices.size() - 20), prices.size())
                 .stream()
-                .mapToDouble(c -> c.getBidEntries().getFirst().getPrice()
-                )
+                .mapToDouble(CandleData::getLowPrice)
                 .min()
                 .orElse(Double.MAX_VALUE);
-    }
 
+    }
     /**
      * Calculate Resistance Level (Highest price in recent period).
      */
-    private double calculateResistance(List<OrderBook> prices) {
-        return prices.subList(Math.max(0, prices.size() - 20), prices.size())
-                .stream()
-                .mapToDouble(c -> c.getBidEntries().getFirst().getPrice()
-                )
-                .max()
-                .orElse(Double.MIN_VALUE);
+    private double calculateResistance(List<CandleData> prices) {
+        return
+                prices.subList(Math.max(0, prices.size() - 20), prices.size())
+                        .stream()
+                        .mapToDouble(CandleData::getHighPrice)
+                        .max()
+                        .orElse(Double.MIN_VALUE);
     }
 
     /**
@@ -188,4 +183,15 @@ public class TradingAI {
         }
     }
 
+    public SIGNAL getSignal(double currentPrice, List<CandleData> prices1, TradeStrategy tradeStrategy) {
+        this.currentPrice = currentPrice;
+        double open = prices1.getLast().getOpenPrice();
+        double high = prices1.stream().mapToDouble(CandleData::getMax).max().orElse(0.0);
+        double low = prices1.stream().mapToDouble(CandleData::getMin).min().orElse(0.0);
+        double close = prices1.getLast().getClosePrice();
+        double volume = prices1.getLast().getVolume();
+
+
+        return tradeStrategy.getSignal(open, high, low, close, volume, prices1);
+    }
 }

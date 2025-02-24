@@ -72,7 +72,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
     };
     /**
-     * Amount of padding to add on the each end of the axis when auto ranging.
+     * Amount of padding to add on the end of the axis when auto ranging.
      */
     private final DoubleProperty autoRangePadding = new SimpleDoubleProperty(0.1);
 
@@ -97,7 +97,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
         int divider = 0;
 
-        double numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
+        double numTicks = delta / (dividers[Math.abs(divider)] * powersOfTen[factor + powersOfTenOffset]);
         // We don't have enough ticks, so increase ticks until we're over the limit, then back off once.
         if (numTicks < maxTicks) {
             while (numTicks < maxTicks) {
@@ -107,9 +107,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
                     --factor;
                     divider = dividers.length - 1;
                 }
-                divider = Math.abs(divider);
 
-                numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
+                numTicks = delta / (dividers[divider] * powersOfTen[Math.abs(factor + powersOfTenOffset)]);
             }
 
             // Now back off once unless we hit exactly
@@ -206,11 +205,11 @@ public class StableTicksAxis extends ValueAxis<Number> {
                 return logFloor;
             case CEILING:
             case UP:
-                return logFloor + lessThanBranchFree(floorPow, x);
+                return logFloor + lessThanBranchFree(x, floorPow);
             case HALF_DOWN:
             case HALF_UP:
             case HALF_EVEN:
-                return logFloor + lessThanBranchFree(halfPowersOf10[logFloor], x);
+                return logFloor + lessThanBranchFree(x, halfPowersOf10[logFloor]);
             default:
                 throw new AssertionError("Unexpected RoundingMode: " + mode);
         }

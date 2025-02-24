@@ -5,11 +5,15 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.css.*;
+import javafx.css.PseudoClass;
 import javafx.scene.control.Labeled;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.Objects;
 
+@Getter
+@Setter
 public class ToggleSwitch extends Labeled {
     private final ReadOnlyBooleanWrapper selected;
     final BooleanProperty turnOnTextLonger;
@@ -75,5 +79,7 @@ public class ToggleSwitch extends Labeled {
     public String getUserAgentStylesheet() {
         return Objects.requireNonNull(ToggleSwitch.class.getResource("/css/toggleswitch.css")).toExternalForm();
     }
+
+    protected boolean on;
 
 }

@@ -69,4 +69,7 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
 
     }
 
+    public Object getSupportedGranularities() {
+        return getSupportedGranularity();
+    }
 }

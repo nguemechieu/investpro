@@ -52,6 +52,7 @@ public class Oanda extends Exchange {
     private Currency counterCurr;
 
 
+
     public Oanda(String accountId, String apiSecret) {
         super(accountId, apiSecret); // OANDA uses only an API key for authentication, no secret required
         this.account_id = accountId;
@@ -313,18 +314,23 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, Consumer<List<Trade>> tradeConsumer) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
         Objects.requireNonNull(tradeConsumer);
 
-        CompletableFuture.runAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             String uriStr = API_URL + "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
             requestBuilder.uri(URI.create(uriStr));
 
             int retryCount = 0;
             int maxRetries = 5;
             long delayMillis = 500; // Initial delay (0.5 sec)
+
+            List<Trade> trades = new ArrayList<>();
+            List<CandleData> completedCandles = new ArrayList<>();
+
+            InProgressCandle currentCandle = null;
 
             while (retryCount < maxRetries) {
                 try {
@@ -341,30 +347,64 @@ public class Oanda extends Exchange {
                     }
 
                     JsonNode tradesResponse = OBJECT_MAPPER.readValue(response.body(), JsonNode.class);
-                    List<Trade> trades = new ArrayList<>();
 
                     for (JsonNode trade : tradesResponse.get("prices")) {
                         logger.info("Found trade {}", trade);
-                        Instant time = Instant.parse(trade.get("time").asText());
-                        double price = trade.get("price").asDouble();
-                        double size = trade.get("liquidity").asDouble();
-                        Trade tr = new Trade(tradePair, price, size, Side.getSide("SELL"), UUID.randomUUID().timestamp(), time);
+                        Instant tradeTime = Instant.parse(trade.get("time").asText());
+                        double tradePrice = trade.get("price").asDouble();
+                        double tradeSize = trade.get("liquidity").asDouble();
+                        Side side = Side.getSide(trade.get("side").asText());
+
+                        OrderBook prices = new OrderBook();
+                        if (side == Side.BUY) {
+                            prices.getAskEntries().add(new OrderBookEntry(tradePrice, tradeSize));
+                        } else {
+                            prices.getBidEntries().add(new OrderBookEntry(tradePrice, tradeSize));
+                        }
+
+                        Trade tr = new Trade(tradePair, prices.getAskEntries().stream().findFirst().get().getPrice(), tradeSize, side, tradeTime);
                         trades.add(tr);
+
+                        // ---- CANDLE MANAGEMENT ----
+
+                        if (currentCandle == null || tradeTime.getEpochSecond() > currentCandle.getOpenTime() + secondsPerCandle) {
+                            // If a new candle is required, close the previous one
+                            if (currentCandle != null) {
+                                currentCandle.closeCandle(tradeTime.getEpochSecond(), currentCandle.getClosePriceSoFar());
+                                completedCandles.add(currentCandle.snapshot());
+                            }
+
+                            // Start a new candle
+                            currentCandle = new InProgressCandle();
+                            currentCandle.setOpenTime(tradeTime.getEpochSecond());
+                            currentCandle.setOpenPrice(tradePrice);
+                            currentCandle.setHighPriceSoFar(tradePrice);
+                            currentCandle.setLowPriceSoFar(tradePrice);
+                            currentCandle.setVolumeSoFar(tradeSize);
+                        } else {
+                            // Update ongoing candle
+                            currentCandle.setHighPriceSoFar(Math.max(currentCandle.getHighPriceSoFar(), tradePrice));
+                            currentCandle.setLowPriceSoFar(Math.min(currentCandle.getLowPriceSoFar(), tradePrice));
+                            currentCandle.setVolumeSoFar(currentCandle.getVolumeSoFar() + tradeSize);
+                            currentCandle.setClosePriceSoFar(tradePrice);
+                        }
                     }
 
-                    tradeConsumer.accept(trades); // Process trades using the provided consumer
-                    return; // Exit loop if successful
+                    // Process trades using the provided consumer
+                    tradeConsumer.accept(trades);
+                    return trades;
 
                 } catch (IOException | InterruptedException e) {
                     logger.error("Error fetching trades", e);
-                    return;
+                    return trades;
                 }
             }
 
             logger.error("Max retries exceeded due to rate limiting.");
+            return trades;
         });
-        return null;
     }
+
 
 
     @Override
@@ -667,7 +707,7 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean supportsStreamingTrades(TradePair tradePair) {
-        return false; // WebSocket support for trades can be added if needed
+        return true;
     }
 
     @Override
@@ -738,7 +778,15 @@ public class Oanda extends Exchange {
                             Instant timestamp = Instant.parse(tradeNode.get("time").asText());
                             Side side = tradeNode.get("side").asText().equalsIgnoreCase("buy") ? Side.BUY : Side.SELL;
 
-                            Trade trade = new Trade(tradePair, price, size, side, timestamp);
+                            OrderBook prices = new OrderBook();
+                            if (side == Side.BUY) {
+                                prices.getAskEntries().add(new OrderBookEntry(price, size));
+                            } else {
+                                prices.getBidEntries().add(new OrderBookEntry(price, size));
+                            }
+
+                            // Notify any listeners in the app
+                            Trade trade = new Trade(tradePair, prices.getAskEntries().stream().findFirst().get().getPrice(), size, side, timestamp);
                             logger.info("Live Trade: {}", trade);
 
                             liveTradeUpdates.onNext(trade);
@@ -824,6 +872,21 @@ public class Oanda extends Exchange {
 
         logger.info("✅ Account summary: {}", accounts);
         return accounts;
+    }
+
+    @Override
+    public Set<Integer> getSupportedGranularity() {
+        return Set.of(
+                CandlestickInterval.ONE_MINUTE.getSeconds(),
+                CandlestickInterval.FIVE_MINUTES.getSeconds(),
+                CandlestickInterval.THIRTY_MINUTES.getSeconds(),
+                CandlestickInterval.ONE_HOUR.getSeconds(),
+                CandlestickInterval.FOUR_HOURS.getSeconds(),
+                CandlestickInterval.SIX_HOURS.getSeconds(),
+                CandlestickInterval.DAY.getSeconds(),
+                CandlestickInterval.WEEK.getSeconds(),
+                CandlestickInterval.MONTH.getSeconds()
+        );
     }
 
 

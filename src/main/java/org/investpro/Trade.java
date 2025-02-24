@@ -5,9 +5,12 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
@@ -19,11 +22,14 @@ import java.util.Objects;
  */
 @Getter
 @Setter
-
+@ToString
 @NoArgsConstructor
 public class Trade {
 
 
+    private Side side;
+    private ENUM_ORDER_TYPE order_type;
+    private List<Double> prices;
     TradePair tradePair;
     Exchange exchange;
     @Id
@@ -41,48 +47,63 @@ public class Trade {
 
     private double amount;
 
-    private Side transactionType;
 
     @Column(name = "timestamp", nullable = false)
     private Instant timestamp;
 
 
     // Constructors, getters, and other methods...
+    private double stopLoss;
+    private double takeProfit;
 
     public Trade(Exchange exchange, TradePair tradePair, double price, double amount, Side transactionType,
                  long localTradeId, Instant timestamp, Money fee) {
         this.tradePair = tradePair;
         this.price = price;
         this.amount = amount;
-        this.transactionType = transactionType;
+        this.side = transactionType;
         this.localTradeId = localTradeId;
         this.timestamp = timestamp;
         this.fee = fee;
         this.exchange = exchange;
     }
+    SIGNAL signal;
 
 
     public Trade(TradePair tradePair, double price, double size, Side side, long tradeId, Instant time) {
         this.tradePair = tradePair;
         this.price = price;
         this.amount = size;
-        this.transactionType = side;
+        this.side = side;
         this.localTradeId = tradeId;
         this.timestamp = time;
     }
-
-    public Trade(double price, double qty, Instant time) throws Exception {
+    public Trade(Double price, double qty, Instant time) throws Exception {
         this.price = price;
         this.amount = qty;
         this.timestamp = time;
     }
-    SIGNAL signal;
+
+    public Trade(Exchange exchange, TradePair tradePair, Side side, ENUM_ORDER_TYPE enumOrderType, double price, double amount, @NotNull Date timestamp, double stopLoss, double takeProfit) {
+        this.tradePair = tradePair;
+        this.price = price;
+        this.amount = amount;
+        this.side = side;
+        this.timestamp = timestamp.toInstant();
+        this.order_type = enumOrderType;
+        this.stopLoss = stopLoss;
+        this.takeProfit = takeProfit;
+        this.exchange = exchange;
+    }
 
 
-    @Override
-    public String toString() {
-        return String.format("Trade [tradePair = %s, price = %s, amount = %s, transactionType = %s, localId = %s, " +
-                "timestamp = %s, fee = %s]", tradePair, price, amount, transactionType, localTradeId, timestamp, fee);
+    public Trade(TradePair tradePair, double price, double size, Side side, Instant timestamp) {
+        this.tradePair = tradePair;
+        this.price = price;
+        this.amount = size;
+        this.timestamp = timestamp;
+        this.side = side;
+
     }
 
     @Override
@@ -100,32 +121,17 @@ public class Trade {
         return Objects.equals(tradePair, other.tradePair)
                 && Objects.equals(price, other.price)
                 && Objects.equals(amount, other.amount)
-                && transactionType == other.transactionType
+                && side == other.side
                 && localTradeId == other.localTradeId
-                && Objects.equals(timestamp, other.timestamp);
+                && Objects.equals(timestamp, other.timestamp)
+                && Objects.equals(stopLoss, other.stopLoss)
+                && Objects.equals(takeProfit, other.takeProfit);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tradePair, price, amount, transactionType, localTradeId, timestamp);
+        return Objects.hash(tradePair, price, amount, side, localTradeId, timestamp);
     }
 
 
-    public Trade(TradePair tradePair, double price, double size, Side side, Instant timestamp) {
-        this.tradePair = tradePair;
-        this.price = price;
-        this.amount = size;
-        this.timestamp = timestamp;
-
-    }
-
-    public void put(TradePair tradePair, SIGNAL signal) {
-
-        Trade trad = new Trade();
-        trad.setTradePair(tradePair);
-        trad.setSignal(signal);
-
-        tradeList.add(trad);
-
-    }
 }

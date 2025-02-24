@@ -52,7 +52,7 @@ public class TradingWindow extends Region {
         loginPage();
         setStyle(
                 "-fx-background-color: #333333;" +
-                        "-fx-text-fill: white;" +
+                        "-fx-text-fill: rgba(13,53,48,0.73);" +
                         "-fx-padding: 10;" +
                         "-fx-border-width: 2;" +
                         "-fx-border-color: #555555;" +

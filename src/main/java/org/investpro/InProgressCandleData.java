@@ -3,7 +3,6 @@ package org.investpro;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
 import java.util.Objects;
 
 @Getter
@@ -17,6 +16,8 @@ public class InProgressCandleData {
     private long currentTill;
     private double lastPrice;
     private double volumeSoFar;
+    private double closePriceSoFar;
+    private long closeTime;
 
     public InProgressCandleData(long openTime, double openPrice, double highPriceSoFar, double lowPriceSoFar,
                                 long currentTill, double lastPrice, double volumeSoFar) {
@@ -49,6 +50,7 @@ public class InProgressCandleData {
                 currentTill == other.currentTill &&
                 lastPrice == other.lastPrice &&
                 volumeSoFar == other.volumeSoFar;
+
     }
 
     @Override
@@ -62,4 +64,5 @@ public class InProgressCandleData {
                         "lowPriceSoFar = %f, currentTill = %d, lastPrice = %f, volumeSoFar = %f]", openTime, openPrice,
                 highPriceSoFar, lowPriceSoFar, currentTill, lastPrice, volumeSoFar);
     }
+
 }

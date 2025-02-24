@@ -15,6 +15,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Separator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
@@ -22,13 +23,16 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
-import lombok.Getter;
-import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
+import static org.investpro.CandleStickChartToolbar.Tool.OPTIONS;
 import static org.investpro.FXUtils.computeTextDimensions;
 
 /**
@@ -49,67 +53,70 @@ import static org.investpro.FXUtils.computeTextDimensions;
  *
  * @author Michael Ennen
  */
-@Getter
-@Setter
 public class CandleStickChartToolbar extends Region {
-    /**
-     * Supported granularity matching OANDA's standard (Seconds, Minutes, Hours, Days, Weeks, Months)
-     */
-    private static final List<Integer> SUPPORTED_GRANULARITY = Arrays.asList(
-            5, 10, 15, 30, 60, 120, 240, 300, 600, 900, 1800, 3600, 7200, 10800, 14400, 21600, 28800, 43200,
-            86400, 604800, 2592000
-    );
-    private HBox toolbar;
+    private final HBox toolbar;
+    private final PopOver optionsPopOver;
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
-    private PopOver optionsPopOver;
-    private Separator functionOptionsSeparator;
+    private final Separator functionOptionsSeparator;
+
     CandleStickChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
-                            Set<Integer> granularities) {
+                            Set<Integer> granu) {
         Objects.requireNonNull(containerWidth);
         Objects.requireNonNull(containerHeight);
-        Objects.requireNonNull(granularities);
+        Objects.requireNonNull(granu);
 
-        List<Node> toolbarNodes = new ArrayList<>((2 * granularities.size()) + Tool.values().length + 1);
+        List<Node> toolbarNodes = new ArrayList<>((2 * granu.size()) + Tool.values().length + 1);
         boolean passedMinuteHourBoundary = false;
         boolean passedHourDayBoundary = false;
         boolean passedDayWeekBoundary = false;
         boolean passedWeekMonthBoundary = false;
-
-        // Ensure we only include supported granularity
-        List<Integer> sortedGranularity = new ArrayList<>(granularities);
-        sortedGranularity.retainAll(SUPPORTED_GRANULARITY);
-        Collections.sort(sortedGranularity);
-
-        for (Integer granularity : sortedGranularity) {
-            if (granularity < 3600) {  // Seconds and Minutes
-                toolbarNodes.add(new ToolbarButton(granularityToLabel(granularity), granularity));
-            } else if (granularity < 86400) { // Hours
+        for (Integer granularity : granu) {
+            if (granularity < 60) {
+                // For granularities less than 60 seconds, display seconds
+                toolbarNodes.add(new ToolbarButton(granularity + "s", granularity));
+            } else if (granularity < 3600) {
+                // For granularities between 60 seconds and 1 hour, display minutes
+                toolbarNodes.add(new ToolbarButton((granularity / 60) + "m", granularity));
+            } else if (granularity < 86400) {
+                // For granularities between 1 hour and 1 day, display hours
                 if (!passedMinuteHourBoundary) {
                     passedMinuteHourBoundary = true;
-                    toolbarNodes.add(new Separator());
+                    Separator minuteHourSeparator = new Separator();
+                    minuteHourSeparator.setOpacity(0);
+                    toolbarNodes.add(minuteHourSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton(granularityToLabel(granularity), granularity));
-            } else if (granularity < 604800) { // Days
+                toolbarNodes.add(new ToolbarButton((granularity / 3600) + "h", granularity));
+            } else if (granularity < 604800) {
+                // For granularities between 1 day and 1 week, display days
                 if (!passedHourDayBoundary) {
                     passedHourDayBoundary = true;
-                    toolbarNodes.add(new Separator());
+                    Separator hourDaySeparator = new Separator();
+                    hourDaySeparator.setOpacity(0);
+                    toolbarNodes.add(hourDaySeparator);
                 }
-                toolbarNodes.add(new ToolbarButton(granularityToLabel(granularity), granularity));
-            } else if (granularity < 2592000) { // Weeks
+                toolbarNodes.add(new ToolbarButton((granularity / 86400) + "d", granularity));
+            } else if (granularity < 2592000) {
+                // For granularities between 1 week and 1 month, display weeks
                 if (!passedDayWeekBoundary) {
                     passedDayWeekBoundary = true;
-                    toolbarNodes.add(new Separator());
+                    Separator dayWeekSeparator = new Separator();
+                    dayWeekSeparator.setOpacity(0);
+                    toolbarNodes.add(dayWeekSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton(granularityToLabel(granularity), granularity));
-            } else { // Months
+                toolbarNodes.add(new ToolbarButton((granularity / 604800) + "w", granularity));
+            } else {
+                // For granularities greater than or equal to 1 month, display months
                 if (!passedWeekMonthBoundary) {
                     passedWeekMonthBoundary = true;
-                    toolbarNodes.add(new Separator());
+                    Separator weekMonthSeparator = new Separator();
+                    weekMonthSeparator.setOpacity(0);
+                    toolbarNodes.add(weekMonthSeparator);
                 }
-                toolbarNodes.add(new ToolbarButton(granularityToLabel(granularity), granularity));
+                toolbarNodes.add(new ToolbarButton((granularity / 2592000) + "mo", granularity));
             }
         }
+
         Separator intervalZoomSeparator = new Separator();
         intervalZoomSeparator.setOpacity(0);
         toolbarNodes.add(intervalZoomSeparator);
@@ -123,18 +130,11 @@ public class CandleStickChartToolbar extends Region {
         optionsPopOver.setHeaderAlwaysVisible(true);
         for (Tool tool : Tool.values()) {
             ToolbarButton toolbarButton;
-            if (tool == Tool.OPTIONS) {
+            if (tool == OPTIONS) {
                 toolbarNodes.add(functionOptionsSeparator);
-                toolbarButton = new ToolbarButton(Tool.OPTIONS);
+                toolbarButton = new ToolbarButton(OPTIONS);
                 toolbarButton.setOnMouseEntered(_ -> {
                     mouseInsideOptionsButton = true;
-
-
-                    if (optionsPopOver.isShowing() && toolbarButton.graphicLabel == null) {
-                        optionsPopOver.hide();
-
-                        return;
-                    }
                     optionsPopOver.show(toolbarButton);
                 });
                 toolbarButton.setOnMouseExited(_ -> {
@@ -168,7 +168,6 @@ public class CandleStickChartToolbar extends Region {
         };
 
         gotFirstSize.addListener(gotFirstSizeChangeListener);
-
         getChildren().setAll(toolbar);
     }
 
@@ -183,62 +182,82 @@ public class CandleStickChartToolbar extends Region {
 
     void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(secondsPerCandle);
+
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
                 if (tool.duration != -1) {
                     tool.setOnAction(_ -> secondsPerCandle.setValue(tool.duration));
-                } else if (tool.tool != null && tool.tool.isZoomFunction()) {
+                } else if (tool.tool != null && tool.tool.isZoomIn()) {
+                    tool.setOnAction(_ -> candleStickChart.changeZoom(
+                            tool.tool.getZoomDirection()));
+                } else if (tool.tool != null && tool.tool.isZoomOut()) {
                     tool.setOnAction(_ -> candleStickChart.changeZoom(
                             tool.tool.getZoomDirection()));
                 } else if (
                         tool.tool != null && tool.tool.isNavigationFunction()) {
                     tool.setOnAction(_ -> candleStickChart.changeNavigation(tool.tool.getNavigationDirection()));
-                } else if (tool.tool != null && tool.tool.isDisplayFunction()) {
-                    tool.setOnAction(_ -> {
-                        tool.tool.displayChart(
-                                candleStickChart.getData(),
-                                candleStickChart.getXAxis(),
-                                candleStickChart.getYAxis(),
-                                candleStickChart.getYAxis2());
+                } else if (tool.tool != null && tool.tool.isFullScreen()) {
+                    tool.setOnAction(_ -> candleStickChart.setFullScreen(true));
 
-                    });
-                } else if (tool.tool != null && tool.tool.isExportFunction()) {
-                    tool.setOnAction(_ -> tool.tool.exportChart(candleStickChart));
+                } else if (tool.tool != null && tool.tool.isPrint_PDF()) {
+                    tool.setOnAction(_ -> candleStickChart.exportAsPDF());
+                } else if (tool.tool != null && tool.tool.isShare()) {
+                    tool.setOnAction(_ -> candleStickChart.shareLink());
+                } else if (tool.tool != null && tool.tool.isPrint()) {
+                    tool.setOnAction(_ -> candleStickChart.print());
+                } else if (tool.tool != null && tool.tool.isRefresh()) {
+                    tool.setOnAction(_ -> candleStickChart.refreshChart());
+                } else if (tool.tool != null && tool.tool.isAutoScroll()) {
+                    tool.setOnAction(_ -> candleStickChart.setAutoScroll(!candleStickChart.isAutoScroll()));
+                } else if (tool.tool != null && tool.tool.isGridToggle()) {
+                    tool.setOnAction(_ -> candleStickChart.setShowGrid(!candleStickChart.isShowGrid()));
+                } else if (tool.tool != null && tool.tool.isLeft()) {
+                    tool.setOnAction(_ -> candleStickChart.changeNavigation(CandleStickChart.NavigationDirection.LEFT));
+                } else if (tool.tool != null && tool.tool.isRight()) {
+                    tool.setOnAction(_ -> candleStickChart.changeNavigation(CandleStickChart.NavigationDirection.RIGHT));
+                } else if (tool.tool != null && tool.tool.isUp()) {
+                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.UP));
+                } else if (tool.tool != null && tool.tool.isDown()) {
+                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.DOWN));
+                } else if (tool.tool != null && tool.tool.isScreenshot()) {
+                    tool.setOnAction(_ -> candleStickChart.captureScreenshot());
+                } else if (tool.tool != null && tool.tool.isScrollUp()) {
+                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.UP));
+
+
+                } else if (tool.tool != null && tool.tool.isScrollDown()) {
+                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.DOWN));
+
+                } else if (tool.tool != null && tool.tool.isGRID_TOGGLE()) {
+                    tool.setOnAction(_ -> candleStickChart.setShowGrid(true));
+
+                } else if (tool.tool != null && tool.tool.isOPTIONS()) {
+                    if (candleStickChart == null) {
+                        return;
+                    }
+                    tool.setOnAction(_ -> optionsPopOver.show(tool));
                 }
 
 
                 tool.setOnMouseEntered(_ -> {
                     if (!mouseInsideOptionsButton) {
                         optionsPopOver.hide();
+                    } else {
+                        candleStickChart.setTooltip(new Tooltip());
+                        optionsPopOver.show(tool);
+                        mouseInsideOptionsButton = false;
                     }
                 });
+
             }
+
 
         }
     }
+
 
     void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
-    }
-
-    /**
-     * Converts OANDA-supported granularities into appropriate labels for UI.
-     */
-
-    private static @NotNull String granularityToLabel(int actualGranularity) {
-        if (actualGranularity < 60) {
-            return "s" + actualGranularity;  // Seconds
-        } else if (actualGranularity < 3600) {
-            return "M" + (actualGranularity / 60);  // Minutes
-        } else if (actualGranularity < 86400) {
-            return "H" + (actualGranularity / 3600);  // Hours
-        } else if (actualGranularity < 604800) {
-            return "D";  // Days
-        } else if (actualGranularity < 2592000) {
-            return "W";  // Weeks (W1, W2, etc.)
-        } else {
-            return "Mo";  // Months
-        }
     }
 
     public enum Tool {
@@ -251,8 +270,14 @@ public class CandleStickChartToolbar extends Region {
         AUTO_SCROLL("/img/scroll-solid.png"),    // NEW: Toggle auto-scroll
         GRID_TOGGLE("/img/grid-solid.png"),      // NEW: Toggle grid visibility
         FULL_SCREEN("/img/fullscreen-solid.png"),// NEW: Toggle full-screen mode
-        EXPORT_PDF("/img/pdf-solid.png"),        // NEW: Export chart as PDF
-        SHARE("/img/share-solid.png");           // NEW: Share chart via link
+        PRINT_PDF("/img/pdf-solid.png"),        // NEW: Export chart as PDF
+        SHARE("/img/share-solid.png"),          // NEW: Share chart via link
+
+        LEFT("/img/left-solid.png"), // Scroll  to the left
+        RIGHT("/img/right-solid.png"), // Scroll  to the right
+        UP("/img/up-solid.png"), // Scroll  up
+        DOWN("/img/down-solid.png") // Scroll  down
+        ;
 
         private final String img;
 
@@ -260,162 +285,114 @@ public class CandleStickChartToolbar extends Region {
             this.img = img;
         }
 
-        public String getImgPath() {
-            return img;
-        }
 
-        public boolean isZoomFunction() {
-            return this == ZOOM_IN || this == ZOOM_OUT;
-        }
+        public @Nullable ZoomDirection getZoomDirection() {
 
-        public ZoomDirection getZoomDirection() {
-            if (!isZoomFunction()) {
-                throw new IllegalArgumentException("Cannot call getZoomDirection() on non-zoom function: " + name());
+            if (this == ZOOM_IN) {
+                return ZoomIn();
             }
-            return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;
+            if (this == ZOOM_OUT) {
+                return ZoomOut();
+            }
+            return null;
+
+        }
+
+        private ZoomDirection ZoomOut() {
+            return ZoomDirection.OUT; // Fix: Should zoom OUT, not IN
+        }
+
+        private ZoomDirection ZoomIn() {
+            return ZoomDirection.IN;  // Fix: Should zoom IN, not OUT
+        }
+
+        public boolean isRefresh() {
+            return this == REFRESH;
         }
 
         public boolean isNavigationFunction() {
-            return this == AUTO_SCROLL || this == REFRESH;
+            return this == LEFT || this == RIGHT;
         }
 
-        public boolean isExportFunction() {
-            return this == SCREENSHOT || this == EXPORT_PDF || this == PRINT || this == SHARE;
-        }
-
-        public boolean isDisplayFunction() {
-            return this == GRID_TOGGLE || this == FULL_SCREEN;
+        public boolean isGRID_TOGGLE() {
+            return this == GRID_TOGGLE;
         }
 
 
-        public void exportChart(CandleStickChart candleStickChart) {
-            // Export chart as specified in the enum
-            // Example usage:
-            if (this == EXPORT_PDF) {
-                //     // Export chart as PDF
-                //...
-                System.out.println("Export chart as PDF");
-                candleStickChart.exportAsPDF();
-            } else if (this == SCREENSHOT) {
-                //     // Save chart as image
-                //...
-                System.out.println("Save chart as image");
-                candleStickChart.captureScreenshot();
-            } else if (this == PRINT) {
-                //     // Print chart
-                //...
-                System.out.println("Print chart");
-                candleStickChart.print();
-            } else if (this == SHARE) {
-                //     // Share chart via link
-                //...
-                System.out.println("Share chart via link");
-                candleStickChart.shareLink();
-            } else {
-                throw new IllegalArgumentException("Cannot call exportChart() on non-export function: " + name());
-            }
-
-        }
-
-        public Object getNavigationDirection() {
+        public CandleStickChart.NavigationDirection getNavigationDirection() {
             if (!isNavigationFunction()) {
                 throw new IllegalArgumentException("Cannot call getNavigationDirection() on non-navigation function: " + name());
             }
-            return this == AUTO_SCROLL ? ScrollDirection.UP : ScrollDirection.DOWN;
+            return this == AUTO_SCROLL ? CandleStickChart.NavigationDirection.LEFT : CandleStickChart.NavigationDirection.RIGHT;
+
         }
 
-        public void displayChart(NavigableMap<Integer, CandleData> data, StableTicksAxis xAxis, StableTicksAxis yAxis, Object yAxis2) {
-            // Display chart with provided data, xAxis, yAxis, and yAxis2 (optional)
-            // Example usage:
-            if (this == REFRESH) {
-                //     // Update chart with new data
-                //     //...
-                System.out.println("Update chart with new data");
-            } else if (this == EXPORT_PDF) {
-                //     // Export chart as PDF
-                //...
-                System.out.println("Export chart as PDF");
-            } else if (this == SCREENSHOT) {
-                //     // Save chart as image
-                //...
-                System.out.println("Save chart as image");
-            } else if (this == FULL_SCREEN) {
-                //     // Toggle full-screen mode
-                //...
-                System.out.println("Toggle full-screen mode");
-            } else if (this == GRID_TOGGLE) {
-                //     // Toggle grid visibility
-                //...
-                System.out.println("Toggle grid visibility");
-            } else if (this == AUTO_SCROLL) {
-                //     // Toggle auto-scroll
-                //...
-                System.out.println("Toggle auto-scroll");
-            } else {
-                throw new IllegalArgumentException("Unsupported function: " + name());
-            }
-        }
-    }
-
-
-    private static class ToolbarButton extends Button {
-        private final String textLabel;
-        private final ImageView graphicLabel;
-        private final Tool tool;
-        private final int duration;
-        private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
-        private final BooleanProperty active = new BooleanPropertyBase(false) {
-            public void invalidated() {
-                pseudoClassStateChanged(activeClass, get());
-            }
-
-            @Override
-            public Object getBean() {
-                return ToolbarButton.this;
-            }
-
-            @Contract(pure = true)
-            @Override
-            public @NotNull String getName() {
-                return "active";
-            }
-        };
-
-        ToolbarButton(String textLabel, int duration) {
-            this(textLabel, null, null, duration);
+        public boolean isZoomIn() {
+            return this == ZOOM_IN;
         }
 
-        ToolbarButton(Tool tool) {
-            this(tool.name(), tool, tool.img, -1);
+        public boolean isZoomOut() {
+            return this == ZOOM_OUT;
         }
 
-        private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
-            if (textLabel == null && img == null) {
-                throw new IllegalArgumentException("textLabel and img were both null");
-            }
-            this.textLabel = textLabel;
-            this.tool = tool;
-            this.duration = duration;
-            setText(textLabel == null ? "" : textLabel);
-            if (img != null) {
-                graphicLabel = new ImageView(new Image(Objects.requireNonNull(ToolbarButton.class.getResourceAsStream(img))));
-                setGraphic(graphicLabel);
-            } else {
-                graphicLabel = new ImageView(new Image(Objects.requireNonNull(
-                        ToolbarButton.class.getResourceAsStream("/img/refresh-solid.png"))));
 
-            }
-            setMinSize(5, 5);
-            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            textOverrunProperty().set(OverrunStyle.CLIP);
-            setEllipsisString("");
-            getStyleClass().add("candle-chart-toolbar-button");
+        public boolean isShare() {
+            return this == SHARE;
         }
 
-        public void setActive(boolean active) {
-            this.active.set(active);
+        public boolean isFullScreen() {
+            return this == FULL_SCREEN;
+        }
+
+        public boolean isPrint_PDF() {
+            return this == PRINT_PDF;
+        }
+
+        public boolean isPrint() {
+            return this == PRINT;
+        }
+
+        public boolean isScreenshot() {
+            return this == SCREENSHOT;
+        }
+
+        public boolean isAutoScroll() {
+            return this == AUTO_SCROLL;
+        }
+
+        public boolean isGridToggle() {
+            return this == GRID_TOGGLE;
+        }
+
+        public boolean isLeft() {
+            return this == LEFT;
+        }
+
+        public boolean isRight() {
+            return this == RIGHT;
+        }
+
+        public boolean isUp() {
+            return this == UP;
+        }
+
+        public boolean isDown() {
+            return this == DOWN;
+        }
+
+        public boolean isScrollDown() {
+            return this == DOWN;
+        }
+
+        public boolean isScrollUp() {
+            return this == UP;
+        }
+
+        public boolean isOPTIONS() {
+            return this == OPTIONS;
         }
     }
+
 
     private class SizeChangeListener extends DelayedSizeChangeListener {
         SizeChangeListener(BooleanProperty gotFirstSize, ObservableValue<Number> containerWidth,
@@ -476,5 +453,88 @@ public class CandleStickChartToolbar extends Region {
                 mouseExitedPopOverFilter = null;
             }
         }
+    }
+
+    private static class ToolbarButton extends Button {
+
+
+        private final String textLabel;
+        private final ImageView graphicLabel;
+        private final Tool tool;
+        private final int duration;
+        private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
+        private final BooleanProperty active = new BooleanPropertyBase(false) {
+            public void invalidated() {
+                pseudoClassStateChanged(activeClass, get());
+            }
+
+            @Override
+            public Object getBean() {
+                return ToolbarButton.this;
+            }
+
+            @Contract(pure = true)
+            @Override
+            public @NotNull String getName() {
+                return "active";
+            }
+        };
+
+        ToolbarButton(String textLabel, int duration) {
+            this(textLabel, null, null, duration);
+        }
+
+        ToolbarButton(Tool tool) {
+            this(null, tool, tool.img, -1);
+        }
+
+        private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
+            if (textLabel == null && img == null) {
+                throw new IllegalArgumentException("textLabel and img were both null");
+            }
+            this.textLabel = textLabel;
+            this.tool = tool;
+            this.duration = duration;
+            setText(textLabel == null ? "" : textLabel);
+
+            if (img != null) {
+                // Load the image
+                graphicLabel = new ImageView(new Image(Objects.requireNonNull(ToolbarButton.class.getResourceAsStream(img))));
+
+                // 🔹 Set fixed size for toolbar icons
+                graphicLabel.setFitWidth(20); // Adjust icon width
+                graphicLabel.setFitHeight(20); // Adjust icon height
+                graphicLabel.setPreserveRatio(true); // Maintain aspect ratio
+
+                setGraphic(graphicLabel);
+            } else {
+                graphicLabel = new ImageView(new Image(Objects.requireNonNull(
+                        ToolbarButton.class.getResourceAsStream("/img/user.png")
+                )));
+            }
+
+            // 🔹 Ensure buttons do not take excessive space
+            setMinSize(30, 30);
+            setMaxSize(40, 40);
+
+            // 🔹 Set proper padding
+            setPadding(new Insets(5, 5, 5, 5));
+
+            textOverrunProperty().set(OverrunStyle.CLIP);
+            setEllipsisString("");
+            getStyleClass().add("candle-chart-toolbar-button");
+        }
+
+        public void setActive(boolean b) {
+            if (b) {
+                active.setValue(true);
+                setStyle("-fx-background-color: #aa227f");
+            } else {
+                active.setValue(false);
+                setStyle("");
+            }
+
+        }
+
     }
 }

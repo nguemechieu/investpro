@@ -21,8 +21,10 @@ public class TradeHistory {
 
         // Initialize trade history with some sample data (optional)
         // Example:
-        addTrade(new Trade(TradePair.of("BTC", "USD"), 10000, 0.01, Side.BUY, 1234567890L, Instant.now()));
-        addTrade(new Trade(TradePair.of("ETH", "USD"), 2000, 0.05, Side.SELL, 9876543210L, Instant.now().plusSeconds(3600)));
+
+
+        addTrade(new Trade(TradePair.of("BTC", "USD"), 0.5, 0.01, Side.BUY, 1234567890L, Instant.now()));
+        addTrade(new Trade(TradePair.of("ETH", "USD"), 0.04, 0.05, Side.SELL, 9876543210L, Instant.now().plusSeconds(3600)));
     }
 
     /**

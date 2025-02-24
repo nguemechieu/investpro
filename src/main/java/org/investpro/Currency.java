@@ -27,7 +27,7 @@ public abstract class Currency implements Comparable<Currency> {  // ✅ Remove 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "currency_id", nullable = false, updatable = false)
-    private long currencyId;  // Use wrapper class `Long` to handle null values
+    protected long currencyId;  // Use wrapper class `Long` to handle null values
 
     @Column(name = "code", nullable = false, unique = true)
     protected String code;
@@ -36,19 +36,19 @@ public abstract class Currency implements Comparable<Currency> {  // ✅ Remove 
     protected String currencyType;
 
     @Column(name = "full_display_name", nullable = false)
-    private String fullDisplayName;
+    protected String fullDisplayName;
 
     @Column(name = "image")
-    private String image;
+    protected String image;
 
     @Column(name = "short_display_name", nullable = false)
-    private String shortDisplayName;
+    protected String shortDisplayName;
 
     @Column(name = "symbol", nullable = false)
-    private String symbol;
+    protected String symbol;
 
     @Column(name = "fractional_digits", nullable = false)
-    private int fractionalDigits;
+    protected int fractionalDigits;
 
 
     // ✅ Default constructor required by JPA

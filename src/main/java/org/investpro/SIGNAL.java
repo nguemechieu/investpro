@@ -6,5 +6,13 @@ public enum SIGNAL {
     HOLD,
     CLOSE_SELL,
     CLOSE_BUY,
-    CLOSE_ALL
+    STRONG_BUY, STRONG_SELL, STOP_LOSS, CLOSE_ALL;
+
+    public boolean isLong() {
+        return this == STRONG_BUY;
+    }
+
+    public boolean isShort() {
+        return this == STRONG_SELL;
+    }
 }

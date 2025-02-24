@@ -28,7 +28,6 @@ module investpro {
     requires jakarta.persistence;
     requires com.github.dockerjava.transport.zerodep;
 
-    requires org.slf4j;
     requires com.github.dockerjava.api;
     requires static lombok;
     requires weka.stable;
@@ -38,6 +37,10 @@ module investpro {
     requires java.compiler;
     requires com.fasterxml.jackson.dataformat.csv;
     requires com.fasterxml.jackson.databind;
+    requires org.apache.pdfbox;
+    requires ch.qos.logback.classic;
+    requires org.slf4j;
+    requires java.management;
 
     opens org.investpro to
 

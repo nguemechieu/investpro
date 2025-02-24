@@ -267,7 +267,7 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt,
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
@@ -297,11 +297,19 @@ public class BinanceUS extends Exchange {
                             break;
                         } else {
                             List<Trade> tr = new ArrayList<>();
+
+                            Side side = Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY");
+                            OrderBook prices = new OrderBook();
+                            prices.getAskEntries().stream().toList().getLast().setPrice(trade.get("ask").get(0).asDouble());
+                            prices.getBidEntries().stream().toList().getLast().setSize(trade.get("qty").asLong());
+                            prices.getBidEntries().stream().toList().getLast().setPrice(trade.get("bid").get(0).asDouble());
+                            prices.getAskEntries().stream().toList().getLast().setSize(trade.get("qty").asLong());
+
                             Trade tradex = new Trade(
                                     tradePair,
 
-                                    trade.get("price").asDouble(), trade.get("qty").asLong(),
-                                    Side.getSide(trade.get("isBuyerMaker").asBoolean() ? "SELL" : "BUY"),
+                                    prices.getAskEntries().stream().findFirst().get().getPrice(), trade.get("qty").asLong(),
+                                    side,
                                     trade.get("id").asLong(),
                                     time
                             );
@@ -775,6 +783,21 @@ public class BinanceUS extends Exchange {
     @Override
     public List<Account> getAccountSummary() {
         return List.of();
+    }
+
+    @Override
+    public Set<Integer> getSupportedGranularity() {
+        return Set.of(
+                CandlestickInterval.ONE_MINUTE.getSeconds(),
+                CandlestickInterval.FIVE_MINUTES.getSeconds(),
+                CandlestickInterval.THIRTY_MINUTES.getSeconds(),
+                CandlestickInterval.ONE_HOUR.getSeconds(),
+                CandlestickInterval.FOUR_HOURS.getSeconds(),
+                CandlestickInterval.SIX_HOURS.getSeconds(),
+                CandlestickInterval.DAY.getSeconds(),
+                CandlestickInterval.WEEK.getSeconds(),
+                CandlestickInterval.MONTH.getSeconds()
+        );
     }
 
 
