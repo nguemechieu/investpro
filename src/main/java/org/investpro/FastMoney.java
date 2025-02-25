@@ -62,26 +62,28 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         return fromDouble(amount, precision, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 
-    public static @NotNull Money ofFiat(long amount, final String currencyCode) throws Exception {
-        Objects.requireNonNull(currencyCode, "currencyCode must not be null");
-        return ofFiat(amount, currencyCode, Objects.requireNonNull(Currency.of(currencyCode)).getFractionalDigits());
-    }
-
     @Contract("_, _, _ -> new")
-    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) throws Exception {
+    public static @NotNull Money ofFiat(long amount, final String currencyCode, int precision) {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         Currency currency = Currency.of(currencyCode);
         amount *= (long) Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
     }
 
-    public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) throws Exception {
-        return fromDouble(amount, precision, currencyCode, CurrencyType.FIAT);
+    public static @NotNull Money ofFiat(final double amount, final String currencyCode, int precision) {
+        Currency currency = Currency.of(currencyCode); // Ensure this returns a valid Currency object
+       if (currency == null){
+
+            throw new IllegalArgumentException("Invalid currency code: " + currencyCode);
+       }
+
+        return new FastMoney(amount, currency, precision);
     }
 
 
+
     @Contract("_, _, _ -> new")
-    public static @NotNull Money ofCrypto(double amount, final String currencyCode, int precision) throws Exception {
+    public static @NotNull Money ofCrypto(double amount, final String currencyCode, int precision) {
         Currency currency = Currency.of(currencyCode);
         amount *= Math.pow(10, precision);
         return new FastMoney(amount, currency, precision);
@@ -89,7 +91,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
 
 
     private static @NotNull Money fromDouble(final double value, final int precision, final String currencyCode,
-                                             final CurrencyType currencyType) throws Exception {
+                                             final CurrencyType currencyType) {
         Objects.requireNonNull(currencyCode, "currencyCode must not be null");
         Objects.requireNonNull(currencyType, "currencyType must not be null");
         Utils.checkPrecision(precision);
@@ -133,8 +135,8 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
         final BigDecimal cleaned = value.stripTrailingZeros();
         // try to convert to double using fixed precision = 3, which will cover most currencies
         // it is required to get rid of rounding issues
-        final double dbl = value.doubleValue();
-        final Money res = fromDoubleNoFallback(dbl, currency.getFractionalDigits(), currency);
+
+        final Money res = fromDoubleNoFallback(value.doubleValue(), currency.getFractionalDigits(), currency);
         if (res != null) {
             return res;
         }
@@ -290,7 +292,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public @NotNull Money multiply(double multiplicand) throws Exception {
+    public @NotNull Money multiply(double multiplicand) {
         return fromDouble(amount * multiplicand / Utils.MULTIPLIERS[precision], precision, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 
@@ -305,7 +307,7 @@ public final class FastMoney implements Money, Comparable<FastMoney> {
     }
 
     @Override
-    public @NotNull Money divide(double divisor) throws Exception {
+    public @NotNull Money divide(double divisor) {
         return fromDouble(amount / divisor / Utils.MULTIPLIERS[precision], precision, currency.getCode(), CurrencyType.valueOf(currency.getCurrencyType()));
     }
 

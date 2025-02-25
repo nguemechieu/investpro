@@ -39,8 +39,9 @@ module investpro {
     requires com.fasterxml.jackson.databind;
     requires org.apache.pdfbox;
     requires ch.qos.logback.classic;
-    requires org.slf4j;
     requires java.management;
+    requires com.fasterxml.uuid;
+    requires org.slf4j;
 
     opens org.investpro to
 

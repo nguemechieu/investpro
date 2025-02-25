@@ -12,10 +12,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Consumer;
 
 @Getter
 @Setter
@@ -147,6 +149,9 @@ public abstract class CustomWebSocketClient implements WebSocket.Listener {
     public abstract void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask);
 
 
+    public abstract void streamLiveTrades(TradePair tradePair, int secondPerCandle, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask);
+
+    public abstract void subscribe(TradePair tradePair, Consumer<List<Trade>> tradeConsumer) ;
 }
 
 

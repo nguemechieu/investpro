@@ -3,6 +3,7 @@ package org.investpro.exchanges;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.uuid.Generators;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
@@ -14,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -141,10 +143,9 @@ public  class Coinbase extends Exchange {
      * <p>
      * This method only needs to be implemented to support live syncing.
      *
-     * @return
      */
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle,
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
@@ -211,9 +212,16 @@ public  class Coinbase extends Exchange {
                                 prices.getBidEntries().stream().toList().getLast().setPrice(trade.get("bid").get(0).asDouble());
                                 prices.getAskEntries().stream().toList().getLast().setSize(trade.get("size").asLong());
 
-                                tradesBeforeStopTime.add(new Trade(tradePair, prices.getTradePair().getAsk(),
-                                        trade.get("size").asLong(),
-                                        Side.getSide(trade.get("side").asText()), trade.get("trade_id").asLong(), time));
+                                tradesBeforeStopTime.add(new Trade(
+                                        exchange,
+                                        tradePair,
+                                        trade.get("side").asText().equals("buy")? Side.BUY : Side.SELL,
+                                        ENUM_ORDER_TYPE.LIMIT,
+                                        BigDecimal.valueOf( trade.get("price").asDouble()),
+                                        BigDecimal.valueOf( trade.get("size").asDouble()),
+                                        time,
+                                        BigDecimal.valueOf(0),  BigDecimal.valueOf(0)
+                                ));
                             }
                         }
                     }
@@ -236,7 +244,6 @@ public  class Coinbase extends Exchange {
 
         DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
                 currentCandleStartedAt, ZoneOffset.UTC));
-        long idealGranularity = Math.max(10, secondsIntoCurrentCandle / 200);
         // Get the closest supported granularity to the ideal granularity.
         int actualGranularity = getSupportedGranularity(secondsPerCandle);
 
@@ -449,15 +456,6 @@ public  class Coinbase extends Exchange {
     public List<Position> getPositions() {
         return null;
     }
-    @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-
-        String urls= "%s://%s:%d".formatted(websocketURL, tradePair.toString('-'), 20);
-        message =
-                "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
-
-
-    }
 
 
     @Override
@@ -522,51 +520,26 @@ public  class Coinbase extends Exchange {
                 String code = rate.get("base_currency").asText();
                 int fractionalDigits = 8;
                 String symbol = rate.get("base_currency").asText();
-                baseCurrency = new Currency(CurrencyType.CRYPTO, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol) {
-                    /**
-                     */
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
+                UUID timeBasedUUID = Generators.timeBasedGenerator().generate(); // Generate UUID v1
 
-                    /**
-                     * @param o
-                     * @return
-                     */
-                    @Override
-                    public int compareTo(java.util.@NotNull Currency o) {
-                        return 0;
-                    }
-                };
+                baseCurrency = new Currency(CurrencyType.CRYPTO.name(), fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, symbol);
                 String fullDisplayName2 = rate.get("quote_currency").asText();
                 String shortDisplayName2 = rate.get("quote_currency").asText();
                 String code2 = rate.get("quote_currency").asText();
                 int fractionalDigits2 = 8;
                 String symbol2 = rate.get("quote_currency").asText();
 
-                counterCurrency = new Currency(CurrencyType.CRYPTO,
+                counterCurrency = new Currency(CurrencyType.CRYPTO.name(),
                         fullDisplayName2, shortDisplayName2, code2, fractionalDigits2, symbol2
-                        , symbol) {
+                        , symbol) ;
 
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
-
-
-                    @Override
-                    public int compareTo(java.util.@NotNull Currency o) {
-                        return 0;
-                    }
-                };
 
 
                 TradePair tp = new TradePair(
                         baseCurrency, counterCurrency
                 );
                 tradePairs.add(tp);
-                logger.info("coinbase trade pair: %s".formatted(tp));
+                logger.info("coinbase trade pair: {}",tp);
 
                 Currency.save(tp.getBaseCurrency());
                 Currency.save(tp.getCounterCurrency());
@@ -611,7 +584,7 @@ public  class Coinbase extends Exchange {
     }
 
     @Override
-    public CustomWebSocketClient getWebsocketClient() {
+    public CustomWebSocketClient getWebsocketClient(Exchange exchange,TradePair tradePair,int secondsPerCandle) {
         return null;
     }
 

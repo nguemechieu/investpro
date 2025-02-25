@@ -21,7 +21,7 @@ public class ZoomLevel {
 
     private final int candleWidth;
 
-    private final double xAxisRangeInSeconds;
+    private double xAxisRangeInSeconds;
     private final IntegerProperty numVisibleCandles;
     private final double secondsPerPixel;
     private final double pixelsPerSecond;
@@ -29,6 +29,7 @@ public class ZoomLevel {
     private final Map<Integer, Pair<Extrema, Extrema>> extremaForCandleRangeMap;
     private double minXValue;
     private double minYValue;
+    private int secondsPerCandle;
 
     ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
               final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
@@ -148,5 +149,23 @@ public class ZoomLevel {
         double newRange = newMaxYValue - newMinYValue;
         double newDuration = newRange / pixelsPerSecond * duration;
         return newDuration / duration;
+    }
+
+    public Map<Integer,? extends CandleData> createInitialData() {
+        Map<Integer, CandleData> initialData = new ConcurrentHashMap<>();
+        int numCandles = (int) (xAxisRangeInSeconds / secondsPerCandle);
+        for (int i = 0; i < numCandles; i++) {
+            initialData.put(i, CandleData.of(i * secondsPerCandle, 100 + Math.random() * 100,
+                    100 + Math.random() * 100, 100 + Math.random() * 100, 100 + Math.random() * 100,
+                    100 + Math.random() * 100));
+        }
+        return initialData;
+    }
+
+    TradePair pair;
+
+    public void setNumVisibleCandles(int i) {
+        numVisibleCandles.set(i);
+        xAxisRangeInSeconds = numVisibleCandles.doubleValue() * secondsPerCandle;
     }
 }

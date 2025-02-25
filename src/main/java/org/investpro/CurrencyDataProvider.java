@@ -1,5 +1,6 @@
 package org.investpro;
 
+import com.fasterxml.uuid.Generators;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -14,6 +15,7 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.UUID;
 
 import static org.investpro.exchanges.Coinbase.client;
 
@@ -29,10 +31,18 @@ public class CurrencyDataProvider {
     public CurrencyDataProvider() {
         logger.info("CryptoCurrencyDataProvider initialized.");
     }
+private static final Db1 db1=new Db1();
+    public static void save(@NotNull ArrayList<Currency> collect) {
+        for (Currency currency : collect) {
+            if (currency == null) continue;
 
-    public static void save(ArrayList<Currency> collect) {
-
+            if (db1.getCurrency(currency.getCode()) == null) {
+                db1.save(currency);
+                Currency.CURRENCIES.put(currency.currencyType, currency);
+            }
+        }
     }
+
 
 
     public void registerCurrencies() {
@@ -67,7 +77,7 @@ public class CurrencyDataProvider {
 
             if (jsonArray.isEmpty()) {
 
-                logger.error("Failed to parse JSON array." + jsonResponse);
+                logger.error("Failed to parse JSON array.{}", jsonResponse);
 
 
                 return; // Assuming the API returns an "image" field
@@ -76,14 +86,17 @@ public class CurrencyDataProvider {
 
             for (JsonElement coinElement : jsonArray) {
                 JsonObject coinJson = coinElement.getAsJsonObject();
-                String id = coinJson.get("id").getAsString();
-                String symbol = coinJson.get("symbol").getAsString().toUpperCase();
-                String name = coinJson.get("name").getAsString();
-                Double currentPrice = coinJson.get("current_price").getAsDouble();
-                String image = coinJson.get("image").getAsString();
-                long marketCap = coinJson.get("market_cap").getAsLong();
-                int marketCapRank = coinJson.get("market_cap_rank").getAsInt();
-                int fractional_digit = coinJson.get("current_price").getAsString().length() - 2;
+                String id = coinJson.has("id") ? coinJson.get("id").getAsString() : "UNKNOWN";
+                String symbol = coinJson.has("symbol") ? coinJson.get("symbol").getAsString().toUpperCase() : "UNK";
+                String name = coinJson.has("name") ? coinJson.get("name").getAsString() : "Unnamed";
+                double currentPrice = coinJson.has("current_price") ? coinJson.get("current_price").getAsDouble() : 0.0;
+                String image = coinJson.has("image") ? coinJson.get("image").getAsString() : "default.png";
+                long marketCap = coinJson.has("market_cap") ? coinJson.get("market_cap").getAsLong() : 0L;
+                int marketCapRank = coinJson.has("market_cap_rank") ? coinJson.get("market_cap_rank").getAsInt() : -1;
+
+
+                   int fractional_digit = (currentPrice == 0) ? 2 : String.valueOf(currentPrice).split("\\.")[1].length();
+
                 CoinInfo coinInfo = new CoinInfo();
 
                 coinInfo.setId(id);
@@ -98,26 +111,13 @@ public class CurrencyDataProvider {
 
                 logger.info("Added coin: {}", coinInfo);
 
+                UUID currencyId = Generators.timeBasedGenerator().generate(); // Generate UUID v1
 
-                Currency coin = new Currency(CurrencyType.CRYPTO, name, id, symbol, fractional_digit, symbol, image) {
-                    /**
-                     * @param o
-                     * @return
-                     */
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
+                CurrencyType type = (name.equalsIgnoreCase("Bitcoin") || name.equalsIgnoreCase("Ethereum")) ? CurrencyType.CRYPTO : CurrencyType.FIAT;
 
-                    /**
-                     * @param o
-                     * @return
-                     */
-                    @Override
-                    public int compareTo(java.util.@NotNull Currency o) {
-                        return 0;
-                    }
-                };
+                Currency coin = new Currency(type.name(), name, id, symbol, fractional_digit, symbol, image);
+
+
 
 
                 coinsToRegister.add(coin);
@@ -125,31 +125,20 @@ public class CurrencyDataProvider {
 
             }
             for (java.util.Currency currency : java.util.Currency.getAvailableCurrencies()) {
-                Currency coin = new Currency(CurrencyType.FIAT, currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 3, currency.getSymbol(), currency.getDisplayName()) {
-                    /**
-                     * @param o
-                     * @return
-                     */
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
 
-                    /**
-                     * @param o
-                     * @return
-                     */
-                    @Override
-                    public int compareTo(java.util.@NotNull Currency o) {
-                        return 0;
-                    }
-                };
+                // Generate UUID v1
+
+                Currency coin = new Currency(CurrencyType.FIAT.name(), currency.getDisplayName(), currency.getCurrencyCode(), currency.getCurrencyCode(), 3, currency.getSymbol(), currency.getDisplayName()) ;
+
+
+
+
                 coinsToRegister.add(coin);
 
 
             }
 
-            save(coinsToRegister);
+            db1.save(coinsToRegister.stream().toList().getFirst());
 
 
         } catch (IOException | InterruptedException e) {

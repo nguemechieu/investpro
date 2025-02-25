@@ -5,7 +5,8 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TelegramUser {
+public class
+TelegramUser {
     private long id;
     private String username;
 

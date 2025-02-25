@@ -13,7 +13,7 @@ import java.util.List;
 @Getter
 @Setter
 
-public class LiveTradesConsumer {
+public  class LiveTradesConsumer {
 
 
     protected static final Logger logger = LoggerFactory.getLogger(LiveTradesConsumer.class);
@@ -31,41 +31,10 @@ public class LiveTradesConsumer {
     public LiveTradesConsumer() {
     }
 
-    public void acceptTrades(@NotNull List<Trade> trades) {
-        // Handle incoming live trades
-        if (trades.isEmpty()) {
-            logger.warn("No trades received for processing.");
-            return;
-        }
 
-        // Add trade data to a queue or buffer
-        tradeQueue.addAll(trades); // You can use a concurrent queue if needed
-
-        logger.info("Received {} trades for processing.", trades.size());
-
-        // Process trade data
-        for (Trade trade : tradeQueue) {
-            if (isValidTrade(trade)) {
-                processTrade(trade);
-                logger.info("Processed trade: {}", trade);
-            } else {
-                logger.error("Invalid trade received: {}", trade);
-            }
-        }
-
-        // Calculate statistics, perform calculations, and update relevant data structures
-        updateTradeStatistics(tradeQueue);
-
-    }
-
-    // Helper method to validate a trade
-    private boolean isValidTrade(Trade trade) {
-        // Implement trade validation logic (e.g., check if trade has valid IDs, currency pair, amounts, etc.)
-        return (trade != null) && (trade.getTradePair() != null && trade.getAmount() > 0);
-    }
 
     // Process each trade
-    private void processTrade(@NotNull Trade trade) {
+    public void processTrade(@NotNull Trade trade) {
         // Implement the logic to process the trade (e.g., record the trade, update live market prices, etc.)
         logger.debug("Processing trade: {} with amount: {} and price: {}",
                 trade.getTradePair(), trade.getAmount(), trade.getPrice());
@@ -77,7 +46,7 @@ public class LiveTradesConsumer {
         updateMarketPrices(trade);
 
         // Step 3: Add trade to trade history
-        updateTradeHistory(trade);
+        //updateTradeHistory();
 
         // Step 4: Send notifications (if applicable)
         notifyUsers(trade);
@@ -97,16 +66,16 @@ public class LiveTradesConsumer {
         TradePair tradePair = trade.getTradePair();
 
         // Simulate updating bid and ask prices based on the trade
-        tradePair.setBid(trade.getPrice() - 0.01); // Example bid price adjustment
-        tradePair.setAsk(trade.getPrice() + 0.01); // Example ask price adjustment
+        tradePair.setBid(trade.getPrice().byteValueExact() - 0.01); // Example bid price adjustment
+        tradePair.setAsk(trade.getPrice().byteValueExact() + 0.01); // Example ask price adjustment
 
         logger.info("Updated market prices for pair: {} - Bid: {}, Ask: {}",
                 tradePair, tradePair.getBid(), tradePair.getAsk());
     }
 
     // Add the trade to the historical data for the trade pair
-    private void updateTradeHistory(@NotNull Trade trade) {
-        TradeHistory.addTrade(trade); // Assuming TradeHistory class exists
+    private void updateTradeHistory(List<CandleData> trade) {
+        TradeHistory.addTrade((Trade) trade); // Assuming TradeHistory class exists
         logger.info("Trade added to history: {}", trade);
     }
 
@@ -115,16 +84,17 @@ public class LiveTradesConsumer {
         // Example: Send a notification to subscribe users
         NotificationService.sendTradeNotification(trade); // Assuming NotificationService exists
         logger.info("Sent trade notification for: {}", trade);
+        // You can also notify systems about the trade using other communication channels (e.g., email, SMS, etc.)
     }
 
     // Update trade statistics based on the trade data
     private void updateTradeStatistics(@NotNull List<Trade> tradeQueue) {
         // Calculate statistics like volume, average trade price, etc.
         double totalVolume = tradeQueue.stream()
-                .mapToDouble(Trade::getAmount)
+                .mapToDouble(m->m.getAmount().doubleValue())
                 .sum();
         double avgPrice = tradeQueue.stream()
-                .mapToDouble(Trade::getPrice)
+                .mapToDouble(m->m.getAmount().doubleValue())
                 .average()
                 .orElse(0);
 
@@ -150,15 +120,8 @@ public class LiveTradesConsumer {
 
     }
 
-    public void add(Exchange exchange) {
 
-        this.exchange.add(exchange);
-    }
 
-    public @NotNull List<Trade> getLiveTrades() {
-
-        return livesTrades;// Placeholder for actual implementation
-    }
 
     public void accept(Trade liveTrade) {
         // Process live trade
@@ -180,5 +143,28 @@ public class LiveTradesConsumer {
             }
         }
         return trades;
+    }
+
+    public void accept(List<CandleData> candleData) {
+        // Implement the logic to process the candle data (e.g., update the in-progress candle, etc.)
+        logger.debug("Processing candle data: {}", candleData);
+
+        // Step 1: Update the in-progress candle based on the new candle data
+        updateInProgressCandle(candleData);
+
+        // Step 2: Add the candle data to the trade history
+        updateTradeHistory(candleData);
+
+        // Step 3: Send notifications (if applicable)
+        notifyUsers((Trade) candleData);
+
+        logger.info("Candle data processed successfully for pair: {}", candleData.getFirst());
+
+    }
+
+    private void updateInProgressCandle(@NotNull List<CandleData> candleData) {
+        // Implement the logic to update the in-progress candle based on the new candle data
+        // For simplicity, assume the in-progress candle is stored in a data structure
+        this.inProgressCandle = candleData.getLast().getSnapshot();
     }
 }

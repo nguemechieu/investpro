@@ -13,6 +13,8 @@ import java.util.List;
 @ToString
 @NoArgsConstructor
 public class PriceData {
+    private  double volume;
+    private  TradePair tradePair;
     private String instrument;
     private double price;
     private Instant timestamp;
@@ -26,6 +28,19 @@ public class PriceData {
         this.bid = bid;
         this.ask = ask;
         this.timestamp = time;
+    }
+
+    public PriceData(TradePair tradePair, double lastPrice, double bidPrice, double askPrice, double volume, long l) {
+        this.tradePair = tradePair;
+        this.price = lastPrice;
+        this.bid = bidPrice;
+        this.ask = askPrice;
+        this.volume = volume;
+        this.timestamp = Instant.ofEpochSecond(l);
+    }
+
+    public void add(PriceData priceData) {
+        this.prices.add(priceData.prices.getFirst());
     }
 
     @Setter

@@ -1,137 +1,386 @@
 package org.investpro;
 
-
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 /**
- * A Trade represents a completed order (then called a trade), which is a transaction where one
- * party buys and the other one sells some amount of currency at a fixed price.
- *
- * @author Noel Nguemechieu
+ * Represents a completed trade transaction where one party buys and the other sells an asset at a fixed price.
+ * This class stores trade metadata including price, quantity, timestamps, and order details.
+ * Author: Noel Nguemechieu
  */
+
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode
 public class Trade {
+    public void createOrder(TradePair tradePair, BigDecimal price,
+                            BigDecimal amount,Side side, ENUM_ORDER_TYPE orderType, Instant instant, BigDecimal stopLoss, BigDecimal takeProfit, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer) {
+        // Implement logic to create the order and update the trade consumer with the new trade
+        // Example:
+         Trade newTrade = Trade.builder()
+            .account(account)
+            .side(side)
+            .orderType(orderType)
+            .tradePair(tradePair)
+            .exchange(exchange)
+            .price(price)
+            .amount(amount)
+            .timestamp(instant)
+            .stopLoss(stopLoss)
+            .takeProfit(takeProfit)
+            .build();
+        tradeConsumer.accept(new ArrayList<>(Collections.singletonList(newTrade)));
+        // Add the new trade to the trade history
+        tradeHistory.getAllTrades().add(newTrade);
 
 
-    private Side side;
-    private ENUM_ORDER_TYPE order_type;
-    private List<Double> prices;
-    TradePair tradePair;
-    Exchange exchange;
+        try {
+            exchange.createOrder(
+                    tradePair,
+                    side,orderType,price.byteValueExact(),amount.byteValueExact(), Date.from(timestamp),stopLoss.byteValueExact(),takeProfit.byteValueExact()
+
+          );
+        } catch (IOException | InterruptedException | NoSuchAlgorithmException | ExecutionException |
+                 InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    enum ACTIVITY_DATE{ DAILY, WEEKLY, MONTHLY}
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "local_trade_id", nullable = false)
-     long localTradeId;
-    Money fee;
-
+    @Column(name = "local_trade_id", updatable = false, nullable = false)
+    private long localTradeId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
-    List<Trade> tradeList = new ArrayList<>();
-    private double price;
 
-    private double amount;
+    @Enumerated(EnumType.STRING)
+    private Side side;
 
+    @Enumerated(EnumType.STRING)
+    private ENUM_ORDER_TYPE orderType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trade_pair_id", nullable = false)
+    private TradePair tradePair;
+
+    private Exchange exchange;
+
+    @Column(name = "price", nullable = false, precision = 18, scale = 8)
+    private BigDecimal price;
+
+    @Column(name = "amount", nullable = false, precision = 18, scale = 8)
+    private BigDecimal amount;
 
     @Column(name = "timestamp", nullable = false)
     private Instant timestamp;
 
+    @Column(name = "stop_loss", precision = 18, scale = 8)
+    private BigDecimal stopLoss;
 
-    // Constructors, getters, and other methods...
-    private double stopLoss;
-    private double takeProfit;
+    @Column(name = "take_profit", precision = 18, scale = 8)
+    private BigDecimal takeProfit;
 
-    public Trade(Exchange exchange, TradePair tradePair, double price, double amount, Side transactionType,
-                 long localTradeId, Instant timestamp, Money fee) {
+    @Column(name = "fee", precision = 18, scale = 8)
+    private BigDecimal fee;
+
+    @Enumerated(EnumType.STRING)
+    private SIGNAL signal;
+
+    private static final Logger logger = LoggerFactory.getLogger(Trade.class);
+
+    private static TradeHistory tradeHistory;
+
+    static {
+        try {
+            tradeHistory = new TradeHistory();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<PriceData> prices;
+    private double openPrice;
+    private double closePrice;
+    private double highPrice;
+    private double lowPrice;
+    private double currentPrice;
+    private double volume;
+    private boolean isClosed;
+    private long tradeId;
+    private int openTime;
+    private int closeTime;
+
+    // 🔹 Constructor for real-time trade data
+    public Trade(TradePair tradePair, BigDecimal price, BigDecimal amount, Side side, Instant timestamp) {
+        this.tradeId = Instant.now().toEpochMilli();
         this.tradePair = tradePair;
         this.price = price;
         this.amount = amount;
-        this.side = transactionType;
-        this.localTradeId = localTradeId;
+        this.side = side;
         this.timestamp = timestamp;
-        this.fee = fee;
+        this.highPrice = price.doubleValue();
+        this.lowPrice = price.doubleValue();
+
+        logger.info("New Trade Created: {}", this);
+        tradeHistory.getAllTrades().add(this);
+
+        // Start tracking high/low price
+        startPriceTracking();
+
+    }
+
+    // 🔹 Constructor for executed trades with additional details
+    public Trade(@NotNull Exchange exchange, TradePair tradePair, Side side, ENUM_ORDER_TYPE orderType, BigDecimal price,
+                 BigDecimal amount, Instant timestamp, BigDecimal stopLoss, BigDecimal takeProfit) {
+
+        this.tradeId = Instant.now().toEpochMilli();
         this.exchange = exchange;
-    }
-    SIGNAL signal;
-
-
-    public Trade(TradePair tradePair, double price, double size, Side side, long tradeId, Instant time) {
         this.tradePair = tradePair;
-        this.price = price;
-        this.amount = size;
         this.side = side;
-        this.localTradeId = tradeId;
-        this.timestamp = time;
-    }
-    public Trade(Double price, double qty, Instant time) throws Exception {
-        this.price = price;
-        this.amount = qty;
-        this.timestamp = time;
-    }
-
-    public Trade(Exchange exchange, TradePair tradePair, Side side, ENUM_ORDER_TYPE enumOrderType, double price, double amount, @NotNull Date timestamp, double stopLoss, double takeProfit) {
-        this.tradePair = tradePair;
+        this.orderType = orderType;
         this.price = price;
         this.amount = amount;
-        this.side = side;
-        this.timestamp = timestamp.toInstant();
-        this.order_type = enumOrderType;
+        this.timestamp = timestamp;
         this.stopLoss = stopLoss;
         this.takeProfit = takeProfit;
-        this.exchange = exchange;
+        this.highPrice = price.doubleValue();
+        this.lowPrice = price.doubleValue();
+
+        tradeHistory.put(this);
+        logger.info("New Trade Created: {}", this);
+
+        // Start tracking high/low price
+        startPriceTracking();
+    }
+    private final ScheduledExecutorService priceTrackerExecutor = Executors.newScheduledThreadPool(1);
+
+
+    /**
+     * 📊 **Efficiently tracks the high & low price while trade is open (without busy-waiting)**.
+     */
+
+    private  double getBalance() {
+
+        return exchange.getAccountSummary().getLast().getBalance();
+    }
+    /**
+     * 🚀 **Closes the trade and stops price tracking**.
+     */
+    public void closeOrder(int tradeId) {
+        this.isClosed = true;
+        this.closeTime = (int) System.currentTimeMillis();
+        this.closePrice = currentPrice; // Store final closing price
+        logger.info("Trade Closed: {}", this);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                exchange.cancelOrder(String.valueOf(tradeId));
+                tradeHistory.getTrade(tradeId).setStatus("Closed");
+            } catch (IOException | InterruptedException | NoSuchAlgorithmException | InvalidKeyException e) {
+                logger.error("Error closing trade {}: {}", tradeId, e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * 🚀 **Cancels all active orders**.
+     */
+    void closeAllOrders() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                exchange.cancelAllOrders();
+            } catch (InvalidKeyException | NoSuchAlgorithmException | IOException e) {
+                logger.error("Error closing all orders: {}", e.getMessage());
+            }
+        });
+        tradeHistory.getTrade(tradeId).setStatus("closed");
+
+
+    }
+String status;
+    /**
+     * 🛒 **Creates a new order and subscribes to live trade data**.
+     */
+    public void createOrder(TradePair tradePair, BigDecimal price, BigDecimal amount, Side side, Instant timestamp,
+                            ENUM_ORDER_TYPE orderType, int secondsPerCandles, Consumer<List<Trade>> tradeConsumer) {
+
+        CustomWebSocketClient websocketClient = exchange.getWebsocketClient(exchange,tradePair, secondsPerCandles);
+        websocketClient.subscribe(tradePair, tradeConsumer);
+
+        TradeOrder tradeOrder = new TradeOrder(exchange, tradePair, side, orderType, price, amount, timestamp);
+        tradeOrder.createOrder();
+        openTime = (int) Instant.now().toEpochMilli();
+        tradeHistory.getTrade(tradeId).setStatus("Created");
+
+
+    }
+
+    /**
+     * 📈 **Updates the trade's current price**.
+     */
+    public void updateTradePrice(double currentPrice) {
+        this.currentPrice = currentPrice;
     }
 
 
-    public Trade(TradePair tradePair, double price, double size, Side side, Instant timestamp) {
-        this.tradePair = tradePair;
-        this.price = price;
-        this.amount = size;
-        this.timestamp = timestamp;
-        this.side = side;
 
-    }
 
-    @Override
-    public boolean equals(Object object) {
-        if (object == this) {
-            return true;
+
+
+
+
+
+
+
+
+
+
+
+
+
+              private final ScheduledExecutorService reportExecutor = Executors.newScheduledThreadPool(1);
+
+
+        private BigDecimal profitLoss;
+        private final List<TradeActivity> tradeActivities = new ArrayList<>();
+        private ACTIVITY_DATE reportFrequency;  // "DAILY", "WEEKLY", "MONTHLY"
+
+        public Trade(Exchange exchange, TradePair tradePair, double initialPrice, ACTIVITY_DATE reportFrequency) {
+            this.exchange = exchange;
+            this.tradePair = tradePair;
+            this.highPrice = initialPrice;
+            this.lowPrice = initialPrice;
+            this.reportFrequency = reportFrequency;
+
+            // Start tracking price and activities
+            startPriceTracking();
+            startReportScheduler();
         }
 
-        if (object == null || object.getClass() != this.getClass()) {
-            return false;
+        /**
+         * 📊 **Tracks high/low prices and trade activities while trade is open.**
+         */
+        private void startPriceTracking() {
+            priceTrackerExecutor.scheduleAtFixedRate(() -> {
+                if (isClosed) {
+                    logger.info("✅ Stopping price tracking for Trade: {}", tradePair);
+                    priceTrackerExecutor.shutdown();
+                    return;
+                }
+
+                try {
+                    double latestPrice = exchange.fetchLivesBidAsk(tradePair);
+
+                    if (latestPrice > highPrice) highPrice = latestPrice;
+                    if (latestPrice < lowPrice) lowPrice = latestPrice;
+
+                    currentPrice = latestPrice;
+                    profitLoss = calculateProfitLoss();
+
+                    // Record the trade activity
+                    tradeActivities.add(new TradeActivity(Instant.now(), currentPrice, highPrice, lowPrice, profitLoss));
+
+                    logger.info("🔹 Trade {} | High: {} | Low: {} | Current: {} | P/L: {}",
+                            tradePair, highPrice, lowPrice, currentPrice, profitLoss);
+
+                } catch (Exception e) {
+                    logger.error("Error tracking price for trade {}: {}", tradePair, e.getMessage());
+                }
+            }, 0, 1, TimeUnit.SECONDS); // Executes every 1 second
         }
 
-        Trade other = (Trade) object;
+        /**
+         * 📆 **Schedules report generation based on user setting (daily, weekly, monthly).**
+         */
+        private void startReportScheduler() {
+            long delay = switch (reportFrequency) {
+                case DAILY-> 1;
+                case WEEKLY -> 7;
+                case MONTHLY -> 30;
+                // Default to daily
+            };
 
-        return Objects.equals(tradePair, other.tradePair)
-                && Objects.equals(price, other.price)
-                && Objects.equals(amount, other.amount)
-                && side == other.side
-                && localTradeId == other.localTradeId
-                && Objects.equals(timestamp, other.timestamp)
-                && Objects.equals(stopLoss, other.stopLoss)
-                && Objects.equals(takeProfit, other.takeProfit);
+            reportExecutor.scheduleAtFixedRate(this::generateReport, delay, delay, TimeUnit.DAYS);
+        }
+
+        /**
+         * 📝 **Generates a trade report and saves it to a file.**
+         */
+        public void generateReport() {
+            if (tradeActivities.isEmpty()) {
+                logger.warn("📉 No trade activities recorded for report generation.");
+                return;
+            }
+
+            String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String fileName = "TradeReport_" + tradePair + "_" + reportFrequency + "_" + date + ".csv";
+
+            try (FileWriter writer = new FileWriter(fileName)) {
+                writer.append("Timestamp,Current Price,High Price,Low Price,Profit/Loss\n");
+
+                for (TradeActivity activity : tradeActivities) {
+                    writer.append(String.format("%s,%.2f,%.2f,%.2f,%.2f\n",
+                            activity.timestamp, activity.currentPrice, activity.highPrice, activity.lowPrice, activity.profitLoss));
+                }
+
+                logger.info("✅ Trade report generated: {}", fileName);
+            } catch (IOException e) {
+                logger.error("❌ Error writing trade report: {}", e.getMessage());
+            }
+
+            // Clear trade activity logs after saving report
+            tradeActivities.clear();
+        }
+
+        /**
+         * 💰 **Calculates profit/loss based on trade execution price.**
+         */
+        @Contract(" -> new")
+        private @NotNull BigDecimal calculateProfitLoss() {
+            return BigDecimal.valueOf(currentPrice - highPrice + lowPrice);
+        }
+
+        /**
+         * 🚀 **Closes the trade and stops tracking.**
+         */
+        public void closeOrder() {
+            this.isClosed = true;
+            logger.info("🚨 Trade Closed: {}", this);
+            priceTrackerExecutor.shutdown();
+            reportExecutor.shutdown();
+        }
+
+    /**
+     * 📊 **Trade Activity Tracker (For Reporting).**
+     */
+    private record TradeActivity(Instant timestamp, double currentPrice, double highPrice, double lowPrice,
+                                 BigDecimal profitLoss) {
     }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(tradePair, price, amount, side, localTradeId, timestamp);
-    }
-
 
 }

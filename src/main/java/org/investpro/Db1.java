@@ -1,8 +1,6 @@
 package org.investpro;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
-import jakarta.persistence.Persistence;
+import jakarta.persistence.*;
 import jakarta.transaction.Transactional;
 import lombok.Getter;
 import lombok.Setter;
@@ -66,7 +64,7 @@ public class Db1 implements Db {
             hibernateProps.setProperty("jakarta.persistence.jdbc.password", PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
             hibernateProps.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
 
-            entityManagerFactory = Persistence.createEntityManagerFactory("User", hibernateProps);
+            entityManagerFactory = Persistence.createEntityManagerFactory("users", hibernateProps);
         }
         return entityManagerFactory;
     }
@@ -119,17 +117,18 @@ public class Db1 implements Db {
     @Override
     public void createTables() {
         String sql = """
-                CREATE TABLE IF NOT EXISTS currencies (
-                    id VARCHAR(36) PRIMARY KEY,
-                    currency_type VARCHAR(255),
-                    code VARCHAR(255) UNIQUE,
-                    full_display_name VARCHAR(255),
-                    short_display_name VARCHAR(255),
-                    fractional_digits INTEGER,
-                    symbol VARCHAR(255),
-                    image VARCHAR(255)
-                );
-                """;
+        CREATE TABLE IF NOT EXISTS currencies (
+            currency_id VARCHAR(36) PRIMARY KEY,
+            code VARCHAR(10) NOT NULL UNIQUE,
+            currency_type VARCHAR(20) NOT NULL,
+            fractional_digits INT NOT NULL,
+            full_display_name VARCHAR(100) NOT NULL,
+            image VARCHAR(255),
+            short_display_name VARCHAR(50) NOT NULL,
+            symbol VARCHAR(10) NOT NULL
+        );
+    """;
+
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(sql);
             logger.info("✅ Table 'currencies' created or already exists.");
@@ -138,86 +137,114 @@ public class Db1 implements Db {
         }
     }
 
+
     @Override
     public void dropTables() {
+        String sql = "DROP TABLE IF EXISTS currencies";
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+            logger.info("�� Table 'currencies' dropped successfully.");
+        } catch (SQLException e) {
+            logger.error("�� Error dropping table: {}", e.getMessage(), e);
+        }
 
     }
 
     @Override
     public void truncateTables() {
+        String sql = "TRUNCATE TABLE currencies";
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+            logger.info("�� Table 'currencies' truncated successfully.");
+        } catch (SQLException e) {
+            logger.error("�� Error truncating table: {}", e.getMessage(), e);
+        }
 
     }
 
     @Override
     public void insertData() {
 
+
     }
 
     @Override
     public void updateData() {
 
-    }
 
+    }
     /**
      * **Save Currency Data**
      */
-    @Override
     @Transactional
-    public void save(Currency currency) {
+    public void save(@NotNull Currency currency) {
+        if (currency.code == null || currency.code.equals("XXX")) {
+            logger.info("currency code is null or invalid");
+            return;
+        }
+
+        EntityManager em = entityManagerFactory.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+
         try {
-            entityManager.getTransaction().begin();
-            entityManager.merge(currency);
-            entityManager.getTransaction().commit();
-            logger.info("✅ Currency data saved successfully.");
+            em.setFlushMode(FlushModeType.AUTO);
+            tx.begin();
+
+            // Check if the currency exists to prevent duplicate entries
+            Currency existingCurrency = em.find(Currency.class, currency.getCode());
+            if (existingCurrency != null) {
+                logger.info("Currency {} already exists. Updating instead of inserting.", currency.getCode());
+                em.merge(currency);
+            } else {
+                logger.info("Saving new currency {}", currency.getCode());
+                em.persist(currency);
+            }
+
+            tx.commit();
+            logger.info("✅ Currency {} saved successfully.", currency.getCode());
+
         } catch (Exception e) {
-            entityManager.getTransaction().rollback();
-            logger.error("❌ Transaction failed: ", e);
-            throw new RuntimeException(e);
+            if (tx.isActive()) {
+                tx.rollback();  // Only rollback if the transaction is still active
+            }
+            logger.error("❌ Transaction failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Database transaction failed for currency: " + currency.getCode(), e);
+        } finally {
+            if (em.isOpen()) {
+                em.close();  // Ensure entity manager is closed properly
+            }
         }
     }
 
-    /**
-     * **Retrieve Currency by Code**
-     */
-    @Override
+
+
     public Currency getCurrency(String code) {
-        String sql = "SELECT * FROM currencies WHERE code = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, code);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return new Currency(
-                        CurrencyType.valueOf(rs.getString("currency_type")),
-                        rs.getString("full_display_name"),
-                        rs.getString("short_display_name"),
-                        rs.getString("code"),
-                        rs.getInt("fractional_digits"),
-                        rs.getString("symbol"),
-                        rs.getString("image")
-                ) {
-                    @Override
-                    public int compareTo(@NotNull Currency o) {
-                        return 0;
-                    }
-
-                    @Override
-                    public int compareTo(java.util.@NotNull Currency o) {
-                        return 0;
-                    }
-                };
-            } else {
-                logger.warn("⚠ Currency with code '{}' not found in database.", code);
-                return null;
-            }
-        } catch (SQLException e) {
-            logger.error("❌ Error retrieving currency '{}': {}", code, e.getMessage(), e);
+        try {
+            return entityManager.find(Currency.class, code);
+        } catch (Exception e) {
+            logger.error("Currency not found: {}", code, e);
             return null;
         }
     }
 
+    @Override
+    public void save(CandleData candle) {
+        EntityManager em = entityManagerFactory.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+
+        try {
+            tx.begin();
+            em.setFlushMode(FlushModeType.AUTO);
+            em.persist(candle);
+            tx.commit();
 
 
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+
+    }
 
 
     /**
@@ -240,41 +267,48 @@ public class Db1 implements Db {
 
     @Override
     public String getDbName() {
-        return "";
+        return dbName;
     }
-
+    String dbName;
     @Override
     public void setDbName(String dbName) {
+        this.dbName = dbName;
+
 
     }
 
     @Override
     public String getUserName() {
-        return "";
+        return username;
     }
 
     @Override
     public void setUserName(String userName) {
+        this.username = userName;
 
     }
-
+    String password;
+    String username;
     @Override
     public String getPassword() {
-        return "";
+        return password;
     }
 
     @Override
     public void setPassword(String password) {
+        this.password = password;
 
     }
 
+    String url;
     @Override
     public String getUrl() {
-        return "";
+        return url;
     }
 
     @Override
     public void setUrl(String url) {
+        this.url = url;
 
     }
 
@@ -305,72 +339,147 @@ public class Db1 implements Db {
 
     @Override
     public int find(String table, String column, String value) {
-        return 0;
+
+        String sql = "SELECT COUNT(*) FROM " + table + " WHERE " + column + " =?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            } else {
+                logger.warn("��� No data found in table '{}' for column '{}' with value '{}'.", table, column, value);
+                return 0;
+            }
+        }
+        catch (SQLException e) {
+            logger.error("�� Error finding data: {}", e.getMessage(), e);
+            return 0;
+        }
     }
 
     @Override
     public void findAll(String table, String column, String value) {
+        String sql = "SELECT * FROM " + table + " WHERE " + column + " =?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                logger.info("Found: {}", rs.getString(column));
+            }
+        } catch (SQLException e) {
+            logger.error("�� Error finding data: {}", e.getMessage(), e);
+        }
 
     }
 
     @Override
     public void update(String table, String column, String value) {
+        String sql = "UPDATE " + table + " SET " + column + " =?" + " WHERE " + column + " =?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            stmt.setString(2, value);
+            stmt.executeUpdate();
+            logger.info("�� Data updated successfully.");
+        } catch (SQLException e) {
+            logger.error("�� Error updating data: {}", e.getMessage(), e);
+        }
 
     }
 
     @Override
     public void insert(String table, String column, String value) {
+        String sql = "INSERT INTO " + table + "(" + column + ") VALUES(?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            stmt.executeUpdate();
+            logger.info("�� Data inserted successfully.");
+        } catch (SQLException e) {
+            logger.error("�� Error inserting data: {}", e.getMessage(), e);
+        }
 
     }
 
     @Override
     public void delete(String table, String column, String value) {
+        String sql = "DELETE FROM " + table + " WHERE " + column + " =?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            stmt.executeUpdate();
+            logger.info("�� Data deleted successfully.");
+        } catch (SQLException e) {
+            logger.error("�� Error deleting data: {}", e.getMessage(), e);
+        }
 
     }
 
     @Override
     public void create(String table, String column, String value) {
+        String sql = "INSERT INTO " + table + "(" + column + ") VALUES(?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            stmt.executeUpdate();
+            logger.info("�� Data inserted successfully.");
+        } catch (SQLException e) {
+            logger.error("�� Error inserting data: {}", e.getMessage(), e);
+        }
 
 
     }
 
     @Override
     public void findById(String table, String column, String value) {
+        String sql = "SELECT * FROM " + table + " WHERE " + column + " =?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, value);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                logger.info("Found: {}", rs.getString(column));
+            } else {
+                logger.warn("��� No data found in table '{}' for column '{}' with value '{}'.", table, column, value);
+            }
+        } catch (SQLException e) {
+            logger.error("�� Error finding data: {}", e.getMessage(), e);
+        }
 
 
     }
 
     @Override
     public Connection getConnection() throws SQLException {
-        return
-                DriverManager.getConnection(getJdbcUrl());
+        return DriverManager.getConnection(getJdbcUrl());
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-        return
-                DriverManager.getConnection(getJdbcUrl(), username, password);
+        return DriverManager.getConnection(getJdbcUrl(), username, password);
     }
 
     @Override
-    public PrintWriter getLogWriter() throws SQLException {
-        return null;
+    public PrintWriter getLogWriter() {
+        return printWriter;
+    }
+    PrintWriter printWriter;
+    @Override
+    public void setLogWriter(PrintWriter out) {
+        this.printWriter=out;
+
+
+
+    }
+    int loginTimeout;
+    @Override
+    public void setLoginTimeout(int seconds) {
+        this.loginTimeout=seconds;
+
+
     }
 
     @Override
-    public void setLogWriter(PrintWriter out) throws SQLException {
-
-    }
-
-    @Override
-    public void setLoginTimeout(int seconds) throws SQLException {
-        throw new UnsupportedOperationException();
-
-    }
-
-    @Override
-    public int getLoginTimeout() throws SQLException {
-        return 0;
+    public int getLoginTimeout() {
+        return loginTimeout;
     }
 
     @Override
@@ -379,8 +488,9 @@ public class Db1 implements Db {
     }
 
     @Override
-    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
+    public java.util.logging.Logger getParentLogger() {
         return null;
+
     }
 
     @Override

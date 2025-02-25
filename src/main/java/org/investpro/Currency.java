@@ -10,104 +10,103 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.investpro.ui.TradingWindow.db1;
-
-
 @Getter
 @Setter
 @Entity
-
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)  // or
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @Table(name = "currencies")
-public abstract class Currency implements Comparable<Currency> {  // ✅ Remove "abstract"
+public   class Currency implements Comparable<Currency> {
     static final ConcurrentHashMap<String, Currency> CURRENCIES = new ConcurrentHashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(Currency.class);
 
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "currency_id", nullable = false, updatable = false)
-    protected long currencyId;  // Use wrapper class `Long` to handle null values
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "currency_id")
+    protected int currencyId;
 
-    @Column(name = "code", nullable = false, unique = true)
+    @Column(name = "code")
     protected String code;
 
-    @Column(name = "currency_type", nullable = false)
+    @Column(name = "currency_type")
     protected String currencyType;
 
-    @Column(name = "full_display_name", nullable = false)
+    @Column(name = "full_display_name")
     protected String fullDisplayName;
 
     @Column(name = "image")
     protected String image;
 
-    @Column(name = "short_display_name", nullable = false)
+    @Column(name = "short_display_name")
     protected String shortDisplayName;
 
-    @Column(name = "symbol", nullable = false)
+    @Column(name = "symbol")
     protected String symbol;
 
-    @Column(name = "fractional_digits", nullable = false)
+    @Column(name = "fractional_digits")
     protected int fractionalDigits;
 
 
-    // ✅ Default constructor required by JPA
+
     public Currency() {
+        this.fullDisplayName = "XXX";
+        this.shortDisplayName = "XXX";
+        this.code = "XXX";
+        this.currencyType = CurrencyType.UNKNOWN.name();
+        this.fractionalDigits = 0;
+        this.symbol = "XXX";
+        this.image = "default.png";
+        CURRENCIES.put(code, this);
     }
 
-    // ✅ Parameterized constructor
-    public Currency(@NotNull CurrencyType currencyType, String fullDisplayName, String shortDisplayName,
-                    String code, int fractionalDigits, String symbol, String image) {
-        this.currencyType = currencyType.name();
+    public Currency(String currencyType, String fullDisplayName, String shortDisplayName, String code, int fractionalDigits, String symbol, String image) {
+
+        this.currencyType = currencyType;
         this.fullDisplayName = Objects.requireNonNull(fullDisplayName, "fullDisplayName must not be null");
         this.shortDisplayName = Objects.requireNonNull(shortDisplayName, "shortDisplayName must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.fractionalDigits = Math.max(0, fractionalDigits);
         this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.image = image;
-
-        logger.info("✅ Currency registered: {}", this);
     }
 
     public static void save(Currency currency) {
 
 
+        if (currency == null) {
+            currency = new Currency();
+            CURRENCIES.put(currency.getCode(), currency);
+
+            return;
+
+        }
         CURRENCIES.put(currency.getCode(), currency);
-        //db1.save(currency);
-
 
     }
-
-    public static Currency of(@NotNull String baseCurrencyCode) {
-
-
-        // Return if already cached
-        if (CURRENCIES.containsKey(baseCurrencyCode)) {
-            return CURRENCIES.get(baseCurrencyCode);
-        }
-
-        // Fetch from DB if not in cache
-        Currency cur = db1.getCurrency(baseCurrencyCode);
-        if (cur != null) {
-            CURRENCIES.put(baseCurrencyCode, cur);
-            return cur;
-        }
+    public static @NotNull Currency of(@NotNull String baseCurrencyCode) {
 
 
-        // Return a fallback empty Currency object
-        return new Currency() {
-            @Override
-            public int compareTo(java.util.@NotNull Currency o) {
-                return 0;
+
+            for (java.util.Currency currency:java.util.Currency.getAvailableCurrencies()) {
+                if (!baseCurrencyCode.equals("XXX") && currency.getCurrencyCode().equals(baseCurrencyCode)) {
+                    Currency cur = new Currency("FIAT", baseCurrencyCode, baseCurrencyCode, baseCurrencyCode, 4, baseCurrencyCode, baseCurrencyCode);
+
+                    CURRENCIES.put(cur.currencyType, cur);
+
+                }
             }
-        };
-    }
 
+            Currency cur = new Currency("FIAT", baseCurrencyCode, baseCurrencyCode, baseCurrencyCode, 4, baseCurrencyCode, baseCurrencyCode);
+
+            CURRENCIES.put(cur.currencyType, cur);
+            return cur;
+
+
+    }
 
     @Override
     public String toString() {
         return "Currency{" +
-                "currencyId=" + currencyId +
+
                 ", code='" + code + '\'' +
                 ", currencyType='" + currencyType + '\'' +
                 ", fullDisplayName='" + fullDisplayName + '\'' +
@@ -136,5 +135,5 @@ public abstract class Currency implements Comparable<Currency> {  // ✅ Remove 
         return this.code.compareTo(o.code);
     }
 
-    public abstract int compareTo(java.util.@NotNull Currency o);
+
 }

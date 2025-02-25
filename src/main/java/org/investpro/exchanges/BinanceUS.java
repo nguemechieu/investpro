@@ -14,6 +14,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.Currency;
 import org.investpro.*;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -21,10 +23,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -32,7 +37,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
@@ -62,6 +67,7 @@ public class BinanceUS extends Exchange {
 
 
     private TradePair tradePair;
+
 
     public BinanceUS(String apikey, String apiSecret) {
         super(apikey, apiSecret);
@@ -267,7 +273,7 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle,
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
@@ -305,13 +311,14 @@ public class BinanceUS extends Exchange {
                             prices.getBidEntries().stream().toList().getLast().setPrice(trade.get("bid").get(0).asDouble());
                             prices.getAskEntries().stream().toList().getLast().setSize(trade.get("qty").asLong());
 
-                            Trade tradex = new Trade(
+                            Trade tradex = new Trade(exchange,
                                     tradePair,
-
-                                    prices.getAskEntries().stream().findFirst().get().getPrice(), trade.get("qty").asLong(),
                                     side,
-                                    trade.get("id").asLong(),
-                                    time
+                                    ENUM_ORDER_TYPE.LIMIT,
+                                    BigDecimal.valueOf( trade.get("price").asDouble()),
+                                    BigDecimal.valueOf( trade.get("qty").asDouble()),
+                                    time,
+                                    BigDecimal.valueOf(0),  BigDecimal.valueOf(0)
                             );
                             tr.add(tradex);
                             trades.accept(tr);
@@ -618,46 +625,82 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-
-        // WebSocket connection and handling for live trade streams
-        String url = "wss://stream.binance.us:9443/ws/%s@trade".formatted(tradePair.toString('/'));
-        String message = "{\"method\": \"SUBSCRIBE\",\"params\": [\"%s@trade\"],\"id\": 1}".formatted(tradePair.toString('-'));
-        CompletableFuture<String> res = null;
-        res.thenAccept(msg -> {
-            try {
-
-                LiveTrade liveTrade = OBJECT_MAPPER.readValue(msg, LiveTrade.class);
-                liveTradesConsumer.accept(liveTrade.getTrade());
-            } catch (JsonProcessingException e) {
-                logger.error("Error parsing JSON: %s".formatted(e.getMessage()));
-                new Messages(Alert.AlertType.ERROR, e.getMessage());
-                throw new IllegalStateException(
-                        "Error parsing JSON: %s".formatted(e.getMessage())
-                );
-            }
-        });
-    }
-
-    @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
-        // No WebSocket connection to stop live trade streams
-        // Implement WebSocket connection and handling for live trade streams
-        String url = "wss://stream.binance.us:9443/ws/%s@trade".formatted(tradePair.toString('/'));
-        String message = "{\"method\": \"UNSUBSCRIBE\",\"params\": [\"%s@trade\"],\"id\": 1}".formatted(tradePair.toString('-'));
-        // Implement WebSocket connection and handling for live trade streams
-
+    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
 
     }
 
     @Override
     public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
 
-        return new ArrayList<>();
 
+        String symbol1 = symbol.getBaseCurrency().getCode().toLowerCase() + symbol.getCounterCurrency().getCode().toLowerCase();
+            String streamUrl = BINANCE_WS_URL + symbol1 + "@ticker"; // Binance US WebSocket stream
+        List<PriceData>prices= new ArrayList<>();
+            try {
+                logger.info("Starting WebSocket for {}", symbol);
+                activeStreams.put(symbol, null);  // Assuming WebSocketClient is a singleton class and this method is called on a separate thread
+                Consumer<PriceData> priceConsumer = (priceData -> {
+                    logger.info("Received price data for {}: {}", tradePair, priceData);
 
+                });
+
+                WebSocketClient webSocketClient = new WebSocketClient(new URI(streamUrl)) {
+                    @Override
+                    public void onOpen(ServerHandshake handshake) {
+                        logger.info("✅ Connected to Binance US WebSocket for {}", tradePair);
+                    }
+
+                    @Override
+                    public void onMessage(String message) {
+                        executorService.execute(() -> processMessage(message, tradePair, priceConsumer));
+                    }
+
+                    @Override
+                    public void onClose(int code, String reason, boolean remote) {
+                        logger.warn("❌ Binance US WebSocket closed for {} - Reason: {}", tradePair, reason);
+                        activeStreams.remove(tradePair);
+                    }
+
+                    @Override
+                    public void onError(Exception ex) {
+                        logger.error("🚨 WebSocket error for {}: {}", tradePair, ex.getMessage(), ex);
+                    }
+                };
+
+                webSocketClient.connect();
+                activeStreams.put(tradePair, webSocketClient);
+
+                    processMessage(message, tradePair, priceConsumer);
+                Consumer<PriceData> re = priceConsumer.andThen(
+                        prices::add
+
+                );
+                logger.info(" WebSocket for {}",re);
+            } catch (Exception e) {
+                logger.error("🚨 Failed to start WebSocket for {}: {}", tradePair, e.getMessage(), e);
+            }
+            return prices;
+        }
+
+    /**
+     * **Process WebSocket JSON Message & Extract Price Data**
+     */
+    private void processMessage(String message, TradePair tradePair, Consumer<PriceData> priceConsumer) {
+        try {
+            JsonNode jsonNode = objectMapper.readTree(message);
+            double lastPrice = jsonNode.get("c").asDouble(); // Last traded price
+            double bidPrice = jsonNode.get("b").asDouble();  // Best bid price
+            double askPrice = jsonNode.get("a").asDouble();  // Best ask price
+            double volume = jsonNode.get("v").asDouble();    // 24h trading volume
+
+            PriceData priceData = new PriceData(tradePair, lastPrice, bidPrice, askPrice, volume, System.currentTimeMillis());
+            priceConsumer.accept(priceData);
+
+            logger.info("📊 Live Price Update for {} → Last: {} | Bid: {} | Ask: {}", tradePair, lastPrice, bidPrice, askPrice);
+        } catch (Exception e) {
+            logger.error("🚨 Error parsing WebSocket message: {}", e.getMessage(), e);
+        }
     }
-
 
     @Override
     public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
@@ -741,8 +784,6 @@ public class BinanceUS extends Exchange {
 
         // Step 4: Append the signature to the query string
         queryString += "&signature=%s".formatted(signature);
-
-
         // Step 6: Set the headers with the API key
         requestBuilder.setHeader("X-MBX-APIKEY", apiKey);
         String url0 = "%s/sapi/v1/capital/withdraw/history".formatted(API_URL);
@@ -755,7 +796,7 @@ public class BinanceUS extends Exchange {
             new Messages(Alert.AlertType.ERROR, response.body());
             throw new RuntimeException("HTTP error response: " + response.body());
         }
-        logger.info("Binance response: " + response.body());
+        logger.info("Binance response: {}",  response.body());
 
         ArrayList<Withdrawal> withdraws = new ArrayList<>();
         Withdrawal withdraw = OBJECT_MAPPER.readValue(response.body(), Withdrawal.class);
@@ -776,10 +817,151 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CustomWebSocketClient getWebsocketClient() {
-        return null;
-    }
+    public CustomWebSocketClient getWebsocketClient(Exchange exchange,TradePair tradePair,int secondsPerCandle) {
+        return new CustomWebSocketClient(BINANCE_WS_URL) {
+            final List<PriceData> priceData1 = new ArrayList<>();
+            final Consumer<PriceData> priceConsumer = (priceData) -> {
+                priceData1.add(priceData);
 
+                if (priceData.getPrices().size() >= 2) {
+                    double bid = priceData.getPrices().get(0).getBids().getLast().getPrice();
+                    double ask = priceData.getPrices().get(1).getBids().getLast().getPrice();
+                    logger.info("Live Price Update for {} → Bid: {} | Ask: {}", tradePair, bid, ask);
+                    priceData1.clear();
+                } else {
+                    logger.info("Not enough live price data for {}. Skipping update.", tradePair);
+                }
+            };
+
+            @Override
+            public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
+                return super.onPing(webSocket, message);
+            }
+
+            @Override
+            public CompletionStage<?> onPong(WebSocket webSocket, ByteBuffer message) {
+                return super.onPong(webSocket, message);
+            }
+
+            @Override
+            public void onMessage(String message) {
+                try {
+                    CandleData candleData = OBJECT_MAPPER.readValue(message, CandleData.class);
+                    CandleData cand;
+                    if (candleData.isComplete()) {
+                        double high = candleData.getMax();
+                        double low = candleData.getMin();
+                        double open = candleData.getOpenPrice();
+                        double close = candleData.getClosePrice();
+                        double volume = candleData.getVolume();
+                        Instant time = Instant.ofEpochSecond(candleData.getCloseTime());
+
+                        cand = new CandleData(high, low, open, close, volume, time);
+                        logger.info("Candle update for {} → High: {} | Low: {} | Open: {} | Close: {} | Volume: {} | Time: {}", tradePair, high, low, open, close, volume, time);
+                    }
+
+                } catch (JsonProcessingException e) {
+                    logger.error("Error parsing WebSocket message: {}", e.getMessage(), e);
+                }
+
+            }
+
+            final WebSocketClient webSocket = new WebSocketClient(URI.create(BINANCE_WS_URL)) {
+                @Override
+                public void onOpen(ServerHandshake handshakedata) {
+                    logger.info("Binance WebSocket client connected to: {}", BINANCE_WS_URL);
+                    webSocket.send(String.format("{\"event\":\"subscribe\",\"streams\":[\"%s@depth%s\"],\"res\":\"1\",\"symbol\":\"%s\"}", tradePair.getBaseCurrency().getCode().toLowerCase(), getBinanceGranularity(secondsPerCandle), tradePair.getBaseCurrency().getCode().toUpperCase() + tradePair.getCounterCurrency().getCode().toUpperCase()));
+                    webSocket.onMessage(priceConsumer.toString());
+
+
+                }
+
+                @Override
+                public void onMessage(String message) {
+                    // parse the message and update the chart
+
+
+                }
+
+                @Override
+                public void onClose(int code, String reason, boolean remote) {
+
+
+                }
+
+                @Override
+                public void onError(Exception ex) {
+
+                }
+            };
+
+            @Override
+            public void onOpen() {
+                String url = "/ws/%s@depth%s".formatted(tradePair.getBaseCurrency().getCode().toLowerCase(), getBinanceGranularity(secondsPerCandle));
+
+                logger.info("Binance WebSocket client connected to: {}", url);
+                webSocket.connect();
+
+
+            }
+
+            @Override
+            public void onClose(int code, String reason, boolean remote) {
+                logger.info("Binance WebSocket client disconnected: {}", reason);
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    logger.error("Binance WebSocket client", e);
+                }
+
+            }
+
+            @Override
+            public void onError(Exception ex) {
+
+            }
+
+            @Override
+            public boolean supportsStreamingTrades(TradePair tradePair) {
+                return false;
+            }
+
+            @Override
+            public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+
+            }
+
+            @Override
+            public void streamLiveTrades(TradePair tradePair, int secondPerCandle, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+
+            }
+
+            @Override
+            public void subscribe(TradePair tradePair, Consumer<List<Trade>> tradeConsumer) {
+
+                // Implement WebSocket client to subscribe to live trades for the given trade pair
+                // and send the live trades to the tradeConsumer
+                // Example:
+//               //
+//                WebSocketClient webSocket = new WebSocketClient(URI.create(BINANCE_WS_URL)) {
+//                    @Override
+//                    public void onOpen(ServerHandshake handshakedata) {
+//                        webSocket.send(String.format("{\"event\":\"subscribe\",\"streams\":[\"%s@depth%s\"],\"res\":\"1\",\"symbol\":\"%s\"}", tradePair.getBaseCurrency().getCode().toLowerCase(), getBinanceGranularity(secondsPerCandle), tradePair.getBaseCurrency().getCode().toUpperCase() + tradePair.getCounterCurrency().getCode().toUpperCase()));
+//                        webSocket.onMessage((Consumer<String>) message -> {
+//                            try {
+//                                BinanceDepthEvent depthEvent = OBJECT_MAPPER.readValue(message, BinanceDepthEvent.class);
+//                                tradeConsumer.accept(depthEvent.get asks().stream()
+//                            } catch (IOException e) {
+//                             logger.error("Error parsing WebSocket message: {}", e.getMessage(), e);}
+//
+//           });
+            }
+
+            ;
+        };
+
+
+    }
     @Override
     public List<Account> getAccountSummary() {
         return List.of();
@@ -929,4 +1111,22 @@ public class BinanceUS extends Exchange {
             };
         }
     }
+    private static final Map<TradePair, WebSocketClient> activeStreams = new ConcurrentHashMap<>();
+
+
+        private static final String BINANCE_WS_URL = "wss://stream.binance.us:9443/ws/";
+
+        private final ObjectMapper objectMapper = new ObjectMapper();
+        private final ExecutorService executorService = Executors.newCachedThreadPool();
+
+        /**
+         * **Stream Live Prices for a Given Trade Pair**
+         *
+         * @param tradePair     Trade pair (e.g., BTC/USD)
+         * @param priceConsumer Callback to process real-time price updates
+         */
+
+
+
+
 }

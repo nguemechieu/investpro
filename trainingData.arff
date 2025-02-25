@@ -1,0 +1,15 @@
+@relation MarketData
+
+@attribute open numeric
+@attribute high numeric
+@attribute low numeric
+@attribute close numeric
+@attribute volume numeric
+@attribute class {HOLD,BUY,SELL}
+
+@data
+?,?,?,?,?,HOLD
+?,?,?,?,?,HOLD
+?,?,?,?,?,HOLD
+?,?,?,?,?,HOLD
+?,?,?,?,?,HOLD

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.uuid.Generators;
 import com.github.dockerjava.api.async.ResultCallback;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
@@ -18,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -314,7 +316,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer) {
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
         Objects.requireNonNull(tradeConsumer);
@@ -328,7 +330,7 @@ public class Oanda extends Exchange {
             long delayMillis = 500; // Initial delay (0.5 sec)
 
             List<Trade> trades = new ArrayList<>();
-            List<CandleData> completedCandles = new ArrayList<>();
+
 
             InProgressCandle currentCandle = null;
 
@@ -362,7 +364,7 @@ public class Oanda extends Exchange {
                             prices.getBidEntries().add(new OrderBookEntry(tradePrice, tradeSize));
                         }
 
-                        Trade tr = new Trade(tradePair, prices.getAskEntries().stream().findFirst().get().getPrice(), tradeSize, side, tradeTime);
+                        Trade tr = new Trade(tradePair, BigDecimal.valueOf(prices.getAskEntries().stream().toList().getLast().getPrice()),BigDecimal.valueOf( tradeSize), side, tradeTime);
                         trades.add(tr);
 
                         // ---- CANDLE MANAGEMENT ----
@@ -371,7 +373,7 @@ public class Oanda extends Exchange {
                             // If a new candle is required, close the previous one
                             if (currentCandle != null) {
                                 currentCandle.closeCandle(tradeTime.getEpochSecond(), currentCandle.getClosePriceSoFar());
-                                completedCandles.add(currentCandle.snapshot());
+
                             }
 
                             // Start a new candle
@@ -556,7 +558,7 @@ public class Oanda extends Exchange {
         requestBuilder.uri(URI.create(API_URL + "/accounts/%s/orders".formatted(account_id)));
 
         HttpResponse<String> response = client.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString()).get();
-        logger.info("OANDA response: %s".formatted(response.body()));
+        logger.info("OANDA response open order: {}",response.body());
         ObjectMapper objectMapper = new ObjectMapper();
 
         JsonNode res = objectMapper.readTree(response.body());
@@ -599,10 +601,6 @@ public class Oanda extends Exchange {
 
         return orders;
 
-        // Convert the List<Order> to an ObservableList<Order>
-
-        // Return the ObservableList
-
     }
 
 
@@ -612,8 +610,8 @@ public class Oanda extends Exchange {
         requestBuilder.uri(URI.create(url));
 
         List<TradePair> tradePairs = new ArrayList<>();
-
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+
         if (response.statusCode() != 200) {
             new Messages(Alert.AlertType.ERROR, String.format("%d\n\n%s", response.statusCode(), response.body()));
             return tradePairs; // Return an empty list if the request fails
@@ -638,68 +636,95 @@ public class Oanda extends Exchange {
             String baseCurrencyCode = currencyPair[0];
             String counterCurrencyCode = currencyPair[1];
 
+
             // Fetch or create base currency
-            Currency baseCurrency;
-
-            baseCurrency = new Currency(CurrencyType.FIAT, baseCurrencyCode, baseCurrencyCode, baseCurrencyCode, 4, baseCurrencyCode, baseCurrencyCode) {
-                @Override
-                public int compareTo(@NotNull java.util.Currency o) {
-                    return 0;
-                }
-            };
-            Currency.save(baseCurrency);
-
+            Currency baseCurrency = Currency.of(baseCurrencyCode);
 
             // Fetch or create counter currency
-            Currency counterCurrency;// = Currency.of(counterCurrencyCode);
-
-            counterCurrency = new Currency(CurrencyType.FIAT, counterCurrencyCode, counterCurrencyCode, counterCurrencyCode, 4, counterCurrencyCode, counterCurrencyCode) {
-                @Override
-                public int compareTo(@NotNull java.util.Currency o) {
-                    return 0;
-                }
-            };
-
-            Currency.save(counterCurrency);
-
+            Currency counterCurrency = Currency.of(counterCurrencyCode);
 
             // Ensure currencies are different before creating a trade pair
-            TradePair tradePair = new TradePair(baseCurrency, counterCurrency);
-            tradePair.getBaseCurrency().setCurrencyType(CurrencyType.FIAT.name());
-            tradePair.getCounterCurrency().setCurrencyType(CurrencyType.FIAT.name());
+            if (!baseCurrency.getCode().equals(counterCurrency.getCode())) {
+                TradePair tradePair = new TradePair(baseCurrency, counterCurrency);
+                tradePair.getBaseCurrency().setCurrencyType(CurrencyType.FIAT.name());
+                tradePair.getCounterCurrency().setCurrencyType(CurrencyType.FIAT.name());
 
-            tradePairs.add(tradePair);
-            logger.info("✅ OANDA trade pair created: {}", tradePair);
+                tradePairs.add(tradePair);
+                logger.info("✅ OANDA trade pair created: {}", tradePair);
+            } else {
+                logger.warn("⚠ Skipping invalid trade pair: {} / {}", baseCurrency.getCode(), counterCurrency.getCode());
+            }
         }
-
 
         return tradePairs;
     }
 
     @Override
-    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
+        // TODO: Implement WebSocket stream to stop live trades
+        // Example: Close WebSocket connection or stop streaming
 
-        // Implement WebSocket connection if needed for live trade streams
+
     }
 
-    @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
-        // Implement WebSocket closing if needed for live trade streams
-    }
 
     @Override
     public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-        return List.of(); // WebSocket streaming for live prices not implemented here
+
+        List<PriceData> priceData = new ArrayList<>();
+
+        CompletableFuture<List<OrderBook>> orderbook = fetchOrderBook(tradePair);
+        orderbook.thenAccept(orderBook -> {
+            logger.info("Orderbook: {}", orderBook);
+            priceData.add(new PriceData(symbol.getSymbol(), orderBook.getFirst().getBidEntries().getFirst().getPrice(), orderBook.getFirst().getAskEntries().getFirst().getPrice(), Instant.now()));
+        });
+        return priceData;
+
     }
 
     @Override
     public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
-        return List.of(); // WebSocket streaming for candlestick not implemented here
+
+
+        try {
+
+            return new ArrayList<>(getCandleDataSupplier(intervalSeconds, tradePair).get().get());
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
 
     @Override
     public void cancelAllOrders() {
+
+        // Cancel all open orders
+        requestBuilder.uri(URI.create(API_URL + "/accounts/%s/orders".formatted(account_id)));
+        requestBuilder.method("DELETE", HttpRequest.BodyPublishers.noBody());
+
+        HttpResponse<String> response;
+        try {
+            response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Handle non-200 responses
+        if (response.statusCode()!= 200) {
+            throw new RuntimeException(String.format("CANCEL ALL ORDERS HTTP error response: %s", response));
+        }
+
+        // Deserialize the JSON response
+        ObjectMapper objectMapper = new ObjectMapper();
+        CancelAllOrdersResponse cancelAllOrdersResponse;
+        try {
+            cancelAllOrdersResponse = objectMapper.readValue(response.body(), CancelAllOrdersResponse.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        logger.info("Canceled {} orders: {}", cancelAllOrdersResponse.getCount(), cancelAllOrdersResponse.getOrder());
 
 
 
@@ -728,8 +753,7 @@ public class Oanda extends Exchange {
 
     @Override
 
-    public CustomWebSocketClient getWebsocketClient() {
-
+    public CustomWebSocketClient getWebsocketClient(Exchange exchange,@NotNull TradePair tradePair,int secondsPerCandle) {
         CustomWebSocketClient re = new CustomWebSocketClient(API_URL + "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_')) {
 
             @Override
@@ -786,7 +810,7 @@ public class Oanda extends Exchange {
                             }
 
                             // Notify any listeners in the app
-                            Trade trade = new Trade(tradePair, prices.getAskEntries().stream().findFirst().get().getPrice(), size, side, timestamp);
+                            Trade trade = new Trade(tradePair, BigDecimal.valueOf(prices.getAskEntries().stream().toList().getLast().getPrice()), BigDecimal.valueOf(size), side, timestamp);
                             logger.info("Live Trade: {}", trade);
 
                             liveTradeUpdates.onNext(trade);
@@ -819,11 +843,162 @@ public class Oanda extends Exchange {
             public boolean supportsStreamingTrades(TradePair tradePair) {
                 return true;
             }
+
             @Override
             public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
-
-
+                streamLiveTrades(tradePair,secondsPerCandle,updateInProgressCandleTask);
             }
+
+
+            private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+            private final ConcurrentHashMap<TradePair, ScheduledFuture<?>> tradeSubscriptions = new ConcurrentHashMap<>();
+            private final ConcurrentHashMap<TradePair, Long> lastTradeTimestamp = new ConcurrentHashMap<>();
+            private final long MAX_INTERVAL = 5000; // Max polling interval (5s)
+            private final long MIN_INTERVAL = 500; // Min polling interval (500ms)
+            private final long DEFAULT_INTERVAL = 1000; // Default polling (1s)
+
+            @Override
+            public void streamLiveTrades(TradePair tradePair, int secondPerCandle, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+                Objects.requireNonNull(tradePair, "TradePair cannot be null");
+                logger.info("📡 Starting live trade streaming for {}", tradePair);
+
+                Runnable fetchTask = new Runnable() {
+                    private long pollingInterval = DEFAULT_INTERVAL; // Start with default interval
+
+                    @Override
+                    public void run() {
+                        try {
+                            updateInProgressCandleTask.run(); // Update in-progress candle
+
+                            // Fetch live trades from the exchange
+                            List<Trade> liveTrades = new ArrayList<>();
+                            Consumer<List<Trade>> consumerTrades = liveTrades::addAll;
+                            fetchRecentTradesUntil(exchange, tradePair, Instant.now(), secondPerCandle, consumerTrades);
+
+                            if (!liveTrades.isEmpty()) {
+                                logger.debug("📊 Received {} new trades for {}", liveTrades.size(), tradePair);
+
+                                // Process each trade and update the current candle
+                                liveTrades.forEach(updateInProgressCandleTask::processTrade);
+
+                                // Update last trade timestamp
+                                lastTradeTimestamp.put(tradePair, System.currentTimeMillis());
+
+                                // Increase polling frequency if active trading is detected
+                                pollingInterval = Math.max(MIN_INTERVAL, pollingInterval - 100);
+                            } else {
+                                // No trades → slow down polling gradually
+                                long lastTradeTime = lastTradeTimestamp.getOrDefault(tradePair, System.currentTimeMillis());
+                                long timeSinceLastTrade = System.currentTimeMillis() - lastTradeTime;
+
+                                if (timeSinceLastTrade > 3000) {
+                                    pollingInterval = Math.min(MAX_INTERVAL, pollingInterval + 500); // Slow down polling
+                                }
+                            }
+
+                            // Re-schedule with the new dynamic interval
+                            ScheduledFuture<?> scheduledTask = scheduler.schedule(this, pollingInterval, TimeUnit.MILLISECONDS);
+                            tradeSubscriptions.put(tradePair, scheduledTask);
+                        } catch (Exception e) {
+                            logger.error("🚨 Error while streaming live trades for {}: {}", tradePair, e.getMessage(), e);
+                        }
+                    }
+                };
+
+                // Start the first fetch immediately
+                ScheduledFuture<?> scheduledTask = scheduler.schedule(fetchTask, 0, TimeUnit.MILLISECONDS);
+                tradeSubscriptions.put(tradePair, scheduledTask);
+            }
+
+
+
+            @Override
+            public void subscribe(TradePair tradePair, Consumer<List<Trade>> tradeConsumer) {
+                Objects.requireNonNull(tradePair, "TradePair cannot be null");
+                Objects.requireNonNull(tradeConsumer, "Trade consumer cannot be null");
+
+                logger.info("📡 Subscribing to live trade updates for {}", tradePair);
+
+                Runnable fetchTask = new Runnable() {
+                    private long pollingInterval = DEFAULT_INTERVAL; // Start with 1s
+
+                    @Override
+                    public void run() {
+                        try {
+                            exchange.updateInProgressCandleTask.run(); // Update in-progress candle
+
+                            // Fetch live trades from the exchange
+                            List<Trade> liveTrades = new ArrayList<>();
+                            Consumer<List<Trade>> consumerTrades = liveTrades::addAll;
+                            fetchRecentTradesUntil(exchange, tradePair, Instant.now(), secondsPerCandle, consumerTrades);
+
+                            if (!liveTrades.isEmpty()) {
+                                logger.debug("📊 ReceivedY {} new trades for {}", liveTrades.size(), tradePair);
+
+                                // Process each trade and update the current candle
+                                liveTrades.forEach(updateInProgressCandleTask::processTrade);
+
+                                // Notify consumer with new trades
+                                tradeConsumer.accept(liveTrades);
+
+                                // Update last trade timestamp
+                                lastTradeTimestamp.put(tradePair, System.currentTimeMillis());
+
+                                // Increase polling frequency for active trading
+                                pollingInterval = Math.max(MIN_INTERVAL, pollingInterval - 100); // Reduce interval if active
+                            } else {
+                                // No trades → slow down polling gradually
+                                long lastTradeTime = lastTradeTimestamp.getOrDefault(tradePair, System.currentTimeMillis());
+                                long timeSinceLastTrade = System.currentTimeMillis() - lastTradeTime;
+
+                                if (timeSinceLastTrade > 3000) {
+                                    pollingInterval = Math.min(MAX_INTERVAL, pollingInterval + 500); // Slow down polling
+                                }
+                            }
+
+                            // Re-schedule with the new dynamic interval
+                            ScheduledFuture<?> scheduledTask = scheduler.schedule(this, pollingInterval, TimeUnit.MILLISECONDS);
+                            tradeSubscriptions.put(tradePair, scheduledTask);
+                        } catch (Exception e) {
+                            logger.error("🚨 Error while streaming live trades for {}: {}", tradePair, e.getMessage(), e);
+                        }
+                    }
+                };
+
+                // Start the first fetch immediately
+                ScheduledFuture<?> scheduledTask = scheduler.schedule(fetchTask, 0, TimeUnit.MILLISECONDS);
+                tradeSubscriptions.put(tradePair, scheduledTask);
+            }
+
+            /**
+             * **Method to Unsubscribe from Trade Updates**
+             */
+            public void unsubscribe(TradePair tradePair) {
+                ScheduledFuture<?> scheduledTask = tradeSubscriptions.remove(tradePair);
+                if (scheduledTask != null) {
+                    scheduledTask.cancel(true);
+                    logger.info("❌ Unsubscribed from live trade updates for {}", tradePair);
+                }
+            }
+
+            /**
+             * **Shutdown the scheduler gracefully**
+             */
+            public void shutdown() {
+                scheduler.shutdown();
+                try {
+                    if (!scheduler.awaitTermination(3, TimeUnit.SECONDS)) {
+                        scheduler.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    scheduler.shutdownNow();
+                }
+            }
+
+
+
+
+
         };
         re.connect(headers);
 
@@ -889,7 +1064,6 @@ public class Oanda extends Exchange {
         );
     }
 
-
     @Override
     public double fetchLivesBidAsk(@NotNull TradePair tradePair) {
         try {
@@ -945,7 +1119,8 @@ public class Oanda extends Exchange {
         return 0;
     }
 
-
+@Getter
+@Setter
     public static class OandaCandleDataSupplier extends CandleDataSupplier {
 
         private static final Logger logger = LoggerFactory.getLogger(OandaCandleDataSupplier.class);
@@ -954,6 +1129,8 @@ public class Oanda extends Exchange {
                 .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
+        private final InProgressCandle inProgressCandle=new InProgressCandle();
+        private int retries=0;
 
         OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
             super(secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
@@ -985,6 +1162,20 @@ public class Oanda extends Exchange {
                     new OandaCandleDataSupplier(secondsPerCandle, tradePair);
         }
 
+        private String validateGranularity(int granularity) {
+            Map<Integer, String> granularityMap = Map.of(
+                    60, "M1",
+                    300, "M5",
+                    900, "M15",
+                    1800, "M30",
+                    3600, "H1",
+                    14400, "H4",
+                    86400, "D",
+                    604800, "W",
+                    2592000, "M"
+            );
+            return granularityMap.getOrDefault(granularity, "M1");
+        }
         @Override
         public Future<List<CandleData>> get() {
             if (endTime.get() == -1) {
@@ -996,7 +1187,7 @@ public class Oanda extends Exchange {
 
             // 🔍 Check Cache First to Reduce API Calls
             if (candleCache.containsKey(startTime)) {
-                logger.info("✅ Using cached candles for {}", tradePair);
+                logger.info("✅ Using cached candles for {},{}", tradePair,candleCache);
                 return CompletableFuture.completedFuture(candleCache.get(startTime));
             }
 
@@ -1004,104 +1195,73 @@ public class Oanda extends Exchange {
                     + tradePair.toString('_')
                     + "/candles?count=" + numCandles
                     + "&price=M&to=" + startDateString
-                    + "&granularity=" + granularityToString(secondsPerCandle);
+                    + "&granularity=" + validateGranularity(secondsPerCandle);
 
-            return fetchWithRetries(uriStr, startTime, tradePair, 0);
+            return fetchWithRetries(uriStr, retries);
         }
 
-        /**
-         * Handles fetching candle data with retries on OANDA rate-limiting (429 errors).
-         */
-        private CompletableFuture<List<CandleData>> fetchWithRetries(String uriStr, int cacheKey, TradePair tradePair, int retryCount) {
+    private @NotNull CompletableFuture<List<CandleData>> fetchWithRetries(String url, int retryCount) {
             return CompletableFuture.runAsync(() -> {
                 try {
-                    // Apply OANDA Rate-Limit Throttling
                     rateLimiter.acquire();
                     Thread.sleep(RATE_LIMIT_DELAY_MS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
             }).thenCompose(_ -> client.sendAsync(
-                    requestBuilder.uri(URI.create(uriStr)).build(),
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(url))
+                            .header("Authorization", "Bearer " + apiSecret)
+                            .GET()
+                            .build(),
                     HttpResponse.BodyHandlers.ofString())
             ).thenCompose(response -> {
-                if (response.statusCode() == 429) { // Too Many Requests (Rate-Limited)
+                if (response.statusCode() == 429) {
                     if (retryCount < MAX_RETRIES) {
-                        long backoffTime = INITIAL_DELAY_MS * (1L << retryCount); // Exponential Backoff
-                        logger.warn("⚠️ Rate-limited! Retrying in {} ms...", backoffTime);
-
+                        long backoffTime = INITIAL_DELAY_MS * (1L << retryCount);
+                        logger.warn("Rate-limited! Retrying in {} ms...", backoffTime);
                         return CompletableFuture.supplyAsync(() -> null,
                                         CompletableFuture.delayedExecutor(backoffTime, TimeUnit.MILLISECONDS))
-                                .thenCompose(_ -> fetchWithRetries(uriStr, cacheKey, tradePair, retryCount + 1));
-
+                                .thenCompose(_ -> fetchWithRetries(url, retryCount + 1));
                     } else {
-                        logger.error("🚨 Max retries reached for fetching candles.");
+                        logger.error("Max retries reached for fetching candles.");
                         return CompletableFuture.failedFuture(new RuntimeException("Rate limit exceeded"));
                     }
                 }
 
                 if (response.statusCode() != 200) {
-                    logger.error("❌ Error fetching candles: {}", response.body());
+                    logger.error("Error fetching candles: {}", response.body());
                     return CompletableFuture.failedFuture(new RuntimeException("Failed to fetch candles"));
                 }
 
-                return processCandleResponse(response.body(), cacheKey, tradePair);
-            }).whenComplete((_, _) -> rateLimiter.release()); // 🔓 Release the semaphore
+                return processCandleResponse(response.body());
+            }).whenComplete((_, _) -> rateLimiter.release());
         }
 
-        /**
-         * Processes the OANDA API response, filters valid candles, and caches data.
-         */
-        private CompletableFuture<List<CandleData>> processCandleResponse(String responseBody, int cacheKey, TradePair tradePair) {
+        private CompletableFuture<List<CandleData>> processCandleResponse(String responseBody) {
             try {
                 JsonNode res = OBJECT_MAPPER.readTree(responseBody);
-                logger.info("📊 OANDA trade pair: {}", tradePair.toString('/'));
-                logger.info("📥 OANDA response: {}", res);
-
-                List<CandleData> candleData = new ArrayList<>();
+                List<CandleData> candles = new ArrayList<>();
                 JsonNode candlesNode = res.get("candles");
 
                 if (candlesNode != null && candlesNode.isArray()) {
                     for (JsonNode candle : candlesNode) {
-                        if (!candle.has("time") || !candle.has("mid")) {
-                            logger.warn("⚠️ Skipping invalid candle data: {}", candle);
-                            continue;
-                        }
-
+                        if (!candle.has("time") || !candle.has("mid")) continue;
                         int time = (int) Instant.parse(candle.get("time").asText()).getEpochSecond();
-
-                        // Skip in-progress candles
-                        if (time + secondsPerCandle > endTime.get()) {
-                            continue;
-                        }
-
-                        candleData.add(new CandleData(
-                                candle.get("mid").get("o").asDouble(),  // Open price
-                                candle.get("mid").get("c").asDouble(),  // Close price
-                                candle.get("mid").get("h").asDouble(),  // High price
-                                candle.get("mid").get("l").asDouble(),  // Low price
+                        candles.add(new CandleData(
+                                candle.get("mid").get("o").asDouble(),
+                                candle.get("mid").get("c").asDouble(),
+                                candle.get("mid").get("h").asDouble(),
+                                candle.get("mid").get("l").asDouble(),
                                 time, (int) System.currentTimeMillis(),
-                                candle.get("volume").asLong()  // Volume
+                                candle.get("volume").asLong()
                         ));
                     }
-
-                    // Sort candles before returning
-                    candleData.sort(Comparator.comparingLong(CandleData::getOpenTime));
-                    logger.info("��� Received {} candles for {}.", candleData.size(),
-                            tradePair.toString('/'));
-
-                    // 📌 Cache the latest candle data
-                    candleCache.put(candleCache.size(), candleData);
-                    endTime.set(candleData.isEmpty() ? cacheKey : candleData.getFirst().getOpenTime()); // ✅ Update endTime
-
-                    return CompletableFuture.completedFuture(candleData);
                 }
-
-                return CompletableFuture.completedFuture(Collections.emptyList());
-
-            } catch (JsonProcessingException ex) {
-                logger.error("🚨 JSON Parsing Error", ex);
-                return CompletableFuture.failedFuture(new RuntimeException("Failed to parse JSON", ex));
+                return CompletableFuture.completedFuture(candles);
+            } catch (IOException e) {
+                logger.error("JSON Parsing Error", e);
+                return CompletableFuture.failedFuture(new RuntimeException("Failed to parse JSON"));
             }
         }
 

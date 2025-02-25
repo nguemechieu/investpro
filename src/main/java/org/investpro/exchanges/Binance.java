@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -152,7 +153,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle,
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(stopAt);
@@ -194,11 +195,14 @@ public class Binance extends Exchange {
                                 prices.getBidEntries().getLast().setPrice(trade.get("price").asDouble());
                                 qty = trade.get("qty").asLong();
                             }
-                            Trade tradex = new Trade(
+                            Trade tradex = new Trade(exchange,
                                     tradePair,
-                                    prices.getAskEntries().stream().findFirst().get().getPrice(), qty,
-                                    side,
-                                    qty, time
+                                 side,
+                                    ENUM_ORDER_TYPE.LIMIT,
+                                    BigDecimal.valueOf( trade.get("price").asDouble()),
+                                    BigDecimal.valueOf( trade.get("qty").asDouble()),
+                                    time,
+                                    BigDecimal.valueOf(0),  BigDecimal.valueOf(0)
                             );
                             tr.add(tradex);
                             trades.accept(tr);
@@ -313,11 +317,6 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-
-    }
-
-    @Override
     public void stopStreamLiveTrades(TradePair tradePair) {
         // Implement WebSocket closing if needed for live trade streams
     }
@@ -363,7 +362,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CustomWebSocketClient getWebsocketClient() {
+    public CustomWebSocketClient getWebsocketClient(Exchange exchange,TradePair tradePair, int secondsPerCandle) {
         return null;
     }
 

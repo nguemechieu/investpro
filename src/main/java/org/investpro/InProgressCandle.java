@@ -2,12 +2,17 @@ package org.investpro;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 @Getter
 @Setter
 public class InProgressCandle {
+    private final List<CandleData> candleData=new ArrayList<>();
     private long openTime;
     private double openPrice;
     private double highPriceSoFar;
@@ -17,15 +22,39 @@ public class InProgressCandle {
     private double volumeSoFar;
     private boolean visible; // is the in-progress candle currently visible on screen?
     private boolean placeHolder;
-    /**
-     * -- GETTER --
-     * Checks if the candle is closed.
-     *
-     * @return true if the candle is closed, false otherwise.
-     */
-    @Getter
+
+
     private boolean closed; // Tracks whether the candle is closed
     private long closeTime; // Records the time when the candle closes
+
+    public InProgressCandle() {
+        candleData.add(new CandleData());
+        this.openTime = candleData.getFirst().getOpenTime();
+        this.openPrice = candleData.getFirst().getOpenPrice();
+        this.highPriceSoFar = candleData.getFirst().getHighPrice();
+        this.lowPriceSoFar = candleData.getFirst().getLowPrice();
+        this.currentTill = candleData.getFirst().getCloseTime();
+        this.closePriceSoFar = candleData.getFirst().getClosePrice();
+        this.volumeSoFar = candleData.getFirst().getVolume();
+        this.visible = true;
+        this.placeHolder = false;
+        this.closed = false;
+        this.closeTime = 0; // Initialize closeTime to 0
+    }
+
+    public InProgressCandle(int openTime, double openPrice, double highPrice, double lowPrice, int closeTime, double closePrice, double volume) {
+        this.openTime = openTime;
+        this.openPrice = openPrice;
+        this.highPriceSoFar = highPrice;
+        this.lowPriceSoFar = lowPrice;
+        this.currentTill = closeTime;
+        this.closePriceSoFar = closePrice;
+        this.volumeSoFar = volume;
+        this.visible = true;
+        this.placeHolder = false;
+        this.closed = false;
+        this.closeTime = 0; // Initialize closeTime to 0
+    }
 
     /**
      * Creates a new (immutable) {@code CandleData} by copying the fields from this {@code InProgressCandle}.
@@ -101,5 +130,25 @@ public class InProgressCandle {
      */
     public double getAveragePriceSoFar() {
         return (openPrice + highPriceSoFar + lowPriceSoFar + closePriceSoFar) / 4;
+    }
+
+    public void set(CandleData candleData) {
+        this.openTime = candleData.getOpenTime();
+        this.openPrice = candleData.getOpenPrice();
+        this.highPriceSoFar = candleData.getHighPrice();
+        this.lowPriceSoFar = candleData.getLowPrice();
+        this.currentTill = candleData.getCloseTime();
+        this.closePriceSoFar = candleData.getClosePrice();
+        this.volumeSoFar = candleData.getVolume();
+        this.visible = true;
+        this.placeHolder = false;
+        this.closed = false;
+        this.closeTime = 0; // Initialize closeTime to 0
+    }
+    double bid;
+    double ask;
+
+    public void setTimestamp(@NotNull Instant now) {
+        this.currentTill = now.getNano(); //
     }
 }

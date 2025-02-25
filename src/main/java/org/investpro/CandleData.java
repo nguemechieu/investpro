@@ -1,10 +1,13 @@
 package org.investpro;
 
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.jetbrains.annotations.Contract;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -17,35 +20,45 @@ import java.util.UUID;
 
 @Getter
 @Setter
-
+@Entity
+@Table(name = "candles")  // Define table name in the database
+@Cacheable
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE) // Enable caching
 public class CandleData {
 
-
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-increment ID
     private Long id;
 
-
+    @Column(name = "open_price", nullable = false)
     private double openPrice;
 
+    @Column(name = "close_price", nullable = false)
     private double closePrice;
 
-
+    @Column(name = "high_price", nullable = false)
     private double highPrice;
 
-
+    @Column(name = "low_price", nullable = false)
     private double lowPrice;
 
+    @Column(name = "open_time", nullable = false)
+    private int openTime; // Unix timestamp
 
-    private int openTime; // Changed to long for better timestamp storage
+    @Column(name = "close_time", nullable = false)
+    private int closeTime; // Unix timestamp
 
-    private int closeTime; // Changed to long
+    @Column(name = "volume", nullable = false)
+    private double volume;
 
-    private double volume; // Removed static
+    @Column(name = "timeframe", nullable = false)
+    private int timeframe;
 
-
-    private boolean placeHolder = false;
-    @Setter
+    @Column(name = "highlighted")
     private boolean highlighted;
 
+    @Column(name = "place_holder")
+    private boolean placeHolder = false;
 
     // ✅ Default constructor (Required for JPA)
     public CandleData() {
@@ -58,17 +71,12 @@ public class CandleData {
         this.closeTime = 0;
         this.volume = 0.0;
         this.placeHolder = false;
-
-
     }
 
     /**
      * **Primary Constructor**
-     * - Initializes a CandleData instance with core OHLC values.
      */
     public CandleData(double openPrice, double closePrice, double highPrice, double lowPrice, int openTime, int closeTime, double volume) {
-
-        this.id = UUID.randomUUID().getLeastSignificantBits();
         this.openPrice = openPrice;
         this.closePrice = closePrice;
         this.highPrice = highPrice;
@@ -76,22 +84,29 @@ public class CandleData {
         this.openTime = openTime;
         this.closeTime = closeTime;
         this.volume = volume;
+    }
+
+    public CandleData(double high, double low, double open, double close, double volume, @NotNull Instant time) {
+        this.openPrice = open;
+        this.closePrice = close;
+        this.highPrice = high;
+        this.lowPrice = low;
+        this.openTime = (int) time.toEpochMilli();
+        this.closeTime = time.getNano();
+        this.volume = volume;
 
     }
 
-
     /**
      * **Factory Method**
-     * - Creates a CandleData instance based on a timestamp.
      */
-    @Contract("_, _, _, _, _, _ -> new")
-    public static @NotNull CandleData of(int timestamp, double open, double high, double low, double close, double volume) {
+    @NotNull
+    public static CandleData of(int timestamp, double open, double high, double low, double close, double volume) {
         return new CandleData(open, close, high, low, timestamp, timestamp + 60, volume);
     }
 
     /**
      * **Equals & HashCode**
-     * - Uses ID as the unique identifier.
      */
     @Override
     public boolean equals(Object object) {
@@ -108,7 +123,6 @@ public class CandleData {
 
     /**
      * **String Representation**
-     * - Formats `CandleData` object for logging/debugging.
      */
     @Override
     public String toString() {
@@ -124,5 +138,22 @@ public class CandleData {
 
     public double getMin() {
         return Double.min(openPrice, closePrice);
+    }
+
+    public void updateExtrema(@NotNull CandleData candleData1) {
+        this.highPrice = Double.max(this.highPrice, candleData1.highPrice);
+        this.lowPrice = Double.min(this.lowPrice, candleData1.lowPrice);
+    }
+
+    public boolean isComplete() {
+        return closePrice != 0.0;
+    }
+
+    public InProgressCandle getSnapshot() {
+        return new InProgressCandle(openTime, openPrice, highPrice, lowPrice, closeTime, closePrice, volume);
+    }
+    public void closeCandle(long closeTime, double closePrice) {
+        this.closeTime = (int) closeTime;
+        this.closePrice = closePrice;
     }
 }

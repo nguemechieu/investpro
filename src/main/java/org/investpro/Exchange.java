@@ -34,6 +34,7 @@ public abstract class Exchange {
     protected static final Logger logger = LoggerFactory.getLogger(
             Exchange.class
     );
+    public CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask;
 
     protected String apiKey;
     protected static String apiSecret;
@@ -123,22 +124,10 @@ public abstract class Exchange {
     /**
      * Add an exchange to the live trades consumer.
      */
-    public void add(Exchange exchange) {
-        liveTradesConsumer.add(exchange);
-    }
 
 
-    /**
-     * Streaming trades is no longer supported without WebSocket.
-     * This method should be overridden if the derived class needs to implement streaming over other mechanisms.
-     */
-    public abstract void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer);
 
-
-    /**
-     * Stop streaming live trades for a specific trade pair.
-     */
-    public abstract void stopStreamLiveTrades(TradePair tradePair);
+    public abstract void stopStreamLiveTrades(@NotNull TradePair tradePair);
 
     // Get candlestick data
     // WebSocket client for live updates
@@ -162,10 +151,10 @@ public abstract class Exchange {
     public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
     private List<News> cachedNews = new ArrayList<>();
 
-    public abstract CustomWebSocketClient getWebsocketClient();
+    public abstract CustomWebSocketClient getWebsocketClient(Exchange exchange,TradePair tradePair, int secondsPerCandles);
     private long lastFetchTime = 0;
 
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer);
+    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer);
 
     public abstract double fetchLivesBidAsk(TradePair tradePair);
 

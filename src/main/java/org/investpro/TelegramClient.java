@@ -33,8 +33,8 @@ public class TelegramClient {
     private boolean isOnline;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     // Thread-safe storage for messages
-    private final NavigableMap<Integer, String> updatedData = Collections.synchronizedNavigableMap(new TreeMap<>());
-    private String chatId;
+    private List<TelegramBotInfo> updatedData = new ArrayList<>();
+    private long chatId;
     private int lastUpdateId = 0;
 
     /**
@@ -43,8 +43,17 @@ public class TelegramClient {
     public TelegramClient(String telegramBotToken) {
         this.botToken = telegramBotToken;
         this.isOnline = checkBotStatus();
+        if (isOnline) {
+            updatedData=fetchUpdates();
+            this.username = updatedData.stream().findFirst().isEmpty() ? "N/A" : updatedData.stream().findFirst().get().getUsername();
+            this.chatId =updatedData.stream().findFirst().get().getChatId();
+
+            logger.info("Bot started successfully");
+        }
 
     }
+
+
 
     private boolean checkBotStatus() {
         String urlString = TELEGRAM_API_URL + botToken + "/getMe";
@@ -74,9 +83,9 @@ public class TelegramClient {
     /**
      * Sends a message.
      */
-    public void sendMessage(String chatId, String message) {
+    public void sendMessage(long chatId, String message) {
         try {
-            sendChatAction(chatId, ENUM_CHAT_ACTION.typing);
+            sendChatAction(String.valueOf(chatId), ENUM_CHAT_ACTION.typing);
             String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
             String url = buildApiUrl("sendMessage", "chat_id=" + chatId, "text=" + encodedMessage, "parse_mode=Markdown");
             HttpResponse<String> response = sendRequest(url);

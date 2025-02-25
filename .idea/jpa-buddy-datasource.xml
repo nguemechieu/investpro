@@ -4,5 +4,8 @@
     <data-sources>
       <data-source id="fb4ef8f5-c1be-4c15-a1fc-43a5cf12143c" name="InvestPro" url="jdbc:mysql://localhost/InvestPro?useSSL=false&amp;allowMultiQueries=true&amp;serverTimezone=UTC" driverClass="com.mysql.cj.jdbc.Driver" />
     </data-sources>
+    <data-source-infos>
+      <data-source-info id="d16f123a-e5be-4ce0-9e32-acd1d8c4d081" persistence-unit-name="investpro:User" />
+    </data-source-infos>
   </component>
 </project>

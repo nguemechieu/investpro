@@ -79,6 +79,7 @@ public class CandleStickChartContainer extends Region {
                 toolbar.setActiveToolbarButton(secondsPerCandle);
                 animateInNewChart(candleStickChart);
             }
+            secondsPerCandle.set(60);
         });
 
     }
@@ -91,11 +92,7 @@ public class CandleStickChartContainer extends Region {
                 15,      // S15: 15 seconds
                 30,      // S30: 30 seconds
                 60,      // M1: 1 minute (60 seconds)
-//                120,     // M2: 2 minutes
-//                180,     // M3: 3 minutes
-//                240,     // M4: 4 minutes
                 300,     // M5: 5 minutes
-                600,     // M10: 10 minutes
                 900,     // M15: 15 minutes
                 1800,    // M30: 30 minutes
                 3600,    // H1: 1 hour (3600 seconds)

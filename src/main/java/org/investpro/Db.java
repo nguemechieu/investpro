@@ -91,4 +91,5 @@ public interface Db extends DataSource {
     Currency getCurrency(String code) throws SQLException;
 
 
+    void save(CandleData candle);
 }

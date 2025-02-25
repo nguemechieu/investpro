@@ -2,7 +2,6 @@ package org.investpro;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -17,15 +16,13 @@ public class TradeHistory {
     private final ConcurrentHashMap<TradePair, SIGNAL> signalMap = new ConcurrentHashMap<>();
 
     // Constructor (optional, but kept for extensibility)
-    public TradeHistory() throws Exception {
+    public TradeHistory() {
 
         // Initialize trade history with some sample data (optional)
         // Example:
 
 
-        addTrade(new Trade(TradePair.of("BTC", "USD"), 0.5, 0.01, Side.BUY, 1234567890L, Instant.now()));
-        addTrade(new Trade(TradePair.of("ETH", "USD"), 0.04, 0.05, Side.SELL, 9876543210L, Instant.now().plusSeconds(3600)));
-    }
+           }
 
     /**
      * Add a trade to the history.
@@ -34,6 +31,10 @@ public class TradeHistory {
      */
     public static void addTrade(@NotNull Trade trade) {
         tradeHistory.add(trade);
+    }
+
+    public static void addTrade(CandleData candleData) {
+
     }
 
     /**
@@ -125,5 +126,39 @@ public class TradeHistory {
     public double getEndTime() {
         if (tradeHistory.isEmpty()) return 0;
         return tradeHistory.getLast().getTimestamp().toEpochMilli();
+    }
+
+    public Long getTradeId(long orderId) {
+        for (Trade trade : tradeHistory) {
+            if (trade.getTradeId() == orderId) {
+                return orderId;
+            }
+        }
+        return 0L;
+    }
+
+   String status;
+
+    public Trade getTrade(long tradeId) {
+        return tradeHistory.stream()
+               .filter(trade -> trade.getTradeId() == tradeId).toList().getLast();
+    }
+
+    public void save(Trade tr) {
+        tradeHistory.add(tr);
+    }
+
+    public void put(Trade trade) {
+        tradeHistory.add(trade);
+    }
+
+    public void updateTradeHistory(Trade trade) {
+        for (int i = 0; i < tradeHistory.size(); i++) {
+            Trade t = tradeHistory.get(i);
+            if (t.getTradeId() == trade.getTradeId()) {
+                tradeHistory.set(i, trade);
+                break;
+            }
+        }
     }
 }
