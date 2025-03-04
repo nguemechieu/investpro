@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -28,8 +27,6 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     protected final int secondsPerCandle;
     protected final TradePair tradePair;
     protected final IntegerProperty endTime;
-    List<CandleData> candleDataList = new ArrayList<>();
-
     public CandleDataSupplier(int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
         Objects.requireNonNull(tradePair);
         Objects.requireNonNull(endTime);
@@ -45,29 +42,5 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     }
 
 
-
-
-
-  /**
-          * Returns a set of supported granularity values (in seconds) that this data supplier can provide.
-            *
-            * @return a set of integers representing supported granularity levels
- */
     public abstract Set<Integer> getSupportedGranularity();
-
-    /**
-     * Creates and returns a new {@code CandleDataSupplier} instance with the given granularity and trade pair.
-     *
-     * @param secondsPerCandle the time interval for each candle in seconds
-     * @param tradePair the trade pair for which the candle data should be supplied
-     * @return a new {@code CandleDataSupplier} instance
-     */
-    public abstract CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
-    public void add(CandleData of) {
-
-        candleDataList.add(of);
-
-    }
-
-
 }

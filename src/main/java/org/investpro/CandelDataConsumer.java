@@ -11,7 +11,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static org.investpro.ui.TradingWindow.db1;
+import static org.investpro.InvestPro.db1;
+
 
 /**
  * A consumer that processes incoming candle data and updates the chart accordingly.

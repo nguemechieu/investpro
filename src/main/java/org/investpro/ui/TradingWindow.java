@@ -10,7 +10,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.investpro.CurrencyDataProvider;
-import org.investpro.Db1;
 import org.investpro.Exchange;
 import org.investpro.Messages;
 import org.investpro.exchanges.Binance;
@@ -30,16 +29,14 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
+import static org.investpro.InvestPro.*;
 
 
 public class TradingWindow extends Region {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
 
-    private static final String CONFIG_FILE = "src/main/resources/config.properties";
-    private static final String CONFIG_FILE2 = "src/main/resources/config2.properties";
-    public static Db1 db1;
+
     private Exchange exchange;
     private final ComboBox<String> comboBox = new ComboBox<>();
     private final TextField apiKeyTextField = new TextField();
@@ -129,14 +126,15 @@ public class TradingWindow extends Region {
                 properties.setProperty("LOGIN_USERNAME", "");
                 properties.setProperty("LOGIN_PASSWORD", "");
                 saveProperties(properties);
-                try {
-                    new CurrencyDataProvider().registerCurrencies();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+
+            }
+            try {
+                CurrencyDataProvider.registerCurrencies();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         });
-        db1 = new Db1();
+
         Button loginSubmitButton = new Button("Login");
         Button signUpButton = new Button("Sign Up");
         signUpButton.setOnAction(_ -> createSignUpPage());
@@ -361,7 +359,7 @@ public class TradingWindow extends Region {
     private void launchTradingWindow() {
         getStyleClass().add("trading-window");
         logger.info("Initializing TradingWindow");
-        setPrefSize(1540, 780);
+        setPrefSize(1530, 780);
 
         GridPane gridPane = new GridPane();
         gridPane.setHgap(10);
@@ -423,7 +421,11 @@ public class TradingWindow extends Region {
                 props.setProperty("EXCHANGE_" + selectedExchange + "_SECRET_KEY", secretKeyTextField.getText());
                 saveProperties2(props);
                 logger.info("Settings saved for {}", selectedExchange);
+
+
             }
+
+
         });
 
         Button cancelBtn = new Button("Close");
@@ -469,12 +471,12 @@ public class TradingWindow extends Region {
                 }
                 logger.info("Exchange instance created for {}", comboBox.getValue());
                 logger.info("Starting trading window for {}", comboBox.getValue());
-                //  getChildren().forEach(child -> child.setVisible(false));
+
 
                 DisplayExchangeUI display = new DisplayExchangeUI(exchange);
                 StackPane root = new StackPane(display);
                 Scene scene = new Scene(root, 1530, 780);
-                scene.getStylesheets().add(Objects.requireNonNull(TradingWindow.class.getResource("/app.css")).toExternalForm());
+                scene.getStylesheets().add(Objects.requireNonNull(TradingWindow.class.getResource("/css/app.css")).toExternalForm());
                 Stage stage = new Stage();
                 stage.setTitle("Trading Window - " + comboBox.getValue());
                 stage.setScene(scene);

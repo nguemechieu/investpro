@@ -1,15 +1,11 @@
 package org.investpro;
 
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 import javafx.util.Pair;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 @Getter
 @Setter
@@ -98,7 +94,7 @@ public final class CandleStickChartUtils {
         }
 
         for (int i = windowSize; i < candleData.size(); i++) {
-            extrema.put((int) candleData.get(i - windowSize).getOpenTime(), new Pair<>(
+            extrema.put(candleData.get(i - windowSize).getOpenTime(), new Pair<>(
                     new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
                             Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
                     new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
@@ -149,7 +145,7 @@ public final class CandleStickChartUtils {
             candleMaxWindow.addLast(i);
         }
 
-        extrema.put((int) candleData.get(candleData.size() - windowSize).getOpenTime(), new Pair<>(
+        extrema.put(candleData.get(candleData.size() - windowSize).getOpenTime(), new Pair<>(
                 new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
                         Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
                 new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
@@ -182,7 +178,7 @@ public final class CandleStickChartUtils {
             currMinCandle = Math.min((int) candleData.get(i).getLowPrice(), prevMinCandle);
             currMaxCandle = Math.max((int) Math.ceil(candleData.get(i).getHighPrice()), prevMaxCandle);
 
-            extrema.put((int) candleData.get(i).getOpenTime(), new Pair<>(new Extrema((double) currMinVolume, (double) currMaxVolume),
+            extrema.put(candleData.get(i).getOpenTime(), new Pair<>(new Extrema((double) currMinVolume, (double) currMaxVolume),
                     new Extrema((double) currMinCandle, (double) currMaxCandle)));
 
             prevMinVolume = currMinVolume;

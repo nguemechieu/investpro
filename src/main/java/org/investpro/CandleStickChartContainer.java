@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * A {@link javafx.scene.layout.Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
+ * A {@link Region} that contains a {@code CandleStickChart} and a {@code CandleStickChartToolbar}.
  * The contained chart will display data for the given {@code tradePair}. The toolbar allows for changing
  * the duration in seconds of each candle as well as configuring the properties of the chart. When a new
  * duration is selected, this container automatically creates a new {@code CandleStickChart} and visually

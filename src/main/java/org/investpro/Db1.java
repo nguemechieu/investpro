@@ -12,6 +12,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.*;
+import java.util.HashMap;
 import java.util.Properties;
 
 @Getter
@@ -35,39 +36,26 @@ public class Db1 implements Db {
     public Db1() {
         loadProperties();
         initializeConnection();
-        initializeEntityManager();
+
+        Properties hibernateProps = new Properties();
+        hibernateProps.setProperty("jakarta.persistence.jdbc.url",
+                "jdbc:mysql://" + PROPERTIES.getProperty("DB_HOST", "localhost") + ":" +
+                        PROPERTIES.getProperty("DB_PORT", "3306") + "/" +
+                        PROPERTIES.getProperty("DB_NAME", "InvestPro") +
+                        "?useSSL=false&serverTimezone=UTC");
+
+        hibernateProps.setProperty("jakarta.persistence.jdbc.user", PROPERTIES.getProperty("DB_USER", "root"));
+        hibernateProps.setProperty("jakarta.persistence.jdbc.password", PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
+        hibernateProps.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
+
+        HashMap<Object, Object> mapper = new HashMap<>(hibernateProps);
+        logger.info("Setting{}", mapper);
+        entityManagerFactory = Persistence.createEntityManagerFactory("User", mapper);
+        entityManager = entityManagerFactory.createEntityManager();
     }
 
-    /**
-     * **Singleton Accessor**
-     */
-    public static synchronized Db1 getInstance() {
-        if (instance == null) {
-            instance = new Db1();
-        }
-        return instance;
-    }
 
-    /**
-     * **Get EntityManagerFactory Singleton**
-     */
-    public static EntityManagerFactory getEntityManagerFactory() {
-        if (entityManagerFactory == null) {
-            Properties hibernateProps = new Properties();
-            hibernateProps.setProperty("jakarta.persistence.jdbc.url",
-                    "jdbc:mysql://" + PROPERTIES.getProperty("DB_HOST", "localhost") + ":" +
-                            PROPERTIES.getProperty("DB_PORT", "3306") + "/" +
-                            PROPERTIES.getProperty("DB_NAME", "InvestPro") +
-                            "?useSSL=false&serverTimezone=UTC");
 
-            hibernateProps.setProperty("jakarta.persistence.jdbc.user", PROPERTIES.getProperty("DB_USER", "root"));
-            hibernateProps.setProperty("jakarta.persistence.jdbc.password", PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
-            hibernateProps.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
-
-            entityManagerFactory = Persistence.createEntityManagerFactory("users", hibernateProps);
-        }
-        return entityManagerFactory;
-    }
 
     /**
      * **Loads database properties from config.properties**
@@ -91,25 +79,14 @@ public class Db1 implements Db {
                     PROPERTIES.getProperty("DB_NAME", "InvestPro") + "?useSSL=false";
 
             this.conn = DriverManager.getConnection(url,
-                    PROPERTIES.getProperty("DB_USER", "admin"),
+                    PROPERTIES.getProperty("DB_USER", "root"),
                     PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
-            logger.info("✅ Connected to MySQL database successfully!");
+            if (conn != null) logger.info("✅ Connected to MySQL database successfully!");
         } catch (SQLException e) {
             logger.error("❌ Database connection error: {}", e.getMessage(), e);
         }
     }
 
-    /**
-     * **Initialize Hibernate Entity Manager**
-     */
-    private void initializeEntityManager() {
-        try {
-            this.entityManager = getEntityManagerFactory().createEntityManager();
-            logger.info("✅ Hibernate EntityManager initialized successfully.");
-        } catch (Exception e) {
-            logger.error("❌ Error initializing EntityManager: {}", e.getMessage(), e);
-        }
-    }
 
     /**
      * **Create Tables**

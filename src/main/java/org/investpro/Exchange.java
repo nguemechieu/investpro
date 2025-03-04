@@ -246,5 +246,4 @@ public abstract class Exchange {
     }
 
 
-    public abstract Set<Integer> getSupportedGranularity();
 }

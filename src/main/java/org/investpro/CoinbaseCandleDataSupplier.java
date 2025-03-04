@@ -19,8 +19,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
-import static org.investpro.exchanges.Coinbase.*;
 import static org.investpro.Exchange.logger;
+import static org.investpro.exchanges.Coinbase.*;
 import static org.investpro.exchanges.Oanda.numCandles;
 
 public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
@@ -41,11 +41,6 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
         return new TreeSet<>(Set.of(60, 300, 900, 3600, 21600, 86400
                 ));
 
-    }
-
-    @Override
-    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new CoinbaseCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
     @Override

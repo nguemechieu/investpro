@@ -312,7 +312,7 @@ String status;
                 } catch (Exception e) {
                     logger.error("Error tracking price for trade {}: {}", tradePair, e.getMessage());
                 }
-            }, 0, 1, TimeUnit.SECONDS); // Executes every 1 second
+            }, 6, 6, TimeUnit.SECONDS); // Executes every 1 second
         }
 
         /**

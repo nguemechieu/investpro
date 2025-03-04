@@ -26,39 +26,29 @@ import java.util.UUID;
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE) // Enable caching
 public class CandleData {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-increment ID
-    private Long id;
-
-    @Column(name = "open_price", nullable = false)
-    private double openPrice;
-
-    @Column(name = "close_price", nullable = false)
-    private double closePrice;
-
-    @Column(name = "high_price", nullable = false)
-    private double highPrice;
-
-    @Column(name = "low_price", nullable = false)
-    private double lowPrice;
-
-    @Column(name = "open_time", nullable = false)
-    private int openTime; // Unix timestamp
-
-    @Column(name = "close_time", nullable = false)
-    private int closeTime; // Unix timestamp
-
-    @Column(name = "volume", nullable = false)
-    private double volume;
-
-    @Column(name = "timeframe", nullable = false)
-    private int timeframe;
-
+    @Column(name = "open_price")
+    protected double openPrice;
+    @Column(name = "close_price")
+    protected double closePrice;
+    @Column(name = "high_price")
+    protected double highPrice;
+    @Column(name = "low_price")
+    protected double lowPrice;
+    @Column(name = "open_time")
+    protected int openTime; // Unix timestamp
+    @Column(name = "close_time")
+    protected int closeTime; // Unix timestamp
+    @Column(name = "volume")
+    protected double volume;
+    @Column(name = "timeframe")
+    protected int timeframe;
     @Column(name = "highlighted")
-    private boolean highlighted;
-
+    protected boolean highlighted;
     @Column(name = "place_holder")
-    private boolean placeHolder = false;
+    protected boolean placeHolder = false;
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO) // Auto-increment ID
+    private Long id;
 
     // ✅ Default constructor (Required for JPA)
     public CandleData() {

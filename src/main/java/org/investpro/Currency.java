@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -101,6 +102,12 @@ public   class Currency implements Comparable<Currency> {
             return cur;
 
 
+    }
+
+    public static void registerCurrencies(List<FiatCurrency> fiatCurrencies) {
+        for (FiatCurrency fiatCurrency : fiatCurrencies) {
+            Currency.save(fiatCurrency);
+        }
     }
 
     @Override

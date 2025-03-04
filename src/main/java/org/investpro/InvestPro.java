@@ -25,17 +25,18 @@ import static org.investpro.Exchange.logger;
 public class InvestPro extends Application {
 
     protected static final Properties PROPERTIES = new Properties();
-    private static final String CONFIG_FILE = "src/main/resources/config.properties";
-    private static final String CONFIG_FILE2 = "src/main/resources/config2.properties";
+    public static String CONFIG_FILE;
+    public static String CONFIG_FILE2;
     // Capitalized static variables for consistency
     protected static String DB_HOST;
     protected static String DB_NAME;
     protected static String DB_USER;
     protected static String DB_PASSWORD;
     protected static String DB_PORT;
+    public static Db1 db1;
 
     public static void main(String[] args) {
-        loadProperties(); // Load properties at startup
+        // Load properties at startup
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         logger.info("InvestPro started at {}", LocalDateTime.now().format(formatter));
         // db1.createTables();
@@ -75,13 +76,7 @@ public class InvestPro extends Application {
             DB_USER = PROPERTIES.getProperty("DB_USER", "root");
             DB_PORT = PROPERTIES.getProperty("DB_PORT", "3306");
 
-            // Set window icon
-            Image icon = new Image(Objects.requireNonNull(InvestPro.class.getResource("/img/investpro.png")).toExternalForm());
-            primaryStage.getIcons().add(icon);
 
-            // Set up the primary scene
-            Scene scene = new Scene(new TradingWindow(), width, height);
-            scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/app.css")).toExternalForm());
 
             // Set up the stage with a dynamic title
             primaryStage.setTitle(String.format("%s - © 2020-%s",
@@ -95,8 +90,24 @@ public class InvestPro extends Application {
             primaryStage.fullScreenProperty().addListener((_, _, newValue) ->
                     primaryStage.setFullScreen(newValue));
 
+
+            CONFIG_FILE = "src/main/resources/config.properties";
+            CONFIG_FILE2 = "src/main/resources/config2.properties";
+            loadProperties();
+            db1 = new Db1();
+            // Set window icon
+            Image icon = new Image(
+                    Objects.requireNonNull(InvestPro.class.getResource("/investpro_icon.png")).toExternalForm()
+            );
+            primaryStage.getIcons().add(icon);
+            // Set up the primary scene
+            Scene scene = new Scene(new TradingWindow(), width, height);
+            scene.getStylesheets().add(Objects.requireNonNull(InvestPro.class.getResource("/css/app.css")).toExternalForm());
+
             // Set the scene and display the stage
             primaryStage.setScene(scene);
+
+
             primaryStage.show();
 
         } catch (Exception e) {

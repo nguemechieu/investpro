@@ -216,17 +216,17 @@ public class CandleStickChartToolbar extends Region {
                 } else if (tool.tool != null && tool.tool.isRight()) {
                     tool.setOnAction(_ -> candleStickChart.changeNavigation(CandleStickChart.NavigationDirection.RIGHT));
                 } else if (tool.tool != null && tool.tool.isUp()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.UP));
+                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.UP));
                 } else if (tool.tool != null && tool.tool.isDown()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.DOWN));
+                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.DOWN));
                 } else if (tool.tool != null && tool.tool.isScreenshot()) {
                     tool.setOnAction(_ -> candleStickChart.captureScreenshot());
                 } else if (tool.tool != null && tool.tool.isScrollUp()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.UP));
+                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.UP));
 
 
                 } else if (tool.tool != null && tool.tool.isScrollDown()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(CandleStickChartToolbar.Tool.DOWN));
+                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.DOWN));
 
                 } else if (tool.tool != null && tool.tool.isGRID_TOGGLE()) {
                     tool.setOnAction(_ -> candleStickChart.setShowGrid(true));

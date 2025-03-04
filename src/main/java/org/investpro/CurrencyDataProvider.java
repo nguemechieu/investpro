@@ -17,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import static org.investpro.InvestPro.db1;
 import static org.investpro.exchanges.Coinbase.client;
 
 /**
@@ -26,12 +27,13 @@ public class CurrencyDataProvider {
     private static final Logger logger = LoggerFactory.getLogger(CurrencyDataProvider.class);
     @Getter
     private static final ArrayList<CoinInfo> coinInfoList = new ArrayList<>();
-    private final ArrayList<Currency> coinsToRegister = new ArrayList<>();
+    private static final ArrayList<Currency> coinsToRegister = new ArrayList<>();
 
     public CurrencyDataProvider() {
         logger.info("CryptoCurrencyDataProvider initialized.");
     }
-private static final Db1 db1=new Db1();
+
+
     public static void save(@NotNull ArrayList<Currency> collect) {
         for (Currency currency : collect) {
             if (currency == null) continue;
@@ -44,8 +46,7 @@ private static final Db1 db1=new Db1();
     }
 
 
-
-    public void registerCurrencies() {
+    public static void registerCurrencies() {
         String jsonUrl = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=BTC";
 
         HttpResponse<String> jsonResponse;

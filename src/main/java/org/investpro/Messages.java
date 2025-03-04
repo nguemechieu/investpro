@@ -3,37 +3,26 @@ package org.investpro;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
-import org.jetbrains.annotations.NotNull;
 
-public class Messages extends Region {
+public class Messages {
 
-    public Messages(@NotNull Alert.AlertType type, String message) {
+    public Messages(Alert.AlertType type, String message) {
         Alert alert = new Alert(type);
-        alert.setTitle("Notification");
-        alert.setHeaderText(null);  // No header text to keep it clean
+        alert.setTitle("InvestPro Notification");
+        alert.setHeaderText("InvestPro");
+        alert.setContentText(null); // We will use a TextArea for better readability.
 
-        // Create a TextArea to display the message
+        // Creating a TextArea for multi-line messages
         TextArea textArea = new TextArea(message);
-        textArea.setWrapText(true);  // Wrap long text
-        textArea.setEditable(false); // Prevent editing
-        textArea.setPrefSize(800, 300);  // Set preferred size
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefSize(450, 250);
 
-        // Wrap textArea inside VBox for proper layout
-        VBox content = new VBox(textArea);
-        content.setPrefSize(800, 300);
+        // Adjusting alert size
+        alert.getDialogPane().setContent(textArea);
+        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+        alert.getDialogPane().setMinWidth(Region.USE_PREF_SIZE);
 
-        // Set dialog size and content
-        alert.getDialogPane().setContent(content);
-        alert.getDialogPane().setMinSize(700, 300);
-        alert.getDialogPane().setPrefSize(800, 350);  // Customize this size as needed
-        alert.setResizable(true);
-        setPrefSize(
-                600, 600
-        );
-
-        // Show the dialog and wait for user interaction
-        alert.show();
-
+        alert.showAndWait();
     }
 }

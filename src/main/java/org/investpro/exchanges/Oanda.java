@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.uuid.Generators;
 import com.github.dockerjava.api.async.ResultCallback;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
@@ -164,7 +163,7 @@ public class Oanda extends Exchange {
         requestBuilder.uri(URI.create(
                 API_URL + "/accounts/%s/orders/%s".formatted(account_id, orderId) // OANDA requires account ID and order ID
         ));
-            requestBuilder.method("DELETE", HttpRequest.BodyPublishers.noBody());
+        requestBuilder.method("DELETE", HttpRequest.BodyPublishers.noBody());
 
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
@@ -315,6 +314,7 @@ public class Oanda extends Exchange {
         return new OandaCandleDataSupplier(secondsPerCandle, tradePair); // Custom class to handle OANDA candlestick data
     }
 
+
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
@@ -322,7 +322,7 @@ public class Oanda extends Exchange {
         Objects.requireNonNull(tradeConsumer);
 
         return CompletableFuture.supplyAsync(() -> {
-            String uriStr = API_URL + "/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
+            String uriStr = "https://stream-fxtrade.oanda.com/v3/accounts/" + account_id + "/pricing?instruments=" + tradePair.toString('_');
             requestBuilder.uri(URI.create(uriStr));
 
             int retryCount = 0;
@@ -534,10 +534,9 @@ public class Oanda extends Exchange {
 
         requestBuilder.uri(URI.create("%s/accounts/%s/positions".formatted(API_URL, account_id)));
         HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-       if ( response.statusCode()!=200)
-       {
-           throw new RuntimeException("Error fetching positions: %d".formatted(response.statusCode()));
-       }
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Error fetching positions: %d".formatted(response.statusCode()));
+        }
 
         logger.info("OANDA response2: {}", response.body());
 
@@ -604,60 +603,91 @@ public class Oanda extends Exchange {
     }
 
 
+
     @Override
     public List<TradePair> getTradePairs() throws Exception {
         String url = String.format("%s/accounts/%s/instruments", API_URL, account_id);
         requestBuilder.uri(URI.create(url));
 
         List<TradePair> tradePairs = new ArrayList<>();
-        HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() != 200) {
-            new Messages(Alert.AlertType.ERROR, String.format("%d\n\n%s", response.statusCode(), response.body()));
-            return tradePairs; // Return an empty list if the request fails
-        }
+        // Implementing a retry mechanism with exponential backoff
+        int retries = 5;
+        int waitTime = 1000; // Initial wait time of 1 second (in milliseconds)
+        while (retries > 0) {
+            try {
+                HttpResponse<String> response = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
-        JsonNode res = new ObjectMapper().readTree(response.body());
-        logger.info("OANDA response: {}", res);
+                if (response.statusCode() == 429) {
+                    // If the status code is 429, we are rate-limited, so retry with exponential backoff
+                    logger.warn("Rate limited. Retrying in {} ms", waitTime);
+                    TimeUnit.MILLISECONDS.sleep(waitTime);
+                    waitTime *= 2;  // Exponential backoff
+                    retries--;
+                    continue;
+                }
 
-        JsonNode instruments = res.get("instruments");
-        if (instruments == null) {
-            logger.warn("No instruments found in OANDA response.");
-            return tradePairs;
-        }
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException(String.format("Error fetching trade pairs: %s", response));
+                }
 
-        for (JsonNode instrument : instruments) {
-            String[] currencyPair = instrument.get("name").asText().split("_");
-            if (currencyPair.length != 2) {
-                logger.warn("Invalid currency pair format: {}", instrument.get("name").asText());
-                continue;
-            }
+                JsonNode res = new ObjectMapper().readTree(response.body());
+                logger.info("OANDA response: {}", res);
 
-            String baseCurrencyCode = currencyPair[0];
-            String counterCurrencyCode = currencyPair[1];
+                JsonNode instruments = res.get("instruments");
+                if (instruments == null) {
+                    logger.warn("No instruments found in OANDA response.");
+                    return tradePairs;
+                }
 
+                // Parse the response and build the trade pairs list
+                for (JsonNode instrument : instruments) {
+                    String[] currencyPair = instrument.get("name").asText().split("_");
+                    if (currencyPair.length != 2) {
+                        logger.warn("Invalid currency pair format: {}", instrument.get("name").asText());
+                        continue;
+                    }
 
-            // Fetch or create base currency
-            Currency baseCurrency = Currency.of(baseCurrencyCode);
+                    String baseCurrencyCode = currencyPair[0];
+                    String counterCurrencyCode = currencyPair[1];
 
-            // Fetch or create counter currency
-            Currency counterCurrency = Currency.of(counterCurrencyCode);
+                    // Fetch or create base currency
+                    Currency baseCurrency = Currency.of(baseCurrencyCode);
 
-            // Ensure currencies are different before creating a trade pair
-            if (!baseCurrency.getCode().equals(counterCurrency.getCode())) {
-                TradePair tradePair = new TradePair(baseCurrency, counterCurrency);
-                tradePair.getBaseCurrency().setCurrencyType(CurrencyType.FIAT.name());
-                tradePair.getCounterCurrency().setCurrencyType(CurrencyType.FIAT.name());
+                    // Fetch or create counter currency
+                    Currency counterCurrency = Currency.of(counterCurrencyCode);
 
-                tradePairs.add(tradePair);
-                logger.info("✅ OANDA trade pair created: {}", tradePair);
-            } else {
-                logger.warn("⚠ Skipping invalid trade pair: {} / {}", baseCurrency.getCode(), counterCurrency.getCode());
+                    // Ensure currencies are different before creating a trade pair
+                    if (!baseCurrency.getCode().equals(counterCurrency.getCode())) {
+                        TradePair tradePair = new TradePair(baseCurrency, counterCurrency);
+                        tradePair.getBaseCurrency().setCurrencyType(CurrencyType.FIAT.name());
+                        tradePair.getCounterCurrency().setCurrencyType(CurrencyType.FIAT.name());
+
+                        tradePairs.add(tradePair);
+                        logger.info("✅ OANDA trade pair created: {}", tradePair);
+                    } else {
+                        logger.warn("⚠ Skipping invalid trade pair: {} / {}", baseCurrency.getCode(), counterCurrency.getCode());
+                    }
+                }
+
+                // If successful, break out of the loop
+                break;
+            } catch (Exception e) {
+                if (retries == 0) {
+                    logger.error("Max retries reached. Unable to fetch trade pairs.", e);
+                    throw e;  // Rethrow exception after max retries
+                } else {
+                    logger.warn("Error fetching trade pairs, retrying... {}", e.getMessage());
+                    retries--;
+                    TimeUnit.MILLISECONDS.sleep(waitTime);
+                    waitTime *= 2; // Exponential backoff
+                }
             }
         }
 
         return tradePairs;
     }
+
 
     @Override
     public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
@@ -1050,21 +1080,6 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public Set<Integer> getSupportedGranularity() {
-        return Set.of(
-                CandlestickInterval.ONE_MINUTE.getSeconds(),
-                CandlestickInterval.FIVE_MINUTES.getSeconds(),
-                CandlestickInterval.THIRTY_MINUTES.getSeconds(),
-                CandlestickInterval.ONE_HOUR.getSeconds(),
-                CandlestickInterval.FOUR_HOURS.getSeconds(),
-                CandlestickInterval.SIX_HOURS.getSeconds(),
-                CandlestickInterval.DAY.getSeconds(),
-                CandlestickInterval.WEEK.getSeconds(),
-                CandlestickInterval.MONTH.getSeconds()
-        );
-    }
-
-    @Override
     public double fetchLivesBidAsk(@NotNull TradePair tradePair) {
         try {
             // Construct OANDA API URL for fetching pricing data
@@ -1119,8 +1134,8 @@ public class Oanda extends Exchange {
         return 0;
     }
 
-@Getter
-@Setter
+    @Getter
+    @Setter
     public static class OandaCandleDataSupplier extends CandleDataSupplier {
 
         private static final Logger logger = LoggerFactory.getLogger(OandaCandleDataSupplier.class);
@@ -1155,12 +1170,6 @@ public class Oanda extends Exchange {
         private static final long RATE_LIMIT_DELAY_MS = 1000; // 1 sec between requests
         private static final Map<Integer, List<CandleData>> candleCache = new ConcurrentHashMap<>();
         private final Semaphore rateLimiter = new Semaphore(1); // Prevents exceeding API limits
-
-        @Override
-        public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            return
-                    new OandaCandleDataSupplier(secondsPerCandle, tradePair);
-        }
 
         private String validateGranularity(int granularity) {
             Map<Integer, String> granularityMap = Map.of(
@@ -1200,7 +1209,7 @@ public class Oanda extends Exchange {
             return fetchWithRetries(uriStr, retries);
         }
 
-    private @NotNull CompletableFuture<List<CandleData>> fetchWithRetries(String url, int retryCount) {
+        private @NotNull CompletableFuture<List<CandleData>> fetchWithRetries(String url, int retryCount) {
             return CompletableFuture.runAsync(() -> {
                 try {
                     rateLimiter.acquire();

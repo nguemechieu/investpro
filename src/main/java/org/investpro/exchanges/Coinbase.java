@@ -510,7 +510,7 @@ public  class Coinbase extends Exchange {
 
             //coinbase response: [{"id":"DOGE-BTC","base_currency":"DOGE","quote_currency":"BTC","quote_increment":"0.00000001","base_increment":"0.1","display_name":"DOGE-BTC","min_market_funds":"0.000016","margin_enabled":false,"post_only":false,"limit_only":false,"cancel_only":false,"status":"online","status_message":"","trading_disabled":false,"fx_stablecoin":false,"max_slippage_percentage":"0.03000000","auction_mode":false,
             for (JsonNode rate : res) {
-                org.investpro.Currency baseCurrency, counterCurrency;
+                Currency baseCurrency, counterCurrency;
 
 
                 String fullDisplayName = rate.get("base_currency").asText();
@@ -591,21 +591,6 @@ public  class Coinbase extends Exchange {
     @Override
     public List<Account> getAccountSummary() {
         return List.of();
-    }
-
-    @Override
-    public Set<Integer> getSupportedGranularity() {
-        return Set.of(
-                CandlestickInterval.ONE_MINUTE.getSeconds(),
-                CandlestickInterval.FIVE_MINUTES.getSeconds(),
-                CandlestickInterval.THIRTY_MINUTES.getSeconds(),
-                CandlestickInterval.ONE_HOUR.getSeconds(),
-                CandlestickInterval.FOUR_HOURS.getSeconds(),
-                CandlestickInterval.SIX_HOURS.getSeconds(),
-                CandlestickInterval.DAY.getSeconds(),
-                CandlestickInterval.WEEK.getSeconds(),
-                CandlestickInterval.MONTH.getSeconds()
-        );
     }
 
     @Override

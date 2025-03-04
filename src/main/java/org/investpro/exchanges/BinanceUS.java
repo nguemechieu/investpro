@@ -957,7 +957,6 @@ public class BinanceUS extends Exchange {
 //           });
             }
 
-            ;
         };
 
 
@@ -965,21 +964,6 @@ public class BinanceUS extends Exchange {
     @Override
     public List<Account> getAccountSummary() {
         return List.of();
-    }
-
-    @Override
-    public Set<Integer> getSupportedGranularity() {
-        return Set.of(
-                CandlestickInterval.ONE_MINUTE.getSeconds(),
-                CandlestickInterval.FIVE_MINUTES.getSeconds(),
-                CandlestickInterval.THIRTY_MINUTES.getSeconds(),
-                CandlestickInterval.ONE_HOUR.getSeconds(),
-                CandlestickInterval.FOUR_HOURS.getSeconds(),
-                CandlestickInterval.SIX_HOURS.getSeconds(),
-                CandlestickInterval.DAY.getSeconds(),
-                CandlestickInterval.WEEK.getSeconds(),
-                CandlestickInterval.MONTH.getSeconds()
-        );
     }
 
 
@@ -1001,12 +985,6 @@ public class BinanceUS extends Exchange {
             // Binance uses fixed time intervals (1m, 3m, 5m, etc.)
             // Here we map them to seconds
             return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400));
-        }
-
-        @Contract("_, _ -> new")
-        @Override
-        public @NotNull CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-            return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair);
         }
 
         @Override

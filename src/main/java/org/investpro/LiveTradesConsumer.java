@@ -20,7 +20,9 @@ public  class LiveTradesConsumer {
     private final List<TradePair> tradePairs = new ArrayList<>();
 
     public Account account;
-    List<Trade> livesTrades = new ArrayList<>();
+    List<Trade> livesTrades = new ArrayList<>(
+
+    );
     private boolean ready;
 
     protected InProgressCandle inProgressCandle;
@@ -115,7 +117,7 @@ public  class LiveTradesConsumer {
         this.tradePairs.clear();
 
         this.exchange.clear();
-        this.inProgressCandle = null;
+        this.inProgressCandle = new InProgressCandle();
         this.ready = false;
 
     }
@@ -146,6 +148,12 @@ public  class LiveTradesConsumer {
     }
 
     public void accept(List<CandleData> candleData) {
+
+
+        if (candleData.isEmpty()) {
+            logger.info("No candle data received on LiveTradesConsumer");
+            return; // No candle data to process
+        }
         // Implement the logic to process the candle data (e.g., update the in-progress candle, etc.)
         logger.debug("Processing candle data: {}", candleData);
 

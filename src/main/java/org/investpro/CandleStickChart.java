@@ -1,7 +1,6 @@
 package org.investpro;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -59,6 +58,7 @@ import org.investpro.ai.TradeStrategy;
 import org.investpro.ai.TradingAI;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import weka.core.Attribute;
@@ -87,7 +87,10 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.ObjDoubleConsumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -96,10 +99,11 @@ import static org.investpro.CandleStickChartUtils.*;
 import static org.investpro.ChartColors.DarkTheme.*;
 import static org.investpro.ChartColors.LightTheme.BEAR_CANDLE_FILL_COLOR;
 import static org.investpro.ChartColors.LightTheme.BULL_CANDLE_FILL_COLOR;
+import static org.investpro.InvestPro.db1;
 import static org.investpro.Side.BUY;
 import static org.investpro.Side.SELL;
 import static org.investpro.exchanges.Oanda.granularityToString;
-import static org.investpro.ui.TradingWindow.db1;
+
 
 /**
  * A resizable chart that allows for analyzing the trading activity of a commodity over time. The chart is made up of
@@ -158,6 +162,7 @@ public class CandleStickChart extends Region {
 
 
     private final EventHandler<ScrollEvent> scrollHandler;
+    private final CandelDataConsumer candleDataConsumer;
     TextField size_textField = new TextField();
     /**
      * Draws the chart contents on the canvas ensuring the latest data is always displayed first.
@@ -234,113 +239,12 @@ public class CandleStickChart extends Region {
     // Adjust based on performance needs
     private EventHandler<MouseEvent> mouseDraggedHandler;
     private KeyEventHandler keyHandler;
-    private final NavigableMap<Integer, CandleData> data = new ConcurrentSkipListMap<>();
+    private NavigableMap<Integer, CandleData> data;
     private List<Trade> prices1;
     private long chartId;
     List<Trade> consumersTradeList=new ArrayList<>();
     private Consumer<List<Trade>> tradeConsumer=(c)-> consumersTradeList.addAll(c);
 
-    private List<CandleData> fetchHistoricalData(TradePair tradePair, int pageIndex, int pageSize) {
-        try {
-            // Fetch data from the database or API with limit and offset
-            return getCandleData(tradePair, secondsPerCandle,pageIndex * pageSize, pageSize);
-        } catch (Exception e) {
-            logger.error("Failed to fetch historical data for {}: {}", tradePair, e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
-
-        /**
-         * Fetch historical candle data with pagination
-         *
-         * @param tradePair The currency pair (e.g., "EUR/USD").
-         * @param offset    The starting point for fetching data.
-         * @param pageSize  The number of records to fetch.
-         * @return List of CandleData objects.
-         */
-        public List<CandleData> getCandleData(@NotNull TradePair tradePair, int timeframe, int offset, int pageSize) {
-
-            try (EntityManager em = db1.entityManager.getEntityManagerFactory().createEntityManager()) {
-                List<CandleData> result; // Default empty list
-                result = em.createQuery(
-                                "SELECT c FROM CandleData c WHERE c.tradePair = :tradePair AND c.timeframe = :timeframe ORDER BY c.openTime DESC",
-                                CandleData.class)
-                        .setParameter("tradePair", tradePair)
-                        .setParameter("timeframe", timeframe) // Fix incorrect parameter binding
-                        .setFirstResult(offset)
-                        .setMaxResults(pageSize)
-                        .getResultList();
-
-                if (result.isEmpty()) {
-                    logger.warn("No candle data found for TradePair: {} with timeframe: {}", tradePair, timeframe);
-                    return updateInProgressCandleTask.getInProgressCandle().getCandleData();
-                }
-                return result;
-            } catch (Exception e) {
-                logger.error("Error fetching CandleData: {}", e.getMessage(), e);
-                return updateInProgressCandleTask.getInProgressCandle().getCandleData(); // Return in-progress candle data as fallback
-            }
-            // Ensure EntityManager is closed properly
-        }
-
-
-
-    private void updateXAxisFormat(int secondsPerCandle, ZoneId timeZone) {
-
-
-        if (secondsPerCandle <= 60) {
-            // 1-minute and below (Intraday Trading)
-
-            formatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(timeZone);
-        } else if (secondsPerCandle <= 14400) {
-            // 1-minute to 4-hour timeframe
-
-            formatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm").withZone(timeZone);
-        } else if (secondsPerCandle <= 86400) {
-            // Daily timeframe
-            formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy").withZone(timeZone);
-        } else {
-            // Weekly, Monthly, or higher
-            formatter = DateTimeFormatter.ofPattern("MMM yyyy").withZone(timeZone);
-        }
-
-        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(formatter));
-    }
-
-
-    private int totalPages = 1;
-
-    private List<CandleData> allCandles = new ArrayList<>(); // Stores all candles
-    private List<CandleData> paginatedCandles = new ArrayList<>(); // Current page candles
-    private CandleDataPager candleDataPager;
-    private String chatId;
-    private ProgressIndicator progressIndicator;
-    private Font canvasNumberFont;
-    private Thread autoScrollThread;
-    private Tooltip tooltip = new Tooltip();
-    private int chartPadding = 10;
-    private String telegramBotToken;
-    private EventHandler<? super MouseEvent> mouseClickedHandler;
-    private EventHandler<? super MouseEvent> mouseMovedHandler;
-    private EventHandler<? super MouseEvent> mouseReleasedHandler;
-    private EventHandler<? super MouseEvent> mousePressedHandler;
-    private TradeStrategy tradeStrategy;
-    private EventHandler<? super ContextMenuEvent> contextMenuHandler;
-    private XYChart.Data<CandleData, CandleData> hoveredDataItem = new XYChart.Data<>();
-    private int numCandlesToSkip;
-    private Canvas overlayCanvas;
-    private double trailingStopPrice = 0.0;
-    private double mouseDownX;
-    private double mouseDownY;
-    private boolean isDragging = false;
-    private ScheduledExecutorService tooltipExecutor = Executors.newSingleThreadScheduledExecutor();
-    private ScheduledExecutorService autoScrollExecutor = Executors.newSingleThreadScheduledExecutor();
-    private GraphicsContext overlayGC;
-    // Labels for time (X-axis) and price (Y-axis)
-    private Label timeLabel = new Label();
-    private Label priceLabel = new Label();
-private Trade trade;
     /**
      * Creates a new {@code CandleStickChart}. This constructor is package-private because it should only
      * be instantiated by a {@link CandleStickChartContainer}.
@@ -356,7 +260,7 @@ private Trade trade;
      * @param containerWidth     the width property of the parent node that contains the chart
      * @param containerHeight    the height property of the parent node that contains the chart
      */
-    CandleStickChart(Exchange exchange, TradePair tradePair,
+    public CandleStickChart(Exchange exchange, TradePair tradePair,
                      boolean liveSyncing, int secondsPerCandle, ObservableNumberValue containerWidth,
                      ObservableNumberValue containerHeight, TelegramClient telegramBot) throws Exception, TelegramApiException {
 
@@ -401,6 +305,7 @@ private Trade trade;
         xAxis.setSide(Side.BOTTOM);
         yAxis.setSide(Side.RIGHT);
         extraAxis.setSide(Side.LEFT);
+
         xAxis.setForceZeroInRange(false);
         yAxis.setForceZeroInRange(false);
         updateXAxisFormat(secondsPerCandle, ZoneId.systemDefault());
@@ -413,24 +318,6 @@ private Trade trade;
         ToolBar trades_setting = new ToolBar();
         trades_setting.setBackground(Background.fill(Color.TRANSPARENT));
         // Thread pool for updating the current in-progress candle
-
-
-        this.trade = new Trade(exchange, tradePair, BUY, ENUM_ORDER_TYPE.STOP_LOSS, BigDecimal.valueOf(0), BigDecimal.valueOf(10), new Date().toInstant(),BigDecimal.valueOf(stopLoss), BigDecimal.valueOf(takeProfit));
-
-
-
-
-
-// Thread pool for fetching new candle data periodically
-
-
-
-
-
-// Define the runnable task to update candles periodically
-
-
-
 
 
         trades_setting.setPadding(new Insets(5, 5, 5, 5));
@@ -456,16 +343,6 @@ private Trade trade;
 
 
 
-        Button sellButton = new Button("Sell");
-
-        this.tradeHistory = new TradeHistory();
-        trades_setting.getItems().addAll(buyButton, sellButton, stopLossTextField, takeProfitTextField);
-
-        trades_setting.setTranslateX(100);
-        trades_setting.setTranslateY(chartHeight - 250);
-        takeProfitTextField.setPrefWidth(100);
-        stopLossTextField.setPrefWidth(100);
-        getChildren().addAll(trades_setting);
         VBox loadingIndicatorContainer = new VBox(progressIndLbl, progressIndicator);
         progressIndicator.setPrefSize(40, 40);
 
@@ -483,26 +360,31 @@ private Trade trade;
 // Get the candle data supplier from the exchange
 
 // Initialize candle data pager & consumer
-        this.candleDataPager = new CandleDataPager(this, exchange.getCandleDataSupplier(secondsPerCandle,tradePair));
-        candleDataPager.setInProgressCandle(new CandleData());
-        candleDataPager.getCandleDataPreProcessor().accept( CompletableFuture.completedFuture(exchange.getCandleDataSupplier(secondsPerCandle,tradePair).get().get().stream().toList()));
-        Consumer<CompletableFuture<List<CandleData>>> response = candleDataPager.getCandleDataPreProcessor().andThen(
-                (rx) -> Platform.runLater(() -> {
-                    try {
-                        if (rx != null && !rx.get().isEmpty()) {
-                            data.clear();
-                            data.values().addAll(rx.get());
-                            drawChartContents(true, 0);
-                        } else {
-                            logger.warn("No data received for chart updates.");
-                        }
-                    } catch (InterruptedException | ExecutionException e) {
-                        throw new RuntimeException(e);
-                    }
-                }));
-        logger.info("Chart updates{}",response);
+        this.candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle, tradePair);
+        this.candleDataConsumer = new CandelDataConsumer(this);
 
+        // Initialize candle data pager & consumer
+        this.candleDataPager = new CandleDataPager(this, candleDataSupplier);
+
+        data = new ConcurrentSkipListMap<>();
+        for (CandleData candleData : candleDataSupplier.get().get()) {
+            data.put(candleData.getOpenTime(), candleData);
+        }
+
+        Button sellButton = new Button("Sell");
+        this.trade = new Trade(exchange, tradePair, BUY, ENUM_ORDER_TYPE.STOP_LOSS, BigDecimal.valueOf(0), BigDecimal.valueOf(10), new Date().toInstant(), BigDecimal.valueOf(stopLoss), BigDecimal.valueOf(takeProfit));
+
+        this.tradeHistory = new TradeHistory();
+        trades_setting.getItems().addAll(buyButton, sellButton, stopLossTextField, takeProfitTextField);
+
+        trades_setting.setTranslateX(100);
+        trades_setting.setTranslateY(chartHeight - 250);
+        takeProfitTextField.setPrefWidth(100);
+        stopLossTextField.setPrefWidth(100);
+        getChildren().addAll(trades_setting);
         this.candlePageConsumer = new CandelDataConsumer(this);
+
+
         Consumer<List<CandleData>> re1 = candlePageConsumer.andThen(
                 (rx) -> Platform.runLater(() -> {
                     if (rx != null && !rx.stream().toList().isEmpty()) {
@@ -522,9 +404,7 @@ private Trade trade;
                         .await(10, TimeUnit.SECONDS);
                 updateInProgressCandleTask.inProgressCandle=inProgressCandle;
 
-                updateInProgressCandleTask.accept(candleDataPager.getCandleDataList());
-                updateInProgressCandleTask.run();
-                updateInProgressCandleTask.setReady(true);
+
 
                 if (!initialized) {
                     logger.error("Websocket failed to initialize for {}", tradePair);
@@ -532,6 +412,11 @@ private Trade trade;
                     logger.info("Websocket initialized for {}", tradePair);
                     exchange.getWebsocketClient(exchange, tradePair, secondsPerCandle)
                             .streamLiveTrades(tradePair, updateInProgressCandleTask);
+
+                    current_price = updateInProgressCandleTask.livesTrades.getLast().getCurrentPrice();
+
+
+
                     Platform.runLater(() -> drawChartContents(true, 0)); // Force update after websocket data
                 }
             } catch (Exception e) {
@@ -540,12 +425,6 @@ private Trade trade;
         }, 5, 5, TimeUnit.SECONDS);
 
 
-        this.mouseClickedHandler = getMouseClickHandlers();
-        this.mouseMovedHandler = getMouseMovedHandlers();
-        this.scrollHandler = getScrollHandlers();
-        this.mousePressedHandler = getMousePressedHandlers();
-        this.mouseReleasedHandler = getMouseReleasedHandlers();
-        this.contextMenu = getContextMenus();
         Platform.runLater(() -> getChildren().addAll(xAxis, yAxis, extraAxis,canvas, overlayCanvas));
 
 
@@ -556,7 +435,12 @@ private Trade trade;
         containerHeight.addListener(sizeListener);
 
 
-
+        this.mouseClickedHandler = getMouseClickHandlers();
+        this.mouseMovedHandler = getMouseMovedHandlers();
+        this.scrollHandler = getScrollHandlers();
+        this.mousePressedHandler = getMousePressedHandlers();
+        this.mouseReleasedHandler = getMouseReleasedHandlers();
+        this.contextMenu = getContextMenus();
 
 
 
@@ -579,6 +463,8 @@ private Trade trade;
                         "Chart size: " + chartWidth + "x" + chartHeight, 0, 10
                 );
                 overlayCanvas.setTranslateX(60);
+                overlayCanvas.setWidth(chartWidth);
+                overlayCanvas.setHeight(chartHeight);
 
 
                 currZoomLevel = new ZoomLevel(0, candleWidth, secondsPerCandle, canvas.widthProperty(), new InstantAxisFormatter(DateTimeFormatter.ISO_INSTANT), candleWidth);
@@ -594,16 +480,7 @@ private Trade trade;
                 //Set the layout
                 layoutChart();
 
-                Platform.runLater(() -> {
-                    double width = Math.max(300, containerWidth.getValue().doubleValue());
-                    double height = Math.max(300, containerHeight.getValue().doubleValue());
 
-                    canvas.setWidth(width - 100);
-                    canvas.setHeight(height - 100);
-
-                    overlayCanvas.setTranslateX(60);
-                    drawChartContents(true, 0);
-                });
 
                 // Set event handlers
                 canvas.setOnMouseEntered(_ -> canvas.getScene().setCursor(Cursor.HAND));
@@ -622,6 +499,19 @@ private Trade trade;
                 // Initialize the  scroll
                 initializeMomentumScrolling(); // Enable momentum scrolling
 
+                CompletableFuture.supplyAsync(candleDataPager.getCandleDataSupplier())
+                        .thenAccept(candleDataPager.getCandleDataPreProcessor()
+                        ).exceptionallyAsync(
+                                e -> {
+                                    logger.error("Error processing candle data: ", e);
+                                    return null;
+                                }
+                        );
+
+
+
+
+
 
                 chartOptions.horizontalGridLinesVisibleProperty().addListener((_, _, _) ->
                         drawChartContents(true,0));
@@ -630,7 +520,16 @@ private Trade trade;
                 chartOptions.showVolumeProperty().addListener((_, _, _) -> drawChartContents(true,0));
                 chartOptions.alignOpenCloseProperty().addListener((_, _, _) -> drawChartContents(true,0));
 
+                Platform.runLater(() -> {
+                    double width = Math.max(300, containerWidth.getValue().doubleValue());
+                    double height = Math.max(300, containerHeight.getValue().doubleValue());
 
+                    canvas.setWidth(width - 100);
+                    canvas.setHeight(height - 100);
+
+                    overlayCanvas.setTranslateX(60);
+                    drawChartContents(true, 0);
+                });
 
                 gotFirstSize.removeListener(this);
             }
@@ -695,6 +594,107 @@ private Trade trade;
 
 
     }
+
+    private List<CandleData> fetchHistoricalData(TradePair tradePair, int pageIndex, int pageSize) {
+        try {
+            // Fetch data from the database or API with limit and offset
+            return candleDataSupplier.get().get();//(tradePair, secondsPerCandle,pageIndex * pageSize, pageSize);
+        } catch (Exception e) {
+            logger.error("Failed to fetch historical data for {}: {}", tradePair, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+
+
+    private void updateXAxisFormat(int secondsPerCandle, ZoneId timeZone) {
+
+
+        if (secondsPerCandle <= 60) {
+            // 1-minute and below (Intraday Trading)
+
+            formatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(timeZone);
+        } else if (secondsPerCandle <= 14400) {
+            // 1-minute to 4-hour timeframe
+
+            formatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm").withZone(timeZone);
+        } else if (secondsPerCandle <= 86400) {
+            // Daily timeframe
+            formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy").withZone(timeZone);
+        } else {
+            // Weekly, Monthly, or higher
+            formatter = DateTimeFormatter.ofPattern("MMM yyyy").withZone(timeZone);
+        }
+
+        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(formatter));
+    }
+
+
+    private int totalPages = 1;
+
+    private List<CandleData> allCandles = new ArrayList<>(); // Stores all candles
+    private List<CandleData> paginatedCandles = new ArrayList<>(); // Current page candles
+    private CandleDataPager candleDataPager;
+    private String chatId;
+    private ProgressIndicator progressIndicator;
+    private Font canvasNumberFont;
+    private Thread autoScrollThread;
+    private Tooltip tooltip = new Tooltip();
+    private int chartPadding = 10;
+    private String telegramBotToken;
+    private EventHandler<? super MouseEvent> mouseClickedHandler;
+    private EventHandler<? super MouseEvent> mouseMovedHandler;
+    private EventHandler<? super MouseEvent> mouseReleasedHandler;
+    private EventHandler<? super MouseEvent> mousePressedHandler;
+    private TradeStrategy tradeStrategy;
+    private EventHandler<? super ContextMenuEvent> contextMenuHandler;
+    private XYChart.Data<CandleData, CandleData> hoveredDataItem = new XYChart.Data<>();
+    private int numCandlesToSkip;
+    private Canvas overlayCanvas;
+    private double trailingStopPrice = 0.0;
+    private double mouseDownX;
+    private double mouseDownY;
+    private boolean isDragging = false;
+    private ScheduledExecutorService tooltipExecutor = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledExecutorService autoScrollExecutor = Executors.newSingleThreadScheduledExecutor();
+    private GraphicsContext overlayGC;
+    // Labels for time (X-axis) and price (Y-axis)
+    private Label timeLabel = new Label();
+    private Label priceLabel = new Label();
+private Trade trade;
+
+        /**
+         * Fetch historical candle data with pagination
+         *
+         * @param tradePair The currency pair (e.g., "EUR/USD").
+         * @param offset    The starting point for fetching data.
+         * @param pageSize  The number of records to fetch.
+         * @return List of CandleData objects.
+         */
+        public List<CandleData> getCandleData(@NotNull TradePair tradePair, int timeframe, int offset, int pageSize) {
+
+            try (EntityManager em = db1.entityManager.getEntityManagerFactory().createEntityManager()) {
+                List<CandleData> result; // Default empty list
+                result = em.createQuery(
+                                "SELECT c FROM CandleData c WHERE  c.timeframe = :timeframe ORDER BY c.openTime DESC",
+                                CandleData.class)
+
+                        .setParameter("timeframe", timeframe) // Fix incorrect parameter binding
+                        .setFirstResult(offset)
+                        .setMaxResults(pageSize)
+                        .getResultList();
+
+                if (result.isEmpty()) {
+                    logger.warn("No candle data found for TradePair: {} with timeframe: {}", tradePair, timeframe);
+                    return updateInProgressCandleTask.getInProgressCandle().getCandleData();
+                }
+                return result;
+            } catch (Exception e) {
+                logger.error("Error fetching CandleData: {}", e.getMessage(), e);
+                return updateInProgressCandleTask.getInProgressCandle().getCandleData(); // Return in-progress candle data as fallback
+            }
+            // Ensure EntityManager is closed properly
+        }
 
     private void trades_setting_save() {
         Properties config = new Properties();
@@ -1047,18 +1047,13 @@ private Trade trade;
         }
     }
 
-    private void trainAIWithHistoricalData(List<CandleData> candles) {
+    private TradingAI trainAIWithHistoricalData(List<CandleData> candles) {
         if (candles.isEmpty()) {
             logger.info("No historical data available for training AI");
-            return;
+            return null;
         }
 
         try {
-
-
-            // Fetch historical market data
-            List<CandleData> historicalData = new ArrayList<>(candles);// Example: 500 candles
-
             // Define attributes
             ArrayList<Attribute> attributes = new ArrayList<>();
             attributes.add(new Attribute("open"));
@@ -1093,34 +1088,64 @@ private Trade trade;
                 instance.setValue(attributes.get(5), classValues.indexOf(signal));
 
                 trainingData.add(instance);
-            }// Normalize data before training AI
-            for (int i = 0; i < trainingData.numAttributes() - 1; i++) {
-                double mean = trainingData.attributeStats(i).numericStats.mean;
-                double stdDev = trainingData.attributeStats(i).numericStats.stdDev;
-                for (int j = 0; j < trainingData.numInstances(); j++) {
-                    trainingData.instance(j).setValue(i, (trainingData.instance(j).value(i) - mean) / stdDev);
+            }
+
+            // Normalize data before training AI
+            normalizeData(trainingData);
+
+            File modelFile = new File("ai_trading_model.model");
+
+            // Load model if exists
+            if (modelFile.exists()) {
+                @Nullable Object tradingAI0 = readModel(modelFile);
+                if (tradingAI0 == null) {
+                    // Load model failed, fallback to default AI
+                    tradingAI = new TradingAI(trainingData);
+                    tradingAI.trainModel();
+                    logger.info("AI Model successfully trained with historical market data, but loading failed. Using default AI.");
+                    // Save model after training
+                    SerializationHelper.write("ai_trading_model.model", trainingData);
+                    logger.info("AI Model saved to file.");
                 }
-            }
 
-            // Train AI model
-            tradingAI = new TradingAI(trainingData);
-            logger.info("Training AI model{}",trainingData);
-// Save model after training
-            SerializationHelper.write("ai_trading_model.model", tradingAI);
 
-// Load model instead of retraining
-            if (new File("ai_trading_model.model").exists()) {
-                tradingAI = (TradingAI) SerializationHelper.read("ai_trading_model.model");
+                logger.info("AI Model loaded from file.");
             } else {
+                // Train AI model if model doesn't exist
+                tradingAI = new TradingAI(trainingData);
                 tradingAI.trainModel();
+                logger.info("AI Model successfully trained with historical market data.");
+                // Save model after training
+                SerializationHelper.write("ai_trading_model.model", tradingAI);
+                logger.info("AI Model saved to file.");
             }
-
-            logger.info("AI Model successfully trained with historical market data.");
 
         } catch (Exception e) {
             logger.error("Error training AI with historical data: ", e);
         }
+        return tradingAI;
     }
+
+    private @Nullable Object readModel(File modelFile) {
+        try {
+            return SerializationHelper.read(modelFile.getName());
+        } catch (Exception e) {
+            logger.error("Error reading AI model from file: ", e);
+            return null;
+        }
+    }
+
+    private void normalizeData(@NotNull Instances trainingData) {
+        // Normalize data attributes (excluding class attribute)
+        for (int i = 0; i < trainingData.numAttributes() - 1; i++) {
+            double mean = trainingData.attributeStats(i).numericStats.mean;
+            double stdDev = trainingData.attributeStats(i).numericStats.stdDev;
+            for (int j = 0; j < trainingData.numInstances(); j++) {
+                trainingData.instance(j).setValue(i, (trainingData.instance(j).value(i) - mean) / stdDev);
+            }
+        }
+    }
+
 
     private void computeExtremaIfNeeded(int zoomLevel) {
         if (!extremaCache.containsKey(zoomLevel)) {
@@ -1591,7 +1616,9 @@ private Trade trade;
         }
 
         int numVisibleCandles = getNumVisibleCandles();
-        NavigableMap<Integer, CandleData> candlesToDraw = data;
+        NavigableMap<Integer, CandleData> candlesToDraw = getCandlesToDraw(
+                numCandlesToSkip, numVisibleCandles
+        );
 
         logger.info("Drawing chart with {} candles (visible: {})", candlesToDraw.size(), numVisibleCandles);
 
@@ -2997,6 +3024,8 @@ private Trade trade;
 
         @Override
         public void resize() {
+
+            logger.info("Cashed{}", candleCache);
             chartWidth = Math.max(300, Math.floor(containerWidth.getValue().doubleValue() / candleWidth) *
                     candleWidth - 60 + ((double) candleWidth / 2));
             chartHeight = Math.max(300, containerHeight.getValue().doubleValue());
@@ -3018,7 +3047,7 @@ private Trade trade;
                     int pageIndex = cachedSize / pageSize; // Determine the next page index
 
                     // Fetch historical data from cache or API
-                    List<CandleData> newCandleData = getCachedOrFetchHistoricalData(tradePair, pageIndex, pageSize);
+                    List<CandleData> newCandleData = data.values().stream().toList();// getCachedOrFetchHistoricalData(tradePair, pageIndex, pageSize);
 
                     if (!newCandleData.isEmpty()) {
                         cacheHistoricalData(tradePair, newCandleData); // Store in cache
@@ -3124,7 +3153,11 @@ private Trade trade;
                     inProgressCandle.getCurrentTill()).toList();
             for (Trade tra : newTrades) {
                 @NotNull InProgressCandleData inProgressCandles=new InProgressCandleData(Instant.now().toEpochMilli(), tra.getOpenPrice(),tra.getHighPrice(),tra.getLowPrice(),Instant.MIN.getNano(), tra.getClosePrice(),tra.getAmount().doubleValue());
-                handleInProgressCandle(inProgressCandles,candleDataPager.getCandleDataList());
+                try {
+                    handleInProgressCandle(inProgressCandles, candleDataPager.getCandleDataSupplier().get().get());
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                }
             }
             // Partition the trades between the current in-progress candle and the candle after that (which we may
             // have entered after last update).
@@ -3181,11 +3214,9 @@ private Trade trade;
 
                 data.put((int) inProgressCandle.getOpenTime(), inProgressCandle.snapshot());
 
-                trainAIWithHistoricalData(data.values().stream().toList());
                 logger.info("AI Training Complete");
+                tradingAI = trainAIWithHistoricalData(data.values().stream().toList());
 
-
-                 current_price = exchange.streamLivePrices(tradePair).getLast().getPrice();
 
                 // Train the AI model
                 SIGNAL signal = tradingAI.getSignal(current_price, data.values().stream().toList(), tradeStrategy);
@@ -3253,7 +3284,11 @@ private Trade trade;
                     .execute(() -> {
                         logger.warn("Retrying fetch attempt {}/{}", retryCount, MAX_RETRIES);
                         CompletableFuture<List<CandleData>> futureCandles = new CompletableFuture<>();
-                        futureCandles.complete(candleDataPager.getCandleDataList());
+                        try {
+                            futureCandles.complete(candleDataPager.getCandleDataSupplier().get().get());
+                        } catch (InterruptedException | ExecutionException e) {
+                            throw new RuntimeException(e);
+                        }
                         futureCandles.whenComplete((candles, throwable) -> {
                             if (throwable == null) {
                                 accept(candles);
