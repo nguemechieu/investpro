@@ -2,6 +2,7 @@ package org.investpro.chart;
 
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -11,21 +12,23 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.CandleChartAIManager;
 import org.investpro.*;
 import org.investpro.ai.InvestProAIPaperTradingBot;
 import org.investpro.ai.InvestProAIPredictor;
 import org.investpro.ai.InvestProFeatureExtractor;
+import org.investpro.ai.InvestProOverlayDrawer;
 import org.investpro.model.Candle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 
 @Getter
 @Setter
 public class CandleStickChart extends XYChart<String, Number> {
+    private final InvestProOverlayDrawer overlayDrawer;
     private Pane drawingLayer;
     private ChartSettingsPanel chartSettingsPanel;
     private List<Candle> loadedCandles;
@@ -104,7 +107,12 @@ public class CandleStickChart extends XYChart<String, Number> {
         List<Double> features = InvestProFeatureExtractor.extractFeatures(loadedCandles);
         InvestProAIPredictor predictorClient = new InvestProAIPredictor();
 
-        InvestProAIPredictor.PredictionResult result = predictorClient.predict(features);
+        InvestProAIPredictor.PredictionResult result = null;
+        try {
+            result = predictorClient.predict(features);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         System.out.println("Prediction: " + result.prediction());
         System.out.println("Confidence: " + result.confidence());
@@ -126,6 +134,9 @@ public class CandleStickChart extends XYChart<String, Number> {
         );
 
         bot.printSummary();
+        Canvas overlayCanvas = new Canvas(800, 600); // Use actual chart width & height dynamically
+        this.overlayDrawer = new InvestProOverlayDrawer(overlayCanvas);
+        this.drawingLayer.getChildren().add(overlayCanvas); // Add canvas to your drawing layer
 
     }
 

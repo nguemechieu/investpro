@@ -40,7 +40,7 @@ public class InvestProAIPredictorClient {
             if (status == 200) {
                 try (Scanner scanner = new Scanner(conn.getInputStream())) {
                     String responseBody = scanner.useDelimiter("\\A").next();
-                    Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
+                    Map responseMap = objectMapper.readValue(responseBody, Map.class);
                     String prediction = (String) responseMap.get("prediction");
                     double confidence = Double.parseDouble(responseMap.get("confidence").toString());
 

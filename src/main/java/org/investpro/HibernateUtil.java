@@ -12,8 +12,8 @@ import static org.investpro.Exchange.logger;
 public class HibernateUtil {
 
     // Provide access to the SessionFactory
-    // The single instance of the SessionFactory (thread-safe)
-    private static SessionFactory sessionFactory;
+    // The single instance of the SessionFactory (thread-safe
+    SessionFactory sessionFactory;
 
     public HibernateUtil() {
         try {

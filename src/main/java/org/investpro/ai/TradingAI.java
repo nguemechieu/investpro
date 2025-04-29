@@ -24,7 +24,7 @@ public class TradingAI {
     private final Classifier model;
     private final Instances trainingData;
     private final List<Attribute> attributes;
-    private double currentPrice;
+     double currentPrice;
 
     public TradingAI(@NotNull Instances trainingData) {
         this.trainingData = trainingData;

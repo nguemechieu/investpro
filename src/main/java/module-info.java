@@ -15,7 +15,6 @@ module investpro {
     requires javafx.swing;
 
     requires com.google.gson;
-    requires testcontainers;
 
 
     requires com.jfoenix;
@@ -26,9 +25,7 @@ module investpro {
 
     requires org.hibernate.commons.annotations;
     requires jakarta.persistence;
-    requires com.github.dockerjava.transport.zerodep;
 
-    requires com.github.dockerjava.api;
     requires static lombok;
     requires weka.stable;
     requires com.nimbusds.jose.jwt;
@@ -38,10 +35,11 @@ module investpro {
     requires com.fasterxml.jackson.dataformat.csv;
     requires com.fasterxml.jackson.databind;
     requires org.apache.pdfbox;
-    requires ch.qos.logback.classic;
+
     requires java.management;
     requires com.fasterxml.uuid;
     requires org.slf4j;
+    requires com.github.dockerjava.transport.zerodep;
 
     opens org.investpro to
 

@@ -1,12 +1,9 @@
 package org.investpro.exchanges;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.github.dockerjava.api.async.ResultCallback;
+
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.scene.control.Alert;
 import lombok.Getter;
@@ -47,8 +44,6 @@ public class Oanda extends Exchange {
     private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
     public static final String API_URL = "https://api-fxtrade.oanda.com/v3";  // OANDA API URL
     private String account_id;
-    private ResultCallback.Adapter<PriceData> livePriceUpdates = new ResultCallback.Adapter<>();
-    private ResultCallback.Adapter<Trade> liveTradeUpdates = new ResultCallback.Adapter<>();
     private @NotNull Map<String, String> headers = new HashMap<>();
     private TradePair tradePair;
     private Currency baseCurr;
@@ -386,11 +381,23 @@ public class Oanda extends Exchange {
 
         List<Position> positions = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
-        JsonNode res = mapper.readTree(response.body());
+        JsonNode res = null;
+        try {
+            res = mapper.readTree(response.body());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(String.valueOf(e));
+        }
 
         for (JsonNode position : res.get("positions")) {
 
-            Position p = mapper.readValue(position.toString(), Position.class);
+            Position p ;
+
+            try {
+                p = mapper.readValue(position.toString(), Position.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(String.valueOf(e));
+            }
+
             positions.add(p);
         }
         return positions;
@@ -788,8 +795,7 @@ public class Oanda extends Exchange {
                             logger.info("Live Update - {} | Bid: {} | Ask: {}", instrument, bid, ask);
 
                             // Notify any listeners in the app
-                            PriceData priceData = new PriceData(instrument, bid, ask, time);
-                            livePriceUpdates.onNext(priceData);
+                            //livePriceUpdates.onNext(priceData);
                         }
                     }
 
@@ -817,7 +823,7 @@ public class Oanda extends Exchange {
                             Trade trade = new Trade(tradePair, BigDecimal.valueOf(prices.getAskEntries().stream().toList().getLast().getPrice()), BigDecimal.valueOf(size), side, timestamp);
                             logger.info("Live Trade: {}", trade);
 
-                            liveTradeUpdates.onNext(trade);
+
                         }
                     }
 
