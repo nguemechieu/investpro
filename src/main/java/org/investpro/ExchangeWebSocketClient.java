@@ -22,15 +22,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
         connectionEstablished = new SimpleBooleanProperty(false);
     }
 
-    public CountDownLatch getInitializationLatch() {
-        return webSocketInitializedLatch;
-    }
 
-    public abstract void streamLiveTrades(TradePair tradePair, LiveTradesConsumer liveTradesConsumer);
-
-    public abstract void stopStreamLiveTrades(TradePair tradePair);
-
-    public abstract boolean supportsStreamingTrades(TradePair tradePair);
 
     @Override
     public void onError(Exception exception) {

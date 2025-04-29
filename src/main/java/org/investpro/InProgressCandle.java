@@ -151,4 +151,12 @@ public class InProgressCandle {
     public void setTimestamp(@NotNull Instant now) {
         this.currentTill = now.getNano(); //
     }
+
+    public double getLastPrice() {
+        return closePriceSoFar;
+    }
+
+    public void setLastPrice(double v) {
+        this.closePriceSoFar = v;
+    }
 }

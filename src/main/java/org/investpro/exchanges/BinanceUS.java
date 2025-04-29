@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.Currency;
 import org.investpro.*;
+import org.investpro.model.Candle;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.Contract;
@@ -41,7 +42,7 @@ import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
-import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.exchanges.Oanda.OandaCandleDataSupplier.OBJECT_MAPPER;
 import static org.investpro.exchanges.Oanda.numCandles;
 
 @Getter
@@ -272,7 +273,7 @@ public class BinanceUS extends Exchange {
         return new BinanceUsCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
-    @Override
+
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
@@ -332,7 +333,7 @@ public class BinanceUS extends Exchange {
         return futureResult;
     }
     @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
                 currentCandleStartedAt, ZoneOffset.UTC));
@@ -624,63 +625,6 @@ public class BinanceUS extends Exchange {
         return tradePairs;
     }
 
-    @Override
-    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
-
-    }
-
-    @Override
-    public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-
-
-        String symbol1 = symbol.getBaseCurrency().getCode().toLowerCase() + symbol.getCounterCurrency().getCode().toLowerCase();
-            String streamUrl = BINANCE_WS_URL + symbol1 + "@ticker"; // Binance US WebSocket stream
-        List<PriceData>prices= new ArrayList<>();
-            try {
-                logger.info("Starting WebSocket for {}", symbol);
-                activeStreams.put(symbol, null);  // Assuming WebSocketClient is a singleton class and this method is called on a separate thread
-                Consumer<PriceData> priceConsumer = (priceData -> {
-                    logger.info("Received price data for {}: {}", tradePair, priceData);
-
-                });
-
-                WebSocketClient webSocketClient = new WebSocketClient(new URI(streamUrl)) {
-                    @Override
-                    public void onOpen(ServerHandshake handshake) {
-                        logger.info("✅ Connected to Binance US WebSocket for {}", tradePair);
-                    }
-
-                    @Override
-                    public void onMessage(String message) {
-                        executorService.execute(() -> processMessage(message, tradePair, priceConsumer));
-                    }
-
-                    @Override
-                    public void onClose(int code, String reason, boolean remote) {
-                        logger.warn("❌ Binance US WebSocket closed for {} - Reason: {}", tradePair, reason);
-                        activeStreams.remove(tradePair);
-                    }
-
-                    @Override
-                    public void onError(Exception ex) {
-                        logger.error("🚨 WebSocket error for {}: {}", tradePair, ex.getMessage(), ex);
-                    }
-                };
-
-                webSocketClient.connect();
-                activeStreams.put(tradePair, webSocketClient);
-
-                    processMessage(message, tradePair, priceConsumer);
-                Consumer<PriceData> re = priceConsumer.andThen(
-                        prices::add
-
-                );
-                logger.info(" WebSocket for {}",re);
-            } catch (Exception e) {
-                logger.error("🚨 Failed to start WebSocket for {}: {}", tradePair, e.getMessage(), e);
-            }
-            return prices;
-        }
 
     /**
      * **Process WebSocket JSON Message & Extract Price Data**
@@ -702,11 +646,7 @@ public class BinanceUS extends Exchange {
         }
     }
 
-    @Override
-    public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
 
-        return new ArrayList<>();
-    }
 
     @Override
     public void cancelAllOrders() {
@@ -805,10 +745,6 @@ public class BinanceUS extends Exchange {
         return withdraws;
     }
 
-    @Override
-    public List<Trade> getLiveTrades(List<TradePair> tradePairs) {
-        return List.of();
-    }
 
 
     @Override
@@ -843,28 +779,7 @@ public class BinanceUS extends Exchange {
                 return super.onPong(webSocket, message);
             }
 
-            @Override
-            public void onMessage(String message) {
-                try {
-                    CandleData candleData = OBJECT_MAPPER.readValue(message, CandleData.class);
-                    CandleData cand;
-                    if (candleData.isComplete()) {
-                        double high = candleData.getMax();
-                        double low = candleData.getMin();
-                        double open = candleData.getOpenPrice();
-                        double close = candleData.getClosePrice();
-                        double volume = candleData.getVolume();
-                        Instant time = Instant.ofEpochSecond(candleData.getCloseTime());
-
-                        cand = new CandleData(high, low, open, close, volume, time);
-                        logger.info("Candle update for {} → High: {} | Low: {} | Open: {} | Close: {} | Volume: {} | Time: {}", tradePair, high, low, open, close, volume, time);
-                    }
-
-                } catch (JsonProcessingException e) {
-                    logger.error("Error parsing WebSocket message: {}", e.getMessage(), e);
-                }
-
-            }
+            private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
             final WebSocketClient webSocket = new WebSocketClient(URI.create(BINANCE_WS_URL)) {
                 @Override
@@ -925,16 +840,89 @@ public class BinanceUS extends Exchange {
             public boolean supportsStreamingTrades(TradePair tradePair) {
                 return false;
             }
+            private final ConcurrentHashMap<TradePair, ScheduledFuture<?>> tradeSubscriptions = new ConcurrentHashMap<>();
+            private final ConcurrentHashMap<TradePair, Long> lastTradeTimestamp = new ConcurrentHashMap<>();
+            private final long MAX_INTERVAL = 5000; // Max polling interval (5s)
+            private final long MIN_INTERVAL = 500; // Min polling interval (500ms)
+            private final long DEFAULT_INTERVAL = 1000; // Default polling (1s)
 
             @Override
-            public void streamLiveTrades(TradePair tradePair, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+            public void onMessage(String message) {
+                try {
+                    CandleData candleData = OBJECT_MAPPER.readValue(message, CandleData.class);
+
+                    if (candleData.isComplete()) {
+                        double high = candleData.getHighPrice();
+                        double low = candleData.getLowPrice();
+                        double open = candleData.getOpenPrice();
+                        double close = candleData.getClosePrice();
+                        double volume = candleData.getVolume();
+                        Instant time = Instant.ofEpochSecond(candleData.getOpenTime());
+
+                        logger.info("Candle update for {} → High: {} | Low: {} | Open: {} | Close: {} | Volume: {} | Time: {}", tradePair, high, low, open, close, volume, time);
+                    }
+
+                } catch (JsonProcessingException e) {
+                    logger.error("Error parsing WebSocket message: {}", e.getMessage(), e);
+                }
 
             }
 
             @Override
-            public void streamLiveTrades(TradePair tradePair, int secondPerCandle, CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask) {
+            public Collection<? extends Trade> streamLiveTrades(TradePair tradePair, int secondPerCandle, UpdateInProgressCandleTask updateInProgressCandleTask) {
+                Objects.requireNonNull(tradePair, "TradePair cannot be null");
+                logger.info("📡 Starting live trade streaming for {}", tradePair);
 
+                Runnable fetchTask = new Runnable() {
+                    private long pollingInterval = DEFAULT_INTERVAL; // Start with default interval
+
+                    @Override
+                    public void run() {
+                        try {
+
+
+                            // Fetch live trades from the exchange
+                            List<Trade> liveTrades = new ArrayList<>();
+                            Consumer<List<Trade>> consumerTrades = liveTrades::addAll;
+                            fetchRecentTradesUntil(exchange, tradePair, Instant.now(), secondPerCandle, consumerTrades);
+
+                            if (!liveTrades.isEmpty()) {
+                                logger.debug("📊 Received {} new trades for {}", liveTrades.size(), tradePair);
+
+                                // Process each trade and update the current candle
+                                liveTrades.forEach(updateInProgressCandleTask::processTrade);
+
+                                // Update last trade timestamp
+                                lastTradeTimestamp.put(tradePair, System.currentTimeMillis());
+
+                                // Increase polling frequency if active trading is detected
+                                pollingInterval = Math.max(MIN_INTERVAL, pollingInterval - 100);
+                            } else {
+                                // No trades → slow down polling gradually
+                                long lastTradeTime = lastTradeTimestamp.getOrDefault(tradePair, System.currentTimeMillis());
+                                long timeSinceLastTrade = System.currentTimeMillis() - lastTradeTime;
+
+                                if (timeSinceLastTrade > 3000) {
+                                    pollingInterval = Math.min(MAX_INTERVAL, pollingInterval + 500); // Slow down polling
+                                }
+                            }
+
+                            // Re-schedule with the new dynamic interval
+                            ScheduledFuture<?> scheduledTask = scheduler.schedule(this, pollingInterval, TimeUnit.MILLISECONDS);
+                            tradeSubscriptions.put(tradePair, scheduledTask);
+                        } catch (Exception e) {
+                            logger.error("🚨 Error while streaming live trades for {}: {}", tradePair, e.getMessage(), e);
+                        }
+                    }
+                };
+
+                // Start the first fetch immediately
+                ScheduledFuture<?> scheduledTask = scheduler.schedule(fetchTask, 0, TimeUnit.MILLISECONDS);
+                tradeSubscriptions.put(tradePair, scheduledTask);
+                return null;
             }
+
+
 
             @Override
             public void subscribe(TradePair tradePair, Consumer<List<Trade>> tradeConsumer) {
@@ -957,12 +945,18 @@ public class BinanceUS extends Exchange {
 //           });
             }
 
+
         };
 
 
     }
     @Override
     public List<Account> getAccountSummary() {
+        return List.of();
+    }
+
+    @Override
+    public List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval) {
         return List.of();
     }
 
@@ -981,7 +975,7 @@ public class BinanceUS extends Exchange {
 
         @Contract(" -> new")
         @Override
-        public @NotNull Set<Integer> getSupportedGranularity() {
+        public @NotNull Set<Integer> getSupportedGranularities() {
             // Binance uses fixed time intervals (1m, 3m, 5m, etc.)
             // Here we map them to seconds
             return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400));
@@ -1049,7 +1043,7 @@ public class BinanceUS extends Exchange {
                                             candle.get(4).asDouble(),  // Close price
                                             candle.get(2).asDouble(),  // High price
                                             candle.get(3).asDouble(),  // Low price
-                                            (int) candle.get(0).asLong(),  // Open time (convert ms to seconds)
+                                            candle.get(0).asInt(),  // Open time (convert ms to seconds)
                                             0,
                                             candle.get(5).asLong()   // Volume
                                     ));
@@ -1088,6 +1082,8 @@ public class BinanceUS extends Exchange {
                 default -> throw new IllegalArgumentException("Unsupported granularity: " + secondsPerCandle);
             };
         }
+
+
     }
     private static final Map<TradePair, WebSocketClient> activeStreams = new ConcurrentHashMap<>();
 

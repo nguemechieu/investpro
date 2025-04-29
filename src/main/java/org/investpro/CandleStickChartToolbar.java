@@ -23,6 +23,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
+import org.investpro.chart.CandleStickChart;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +35,7 @@ import java.util.Set;
 
 import static org.investpro.CandleStickChartToolbar.Tool.OPTIONS;
 import static org.investpro.FXUtils.computeTextDimensions;
+import static org.investpro.NavigationDirection.*;
 
 /**
  * A resizable toolbar, placed at the top of a {@code CandleStickChart} and contained
@@ -193,9 +195,7 @@ public class CandleStickChartToolbar extends Region {
                 } else if (tool.tool != null && tool.tool.isZoomOut()) {
                     tool.setOnAction(_ -> candleStickChart.changeZoom(
                             tool.tool.getZoomDirection()));
-                } else if (
-                        tool.tool != null && tool.tool.isNavigationFunction()) {
-                    tool.setOnAction(_ -> candleStickChart.changeNavigation(tool.tool.getNavigationDirection()));
+
                 } else if (tool.tool != null && tool.tool.isFullScreen()) {
                     tool.setOnAction(_ -> candleStickChart.setFullScreen(true));
 
@@ -212,21 +212,21 @@ public class CandleStickChartToolbar extends Region {
                 } else if (tool.tool != null && tool.tool.isGridToggle()) {
                     tool.setOnAction(_ -> candleStickChart.setShowGrid(!candleStickChart.isShowGrid()));
                 } else if (tool.tool != null && tool.tool.isLeft()) {
-                    tool.setOnAction(_ -> candleStickChart.changeNavigation(CandleStickChart.NavigationDirection.LEFT));
+                    tool.setOnAction(_ -> candleStickChart.changeNavigation(LEFT));
                 } else if (tool.tool != null && tool.tool.isRight()) {
-                    tool.setOnAction(_ -> candleStickChart.changeNavigation(CandleStickChart.NavigationDirection.RIGHT));
+                    tool.setOnAction(_ -> candleStickChart.changeNavigation(RIGHT));
                 } else if (tool.tool != null && tool.tool.isUp()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.UP));
+                    tool.setOnAction(_ -> candleStickChart.scroll(UP));
                 } else if (tool.tool != null && tool.tool.isDown()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.DOWN));
+                    tool.setOnAction(_ -> candleStickChart.scroll(DOWN));
                 } else if (tool.tool != null && tool.tool.isScreenshot()) {
                     tool.setOnAction(_ -> candleStickChart.captureScreenshot());
                 } else if (tool.tool != null && tool.tool.isScrollUp()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.UP));
+                    tool.setOnAction(_ -> candleStickChart.scroll(UP));
 
 
                 } else if (tool.tool != null && tool.tool.isScrollDown()) {
-                    tool.setOnAction(_ -> candleStickChart.scroll(Tool.DOWN));
+                    tool.setOnAction(_ -> candleStickChart.scroll(DOWN));
 
                 } else if (tool.tool != null && tool.tool.isGRID_TOGGLE()) {
                     tool.setOnAction(_ -> candleStickChart.setShowGrid(true));
@@ -319,13 +319,7 @@ public class CandleStickChartToolbar extends Region {
         }
 
 
-        public CandleStickChart.NavigationDirection getNavigationDirection() {
-            if (!isNavigationFunction()) {
-                throw new IllegalArgumentException("Cannot call getNavigationDirection() on non-navigation function: " + name());
-            }
-            return this == AUTO_SCROLL ? CandleStickChart.NavigationDirection.LEFT : CandleStickChart.NavigationDirection.RIGHT;
 
-        }
 
         public boolean isZoomIn() {
             return this == ZOOM_IN;

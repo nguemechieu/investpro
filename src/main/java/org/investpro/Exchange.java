@@ -4,6 +4,7 @@ package org.investpro;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.investpro.model.Candle;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +20,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import static org.investpro.exchanges.Coinbase.client;
 import static org.investpro.exchanges.Coinbase.requestBuilder;
@@ -31,10 +31,9 @@ import static org.investpro.exchanges.Coinbase.requestBuilder;
  */
 public abstract class Exchange {
 
-    protected static final Logger logger = LoggerFactory.getLogger(
+    public static final Logger logger = LoggerFactory.getLogger(
             Exchange.class
     );
-    public CandleStickChart.UpdateInProgressCandleTask updateInProgressCandleTask;
 
     protected String apiKey;
     protected static String apiSecret;
@@ -88,7 +87,7 @@ public abstract class Exchange {
     /**
      * Fetch candle data for the current in-progress candle, used for live syncing.
      */
-    public abstract CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
+    public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
 
 
@@ -127,16 +126,6 @@ public abstract class Exchange {
 
 
 
-    public abstract void stopStreamLiveTrades(@NotNull TradePair tradePair);
-
-    // Get candlestick data
-    // WebSocket client for live updates
-    // Stream live prices
-    public abstract List<PriceData> streamLivePrices(@NotNull TradePair symbol);
-
-    // Stream live candlestick data
-    public abstract List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds);
-
 
     // Cancel all orders
     public abstract void cancelAllOrders() throws InvalidKeyException, NoSuchAlgorithmException, IOException;
@@ -148,13 +137,11 @@ public abstract class Exchange {
 
     public abstract List<Withdrawal> Withdraw() throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException;
 
-    public abstract List<Trade> getLiveTrades(List<TradePair> tradePairs);
     private List<News> cachedNews = new ArrayList<>();
 
     public abstract CustomWebSocketClient getWebsocketClient(Exchange exchange,TradePair tradePair, int secondsPerCandles);
     private long lastFetchTime = 0;
 
-    public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle, Consumer<List<Trade>> tradeConsumer);
 
     public abstract double fetchLivesBidAsk(TradePair tradePair);
 
@@ -246,4 +233,5 @@ public abstract class Exchange {
     }
 
 
+    public abstract List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval);
 }

@@ -4,6 +4,8 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,13 +14,15 @@ import org.slf4j.LoggerFactory;
  * - Monitors changes in container **width** and **height**.
  * - Ensures layout updates only when the size is stable.
  */
+@Getter
+@Setter
 public class SizeChangeListener implements ChangeListener<Number> {
 
     private final BooleanProperty gotFirstSize;
     private final ObservableNumberValue containerWidth;
     private final ObservableNumberValue containerHeight;
     private boolean sizeUpdated = false;
-    private final CandleStickChartToolbar chart;
+    private CandleStickChartToolbar chart;
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
      * **Constructor**

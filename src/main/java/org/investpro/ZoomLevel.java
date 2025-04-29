@@ -26,12 +26,12 @@ public class ZoomLevel {
     private final double secondsPerPixel;
     private final double pixelsPerSecond;
     private final InstantAxisFormatter xAxisFormatter;
-    private final Map<Integer, Pair<Extrema, Extrema>> extremaForCandleRangeMap;
+    private final Map<Long, Pair<Extrema<Number>, Extrema<Number>>> extremaForCandleRangeMap;
     private double minXValue;
     private double minYValue;
     private int secondsPerCandle;
 
-    ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
+    public ZoomLevel(final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
               final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
               final double minXValue) {
         this.zoomLevelId = zoomLevelId;
@@ -123,14 +123,14 @@ public class ZoomLevel {
 
     public double getMinYValue() {
         return extremaForCandleRangeMap.values().stream()
-                .mapToDouble(Extrema::getMin)
+                .mapToDouble(m -> m.getValue().getMin().doubleValue())
                 .min()
                 .orElse(Double.NaN);
     }
 
     public double getMaxYValue() {
         return extremaForCandleRangeMap.values().stream()
-                .mapToDouble(Extrema::getMax)
+                .mapToDouble(m -> m.getValue().getMax().doubleValue())
                 .max()
                 .orElse(Double.NaN);
     }
@@ -151,16 +151,6 @@ public class ZoomLevel {
         return newDuration / duration;
     }
 
-    public Map<Integer,? extends CandleData> createInitialData() {
-        Map<Integer, CandleData> initialData = new ConcurrentHashMap<>();
-        int numCandles = (int) (xAxisRangeInSeconds / secondsPerCandle);
-        for (int i = 0; i < numCandles; i++) {
-            initialData.put(i, CandleData.of(i * secondsPerCandle, 100 + Math.random() * 100,
-                    100 + Math.random() * 100, 100 + Math.random() * 100, 100 + Math.random() * 100,
-                    100 + Math.random() * 100));
-        }
-        return initialData;
-    }
 
     TradePair pair;
 

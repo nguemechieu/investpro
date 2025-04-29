@@ -8,15 +8,19 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import lombok.Getter;
-import lombok.Setter;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
 
-@Getter
-@Setter
-public class CandleStickChartOptions {
+/**
+ * Encapsulates all the possible options for a CandleStickChart.
+ *
 
+ */
+public class CandleStickChartOptions {
+    @Getter
     private final VBox optionsPane;
 
     public CandleStickChartOptions() {
@@ -69,8 +73,9 @@ public class CandleStickChartOptions {
             return CandleStickChartOptions.this;
         }
 
+        @Contract(pure = true)
         @Override
-        public String getName() {
+        public @NotNull String getName() {
             return "Horizontal Grid Lines";
         }
     };
@@ -92,8 +97,9 @@ public class CandleStickChartOptions {
             return CandleStickChartOptions.this;
         }
 
+        @Contract(pure = true)
         @Override
-        public String getName() {
+        public @NotNull String getName() {
             return "Volume Bars";
         }
     };
@@ -135,14 +141,9 @@ public class CandleStickChartOptions {
     }
 
     public void setGridVisible(boolean b) {
-        verticalGridLinesVisible.set(b);
-        horizontalGridLinesVisible.set(b);
+//        verticalGridLinesVisible.set(b);
+//        horizontalGridLinesVisible.set(b);
     }
-
-    public boolean isShowTooltip() {
-        return showVolume.get() || alignOpenClose.get();
-    }
-
 
     private static class ChartOption {
         private final ToggleSwitch optionSwitch;

@@ -2,9 +2,7 @@ package org.investpro;
 
 import java.util.Objects;
 
-/**
- * @author Michael Ennen
- */
+
 public class FastMoneyFormatter implements MoneyFormatter<Money> {
     @Override
     public String format(Money money) {

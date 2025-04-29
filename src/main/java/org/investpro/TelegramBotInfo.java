@@ -1,6 +1,7 @@
 package org.investpro;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,13 +21,16 @@ public class TelegramBotInfo {
     private String firstName;         // Sender's first name
     private String lastName;          // Sender's last name
     private boolean isBot;            // Whether sender is a bot
-    private String languageCode;      // User's language code
-    private String message;           // Text message content
+    private String languageCode;
+
+    // User's language code
+    @JsonProperty("message")
+    private Object message;           // Text message content
     private String messageType;       // Type of message (text, photo, video, etc.)
     private long date;                // Unix timestamp of message
     private List<String> entities;    // Message formatting (bold, italics, links, etc.)
     private List<String> photoUrls;   // URLs of attached photos
-    private String documentUrl;       // URL of attached document
+    private String documentUrl;       // URL of an attached document
     private String videoUrl;          // URL of attached video
     private String voiceUrl;          // URL of voice message
     private String location;          // GPS location if included in message

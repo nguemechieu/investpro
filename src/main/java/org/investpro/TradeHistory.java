@@ -161,4 +161,9 @@ public class TradeHistory {
             }
         }
     }
+
+    public void addTrades(List<Trade> r) {
+
+        getAllTrades().addAll(r);
+    }
 }

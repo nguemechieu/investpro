@@ -42,5 +42,5 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     }
 
 
-    public abstract Set<Integer> getSupportedGranularity();
+    public abstract Set<Integer> getSupportedGranularities();
 }

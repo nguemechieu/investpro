@@ -1,0 +1,8 @@
+.root {
+    -fx-background-color: #1e1e1e;
+    -fx-text-fill: white;
+}
+
+.chart {
+    -fx-background-color: #1e1e1e;
+}

@@ -1,7 +1,8 @@
 package org.investpro.ai;
 
-import org.investpro.CandleData;
+
 import org.investpro.SIGNAL;
+import org.investpro.model.Candle;
 import org.jetbrains.annotations.NotNull;
 import weka.classifiers.Classifier;
 import weka.classifiers.trees.J48;
@@ -34,7 +35,7 @@ public class TradingAI {
             logger.info("Training AI with provided data...");
             model.buildClassifier(trainingData);  // Train using training data
             saveTrainingData(trainingData);
-            
+
         } catch (Exception e) {
             logger.severe("❌ Error building classifier: " + e.getMessage());
         }
@@ -62,7 +63,7 @@ public class TradingAI {
     /**
      * Generate a trading signal based on moving averages.
      */
-    public SIGNAL getMovingAverageSignal(List<CandleData> prices, double currentPrice) {
+    public SIGNAL getMovingAverageSignal(List<Candle> prices, double currentPrice) {
         if (prices.isEmpty()) return SIGNAL.HOLD;
 
         double shortTermMA = calculateMovingAverage(prices, 20);
@@ -83,10 +84,10 @@ public class TradingAI {
     /**
      * Calculate Moving Average.
      */
-    private double calculateMovingAverage(List<CandleData> prices, int period) {
+    private double calculateMovingAverage(List<Candle> prices, int period) {
         return prices.subList(Math.max(0, prices.size() - period), prices.size())
                 .stream()
-                .mapToDouble(CandleData::getClosePrice)
+                .mapToDouble(m -> m.getClose().doubleValue())
                 .average()
                 .orElse(0.0);
     }
@@ -94,10 +95,10 @@ public class TradingAI {
     /**
      * Calculate Support Level (Lowest price in recent period).
      */
-    private double calculateSupport(@NotNull List<CandleData> prices) {
+    private double calculateSupport(@NotNull List<Candle> prices) {
         return prices.subList(Math.max(0, prices.size() - 20), prices.size())
                 .stream()
-                .mapToDouble(CandleData::getLowPrice)
+                .mapToDouble(m -> m.getLow().doubleValue())
                 .min()
                 .orElse(Double.MAX_VALUE);
 
@@ -105,11 +106,13 @@ public class TradingAI {
     /**
      * Calculate Resistance Level (Highest price in recent period).
      */
-    private double calculateResistance(List<CandleData> prices) {
+    private double calculateResistance(List<Candle> prices) {
         return
                 prices.subList(Math.max(0, prices.size() - 20), prices.size())
                         .stream()
-                        .mapToDouble(CandleData::getHighPrice)
+                        .mapToDouble(
+                                m -> m.getHigh().doubleValue()
+                        )
                         .max()
                         .orElse(Double.MIN_VALUE);
     }
@@ -183,13 +186,13 @@ public class TradingAI {
         }
     }
 
-    public SIGNAL getSignal(double currentPrice, List<CandleData> prices1, TradeStrategy tradeStrategy) {
+    public SIGNAL getSignal(double currentPrice, List<Candle> prices1, TradeStrategy tradeStrategy) {
         this.currentPrice = currentPrice;
-        double open = prices1.getLast().getOpenPrice();
-        double high = prices1.stream().mapToDouble(CandleData::getMax).max().orElse(0.0);
-        double low = prices1.stream().mapToDouble(CandleData::getMin).min().orElse(0.0);
-        double close = prices1.getLast().getClosePrice();
-        double volume = prices1.getLast().getVolume();
+        double open = prices1.getLast().getOpen().byteValueExact();
+        double high = prices1.stream().mapToDouble(m -> m.getHigh().doubleValue()).max().orElse(0.0);
+        double low = prices1.stream().mapToDouble(m -> m.getLow().doubleValue()).min().orElse(0.0);
+        double close = prices1.getLast().getClose().byteValueExact();
+        double volume = prices1.getLast().getVolume().byteValueExact();
 
 
         return tradeStrategy.getSignal(open, high, low, close, volume, prices1);

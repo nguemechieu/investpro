@@ -311,7 +311,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     @Override
     protected Range getRange() {
-        return getRange(getLowerBound(), getUpperBound());
+        return getRange(getValue(), getMaxValue());
     }
 
     private @NotNull Range getRange(double minValue, double maxValue) {

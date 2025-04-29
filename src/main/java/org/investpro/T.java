@@ -1,20 +1,16 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
+@Setter
+@Getter
 public class T {
     private static final double PRECISION = 0.0000000001;
     private double value;
 
     public T(double value) {
-        this.value = value;
-    }
-
-    public double getValue() {
-        return value;
-    }
-
-    public void setValue(double value) {
         this.value = value;
     }
 

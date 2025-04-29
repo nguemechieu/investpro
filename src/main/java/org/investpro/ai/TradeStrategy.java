@@ -3,6 +3,7 @@ package org.investpro.ai;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.*;
+import org.investpro.model.Candle;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +73,7 @@ public class TradeStrategy {
         logger.info("Sell Command Executed");
     }
 
-    public SIGNAL getSignal(double open, double high, double low, double close, double volume, List<CandleData> historicalPrices) {
+    public SIGNAL getSignal(double open, double high, double low, double close, double volume, List<Candle> historicalPrices) {
         return switch (strategy) {
 
             case ADX_STRATEGY -> adxStrategy(historicalPrices);
@@ -85,7 +86,7 @@ public class TradeStrategy {
     }
 
     // 📌 RSI Strategy (Fixes Issues)
-    private SIGNAL rsiCrossoverStrategy(List<CandleData> historicalPrices) {
+    private SIGNAL rsiCrossoverStrategy(List<Candle> historicalPrices) {
         if (historicalPrices.size() < 14) return SIGNAL.HOLD;
 
         double rsi = calculateRSI(historicalPrices, 14);
@@ -95,10 +96,10 @@ public class TradeStrategy {
         return SIGNAL.HOLD;
     }
 
-    private double calculateRSI(List<CandleData> historicalPrices, int period) {
+    private double calculateRSI(List<Candle> historicalPrices, int period) {
         double gainSum = 0, lossSum = 0;
         for (int i = 1; i <= period; i++) {
-            double change = historicalPrices.get(i).getClosePrice() - historicalPrices.get(i - 1).getClosePrice();
+            double change = historicalPrices.get(i).getClose().byteValueExact() - historicalPrices.get(i - 1).getClose().doubleValue();
             if (change > 0) gainSum += change;
             else lossSum -= change;
         }
@@ -111,38 +112,38 @@ public class TradeStrategy {
     }
 
     // 📌 Optimized MACD Strategy
-    private SIGNAL macdStrategy(List<CandleData> historicalPrices) {
+    private SIGNAL macdStrategy(List<Candle> historicalPrices) {
         if (historicalPrices.size() < 26) return SIGNAL.HOLD;
 
         double macd = calculateMACD(historicalPrices);
-        double signal = calculateEMA(historicalPrices.subList(historicalPrices.size() - 9, historicalPrices.size()), 9);
+        double signal = calculateEMA(historicalPrices.subList(historicalPrices.getLast().getLow().byteValueExact() - 9, historicalPrices.size()), 9);
 
         if (macd > signal) return SIGNAL.BUY;
         if (macd < signal) return SIGNAL.SELL;
         return SIGNAL.HOLD;
     }
 
-    private double calculateMACD(List<CandleData> historicalPrices) {
+    private double calculateMACD(List<Candle> historicalPrices) {
         double fastEMA = calculateEMA(historicalPrices, 12);
         double slowEMA = calculateEMA(historicalPrices, 26);
         return fastEMA - slowEMA;
     }
 
-    private double calculateEMA(@NotNull List<CandleData> prices, int period) {
+    private double calculateEMA(@NotNull List<Candle> prices, int period) {
         if (prices.size() < period) return 0;
 
         double smoothing = 2.0 / (period + 1);
-        double ema = prices.getFirst().getClosePrice();
+        double ema = prices.getFirst().getClose().doubleValue();
 
         for (int i = 1; i < prices.size(); i++) {
-            ema = (prices.get(i).getClosePrice() - ema) * smoothing + ema;
+            ema = (prices.get(i).getClose().doubleValue() - ema) * smoothing + ema;
         }
 
         return ema;
     }
 
     // 📌 Optimized SMA Strategy
-    private SIGNAL simpleMovingAverageStrategy(List<CandleData> historicalPrices) {
+    private SIGNAL simpleMovingAverageStrategy(List<Candle> historicalPrices) {
         if (historicalPrices.size() < 50) return SIGNAL.HOLD;
 
         double shortSMA = calculateSMA(historicalPrices, 10);
@@ -153,18 +154,18 @@ public class TradeStrategy {
         return SIGNAL.HOLD;
     }
 
-    private double calculateSMA(List<CandleData> prices, int period) {
+    private double calculateSMA(List<Candle> prices, int period) {
         double sum = 0;
 
         for (int i = prices.size() - period; i < prices.size(); i++) {
-            sum += prices.get(i).getClosePrice();
+            sum += prices.get(i).getClose().doubleValue();
         }
 
         return sum / period;
     }
 
     // 📌 Optimized ADX Strategy
-    private SIGNAL adxStrategy(List<CandleData> historicalPrices) {
+    private SIGNAL adxStrategy(List<Candle> historicalPrices) {
         if (historicalPrices.size() < 14) return SIGNAL.HOLD;
 
         double adx = calculateADX(historicalPrices);
@@ -177,20 +178,20 @@ public class TradeStrategy {
         return SIGNAL.HOLD;
     }
 
-    private double calculateADX(List<CandleData> prices) {
+    private double calculateADX(List<Candle> prices) {
         return 25 + Math.random() * 10;
     }
 
-    private double calculatePlusDI(List<CandleData> prices) {
+    private double calculatePlusDI(List<Candle> prices) {
         return 20 + Math.random() * 5;
     }
 
-    private double calculateMinusDI(List<CandleData> prices) {
+    private double calculateMinusDI(List<Candle> prices) {
         return 20 + Math.random() * 5;
     }
 
     // 📌 Optimized Bollinger Bands Strategy
-    private SIGNAL bollingerBandStrategy(@NotNull List<CandleData> historicalPrices, double close) {
+    private SIGNAL bollingerBandStrategy(@NotNull List<Candle> historicalPrices, double close) {
         if (historicalPrices.size() < 20) return SIGNAL.HOLD;
 
         double[] bands = calculateBollingerBands(historicalPrices);
@@ -202,15 +203,17 @@ public class TradeStrategy {
         return SIGNAL.HOLD;
     }
 
-    private double @NotNull [] calculateBollingerBands(List<CandleData> prices) {
+    private double @NotNull [] calculateBollingerBands(List<Candle> prices) {
         double sma = calculateSMA(prices, 20);
-        double variance = prices.stream().mapToDouble(p -> Math.pow(p.getClosePrice() - sma, 2)).sum() / prices.size();
+        double variance = prices.stream().mapToDouble(p -> Math.pow(p.getClose().byteValueExact() - sma, 2)).sum() / prices.size();
         double stdDev = Math.sqrt(variance);
         return new double[]{sma - (2 * stdDev), sma + (2 * stdDev)};
     }
 
     // 📌 Custom Strategy Example
     private SIGNAL customStrategy(double open, double high, double low, double close, double volume) {
+
+
         if (volume > 10000 && close > open) return SIGNAL.BUY;
         if (volume < 5000 && close < open) return SIGNAL.SELL;
         return SIGNAL.HOLD;

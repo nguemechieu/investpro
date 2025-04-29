@@ -114,7 +114,7 @@ public class Trade {
 
     private static final Logger logger = LoggerFactory.getLogger(Trade.class);
 
-    private static TradeHistory tradeHistory;
+    public static TradeHistory tradeHistory;
 
     static {
         try {
@@ -277,6 +277,9 @@ String status;
             this.highPrice = initialPrice;
             this.lowPrice = initialPrice;
             this.reportFrequency = reportFrequency;
+            this.tradeId = Instant.now().toEpochMilli();
+            this.status = "Open";
+            tradeHistory.put(this);
 
             // Start tracking price and activities
             startPriceTracking();

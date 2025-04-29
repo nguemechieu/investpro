@@ -12,10 +12,10 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
 import static org.investpro.Exchange.logger;
 import static org.investpro.exchanges.Coinbase.client;
 import static org.investpro.exchanges.Coinbase.requestBuilder;
+import static org.investpro.exchanges.Oanda.OandaCandleDataSupplier.OBJECT_MAPPER;
 
 public class ExchangeInfo {
 
@@ -30,10 +30,7 @@ public class ExchangeInfo {
     // Method to fetch and parse exchange info from Binance US
     public static @NotNull ExchangeData fetchExchangeInfo() throws Exception {
         // Construct HTTP request
-       requestBuilder
-                .uri(URI.create(BINANCE_API_URL + EXCHANGE_INFO_ENDPOINT))
-
-           ;
+        requestBuilder.uri(URI.create(BINANCE_API_URL + EXCHANGE_INFO_ENDPOINT));
 
         // Send the HTTP request and retrieve the response
         HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());

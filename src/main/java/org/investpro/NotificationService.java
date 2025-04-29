@@ -25,6 +25,12 @@ public class NotificationService {
         logger.info("Trade executed: {}", trade);
     }
 
+    public static void sendCandleDataNotification(List<CandleData> candleData) {
+        // Here you would implement the notification logic based on the candle data,
+        // For example, you could log the candle data to a file or email the subscribers
+        logger.info("Candle data received: {}", candleData);
+    }
+
     // Subscribe a user to notifications
     public void subscribe(String subscriber) {
         if (!subscribers.contains(subscriber)) {

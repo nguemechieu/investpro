@@ -10,6 +10,7 @@
           <option name="buildImageConfig">
             <BuildImageConfig>
               <option name="builtImageTag" value="&lt;none&gt;:&lt;none&gt;" />
+              <option name="contextFolder" value=".." />
               <option name="dockerFile" value="Dockerfile" />
             </BuildImageConfig>
           </option>

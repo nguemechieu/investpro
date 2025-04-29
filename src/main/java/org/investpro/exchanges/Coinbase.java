@@ -10,6 +10,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.investpro.Currency;
 import org.investpro.*;
+import org.investpro.model.Candle;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
-import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.exchanges.Binance.BinanceCandleDataSupplier.OBJECT_MAPPER;
 
 
 public  class Coinbase extends Exchange {
@@ -144,7 +145,7 @@ public  class Coinbase extends Exchange {
      * This method only needs to be implemented to support live syncing.
      *
      */
-    @Override
+
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> tradeConsumer) {
         Objects.requireNonNull(tradePair);
@@ -238,7 +239,7 @@ public  class Coinbase extends Exchange {
      * This method only needs to be implemented to support live syncing.
      */
     @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         String startDateString = "2016-10-17T15%3A00%3A00.000000000Z";
 
@@ -458,36 +459,8 @@ public  class Coinbase extends Exchange {
     }
 
 
-    @Override
-    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
-
-        String urls = websocketURL + "://" + tradePair.toString('-') + ":" + 20;
-        message =
-                "{\"type\": \"unsubscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(tradePair.toString('-'));
 
 
-    }
-
-    @Override
-    public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-        String urls = websocketURL + "://" + symbol.toString('-') + ":" + 20;
-        message = "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"ticker\",\"product_id\": \"%s\"}]}".formatted(symbol);
-
-
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
-
-        String urls = websocketURL + "://" + symbol + ":" + intervalSeconds;
-        message =
-                "{\"type\": \"subscribe\", \"channels\": [{\"name\": \"level2\",\"product_id\": \"%s\"}]}".formatted(symbol);
-
-
-        return Collections.emptyList();
-
-    }
 
     @Override
     public List<TradePair> getTradePairs() {
@@ -572,10 +545,6 @@ public  class Coinbase extends Exchange {
         return null;
     }
 
-    @Override
-    public List<Trade> getLiveTrades(List<TradePair> tradePairs) {
-        return List.of();
-    }
 
 
     @Override
@@ -590,6 +559,11 @@ public  class Coinbase extends Exchange {
 
     @Override
     public List<Account> getAccountSummary() {
+        return List.of();
+    }
+
+    @Override
+    public List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval) {
         return List.of();
     }
 

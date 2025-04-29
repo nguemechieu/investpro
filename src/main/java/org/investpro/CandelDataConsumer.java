@@ -4,6 +4,7 @@ package org.investpro;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.chart.CandleStickChart;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,11 +31,7 @@ public class CandelDataConsumer implements Consumer<List<CandleData>> {
 
     public CandelDataConsumer(@NotNull CandleStickChart candleStickChart) {
         this.candleStickChart = candleStickChart;
-        candleStickChart.getChart().getData().clear();
-        candleStickChart.getChart().getYAxis().setAutoRanging(false);
-        candleStickChart.getChart().getXAxis().setAutoRanging(false);
-        candleStickChart.getChart().getYAxis().setAutoRanging(true);
-        candleStickChart.getChart().getXAxis().setAnimated(false);
+
 
         // Initialize variables
 
@@ -100,7 +97,5 @@ public class CandelDataConsumer implements Consumer<List<CandleData>> {
         logger.info("🔄 In-Progress Candle: OpenTime={}, OpenPrice={}, ClosePrice={}",
                 candle.getOpenTime(), candle.getOpenPrice(), candle.getClosePrice());
 
-        // This can be used to update the chart dynamically without finalizing the candle
-        candleStickChart.setInProgressCandle(candle.getSnapshot());
     }
 }

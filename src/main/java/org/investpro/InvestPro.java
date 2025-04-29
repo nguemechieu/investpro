@@ -65,18 +65,16 @@ public class InvestPro extends Application {
     @Override
     public void start(@NotNull Stage primaryStage) {
         try {
-            // Load user-defined width & height from properties
+            // Load user-defined width and height from properties
             int width = Integer.parseInt(PROPERTIES.getProperty("window_width", "1530"));
             int height = Integer.parseInt(PROPERTIES.getProperty("window_height", "780"));
 
             // Assign database properties to static variables
             DB_HOST = PROPERTIES.getProperty("DB_HOST", "localhost");
-            DB_NAME = PROPERTIES.getProperty("DB_NAME", "default");
-            DB_PASSWORD = PROPERTIES.getProperty("DB_PASSWORD", "password");
+            DB_NAME = PROPERTIES.getProperty("DB_NAME", "investpro");
+            DB_PASSWORD = PROPERTIES.getProperty("DB_PASSWORD", "admin123");
             DB_USER = PROPERTIES.getProperty("DB_USER", "root");
             DB_PORT = PROPERTIES.getProperty("DB_PORT", "3306");
-
-
 
             // Set up the stage with a dynamic title
             primaryStage.setTitle(String.format("%s - © 2020-%s",

@@ -1,5 +1,10 @@
 package org.investpro;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class LiveTrade {
     private final LiveTradesConsumer consumer;
     private Trade trade;
@@ -10,15 +15,6 @@ public class LiveTrade {
         this.consumer = consumer;
     }
 
-    public Trade getTrade() {
-        return trade;
-    }
 
-    public void setTrade(Trade trade) {
-        this.trade = trade;
-    }
 
-    public LiveTradesConsumer getConsumer() {
-        return consumer;
-    }
 }

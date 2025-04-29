@@ -10,6 +10,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Alert;
 import org.investpro.*;
+import org.investpro.model.Candle;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,7 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 import static org.investpro.BinanceUtils.HmacSHA256;
-import static org.investpro.CoinbaseCandleDataSupplier.OBJECT_MAPPER;
+import static org.investpro.exchanges.Binance.BinanceCandleDataSupplier.OBJECT_MAPPER;
 import static org.investpro.exchanges.Oanda.numCandles;
 
 public class Binance extends Exchange {
@@ -152,7 +153,7 @@ public class Binance extends Exchange {
         return new BinanceCandleDataSupplier(secondsPerCandle, tradePair); // Custom class to handle Binance candlestick data
     }
 
-    @Override
+
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(Exchange exchange,TradePair tradePair, Instant stopAt, int secondsPerCandle,
                                                                  Consumer<List<Trade>> trades) {
         Objects.requireNonNull(tradePair);
@@ -219,7 +220,7 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             @NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         String startDateString = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(
                 currentCandleStartedAt, ZoneOffset.UTC));
@@ -316,21 +317,6 @@ public class Binance extends Exchange {
         return tradePairs;
     }
 
-    @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
-        // Implement WebSocket closing if needed for live trade streams
-    }
-
-    @Override
-    public List<PriceData> streamLivePrices(@NotNull TradePair symbol) {
-        return List.of(); // WebSocket streaming for live prices not implemented here
-    }
-
-    @Override
-    public List<CandleData> streamLiveCandlestick(@NotNull TradePair symbol, int intervalSeconds) {
-        return List.of(); // WebSocket streaming for candlestick not implemented here
-    }
-
 
     @Override
     public void cancelAllOrders() {
@@ -350,11 +336,6 @@ public class Binance extends Exchange {
         return null;
     }
 
-    @Override
-    public List<Trade> getLiveTrades(List<TradePair> tradePairs) {
-        return List.of();
-    }
-
 
     @Override
     public double fetchLivesBidAsk(TradePair tradePair) {
@@ -368,6 +349,11 @@ public class Binance extends Exchange {
 
     @Override
     public List<Account> getAccountSummary() {
+        return List.of();
+    }
+
+    @Override
+    public List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval) {
         return List.of();
     }
 
@@ -392,7 +378,7 @@ public class Binance extends Exchange {
     }
 
 
-    private static class BinanceCandleDataSupplier extends CandleDataSupplier {
+    public static class BinanceCandleDataSupplier extends CandleDataSupplier {
 
         protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
@@ -405,7 +391,7 @@ public class Binance extends Exchange {
         }
 
         @Override
-        public Set<Integer> getSupportedGranularity() {
+        public Set<Integer> getSupportedGranularities() {
             // Binance uses fixed time intervals (1m, 3m, 5m, etc.)
             // Here we map them to seconds
             return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400));
@@ -471,7 +457,7 @@ public class Binance extends Exchange {
                                         candle.get(4).asDouble(),  // close price
                                         candle.get(2).asDouble(),  // high price
                                         candle.get(3).asDouble(),  // low price
-                                        (int) candle.get(0).asLong(),  // open time (convert ms to seconds)
+                                        candle.get(0).asInt(),  // open time (convert ms to seconds)
                                         0,
                                         candle.get(5).asLong()   // volume
                                 ));
@@ -500,6 +486,8 @@ public class Binance extends Exchange {
                 default -> throw new IllegalArgumentException("Unsupported granularity: " + secondsPerCandle);
             };
         }
+
+
     }
 
 }

@@ -36,15 +36,21 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         @Override
         public boolean isSettable(@NotNull ToggleSwitch toggleSwitch) {
             final ToggleSwitchSkin skin = (ToggleSwitchSkin) toggleSwitch.getSkin();
-            return skin.thumbMoveAnimationTime == null || !skin.thumbMoveAnimationTime.isBound();
+
+
+            return !skin.thumbMoveAnimationTime.isBound();
         }
 
         @Override
-        public StyleableProperty<Number> getStyleableProperty(@NotNull ToggleSwitch toggleSwitch) {
-            return
-                    (StyleableProperty<Number>) ((ToggleSwitchSkin) toggleSwitch.getSkin()).thumbMoveAnimationTimeProperty();
+        public StyleableProperty<Number> getStyleableProperty(ToggleSwitch styleable) {
+            final ToggleSwitchSkin skin = (ToggleSwitchSkin) styleable.getSkin();
+            return (StyleableProperty<Number>) skin.thumbMoveAnimationTimeProperty();
         }
+
+
     };
+    private final DoubleProperty thumbMoveAnimationTime = new SimpleDoubleProperty(300);
+
     private static final List<CssMetaData<? extends Styleable, ?>> STYLES;
 
     static {
@@ -53,7 +59,6 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         STYLES = Collections.unmodifiableList(style);
     }
 
-    private final DoubleProperty thumbMoveAnimationTime;
 
     protected ToggleSwitchSkin(ToggleSwitch control) {
         super(control);
@@ -69,7 +74,6 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         updateLabel(control);
 
         StackPane.setAlignment(label, Pos.CENTER_LEFT);
-        thumbMoveAnimationTime = new SimpleDoubleProperty(300); // Corrected: Now an instance variable.
 
         control.textProperty().addListener((_, _, _) -> updateLabel(control));
 
@@ -79,6 +83,7 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         thumb.setOnMouseReleased(_ -> toggleSwitchState(control));
         control.selectedProperty().addListener((_, _, _) -> selectedStateChanged());
     }
+
 
     public static List<CssMetaData<? extends Styleable, ?>> getClassCssMetaData() {
         return STYLES;
