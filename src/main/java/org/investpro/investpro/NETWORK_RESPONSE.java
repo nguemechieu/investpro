@@ -1,9 +1,11 @@
 package org.investpro.investpro;
 
+import lombok.Getter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 
+@Getter
 public enum NETWORK_RESPONSE {
     SERVER_OK(200),
     CREATED(201),
@@ -168,7 +170,4 @@ public enum NETWORK_RESPONSE {
     }
 
 
-    public int getResponseCode() {
-        return responseCode;
-    }
 }

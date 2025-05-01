@@ -5,12 +5,12 @@
 
     <persistence-unit name="User" transaction-type="RESOURCE_LOCAL">
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
-        <class>org.investpro.User</class>
-        <class>org.investpro.Currency</class>
-        <class>org.investpro.Order</class>
-        <class>org.investpro.TradePair</class>
-        <class>org.investpro.CandleData</class>
-        <class>org.investpro.Trade</class>
+        <class>org.investpro.investpro.model.User</class>
+        <class>org.investpro.investpro.model.Currency</class>
+        <class>org.investpro.investpro.model.Order</class>
+        <class>org.investpro.investpro.model.TradePair</class>
+        <class>org.investpro.investpro.model.Candle</class>
+        <class>org.investpro.investpro.model.Trade</class>
 
         <properties>
             <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>

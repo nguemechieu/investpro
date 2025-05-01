@@ -1,6 +1,6 @@
 # InvestPro
 
-![InvestPro, LLC](src/main/resources/img/investpro_icon.png)
+![InvestPro, LLC](src/main/resources/investpro_icon.png)
 
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/maven-publish.yml/badge.svg)
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/docker-image.yml)
@@ -33,34 +33,63 @@
 - **Linux** ![Linux](./src/docs/linux.ico)
 - **macOS** ![MacOS](./src/docs/macos.ico)
 
-## Getting Started
+📈 InvestPro – Intelligent Financial Market Analysis and Trading Platform
+InvestPro is a modern, full-featured Java-based desktop application designed for real-time financial market analysis,
+intelligent trading, and predictive insights using AI. Built with JavaFX, JPA/Hibernate, gRPC, and Spring-inspired
+architecture, InvestPro is both a trader’s assistant and a powerful research tool.
 
-### Prerequisites
+💡 Key Features
+Real-Time Market Data: Connects to leading crypto and stock exchanges (Coinbase, Binance US, Oanda) to stream live
+candlestick data.
 
-1. **Install Java Development Kit (JDK) version 11 or higher**.
-2. **Install Apache Maven version 3.6 or higher**.
-3. **Clone the InvestPro repository** from GitHub.
+Modular Data Suppliers: Abstracted CandleDataSupplier implementations provide flexible multi-exchange support.
 
-### Setup Process
+AI-Powered Predictions: Seamlessly integrates with a Python-based gRPC prediction server using machine learning (DNNs)
+to forecast market direction with confidence scoring.
 
-1. Open a terminal in the project directory.
-2. Run the following command to compile and package the application:
+Interactive Candlestick Charting: Custom JavaFX candlestick chart component with overlays for indicators (RSI, ATR,
+MACD, etc.).
 
-    ```bash
-    mvn clean package
-    ```
+Integrated Database (JPA/Hibernate): Stores historical candles, currencies, and user data using MySQL and standard
+entity mappings.
 
-3. Run the following command to start the application:
+Detachable PopOver UI: Intuitive UX using custom-styled popovers for tooltips, configuration panels, and data overlays.
 
-    ```bash
-    java -jar target/investpro-1.0-SNAPSHOT.jar
-    ```
+Modular Architecture: Leverages Java Platform Module System (JPMS) for high maintainability, security, and future
+scalability.
 
-This will start the application on port 8080. Modify the port number if another application is using port 8080.
+⚙️ Tech Stack
+Frontend: JavaFX (with CSS styling), ControlsFX, JFoenix
 
-### Build Docker Image
+Backend/Data: Java 23, JPA (Hibernate), MySQL
 
-You can build the Docker image by running the following command:
+AI Integration: Python ML server via gRPC
 
-```bash
-docker build -t investpro .
+Messaging: Protocol Buffers (Protobuf)
+
+Security & Logging: SLF4J + Logback, modular package encapsulation
+
+Build Tool: Maven with module path awareness (module-info.java)
+
+🧠 Use Cases
+Live market data monitoring
+
+AI-powered trading strategy backtesting
+
+Candle pattern and indicator visualization
+
+Trader decision support system
+
+🧠 AI Integration
+InvestPro leverages a companion project called investpro_ai_server — a Python-based gRPC microservice powered by machine
+learning models (e.g. TensorFlow/Keras). This AI server performs real-time market predictions (e.g. up/down
+classification with confidence) using indicators like RSI, MACD, Bollinger Bands, and OHLCV data.
+
+Prediction Features:
+
+✅ Realtime predictions via gRPC with PredictorGrpc.Predict endpoint
+
+✅ Confidence scoring and decision visualization
+
+✅ Integrated with InvestPro’s charting UI
+

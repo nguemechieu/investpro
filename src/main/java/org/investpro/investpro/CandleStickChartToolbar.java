@@ -384,7 +384,7 @@ public class CandleStickChartToolbar extends Region {
         }
     }
 
-    private static class ToolbarButton extends Button {
+    public static class ToolbarButton extends Button {
 
 
         private final String textLabel;

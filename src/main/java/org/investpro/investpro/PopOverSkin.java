@@ -28,15 +28,6 @@
 package org.investpro.investpro;
 
 
-import static java.lang.Double.MAX_VALUE;
-import static javafx.geometry.Pos.CENTER_LEFT;
-import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
-import static javafx.scene.paint.Color.YELLOW;
-import static org.investpro.investpro.PopOver.ArrowLocation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
@@ -51,19 +42,19 @@ import javafx.scene.control.Skin;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.HLineTo;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.LineTo;
-import javafx.scene.shape.MoveTo;
-import javafx.scene.shape.Path;
-import javafx.scene.shape.PathElement;
-import javafx.scene.shape.QuadCurveTo;
-import javafx.scene.shape.VLineTo;
+import javafx.scene.shape.*;
 import javafx.stage.Window;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.lang.Double.MAX_VALUE;
+import static javafx.geometry.Pos.CENTER_LEFT;
+import static javafx.scene.control.ContentDisplay.GRAPHIC_ONLY;
+import static javafx.scene.paint.Color.YELLOW;
+import static org.investpro.investpro.PopOver.ArrowLocation.*;
+
 public class PopOverSkin implements Skin<PopOver> {
-    private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
     private final Label title;
     private final Label closeIcon;
     private final Path path;
@@ -76,19 +67,9 @@ public class PopOverSkin implements Skin<PopOver> {
     private double xOffset;
     private double yOffset;
     private boolean tornOff;
-    private MoveTo moveTo;
-    private QuadCurveTo topCurveTo, rightCurveTo, bottomCurveTo, leftCurveTo;
-    private HLineTo lineBTop, lineETop, lineHTop, lineKTop;
-    private LineTo lineCTop, lineDTop, lineFTop, lineGTop, lineITop, lineJTop;
-    private VLineTo lineBRight, lineERight, lineHRight, lineKRight;
-    private LineTo lineCRight, lineDRight, lineFRight, lineGRight, lineIRight,
-            lineJRight;
-    private HLineTo lineBBottom, lineEBottom, lineHBottom, lineKBottom;
-    private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
-            lineIBottom, lineJBottom;
-    private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
-    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
-            lineJLeft;
+
+    private static final String DETACHED_STYLE_CLASS = "detached"; //$NON-NLS-1$
+
     public PopOverSkin(final PopOver popOver) {
         this.popOver = popOver;
         stackPane = popOver.getRoot();
@@ -303,6 +284,25 @@ public class PopOverSkin implements Skin<PopOver> {
 
         return group;
     }
+
+    private MoveTo moveTo;
+
+    private QuadCurveTo topCurveTo, rightCurveTo, bottomCurveTo, leftCurveTo;
+
+    private HLineTo lineBTop, lineETop, lineHTop, lineKTop;
+    private LineTo lineCTop, lineDTop, lineFTop, lineGTop, lineITop, lineJTop;
+
+    private VLineTo lineBRight, lineERight, lineHRight, lineKRight;
+    private LineTo lineCRight, lineDRight, lineFRight, lineGRight, lineIRight,
+            lineJRight;
+
+    private HLineTo lineBBottom, lineEBottom, lineHBottom, lineKBottom;
+    private LineTo lineCBottom, lineDBottom, lineFBottom, lineGBottom,
+            lineIBottom, lineJBottom;
+
+    private VLineTo lineBLeft, lineELeft, lineHLeft, lineKLeft;
+    private LineTo lineCLeft, lineDLeft, lineFLeft, lineGLeft, lineILeft,
+            lineJLeft;
 
     private void createPathElements() {
         DoubleProperty centerYProperty = new SimpleDoubleProperty();

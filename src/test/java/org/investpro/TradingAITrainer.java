@@ -1,6 +1,6 @@
 package org.investpro;
 
-import org.investpro.ai.TradingAI;
+import org.investpro.investpro.ai.TradingAI;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instances;
@@ -40,11 +40,9 @@ public class TradingAITrainer {
 
             trainingData.add(instance);
         }
-
         // Train the AI model
         TradingAI tradingAI = new TradingAI(trainingData);
         tradingAI.trainModel();
-
 
     }
 }

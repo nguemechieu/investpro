@@ -1,6 +1,18 @@
 <component name="ArtifactManager">
   <artifact type="javafx" name="investpro">
     <output-path>$PROJECT_DIR$/out/artifacts/investpro</output-path>
+    <properties id="javafx-properties">
+      <options>
+        <option name="appClass" value="org.investpro.investpro.InvestPro" />
+        <option name="description" value="InvestPro – Intelligent Financial Market Analysis and Trading Platform InvestPro is a modern, full-featured Java-based desktop application designed for real-time financial market analysis, intelligent trading, and predictive insights using AI. Built with JavaFX, JPA/Hibernate, gRPC, and Spring-inspired architecture, InvestPro is both a trader’s assistant and a powerful research tool.   Key Features Real-Time Market Data: Connects to leading crypto and stock exchanges (Coinbase, Binance US, Oanda) to stream live candlestick data.  Modular Data Suppliers: Abstracted CandleDataSupplier implementations provide flexible multi-exchange support.  AI-Powered Predictions: Seamlessly integrates with a Python-based gRPC prediction server using machine learning (DNNs) to forecast market direction with confidence scoring.  Interactive Candlestick Charting: Custom JavaFX candlestick chart component with overlays for indicators (RSI, ATR, MACD, etc.).  Integrated Database (JPA/Hibernate): Stores historical candles, currencies, and user data using MySQL and standard entity mappings.  Detachable PopOver UI: Intuitive UX using custom-styled popovers for tooltips, configuration panels, and data overlays.  Modular Architecture: Leverages Java Platform Module System (JPMS) for high maintainability, security, and future scalability.  ⚙️ Tech Stack Frontend: JavaFX (with CSS styling), ControlsFX, JFoenix  Backend/Data: Java 23, JPA (Hibernate), MySQL  AI Integration: Python ML server via gRPC  Messaging: Protocol Buffers (Protobuf)  Security &amp; Logging: SLF4J + Logback, modular package encapsulation  Build Tool: Maven with module path awareness (module-info.java)   Use Cases Live market data monitoring  AI-powered trading strategy backtesting  Candle pattern and indicator visualization  Trader decision support system" />
+        <option name="height" value="800" />
+        <option name="htmlPlaceholderId" value="" />
+        <option name="title" value="InvestPro" />
+        <option name="vendor" value="sopotek,inc" />
+        <option name="version" value="1.0" />
+        <option name="width" value="1530" />
+      </options>
+    </properties>
     <root id="root">
       <element id="archive" name="investpro.jar">
         <element id="module-output" name="investpro" />
