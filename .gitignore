@@ -36,9 +36,3 @@ build/
 
 ### Mac OS ###
 .DS_Store
-# Project exclude paths
-/out/
-
-
-investpro_db.sql
-InvestPro.log

@@ -1,0 +1,5 @@
+<root>
+    <item name='com.nimbusds.jwt.JWTClaimsSet com.nimbusds.jose.Payload toPayload()'>
+        <annotation name='org.jetbrains.annotations.NotNull'/>
+    </item>
+</root>

@@ -31,6 +31,7 @@ module investpro {
     requires com.nimbusds.jose.jwt;
     requires mysql.connector.j;
     requires jakarta.transaction;
+    requires io.grpc;
     requires java.compiler;
     requires com.fasterxml.jackson.dataformat.csv;
     requires com.fasterxml.jackson.databind;
@@ -40,6 +41,12 @@ module investpro {
     requires com.fasterxml.uuid;
     requires org.slf4j;
     requires com.github.dockerjava.transport.zerodep;
+    requires persistence.api;
+
+    requires com.google.protobuf;
+    requires io.grpc.stub;
+    requires io.grpc.protobuf;
+    requires com.google.common;
 
     opens org.investpro to
 
@@ -59,8 +66,7 @@ module investpro {
             ;
 
 
-    exports org.investpro;
-    exports org.investpro.exchanges;
+    exports org.investpro.investpro to javafx.graphics;
     opens org.investpro.exchanges to bounce, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, io.github.cdimascio.dotenv.java, jakarta.persistence, javafx.swing, netlib.java, org.hibernate.orm.core, org.json, weka.stable;
     exports org.investpro.ui;
     opens org.investpro.ui to bounce, com.fasterxml.jackson.databind, com.fasterxml.jackson.datatype.jsr310, com.google.gson, io.github.cdimascio.dotenv.java, jakarta.persistence, javafx.swing, netlib.java, org.hibernate.orm.core, org.json, weka.stable;

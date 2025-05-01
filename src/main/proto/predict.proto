@@ -1,0 +1,47 @@
+// Predict.proto - gRPC API for InvestPro AI Market Prediction
+
+syntax = "proto3";
+
+// Java package config
+
+
+package org.investpro.grpc;
+option java_package = "org.investpro.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "PredictProto";
+
+// Import Google's Empty message
+import "google/protobuf/empty.proto";
+
+/// Input features for market prediction
+message MarketDataRequest {
+  double open = 1;           // Open price
+  double close = 2;          // Close price
+  double high = 3;           // High price
+  double low = 4;            // Low price
+  double volume = 5;         // Trade volume
+  double rsi = 6;            // Relative Strength Index
+  double atr = 7;            // Average True Range
+  double macd = 8;           // MACD indicator
+  double stoch = 9;          // Stochastic oscillator
+  double bb_upper = 10;      // Bollinger Band upper value
+  double bb_lower = 11;      // Bollinger Band lower value
+}
+
+/// Prediction output
+message PredictionResponse {
+  string prediction = 1;     // e.g. "up" or "down"
+  float confidence = 2;      // Confidence score (0.0 to 1.0)
+}
+
+/// Server health check response
+message HealthStatus {
+  string status = 1;         // e.g. "SERVING"
+
+}
+
+/// gRPC service for AI prediction
+service Predictor {
+  rpc Predict (MarketDataRequest) returns (PredictionResponse);
+  rpc HealthCheck (google.protobuf.Empty) returns (HealthStatus);
+}
