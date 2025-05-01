@@ -19,5 +19,13 @@ module invespro {
     requires io.grpc.stub;
     requires io.grpc.protobuf;
     requires com.google.common;
+
+    opens org.investpro.investpro.model to org.hibernate.orm.core, jakarta.persistence;
+    opens org.investpro.investpro to javafx.graphics, javafx.fxml;
+
+    // Enable Hibernate + ByteBuddy reflective access
+
+    // Optional: export for compile-time reference
+    exports org.investpro.investpro.model;
     exports org.investpro.investpro to javafx.graphics;
 }

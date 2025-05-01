@@ -7,69 +7,99 @@ import lombok.Setter;
 import java.io.Serializable;
 import java.util.Date;
 
-@Setter
 @Getter
+@Setter
 @Entity
-@Table(name = "coin_info") // Defines the table name in the database
+@Table(name = "coin_info")
+@Access(AccessType.FIELD)
 public class CoinInfo implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @Column(name = "id", nullable = false)
-    String id;
+    private String id;
+
     @Column(name = "symbol", nullable = false)
-    String symbol;
+    private String symbol;
+
     @Column(name = "name", nullable = false)
-    String name;
+    private String name;
+
     @Column(name = "image")
-    String image;
+    private String image;
+
     @Column(name = "current_price")
-    double current_price;
+    private double current_price;
+
     @Column(name = "market_cap")
-    long market_cap;
+    private long market_cap;
+
     @Column(name = "market_cap_rank")
-    int market_cap_rank;
+    private int market_cap_rank;
+
     @Column(name = "fully_diluted_valuation")
-    long fully_diluted_valuation;
+    private long fully_diluted_valuation;
+
     @Column(name = "total_volume")
-    long total_volume;
+    private long total_volume;
+
     @Column(name = "high_24h")
-    double high_24h;
+    private double high_24h;
+
     @Column(name = "low_24h")
-    double low_24h;
+    private double low_24h;
+
     @Column(name = "price_change_24h")
-    double price_change_24h;
+    private double price_change_24h;
+
     @Column(name = "price_change_percentage_24h")
-    double price_change_percentage_24h;
+    private double price_change_percentage_24h;
+
     @Column(name = "market_cap_change_24h")
-    long market_cap_change_24h;
+    private long market_cap_change_24h;
+
     @Column(name = "market_cap_change_percentage_24h")
-    double market_cap_change_percentage_24h;
+    private double market_cap_change_percentage_24h;
+
     @Column(name = "circulating_supply")
-    long circulating_supply;
+    private long circulating_supply;
+
     @Column(name = "total_supply")
-    long total_supply;
+    private long total_supply;
+
     @Column(name = "max_supply")
-    long max_supply;
-    @Column(name = "ath") // All-Time High
-    double ath;
+    private long max_supply;
+
+    @Column(name = "ath")
+    private double ath;
+
     @Column(name = "ath_change_percentage")
-    double ath_change_percentage;
+    private double ath_change_percentage;
+
+    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "ath_date")
-    @Temporal(TemporalType.TIMESTAMP)
-    Date ath_date;
-    @Column(name = "atl") // All-Time Low
-    double atl;
+    private Date ath_date;
+
+    @Column(name = "atl")
+    private double atl;
+
     @Column(name = "atl_change_percentage")
-    double atl_change_percentage;
+    private double atl_change_percentage;
+
+    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "atl_date")
-    @Temporal(TemporalType.TIMESTAMP)
-    Date atl_date;
+    private Date atl_date;
+    @Convert(converter = StringArrayConverter.class)
     @Column(name = "roi")
-    String roi; // ROI (can be null)
-    @Column(name = "last_updated")
+    private String[] roi;
+
     @Temporal(TemporalType.TIMESTAMP)
-    Date last_updated;
-    int fractional_digits;
+    @Column(name = "last_updated")
+    private Date last_updated;
+
+    @Column(name = "fractional_digits")
+    private int fractional_digits;
 
     @Override
     public String toString() {
@@ -104,23 +134,6 @@ public class CoinInfo implements Serializable {
                 '}';
     }
 
-    // Getters and Setters
 
-
-    public void setCurrentPrice(Double currentPrice) {
-        this.current_price = currentPrice;
-    }
-
-    public void setMarketCap(long marketCap) {
-        this.market_cap = marketCap;
-    }
-
-    public void setMarketCapRank(int marketCapRank) {
-        this.market_cap_rank = marketCapRank;
-    }
-
-    public void setFractionalDigits(int fractionalDigit) {
-        this.fractional_digits = fractionalDigit;
-    }
 
 }

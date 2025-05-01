@@ -89,6 +89,7 @@ public class PopOver extends PopupControl {
     protected Skin<?> createDefaultSkin() {
         return new PopOverSkin(this);
     }
+
     private final StackPane root = new StackPane();
 
     /**
@@ -159,14 +160,16 @@ public class PopOver extends PopupControl {
     private final WeakChangeListener<Number> weakXListener = new WeakChangeListener<>(
             xListener);    private final WeakInvalidationListener weakHideListener = new WeakInvalidationListener(
             hideListener);
-    private final ChangeListener<Number> yListener = (value, oldY, newY) -> setAnchorY(
-            getAnchorY() + (newY.doubleValue() - oldY.doubleValue()));
-    private final WeakChangeListener<Number> weakYListener = new WeakChangeListener<>(
-            yListener);
     private final BooleanProperty headerAlwaysVisible = new SimpleBooleanProperty(this,
             "headerAlwaysVisible"); //$NON-NLS-1$
     private final BooleanProperty detachable = new SimpleBooleanProperty(this,
             "detachable", true); //$NON-NLS-1$
+
+    private final ChangeListener<Number> yListener = (value, oldY, newY) -> setAnchorY(
+            getAnchorY() + (newY.doubleValue() - oldY.doubleValue()));
+
+    private final WeakChangeListener<Number> weakYListener = new WeakChangeListener<>(
+            yListener);
     private final BooleanProperty detached = new SimpleBooleanProperty(this,
             "detached", false); //$NON-NLS-1$
     // arrow size support
@@ -188,188 +191,6 @@ public class PopOver extends PopupControl {
         if (owner == null) return;
         owner.applyCss();
         show(owner, 4);
-    }
-    // arrow indent support
-    private final DoubleProperty arrowIndent = new SimpleDoubleProperty(this,
-            "arrowIndent", 12); //$NON-NLS-1$
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public final void show(Window owner) {
-        super.show(owner);
-        ownerWindow = owner;
-
-        showFadeInAnimation(DEFAULT_FADE_DURATION);
-
-        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
-                closePopOverOnOwnerWindowClose);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public final void show(Window ownerWindow, double anchorX, double anchorY) {
-        super.show(ownerWindow, anchorX, anchorY);
-        this.ownerWindow = ownerWindow;
-
-        showFadeInAnimation(DEFAULT_FADE_DURATION);
-
-        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
-                closePopOverOnOwnerWindowClose);
-    }
-    // radius support
-    private final DoubleProperty cornerRadius = new SimpleDoubleProperty(this,
-            "cornerRadius", 6); //$NON-NLS-1$
-    private final StringProperty title = new SimpleStringProperty(this, "title", "Info"); //$NON-NLS-1$ //$NON-NLS-2$
-    private final ObjectProperty<ArrowLocation> arrowLocation = new SimpleObjectProperty<>(
-            this, "arrowLocation", ArrowLocation.LEFT_TOP); //$NON-NLS-1$
-
-    private void showFadeInAnimation(Duration fadeInDuration) {
-        // Fade In
-        Node skinNode = getSkin().getNode();
-        skinNode.setOpacity(0);
-
-        FadeTransition fadeIn = new FadeTransition(fadeInDuration, skinNode);
-        fadeIn.setFromValue(0);
-        fadeIn.setToValue(1);
-        fadeIn.play();
-    }
-
-    private void ownerWindowClosing() {
-        hide(Duration.ZERO);
-    }
-
-    /**
-     * Hides the pop over by quickly changing its opacity to 0.
-     *
-     * @see #hide(Duration)
-     */
-    @Override
-    public final void hide() {
-        hide(DEFAULT_FADE_DURATION);
-    }
-    private Window ownerWindow;
-
-    private void adjustWindowLocation() {
-        Bounds bounds = PopOver.this.getSkin().getNode().getBoundsInParent();
-
-        switch (getArrowLocation()) {
-            case TOP_CENTER:
-            case TOP_LEFT:
-            case TOP_RIGHT:
-                setAnchorX(getAnchorX() + bounds.getMinX() - computeXOffset());
-                setAnchorY(getAnchorY() + bounds.getMinY() + getArrowSize());
-                break;
-            case LEFT_TOP:
-            case LEFT_CENTER:
-            case LEFT_BOTTOM:
-                setAnchorX(getAnchorX() + bounds.getMinX() + getArrowSize());
-                setAnchorY(getAnchorY() + bounds.getMinY() - computeYOffset());
-                break;
-            case BOTTOM_CENTER:
-            case BOTTOM_LEFT:
-            case BOTTOM_RIGHT:
-                setAnchorX(getAnchorX() + bounds.getMinX() - computeXOffset());
-                setAnchorY(getAnchorY() - bounds.getMinY() - bounds.getMaxY() - 1);
-                break;
-            case RIGHT_TOP:
-            case RIGHT_BOTTOM:
-            case RIGHT_CENTER:
-                setAnchorX(getAnchorX() - bounds.getMinX() - bounds.getMaxX() - 1);
-                setAnchorY(getAnchorY() + bounds.getMinY() - computeYOffset());
-                break;
-        }
-    }
-
-    private double computeXOffset() {
-        return switch (getArrowLocation()) {
-            case TOP_LEFT, BOTTOM_LEFT -> getCornerRadius() + getArrowIndent() + getArrowSize();
-            case TOP_CENTER, BOTTOM_CENTER -> getContentNode().prefWidth(-1) / 2;
-            case TOP_RIGHT, BOTTOM_RIGHT -> getContentNode().prefWidth(-1) - getArrowIndent()
-                    - getCornerRadius() - getArrowSize();
-            default -> 0;
-        };
-    }
-
-    private double computeYOffset() {
-        double prefContentHeight = getContentNode().prefHeight(-1);
-
-        return switch (getArrowLocation()) {
-            case LEFT_TOP, RIGHT_TOP -> getCornerRadius() + getArrowIndent() + getArrowSize();
-            case LEFT_CENTER, RIGHT_CENTER -> Math.max(prefContentHeight, 2 * (getCornerRadius()
-                    + getArrowIndent() + getArrowSize())) / 2;
-            case LEFT_BOTTOM, RIGHT_BOTTOM -> Math.max(prefContentHeight - getCornerRadius()
-                    - getArrowIndent() - getArrowSize(), getCornerRadius()
-                    + getArrowIndent() + getArrowSize());
-            default -> 0;
-        };
-    }
-
-    /**
-     * Detaches the pop over from the owning node. The pop over will no longer
-     * display an arrow pointing at the owner node.
-     */
-    public final void detach() {
-        if (isDetachable()) {
-            setDetached(true);
-        }
-    }
-
-    // always show header
-
-    /**
-     * Creates a pop over with a label as the content node.
-     */
-    public PopOver() {
-        super();
-
-        getStyleClass().add(DEFAULT_STYLE_CLASS);
-
-        getRoot().getStylesheets().add(
-                PopOver.class.getResource("/css/popover.css").toExternalForm()); //$NON-NLS-1$
-
-        setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
-        setOnHiding(evt -> setDetached(false));
-
-        /*
-         * Create some initial content.
-         */
-        Label label = new Label("<No Content>"); //$NON-NLS-1$
-        label.setPrefSize(200, 200);
-        label.setPadding(new Insets(4));
-        setContentNode(label);
-
-        InvalidationListener repositionListener = observable -> {
-            if (isShowing() && !isDetached()) {
-                show(getOwnerNode(), targetX, targetY);
-                adjustWindowLocation();
-            }
-        };
-
-        arrowSize.addListener(repositionListener);
-        cornerRadius.addListener(repositionListener);
-        arrowLocation.addListener(repositionListener);
-        arrowIndent.addListener(repositionListener);
-        headerAlwaysVisible.addListener(repositionListener);
-
-        /*
-         * A detached popover should of course not automatically hide itself.
-         */
-        detached.addListener(it -> {
-            setAutoHide(!isDetached());
-        });
-
-        setAutoHide(true);
-    }
-
-    /**
-     * Determines whether the {@link PopOver} header should remain visible, even while attached.
-     */
-    public final BooleanProperty headerAlwaysVisibleProperty() {
-        return headerAlwaysVisible;
     }
 
     /**
@@ -418,18 +239,12 @@ public class PopOver extends PopupControl {
                 break;
         }
     }
-
-    /**
-     * Returns the value of the detachable property.
-     *
-     * @return true if the header is visible even while attached
-     * @see #headerAlwaysVisibleProperty()
-     */
-    public final boolean isHeaderAlwaysVisible() {
-        return headerAlwaysVisible.getValue();
-    }
-
-    // detach support
+    // arrow indent support
+    private final DoubleProperty arrowIndent = new SimpleDoubleProperty(this,
+            "arrowIndent", 12); //$NON-NLS-1$
+    // radius support
+    private final DoubleProperty cornerRadius = new SimpleDoubleProperty(this,
+            "cornerRadius", 6); //$NON-NLS-1$
 
     /**
      * Makes the pop over visible at the give location and associates it with
@@ -444,14 +259,7 @@ public class PopOver extends PopupControl {
     public final void show(Node owner, double x, double y) {
         show(owner, x, y, DEFAULT_FADE_DURATION);
     }
-
-    /**
-     * Determines if the pop over is detachable at all.
-     */
-    public final BooleanProperty detachableProperty() {
-        return detachable;
-    }
-
+    private final StringProperty title = new SimpleStringProperty(this, "title", "Info"); //$NON-NLS-1$ //$NON-NLS-2$
     /**
      * Makes the pop over visible at the give location and associates it with
      * the given owner node. The x and y coordinate will be the target location
@@ -534,15 +342,53 @@ public class PopOver extends PopupControl {
         ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
                 closePopOverOnOwnerWindowClose);
     }
+    private final ObjectProperty<ArrowLocation> arrowLocation = new SimpleObjectProperty<>(
+            this, "arrowLocation", ArrowLocation.LEFT_TOP); //$NON-NLS-1$
+    private Window ownerWindow;
 
     /**
-     * Returns the value of the detachable property.
-     *
-     * @return true if the user is allowed to detach / tear off the pop over
-     * @see #detachableProperty()
+     * Creates a pop over with a label as the content node.
      */
-    public final boolean isDetachable() {
-        return detachableProperty().get();
+    public PopOver() {
+        super();
+
+        getStyleClass().add(DEFAULT_STYLE_CLASS);
+
+        getRoot().getStylesheets().add(
+                PopOver.class.getResource("/css/popover.css").toExternalForm()); //$NON-NLS-1$
+
+        setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
+        setOnHiding(evt -> setDetached(false));
+
+        /*
+         * Create some initial content.
+         */
+        Label label = new Label("<No Content>"); //$NON-NLS-1$
+        label.setPrefSize(200, 200);
+        label.setPadding(new Insets(4));
+        setContentNode(label);
+
+        InvalidationListener repositionListener = observable -> {
+            if (isShowing() && !isDetached()) {
+                show(getOwnerNode(), targetX, targetY);
+                adjustWindowLocation();
+            }
+        };
+
+        arrowSize.addListener(repositionListener);
+        cornerRadius.addListener(repositionListener);
+        arrowLocation.addListener(repositionListener);
+        arrowIndent.addListener(repositionListener);
+        headerAlwaysVisible.addListener(repositionListener);
+
+        /*
+         * A detached popover should of course not automatically hide itself.
+         */
+        detached.addListener(it -> {
+            setAutoHide(!isDetached());
+        });
+
+        setAutoHide(true);
     }
 
     /**
@@ -578,14 +424,89 @@ public class PopOver extends PopupControl {
     }
 
     /**
-     * Determines whether the pop over is detached from the owning node or not.
-     * A detached pop over no longer shows an arrow pointing at the owner and
-     * features its own title bar.
-     *
-     * @return the detached property
+     * {@inheritDoc}
      */
-    public final BooleanProperty detachedProperty() {
-        return detached;
+    @Override
+    public final void show(Window owner) {
+        super.show(owner);
+        ownerWindow = owner;
+
+        showFadeInAnimation(DEFAULT_FADE_DURATION);
+
+        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
+                closePopOverOnOwnerWindowClose);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public final void show(Window ownerWindow, double anchorX, double anchorY) {
+        super.show(ownerWindow, anchorX, anchorY);
+        this.ownerWindow = ownerWindow;
+
+        showFadeInAnimation(DEFAULT_FADE_DURATION);
+
+        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
+                closePopOverOnOwnerWindowClose);
+    }
+
+    private void showFadeInAnimation(Duration fadeInDuration) {
+        // Fade In
+        Node skinNode = getSkin().getNode();
+        skinNode.setOpacity(0);
+
+        FadeTransition fadeIn = new FadeTransition(fadeInDuration, skinNode);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.play();
+    }
+
+    private void ownerWindowClosing() {
+        hide(Duration.ZERO);
+    }
+
+    // always show header
+
+    /**
+     * Hides the pop over by quickly changing its opacity to 0.
+     *
+     * @see #hide(Duration)
+     */
+    @Override
+    public final void hide() {
+        hide(DEFAULT_FADE_DURATION);
+    }
+
+    private void adjustWindowLocation() {
+        Bounds bounds = PopOver.this.getSkin().getNode().getBoundsInParent();
+
+        switch (getArrowLocation()) {
+            case TOP_CENTER:
+            case TOP_LEFT:
+            case TOP_RIGHT:
+                setAnchorX(getAnchorX() + bounds.getMinX() - computeXOffset());
+                setAnchorY(getAnchorY() + bounds.getMinY() + getArrowSize());
+                break;
+            case LEFT_TOP:
+            case LEFT_CENTER:
+            case LEFT_BOTTOM:
+                setAnchorX(getAnchorX() + bounds.getMinX() + getArrowSize());
+                setAnchorY(getAnchorY() + bounds.getMinY() - computeYOffset());
+                break;
+            case BOTTOM_CENTER:
+            case BOTTOM_LEFT:
+            case BOTTOM_RIGHT:
+                setAnchorX(getAnchorX() + bounds.getMinX() - computeXOffset());
+                setAnchorY(getAnchorY() - bounds.getMinY() - bounds.getMaxY() - 1);
+                break;
+            case RIGHT_TOP:
+            case RIGHT_BOTTOM:
+            case RIGHT_CENTER:
+                setAnchorX(getAnchorX() - bounds.getMinX() - bounds.getMaxX() - 1);
+                setAnchorY(getAnchorY() + bounds.getMinY() - computeYOffset());
+                break;
+        }
     }
 
     /**
@@ -596,6 +517,42 @@ public class PopOver extends PopupControl {
      */
     public final void setHeaderAlwaysVisible(boolean visible) {
         headerAlwaysVisible.setValue(visible);
+    }
+
+    private double computeXOffset() {
+        return switch (getArrowLocation()) {
+            case TOP_LEFT, BOTTOM_LEFT -> getCornerRadius() + getArrowIndent() + getArrowSize();
+            case TOP_CENTER, BOTTOM_CENTER -> getContentNode().prefWidth(-1) / 2;
+            case TOP_RIGHT, BOTTOM_RIGHT -> getContentNode().prefWidth(-1) - getArrowIndent()
+                    - getCornerRadius() - getArrowSize();
+            default -> 0;
+        };
+    }
+
+    // detach support
+
+    private double computeYOffset() {
+        double prefContentHeight = getContentNode().prefHeight(-1);
+
+        return switch (getArrowLocation()) {
+            case LEFT_TOP, RIGHT_TOP -> getCornerRadius() + getArrowIndent() + getArrowSize();
+            case LEFT_CENTER, RIGHT_CENTER -> Math.max(prefContentHeight, 2 * (getCornerRadius()
+                    + getArrowIndent() + getArrowSize())) / 2;
+            case LEFT_BOTTOM, RIGHT_BOTTOM -> Math.max(prefContentHeight - getCornerRadius()
+                    - getArrowIndent() - getArrowSize(), getCornerRadius()
+                    + getArrowIndent() + getArrowSize());
+            default -> 0;
+        };
+    }
+
+    /**
+     * Detaches the pop over from the owning node. The pop over will no longer
+     * display an arrow pointing at the owner node.
+     */
+    public final void detach() {
+        if (isDetachable()) {
+            setDetached(true);
+        }
     }
 
     /**
@@ -609,6 +566,40 @@ public class PopOver extends PopupControl {
     }
 
     /**
+     * Determines whether the {@link PopOver} header should remain visible, even while attached.
+     */
+    public final BooleanProperty headerAlwaysVisibleProperty() {
+        return headerAlwaysVisible;
+    }
+
+    /**
+     * Returns the value of the detachable property.
+     *
+     * @return true if the header is visible even while attached
+     * @see #headerAlwaysVisibleProperty()
+     */
+    public final boolean isHeaderAlwaysVisible() {
+        return headerAlwaysVisible.getValue();
+    }
+
+    /**
+     * Determines if the pop over is detachable at all.
+     */
+    public final BooleanProperty detachableProperty() {
+        return detachable;
+    }
+
+    /**
+     * Returns the value of the detachable property.
+     *
+     * @return true if the user is allowed to detach / tear off the pop over
+     * @see #detachableProperty()
+     */
+    public final boolean isDetachable() {
+        return detachableProperty().get();
+    }
+
+    /**
      * Returns the value of the detached property.
      *
      * @return true if the pop over is currently detached.
@@ -616,6 +607,17 @@ public class PopOver extends PopupControl {
      */
     public final boolean isDetached() {
         return detachedProperty().get();
+    }
+
+    /**
+     * Determines whether the pop over is detached from the owning node or not.
+     * A detached pop over no longer shows an arrow pointing at the owner and
+     * features its own title bar.
+     *
+     * @return the detached property
+     */
+    public final BooleanProperty detachedProperty() {
+        return detached;
     }
 
     /**
@@ -651,7 +653,7 @@ public class PopOver extends PopupControl {
      * Sets the value of the detached property.
      *
      * @param detached if true the pop over will change its apperance to "detached"
-     * mode
+     *                 mode
      * @see #detachedProperty()
      */
     public final void setDetached(boolean detached) {

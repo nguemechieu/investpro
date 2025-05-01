@@ -3,7 +3,7 @@ package org.investpro.investpro;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.model.CoinInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +12,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Abstract base for HTTP-only Exchange implementations.
@@ -55,10 +58,14 @@ public abstract class Exchange implements
             requestBuilder.uri(uri);
             HttpResponse<String> response = client.build().send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
 
-            if (response.statusCode() == 429) throw new IOException("Rate limit hit");
-            if (response.statusCode() != 200)
-                throw new IOException("Failed to fetch news: " + response.statusCode());
-
+            if (response.statusCode() == 429) {
+                logger.info("Rate limit hit");
+                return new ArrayList<>();
+            }
+            if (response.statusCode() != 200) {
+                logger.info("Failed to fetch news: " + response.statusCode());
+                return new ArrayList<>();
+            }
             ObjectMapper objectMapper = new ObjectMapper();
             List<News> parsedNews = new ArrayList<>();
             JsonNode root = objectMapper.readTree(response.body());
@@ -106,11 +113,14 @@ public abstract class Exchange implements
             } catch (Exception e) {
                 retries++;
                 logger.warn("Retry {}/{} failed: {}", retries, MAX_RETRIES, e.getMessage());
-                if (retries == MAX_RETRIES) {
-                    throw new RuntimeException("\u274C Failed after retries", e);
-                }
+
                 try {
+
                     Thread.sleep(delay);
+                    if (retries == MAX_RETRIES) {
+                        logger.info("❌ Failed after retries", e);
+                        return new ArrayList<>();
+                    }
                 } catch (InterruptedException ignored) {
                 }
                 delay *= 2;

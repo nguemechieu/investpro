@@ -28,7 +28,7 @@ public class CurrencyDataProvider {
     @Getter
     private static final ArrayList<CoinInfo> coinInfoList = new ArrayList<>();
     private static final ArrayList<Currency> coinsToRegister = new ArrayList<>();
-    private static HttpClient.Builder client = HttpClient.newBuilder();
+    private static final HttpClient.Builder client = HttpClient.newBuilder();
 
     public CurrencyDataProvider() {
         logger.info("CryptoCurrencyDataProvider initialized.");
@@ -104,11 +104,11 @@ public class CurrencyDataProvider {
                 coinInfo.setId(id);
                 coinInfo.setSymbol(symbol);
                 coinInfo.setName(name);
-                coinInfo.setCurrentPrice(currentPrice);
+                coinInfo.setCurrent_price(currentPrice);
                 coinInfo.setImage(image);
-                coinInfo.setMarketCap(marketCap);
-                coinInfo.setMarketCapRank(marketCapRank);
-                coinInfo.setFractionalDigits(fractional_digit);
+                coinInfo.setMarket_cap(marketCap);
+                coinInfo.setMarket_cap_rank(marketCapRank);
+                coinInfo.setFractional_digits(fractional_digit);
                 coinInfoList.add(coinInfo);
 
                 logger.info("Added coin: {}", coinInfo);
@@ -135,8 +135,10 @@ public class CurrencyDataProvider {
 
 
             }
+            for (Currency m : coinsToRegister)
 
-            db1.save(coinsToRegister.stream().toList().getFirst());
+                if (m != null)
+                    db1.save(m);
 
 
         } catch (IOException | InterruptedException e) {

@@ -325,6 +325,13 @@
             <version>1.62.2</version>
         </dependency>
 
+        <!--This dependency enable db persistency connection/-->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>6.4.4.Final</version>
+        </dependency>
+
 
     </dependencies>
 

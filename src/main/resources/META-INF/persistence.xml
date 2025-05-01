@@ -11,6 +11,7 @@
         <class>org.investpro.investpro.model.TradePair</class>
         <class>org.investpro.investpro.model.Candle</class>
         <class>org.investpro.investpro.model.Trade</class>
+        <class>org.investpro.investpro.model.CoinInfo</class>
 
         <properties>
             <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
