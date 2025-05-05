@@ -3,7 +3,10 @@ package org.investpro.investpro;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.model.CoinInfo;
+import org.investpro.investpro.model.OrderBook;
+import org.investpro.investpro.model.Trade;
+import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,7 +129,10 @@ public abstract class Exchange implements
 
     public abstract Set<Integer> granularity();
 
-    public abstract CompletableFuture<Trade> fetchRecentTrades(TradePair tradePair, Instant instant);
+    public abstract CompletableFuture<List<Trade>> fetchRecentTrades(TradePair tradePair, Instant instant);
+
+    public abstract CompletableFuture<List<OrderBook>> getOrderBook(TradePair tradePair, Instant instant);
+
     @FunctionalInterface
     protected interface FetchFunction<T> {
         T fetch() throws Exception;

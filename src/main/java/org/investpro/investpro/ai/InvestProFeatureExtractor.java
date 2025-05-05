@@ -12,7 +12,7 @@ public class InvestProFeatureExtractor {
     private static final int RSI_PERIOD = 14;
     private static final int EMA_PERIOD = 10;
 
-    public static @NotNull List<Double> extractFeatures(List<CandleData> candles) {
+    public static @NotNull List<Double> extractFeatures(@NotNull List<CandleData> candles) {
 
         List<Double> features = new ArrayList<>();
 
@@ -37,7 +37,7 @@ public class InvestProFeatureExtractor {
 
         // 3. Candle range (high - low)
         features.add(last.getHighPrice() - last.getLowPrice());
-        ;//.doubleValue());
+        //.doubleValue());
 
         // 4. Close - Previous Close (momentum)
         features.add(last.getClosePrice() - prev.getClosePrice());
@@ -71,7 +71,7 @@ public class InvestProFeatureExtractor {
 
         double k = 2.0 / (period + 1);
         double ema = candles.get(candles.size() - period).getClosePrice();
-        ;//)//.doubleValue();
+        //)//.doubleValue();
 
         for (int i = candles.size() - period + 1; i < candles.size(); i++) {
             double close = candles.get(i).getClosePrice();//.doubleValue();

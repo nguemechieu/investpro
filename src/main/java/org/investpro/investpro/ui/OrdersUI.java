@@ -6,7 +6,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Region;
 import lombok.Getter;
 import lombok.Setter;
-
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.model.Order;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +21,7 @@ import java.util.concurrent.*;
 
 @Getter
 @Setter
+
 public class OrdersUI extends Region {
     private static final Logger logger = LoggerFactory.getLogger(OrdersUI.class);
     private final List<Order> orderList = new CopyOnWriteArrayList<>();

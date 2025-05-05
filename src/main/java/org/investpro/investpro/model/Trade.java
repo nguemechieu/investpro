@@ -1,15 +1,17 @@
 package org.investpro.investpro.model;
 
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.type.Money;
 import jakarta.persistence.*;
-import javafx.geometry.Side;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
+import org.investpro.investpro.Side;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -32,8 +34,8 @@ public class Trade {
     @Column(name = "local_trade_id", nullable = false)
     long localTradeId;
     Money fee;
-
-
+    @JsonProperty("trades")
+    List<Trade> trades;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
@@ -46,7 +48,7 @@ public class Trade {
 
     @Column(name = "timestamp", nullable = false)
     private Instant timestamp;
-
+    Side side;
 
     // Constructors, getters, and other methods...
 
@@ -115,4 +117,9 @@ public class Trade {
 
         return localTradeId;
     }
+    double size;
+    @JsonProperty("lastTransactionID")
+    private long lastTransactionID;
+
+
 }

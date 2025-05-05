@@ -1,47 +1,83 @@
-// Predict.proto - gRPC API for InvestPro AI Market Prediction
-
 syntax = "proto3";
-
-// Java package config
-
-
 package org.investpro.grpc;
-option java_package = "org.investpro.grpc";
-option java_multiple_files = true;
-option java_outer_classname = "PredictProto";
 
-// Import Google's Empty message
 import "google/protobuf/empty.proto";
 
-/// Input features for market prediction
+// ========== Market Data Input ==========
 message MarketDataRequest {
-  double open = 1;           // Open price
-  double close = 2;          // Close price
-  double high = 3;           // High price
-  double low = 4;            // Low price
-  double volume = 5;         // Trade volume
-  double rsi = 6;            // Relative Strength Index
-  double atr = 7;            // Average True Range
-  double macd = 8;           // MACD indicator
-  double stoch = 9;          // Stochastic oscillator
-  double bb_upper = 10;      // Bollinger Band upper value
-  double bb_lower = 11;      // Bollinger Band lower value
+  double open = 1;
+  double close = 2;
+  double high = 3;
+  double low = 4;
+  double volume = 5;
+  double rsi = 6;
+  double atr = 7;
+  double macd = 8;
+  double stoch = 9;
+  double bb_upper = 10;
+  double bb_lower = 11;
 }
 
-/// Prediction output
+// ========== Prediction Output ==========
 message PredictionResponse {
-  string prediction = 1;     // e.g. "up" or "down"
-  float confidence = 2;      // Confidence score (0.0 to 1.0)
+  string prediction = 1;
+  double confidence = 2;
+  double probability_up = 3;
+  double probability_down = 4;
 }
 
-/// Server health check response
+// ========== Batch Prediction Support ==========
+message BatchPredictionRequest {
+  repeated MarketDataRequest candles = 1;
+}
+
+message BatchPredictionResponse {
+  repeated PredictionResponse predictions = 1;
+}
+
+// ========== Feedback Support ==========
+message TradeFeedbackRequest {
+  string trade_id = 1;
+  string result = 2; // "win" or "loss"
+  double pnl = 3;
+}
+
+message FeedbackResponse {
+  string status = 1;
+}
+
+// ========== Diagnostics ==========
 message HealthStatus {
-  string status = 1;         // e.g. "SERVING"
-
+  string status = 1;
+  string version = 2;
+  string model_name = 3;
+  int64 timestamp = 4;
 }
 
-/// gRPC service for AI prediction
+message ModelInfo {
+  string name = 1;
+  string version = 2;
+  string framework = 3;
+  int64 last_trained = 4;
+}
+
+// ========== Model Reload ==========
+message ReloadModelRequest {
+  string model_path = 1;
+}
+
+message ReloadModelResponse {
+  string status = 1;
+  string details = 2;
+}
+
+// ========== Service Definition ==========
 service Predictor {
   rpc Predict (MarketDataRequest) returns (PredictionResponse);
+  rpc BatchPredict (BatchPredictionRequest) returns (BatchPredictionResponse);
+  rpc BatchPredictStream (stream MarketDataRequest) returns (stream PredictionResponse); // <-- Streaming Support
+  rpc SendTradeFeedback (TradeFeedbackRequest) returns (FeedbackResponse);
   rpc HealthCheck (google.protobuf.Empty) returns (HealthStatus);
+  rpc GetModelInfo (google.protobuf.Empty) returns (ModelInfo);
+  rpc ReloadModel (ReloadModelRequest) returns (ReloadModelResponse);
 }

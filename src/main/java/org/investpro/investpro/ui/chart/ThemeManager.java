@@ -36,6 +36,4 @@ public class ThemeManager {
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(DARK_THEME)).toExternalForm());
     }
 
-    public void toggleTheme(int i) {
-    }
 }

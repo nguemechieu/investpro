@@ -3,11 +3,13 @@ package org.investpro.investpro.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
+import lombok.Setter;
 import org.investpro.investpro.CreateOrderRequest;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.model.Order;
+import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,10 +18,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
-import java.util.*;
-import java.util.concurrent.ExecutionException;
-
+@Getter
+@Setter
 
 public class OandaOrderService {
 
@@ -27,7 +31,7 @@ public class OandaOrderService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final String accountId;
-    @Getter
+
     private final String apiSecret;
     private final HttpClient client;
     private final HttpRequest.Builder baseRequestBuilder;
@@ -69,7 +73,7 @@ public class OandaOrderService {
         return getOrders(tradePair); // Simplified, you may filter by tradePair if needed
     }
 
-    public List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException {
+    public List<Order> getPendingOrders() throws IOException, InterruptedException {
         HttpRequest request = baseRequestBuilder.uri(URI.create(Oanda.API_URL + "/accounts/" + accountId + "/pendingOrders"))
                 .GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());

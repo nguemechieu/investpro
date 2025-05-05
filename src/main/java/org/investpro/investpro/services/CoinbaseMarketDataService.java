@@ -2,8 +2,6 @@ package org.investpro.investpro.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
-import lombok.Setter;
 import org.investpro.investpro.exchanges.Coinbase;
 import org.investpro.investpro.model.OrderBook;
 import org.investpro.investpro.model.OrderBookEntry;
@@ -18,7 +16,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -82,7 +79,10 @@ public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpCli
                 root.get("bids").forEach(b -> bids.add(new OrderBookEntry(b.get(0).asDouble(), b.get(1).asDouble())));
                 root.get("asks").forEach(a -> asks.add(new OrderBookEntry(a.get(0).asDouble(), a.get(1).asDouble())));
 
-                return List.of(new OrderBook(Instant.now(), bids, asks));
+                OrderBook cand = new OrderBook();
+                cand.getAskEntries().getLast().setAmount(asks.getLast().getAmount());
+                cand.getAskEntries().getLast().setPrice(asks.getLast().getPrice());
+                return List.of(cand);
 
             } catch (IOException | InterruptedException e) {
                 logger.error("Failed to fetch order book", e);

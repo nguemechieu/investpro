@@ -2,10 +2,11 @@ package org.investpro.investpro.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.investpro.investpro.model.Fee;
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.investpro.exchanges.Coinbase;
 import org.investpro.investpro.model.Account;
-
+import org.investpro.investpro.model.Fee;
 import org.investpro.investpro.model.Position;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,14 +20,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@Getter
+@Setter
 public class CoinbaseAccountService {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseAccountService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private final String apiKey;
-    private final String apiSecret;
-    private final HttpClient httpClient;
+    private String apiKey;
+    private String apiSecret;
+    private HttpClient httpClient;
 
     public CoinbaseAccountService(String apiKey, String apiSecret, HttpClient httpClient) {
         this.apiKey = apiKey;

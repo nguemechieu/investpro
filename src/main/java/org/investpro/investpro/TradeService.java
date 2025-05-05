@@ -4,7 +4,7 @@ import org.investpro.investpro.model.Trade;
 import org.investpro.investpro.model.TradePair;
 
 import java.time.Instant;
-import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -34,7 +34,7 @@ public interface TradeService {
      * @param pair The trading pair.
      * @return Optional price as double.
      */
-    Optional<Double> getLatestPrice(TradePair pair);
+    Double[] getLatestPrice(TradePair pair);
 
     /**
      * Fetches a single most recent trade for the specified pair and instant.
@@ -43,5 +43,5 @@ public interface TradeService {
      * @param instant Timestamp reference.
      * @return A CompletableFuture of a Trade.
      */
-    CompletableFuture<Trade> fetchRecentTrade(TradePair pair, Instant instant);
+    CompletableFuture<List<Trade>> fetchRecentTrade(TradePair pair, Instant instant);
 }

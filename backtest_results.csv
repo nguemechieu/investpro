@@ -1,0 +1,2401 @@
+Trade #,Prediction,Entry,Exit,PnL,Result
+1,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89987,0,89974,-0,00013,LOSS
+2,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89974,0,89994,0,00020,LOSS
+3,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89994,0,90012,0,00018,LOSS
+4,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90012,0,90045,0,00033,LOSS
+5,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90045,0,90032,-0,00013,LOSS
+6,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90032,0,90038,0,00006,LOSS
+7,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90038,0,90056,0,00018,LOSS
+8,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90056,0,90046,-0,00010,LOSS
+9,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90046,0,90045,-0,00001,LOSS
+10,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90045,0,90032,-0,00013,LOSS
+11,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90032,0,90026,-0,00006,LOSS
+12,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90026,0,90033,0,00007,LOSS
+13,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90033,0,90040,0,00007,LOSS
+14,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90040,0,90013,-0,00027,LOSS
+15,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90013,0,90024,0,00011,LOSS
+16,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90024,0,90042,0,00018,LOSS
+17,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90042,0,90030,-0,00012,LOSS
+18,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90030,0,90034,0,00004,LOSS
+19,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90034,0,90049,0,00015,LOSS
+20,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90049,0,90053,0,00004,LOSS
+21,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90053,0,90037,-0,00016,LOSS
+22,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90037,0,90039,0,00002,LOSS
+23,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90039,0,90022,-0,00017,LOSS
+24,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90022,0,89780,-0,00242,LOSS
+25,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89780,0,89784,0,00004,LOSS
+26,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89784,0,89762,-0,00022,LOSS
+27,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89762,0,89716,-0,00046,LOSS
+28,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89716,0,89732,0,00016,LOSS
+29,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89732,0,89754,0,00022,LOSS
+30,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89754,0,89824,0,00070,LOSS
+31,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89824,0,89802,-0,00022,LOSS
+32,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89802,0,89800,-0,00002,LOSS
+33,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89800,0,89780,-0,00020,LOSS
+34,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89780,0,89782,0,00002,LOSS
+35,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89782,0,89744,-0,00038,LOSS
+36,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89744,0,89755,0,00011,LOSS
+37,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89755,0,89747,-0,00008,LOSS
+38,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89747,0,89759,0,00012,LOSS
+39,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89759,0,89797,0,00038,LOSS
+40,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89797,0,89778,-0,00019,LOSS
+41,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89778,0,89792,0,00014,LOSS
+42,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89792,0,89826,0,00034,LOSS
+43,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89826,0,89880,0,00054,LOSS
+44,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89880,0,89875,-0,00005,LOSS
+45,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89875,0,89928,0,00053,LOSS
+46,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89928,0,89900,-0,00028,LOSS
+47,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89900,0,89908,0,00008,LOSS
+48,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89908,0,89940,0,00032,LOSS
+49,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89940,0,89920,-0,00020,LOSS
+50,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89920,0,89903,-0,00017,LOSS
+51,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89903,0,89886,-0,00017,LOSS
+52,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89886,0,89862,-0,00024,LOSS
+53,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89862,0,89892,0,00030,LOSS
+54,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89892,0,89904,0,00012,LOSS
+55,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89904,0,89922,0,00018,LOSS
+56,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89922,0,89918,-0,00004,LOSS
+57,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89918,0,89926,0,00008,LOSS
+58,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89926,0,89940,0,00014,LOSS
+59,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89940,0,89905,-0,00035,LOSS
+60,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89905,0,89894,-0,00011,LOSS
+61,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89894,0,89840,-0,00054,LOSS
+62,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89840,0,89822,-0,00018,LOSS
+63,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89822,0,89826,0,00004,LOSS
+64,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89826,0,89834,0,00008,LOSS
+65,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89834,0,89854,0,00020,LOSS
+66,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89854,0,89874,0,00020,LOSS
+67,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89874,0,89820,-0,00054,LOSS
+68,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89820,0,89778,-0,00042,LOSS
+69,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89778,0,89828,0,00050,LOSS
+70,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89828,0,89830,0,00002,LOSS
+71,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89830,0,89796,-0,00034,LOSS
+72,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89796,0,89840,0,00044,LOSS
+73,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89840,0,89825,-0,00015,LOSS
+74,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89825,0,89846,0,00021,LOSS
+75,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89846,0,89830,-0,00016,LOSS
+76,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89830,0,89832,0,00002,LOSS
+77,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89832,0,89873,0,00041,LOSS
+78,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89873,0,89904,0,00031,LOSS
+79,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89904,0,89859,-0,00045,LOSS
+80,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89859,0,89780,-0,00079,LOSS
+81,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89780,0,89820,0,00040,LOSS
+82,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89820,0,89864,0,00044,LOSS
+83,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89864,0,89867,0,00003,LOSS
+84,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89867,0,89910,0,00043,LOSS
+85,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89910,0,89936,0,00026,LOSS
+86,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89936,0,89932,-0,00004,LOSS
+87,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89932,0,89936,0,00004,LOSS
+88,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89936,0,89963,0,00027,LOSS
+89,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89963,0,89858,-0,00105,LOSS
+90,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89858,0,89847,-0,00011,LOSS
+91,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89847,0,89866,0,00019,LOSS
+92,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89866,0,89842,-0,00024,LOSS
+93,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89842,0,89858,0,00016,LOSS
+94,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89858,0,89894,0,00036,LOSS
+95,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89894,0,89895,0,00001,LOSS
+96,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89895,0,89895,0,00000,LOSS
+97,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89895,0,89890,-0,00005,LOSS
+98,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89890,0,89809,-0,00081,LOSS
+99,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89809,0,89808,-0,00001,LOSS
+100,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89808,0,89874,0,00066,LOSS
+101,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89874,0,89862,-0,00012,LOSS
+102,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89862,0,89854,-0,00008,LOSS
+103,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89854,0,89892,0,00038,LOSS
+104,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89892,0,89870,-0,00022,LOSS
+105,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89870,0,89851,-0,00019,LOSS
+106,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89851,0,89840,-0,00011,LOSS
+107,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89840,0,89866,0,00026,LOSS
+108,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89866,0,89811,-0,00055,LOSS
+109,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89811,0,89864,0,00053,LOSS
+110,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89864,0,89782,-0,00082,LOSS
+111,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89782,0,89848,0,00066,LOSS
+112,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89848,0,89884,0,00036,LOSS
+113,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89884,0,89911,0,00027,LOSS
+114,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89911,0,89892,-0,00019,LOSS
+115,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89892,0,89892,0,00000,LOSS
+116,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89892,0,89818,-0,00074,LOSS
+117,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89818,0,89817,-0,00001,LOSS
+118,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89817,0,89907,0,00090,LOSS
+119,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89907,0,89888,-0,00019,LOSS
+120,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89888,0,89896,0,00008,LOSS
+121,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89896,0,89868,-0,00028,LOSS
+122,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89868,0,89896,0,00028,LOSS
+123,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89896,0,89877,-0,00019,LOSS
+124,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89877,0,89898,0,00021,LOSS
+125,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89898,0,89906,0,00008,LOSS
+126,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89906,0,89924,0,00018,LOSS
+127,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89924,0,89914,-0,00010,LOSS
+128,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89914,0,89902,-0,00012,LOSS
+129,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89902,0,89883,-0,00019,LOSS
+130,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89883,0,89896,0,00013,LOSS
+131,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89896,0,89888,-0,00008,LOSS
+132,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89888,0,89864,-0,00024,LOSS
+133,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89864,0,89841,-0,00023,LOSS
+134,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89841,0,89832,-0,00009,LOSS
+135,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89832,0,89796,-0,00036,LOSS
+136,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89796,0,89754,-0,00042,LOSS
+137,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89754,0,89751,-0,00003,LOSS
+138,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89751,0,89726,-0,00025,LOSS
+139,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89726,0,89740,0,00014,LOSS
+140,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89740,0,89714,-0,00026,LOSS
+141,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89714,0,89711,-0,00003,LOSS
+142,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89711,0,89695,-0,00016,LOSS
+143,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89695,0,89701,0,00006,LOSS
+144,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89701,0,89704,0,00003,LOSS
+145,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89704,0,89735,0,00031,LOSS
+146,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89735,0,89724,-0,00011,LOSS
+147,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89724,0,89742,0,00018,LOSS
+148,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89742,0,89725,-0,00017,LOSS
+149,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89725,0,89712,-0,00013,LOSS
+150,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89712,0,89782,0,00070,LOSS
+151,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89782,0,89774,-0,00008,LOSS
+152,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89774,0,89790,0,00016,LOSS
+153,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89790,0,89803,0,00013,LOSS
+154,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89803,0,89752,-0,00051,LOSS
+155,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89752,0,89753,0,00001,LOSS
+156,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89753,0,89742,-0,00011,LOSS
+157,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89742,0,89722,-0,00020,LOSS
+158,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89722,0,89708,-0,00014,LOSS
+159,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89708,0,89732,0,00024,LOSS
+160,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89732,0,89726,-0,00006,LOSS
+161,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89726,0,89722,-0,00004,LOSS
+162,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89722,0,89718,-0,00004,LOSS
+163,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89718,0,89706,-0,00012,LOSS
+164,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89706,0,89710,0,00004,LOSS
+165,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89710,0,89738,0,00028,LOSS
+166,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89738,0,89712,-0,00026,LOSS
+167,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89712,0,89710,-0,00002,LOSS
+168,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89710,0,89735,0,00025,LOSS
+169,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89735,0,89747,0,00012,LOSS
+170,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89747,0,89768,0,00021,LOSS
+171,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89768,0,89770,0,00002,LOSS
+172,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89770,0,89738,-0,00032,LOSS
+173,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89738,0,89829,0,00091,LOSS
+174,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89829,0,89850,0,00021,LOSS
+175,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89850,0,89850,0,00000,LOSS
+176,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89850,0,89781,-0,00069,LOSS
+177,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89781,0,89784,0,00003,LOSS
+178,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89784,0,89777,-0,00007,LOSS
+179,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89777,0,89816,0,00039,LOSS
+180,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89816,0,89830,0,00014,LOSS
+181,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89830,0,89805,-0,00025,LOSS
+182,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89805,0,89814,0,00009,LOSS
+183,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89814,0,89826,0,00012,LOSS
+184,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89826,0,89826,0,00000,LOSS
+185,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89826,0,89806,-0,00020,LOSS
+186,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89806,0,89782,-0,00024,LOSS
+187,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89782,0,89768,-0,00014,LOSS
+188,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89768,0,89753,-0,00015,LOSS
+189,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89753,0,89796,0,00043,LOSS
+190,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89796,0,89780,-0,00016,LOSS
+191,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89780,0,89800,0,00020,LOSS
+192,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89800,0,89774,-0,00026,LOSS
+193,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89774,0,89790,0,00016,LOSS
+194,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89790,0,89822,0,00032,LOSS
+195,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89822,0,89858,0,00036,LOSS
+196,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89858,0,89873,0,00015,LOSS
+197,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89873,0,89899,0,00026,LOSS
+198,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89899,0,89919,0,00020,LOSS
+199,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89919,0,89930,0,00011,LOSS
+200,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89930,0,90078,0,00148,LOSS
+201,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90078,0,90060,-0,00018,LOSS
+202,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90060,0,90076,0,00016,LOSS
+203,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90076,0,90003,-0,00073,LOSS
+204,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90003,0,90034,0,00031,LOSS
+205,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90034,0,90002,-0,00032,LOSS
+206,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90002,0,90012,0,00010,LOSS
+207,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90012,0,90024,0,00012,LOSS
+208,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90024,0,90060,0,00036,LOSS
+209,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90060,0,89942,-0,00118,LOSS
+210,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89942,0,90039,0,00097,LOSS
+211,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90039,0,90068,0,00029,LOSS
+212,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90068,0,90060,-0,00008,LOSS
+213,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90060,0,90061,0,00001,LOSS
+214,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90061,0,90031,-0,00030,LOSS
+215,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90031,0,90046,0,00015,LOSS
+216,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90046,0,89997,-0,00049,LOSS
+217,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89997,0,89967,-0,00030,LOSS
+218,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89967,0,89992,0,00025,LOSS
+219,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89992,0,89977,-0,00015,LOSS
+220,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89977,0,90006,0,00029,LOSS
+221,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90006,0,90005,-0,00001,LOSS
+222,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90005,0,90006,0,00001,LOSS
+223,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90006,0,90013,0,00007,LOSS
+224,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90013,0,90038,0,00025,LOSS
+225,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90038,0,90070,0,00032,LOSS
+226,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90070,0,90072,0,00002,LOSS
+227,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90072,0,90090,0,00018,LOSS
+228,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90090,0,90085,-0,00005,LOSS
+229,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90085,0,90085,0,00000,LOSS
+230,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90085,0,90085,0,00000,LOSS
+231,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90085,0,90080,-0,00005,LOSS
+232,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90080,0,90074,-0,00006,LOSS
+233,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90074,0,90126,0,00052,LOSS
+234,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90126,0,90154,0,00028,LOSS
+235,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90154,0,90118,-0,00036,LOSS
+236,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90118,0,90074,-0,00044,LOSS
+237,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90074,0,90098,0,00024,LOSS
+238,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90098,0,90109,0,00011,LOSS
+239,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90109,0,90104,-0,00005,LOSS
+240,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90104,0,90116,0,00012,LOSS
+241,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90116,0,90070,-0,00046,LOSS
+242,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90070,0,90010,-0,00060,LOSS
+243,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90010,0,89993,-0,00017,LOSS
+244,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89993,0,89970,-0,00023,LOSS
+245,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89970,0,90014,0,00044,LOSS
+246,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90014,0,90051,0,00037,LOSS
+247,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90051,0,90064,0,00013,LOSS
+248,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90064,0,90040,-0,00024,LOSS
+249,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90040,0,90014,-0,00026,LOSS
+250,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90014,0,90094,0,00080,LOSS
+251,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90094,0,90148,0,00054,LOSS
+252,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90148,0,90095,-0,00053,LOSS
+253,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90095,0,90108,0,00013,LOSS
+254,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90108,0,90085,-0,00023,LOSS
+255,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90085,0,90096,0,00011,LOSS
+256,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90096,0,90064,-0,00032,LOSS
+257,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90064,0,90040,-0,00024,LOSS
+258,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90040,0,90051,0,00011,LOSS
+259,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90051,0,90012,-0,00039,LOSS
+260,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90012,0,90023,0,00011,LOSS
+261,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90023,0,90000,-0,00023,LOSS
+262,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90000,0,89993,-0,00007,LOSS
+263,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89993,0,89990,-0,00003,LOSS
+264,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89990,0,90008,0,00018,LOSS
+265,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90008,0,90028,0,00020,LOSS
+266,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90028,0,90014,-0,00014,LOSS
+267,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90014,0,90026,0,00012,LOSS
+268,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90026,0,90012,-0,00014,LOSS
+269,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90012,0,90120,0,00108,LOSS
+270,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90120,0,90275,0,00155,LOSS
+271,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90275,0,90306,0,00031,LOSS
+272,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90306,0,90240,-0,00066,LOSS
+273,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90240,0,90268,0,00028,LOSS
+274,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90268,0,90353,0,00085,LOSS
+275,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90353,0,90316,-0,00037,LOSS
+276,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90316,0,90284,-0,00032,LOSS
+277,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90284,0,90332,0,00048,LOSS
+278,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90332,0,90186,-0,00146,LOSS
+279,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90186,0,90273,0,00087,LOSS
+280,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90273,0,90228,-0,00045,LOSS
+281,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90228,0,90241,0,00013,LOSS
+282,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90241,0,90088,-0,00153,LOSS
+283,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90088,0,90016,-0,00072,LOSS
+284,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90016,0,90082,0,00066,LOSS
+285,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90082,0,90086,0,00004,LOSS
+286,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90086,0,90056,-0,00030,LOSS
+287,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90056,0,90147,0,00091,LOSS
+288,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90147,0,90207,0,00060,LOSS
+289,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90207,0,90210,0,00003,LOSS
+290,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90210,0,90180,-0,00030,LOSS
+291,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90180,0,90186,0,00006,LOSS
+292,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90186,0,90179,-0,00007,LOSS
+293,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90179,0,90178,-0,00001,LOSS
+294,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90178,0,90176,-0,00002,LOSS
+295,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90176,0,90179,0,00003,LOSS
+296,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90179,0,90159,-0,00020,LOSS
+297,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90159,0,90328,0,00169,LOSS
+298,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90328,0,90264,-0,00064,LOSS
+299,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90264,0,90244,-0,00020,LOSS
+300,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90244,0,90348,0,00104,LOSS
+301,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90348,0,90236,-0,00112,LOSS
+302,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90236,0,90832,0,00596,LOSS
+303,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90832,0,90762,-0,00070,LOSS
+304,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90762,0,90772,0,00010,LOSS
+305,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90772,0,90724,-0,00048,LOSS
+306,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90724,0,90653,-0,00071,LOSS
+307,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90653,0,90550,-0,00103,LOSS
+308,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90550,0,90353,-0,00197,LOSS
+309,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90353,0,90365,0,00012,LOSS
+310,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90365,0,90344,-0,00021,LOSS
+311,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90344,0,90173,-0,00171,LOSS
+312,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90173,0,90195,0,00022,LOSS
+313,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90195,0,90183,-0,00012,LOSS
+314,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90183,0,90180,-0,00003,LOSS
+315,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90180,0,90220,0,00040,LOSS
+316,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90220,0,90311,0,00091,LOSS
+317,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90311,0,90198,-0,00113,LOSS
+318,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90198,0,89990,-0,00208,LOSS
+319,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89990,0,90147,0,00157,LOSS
+320,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90147,0,90046,-0,00101,LOSS
+321,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90046,0,90108,0,00062,LOSS
+322,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90108,0,90076,-0,00032,LOSS
+323,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90076,0,90160,0,00084,LOSS
+324,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90160,0,90076,-0,00084,LOSS
+325,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90076,0,90102,0,00026,LOSS
+326,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90102,0,90268,0,00166,LOSS
+327,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90268,0,90175,-0,00093,LOSS
+328,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90175,0,90196,0,00021,LOSS
+329,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90196,0,90194,-0,00002,LOSS
+330,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90194,0,90240,0,00046,LOSS
+331,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90240,0,90227,-0,00013,LOSS
+332,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90227,0,90178,-0,00049,LOSS
+333,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90178,0,90146,-0,00032,LOSS
+334,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90146,0,90266,0,00120,LOSS
+335,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90266,0,90264,-0,00002,LOSS
+336,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90264,0,90242,-0,00022,LOSS
+337,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90242,0,90300,0,00058,LOSS
+338,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90300,0,90303,0,00003,LOSS
+339,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90303,0,90228,-0,00075,LOSS
+340,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90228,0,90275,0,00047,LOSS
+341,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90275,0,90287,0,00012,LOSS
+342,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90287,0,90320,0,00033,LOSS
+343,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90320,0,90195,-0,00125,LOSS
+344,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90195,0,90222,0,00027,LOSS
+345,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90222,0,90223,0,00001,LOSS
+346,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90223,0,90227,0,00004,LOSS
+347,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90227,0,90234,0,00007,LOSS
+348,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90234,0,90238,0,00004,LOSS
+349,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90238,0,90237,-0,00001,LOSS
+350,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90237,0,90262,0,00025,LOSS
+351,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90262,0,90212,-0,00050,LOSS
+352,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90212,0,90198,-0,00014,LOSS
+353,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90198,0,90163,-0,00035,LOSS
+354,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90163,0,90228,0,00065,LOSS
+355,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90228,0,90202,-0,00026,LOSS
+356,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90202,0,90210,0,00008,LOSS
+357,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90210,0,90213,0,00003,LOSS
+358,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90213,0,90236,0,00023,LOSS
+359,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90236,0,90274,0,00038,LOSS
+360,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90274,0,90272,-0,00002,LOSS
+361,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90272,0,90290,0,00018,LOSS
+362,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90290,0,90343,0,00053,LOSS
+363,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90343,0,90267,-0,00076,LOSS
+364,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90267,0,90298,0,00031,LOSS
+365,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90298,0,90357,0,00059,LOSS
+366,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90357,0,90352,-0,00005,LOSS
+367,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90352,0,90258,-0,00094,LOSS
+368,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90258,0,90224,-0,00034,LOSS
+369,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90224,0,90274,0,00050,LOSS
+370,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90274,0,90244,-0,00030,LOSS
+371,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90244,0,90064,-0,00180,LOSS
+372,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90064,0,90124,0,00060,LOSS
+373,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90124,0,90262,0,00138,LOSS
+374,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90262,0,90406,0,00144,LOSS
+375,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90406,0,90288,-0,00118,LOSS
+376,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90288,0,90304,0,00016,LOSS
+377,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90304,0,90166,-0,00138,LOSS
+378,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90166,0,90194,0,00028,LOSS
+379,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90194,0,90156,-0,00038,LOSS
+380,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90156,0,90092,-0,00064,LOSS
+381,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90092,0,90080,-0,00012,LOSS
+382,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90080,0,90126,0,00046,LOSS
+383,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90126,0,90094,-0,00032,LOSS
+384,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90094,0,90063,-0,00031,LOSS
+385,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90063,0,90038,-0,00025,LOSS
+386,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90038,0,90002,-0,00036,LOSS
+387,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90002,0,90053,0,00051,LOSS
+388,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90053,0,90042,-0,00011,LOSS
+389,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90042,0,90107,0,00065,LOSS
+390,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90107,0,90092,-0,00015,LOSS
+391,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90092,0,90122,0,00030,LOSS
+392,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90122,0,90114,-0,00008,LOSS
+393,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90114,0,90104,-0,00010,LOSS
+394,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,90104,0,90130,0,00026,LOSS
+395,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,90130,0,89958,-0,00172,LOSS
+396,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89958,0,89664,-0,00294,LOSS
+397,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89664,0,89842,0,00178,LOSS
+398,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89842,0,89780,-0,00062,LOSS
+399,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89780,0,89766,-0,00014,LOSS
+400,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89766,0,89740,-0,00026,LOSS
+401,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89740,0,89701,-0,00039,LOSS
+402,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89701,0,89644,-0,00057,LOSS
+403,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89644,0,89588,-0,00056,LOSS
+404,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89588,0,89644,0,00056,LOSS
+405,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89644,0,89662,0,00018,LOSS
+406,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89662,0,89718,0,00056,LOSS
+407,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89718,0,89712,-0,00006,LOSS
+408,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89712,0,89737,0,00025,LOSS
+409,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89737,0,89709,-0,00028,LOSS
+410,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89709,0,89662,-0,00047,LOSS
+411,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89662,0,89678,0,00016,LOSS
+412,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89678,0,89706,0,00028,LOSS
+413,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89706,0,89703,-0,00003,LOSS
+414,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89703,0,89732,0,00029,LOSS
+415,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89732,0,89792,0,00060,LOSS
+416,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89792,0,89801,0,00009,LOSS
+417,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89801,0,89816,0,00015,LOSS
+418,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89816,0,89784,-0,00032,LOSS
+419,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89784,0,89762,-0,00022,LOSS
+420,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89762,0,89745,-0,00017,LOSS
+421,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89745,0,89742,-0,00003,LOSS
+422,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89742,0,89737,-0,00005,LOSS
+423,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89737,0,89732,-0,00005,LOSS
+424,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89732,0,89700,-0,00032,LOSS
+425,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89700,0,89700,0,00000,LOSS
+426,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89700,0,89568,-0,00132,LOSS
+427,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89568,0,89612,0,00044,LOSS
+428,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89612,0,89619,0,00007,LOSS
+429,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89619,0,89598,-0,00021,LOSS
+430,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89598,0,89640,0,00042,LOSS
+431,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89640,0,89627,-0,00013,LOSS
+432,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89627,0,89621,-0,00006,LOSS
+433,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89621,0,89656,0,00035,LOSS
+434,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89656,0,89576,-0,00080,LOSS
+435,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89576,0,89572,-0,00004,LOSS
+436,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89572,0,89588,0,00016,LOSS
+437,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89588,0,89614,0,00026,LOSS
+438,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89614,0,89640,0,00026,LOSS
+439,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89640,0,89680,0,00040,LOSS
+440,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89680,0,89597,-0,00083,LOSS
+441,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89597,0,89636,0,00039,LOSS
+442,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89636,0,89688,0,00052,LOSS
+443,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89688,0,89646,-0,00042,LOSS
+444,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89646,0,89590,-0,00056,LOSS
+445,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89590,0,89539,-0,00051,LOSS
+446,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89539,0,89574,0,00035,LOSS
+447,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89574,0,89600,0,00026,LOSS
+448,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89600,0,89538,-0,00062,LOSS
+449,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89538,0,89606,0,00068,LOSS
+450,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89606,0,89603,-0,00003,LOSS
+451,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89603,0,89592,-0,00011,LOSS
+452,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89592,0,89597,0,00005,LOSS
+453,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89597,0,89589,-0,00008,LOSS
+454,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89589,0,89613,0,00024,LOSS
+455,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89613,0,89584,-0,00029,LOSS
+456,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89584,0,89578,-0,00006,LOSS
+457,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89578,0,89546,-0,00032,LOSS
+458,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89546,0,89570,0,00024,LOSS
+459,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89570,0,89462,-0,00108,LOSS
+460,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89462,0,89474,0,00012,LOSS
+461,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89474,0,89410,-0,00064,LOSS
+462,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89410,0,89393,-0,00017,LOSS
+463,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89393,0,89467,0,00074,LOSS
+464,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89467,0,89454,-0,00013,LOSS
+465,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89454,0,89544,0,00090,LOSS
+466,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89544,0,89548,0,00004,LOSS
+467,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89548,0,89657,0,00109,LOSS
+468,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89657,0,89607,-0,00050,LOSS
+469,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89607,0,89524,-0,00083,LOSS
+470,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89524,0,89542,0,00018,LOSS
+471,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89542,0,89573,0,00031,LOSS
+472,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89573,0,89590,0,00017,LOSS
+473,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89590,0,89570,-0,00020,LOSS
+474,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89570,0,89612,0,00042,LOSS
+475,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89612,0,89601,-0,00011,LOSS
+476,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89601,0,89651,0,00050,LOSS
+477,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89651,0,89656,0,00005,LOSS
+478,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89656,0,89714,0,00058,LOSS
+479,[prediction: "up"
+confidence: 0.85
+probability_up: 0.85
+probability_down: 0.15000000000000002
+],0,89714,0,89710,-0,00004,LOSS
+480,[prediction: "down"
+confidence: 0.85
+probability_up: 0.15000000000000002
+probability_down: 0.85
+],0,89710,0,00000,-0,89710,LOSS

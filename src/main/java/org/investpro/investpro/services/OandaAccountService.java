@@ -4,9 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.Fee;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.model.Account;
+import org.investpro.investpro.model.Fee;
+import org.investpro.investpro.model.Position;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +30,7 @@ public class OandaAccountService {
     private final String accountId;
     private final String apiSecret;
     private final HttpClient client;
-    private final HttpRequest.Builder baseRequestBuilder;
+    HttpRequest.Builder baseRequestBuilder;
 
     public OandaAccountService(String accountId, String apiSecret, HttpClient client) {
 

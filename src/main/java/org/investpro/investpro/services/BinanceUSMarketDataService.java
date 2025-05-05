@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -55,7 +56,7 @@ public class BinanceUSMarketDataService {
                 List<OrderBookEntry> bidEntries = parseOrderEntries(rootNode.get("bids"));
                 List<OrderBookEntry> askEntries = parseOrderEntries(rootNode.get("asks"));
 
-                OrderBook orderBook = new OrderBook(java.time.Instant.now(), bidEntries, askEntries);
+                OrderBook orderBook = new OrderBook(Instant.now(), bidEntries, askEntries);
                 futureResult.complete(List.of(orderBook));
 
             } catch (IOException | InterruptedException e) {

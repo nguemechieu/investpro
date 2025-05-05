@@ -1,11 +1,11 @@
 package org.investpro.investpro.ai;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import javafx.application.Platform;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
+import lombok.Getter;
+import lombok.Setter;
+import org.investpro.grpc.Predict;
 import org.investpro.investpro.TelegramClient;
 import org.investpro.investpro.model.CandleData;
 import org.slf4j.Logger;
@@ -13,12 +13,14 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @Getter
 @Setter
 public class InvestProAIPaperTradingBot {
 
-    private final InvestProAIPredictorClient aiClient = new InvestProAIPredictorClient();
+    private final InvestProAIPredictor aiClient = new InvestProAIPredictor("localhost", 50051);
     private final List<Trade> openTrades = new ArrayList<>();
     private final List<Trade> closedTrades = new ArrayList<>();
     private final double stopLossPercent = 0.005; // 0.5% Stop loss
@@ -40,10 +42,31 @@ public class InvestProAIPaperTradingBot {
             return; // Need at least 26 candles for features
         }
 
-        List<Double> features = InvestProFeatureExtractor.extractFeatures(recentCandles);
-        var predictionResult = aiClient.predict(features);
+        InvestProAIPredictor predictor = new InvestProAIPredictor("localhost", 50051);
 
-        if (predictionResult.confidence() < 0.7) {
+        List<Predict.MarketDataRequest> requests = new ArrayList<>();
+        CompletableFuture<List<Predict.PredictionResponse>> predictionResult = predictor.streamBatchPredict(requests);
+
+        predictionResult.thenAccept(responses -> {
+            for (Predict.PredictionResponse response : responses) {
+                System.out.println("Prediction: " + response.getPrediction() +
+                        ", Confidence: " + response.getConfidence());
+            }
+        }).exceptionally(ex -> {
+            System.err.println("Prediction stream failed: " + ex.getMessage());
+            return null;
+        });
+        double confidence;
+        String prediction;
+        try {
+            confidence = predictionResult.get().stream().toList().getFirst().getConfidence();
+            prediction = predictionResult.get().stream().toList().getFirst().getPrediction();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        if (confidence < 0.7) {
 
             logger.info("Only trade high confidence signals");
             return; // 🔥 Only trade high confidence signals
@@ -53,10 +76,10 @@ public class InvestProAIPaperTradingBot {
         double entryPrice = latestCandle.getClosePrice();//.doubleValue();
         double tradeSize = (accountBalance * riskPerTrade) / (entryPrice * stopLossPercent);
 
-        if (predictionResult.prediction().equalsIgnoreCase("up")) {
+        if (prediction.equalsIgnoreCase("up")) {
             openTrades.add(new Trade("BUY", entryPrice, tradeSize));
             logger.info("\uD83D\uDCC8 AI Bot BUY @{} (size: {})", entryPrice, tradeSize);
-        } else if (predictionResult.prediction().equalsIgnoreCase("down")) {
+        } else if (prediction.equalsIgnoreCase("down")) {
             openTrades.add(new Trade("SELL", entryPrice, tradeSize));
             logger.info("\uD83D\uDCC9 AI Bot SELL @{} (size: {})", entryPrice, tradeSize);
         }

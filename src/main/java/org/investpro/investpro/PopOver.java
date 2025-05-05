@@ -28,20 +28,10 @@
 
 package org.investpro.investpro;
 
-import static java.util.Objects.requireNonNull;
-import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
-
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
 import javafx.event.EventHandler;
@@ -55,9 +45,11 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
-import org.investpro.investpro.PopOverSkin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.requireNonNull;
+import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
 
 /**
  * The PopOver control provides detailed information about an owning node in a
@@ -269,6 +261,58 @@ public class PopOver extends PopupControl {
         show(owner, x, y, DEFAULT_FADE_DURATION);
     }
     private final StringProperty title = new SimpleStringProperty(this, "title", "Info"); //$NON-NLS-1$ //$NON-NLS-2$
+    EventHandler<? super WindowEvent> closePopOverOnOwnerWindowClose
+            = (r) -> {
+
+    };
+    private final ObjectProperty<ArrowLocation> arrowLocation = new SimpleObjectProperty<>(
+            this, "arrowLocation", ArrowLocation.LEFT_TOP); //$NON-NLS-1$
+    private Window ownerWindow;
+    /**
+     * Creates a pop over with a label as the content node.
+     */
+    public PopOver() {
+        super();
+
+        getStyleClass().add(DEFAULT_STYLE_CLASS);
+
+        getRoot().getStylesheets().add(
+                requireNonNull(PopOver.class.getResource("/css/popover.css")).toExternalForm()); //$NON-NLS-1$
+
+        setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
+        setOnHiding(evt -> setDetached(false));
+
+        /*
+         * Create some initial content.
+         */
+        Label label = new Label("<No Content>"); //$NON-NLS-1$
+        label.setPrefSize(200, 200);
+        label.setPadding(new Insets(4));
+        setContentNode(label);
+
+        InvalidationListener repositionListener = observable -> {
+            if (isShowing() && !isDetached()) {
+                show(getOwnerNode(), targetX, targetY);
+                adjustWindowLocation();
+            }
+        };
+
+        arrowSize.addListener(repositionListener);
+        cornerRadius.addListener(repositionListener);
+        arrowLocation.addListener(repositionListener);
+        arrowIndent.addListener(repositionListener);
+        headerAlwaysVisible.addListener(repositionListener);
+
+        /*
+         * A detached popover should of course not automatically hide itself.
+         */
+        detached.addListener(it -> {
+            setAutoHide(!isDetached());
+        });
+
+        setAutoHide(true);
+    }
+
     /**
      * Makes the pop over visible at the give location and associates it with
      * the given owner node. The x and y coordinate will be the target location
@@ -348,56 +392,9 @@ public class PopOver extends PopupControl {
         showFadeInAnimation(fadeInDuration);
 
         // Bug fix - close popup when owner window is closing
+
         ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
                 closePopOverOnOwnerWindowClose);
-    }
-    private final ObjectProperty<ArrowLocation> arrowLocation = new SimpleObjectProperty<>(
-            this, "arrowLocation", ArrowLocation.LEFT_TOP); //$NON-NLS-1$
-    private Window ownerWindow;
-
-    /**
-     * Creates a pop over with a label as the content node.
-     */
-    public PopOver() {
-        super();
-
-        getStyleClass().add(DEFAULT_STYLE_CLASS);
-
-        getRoot().getStylesheets().add(
-                PopOver.class.getResource("/css/popover.css").toExternalForm()); //$NON-NLS-1$
-
-        setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
-        setOnHiding(evt -> setDetached(false));
-
-        /*
-         * Create some initial content.
-         */
-        Label label = new Label("<No Content>"); //$NON-NLS-1$
-        label.setPrefSize(200, 200);
-        label.setPadding(new Insets(4));
-        setContentNode(label);
-
-        InvalidationListener repositionListener = observable -> {
-            if (isShowing() && !isDetached()) {
-                show(getOwnerNode(), targetX, targetY);
-                adjustWindowLocation();
-            }
-        };
-
-        arrowSize.addListener(repositionListener);
-        cornerRadius.addListener(repositionListener);
-        arrowLocation.addListener(repositionListener);
-        arrowIndent.addListener(repositionListener);
-        headerAlwaysVisible.addListener(repositionListener);
-
-        /*
-         * A detached popover should of course not automatically hide itself.
-         */
-        detached.addListener(it -> {
-            setAutoHide(!isDetached());
-        });
-
-        setAutoHide(true);
     }
 
     /**

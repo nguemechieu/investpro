@@ -36,4 +36,6 @@ module invespro {
     opens org.investpro.investpro.model to com.fasterxml.jackson.databind, jakarta.persistence, javafx.fxml, javafx.graphics, org.hibernate.orm.core;
     exports org.investpro.investpro.ui to javafx.graphics;
     opens org.investpro.investpro.ui to com.fasterxml.jackson.databind, javafx.fxml, javafx.graphics;
+    exports org.investpro.investpro.ai to javafx.graphics;
+    opens org.investpro.investpro.ai to com.fasterxml.jackson.databind, javafx.fxml, javafx.graphics;
 }

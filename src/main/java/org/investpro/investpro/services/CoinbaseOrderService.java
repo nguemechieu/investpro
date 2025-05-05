@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.investpro.investpro.CreateOrderRequest;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
-import org.investpro.investpro.SIGNAL;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Coinbase;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.model.Order;
+import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,7 @@ public class CoinbaseOrderService {
         this.httpClient = httpClient;
     }
 
-    public List<Order> getOrders() throws IOException, InterruptedException, ExecutionException {
+    public List<Order> getOrders(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
         String url = Coinbase.API_URL + "/orders";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -57,7 +57,7 @@ public class CoinbaseOrderService {
         return orders;
     }
 
-    public List<Order> getOpenOrder(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
+    public List<Order> getOpenOrder(TradePair tradePair) throws IOException, InterruptedException {
         String url = Coinbase.API_URL + "/orders?product_id=" + tradePair.toString('-');
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))

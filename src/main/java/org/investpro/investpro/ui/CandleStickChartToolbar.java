@@ -19,7 +19,6 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.util.Duration;
-
 import org.investpro.investpro.CandleStickChartOptions;
 import org.investpro.investpro.PopOver;
 import org.investpro.investpro.SizeChangeListener;
@@ -163,7 +162,7 @@ public class CandleStickChartToolbar extends Region {
                 } else if (tool.tool != null) {
                     switch (tool.tool) {
                         case ZOOM_IN, ZOOM_OUT ->
-                                tool.setOnAction(_ -> CandleStickChart.changeZoom(tool.tool.getZoomDirection()));
+                                tool.setOnAction(_ -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
                         case FULL_SCREEN -> tool.setOnAction(_ -> candleStickChart.setFullScreen(true));
                         case PRINT_PDF -> tool.setOnAction(_ -> candleStickChart.exportAsPDF());
                         case SHARE -> tool.setOnAction(_ -> candleStickChart.shareLink());

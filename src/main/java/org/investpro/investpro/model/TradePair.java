@@ -3,6 +3,7 @@ package org.investpro.investpro.model;
 import javafx.util.Pair;
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.investpro.Exchange;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -10,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 
-
+@Setter
 @Getter
 public class TradePair extends Pair<Currency, Currency> {
 
@@ -21,8 +22,16 @@ public class TradePair extends Pair<Currency, Currency> {
     double bid;
     // Getter for ask price
     double ask;
-    @Setter
+
     private long id;
+    Exchange exchange;
+
+    public TradePair(Currency key, Currency value, Currency baseCurrency, Currency counterCurrency, Exchange exchange) {
+        super(key, value);
+        this.baseCurrency = baseCurrency;
+        this.counterCurrency = counterCurrency;
+        this.exchange = exchange;
+    }
 
     // Constructor that takes two currencies
     public TradePair(@NotNull Currency baseCurrency, @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {
@@ -51,6 +60,14 @@ public class TradePair extends Pair<Currency, Currency> {
         this.counterCurrency = Currency.of(counterCurrencyCode);
     }
 
+    public TradePair(Currency baseCurrency, Currency counterCurrency, Exchange exchange) {
+        super(baseCurrency, counterCurrency);
+        this.exchange = exchange;
+
+    }
+
+
+
 
     // Factory method for TradePair using currency codes
     @Contract("_, _ -> new")
@@ -70,17 +87,6 @@ public class TradePair extends Pair<Currency, Currency> {
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
 
-    // Getter for base currency
-
-    // Getter for counter currency
-
-    public void setBaseCurrency(Currency baseCurrency) {
-        this.baseCurrency = baseCurrency;
-    }
-
-    public void setCounterCurrency(Currency counterCurrency) {
-        this.counterCurrency = counterCurrency;
-    }
 
     // Setter for bid price with validation
     public void setBid(double bid) {

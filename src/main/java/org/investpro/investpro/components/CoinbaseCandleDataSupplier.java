@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.investpro.investpro.CandleDataSupplier;
-
 import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
@@ -23,7 +22,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseCandleDataSupplier.class);
     private static final String BASE_URL = "https://api.coinbase.com/v3/products";
-    private static final HttpClient client = HttpClient.newHttpClient();
+    public static final HttpClient client = HttpClient.newHttpClient();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private static final Map<Integer, String> GRANULARITY_MAP = Map.of(
