@@ -28,12 +28,23 @@
 
 package org.investpro.investpro;
 
+import static java.util.Objects.requireNonNull;
+import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
+
 import javafx.animation.FadeTransition;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
-import javafx.beans.property.*;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.WeakChangeListener;
+import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -44,11 +55,9 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
 import javafx.util.Duration;
+import org.investpro.investpro.PopOverSkin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.Objects.requireNonNull;
-import static javafx.scene.input.MouseEvent.MOUSE_CLICKED;
 
 /**
  * The PopOver control provides detailed information about an owning node in a
@@ -423,61 +432,6 @@ public class PopOver extends PopupControl {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public final void show(Window owner) {
-        super.show(owner);
-        ownerWindow = owner;
-
-        showFadeInAnimation(DEFAULT_FADE_DURATION);
-
-        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
-                closePopOverOnOwnerWindowClose);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public final void show(Window ownerWindow, double anchorX, double anchorY) {
-        super.show(ownerWindow, anchorX, anchorY);
-        this.ownerWindow = ownerWindow;
-
-        showFadeInAnimation(DEFAULT_FADE_DURATION);
-
-        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
-                closePopOverOnOwnerWindowClose);
-    }
-
-    private void showFadeInAnimation(Duration fadeInDuration) {
-        // Fade In
-        Node skinNode = getSkin().getNode();
-        skinNode.setOpacity(0);
-
-        FadeTransition fadeIn = new FadeTransition(fadeInDuration, skinNode);
-        fadeIn.setFromValue(0);
-        fadeIn.setToValue(1);
-        fadeIn.play();
-    }
-
-    private void ownerWindowClosing() {
-        hide(Duration.ZERO);
-    }
-
-    // always show header
-
-    /**
-     * Hides the pop over by quickly changing its opacity to 0.
-     *
-     * @see #hide(Duration)
-     */
-    @Override
-    public final void hide() {
-        hide(DEFAULT_FADE_DURATION);
-    }
-
     private void adjustWindowLocation() {
         Bounds bounds = PopOver.this.getSkin().getNode().getBoundsInParent();
 
@@ -509,16 +463,6 @@ public class PopOver extends PopupControl {
         }
     }
 
-    /**
-     * Sets the value of the headerAlwaysVisible property.
-     *
-     * @param visible if true, then the header is visible even while attached
-     * @see #headerAlwaysVisibleProperty()
-     */
-    public final void setHeaderAlwaysVisible(boolean visible) {
-        headerAlwaysVisible.setValue(visible);
-    }
-
     private double computeXOffset() {
         return switch (getArrowLocation()) {
             case TOP_LEFT, BOTTOM_LEFT -> getCornerRadius() + getArrowIndent() + getArrowSize();
@@ -528,8 +472,6 @@ public class PopOver extends PopupControl {
             default -> 0;
         };
     }
-
-    // detach support
 
     private double computeYOffset() {
         double prefContentHeight = getContentNode().prefHeight(-1);
@@ -555,14 +497,20 @@ public class PopOver extends PopupControl {
         }
     }
 
+    // always show header
+
     /**
-     * Sets the value of the detachable property.
-     *
-     * @param detachable if true then the user can detach / tear off the pop over
-     * @see #detachableProperty()
+     * {@inheritDoc}
      */
-    public final void setDetachable(boolean detachable) {
-        detachableProperty().set(detachable);
+    @Override
+    public final void show(Window owner) {
+        super.show(owner);
+        ownerWindow = owner;
+
+        showFadeInAnimation(DEFAULT_FADE_DURATION);
+
+        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
+                closePopOverOnOwnerWindowClose);
     }
 
     /**
@@ -570,6 +518,20 @@ public class PopOver extends PopupControl {
      */
     public final BooleanProperty headerAlwaysVisibleProperty() {
         return headerAlwaysVisible;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public final void show(Window ownerWindow, double anchorX, double anchorY) {
+        super.show(ownerWindow, anchorX, anchorY);
+        this.ownerWindow = ownerWindow;
+
+        showFadeInAnimation(DEFAULT_FADE_DURATION);
+
+        ownerWindow.addEventFilter(WindowEvent.WINDOW_CLOSE_REQUEST,
+                closePopOverOnOwnerWindowClose);
     }
 
     /**
@@ -582,11 +544,28 @@ public class PopOver extends PopupControl {
         return headerAlwaysVisible.getValue();
     }
 
+    // detach support
+
+    private void showFadeInAnimation(Duration fadeInDuration) {
+        // Fade In
+        Node skinNode = getSkin().getNode();
+        skinNode.setOpacity(0);
+
+        FadeTransition fadeIn = new FadeTransition(fadeInDuration, skinNode);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.play();
+    }
+
     /**
      * Determines if the pop over is detachable at all.
      */
     public final BooleanProperty detachableProperty() {
         return detachable;
+    }
+
+    private void ownerWindowClosing() {
+        hide(Duration.ZERO);
     }
 
     /**
@@ -600,13 +579,13 @@ public class PopOver extends PopupControl {
     }
 
     /**
-     * Returns the value of the detached property.
+     * Hides the pop over by quickly changing its opacity to 0.
      *
-     * @return true if the pop over is currently detached.
-     * @see #detachedProperty()
+     * @see #hide(Duration)
      */
-    public final boolean isDetached() {
-        return detachedProperty().get();
+    @Override
+    public final void hide() {
+        hide(DEFAULT_FADE_DURATION);
     }
 
     /**
@@ -618,6 +597,36 @@ public class PopOver extends PopupControl {
      */
     public final BooleanProperty detachedProperty() {
         return detached;
+    }
+
+    /**
+     * Sets the value of the headerAlwaysVisible property.
+     *
+     * @param visible if true, then the header is visible even while attached
+     * @see #headerAlwaysVisibleProperty()
+     */
+    public final void setHeaderAlwaysVisible(boolean visible) {
+        headerAlwaysVisible.setValue(visible);
+    }
+
+    /**
+     * Sets the value of the detachable property.
+     *
+     * @param detachable if true then the user can detach / tear off the pop over
+     * @see #detachableProperty()
+     */
+    public final void setDetachable(boolean detachable) {
+        detachableProperty().set(detachable);
+    }
+
+    /**
+     * Returns the value of the detached property.
+     *
+     * @return true if the pop over is currently detached.
+     * @see #detachedProperty()
+     */
+    public final boolean isDetached() {
+        return detachedProperty().get();
     }
 
     /**

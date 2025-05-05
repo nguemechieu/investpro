@@ -6,7 +6,7 @@ import java.util.Date;
 
 public record CreateOrderRequest(String symbol, Side side, ENUM_ORDER_TYPE orderType, double price, double size,
                                  Date timestamp, double stopLoss, double takeProfit) {
-    public CreateOrderRequest(String symbol, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) {
+    public CreateOrderRequest(String symbol, @NotNull Side side, ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) {
 
 
         this.symbol = symbol;

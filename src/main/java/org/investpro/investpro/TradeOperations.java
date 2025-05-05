@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public interface TradeOperations {
-    void createOrder(TradePair tradePair, @NotNull Side side, @NotNull ENUM_ORDER_TYPE orderType,
+    void createOrder(TradePair tradePair, @NotNull Side side, ENUM_ORDER_TYPE orderType,
                      double price, double size, Date timestamp, double stopLoss, double takeProfit)
             throws IOException, InterruptedException, NoSuchAlgorithmException, InvalidKeyException, ExecutionException;
 

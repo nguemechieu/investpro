@@ -12,13 +12,11 @@
         <class>org.investpro.investpro.model.Candle</class>
         <class>org.investpro.investpro.model.Trade</class>
         <class>org.investpro.investpro.model.CoinInfo</class>
-
         <properties>
             <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
             <property name="hibernate.show_sql" value="true"/>
             <property name="hibernate.format_sql" value="true"/>
             <property name="hibernate.hbm2ddl.auto" value="update"/>
-
             <!-- Dynamically read DB credentials -->
             <property name="jakarta.persistence.jdbc.url"
                       value="jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&amp;serverTimezone=UTC"/>

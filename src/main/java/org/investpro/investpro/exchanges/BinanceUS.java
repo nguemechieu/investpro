@@ -2,10 +2,7 @@ package org.investpro.investpro.exchanges;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.CandleDataSupplier;
-import org.investpro.investpro.ENUM_ORDER_TYPE;
-import org.investpro.investpro.Exchange;
-import org.investpro.investpro.Side;
+import org.investpro.investpro.*;
 import org.investpro.investpro.model.*;
 import org.investpro.investpro.services.BinanceUSAccountService;
 import org.investpro.investpro.services.BinanceUSCandleService;
@@ -19,8 +16,11 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Getter
@@ -51,6 +51,15 @@ public class BinanceUS extends Exchange {
         this.orderService = new BinanceUSOrderService(apiKey, apiSecret, httpClient);
 
         this.candleService = new BinanceUSCandleService(apiKey, apiSecret, tradePair, timeframe);
+    }
+
+    public Set<Integer> granularity() {
+        return Set.of(1, 5, 15, 60, 1440); // supported granularities in minutes
+    }
+
+    @Override
+    public CompletableFuture<Trade> fetchRecentTrades(TradePair tradePair, Instant instant) {
+        return null;
     }
 
     @Override
@@ -89,7 +98,7 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public void createOrder(TradePair tradePair, Side side, @NotNull ENUM_ORDER_TYPE orderType, double price, double size, java.util.Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
+    public void createOrder(TradePair tradePair, Side side, ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) throws IOException, InterruptedException {
         orderService.createOrder(tradePair, side, orderType, price, size, timestamp, stopLoss, takeProfit);
     }
 
@@ -130,12 +139,32 @@ public class BinanceUS extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<Candle>> fetchCandleDataForInProgressCandle(TradePair tradePair, java.time.Instant start, long offset, int secondsPerCandle) {
+    public CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant start, long offset, int secondsPerCandle) {
         return candleService.fetchCandleDataForInProgressCandle(tradePair, start, offset, secondsPerCandle);
     }
 
     @Override
-    public List<Candle> getHistoricalCandles(String symbol, java.time.Instant startTime, java.time.Instant endTime, String interval) {
+    public List<CandleData> getHistoricalCandles(TradePair symbol, Instant startTime, Instant endTime, int interval) {
         return candleService.getHistoricalCandles(symbol, startTime, endTime, interval);
+    }
+
+    @Override
+    public String getRecentTrades(TradePair pair) {
+        return "";
+    }
+
+    @Override
+    public void connectAndProcessTrades(String symbol, InProgressCandleUpdater updater) {
+
+    }
+
+    @Override
+    public Optional<Double> getLatestPrice(TradePair pair) {
+        return Optional.empty();
+    }
+
+    @Override
+    public CompletableFuture<Trade> fetchRecentTrade(TradePair pair, Instant instant) {
+        return null;
     }
 }

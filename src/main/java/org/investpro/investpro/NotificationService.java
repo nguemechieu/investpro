@@ -1,6 +1,6 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.Candle;
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.Trade;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -27,7 +27,7 @@ public class NotificationService {
         logger.info("Trade executed: {}", trade);
     }
 
-    public static void sendCandleDataNotification(List<Candle> candleData) {
+    public static void sendCandleDataNotification(List<CandleData> candleData) {
         // Here you would implement the notification logic based on the candle data,
         // For example, you could log the candle data to a file or email the subscribers
         logger.info("Candle data received: {}", candleData);

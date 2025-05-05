@@ -1,0 +1,12 @@
+.root {
+    -fx-background-color: #16dda1;
+    -fx-text-fill: #ffffff;
+}
+
+.chart {
+    -fx-background-color: black;
+}
+
+.canvas {
+    -fx-background-color: black;
+}

@@ -1,4 +1,4 @@
-.tradingWindow{
+tradingWindow {
     -fx-text-fill: #ffffff;
     -fx-text-align: center;
     -fx-background-color: #116798;
@@ -6,9 +6,11 @@
     -fx-background-insets: 0;
     -fx-border-color: #ac7446;
     -fx-border-width: 2.0;
+    -fx-background-image: url("./investpro_icon.png");
 }
 .chart-container {
     -fx-background-color: #28b612;
+    -fx-background-image: url("./investpro_icon.png");
     -fx-background-radius: 10.0;
     -fx-background-insets: 0;
     -fx-border-color: #466fac;
@@ -32,7 +34,9 @@
     -fx-background-color: #1d70cc;
     -fx-background-radius: 5.0;
     -fx-background-insets: 0;
+    -fx-background-image: url("./investpro_icon.png");
 }
+
 
 .position-tab {
     -fx-text-fill: white;
@@ -74,7 +78,9 @@
     -fx-background-insets: 0;
 }
 
-
+.canvas {
+    -fx-background-color: black;
+}
 .news_border_pane {
     -fx-background-color: #0a3936;
     -fx-border-color: #b16815;
@@ -167,7 +173,7 @@
 .candlestick-tooltip-label {
     -fx-font-size: 0.75em;
     -fx-font-weight: bold;
-    -fx-text-fill: GOLD;
+    -fx-text-fill: #ffffff;
     -fx-padding: 2 5 2 0;
 }
 

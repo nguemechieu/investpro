@@ -16,6 +16,9 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -35,14 +38,13 @@ public class AccountSummaryUI extends Region {
     public AccountSummaryUI(Exchange exchange) {
         this.exchange = exchange;
         this.canvas = new Canvas(1300, 780); // Increased width for better readability
-
-
         this.scrollPane = createScrollPane();
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         this.accountSummaryList = new CopyOnWriteArrayList<>();
-
+        Platform.runLater(() -> {
         setupUI();
-        startUpdating();
+            startUpdating();
+        });
         logger.info("Account summary initialized.");
     }
 
@@ -73,7 +75,10 @@ public class AccountSummaryUI extends Region {
      */
     private void startUpdating() {
         scheduler.scheduleAtFixedRate(() -> {
-            List<Account> updatedAccounts = exchange.getAccountSummary();
+
+
+            List<Account> updatedAccounts;
+            updatedAccounts = exchange.getAccountSummary();
             synchronized (accountSummaryList) {
                 accountSummaryList.clear();
                 accountSummaryList.addAll(updatedAccounts);

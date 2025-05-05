@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import jakarta.transaction.Transactional;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.Candle;
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.Currency;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -28,7 +28,7 @@ public class Db1 implements Db {
     private static EntityManagerFactory entityManagerFactory;
     protected EntityManager entityManager;
     private Connection conn;
-    private String dbName, username, password, url;
+    private String dbName, password, url;
     private PrintWriter printWriter;
     private int loginTimeout;
 
@@ -39,15 +39,17 @@ public class Db1 implements Db {
         hibernateProps.setProperty("jakarta.persistence.jdbc.url",
                 "jdbc:mysql://" + PROPERTIES.getProperty("DB_HOST", "localhost") + ":" +
                         PROPERTIES.getProperty("DB_PORT", "3306") + "/" +
-                        PROPERTIES.getProperty("DB_NAME", "InvestPro") +
-                        "?useSSL=false&serverTimezone=UTC");
+                        PROPERTIES.getProperty("DB_NAME", "investpro") +
+                        "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true");
+
         hibernateProps.setProperty("jakarta.persistence.jdbc.user", PROPERTIES.getProperty("DB_USER", "root"));
         hibernateProps.setProperty("jakarta.persistence.jdbc.password", PROPERTIES.getProperty("DB_PASSWORD", "admin123"));
         hibernateProps.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
 
         HashMap<Object, Object> mapper = new HashMap<>(hibernateProps);
-        logger.info("Setting{}", mapper);
+
         entityManagerFactory = Persistence.createEntityManagerFactory("User", mapper);
+        logger.info("Setting{}", mapper);
         entityManager = entityManagerFactory.createEntityManager();
     }
 
@@ -167,7 +169,7 @@ public class Db1 implements Db {
     }
 
     @Override
-    public void save(Candle candle) {
+    public void save(CandleData candle) {
         EntityManager em = entityManagerFactory.createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {

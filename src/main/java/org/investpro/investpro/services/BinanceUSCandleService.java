@@ -8,8 +8,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.CandleDataSupplier;
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.components.BinanceUSCandleDataSupplier;
-import org.investpro.investpro.model.Candle;
+
 import org.investpro.investpro.model.TradePair;
 
 import org.slf4j.Logger;
@@ -53,7 +54,7 @@ public class BinanceUSCandleService {
         return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400));
     }
 
-    public CompletableFuture<List<Candle>> get() {
+    public CompletableFuture<List<CandleData>> get() {
         if (endTime.get() == -1) {
             endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
         }
@@ -81,9 +82,9 @@ public class BinanceUSCandleService {
 
                     try {
                         JsonNode res = OBJECT_MAPPER.readTree(response.body());
-                        List<Candle> candles = new ArrayList<>();
+                        List<CandleData> candles = new ArrayList<>();
                         for (JsonNode candle : res) {
-                            candles.add(new Candle(
+                            candles.add(new CandleData(
                                     candle.get(0).asLong(),
                                     candle.get(1).asDouble(),
                                     candle.get(4).asDouble(),
@@ -93,7 +94,7 @@ public class BinanceUSCandleService {
                             ));
                         }
 
-                        candles.sort(Comparator.comparingLong(c -> c.getTime().getEpochSecond()));
+                        candles.sort(Comparator.comparingLong(CandleData::getOpenTime));
                         endTime.set((int) (startTimeMillis / 1000L));
 
                         return candles;
@@ -122,12 +123,12 @@ public class BinanceUSCandleService {
         return new BinanceUSCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
-    public List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval) {
+    public List<CandleData> getHistoricalCandles(TradePair symbol, Instant startTime, Instant endTime, int interval) {
 
         return new ArrayList<>();
     }
 
-    public CompletableFuture<Optional<Candle>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant start, long offset, int secondsPerCandle) {
+    public CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant start, long offset, int secondsPerCandle) {
         return CompletableFuture.completedFuture(
                 Optional.empty()
         );

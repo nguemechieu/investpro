@@ -3,15 +3,18 @@ package org.investpro.investpro.ui;
 import javafx.application.Platform;
 import javafx.geometry.Orientation;
 import javafx.geometry.Side;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
 
 import org.investpro.investpro.Browser;
-import org.investpro.investpro.CandleStickChartDisplay;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.Messages;
+
+import org.investpro.investpro.ui.chart.CandleStickChartContainer;
 import org.investpro.investpro.model.TradePair;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +29,12 @@ public class DisplayExchangeUI extends AnchorPane {
     private final Exchange exchange;
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private final TabPane chartradeTabPane = new TabPane();
+    private final String tokens;
 
-    public DisplayExchangeUI(@NotNull Exchange exchange) {
+    public DisplayExchangeUI(@NotNull Exchange exchange, String tokens) {
         this.exchange = exchange;
+        this.tokens = tokens;
+
         initializeUI();
     }
 
@@ -38,10 +44,20 @@ public class DisplayExchangeUI extends AnchorPane {
             ComboBox<String> tradePairsCombo = createTradePairsComboBox();
             ToolBar tradeToolBar = createTradeToolBar(tradePairsCombo);
             TabPane tradingTabPane = createTradingTabPane(tradeToolBar);
+// Make the TabPane fill the entire DisplayExchangeUI
+            AnchorPane.setTopAnchor(tradingTabPane, 0.0);
+            AnchorPane.setBottomAnchor(tradingTabPane, 0.0);
+            AnchorPane.setLeftAnchor(tradingTabPane, 0.0);
+            AnchorPane.setRightAnchor(tradingTabPane, 0.0);
 
             // Fetch trade pairs asynchronously
             loadTradePairs(tradePairsCombo);
 
+            // Bind tab pane to full size of the AnchorPane
+            AnchorPane.setTopAnchor(tradingTabPane, 0.0);
+            AnchorPane.setBottomAnchor(tradingTabPane, 0.0);
+            AnchorPane.setLeftAnchor(tradingTabPane, 0.0);
+            AnchorPane.setRightAnchor(tradingTabPane, 0.0);
             // Add all elements to the main UI
             getChildren().add(tradingTabPane);
         } catch (Exception e) {
@@ -50,13 +66,14 @@ public class DisplayExchangeUI extends AnchorPane {
         }
     }
 
-    private ComboBox<String> createTradePairsComboBox() {
+    private @NotNull ComboBox<String> createTradePairsComboBox() {
         ComboBox<String> tradePairsCombo = new ComboBox<>();
         tradePairsCombo.setPromptText("Select Pair");
         return tradePairsCombo;
     }
 
-    private ToolBar createTradeToolBar(ComboBox<String> tradePairsCombo) {
+    @Contract("_ -> new")
+    private @NotNull ToolBar createTradeToolBar(ComboBox<String> tradePairsCombo) {
         Button autoTradeBtn = new Button("Auto");
         Button addChartBtn = new Button("Add Chart");
 
@@ -65,30 +82,30 @@ public class DisplayExchangeUI extends AnchorPane {
         return new ToolBar(tradePairsCombo, addChartBtn, autoTradeBtn);
     }
 
-    private TabPane createTradingTabPane(ToolBar tradeToolBar) {
+    private @NotNull TabPane createTradingTabPane(ToolBar tradeToolBar) {
         TabPane tradingTabPane = new TabPane(
                 createTab("Account Summary", new AccountSummaryUI(exchange)),
                 createTab("Trading", new VBox(tradeToolBar, new Separator(Orientation.HORIZONTAL), chartradeTabPane)),
                 createTab("Position", new PositionsUI(exchange)),
-                createTab("Orders", new VBox(new Label("Orders"), new OrdersUI(exchange))),
-                createTab("Pending Orders", new VBox(new Label("Pending Orders"), new PendingOrdersUI(exchange))),
-                createTab("Coin Info", new VBox(new Label("Coins"), new CoinInfoUI(exchange))),
+                createTab("Orders", new VBox(new Label("Orders..."), new OrdersUI(exchange))),
+                createTab("Pending..", new VBox(new Label("Pending..."), new PendingOrdersUI(exchange))),
+                createTab("Coin Info", new VBox(new Label("Coins..."), new CoinInfoUI(exchange))),
                 createTab("News", new NewsUI(exchange)),
-                createTab("Mini Web", new Browser(), false)
+                createTab("Web", new Browser(), false)
         );
 
-        tradingTabPane.setPrefSize(1530, 780);
+
         tradingTabPane.setSide(Side.TOP);
         tradingTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
 
         return tradingTabPane;
     }
 
-    private Tab createTab(String title, javafx.scene.Node content) {
+    private @NotNull Tab createTab(String title, Node content) {
         return createTab(title, content, true);
     }
 
-    private Tab createTab(String title, javafx.scene.Node content, boolean closable) {
+    private @NotNull Tab createTab(String title, Node content, boolean closable) {
         Tab tab = new Tab(title);
         tab.setContent(content);
         tab.setClosable(closable);
@@ -109,7 +126,7 @@ public class DisplayExchangeUI extends AnchorPane {
         });
     }
 
-    private void handleAddChart(ComboBox<String> tradePairsCombo) {
+    private void handleAddChart(@NotNull ComboBox<String> tradePairsCombo) {
         String selectedPair = tradePairsCombo.getSelectionModel().getSelectedItem();
         if (selectedPair == null || selectedPair.isEmpty()) {
             showError("Please select a trade pair before adding a chart.");
@@ -126,12 +143,13 @@ public class DisplayExchangeUI extends AnchorPane {
             }
 
             TradePair tradePair = new TradePair(pair[0], pair[1]);
-            CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(exchange, tradePair);
-            chartDisplay.setPrefSize(1530, 780);
+            CandleStickChartContainer chartDisplay = new CandleStickChartContainer(exchange, tradePair, tokens);
+            chartDisplay.setPrefSize(1530, 800);
 
             Tab chartTab = new Tab(tradePairStr, chartDisplay);
             chartradeTabPane.getTabs().add(chartTab);
             chartradeTabPane.getSelectionModel().select(chartTab);
+
         } catch (Exception e) {
             logger.error("Error adding chart", e);
             showError("Error adding chart: " + e.getMessage());

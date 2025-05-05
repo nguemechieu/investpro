@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class InvestProAIPredictorClient {
             String jsonPayload = objectMapper.writeValueAsString(payload);
 
             try (OutputStream os = conn.getOutputStream()) {
-                os.write(jsonPayload.getBytes("utf-8"));
+                os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
             }
 
             int status = conn.getResponseCode();

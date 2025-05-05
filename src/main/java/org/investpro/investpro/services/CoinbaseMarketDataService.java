@@ -1,6 +1,5 @@
 package org.investpro.investpro.services;
 
-import com.fasterxml.jackson.core.ObjectCodec;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
@@ -9,6 +8,8 @@ import org.investpro.investpro.exchanges.Coinbase;
 import org.investpro.investpro.model.OrderBook;
 import org.investpro.investpro.model.OrderBookEntry;
 import org.investpro.investpro.model.TradePair;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,23 +23,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-@Getter
-@Setter
-public class CoinbaseMarketDataService {
+
+public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpClient httpClient) {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseMarketDataService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private final String apiKey;
-    private final String apiSecret;
-    private final HttpClient httpClient;
 
-    public CoinbaseMarketDataService(String apiKey, String apiSecret, HttpClient httpClient) {
-        this.apiKey = apiKey;
-        this.apiSecret = apiSecret;
-        this.httpClient = httpClient;
-    }
-
-    public String getExchangeMessage() {
+    @Contract(pure = true)
+    public @NotNull String getExchangeMessage() {
         return "Coinbase Market Data Service Active";
     }
 

@@ -13,66 +13,47 @@ import org.jetbrains.annotations.NotNull;
 
 public class Browser extends AnchorPane {
 
-    ToolBar toolbar = new ToolBar();
-    ToolBar toolbar2 = new ToolBar();
-    TabPane tabPane = new TabPane();
-    private double zoomLevel = 1.0; // Initial zoom level
+    private final TabPane tabPane = new TabPane();
+    ToolBar mainToolbar = new ToolBar();
+    private double zoomLevel = 1.0;
 
     public Browser() {
-
-        // TextField for the URL bar
-        TextField urlField = new TextField();
-        urlField.setPrefWidth(600);
-
-        // Set up the layout
-        Button btnAdd = new Button("+");
-        Button btnRemove = new Button("-");
-
-        btnAdd.setOnAction(_ -> {
-            Browser newBrowser = new Browser();
-            getChildren().add(newBrowser);
-        });
-
+        setPrefSize(1540, 740);
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
         tabPane.setPrefSize(1500, 750);
-
         HBox.setHgrow(tabPane, Priority.ALWAYS);
-        toolbar2.setTranslateY(700);
-        toolbar2.setTranslateX(0);
-        HBox.setHgrow(toolbar2, Priority.ALWAYS);
 
-        final int[] index = {0};
-        AnchorPane.setTopAnchor(tabPane, 0.0);
+        Button addTabButton = new Button("+");
+        Button removeTabButton = new Button("-");
 
-        btnAdd.setOnAction(_ -> {
-            index[0]++;
-            Tab tab = new Tab("Tab " + index[0]);
-            WebView webView = new WebView();
-            WebEngine webEngine = webView.getEngine();
-            webEngine.loadContent("<html><body>Hello, World!</body></html>");
-            tab.setClosable(true);
-            tab.setContent(DisplayWebBrowser());
-            tabPane.getTabs().add(tab);
-            tabPane.getSelectionModel().select(tabPane.getTabs().size() - 1);
-        });
+        addTabButton.setOnAction(_ -> addNewTab());
+        removeTabButton.setOnAction(_ -> removeSelectedTab());
 
-        btnRemove.setOnAction(_ -> {
-            if (tabPane.getTabs().size() > 1) {
-                tabPane.getTabs().remove(tabPane.getSelectionModel().getSelectedIndex());
-            }
-        });
+        mainToolbar.getItems().addAll(addTabButton, new Separator(Orientation.VERTICAL), removeTabButton);
+        AnchorPane.setTopAnchor(tabPane, 40.0);
 
-        toolbar.getItems().addAll(btnAdd, new Separator(Orientation.VERTICAL), btnRemove);
-        toolbar.setTranslateY(0);
-        tabPane.setTranslateY(40);
+        getChildren().addAll(mainToolbar, new Separator(Orientation.HORIZONTAL), tabPane);
 
-        getChildren().addAll(toolbar, new Separator(Orientation.HORIZONTAL), tabPane);
-        setPrefSize(1540, 740);
+        addNewTab(); // Open one tab by default
     }
 
-    private @NotNull AnchorPane DisplayWebBrowser() {
-        AnchorPane anchorPane = new AnchorPane();
-        anchorPane.setPrefSize(1540, 740);
+    private void addNewTab() {
+        Tab tab = new Tab("Tab " + (tabPane.getTabs().size() + 1));
+        tab.setContent(createWebViewPane());
+        tab.setClosable(true);
+        tabPane.getTabs().add(tab);
+        tabPane.getSelectionModel().select(tab);
+    }
+
+    private void removeSelectedTab() {
+        if (tabPane.getTabs().size() > 1) {
+            tabPane.getTabs().remove(tabPane.getSelectionModel().getSelectedIndex());
+        }
+    }
+
+    private @NotNull AnchorPane createWebViewPane() {
+        AnchorPane container = new AnchorPane();
+        container.setPrefSize(1540, 740);
 
         WebView webView = new WebView();
         WebEngine webEngine = webView.getEngine();
@@ -81,22 +62,8 @@ public class Browser extends AnchorPane {
         urlField.setPromptText("Enter a URL");
         urlField.setPrefWidth(600);
 
-        Button goButton = new Button("Search");
-        goButton.setOnAction(_ -> {
-            String url = urlField.getText().startsWith("http") ? urlField.getText() : "https://" + urlField.getText();
-            webEngine.load(url);
-        });
-
-        urlField.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
-            if (event.getClickCount() == 2) {
-                String url = urlField.getText().startsWith("http") ? urlField.getText() : "https://" + urlField.getText();
-                webEngine.load(url);
-            } else {
-                urlField.clear();
-                urlField.requestFocus();
-                urlField.setCursor(Cursor.TEXT);
-            }
-        });
+        Button goButton = new Button("Go");
+        goButton.setOnAction(_ -> loadUrl(webEngine, urlField.getText()));
 
         Button backButton = new Button("Back");
         backButton.setOnAction(_ -> {
@@ -115,32 +82,45 @@ public class Browser extends AnchorPane {
         Button refreshButton = new Button("Refresh");
         refreshButton.setOnAction(_ -> webEngine.reload());
 
-        Button zoomInButton = new Button("Zoom In");
-        Button zoomOutButton = new Button("Zoom Out");
-
+        Button zoomInButton = new Button("+");
         zoomInButton.setOnAction(_ -> {
-            zoomLevel += 0.1;
+            zoomLevel = Math.min(zoomLevel + 0.1, 3.0);
             webView.setZoom(zoomLevel);
         });
 
+        Button zoomOutButton = new Button("-");
         zoomOutButton.setOnAction(_ -> {
-            zoomLevel = Math.max(zoomLevel - 0.1, 0.5); // Set the minimum zoom level to 0.5
+            zoomLevel = Math.max(zoomLevel - 0.1, 0.5);
             webView.setZoom(zoomLevel);
         });
 
+        ToolBar urlBar = new ToolBar(goButton, backButton, forwardButton, refreshButton, zoomInButton, zoomOutButton, urlField);
+        AnchorPane.setTopAnchor(urlBar, 0.0);
+        AnchorPane.setTopAnchor(webView, 35.0);
+        AnchorPane.setBottomAnchor(webView, 0.0);
+        AnchorPane.setLeftAnchor(webView, 0.0);
+        AnchorPane.setRightAnchor(webView, 0.0);
 
-        ToolBar toolbar2 = new ToolBar();
-        toolbar2.getItems().addAll(goButton, backButton, forwardButton, refreshButton, zoomInButton, zoomOutButton);
-
-        HBox tools = new HBox(10, toolbar2, new Separator(Orientation.HORIZONTAL), urlField);
-        tools.setTranslateX(0);
-        tools.setTranslateY(0);
-
-        anchorPane.getChildren().addAll(tools, new Separator(Orientation.HORIZONTAL), webView);
-
-        webView.setPrefSize(1500, 740);
         webEngine.load("https://www.google.com");
 
-        return anchorPane;
+        urlField.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
+            if (event.getClickCount() == 2) {
+                loadUrl(webEngine, urlField.getText());
+            } else {
+                urlField.clear();
+                urlField.requestFocus();
+                urlField.setCursor(Cursor.TEXT);
+            }
+        });
+
+        container.getChildren().addAll(urlBar, webView);
+        return container;
+    }
+
+    private void loadUrl(WebEngine engine, String input) {
+        if (!input.startsWith("http")) {
+            input = "https://" + input;
+        }
+        engine.load(input);
     }
 }

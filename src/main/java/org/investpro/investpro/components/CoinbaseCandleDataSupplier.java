@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.investpro.investpro.CandleDataSupplier;
-import org.investpro.investpro.model.Candle;
+
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,7 @@ import java.util.concurrent.Future;
 public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseCandleDataSupplier.class);
-    private static final String BASE_URL = "https://api.exchange.coinbase.com/products";
+    private static final String BASE_URL = "https://api.coinbase.com/v3/products";
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
@@ -36,6 +37,8 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     int numCandles = 1000;
 
     public CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+
+        Objects.requireNonNull(tradePair);
         super(secondsPerCandle, tradePair);
     }
 
@@ -49,7 +52,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     }
 
     @Override
-    public Future<List<Candle>> get() {
+    public Future<List<CandleData>> get() {
         try {
             if (endTime.get() == -1) {
                 endTime.set((int) Instant.now().getEpochSecond());
@@ -78,18 +81,19 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                     .thenApply(body -> {
                         try {
                             JsonNode array = OBJECT_MAPPER.readTree(body);
-                            List<Candle> candles = new ArrayList<>();
+                            List<CandleData> candles = new ArrayList<>();
                             for (JsonNode node : array) {
-                                candles.add(new Candle(
-                                        node.get(0).asLong(),       // time
+                                candles.add(new CandleData(
+
                                         node.get(3).asDouble(),     // open
                                         node.get(4).asDouble(),     // close
                                         node.get(2).asDouble(),     // high
                                         node.get(1).asDouble(),     // low
+                                        node.get(0).asLong(),       // time
                                         node.get(5).asLong()        // volume
                                 ));
                             }
-                            candles.sort(Comparator.comparing(Candle::getTime)); // ascending
+                            candles.sort(Comparator.comparing(CandleData::getOpenTime)); // ascending
                             return candles;
                         } catch (Exception e) {
                             logger.error("Error parsing candle data: {}", e.getMessage(), e);

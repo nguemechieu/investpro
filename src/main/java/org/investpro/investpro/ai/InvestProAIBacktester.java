@@ -1,7 +1,6 @@
 package org.investpro.investpro.ai;
 
-import org.investpro.investpro.model.Candle;
-import org.jetbrains.annotations.NotNull;
+import org.investpro.investpro.model.CandleData;
 
 import java.util.List;
 
@@ -16,7 +15,7 @@ public class InvestProAIBacktester {
     private int losses = 0;
     private double cumulativeProfit = 0.0;
 
-    public void runBacktest(List<Candle> candles) {
+    public void runBacktest(List<CandleData> candles) {
         if (candles.size() < 21) {
             logger.info("Not enough candles to backtest.");
             return;
@@ -27,8 +26,8 @@ public class InvestProAIBacktester {
 
             var prediction = aiClient.predict(features);
 
-            Candle entryCandle = candles.get(i);
-            Candle exitCandle = candles.get(i + 1); // assume we close next candle (for simplicity)
+            CandleData entryCandle = candles.get(i);
+            CandleData exitCandle = candles.get(i + 1); // assume we close next candle (for simplicity)
 
             simulateTrade(prediction, entryCandle, exitCandle);
         }
@@ -36,22 +35,22 @@ public class InvestProAIBacktester {
         printReport();
     }
 
-    private void simulateTrade(InvestProAIPredictorClient.PredictionResult prediction, Candle entry, Candle exit) {
+    private void simulateTrade(InvestProAIPredictorClient.PredictionResult prediction, CandleData entry, CandleData exit) {
         if (prediction.prediction().equalsIgnoreCase("unknown")) return;
 
         totalTrades++;
 
-        boolean correct = prediction.prediction().equalsIgnoreCase("up") && exit.getClose().doubleValue() > entry.getClose().doubleValue();
-        if (prediction.prediction().equalsIgnoreCase("down") && exit.getClose().doubleValue() < entry.getClose().doubleValue()) {
+        boolean correct = prediction.prediction().equalsIgnoreCase("up") && exit.getClosePrice() > entry.getClosePrice();
+        if (prediction.prediction().equalsIgnoreCase("down") && exit.getClosePrice() < entry.getClosePrice()) {
             correct = true;
         }
 
         if (correct) {
             wins++;
-            cumulativeProfit += Math.abs(exit.getClose().doubleValue() - entry.getClose().doubleValue());
+            cumulativeProfit += Math.abs(exit.getClosePrice() - entry.getClosePrice());
         } else {
             losses++;
-            cumulativeProfit -= Math.abs(exit.getClose().doubleValue() - entry.getClose().doubleValue());
+            cumulativeProfit -= Math.abs(exit.getClosePrice() - entry.getClosePrice());
         }
     }
 
@@ -68,9 +67,9 @@ public class InvestProAIBacktester {
         logger.info("--------------------------\n");
     }
 
-    private List<Double> extractSimpleFeatures(@NotNull List<Candle> candles) {
+    private List<Double> extractSimpleFeatures(List<CandleData> candles) {
         return candles.stream()
-                .map(c -> c.getClose().doubleValue()) // simple features (closes)
+                .map(CandleData::getClosePrice) // simple features (closes)
                 .toList();
     }
 }

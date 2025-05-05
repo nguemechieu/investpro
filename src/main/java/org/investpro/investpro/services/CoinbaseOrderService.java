@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.investpro.investpro.CreateOrderRequest;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
+import org.investpro.investpro.SIGNAL;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Coinbase;
 import org.investpro.investpro.model.*;

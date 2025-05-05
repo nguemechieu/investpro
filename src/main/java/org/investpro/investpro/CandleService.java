@@ -1,6 +1,6 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.Candle;
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,9 +10,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 public interface CandleService {
-    List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval);
+    List<CandleData> getHistoricalCandles(TradePair tradePair, Instant startTime, Instant endTime, int interval);
 
     CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair);
 
-    CompletableFuture<Optional<Candle>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
+    CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle);
 }

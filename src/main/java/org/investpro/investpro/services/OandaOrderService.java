@@ -1,8 +1,8 @@
 package org.investpro.investpro.services;
 
-import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import org.investpro.investpro.CreateOrderRequest;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.Side;
@@ -27,6 +27,7 @@ public class OandaOrderService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final String accountId;
+    @Getter
     private final String apiSecret;
     private final HttpClient client;
     private final HttpRequest.Builder baseRequestBuilder;
@@ -41,13 +42,15 @@ public class OandaOrderService {
                 .header("Content-Type", "application/json");
     }
 
-    public List<Order> getOrders() throws IOException, InterruptedException {
+    public List<Order> getOrders(TradePair tradePair) throws IOException, InterruptedException {
         HttpRequest request = baseRequestBuilder.uri(URI.create(Oanda.API_URL + "/accounts/" + accountId + "/orders"))
                 .GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("ORDER HTTP error: " + response.body());
+            logger.error("ORDER HTTP error: {}", response.body());
+
+            return new ArrayList<>();
         }
 
         JsonNode root = OBJECT_MAPPER.readTree(response.body());
@@ -62,8 +65,8 @@ public class OandaOrderService {
         return orders;
     }
 
-    public List<Order> getOpenOrder(TradePair tradePair) throws IOException, InterruptedException, ExecutionException {
-        return getOrders(); // Simplified, you may filter by tradePair if needed
+    public List<Order> getOpenOrder(TradePair tradePair) throws IOException, InterruptedException {
+        return getOrders(tradePair); // Simplified, you may filter by tradePair if needed
     }
 
     public List<Order> getPendingOrders() throws IOException, InterruptedException, ExecutionException {
@@ -72,7 +75,8 @@ public class OandaOrderService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Error fetching pending orders: " + response.body());
+            logger.error("Error fetching pending orders: {}", response.body());
+            return new ArrayList<>();
         }
 
         List<Order> orders = new ArrayList<>();
@@ -99,7 +103,8 @@ public class OandaOrderService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 201) {
-            throw new RuntimeException("Error creating order: " + response.body());
+            logger.error("Error creating order: {}", response.body());
+            return;
         }
         logger.info("Order created: {}", response.body());
     }
@@ -112,7 +117,7 @@ public class OandaOrderService {
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Error cancelling order: " + response.body());
+            logger.error("Error cancelling order: {}", response.body());
         }
         logger.info("Order cancelled: {}", orderId);
     }
@@ -125,9 +130,10 @@ public class OandaOrderService {
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Error cancelling all orders: " + response.body());
+            logger.error("Error cancelling all orders: {}", response.body());
         }
 
         logger.info("All orders cancelled for account: {}", accountId);
     }
+
 }

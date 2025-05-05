@@ -1,6 +1,7 @@
 package org.investpro.investpro;
 
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import java.util.Date;
 
 @Getter
 @Setter
+
 public class News {
     private static final Logger logger = LoggerFactory.getLogger(News.class);
     String impact;

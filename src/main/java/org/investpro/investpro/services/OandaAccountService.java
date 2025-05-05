@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Getter
 @Setter
@@ -31,6 +32,10 @@ public class OandaAccountService {
     private final HttpRequest.Builder baseRequestBuilder;
 
     public OandaAccountService(String accountId, String apiSecret, HttpClient client) {
+
+        Objects.requireNonNull(accountId);
+        Objects.requireNonNull(client);
+        Objects.requireNonNull(apiSecret);
         this.accountId = accountId;
         this.apiSecret = apiSecret;
         this.client = client;
@@ -38,6 +43,7 @@ public class OandaAccountService {
                 .header("Authorization", "Bearer " + apiSecret)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json");
+        logger.debug(OandaAccountService.class.getName());
     }
 
     public List<Fee> getTradingFee() throws IOException, InterruptedException {
@@ -58,7 +64,8 @@ public class OandaAccountService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to fetch accounts: " + response.body());
+            logger.error("Failed to fetch accounts: {}", response.body());
+            return List.of(new Account());
         }
 
         JsonNode root = OBJECT_MAPPER.readTree(response.body());

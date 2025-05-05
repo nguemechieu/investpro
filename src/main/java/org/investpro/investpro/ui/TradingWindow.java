@@ -6,8 +6,8 @@ import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.investpro.investpro.CurrencyDataProvider;
 import org.investpro.investpro.Exchange;
@@ -40,19 +40,24 @@ public class TradingWindow extends Region {
     private final TextField secretKeyTextField = new TextField();
     Properties properties = loadProperties();
     private Exchange exchange;
+    private final TextField tokensField = new TextField();
 
     public TradingWindow() {
 
         setPadding(new Insets(10));
+        tokensField.setText("2032573404:AAGnxJpNMJBKqLzvE5q4kGt1cCGF632bP7A"
+        );
 
         loginPage();
         setStyle(
-                "-fx-background-color: #333333;" +
-                        "-fx-text-fill: rgba(13,53,48,0.73);" +
+                "-fx-background-color: #021729;" +
+                        "-fx-text-fill: rgba(176,186,185,0.73);" +
                         "-fx-padding: 10;" +
                         "-fx-border-width: 2;" +
-                        "-fx-border-color: #555555;" +
+
+                        "-fx-background-image:url(investpro_image.png);" +
                         "-fx-border-radius: 5;"
+
         );
 
 
@@ -164,12 +169,13 @@ public class TradingWindow extends Region {
             loginPasswordField.setText(properties.getProperty("LOGIN_PASSWORD"));
         }
 
-        loginSubmitButton.setOnAction(_ -> handleLogin(loginUsernameField.getText(), loginPasswordField.getText()));
+        loginSubmitButton.setOnAction(_ -> handleLogin(loginUsernameField.getText(), loginPasswordField.getText(), tokensField.getText()));
         forgotPasswordButton.setOnAction(_ -> resetPasswordPage());
 
         loginGrid.setTranslateX(600);
         loginGrid.setTranslateY(200);
         getChildren().add(loginGrid);
+
     }
 
     private void resetPasswordPage() {
@@ -337,25 +343,24 @@ public class TradingWindow extends Region {
         }
     }
 
-    private void handleLogin(@NotNull String username, String password) {
+    private void handleLogin(@NotNull String username, String password, String tokens) {
         try {
             Query res = db1.getEntityManager().createNativeQuery("SELECT * FROM users WHERE username = :username AND password = :password");
             res.setParameter("username", username);
             res.setParameter("password", password);
-
             if (res.getResultList().isEmpty()) {
                 new Messages(Alert.AlertType.WARNING, "Invalid credentials.");
                 return;
             }
 
-            launchTradingWindow();
+            launchTradingWindow(tokens);
         } catch (Exception e) {
             logger.error("Error during login", e);
             new Messages(Alert.AlertType.ERROR, "An error occurred during login.");
         }
     }
 
-    private void launchTradingWindow() {
+    private void launchTradingWindow(String tokens) {
         getStyleClass().add("trading-window");
         logger.info("Initializing TradingWindow");
         setPrefSize(1530, 780);
@@ -368,7 +373,7 @@ public class TradingWindow extends Region {
         gridPane.add(exchangeLabel, 0, 2);
 
         comboBox.setValue("Select your exchange");
-        comboBox.getItems().addAll("BINANCE US", "BINANCE", "OANDA", "COINBASE", "BITFINEX", "BITMEX", "POLONIEX");
+        comboBox.getItems().addAll("BINANCEUS", "BINANCE", "OANDA", "COINBASE", "BITFINEX", "BITMEX", "POLONIEX");
         gridPane.add(comboBox, 1, 2);
         comboBox.getStyleClass().add("combo-box");
 
@@ -472,12 +477,12 @@ public class TradingWindow extends Region {
                 logger.info("Starting trading window for {}", comboBox.getValue());
 
 
-                DisplayExchangeUI display = new DisplayExchangeUI(exchange);
-                StackPane root = new StackPane(display);
+                DisplayExchangeUI display = new DisplayExchangeUI(exchange, tokens);
+                Pane root = new Pane(display);
                 Scene scene = new Scene(root, 1530, 780);
                 scene.getStylesheets().add(Objects.requireNonNull(TradingWindow.class.getResource("/css/app.css")).toExternalForm());
                 Stage stage = new Stage();
-                stage.setTitle("Trading Window - " + comboBox.getValue());
+                stage.setTitle("Trade  - " + comboBox.getValue());
                 stage.setScene(scene);
                 stage.show();
 

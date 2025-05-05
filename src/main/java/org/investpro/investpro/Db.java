@@ -1,6 +1,7 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.Candle;
+
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.Currency;
 
 import javax.sql.DataSource;
@@ -85,5 +86,5 @@ public interface Db extends DataSource {
 
     Currency getCurrency(String code) throws SQLException;
 
-    void save(Candle candle);
+    void save(CandleData candle);
 }

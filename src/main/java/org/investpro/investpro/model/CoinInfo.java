@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serial;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Date;
 
 @Getter
@@ -14,6 +16,7 @@ import java.util.Date;
 @Access(AccessType.FIELD)
 public class CoinInfo implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     @Id
@@ -87,14 +90,14 @@ public class CoinInfo implements Serializable {
     @Column(name = "atl_change_percentage")
     private double atl_change_percentage;
 
-    @Temporal(TemporalType.TIMESTAMP)
+
     @Column(name = "atl_date")
     private Date atl_date;
     @Convert(converter = StringArrayConverter.class)
     @Column(name = "roi")
     private String[] roi;
 
-    @Temporal(TemporalType.TIMESTAMP)
+
     @Column(name = "last_updated")
     private Date last_updated;
 
@@ -128,7 +131,7 @@ public class CoinInfo implements Serializable {
                 ", atl=" + atl +
                 ", atl_change_percentage=" + atl_change_percentage +
                 ", atl_date=" + atl_date +
-                ", roi='" + roi + '\'' +
+                ", roi='" + Arrays.toString(roi) + '\'' +
                 ", last_updated=" + last_updated +
                 ", fractional_digits=" + fractional_digits +
                 '}';

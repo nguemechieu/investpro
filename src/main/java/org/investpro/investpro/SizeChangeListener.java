@@ -4,8 +4,10 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
+import javafx.scene.layout.Region;
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.investpro.ui.CandleStickChartToolbar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +33,12 @@ public class SizeChangeListener implements ChangeListener<Number> {
      * @param gotFirstSize    Indicates if the size has stabilized.
      * @param containerWidth  The observable width of the container.
      * @param containerHeight The observable height of the container.
-     * @param chart           The chart instance to be resized.
      */
     public SizeChangeListener(BooleanProperty gotFirstSize, ObservableNumberValue containerWidth,
-                              ObservableNumberValue containerHeight, CandleStickChartToolbar chart) {
+                              ObservableNumberValue containerHeight) {
         this.gotFirstSize = gotFirstSize;
         this.containerWidth = containerWidth;
         this.containerHeight = containerHeight;
-        this.chart = chart;
     }
 
     /**
@@ -57,19 +57,41 @@ public class SizeChangeListener implements ChangeListener<Number> {
             gotFirstSize.set(true);  // Size has now stabilized.
 
         }
+        resize();
     }
-
-    public void resize() {
-
-    }
-
 
     /**
-     * **Resizes the Chart Layout**
+     * 📐 **Resizes the Chart Layout**
      * - Dynamically adjusts chart elements when the container size changes.
      * - Updates fonts, paddings, and element positions.
      * - Ensures responsiveness and scalability.
      */
+    public void resize() {
+        if (chart == null || chart.getScene() == null) return;
+
+        double width = chart.getScene().getWidth();
+        double height = chart.getScene().getHeight();
+
+        // Adjust canvas size
+        chart.setPrefWidth(width);
+        chart.setPrefHeight(height);
+
+        if (chart instanceof Region region) {
+            region.setMinSize(width, height);
+            region.setMaxSize(width, height);
+        }
+
+        // Redraw or re-layout content
+        chart.requestLayout();
+        chart.layout(); // Force layout pass if needed
+
+        // Optional: update font sizes and padding
+        double scale = Math.min(width / 1200.0, height / 800.0);
+        chart.setStyle("-fx-font-size: " + (12 * scale) + "px;");
+
+        logger.info("Chart resized to {}x{}", width, height);
+    }
+
 
 
 }

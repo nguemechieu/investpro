@@ -19,13 +19,21 @@ module invespro {
     requires io.grpc.stub;
     requires io.grpc.protobuf;
     requires com.google.common;
+    requires org.apache.pdfbox;
+    requires doxia.sink.api;
+    requires proto.google.common.protos;
 
-    opens org.investpro.investpro.model to org.hibernate.orm.core, jakarta.persistence;
-    opens org.investpro.investpro to javafx.graphics, javafx.fxml;
-
-    // Enable Hibernate + ByteBuddy reflective access
+    opens org.investpro.investpro to javafx.graphics, javafx.fxml, com.fasterxml.jackson.databind;
+    exports org.investpro.grpc;
 
     // Optional: export for compile-time reference
     exports org.investpro.investpro.model;
     exports org.investpro.investpro to javafx.graphics;
+    exports org.investpro.investpro.ui.chart to javafx.graphics;
+    opens org.investpro.investpro.ui.chart to javafx.fxml, javafx.graphics;
+    exports org.investpro.investpro.ui.chart.overlay to javafx.graphics;
+    opens org.investpro.investpro.ui.chart.overlay to javafx.fxml, javafx.graphics;
+    opens org.investpro.investpro.model to com.fasterxml.jackson.databind, jakarta.persistence, javafx.fxml, javafx.graphics, org.hibernate.orm.core;
+    exports org.investpro.investpro.ui to javafx.graphics;
+    opens org.investpro.investpro.ui to com.fasterxml.jackson.databind, javafx.fxml, javafx.graphics;
 }

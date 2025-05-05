@@ -2,18 +2,17 @@ package org.investpro.investpro;
 
 import javafx.util.Pair;
 
-public class Extrema<T extends Number> extends Pair<T, T> {
 
-    public Extrema(T min, T max) {
+public class Extrema extends Pair<Double, Double> {
+    public Extrema(Double min, Double max) {
         super(min, max);
     }
 
-    public T getMin() {
+    public Double getMin() {
         return getKey();
     }
 
-    public T getMax() {
+    public Double getMax() {
         return getValue();
     }
-
 }

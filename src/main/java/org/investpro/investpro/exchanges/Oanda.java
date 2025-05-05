@@ -7,14 +7,11 @@ import org.investpro.investpro.model.*;
 import org.investpro.investpro.model.Account;
 import org.investpro.investpro.services.*;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -27,7 +24,6 @@ import java.util.concurrent.ExecutionException;
 public class Oanda extends Exchange {
 
     public static final String API_URL = "https://api-fxtrade.oanda.com/v3";
-    private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
     private final String accountId;
     private final String apiSecret;
     private final HttpClient httpClient;
@@ -36,22 +32,70 @@ public class Oanda extends Exchange {
     private final OandaAccountService accountService;
     private final OandaMarketDataService marketDataService;
     private final OandaCandleService candleService;
+    private final OandaTradeService oandaTradeService;
+    private TradePair tradePair;
 
     public Oanda(String accountId, String apiSecret) {
+        Objects.requireNonNull(accountId);
+        Objects.requireNonNull(apiSecret);
         super(accountId, apiSecret);
         this.accountId = accountId;
         this.apiSecret = apiSecret;
         this.httpClient = HttpClient.newHttpClient();
-
         this.orderService = new OandaOrderService(accountId, apiSecret, httpClient);
         this.accountService = new OandaAccountService(accountId, apiSecret, httpClient);
         this.marketDataService = new OandaMarketDataService(accountId, apiSecret, httpClient);
-        this.candleService = new OandaCandleService(accountId, apiSecret, httpClient);
+        this.candleService = new OandaCandleService(accountId, apiSecret, httpClient, 1000);
+        this.oandaTradeService = new OandaTradeService(accountId, apiSecret, httpClient);
+
     }
+
+    @Override
+    public Set<Integer> granularity() {
+        return Set.of(
+                60, 5 * 60, 15 * 60, 30 * 60, 3600, 2 * 3600, 4 * 3600, 24 * 7 * 3600, 24 * 7 * 3600 * 4
+        ); // supported granularity in minutes
+    }
+
+    @Override
+    public CompletableFuture<Trade> fetchRecentTrades(TradePair tradePair, Instant instant) {
+        return oandaTradeService.fetchRecentTrades(tradePair);
+    }
+
+
+    @Override
+    public String getRecentTrades(TradePair pair) {
+        return oandaTradeService.getRecentTrades(pair).orElse("no data found");
+    }
+
+    @Override
+    public void connectAndProcessTrades(String symbol, InProgressCandleUpdater updater) {
+
+    }
+
+
+    @Override
+    public Optional<Double> getLatestPrice(TradePair pair) {
+        return Optional.empty();
+    }
+
+    @Override
+    public CompletableFuture<Trade> fetchRecentTrade(TradePair pair, Instant instant) {
+        return oandaTradeService.fetchRecentTrades(pair).toCompletableFuture();
+    }
+
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         return candleService.getCandleDataSupplier(secondsPerCandle, tradePair);
+    }
+
+    @Override
+    public CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        return CompletableFuture.completedFuture(
+                candleService.fetchCandleDataForInProgressCandle(tradePair,
+                        currentCandleStartedAt, Instant.ofEpochSecond(secondsIntoCurrentCandle),
+                        secondsPerCandle).stream().toList().stream().findFirst());
     }
 
     // --- Delegated Implementations ---
@@ -66,14 +110,12 @@ public class Oanda extends Exchange {
         return marketDataService.fetchLivesBidAsk(tradePair);
     }
 
-    @Override
-    public CompletableFuture<Optional<Candle>> fetchCandleDataForInProgressCandle(@NotNull TradePair pair, Instant start, long offset, int secondsPerCandle) {
-        return candleService.fetchCandleDataForInProgressCandle(pair, start, offset, secondsPerCandle);
-    }
 
     @Override
-    public java.util.List<Candle> getHistoricalCandles(String symbol, java.time.Instant startTime, java.time.Instant endTime, String interval) {
-        return candleService.getHistoricalCandles(symbol, startTime, endTime, interval);
+    public List<CandleData> getHistoricalCandles(TradePair tradePair, Instant startTime, @NotNull Instant endTime, int interval) {
+        return candleService.fetchCandleDataForInProgressCandle(tradePair, startTime,
+
+                endTime, interval);
     }
 
     @Override
@@ -82,7 +124,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public java.util.List<TradePair> getTradePairs() throws Exception {
+    public List<TradePair> getTradePairs() throws Exception {
         return marketDataService.getTradePairs();
     }
 
@@ -92,7 +134,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public List<org.investpro.investpro.model.Account> getAccounts() throws IOException, InterruptedException {
+    public List<Account> getAccounts() throws IOException, InterruptedException {
         return accountService.getAccounts();
     }
 
@@ -102,23 +144,23 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public java.util.List<Order> getOrders() throws IOException, InterruptedException {
-        return orderService.getOrders();
+    public List<Order> getOrders() throws IOException, InterruptedException {
+        return orderService.getOrders(tradePair);
     }
 
     @Override
-    public java.util.List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, ExecutionException, InterruptedException {
+    public List<Order> getOpenOrder(@NotNull TradePair tradePair) throws IOException, InterruptedException {
         return orderService.getOpenOrder(tradePair);
     }
 
     @Override
-    public java.util.List<Order> getPendingOrders() throws IOException, ExecutionException, InterruptedException {
+    public List<Order> getPendingOrders() throws IOException, ExecutionException, InterruptedException {
         return orderService.getPendingOrders();
     }
 
     @Override
-    public void createOrder(TradePair tradePair, Side side, ENUM_ORDER_TYPE orderType,
-                            double price, double size, java.util.Date timestamp,
+    public void createOrder(TradePair tradePair, @NotNull Side side, ENUM_ORDER_TYPE orderType,
+                            double price, double size, Date timestamp,
                             double stopLoss, double takeProfit) throws IOException, InterruptedException {
         orderService.createOrder(tradePair, side, orderType, price, size, timestamp, stopLoss, takeProfit);
     }
@@ -135,7 +177,7 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public java.util.List<Position> getPositions() throws IOException, InterruptedException {
+    public List<Position> getPositions() throws IOException, InterruptedException {
         return accountService.getPositions();
     }
 }

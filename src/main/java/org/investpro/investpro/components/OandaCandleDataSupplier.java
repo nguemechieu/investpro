@@ -5,7 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Getter;
 import org.investpro.investpro.CandleDataSupplier;
-import org.investpro.investpro.model.Candle;
+
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,12 +21,11 @@ import java.util.*;
 import java.util.concurrent.Future;
 
 @Getter
-
 public class OandaCandleDataSupplier extends CandleDataSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(OandaCandleDataSupplier.class);
     private static final String API_URL = "https://api-fxtrade.oanda.com/v3";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
+    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
     private static final HttpClient httpClient = HttpClient.newHttpClient();
 
     private static final Map<Integer, String> GRANULARITY_MAP = Map.of(
@@ -38,11 +38,12 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
             86400, "D",
             604800, "W"
     );
-    int numCandles = 1000;
-    private String apiSecret;
+
+    private final int numCandles = 5000;
+
 
     public OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        super(secondsPerCandle, tradePair);
+        super(secondsPerCandle, Objects.requireNonNull(tradePair));
     }
 
     @Override
@@ -55,58 +56,68 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
     }
 
     @Override
-    public Future<List<Candle>> get() {
+    public Future<List<CandleData>> get() {
+        int end = endTime.get();
+        Instant now = Instant.now();
+        int startEpoch = end == -1
+                ? (int) (now.getEpochSecond() - secondsPerCandle * numCandles)
+                : end - secondsPerCandle * numCandles;
 
-        int start = endTime.get() == -1
-                ? (int) (Instant.now().getEpochSecond() - secondsPerCandle * numCandles)
-                : endTime.get() - secondsPerCandle * numCandles;
-
-        String startIso = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(start));
+        String startIso = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(startEpoch));
         String instrument = tradePair.toString('_');
         String granularity = getGranularityLabel(secondsPerCandle);
-        String url = String.format("%s/instruments/%s/candles?granularity=%s&from=%s&price=M", API_URL, instrument, granularity, startIso);
+
+        String url = String.format("%s/instruments/%s/candles?granularity=%s&from=%s&price=M",
+                API_URL, instrument, granularity, startIso);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + apiSecret)
+                .header("Authorization", "Bearer 186bcf0b71e393506c79af84a45a857e-247e832f3a754cb65a33be57296ce955")
                 .GET()
                 .build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     try {
-                        JsonNode root = OBJECT_MAPPER.readTree(response.body());
-                        JsonNode candlesNode = root.get("candles");
-                        if (candlesNode == null || !candlesNode.isArray()) {
-                            logger.warn("No candles returned for: {}", instrument);
-                            return Collections.emptyList();
+                        logger.info("OANDA Response: {}", response.body());
+
+                        if (response.statusCode() != 200) {
+                            logger.warn("Non-200 response: {}", response.statusCode());
+                            return List.of(new CandleData());
+                        }
+                        JsonNode root = MAPPER.readTree(response.body());
+                        JsonNode candlesNode = root.path("candles");
+
+                        if (!candlesNode.isArray()) {
+                            logger.warn("Unexpected candle format from OANDA for instrument: {}", instrument);
+                            return List.of();
                         }
 
-                        List<Candle> candles = new ArrayList<>();
+                        List<CandleData> candles = new ArrayList<>();
                         for (JsonNode node : candlesNode) {
-                            long timestamp = Instant.parse(node.get("time").asText()).getEpochSecond();
-                            JsonNode mid = node.get("mid");
-                            candles.add(new Candle(
-                                    timestamp,
-                                    mid.get("o").asDouble(),
-                                    mid.get("c").asDouble(),
-                                    mid.get("h").asDouble(),
-                                    mid.get("l").asDouble(),
-                                    node.get("volume").asLong()
-                            ));
+                            JsonNode mid = node.path("mid");
+                            CandleData candle = new CandleData(
+                                    mid.path("o").asDouble(),
+                                    mid.path("c").asDouble(),
+                                    mid.path("h").asDouble(),
+                                    mid.path("l").asDouble(),
+                                    Instant.parse(node.path("time").asText()).getEpochSecond(),
+
+                                    node.path("volume").asLong()
+                            );
+                            candles.add(candle);
                         }
 
-                        // Sort by time and update endTime for next request
-                        candles.sort(Comparator.comparingLong(c -> c.getTime().getEpochSecond()));
+                        candles.sort(Comparator.comparing(CandleData::getOpenTime));
                         if (!candles.isEmpty()) {
-                            endTime.set((int) candles.getLast().getTime().getEpochSecond());
+                            endTime.set(candles.getLast().getOpenTime());
                         }
 
                         return candles;
 
                     } catch (Exception e) {
-                        logger.error("Error parsing OANDA candle data: {}", e.getMessage(), e);
-                        return Collections.emptyList();
+                        logger.error("❌ Failed to parse OANDA candle data", e);
+                        return List.of();
                     }
                 });
     }

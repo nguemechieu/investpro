@@ -28,7 +28,7 @@ public class CurrencyDataProvider {
     @Getter
     private static final ArrayList<CoinInfo> coinInfoList = new ArrayList<>();
     private static final ArrayList<Currency> coinsToRegister = new ArrayList<>();
-    private static final HttpClient.Builder client = HttpClient.newBuilder();
+    private static HttpClient.Builder client = HttpClient.newBuilder();
 
     public CurrencyDataProvider() {
         logger.info("CryptoCurrencyDataProvider initialized.");

@@ -6,9 +6,9 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.CandleDataSupplier;
 import org.investpro.investpro.exchanges.Coinbase;
-import org.investpro.investpro.model.Candle;
 
 
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +38,7 @@ public class CoinbaseCandleService {
         this.httpClient = httpClient;
     }
 
-    public CompletableFuture<Optional<Candle>> fetchCandleDataForInProgressCandle(
+    public CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(
             TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
 
         String startDateString = DateTimeFormatter.ISO_INSTANT.format(currentCandleStartedAt);
@@ -70,7 +70,7 @@ public class CoinbaseCandleService {
                         double close = first.get(4).asDouble();
                         long volume = first.get(5).asLong();
 
-                        return Optional.of(new Candle(openTime, open, high, low,
+                        return Optional.of(new CandleData(openTime, open, high, low,
                                 close, volume));
                     } catch (Exception e) {
                         logger.error("Error parsing in-progress candle data", e);
@@ -79,7 +79,7 @@ public class CoinbaseCandleService {
                 });
     }
 
-    public List<Candle> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval) {
+    public List<CandleData> getHistoricalCandles(String symbol, Instant startTime, Instant endTime, String interval) {
         // Placeholder for historical candles (not implemented)
         return Collections.emptyList();
     }
@@ -107,7 +107,7 @@ public class CoinbaseCandleService {
         }
 
         @Override
-        public Future<List<Candle>> get() {
+        public Future<List<CandleData>> get() {
             return CompletableFuture.completedFuture(List.of());
         }
     }

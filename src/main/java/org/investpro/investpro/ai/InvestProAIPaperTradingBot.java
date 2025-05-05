@@ -2,10 +2,14 @@ package org.investpro.investpro.ai;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.Candle;
+
 import javafx.application.Platform;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
+import org.investpro.investpro.TelegramClient;
+import org.investpro.investpro.model.CandleData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,13 +27,15 @@ public class InvestProAIPaperTradingBot {
     private double riskPerTrade = 0.02; // Risk 2% per trade
     private XYChart.Series<Number, Number> equityCurveSeries = new XYChart.Series<>();
     private int tradeCounter = 0;
+    private static final Logger logger = LoggerFactory.getLogger(InvestProAIPaperTradingBot.class);
 
-    public InvestProAIPaperTradingBot(LineChart<Number, Number> equityCurveChart) {
+    public InvestProAIPaperTradingBot(TelegramClient telegram, LineChart<Number, Number> equityCurveChart) {
         this.equityCurveSeries.setName("Equity Curve");
         equityCurveChart.getData().add(this.equityCurveSeries);
+        telegram.sendMessage(telegram.getChatId(), equityCurveSeries.toString());
     }
 
-    public void onNewCandle(List<Candle> recentCandles) {
+    public void onNewCandle(List<CandleData> recentCandles) {
         if (recentCandles.size() < 26) {
             return; // Need at least 26 candles for features
         }
@@ -38,27 +44,29 @@ public class InvestProAIPaperTradingBot {
         var predictionResult = aiClient.predict(features);
 
         if (predictionResult.confidence() < 0.7) {
+
+            logger.info("Only trade high confidence signals");
             return; // 🔥 Only trade high confidence signals
         }
 
-        Candle latestCandle = recentCandles.get(recentCandles.size() - 1);
-        double entryPrice = latestCandle.getClose().doubleValue();
+        CandleData latestCandle = recentCandles.getLast();
+        double entryPrice = latestCandle.getClosePrice();//.doubleValue();
         double tradeSize = (accountBalance * riskPerTrade) / (entryPrice * stopLossPercent);
 
         if (predictionResult.prediction().equalsIgnoreCase("up")) {
             openTrades.add(new Trade("BUY", entryPrice, tradeSize));
-            System.out.println("📈 AI Bot BUY @" + entryPrice + " (size: " + tradeSize + ")");
+            logger.info("\uD83D\uDCC8 AI Bot BUY @{} (size: {})", entryPrice, tradeSize);
         } else if (predictionResult.prediction().equalsIgnoreCase("down")) {
             openTrades.add(new Trade("SELL", entryPrice, tradeSize));
-            System.out.println("📉 AI Bot SELL @" + entryPrice + " (size: " + tradeSize + ")");
+            logger.info("\uD83D\uDCC9 AI Bot SELL @{} (size: {})", entryPrice, tradeSize);
         }
     }
 
-    public void onCloseCandle(Candle closingCandle) {
+    public void onCloseCandle(CandleData closingCandle) {
         List<Trade> toClose = new ArrayList<>(openTrades);
 
         for (Trade trade : toClose) {
-            double closePrice = closingCandle.getClose().doubleValue();
+            double closePrice = closingCandle.getClosePrice();//.doubleValue();
             double profit = 0;
             boolean shouldClose = false;
 
@@ -91,9 +99,7 @@ public class InvestProAIPaperTradingBot {
     }
 
     private void updateEquityCurve(int tradeNum, double balance) {
-        Platform.runLater(() -> {
-            equityCurveSeries.getData().add(new XYChart.Data<>(tradeNum, balance));
-        });
+        Platform.runLater(() -> equityCurveSeries.getData().add(new XYChart.Data<>(tradeNum, balance)));
     }
 
     public void printSummary() {

@@ -7,6 +7,7 @@ import org.investpro.investpro.model.*;
 import org.investpro.investpro.model.Account;
 import org.investpro.investpro.services.CoinbaseAccountService;
 import org.investpro.investpro.services.CoinbaseMarketDataService;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,8 +15,11 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Getter
@@ -30,6 +34,7 @@ public class Coinbase extends Exchange {
 
     private final CoinbaseAccountService accountService;
     private final CoinbaseMarketDataService marketDataService;
+
     // TODO: CoinbaseOrderService and CoinbaseCandleService can be added similarly
 
     public Coinbase(String apiKey, String apiSecret) {
@@ -40,6 +45,36 @@ public class Coinbase extends Exchange {
 
         this.accountService = new CoinbaseAccountService(apiKey, apiSecret, httpClient);
         this.marketDataService = new CoinbaseMarketDataService(apiKey, apiSecret, httpClient);
+    }
+
+    @Override
+    public Set<Integer> granularity() {
+        return Set.of(1, 5, 15, 60, 1440); // supported granularities in minutes
+    }
+
+    @Override
+    public CompletableFuture<Trade> fetchRecentTrades(TradePair tradePair, Instant instant) {
+        return null;
+    }
+
+    @Override
+    public String getRecentTrades(TradePair pair) {
+        return "";
+    }
+
+    @Override
+    public void connectAndProcessTrades(String string, InProgressCandleUpdater updater) {
+
+    }
+
+    @Override
+    public Optional<Double> getLatestPrice(TradePair pair) {
+        return Optional.empty();
+    }
+
+    @Override
+    public CompletableFuture<Trade> fetchRecentTrade(TradePair pair, Instant instant) {
+        return null;
     }
 
 
@@ -81,7 +116,7 @@ public class Coinbase extends Exchange {
     // Stub methods (To be implemented or delegated)
 
     @Override
-    public void createOrder(TradePair tradePair, Side side, ENUM_ORDER_TYPE orderType, double price, double size, java.util.Date timestamp, double stopLoss, double takeProfit) {
+    public void createOrder(TradePair tradePair, Side side, ENUM_ORDER_TYPE orderType, double price, double size, Date timestamp, double stopLoss, double takeProfit) {
         throw new UnsupportedOperationException("createOrder not yet implemented");
     }
 
@@ -122,12 +157,12 @@ public class Coinbase extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<Candle>> fetchCandleDataForInProgressCandle(TradePair tradePair, java.time.Instant start, long offset, int secondsPerCandle) {
+    public CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant start, long offset, int secondsPerCandle) {
         throw new UnsupportedOperationException("fetchCandleDataForInProgressCandle not yet implemented");
     }
 
     @Override
-    public List<Candle> getHistoricalCandles(String symbol, java.time.Instant startTime, java.time.Instant endTime, String interval) {
+    public List<CandleData> getHistoricalCandles(TradePair symbol, Instant startTime, Instant endTime, int interval) {
         throw new UnsupportedOperationException("getHistoricalCandles not yet implemented");
     }
 }

@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.investpro.investpro.CandleDataSupplier;
-import org.investpro.investpro.model.Candle;
+
+import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,7 @@ public class BinanceUSCandleDataSupplier extends CandleDataSupplier {
     }
 
     @Override
-    public Future<List<Candle>> get() {
+    public Future<List<CandleData>> get() {
         try {
             if (endTime.get() == -1) {
                 endTime.set((int) Instant.now().getEpochSecond());
@@ -75,20 +76,22 @@ public class BinanceUSCandleDataSupplier extends CandleDataSupplier {
                     .thenApply(body -> {
                         try {
                             JsonNode array = OBJECT_MAPPER.readTree(body);
-                            List<Candle> candles = new ArrayList<>();
+                            List<CandleData> candles = new ArrayList<>();
                             for (JsonNode node : array) {
-                                candles.add(new Candle(
-                                        node.get(0).asLong() / 1000,
+                                candles.add(new CandleData(
+
                                         node.get(1).asDouble(),
                                         node.get(4).asDouble(),
                                         node.get(2).asDouble(),
+
                                         node.get(3).asDouble(),
+                                        node.get(0).asLong(),
                                         node.get(5).asLong()
                                 ));
                             }
 
                             if (!candles.isEmpty()) {
-                                endTime.set((int) candles.getLast().getTime().getEpochSecond());
+                                endTime.set((int) candles.getLast().getOpenTime());
                             }
 
                             return candles;
