@@ -1,5 +1,7 @@
 package org.investpro.investpro.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Getter
 @Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Account {
     protected final List<Deposit> depositRecords = new CopyOnWriteArrayList<>();
     private final List<Withdrawal> withdrawalRecords = new CopyOnWriteArrayList<>();
@@ -42,6 +45,7 @@ public class Account {
     private double commission;
     private double dividendAdjustment;
     private double guaranteedExecutionFees;
+    @JsonAlias("trueUnrealizedPL")
     private double unrealizedPL;
     @JsonProperty("NAV")
     private double NAV;  // Net Asset Value
@@ -281,6 +285,7 @@ public class Account {
      **/
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Balance {
         @JsonProperty("asset")
         private String asset;
@@ -301,6 +306,7 @@ public class Account {
 
     @Getter
     @Setter
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class CommissionRates {
         @JsonProperty("maker")
         private double maker;

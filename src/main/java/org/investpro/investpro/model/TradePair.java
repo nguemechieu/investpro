@@ -117,6 +117,15 @@ public class TradePair extends Pair<Currency, Currency> {
         };
     }
 
+    public String toSymbol() {
+        return getBaseCurrency().getCode().toUpperCase() + getCounterCurrency().getCode().toUpperCase();
+    }
+
+    @Override
+    public String toString() {
+        return toString('/');
+    }
+
     // Get the symbol of the trade pair, e.g., USD/EUR
     public String getSymbol() {
         return String.format("%s/%s", baseCurrency.getSymbol(), counterCurrency.getSymbol());

@@ -79,14 +79,15 @@ public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpCli
                 root.get("bids").forEach(b -> bids.add(new OrderBookEntry(b.get(0).asDouble(), b.get(1).asDouble())));
                 root.get("asks").forEach(a -> asks.add(new OrderBookEntry(a.get(0).asDouble(), a.get(1).asDouble())));
 
-                OrderBook cand = new OrderBook();
-                cand.getAskEntries().getLast().setAmount(asks.getLast().getAmount());
-                cand.getAskEntries().getLast().setPrice(asks.getLast().getPrice());
-                return List.of(cand);
+                OrderBook orderBook = new OrderBook(tradePair, java.time.Instant.now(), bids, asks);
+                return List.of(orderBook);
 
             } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 logger.error("Failed to fetch order book", e);
-                throw new RuntimeException(e);
+                return List.of();
             }
         });
     }

@@ -1,56 +1,248 @@
 .candle-chart-container {
-    -fx-background-color: BLACK;
+    -fx-background-color: linear-gradient(to bottom, #06111d, #0f2236);
+    -fx-background-radius: 24;
+    -fx-border-radius: 24;
+    -fx-border-color: rgba(148, 163, 184, 0.22);
+    -fx-border-width: 1;
+    -fx-padding: 14;
 }
-.candle-chart-toolbar {
-    -fx-alignment: CENTER_LEFT;
-    -fx-padding: 0.0 8.0 0.0 0.0;
 
-    -fx-border-color: transparent;
+.chart-shell {
+    -fx-background-color: linear-gradient(to bottom, rgba(7, 17, 29, 0.92), rgba(10, 27, 43, 0.96));
+    -fx-background-radius: 20;
+    -fx-border-radius: 20;
+    -fx-border-color: rgba(125, 211, 252, 0.15);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.5), 32, 0.16, 0, 10);
+}
+
+.chart-toolbar-shell {
+    -fx-padding: 10 14 4 14;
+}
+
+.chart-stage {
+    -fx-padding: 6 10 12 10;
+}
+
+.chart-workspace {
+    -fx-padding: 10 10 12 10;
+}
+
+.chart-detail-tabs {
+    -fx-tab-min-height: 34;
+}
+
+.chart-detail-tabs .tab-header-area {
+    -fx-padding: 0 0 10 0;
+}
+
+.chart-detail-tabs .tab-header-background {
     -fx-background-color: transparent;
-    -fx-border-radius: 3;
 }
+
+.chart-detail-tabs .tab {
+    -fx-background-color: rgba(8, 21, 35, 0.74);
+    -fx-background-radius: 14 14 0 0;
+    -fx-border-color: rgba(148, 163, 184, 0.16);
+    -fx-border-radius: 14 14 0 0;
+}
+
+.chart-detail-tabs .tab:selected {
+    -fx-background-color: rgba(15, 23, 42, 0.96);
+    -fx-border-color: rgba(56, 189, 248, 0.28);
+}
+
+.chart-detail-tabs .tab-label {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-weight: 700;
+}
+
+.chart-detail-tabs .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.candle-chart-toolbar {
+    -fx-alignment: center-left;
+    -fx-background-color: rgba(8, 21, 35, 0.78);
+    -fx-background-radius: 18;
+    -fx-border-radius: 18;
+    -fx-border-color: rgba(148, 163, 184, 0.16);
+    -fx-border-width: 1;
+}
+
+.candle-chart-toolbar .separator:vertical .line {
+    -fx-border-color: rgba(148, 163, 184, 0.18);
+    -fx-border-width: 0 1 0 0;
+}
+
 .candle-chart-toolbar-button {
-    -fx-font-weight: bold;
+    -fx-font-weight: 700;
+    -fx-font-size: 12px;
+    -fx-text-fill: #e2e8f0;
+    -fx-background-color: rgba(15, 23, 42, 0.9);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-border-color: rgba(148, 163, 184, 0.14);
+    -fx-border-width: 1;
+    -fx-cursor: hand;
 }
-.candle-chart-toolbar-button .glyph {
-    -fx-padding: 5.0 10.0 5.0 10.0;
+
+.candle-chart-toolbar-button:hover {
+    -fx-background-color: rgba(30, 41, 59, 0.96);
+    -fx-border-color: rgba(125, 211, 252, 0.35);
 }
-.candle-chart-toolbar-button.active{
-    -fx-background-color: -fx-shadow-highlight-color,
-    -fx-outer-border, -fx-inner-border, #64B5F6;
+
+.candle-chart-toolbar-button:pressed {
+    -fx-background-color: rgba(15, 118, 110, 0.95);
 }
+
+.chart-surface {
+    -fx-background-color: linear-gradient(to bottom, rgba(7, 17, 29, 0.96), rgba(10, 27, 43, 0.98));
+    -fx-background-radius: 20;
+    -fx-border-radius: 20;
+    -fx-border-color: rgba(148, 163, 184, 0.16);
+    -fx-border-width: 1;
+}
+
+.chart-toolbar-panel {
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.35), 20, 0.12, 0, 6);
+}
+
+.chart-toolbar-divider {
+    -fx-padding: 2 4 2 4;
+}
+
+.chart-toolbar-divider .line {
+    -fx-border-color: rgba(148, 163, 184, 0.18);
+    -fx-border-width: 1 0 0 0;
+}
+
+.chart-canvas-shell {
+    -fx-background-color: linear-gradient(to bottom, rgba(6, 17, 29, 0.94), rgba(7, 20, 33, 0.98));
+    -fx-background-radius: 22;
+    -fx-border-radius: 22;
+    -fx-border-color: rgba(148, 163, 184, 0.16);
+    -fx-border-width: 1;
+}
+
+.chart-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-fit-to-width: false;
+    -fx-fit-to-height: false;
+}
+
+.chart-scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.chart-scroll-pane .corner {
+    -fx-background-color: transparent;
+}
+
+.chart-scroll-pane .scroll-bar:horizontal,
+.chart-scroll-pane .scroll-bar:vertical {
+    -fx-background-color: rgba(8, 18, 29, 0.92);
+    -fx-background-radius: 14;
+}
+
+.chart-scroll-pane .thumb {
+    -fx-background-color: rgba(148, 163, 184, 0.42);
+    -fx-background-radius: 14;
+}
+
+.chart-scroll-content {
+    -fx-background-color: transparent;
+}
+
+.chart-surface-empty {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 13px;
+    -fx-background-color: rgba(8, 18, 29, 0.88);
+    -fx-border-color: rgba(148, 163, 184, 0.18);
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-padding: 10 14 10 14;
+}
+
+.market-info-grid {
+    -fx-pref-wrap-length: 900;
+}
+
+.chart-metric-card {
+    -fx-background-color: rgba(8, 18, 29, 0.9);
+    -fx-background-radius: 18;
+    -fx-border-radius: 18;
+    -fx-border-color: rgba(148, 163, 184, 0.16);
+}
+
+.chart-metric-title {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-letter-spacing: 0.08em;
+}
+
+.chart-metric-value {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+}
+
+.chart-orderbook-panel {
+    -fx-background-color: transparent;
+}
+
+.chart-section-title {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+}
+
+.chart-toolbar-hint {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+.chart-orderbook-table {
+    -fx-background-color: rgba(8, 18, 29, 0.85);
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: rgba(148, 163, 184, 0.14);
+}
+
+.chart-orderbook-table .column-header-background {
+    -fx-background-color: rgba(15, 23, 42, 0.96);
+    -fx-background-radius: 16 16 0 0;
+}
+
+.chart-orderbook-table .column-header,
+.chart-orderbook-table .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: rgba(148, 163, 184, 0.1);
+}
+
+.chart-orderbook-table .label {
+    -fx-text-fill: #e2e8f0;
+}
+
+.chart-orderbook-table .table-row-cell {
+    -fx-background-color: rgba(8, 18, 29, 0.82);
+    -fx-text-fill: #e2e8f0;
+}
+
+.chart-orderbook-table .table-row-cell:filled:selected {
+    -fx-background-color: rgba(8, 145, 178, 0.3);
+}
+
 .candle-chart .axis {
-    -fx-background-color: BLACK;
-    -fx-tick-label-fill: rgb(204, 204, 197);
+    -fx-background-color: transparent;
+    -fx-tick-label-fill: #cbd5e1;
 }
-.candle-chart .axis:right, .candle-chart .axis:left {
+
+.candle-chart .axis:right,
+.candle-chart .axis:left {
     -fx-minor-tick-visible: false;
-}
-
-.default-color0.chart-series-area-line {
-    -fx-stroke: rgb(64, 175, 59);
-    -fx-stroke-width: 1;
-    -fx-stroke-color: rgb(64, 175, 59);
-}
-.default-color1.chart-series-area-line {
-    -fx-stroke: rgb(204, 20, 20);
-    -fx-stroke-width: 1;
-    -fx-stroke-color: rgb(204, 20, 20);
-}
-.default-color0.chart-series-area-fill {
-    -fx-fill: rgba(50, 137, 46, 0.8);
-    -fx-fill-opacity: 1;
-    -fx-fill-width: 1;
-    -fx-fill-color: rgb(50, 137, 46);
-}
-.default-color1.chart-series-area-fill {
-    -fx-fill: rgba(153, 15, 1, 0.8);
-    -fx-fill-opacity: 1;
-    -fx-fill-width: 1;
-    -fx-fill-color: rgb(153, 15, 1);
-}
-.chart-series-area-line {
-    -fx-stroke-width: 2px;
-    -fx-stroke-color: rgb(204, 20, 20);
-
 }

@@ -1,5 +1,6 @@
 package org.investpro.investpro.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
@@ -7,6 +8,7 @@ import lombok.*;
 @Setter
 @Getter
 @ToString
+@JsonIgnoreProperties(ignoreUnknown = true)
 @NoArgsConstructor
 public class Position {
 
@@ -26,6 +28,7 @@ public class Position {
     private double financing;
     private double dividendAdjustment;
     private double guaranteedExecutionFees;
+    @JsonAlias("trueUnrealizedPL")
     private double unrealizedPL;
 
     public double getProfitOrLoss() {
@@ -52,6 +55,7 @@ public class Position {
         private double financing;
         private double dividendAdjustment;
         private double guaranteedExecutionFees;
+        @JsonAlias("trueUnrealizedPL")
         private double unrealizedPL;
 
     }

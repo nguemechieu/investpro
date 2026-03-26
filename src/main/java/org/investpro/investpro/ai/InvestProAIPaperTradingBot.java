@@ -7,81 +7,89 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.grpc.Predict;
 import org.investpro.investpro.TelegramClient;
+import org.investpro.investpro.indicators.IndicatorCalculator;
 import org.investpro.investpro.model.CandleData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Getter
 @Setter
 public class InvestProAIPaperTradingBot {
 
-    private final InvestProAIPredictor aiClient = new InvestProAIPredictor("localhost", 50051);
+    private static final Logger logger = LoggerFactory.getLogger(InvestProAIPaperTradingBot.class);
+    private static final String DEFAULT_AI_HOST = System.getProperty("investpro.ai.host", "localhost");
+    private static final int DEFAULT_AI_PORT = Integer.getInteger("investpro.ai.port", 50051);
+
+    private final InvestProAIPredictor aiClient = new InvestProAIPredictor(DEFAULT_AI_HOST, DEFAULT_AI_PORT);
     private final List<Trade> openTrades = new ArrayList<>();
     private final List<Trade> closedTrades = new ArrayList<>();
-    private final double stopLossPercent = 0.005; // 0.5% Stop loss
-    private final double takeProfitPercent = 0.01; // 1% Take profit
-    private double accountBalance = 10_000.0; // Starting paper trading balance
-    private double riskPerTrade = 0.02; // Risk 2% per trade
-    private XYChart.Series<Number, Number> equityCurveSeries = new XYChart.Series<>();
+    private final double stopLossPercent = 0.005;
+    private final double takeProfitPercent = 0.01;
+    private final XYChart.Series<Number, Number> equityCurveSeries = new XYChart.Series<>();
+    private double accountBalance = 10_000.0;
+    private double riskPerTrade = 0.02;
     private int tradeCounter = 0;
-    private static final Logger logger = LoggerFactory.getLogger(InvestProAIPaperTradingBot.class);
 
     public InvestProAIPaperTradingBot(TelegramClient telegram, LineChart<Number, Number> equityCurveChart) {
-        this.equityCurveSeries.setName("Equity Curve");
-        equityCurveChart.getData().add(this.equityCurveSeries);
-        telegram.sendMessage(telegram.getChatId(), equityCurveSeries.toString());
+        equityCurveSeries.setName("Equity Curve");
+        if (equityCurveChart != null) {
+            equityCurveChart.getData().add(equityCurveSeries);
+        }
+        if (telegram != null && telegram.canSendMessages()) {
+            telegram.sendMessage(telegram.getChatId(), "AI paper trading bot started.");
+        }
     }
 
     public void onNewCandle(List<CandleData> recentCandles) {
         if (recentCandles.size() < 26) {
-            return; // Need at least 26 candles for features
+            return;
         }
 
-        InvestProAIPredictor predictor = new InvestProAIPredictor("localhost", 50051);
+        if (!aiClient.checkHealth()) {
+            logger.debug("Skipping paper-trading prediction because the predictor is unavailable.");
+            return;
+        }
 
-        List<Predict.MarketDataRequest> requests = new ArrayList<>();
-        CompletableFuture<List<Predict.PredictionResponse>> predictionResult = predictor.streamBatchPredict(requests);
-
-        predictionResult.thenAccept(responses -> {
-            for (Predict.PredictionResponse response : responses) {
-                System.out.println("Prediction: " + response.getPrediction() +
-                        ", Confidence: " + response.getConfidence());
-            }
-        }).exceptionally(ex -> {
-            System.err.println("Prediction stream failed: " + ex.getMessage());
-            return null;
-        });
-        double confidence;
-        String prediction;
+        Predict.MarketDataRequest request = buildRequest(recentCandles);
+        List<Predict.PredictionResponse> responses;
         try {
-            confidence = predictionResult.get().stream().toList().getFirst().getConfidence();
-            prediction = predictionResult.get().stream().toList().getFirst().getPrediction();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
+            responses = aiClient.streamBatchPredict(List.of(request)).get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("Paper-trading prediction interrupted.", e);
+            return;
+        } catch (ExecutionException | TimeoutException e) {
+            logger.warn("Paper-trading prediction failed.", e);
+            return;
         }
 
+        if (responses.isEmpty()) {
+            logger.debug("Skipping paper-trading decision because no AI prediction was returned.");
+            return;
+        }
 
-        if (confidence < 0.7) {
-
+        Predict.PredictionResponse prediction = responses.getFirst();
+        if (prediction.getConfidence() < 0.7) {
             logger.info("Only trade high confidence signals");
-            return; // 🔥 Only trade high confidence signals
+            return;
         }
 
         CandleData latestCandle = recentCandles.getLast();
-        double entryPrice = latestCandle.getClosePrice();//.doubleValue();
+        double entryPrice = latestCandle.getClosePrice();
         double tradeSize = (accountBalance * riskPerTrade) / (entryPrice * stopLossPercent);
 
-        if (prediction.equalsIgnoreCase("up")) {
+        if (prediction.getPrediction().equalsIgnoreCase("up")) {
             openTrades.add(new Trade("BUY", entryPrice, tradeSize));
-            logger.info("\uD83D\uDCC8 AI Bot BUY @{} (size: {})", entryPrice, tradeSize);
-        } else if (prediction.equalsIgnoreCase("down")) {
+            logger.info("AI Bot BUY @{} (size: {})", entryPrice, tradeSize);
+        } else if (prediction.getPrediction().equalsIgnoreCase("down")) {
             openTrades.add(new Trade("SELL", entryPrice, tradeSize));
-            logger.info("\uD83D\uDCC9 AI Bot SELL @{} (size: {})", entryPrice, tradeSize);
+            logger.info("AI Bot SELL @{} (size: {})", entryPrice, tradeSize);
         }
     }
 
@@ -89,7 +97,7 @@ public class InvestProAIPaperTradingBot {
         List<Trade> toClose = new ArrayList<>(openTrades);
 
         for (Trade trade : toClose) {
-            double closePrice = closingCandle.getClosePrice();//.doubleValue();
+            double closePrice = closingCandle.getClosePrice();
             double profit = 0;
             boolean shouldClose = false;
 
@@ -115,7 +123,7 @@ public class InvestProAIPaperTradingBot {
                 openTrades.remove(trade);
                 closedTrades.add(trade);
                 tradeCounter++;
-                System.out.println("💰 Closed " + trade.side + " @ " + closePrice + " | Profit: " + String.format("%.2f", profit));
+                logger.info("Closed {} @ {} | Profit: {}", trade.side, closePrice, String.format("%.2f", profit));
                 updateEquityCurve(tradeCounter, accountBalance);
             }
         }
@@ -134,6 +142,40 @@ public class InvestProAIPaperTradingBot {
         System.out.println("-------------------------------\n");
     }
 
+    private Predict.MarketDataRequest buildRequest(List<CandleData> recentCandles) {
+        List<CandleData> featureCandles = recentCandles.subList(recentCandles.size() - 20, recentCandles.size());
+        CandleData latestCandle = recentCandles.getLast();
+
+        return Predict.MarketDataRequest.newBuilder()
+                .setOpen(latestCandle.getOpenPrice())
+                .setHigh(latestCandle.getHighPrice())
+                .setLow(latestCandle.getLowPrice())
+                .setClose(latestCandle.getClosePrice())
+                .setVolume(latestCandle.getVolume())
+                .setAtr(calculateAtr(recentCandles, 14))
+                .setRsi(IndicatorCalculator.calculateRSI(recentCandles, 14))
+                .setBbUpper(IndicatorCalculator.calculateBollingerUpper(featureCandles, 20))
+                .setBbLower(IndicatorCalculator.calculateBollingerLower(featureCandles, 20))
+                .setStoch(IndicatorCalculator.calculateStochastic(recentCandles, 14))
+                .setMacd(IndicatorCalculator.calculateMACD(recentCandles))
+                .build();
+    }
+
+    private double calculateAtr(List<CandleData> candles, int period) {
+        if (candles.size() < period + 1) {
+            return 0;
+        }
+
+        double sum = 0;
+        for (int i = candles.size() - period; i < candles.size(); i++) {
+            double high = candles.get(i).getHighPrice();
+            double low = candles.get(i).getLowPrice();
+            double prevClose = candles.get(i - 1).getClosePrice();
+            sum += Math.max(high - low, Math.max(Math.abs(high - prevClose), Math.abs(low - prevClose)));
+        }
+        return sum / period;
+    }
+
     private static class Trade {
         String side;
         double entryPrice;
@@ -141,13 +183,13 @@ public class InvestProAIPaperTradingBot {
         double exitPrice;
         double profit;
 
-        public Trade(String side, double entryPrice, double tradeSize) {
+        Trade(String side, double entryPrice, double tradeSize) {
             this.side = side;
             this.entryPrice = entryPrice;
             this.tradeSize = tradeSize;
         }
 
-        public void close(double exitPrice, double profit) {
+        void close(double exitPrice, double profit) {
             this.exitPrice = exitPrice;
             this.profit = profit;
         }

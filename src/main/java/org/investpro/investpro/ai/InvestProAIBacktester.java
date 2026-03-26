@@ -4,6 +4,8 @@ import org.investpro.grpc.Predict;
 import org.investpro.investpro.indicators.IndicatorCalculator;
 import org.investpro.investpro.model.CandleData;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -11,12 +13,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-
-import static org.investpro.investpro.Exchange.logger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class InvestProAIBacktester {
 
-    private final InvestProAIPredictor aiClient = new InvestProAIPredictor("localhost", 50051);
+    private static final Logger logger = LoggerFactory.getLogger(InvestProAIBacktester.class);
+    private static final String DEFAULT_AI_HOST = System.getProperty("investpro.ai.host", "localhost");
+    private static final int DEFAULT_AI_PORT = Integer.getInteger("investpro.ai.port", 50051);
+
+    private final InvestProAIPredictor aiClient = new InvestProAIPredictor(DEFAULT_AI_HOST, DEFAULT_AI_PORT);
 
     private int totalTrades = 0;
     private int wins = 0;
@@ -24,8 +30,15 @@ public class InvestProAIBacktester {
     private double cumulativeProfit = 0.0;
 
     public void runBacktest(@NotNull List<CandleData> candles) {
+        resetStats();
+
         if (candles.size() < 21) {
             logger.info("Not enough candles to backtest.");
+            return;
+        }
+
+        if (!aiClient.checkHealth()) {
+            logger.warn("Skipping AI backtest because the predictor is unavailable.");
             return;
         }
 
@@ -59,15 +72,23 @@ public class InvestProAIBacktester {
                 requestList.add(request);
 
                 CompletableFuture<List<Predict.PredictionResponse>> prediction = aiClient.streamBatchPredict(requestList);
+                List<Predict.PredictionResponse> predictionResponses = prediction.get(5, TimeUnit.SECONDS);
+                if (predictionResponses.isEmpty()) {
+                    logger.debug("Skipping backtest trade {} because no AI prediction was returned.", i - 19);
+                    continue;
+                }
 
                 CandleData exitCandle = candles.get(i + 1);
-                simulateTrade(prediction.get().toString(), latest, exitCandle, csvWriter);
+                simulateTrade(predictionResponses.getFirst().getPrediction(), latest, exitCandle, csvWriter);
             }
 
         } catch (IOException e) {
             logger.error("Failed to write CSV: {}", e.getMessage(), e);
-        } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("AI backtest interrupted.", e);
+        } catch (ExecutionException | TimeoutException e) {
+            logger.error("AI backtest failed while waiting for predictions.", e);
         }
 
         printReport();
@@ -93,10 +114,10 @@ public class InvestProAIBacktester {
 
         String result = correct ? "WIN" : "LOSS";
 
-        logger.info(String.format("Trade #%d: Prediction=%s | Entry=%.5f | Exit=%.5f | PnL=%.5f | Result=%s",
-                totalTrades, prediction, entry.getClosePrice(), exit.getClosePrice(), pnl, result));
+        logger.info("Trade #{}: Prediction={} | Entry={} | Exit={} | PnL={} | Result={}",
+                totalTrades, prediction, entry.getClosePrice(), exit.getClosePrice(), pnl, result);
 
-        csvWriter.append(String.format("%d,%s,%.5f,%.5f,%.5f,%s\n",
+        csvWriter.append(String.format("%d,%s,%.5f,%.5f,%.5f,%s%n",
                 totalTrades, prediction, entry.getClosePrice(), exit.getClosePrice(), pnl, result));
     }
 
@@ -107,9 +128,9 @@ public class InvestProAIBacktester {
         System.out.println("Losses: " + losses);
 
         double winRate = (totalTrades == 0) ? 0 : (wins * 100.0) / totalTrades;
-        logger.info(String.format("Win Rate: %.2f%%", winRate));
-        logger.info(String.format("Cumulative Profit: %.2f", cumulativeProfit));
-        logger.info("--------------------------\n");
+        logger.info("Win Rate: {}%", String.format("%.2f", winRate));
+        logger.info("Cumulative Profit: {}", String.format("%.2f", cumulativeProfit));
+        logger.info("--------------------------");
     }
 
     private double calculateATR(@NotNull List<CandleData> candles, int period) {
@@ -122,5 +143,12 @@ public class InvestProAIBacktester {
             sum += Math.max(high - low, Math.max(Math.abs(high - prevClose), Math.abs(low - prevClose)));
         }
         return sum / period;
+    }
+
+    private void resetStats() {
+        totalTrades = 0;
+        wins = 0;
+        losses = 0;
+        cumulativeProfit = 0.0;
     }
 }

@@ -7,6 +7,7 @@ import javafx.scene.layout.Region;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
+import org.investpro.investpro.FxLifecycle;
 import org.investpro.investpro.model.Order;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Getter
 @Setter
@@ -29,6 +31,7 @@ public class OrdersUI extends Region {
     private ListView<Order> orderListView = new ListView<>();
     private ScrollPane orderScrollPane = createScrollPane();
     private ScheduledExecutorService scheduler;
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public OrdersUI(@NotNull Exchange exchange) {
         this.exchange = exchange;
@@ -37,6 +40,11 @@ public class OrdersUI extends Region {
 
         setupUI();
         startUpdating();
+        sceneProperty().addListener((_, _, newScene) -> {
+            if (newScene == null) {
+                shutdown();
+            }
+        });
     }
 
     /**
@@ -65,6 +73,9 @@ public class OrdersUI extends Region {
      */
     private void startUpdating() {
         scheduler.scheduleAtFixedRate(() -> {
+            if (disposed.get() || !FxLifecycle.isShowing(this)) {
+                return;
+            }
             try {
                 List<Order> newOrders = exchange.getOrders();
                 synchronized (orderList) {
@@ -72,14 +83,14 @@ public class OrdersUI extends Region {
                     orderList.addAll(newOrders);
                 }
 
-                Platform.runLater(() -> {
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this), () -> {
                     synchronized (orderList) {
                         updateOrderListView();
                     }
                 });
 
             } catch (IOException | SQLException | NoSuchAlgorithmException | InvalidKeyException | ExecutionException |
-                     InterruptedException | ClassNotFoundException e) {
+                     InterruptedException | ClassNotFoundException | RuntimeException e) {
                 logger.error("Error fetching orders", e);
             }
         }, 5, 10, TimeUnit.SECONDS);
@@ -91,5 +102,12 @@ public class OrdersUI extends Region {
     private void updateOrderListView() {
         orderListView.getItems().clear();
         orderListView.getItems().addAll(orderList);
+    }
+
+    public void shutdown() {
+        if (!disposed.compareAndSet(false, true)) {
+            return;
+        }
+        scheduler.shutdownNow();
     }
 }

@@ -4,12 +4,15 @@ import org.investpro.grpc.Predict;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.Side;
+import org.investpro.investpro.TelegramClient;
 import org.investpro.investpro.indicators.IndicatorCalculator;
 import org.investpro.investpro.model.Account;
 import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
 import org.investpro.investpro.ui.chart.CandleStickChart;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -20,11 +23,16 @@ import static org.investpro.investpro.Side.BUY;
 import static org.investpro.investpro.Side.SELL;
 
 public class InvestProAIAutotrader {
+    private static final Logger logger = LoggerFactory.getLogger(InvestProAIAutotrader.class);
+    private static final String DEFAULT_PREDICTOR_HOST = System.getProperty("investpro.ai.host", "localhost");
+    private static final int DEFAULT_PREDICTOR_PORT = Integer.getInteger("investpro.ai.port", 50051);
+    private static final int MIN_CANDLES_FOR_SIGNALS = 20;
 
     private final CandleStickChart chart;
     private final double maxRiskRatio = 2.0;
+    private final InvestProAIPredictor predictor;
+    private final TelegramClient telegram;
     double confidenceThreshold = 0.7;
-    InvestProAIPredictor predictor;
     double equity;
     double riskPercentage = 0.01;
     double balance;
@@ -36,19 +44,27 @@ public class InvestProAIAutotrader {
 
     public InvestProAIAutotrader(CandleStickChart chart) {
         this.chart = chart;
-        this.predictor = new InvestProAIPredictor("localhost", 50051);
+        this.telegram = chart.getTelegram();
+        this.predictor = new InvestProAIPredictor(DEFAULT_PREDICTOR_HOST, DEFAULT_PREDICTOR_PORT);
     }
+
     public void onNewCandle(CandleData latestCandle) {
+        if (latestCandle == null) {
+            return;
+        }
+
         try {
             List<CandleData> candles = chart.getCandleData();
-            if (candles == null || candles.isEmpty()) return;
+            if (candles == null || candles.size() < MIN_CANDLES_FOR_SIGNALS) {
+                return;
+            }
 
             updateAccountBalance();
+            if (!predictor.checkHealth()) {
+                logger.debug("Skipping AI prediction because the predictor is unavailable.");
+                return;
+            }
 
-            InvestProAIPredictor investProAIPredictor = new InvestProAIPredictor("localhost", 50051);
-            investProAIPredictor.checkHealth();
-
-            // Extract indicators
             double atr = calculateATR(candles, 14);
             double bbLower = IndicatorCalculator.calculateBollingerLower(candles, 20);
             double bbUpper = IndicatorCalculator.calculateBollingerUpper(candles, 20);
@@ -73,76 +89,67 @@ public class InvestProAIAutotrader {
             List<Predict.MarketDataRequest> requestList = new ArrayList<>();
             requestList.add(marketDataRequest);
 
-            CompletableFuture<List<Predict.PredictionResponse>> future = investProAIPredictor.streamBatchPredict(requestList);
-
+            CompletableFuture<List<Predict.PredictionResponse>> future = predictor.streamBatchPredict(requestList);
             future.thenAccept(responses -> {
-                if (!responses.isEmpty()) {
-                    Predict.PredictionResponse prediction = responses.get(0);
-                    double confidence = prediction.getConfidence();
-                    String direction = prediction.getPrediction();
+                if (responses.isEmpty()) {
+                    logger.debug("AI predictor returned no responses.");
+                    return;
+                }
 
-                    if (confidence >= confidenceThreshold) {
-                        try {
-                            if ("up".equalsIgnoreCase(direction)) {
-                                executeOrder(BUY, latestCandle, candles);
-                            } else if ("down".equalsIgnoreCase(direction)) {
-                                executeOrder(SELL, latestCandle, candles);
-                            }
-                        } catch (Exception e) {
-                            chart.getTelegram().sendMessage(chart.getTelegram().getChatId(),
-                                    "❌ Order execution failed: " + e.getMessage());
+                Predict.PredictionResponse prediction = responses.get(0);
+                double confidence = prediction.getConfidence();
+                String direction = prediction.getPrediction();
+
+                if (confidence >= confidenceThreshold) {
+                    try {
+                        if ("up".equalsIgnoreCase(direction)) {
+                            executeOrder(BUY, latestCandle, candles);
+                        } else if ("down".equalsIgnoreCase(direction)) {
+                            executeOrder(SELL, latestCandle, candles);
                         }
-                    } else {
-                        String message = "ℹ️ Confidence (" + confidence + ") too low. No trade.";
-                        chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), message);
+                    } catch (Exception ex) {
+                        notifyTelegram("Order execution failed: " + ex.getMessage());
+                        logger.error("Order execution failed: {}", ex.getMessage(), ex);
                     }
                 } else {
-                    chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), "⚠️ No prediction received.");
+                    logger.debug("Skipping trade because prediction confidence {} is below threshold {}.",
+                            confidence,
+                            confidenceThreshold);
                 }
 
                 closeOpenOrders();
-
-            }).exceptionally(e -> {
-                chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), "❗ Prediction error: " + e.getMessage());
+            }).exceptionally(ex -> {
+                logger.warn("AI prediction failed: {}", ex.getMessage());
                 return null;
             });
-
-
-        } catch (Exception e) {
-            chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), "❗ Error: " + e.getMessage());
-            throw new RuntimeException(e);
+        } catch (Exception ex) {
+            logger.error("AI autotrader failed while processing a new candle: {}", ex.getMessage(), ex);
         }
     }
-
 
     private void updateAccountBalance() {
         try {
             List<Account> accounts = chart.getExchange().getAccounts();
             if (!accounts.isEmpty()) {
                 Account account = accounts.getFirst();
-                this.accountBalance = account.getBalance();
-                this.equity = account.getEquity();
-                this.balance = account.getBalance();
-                this.profit = account.getProfitability();
-                this.profitOrLoss = account.getPl();
-                this.availableBalance = account.getAvailableBalance();
-
-                chart.getTelegram().sendMessage(chart.getTelegram().getChatId(),
-                        "💰 Account Updated:\nBalance: $" + balance +
-                                "\nEquity: $" + equity +
-                                "\nAvailable: $" + availableBalance +
-                                "\nP/L: $" + profitOrLoss +
-                                "\nProfitability: " + profit + "%");
+                accountBalance = account.getBalance();
+                equity = account.getEquity();
+                balance = account.getBalance();
+                profit = account.getProfitability();
+                profitOrLoss = account.getPl();
+                availableBalance = account.getAvailableBalance();
             }
-        } catch (Exception e) {
-            chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), "⚠️ Balance fetch failed: " + e.getMessage());
+        } catch (Exception ex) {
+            logger.warn("Balance fetch failed: {}", ex.getMessage());
         }
     }
 
     private double calculateATR(@NotNull List<CandleData> candles, int period) {
-        if (candles.size() < period + 1) return 0;
-        double sum = 0;
+        if (candles.size() < period + 1) {
+            return 0;
+        }
 
+        double sum = 0;
         for (int i = candles.size() - period; i < candles.size(); i++) {
             double high = candles.get(i).getHighPrice();
             double low = candles.get(i).getLowPrice();
@@ -161,9 +168,8 @@ public class InvestProAIAutotrader {
     private boolean validateRiskReward(double tp, double sl) {
         double rrRatio = tp / sl;
         if (rrRatio < 1 || rrRatio > maxRiskRatio) {
-            String msg = "❗ Invalid Risk/Reward Ratio: " + rrRatio + ". Trade skipped.";
-            //   Platform.runLater(() -> new Alert(Alert.AlertType.WARNING, msg).show());
-            chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), msg);
+            String msg = "Invalid risk/reward ratio: " + rrRatio + ". Trade skipped.";
+            notifyTelegram(msg);
             return false;
         }
         return true;
@@ -179,11 +185,13 @@ public class InvestProAIAutotrader {
         double pipValue = 10.0;
         double lotSize = calculateLotSize(sl, pipValue);
 
-        if (!validateRiskReward(tp, sl)) return;
+        if (!validateRiskReward(tp, sl)) {
+            return;
+        }
 
         String direction = side == BUY ? "BUY" : "SELL";
-        String message = "✅ [AI TRADE] " + direction + " @ " + entryPrice + " | Lot: " + lotSize;
-        chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), message);
+        String message = "[AI TRADE] " + direction + " @ " + entryPrice + " | Lot: " + lotSize;
+        notifyTelegram(message);
 
         exchange.createOrder(pair, side, ENUM_ORDER_TYPE.STOP, entryPrice, lotSize, new Date(), sl, tp);
     }
@@ -195,16 +203,20 @@ public class InvestProAIAutotrader {
                 if (rr > maxRiskRatio || rr < 1) {
                     try {
                         chart.getExchange().cancelOrder(order.getLastTransactionID());
-                        chart.getTelegram().sendMessage(chart.getTelegram().getChatId(),
-                                "❌ Order Closed - R/R Ratio out of bounds: " + rr);
-                    } catch (Exception e) {
-                        chart.getTelegram().sendMessage(chart.getTelegram().getChatId(),
-                                "⚠️ Failed to close order: " + e.getMessage());
+                        notifyTelegram("Order closed because the risk/reward ratio moved out of bounds: " + rr);
+                    } catch (Exception ex) {
+                        notifyTelegram("Failed to close order: " + ex.getMessage());
                     }
                 }
             });
-        } catch (Exception e) {
-            chart.getTelegram().sendMessage(chart.getTelegram().getChatId(), "⚠️ Order check failed: " + e.getMessage());
+        } catch (Exception ex) {
+            notifyTelegram("Order check failed: " + ex.getMessage());
+        }
+    }
+
+    private void notifyTelegram(String message) {
+        if (telegram != null) {
+            telegram.sendMessage(telegram.getChatId(), message);
         }
     }
 }

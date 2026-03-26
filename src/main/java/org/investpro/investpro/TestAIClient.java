@@ -7,13 +7,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class TestAIClient {
 
     public static void main(String[] args) {
-        InvestProAIPredictor client = new InvestProAIPredictor("localhost", 50051);
+        String host = System.getProperty("investpro.ai.host", "localhost");
+        int port = Integer.getInteger("investpro.ai.port", 50051);
+        InvestProAIPredictor client = new InvestProAIPredictor(host, port);
 
-        // Create a sample MarketDataRequest with real values
         Predict.MarketDataRequest request = Predict.MarketDataRequest.newBuilder()
                 .setOpen(29500.0)
                 .setClose(29350.0)
@@ -31,21 +34,30 @@ public class TestAIClient {
         List<Predict.MarketDataRequest> featureList = new ArrayList<>();
         featureList.add(request);
 
+        if (!client.checkHealth()) {
+            System.out.printf("AI predictor is unavailable at %s:%d.%n", host, port);
+            client.shutdown();
+            return;
+        }
+
         CompletableFuture<List<Predict.PredictionResponse>> predictionResult = client.streamBatchPredict(featureList);
 
         try {
-            List<Predict.PredictionResponse> results = predictionResult.get();
+            List<Predict.PredictionResponse> results = predictionResult.get(5, TimeUnit.SECONDS);
             if (!results.isEmpty()) {
                 Predict.PredictionResponse last = results.getLast();
-                System.out.println("✅ Prediction: " + last.getPrediction());
-                System.out.println("🎯 Confidence: " + last.getConfidence());
+                System.out.println("Prediction: " + last.getPrediction());
+                System.out.println("Confidence: " + last.getConfidence());
             } else {
-                System.out.println("⚠️ No predictions returned.");
+                System.out.println("No predictions returned.");
             }
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            e.printStackTrace();
+        } catch (ExecutionException | TimeoutException e) {
             e.printStackTrace();
         } finally {
-            client.shutdown(); // Clean up gRPC channel
+            client.shutdown();
         }
     }
 }

@@ -1,10 +1,10 @@
 package org.investpro.investpro.ai;
 
-
 import org.investpro.investpro.SIGNAL;
-
 import org.investpro.investpro.model.CandleData;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import weka.classifiers.Classifier;
 import weka.classifiers.trees.J48;
 import weka.core.Attribute;
@@ -17,35 +17,29 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 public class TradingAI {
 
-    private static final Logger logger = Logger.getLogger(TradingAI.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(TradingAI.class);
     private final Classifier model;
     private final Instances trainingData;
     private final List<Attribute> attributes;
     double currentPrice;
 
-
     public TradingAI(@NotNull Instances trainingData) {
         this.trainingData = trainingData;
         this.attributes = createAttributes();
-        this.model = new J48();  // Decision Tree Classifier
+        this.model = new J48();
 
         try {
             logger.info("Training AI with provided data...");
-            model.buildClassifier(trainingData);  // Train using training data
+            model.buildClassifier(trainingData);
             saveTrainingData(trainingData);
-
         } catch (Exception e) {
-            logger.severe("❌ Error building classifier: " + e.getMessage());
+            logger.error("Error building classifier: {}", e.getMessage(), e);
         }
     }
 
-    /**
-     * Generate a trading signal using the trained classifier.
-     */
     public SIGNAL getSignal(double open, double high, double low, double close, double volume) {
         try {
             Instance instance = createInstance(open, high, low, close, volume);
@@ -57,16 +51,15 @@ public class TradingAI {
                 default -> SIGNAL.HOLD;
             };
         } catch (Exception e) {
-            logger.severe("❌ Prediction error: " + e.getMessage());
+            logger.error("Prediction error: {}", e.getMessage(), e);
         }
         return SIGNAL.HOLD;
     }
 
-    /**
-     * Generate a trading signal based on moving averages.
-     */
     public SIGNAL getMovingAverageSignal(List<CandleData> prices, double currentPrice) {
-        if (prices.isEmpty()) return SIGNAL.HOLD;
+        if (prices.isEmpty()) {
+            return SIGNAL.HOLD;
+        }
 
         double shortTermMA = calculateMovingAverage(prices, 20);
         double longTermMA = calculateMovingAverage(prices, 50);
@@ -83,9 +76,6 @@ public class TradingAI {
         }
     }
 
-    /**
-     * Calculate Moving Average.
-     */
     private double calculateMovingAverage(List<CandleData> prices, int period) {
         return prices.subList(Math.max(0, prices.size() - period), prices.size())
                 .stream()
@@ -94,35 +84,22 @@ public class TradingAI {
                 .orElse(0.0);
     }
 
-    /**
-     * Calculate Support Level (Lowest price in recent period).
-     */
     private double calculateSupport(@NotNull List<CandleData> prices) {
         return prices.subList(Math.max(0, prices.size() - 20), prices.size())
                 .stream()
                 .mapToDouble(CandleData::getLowPrice)
                 .min()
                 .orElse(Double.MAX_VALUE);
-
     }
 
-    /**
-     * Calculate Resistance Level (Highest price in recent period).
-     */
     private double calculateResistance(List<CandleData> prices) {
-        return
-                prices.subList(Math.max(0, prices.size() - 20), prices.size())
-                        .stream()
-                        .mapToDouble(
-                                CandleData::getHighPrice
-                        )
-                        .max()
-                        .orElse(Double.MIN_VALUE);
+        return prices.subList(Math.max(0, prices.size() - 20), prices.size())
+                .stream()
+                .mapToDouble(CandleData::getHighPrice)
+                .max()
+                .orElse(Double.MIN_VALUE);
     }
 
-    /**
-     * Create an instance for prediction based on trained data.
-     */
     private @NotNull Instance createInstance(double open, double high, double low, double close, double volume) {
         Instance instance = new DenseInstance(attributes.size());
         instance.setDataset(trainingData);
@@ -131,13 +108,10 @@ public class TradingAI {
         instance.setValue(attributes.get(2), low);
         instance.setValue(attributes.get(3), close);
         instance.setValue(attributes.get(4), volume);
-        instance.setMissing(attributes.get(5)); // Class attribute for prediction
+        instance.setMissing(attributes.get(5));
         return instance;
     }
 
-    /**
-     * Define trading attributes (OHLCV + class labels).
-     */
     private @NotNull List<Attribute> createAttributes() {
         List<Attribute> attributes = new ArrayList<>();
         attributes.add(new Attribute("open"));
@@ -146,46 +120,37 @@ public class TradingAI {
         attributes.add(new Attribute("close"));
         attributes.add(new Attribute("volume"));
 
-        // Class Attribute (BUY, SELL, HOLD)
         ArrayList<String> classValues = new ArrayList<>();
-        classValues.add("HOLD");  // 0
-        classValues.add("BUY");   // 1
-        classValues.add("SELL");  // 2
+        classValues.add("HOLD");
+        classValues.add("BUY");
+        classValues.add("SELL");
         attributes.add(new Attribute("class", classValues));
 
         return attributes;
     }
 
-    /**
-     * Save training data to a file.
-     */
     private void saveTrainingData(@NotNull Instances data) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("trainingData.arff"))) {
             writer.write(data.toString());
-            logger.info("✅ Training data saved successfully.");
+            logger.info("Training data saved successfully.");
         } catch (IOException e) {
-            logger.severe("❌ Error saving training data: " + e.getMessage());
+            logger.error("Error saving training data: {}", e.getMessage(), e);
         }
     }
 
     public void trainModel() {
         try {
-            logger.info("🔄 Training AI model...");
+            logger.info("Training AI model...");
 
-            // Ensure training data is not empty
             if (trainingData.numInstances() == 0) {
-                logger.warning("⚠ No training data available. Cannot train model.");
+                logger.warn("No training data available. Cannot train model.");
                 return;
             }
 
-
-            // Save training data
             saveTrainingData(trainingData);
-
-            logger.info("✅ Model training completed successfully!");
-
+            logger.info("Model training completed successfully.");
         } catch (Exception e) {
-            logger.severe("❌ Error training model: " + e.getMessage());
+            logger.error("Error training model: {}", e.getMessage(), e);
         }
     }
 
@@ -196,7 +161,6 @@ public class TradingAI {
         double low = prices1.stream().mapToDouble(CandleData::getLowPrice).min().orElse(0.0);
         double close = prices1.getLast().getClosePrice();
         double volume = prices1.getLast().getVolume();
-
 
         return tradeStrategy.getSignal(open, high, low, close, volume, prices1);
     }

@@ -1,6 +1,8 @@
 package org.investpro.investpro.model;
 
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,10 +17,12 @@ import java.util.Objects;
 @Getter
 @Setter
 @Entity
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Table(name = "orders")
 public class Order {
 
     @Column(name = "symbol", nullable = false)
+    @JsonAlias("instrument")
     String symbol;
     @Column(name = "is_working", nullable = false)
     boolean isWorking;
@@ -26,6 +30,7 @@ public class Order {
     String lastTransactionID;  // Not mapped to database
     @Transient
     Order[] orders;  // Not mapped to database
+    @JsonAlias("id")
     long orderId;
     long time;
     @Column(name = "side", nullable = false)
@@ -33,13 +38,15 @@ public class Order {
     Side side;
     @Column(name = "order_type", nullable = false)
     @Enumerated(EnumType.STRING)
+    @JsonAlias("type")
     ENUM_ORDER_TYPE orderType;
     @Column(name = "price", nullable = false)
     double price;
     @Column(name = "size", nullable = false)
+    @JsonAlias({"units", "currentUnits", "origQty", "executedQty"})
     double size;
     @Column(name = "timestamp", nullable = false)
-
+    @JsonAlias({"createTime", "time"})
     Date timestamp;
     @Column(name = "stop_loss")
     double stopLoss;
@@ -47,6 +54,7 @@ public class Order {
     double takeProfit;
     @Column(name = "order_status", nullable = false)
     @Enumerated(EnumType.STRING)
+    @JsonAlias({"state", "status"})
     ENUM_ORDER_STATUS orderStatus;
     @Id
 
@@ -141,7 +149,11 @@ public class Order {
 
     // Additional Methods
     public boolean isOrderActive() {
-        return orderStatus == ENUM_ORDER_STATUS.NEW || orderStatus == ENUM_ORDER_STATUS.PARTIALLY_FILLED;
+        return orderStatus == ENUM_ORDER_STATUS.NEW
+                || orderStatus == ENUM_ORDER_STATUS.OPEN
+                || orderStatus == ENUM_ORDER_STATUS.PENDING
+                || orderStatus == ENUM_ORDER_STATUS.IN_PROGRESS
+                || orderStatus == ENUM_ORDER_STATUS.PARTIALLY_FILLED;
     }
 
     public void fulfillOrder() {

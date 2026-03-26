@@ -68,7 +68,7 @@ public class Currency implements Comparable<java.util.Currency> {
         this.fractionalDigits = Math.max(0, fractionalDigits);
         this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.image = image;
-        logger.info(Currency.class.getName());
+        logger.debug("Registered currency template for {}", code);
     }
 
     public static void save(Currency currency) {
@@ -92,14 +92,14 @@ public class Currency implements Comparable<java.util.Currency> {
             if (!baseCurrencyCode.equals("XXX") && currency.getCurrencyCode().equals(baseCurrencyCode)) {
                 Currency cur = new Currency("FIAT", baseCurrencyCode, baseCurrencyCode, baseCurrencyCode, 4, baseCurrencyCode, baseCurrencyCode);
 
-                CURRENCIES.put(cur.currencyType, cur);
+                CURRENCIES.put(cur.code, cur);
 
             }
         }
 
         Currency cur = new Currency("FIAT", baseCurrencyCode, baseCurrencyCode, baseCurrencyCode, 4, baseCurrencyCode, baseCurrencyCode);
 
-        CURRENCIES.put(cur.currencyType, cur);
+        CURRENCIES.put(cur.code, cur);
         return cur;
 
 

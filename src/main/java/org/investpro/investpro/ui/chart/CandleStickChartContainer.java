@@ -1,11 +1,11 @@
 package org.investpro.investpro.ui.chart;
 
-import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
-import javafx.scene.layout.AnchorPane;
+import javafx.scene.Node;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.util.Duration;
+import javafx.scene.shape.Rectangle;
 import org.investpro.investpro.*;
 import org.investpro.investpro.model.TradePair;
 import org.investpro.investpro.ui.CandleStickChartToolbar;
@@ -22,10 +22,13 @@ import java.util.Objects;
 public class CandleStickChartContainer extends Region {
     private final VBox candleChartContainer;
     private final CandleStickChartToolbar toolbar;
+    private final ChartWorkspacePane workspacePane;
     private final Exchange exchange;
     private final TradePair tradePair;
+    private final String tokens;
     private final SimpleIntegerProperty secondsPerCandle;
     private ChartLayout chartLayout;
+    private final VBox root;
 
     public CandleStickChartContainer(Exchange exchange, TradePair tradePair, String tokens) {
         Objects.requireNonNull(exchange, "exchange must not be null");
@@ -33,35 +36,47 @@ public class CandleStickChartContainer extends Region {
 
         this.exchange = exchange;
         this.tradePair = tradePair;
+        this.tokens = tokens;
         this.secondsPerCandle = new SimpleIntegerProperty(3600);
 
         getStyleClass().add("candle-chart-container");
+        getStylesheets().add(Objects.requireNonNull(
+                CandleStickChartContainer.class.getResource("/css/chart.css")
+        ).toExternalForm());
         setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         CandleDataSupplier candleDataSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
         toolbar = new CandleStickChartToolbar(widthProperty(), heightProperty(), candleDataSupplier.getSupportedGranularity());
 
-        VBox toolbarContainer = new VBox(toolbar);
-        toolbarContainer.setPrefWidth(Double.MAX_VALUE);
-        toolbarContainer.setPrefHeight(50);
-        toolbarContainer.prefWidthProperty().bind(prefWidthProperty());
-        AnchorPane.setTopAnchor(toolbarContainer, 10.0);
-        AnchorPane.setLeftAnchor(toolbarContainer, 82.0);
-        AnchorPane.setRightAnchor(toolbarContainer, 0.0);
-
         candleChartContainer = new VBox();
-        candleChartContainer.setPrefSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        AnchorPane.setTopAnchor(candleChartContainer, 46.0);
-        AnchorPane.setLeftAnchor(candleChartContainer, 15.0);
-        AnchorPane.setRightAnchor(candleChartContainer, 15.0);
-        AnchorPane.setBottomAnchor(candleChartContainer, 0.0);
+        candleChartContainer.getStyleClass().add("chart-stage");
+        candleChartContainer.setFillWidth(true);
+        candleChartContainer.setMinHeight(0);
+        candleChartContainer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(candleChartContainer, Priority.ALWAYS);
 
-        AnchorPane containerRoot = new AnchorPane(toolbarContainer, candleChartContainer);
-        containerRoot.prefHeightProperty().bind(prefHeightProperty());
-        containerRoot.prefWidthProperty().bind(prefWidthProperty());
-        getChildren().setAll(containerRoot);
+        Rectangle chartClip = new Rectangle();
+        chartClip.widthProperty().bind(candleChartContainer.widthProperty());
+        chartClip.heightProperty().bind(candleChartContainer.heightProperty());
+        candleChartContainer.setClip(chartClip);
+
+        workspacePane = new ChartWorkspacePane(exchange, tradePair, toolbar, candleChartContainer);
+        workspacePane.setMinSize(0, 0);
+        VBox.setVgrow(workspacePane, Priority.ALWAYS);
+
+        root = new VBox(workspacePane);
+        root.getStyleClass().add("chart-shell");
+        root.setFillWidth(true);
+        root.setMinSize(0, 0);
+        root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        root.prefHeightProperty().bind(prefHeightProperty());
+        root.prefWidthProperty().bind(prefWidthProperty());
+        VBox.setVgrow(candleChartContainer, Priority.ALWAYS);
+        getChildren().setAll(root);
 
         chartLayout = createNewChart(secondsPerCandle.get());
+        chartLayout.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(chartLayout, Priority.ALWAYS);
         candleChartContainer.getChildren().add(chartLayout);
         toolbar.registerEventHandlers(chartLayout.getChart(), secondsPerCandle);
         toolbar.setChartOptions(chartLayout.getChart().getChartOptions());
@@ -70,6 +85,8 @@ public class CandleStickChartContainer extends Region {
         secondsPerCandle.addListener((obs, oldVal, newVal) -> {
             if (!oldVal.equals(newVal)) {
                 ChartLayout newChart = createNewChart(newVal.intValue());
+                newChart.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+                VBox.setVgrow(newChart, Priority.ALWAYS);
                 toolbar.registerEventHandlers(newChart.getChart(), secondsPerCandle);
                 toolbar.setChartOptions(newChart.getChart().getChartOptions());
                 toolbar.setActiveToolbarButton(secondsPerCandle);
@@ -78,6 +95,12 @@ public class CandleStickChartContainer extends Region {
         });
 
         secondsPerCandle.set(3600);
+
+        sceneProperty().addListener((_, _, newScene) -> {
+            if (newScene == null) {
+                shutdown();
+            }
+        });
     }
 
 
@@ -87,8 +110,16 @@ public class CandleStickChartContainer extends Region {
         }
 
         try {
-            String tokens = "2032573404:AAGnxJpNMJBKqLzvE5q4kGt1cCGF632bP7A";
-            return new ChartLayout(exchange, tradePair, exchange.getCandleDataSupplier(secondsPerCandle, tradePair), true, secondsPerCandle, widthProperty(), heightProperty(), tokens);
+            return new ChartLayout(
+                    exchange,
+                    tradePair,
+                    exchange.getCandleDataSupplier(secondsPerCandle, tradePair),
+                    true,
+                    secondsPerCandle,
+                    candleChartContainer.widthProperty(),
+                    candleChartContainer.heightProperty(),
+                    tokens
+            );
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -97,26 +128,16 @@ public class CandleStickChartContainer extends Region {
     private void animateInNewChart(ChartLayout newChart) {
         Objects.requireNonNull(newChart, "newChart must not be null");
 
-        if (chartLayout != null) {
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(500), chartLayout);
-            fadeOut.setFromValue(1.0);
-            fadeOut.setToValue(0.0);
-            fadeOut.setOnFinished(event -> {
-                chartLayout = newChart;
-                candleChartContainer.getChildren().setAll(newChart);
-                FadeTransition fadeIn = new FadeTransition(Duration.millis(500), chartLayout);
-                fadeIn.setFromValue(0.0);
-                fadeIn.setToValue(1.0);
-                fadeIn.play();
-            });
-            fadeOut.play();
-        } else {
-            chartLayout = newChart;
-            candleChartContainer.getChildren().setAll(newChart);
-            FadeTransition fadeIn = new FadeTransition(Duration.millis(500), chartLayout);
-            fadeIn.setFromValue(0.0);
-            fadeIn.setToValue(1.0);
-            fadeIn.play();
+        ChartLayout oldChart = chartLayout;
+        chartLayout = newChart;
+        chartLayout.setOpacity(1.0);
+        candleChartContainer.getChildren().setAll(newChart);
+        workspacePane.setCandlestickContent(candleChartContainer);
+
+        if (oldChart != null) {
+            oldChart.setVisible(false);
+            oldChart.setManaged(false);
+            oldChart.shutdown();
         }
     }
 
@@ -128,5 +149,92 @@ public class CandleStickChartContainer extends Region {
     @Override
     protected double computeMinHeight(double width) {
         return 350;
+    }
+
+    @Override
+    protected void layoutChildren() {
+        root.resizeRelocate(0, 0, getWidth(), getHeight());
+    }
+
+    @Override
+    protected double computePrefWidth(double height) {
+        return root.prefWidth(height);
+    }
+
+    @Override
+    protected double computePrefHeight(double width) {
+        return root.prefHeight(width);
+    }
+
+    public CandleStickChart getChart() {
+        return chartLayout.getChart();
+    }
+
+    public TradePair getTradePair() {
+        return tradePair;
+    }
+
+    public int getSecondsPerCandle() {
+        return secondsPerCandle.get();
+    }
+
+    public void setSecondsPerCandle(int seconds) {
+        if (seconds > 0 && secondsPerCandle.get() != seconds) {
+            secondsPerCandle.set(seconds);
+        }
+    }
+
+    public CandleStickChartOptions getChartOptions() {
+        return getChart().getChartOptions();
+    }
+
+    public Node createChartOptionsPane() {
+        return getChartOptions().createMirroredOptionsPane();
+    }
+
+    public void refreshChart() {
+        getChart().refreshChart();
+    }
+
+    public void showTradeTicket() {
+        getChart().showTradeTicket();
+    }
+
+    public void toggleAiTrading() {
+        getChart().toggleAiTrading();
+    }
+
+    public boolean isAiTradingEnabled() {
+        return getChart().isAiTradingEnabled();
+    }
+
+    public void jumpToLatestCandle() {
+        getChart().jumpToLatestCandle();
+    }
+
+    public void captureScreenshot() {
+        getChart().captureScreenshot();
+    }
+
+    public void toggleBidAskLines() {
+        getChart().setBidAskLinesVisible(!getChart().isBidAskLinesVisible());
+    }
+
+    public boolean isBidAskLinesVisible() {
+        return getChart().isBidAskLinesVisible();
+    }
+
+    public void toggleVolumeBars() {
+        CandleStickChartOptions options = getChartOptions();
+        options.setShowVolume(!options.isShowVolume());
+        refreshChart();
+    }
+
+    public void shutdown() {
+        if (chartLayout != null) {
+            chartLayout.shutdown();
+        }
+        candleChartContainer.getChildren().clear();
+        workspacePane.shutdown();
     }
 }

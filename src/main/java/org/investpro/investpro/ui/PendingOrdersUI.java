@@ -1,6 +1,5 @@
 package org.investpro.investpro.ui;
 
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -10,6 +9,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import org.investpro.investpro.Exchange;
+import org.investpro.investpro.FxLifecycle;
 import org.investpro.investpro.model.Order;
 import org.jetbrains.annotations.NotNull;
 
@@ -21,53 +21,55 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PendingOrdersUI extends Region {
     private final Exchange exchange;
     private final ScheduledExecutorService scheduler;
     private final Label statusLabel;
-    ListView<Order> pendingOrdersView;
+    private final ListView<Order> pendingOrdersView;
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public PendingOrdersUI(@NotNull Exchange exchange) {
         this.exchange = exchange;
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
 
-        // **Title Label**
-        Label titleLabel = new Label("📌 Pending Orders");
+        Label titleLabel = new Label("Pending Orders");
         titleLabel.setFont(Font.font("Arial", 22));
         titleLabel.setTextFill(Color.DARKORANGE);
 
-        // **Status Label**
         statusLabel = new Label("Loading pending orders...");
         statusLabel.setFont(Font.font("Arial", 16));
         statusLabel.setTextFill(Color.GRAY);
 
-        // **ListView for Orders**
         pendingOrdersView = new ListView<>();
         pendingOrdersView.setPrefWidth(1400);
         pendingOrdersView.setPrefHeight(700);
         pendingOrdersView.setPlaceholder(new Label("No pending orders available"));
         pendingOrdersView.setCellFactory(_ -> new OrderCell());
 
-        // **ScrollPane for smooth scrolling**
         ScrollPane scrollPane = new ScrollPane(pendingOrdersView);
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(true);
         scrollPane.setPadding(new Insets(10));
 
-        // **UI Layout**
         setPadding(new Insets(10));
-        setPrefSize(
-                1500, 780);
+        setPrefSize(1500, 780);
 
-        // **Start Auto-Refreshing**
         startUpdating();
         getChildren().addAll(titleLabel, statusLabel, scrollPane);
-
+        sceneProperty().addListener((_, _, newScene) -> {
+            if (newScene == null) {
+                shutdown();
+            }
+        });
     }
 
     private void startUpdating() {
         scheduler.scheduleAtFixedRate(() -> {
+            if (disposed.get() || !FxLifecycle.isShowing(this)) {
+                return;
+            }
             try {
                 List<Order> pendingOrders;
                 try {
@@ -77,22 +79,22 @@ public class PendingOrdersUI extends Region {
                 }
 
                 List<Order> finalPendingOrders = pendingOrders;
-                Platform.runLater(() -> {
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this), () -> {
                     pendingOrdersView.getItems().setAll(finalPendingOrders);
-                    statusLabel.setText("✅ Updated at " + java.time.LocalTime.now());
+                    statusLabel.setText("Updated at " + java.time.LocalTime.now());
 
                     if (finalPendingOrders.isEmpty()) {
-                        statusLabel.setText("⚠️ No pending orders.");
+                        statusLabel.setText("No pending orders.");
                     }
                 });
 
-            } catch (IOException | InterruptedException | ExecutionException e) {
-                Platform.runLater(() -> statusLabel.setText("❌ Error fetching orders!"));
+            } catch (IOException | InterruptedException | ExecutionException | RuntimeException e) {
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this),
+                        () -> statusLabel.setText("Error fetching orders."));
             }
         }, 3, 10, TimeUnit.SECONDS);
     }
 
-    // **Custom ListCell for Orders**
     private static class OrderCell extends ListCell<Order> {
         @Override
         protected void updateItem(Order order, boolean empty) {
@@ -100,9 +102,16 @@ public class PendingOrdersUI extends Region {
             if (empty || order == null) {
                 setText(null);
             } else {
-                setText(String.format("📌 %s | %s | Amount: %.4f | Price: %.2f",
+                setText(String.format("%s | %s | Amount: %.4f | Price: %.2f",
                         order.getSymbol(), order.getOrderType(), order.getSize(), order.getPrice()));
             }
         }
+    }
+
+    public void shutdown() {
+        if (!disposed.compareAndSet(false, true)) {
+            return;
+        }
+        scheduler.shutdownNow();
     }
 }

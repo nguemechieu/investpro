@@ -53,7 +53,8 @@ public class OandaAccountService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to fetch trading fees: " + response.body());
+            logger.warn("Failed to fetch OANDA trading fees. HTTP {}: {}", response.statusCode(), response.body());
+            return List.of();
         }
         Fee fee = OBJECT_MAPPER.readValue(response.body(), Fee.class);
         return List.of(fee);
@@ -65,8 +66,8 @@ public class OandaAccountService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            logger.error("Failed to fetch accounts: {}", response.body());
-            return List.of(new Account());
+            logger.warn("Failed to fetch OANDA accounts. HTTP {}: {}", response.statusCode(), response.body());
+            return List.of();
         }
 
         JsonNode root = OBJECT_MAPPER.readTree(response.body());
@@ -84,7 +85,8 @@ public class OandaAccountService {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                throw new RuntimeException("Failed to fetch account summary: " + response.body());
+                logger.warn("Failed to fetch OANDA account summary. HTTP {}: {}", response.statusCode(), response.body());
+                return List.of();
             }
 
             JsonNode json = OBJECT_MAPPER.readTree(response.body());
@@ -92,7 +94,8 @@ public class OandaAccountService {
             Account account = OBJECT_MAPPER.treeToValue(accountJson, Account.class);
             return List.of(account);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch account summary", e);
+            logger.error("Failed to fetch OANDA account summary", e);
+            return List.of();
         }
     }
 
@@ -102,7 +105,8 @@ public class OandaAccountService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to fetch positions: " + response.body());
+            logger.warn("Failed to fetch OANDA positions. HTTP {}: {}", response.statusCode(), response.body());
+            return List.of();
         }
 
         JsonNode json = OBJECT_MAPPER.readTree(response.body());

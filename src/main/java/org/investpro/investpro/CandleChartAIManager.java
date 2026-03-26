@@ -62,7 +62,7 @@ public class CandleChartAIManager {
             series = new XYChart.Series<>();
             chart.getData().add(series);
         } else {
-            series = chart.getData().get(0); // Assume main series is at 0
+            series = chart.getData().getFirst(); // Assume main series is at 0
         }
 
         if (index >= series.getData().size()) return;

@@ -4,6 +4,7 @@ public enum ENUM_ORDER_STATUS {
     OPEN,
     FILLED,
     CANCELLED,
+    PENDING,
     PARTIALLY_FILLED,
     REJECTED,
     EXPIRED,

@@ -39,7 +39,7 @@ public class BinanceUSMarketDataService {
 
         CompletableFuture.runAsync(() -> {
             try {
-                String uriStr = API_URL + "/depth?symbol=" + tradePair.toString().replace("/", "") + "&limit=100";
+                String uriStr = API_URL + "/depth?symbol=" + tradePair.toSymbol() + "&limit=100";
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(uriStr))
                         .header("X-MBX-APIKEY", apiKey)
@@ -81,7 +81,7 @@ public class BinanceUSMarketDataService {
 
     public double fetchLiveBidAsk(TradePair tradePair) {
         try {
-            String uri = API_URL + "/ticker/bookTicker?symbol=" + tradePair.toString().replace("/", "");
+            String uri = API_URL + "/ticker/bookTicker?symbol=" + tradePair.toSymbol();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(uri))
                     .header("X-MBX-APIKEY", apiKey)
@@ -110,10 +110,48 @@ public class BinanceUSMarketDataService {
     }
 
     public double fetchLivesBidAsk(TradePair tradePair) {
-        return 0;
+        return fetchLiveBidAsk(tradePair);
     }
 
     public List<TradePair> getTradePairs() {
-        return new ArrayList<>();
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL + "/exchangeInfo"))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                logger.error("Failed to fetch Binance US trade pairs: {}", response.body());
+                return List.of();
+            }
+
+            JsonNode rootNode = OBJECT_MAPPER.readTree(response.body());
+            JsonNode symbolsNode = rootNode.path("symbols");
+            List<TradePair> pairs = new ArrayList<>();
+            if (!symbolsNode.isArray()) {
+                return List.of();
+            }
+
+            for (JsonNode symbolNode : symbolsNode) {
+                if (!"TRADING".equalsIgnoreCase(symbolNode.path("status").asText())) {
+                    continue;
+                }
+
+                try {
+                    pairs.add(TradePair.of(
+                            symbolNode.path("baseAsset").asText(),
+                            symbolNode.path("quoteAsset").asText()
+                    ));
+                } catch (Exception e) {
+                    logger.debug("Skipping unsupported Binance US symbol {}", symbolNode.path("symbol").asText(), e);
+                }
+            }
+
+            return pairs;
+        } catch (Exception e) {
+            logger.error("Error fetching Binance US trade pairs", e);
+            return List.of();
+        }
     }
 }

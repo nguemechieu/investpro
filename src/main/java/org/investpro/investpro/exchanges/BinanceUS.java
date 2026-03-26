@@ -8,6 +8,7 @@ import org.investpro.investpro.services.BinanceUSAccountService;
 import org.investpro.investpro.services.BinanceUSCandleService;
 import org.investpro.investpro.services.BinanceUSMarketDataService;
 import org.investpro.investpro.services.BinanceUSOrderService;
+import org.investpro.investpro.services.BinanceUSTradeService;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,7 @@ public class BinanceUS extends Exchange {
     private final BinanceUSMarketDataService marketDataService;
     private final BinanceUSOrderService orderService;
     private final BinanceUSCandleService candleService;
+    private final BinanceUSTradeService tradeService;
     private final int timeframe = 3600;
     TradePair tradePair;
 
@@ -49,13 +51,14 @@ public class BinanceUS extends Exchange {
         this.accountService = new BinanceUSAccountService(apiKey, apiSecret, httpClient);
         this.marketDataService = new BinanceUSMarketDataService(apiKey, httpClient);
         this.orderService = new BinanceUSOrderService(apiKey, apiSecret, httpClient);
+        this.tradeService = new BinanceUSTradeService(apiKey, apiSecret, httpClient);
 
         // Delay candleService creation until tradePair is provided
         this.candleService = new BinanceUSCandleService(apiKey, apiSecret, null, timeframe);
     }
 
     public Set<Integer> granularity() {
-        return Set.of(1, 5, 15, 60, 1440); // supported granularities in minutes
+        return Set.of(60, 180, 300, 900, 1800, 3600, 14400, 86400);
     }
 
     @Override
@@ -67,12 +70,12 @@ public class BinanceUS extends Exchange {
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTrades(TradePair tradePair, Instant instant) {
-        return null;
+        return tradeService.fetchRecentTrades(tradePair);
     }
 
     @Override
     public CompletableFuture<List<OrderBook>> getOrderBook(TradePair tradePair, Instant instant) {
-        return null;
+        return marketDataService.fetchOrderBook(tradePair);
     }
 
     @Override
@@ -149,36 +152,34 @@ public class BinanceUS extends Exchange {
 
     @Override
     public void connectAndProcessTrades(String symbol, InProgressCandleUpdater updater) {
-        throw new UnsupportedOperationException("connectAndProcessTrades not implemented yet");
+        tradeService.connectAndProcessTrades(symbol, json -> updater.accept(json));
     }
 
     @Override
     public Double[] getLatestPrice(TradePair pair) {
-        return new Double[0];
+        return tradeService.getLatestPrice(pair);
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTrade(TradePair pair, Instant instant) {
-        return null;
+        return tradeService.fetchRecentTrades(pair);
     }
 
 
     @Override
     public CompletableFuture<List<Optional<?>>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant start, long offset, int secondsPerCandle) {
-
-        throw new UnsupportedOperationException("connectAndProcessTrades not implemented yet");
-
+        return candleService.fetchCandleDataForInProgressCandle(tradePair, start, offset, secondsPerCandle)
+                .thenApply(optionalCandle -> List.of(optionalCandle));
     }
     @Override
     public CompletableFuture<Optional<?>> getHistoricalCandles(TradePair symbol, Instant startTime, Instant endTime, int interval) {
-        throw new UnsupportedOperationException("connectAndProcessTrades not implemented yet");
-
-        //candleService.getHistoricalCandles(symbol, startTime, endTime, interval);
+        List<CandleData> candles = candleService.getHistoricalCandles(symbol, startTime, endTime, interval);
+        return CompletableFuture.completedFuture(candles.isEmpty() ? Optional.empty() : Optional.of(candles));
     }
 
     @Override
     public String getRecentTrades(TradePair pair) {
-        return "";
+        return tradeService.getRecentTrades(pair.toSymbol()).orElse("no data found");
     }
 
     }

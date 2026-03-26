@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="InvestPro" type="Application" factoryName="Application" nameIsGenerated="true">
-    <option name="ALTERNATIVE_JRE_PATH" value="$PROJECT_DIR$/../../../../Program Files/Java/jdk-23" />
+    <option name="ALTERNATIVE_JRE_PATH" value="$USER_HOME$/.jdks/corretto-23.0.2" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <option name="MAIN_CLASS_NAME" value="org.investpro.investpro.InvestPro" />
-    <module name="invespro" />
+    <option name="MAIN_CLASS_NAME" value="org.investpro.investpro.InvestProLauncher" />
+    <module name="investpro" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="org.investpro.exchanges.*" />

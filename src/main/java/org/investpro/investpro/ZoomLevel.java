@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.investpro.investpro.ui.chart.CandleStickChart.*;
-
 @Getter
 @Setter
 
@@ -32,7 +30,8 @@ public class ZoomLevel {
     private final double pixelsPerSecond;
     private final InstantAxisFormatter xAxisFormatter;
     private final Map<Integer, Pair<Extrema, Extrema>> extremaForCandleRangeMap;
-    static CandleStickChart chart;
+    private final CandleStickChart chart;
+    private final int secondsPerCandle;
     private double minXValue;
     private final int[] zoomSecondsOptions = {60, 120, 300, 600, 900, 1800, 3600}; // 1min to 1h
 
@@ -92,8 +91,10 @@ public class ZoomLevel {
     public ZoomLevel(CandleStickChart chart, final int zoomLevelId, final int candleWidth, final int secondsPerCandle,
                      final @NotNull DoubleProperty plotAreaWidthProperty, final InstantAxisFormatter xAxisFormatter,
                      final double minXValue) {
+        this.chart = chart;
         this.zoomLevelId = zoomLevelId;
         this.candleWidth = candleWidth;
+        this.secondsPerCandle = secondsPerCandle;
         numVisibleCandles = new SimpleIntegerProperty((int) (plotAreaWidthProperty.doubleValue() / candleWidth));
         numVisibleCandles.bind(Bindings.createDoubleBinding(() -> plotAreaWidthProperty.doubleValue() / candleWidth,
                 plotAreaWidthProperty));
@@ -103,14 +104,6 @@ public class ZoomLevel {
         this.minXValue = minXValue;
         this.xAxisRangeInSeconds = numVisibleCandles.doubleValue() * secondsPerCandle;
         extremaForCandleRangeMap = new ConcurrentHashMap<>();
-
-        ZoomLevel.chart = chart;
-
-    }
-
-    public static ZoomLevel create(int zoomLevelId, int candleWidth, int secondsPerCandle,
-                                   DoubleProperty widthProperty, InstantAxisFormatter formatter, double minXValue) {
-        return new ZoomLevel(chart, zoomLevelId, candleWidth, secondsPerCandle, widthProperty, formatter, minXValue);
     }
 
     public void zoomIn() {
@@ -131,7 +124,7 @@ public class ZoomLevel {
         // or plotAreaWidthProperty
 
         InstantAxisFormatter gh = new InstantAxisFormatter(DateTimeFormatter.BASIC_ISO_DATE);
-        currZoomLevel = new ZoomLevel(chart,
+        ZoomLevel updatedZoomLevel = new ZoomLevel(chart,
                 zoomIndex,
                 candleWidth,
                 secondsPerCandle,
@@ -139,32 +132,34 @@ public class ZoomLevel {
 
                 10
         );
+        chart.setCurrZoomLevel(updatedZoomLevel);
         setAxisBoundsAfterZoom(); // adjust xAxis range, bounds, etc.
         chart.drawChartContents(true);
     }
 
     private void setAxisBoundsAfterZoom() {
-        int secondsPerCandle = currZoomLevel.getSecondsPerCandle(); // derive from your constructor values if needed
-        int visibleCandles = currZoomLevel.getNumVisibleCandles();
+        ZoomLevel currentZoomLevel = chart.getCurrZoomLevel();
+        int secondsPerCandle = currentZoomLevel.getSecondsPerCandle(); // derive from your constructor values if needed
+        int visibleCandles = currentZoomLevel.getNumVisibleCandles();
         double totalVisibleSeconds = visibleCandles * secondsPerCandle;
 
         // Keep current center X so zoom feels anchored
-        double currentLower = xAxis.getLowerBound();
-        double currentUpper = xAxis.getUpperBound();
+        double currentLower = chart.getXAxis().getLowerBound();
+        double currentUpper = chart.getXAxis().getUpperBound();
         double center = (currentLower + currentUpper) / 2;
 
         double newLower = center - (totalVisibleSeconds / 2);
         double newUpper = center + (totalVisibleSeconds / 2);
 
         // Apply new bounds
-        xAxis.setLowerBound(newLower);
-        xAxis.setUpperBound(newUpper);
+        chart.getXAxis().setLowerBound(newLower);
+        chart.getXAxis().setUpperBound(newUpper);
 
-        logger.info("Zoom applied: secondsPerCandle={}, visibleCandles={}, newXBounds=({}, {})",
+        CandleStickChart.logger.info("Zoom applied: secondsPerCandle={}, visibleCandles={}, newXBounds=({}, {})",
                 secondsPerCandle, visibleCandles, newLower, newUpper);
     }
 
-    private int getSecondsPerCandle() {
+    public int getSecondsPerCandle() {
         return secondsPerCandle;
     }
 

@@ -7,13 +7,10 @@ import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.css.PseudoClass;
 import javafx.scene.control.Labeled;
-import lombok.Getter;
-import lombok.Setter;
+import javafx.scene.control.Skin;
 
 import java.util.Objects;
 
-@Getter
-@Setter
 public class ToggleSwitch extends Labeled {
     private static final String DEFAULT_STYLE_CLASS = "toggle-switch";
     private static final PseudoClass PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected");
@@ -21,8 +18,6 @@ public class ToggleSwitch extends Labeled {
     private final ReadOnlyBooleanWrapper selected;
     private final ReadOnlyStringWrapper turnOnText;
     private final ReadOnlyStringWrapper turnOffText;
-    protected boolean on;
-
     public ToggleSwitch(@NamedArg("initialValue") boolean initialValue) {
         this(initialValue, "On", "Off");
     }
@@ -63,6 +58,10 @@ public class ToggleSwitch extends Labeled {
         return selected.getReadOnlyProperty();
     }
 
+    public final void setOn(boolean on) {
+        setSelected(on);
+    }
+
     protected final void setSelected(boolean selected) {
         this.selected.set(selected);
     }
@@ -80,4 +79,8 @@ public class ToggleSwitch extends Labeled {
         return Objects.requireNonNull(ToggleSwitch.class.getResource("/css/toggleswitch.css")).toExternalForm();
     }
 
+    @Override
+    protected Skin<?> createDefaultSkin() {
+        return new ToggleSwitchSkin(this);
+    }
 }

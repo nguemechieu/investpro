@@ -63,9 +63,14 @@ public class BinanceUSCandleService {
 
         long startTimeMillis = Math.max(endTimeMillis - (numCandles * secondsPerCandle * 1000L), 1422144000000L);
 
-        String url = String.format("https://api.binance.us/api/v3/klines?symbol=%s&interval=%s",
-                tradePair.toString('/'),
-                getBinanceInterval(secondsPerCandle));
+        String url = String.format(
+                "https://api.binance.us/api/v3/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d",
+                tradePair.toSymbol(),
+                getBinanceInterval(secondsPerCandle),
+                startTimeMillis,
+                endTimeMillis,
+                numCandles
+        );
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -85,11 +90,11 @@ public class BinanceUSCandleService {
                         List<CandleData> candles = new ArrayList<>();
                         for (JsonNode candle : res) {
                             candles.add(new CandleData(
-                                    candle.get(0).asLong(),
                                     candle.get(1).asDouble(),
                                     candle.get(4).asDouble(),
                                     candle.get(2).asDouble(),
                                     candle.get(3).asDouble(),
+                                    toEpochSeconds(candle.get(0).asLong()),
                                     candle.get(5).asLong()
                             ));
                         }
@@ -124,13 +129,63 @@ public class BinanceUSCandleService {
     }
 
     public List<CandleData> getHistoricalCandles(TradePair symbol, Instant startTime, Instant endTime, int interval) {
+        try {
+            long startTimeMillis = Math.max(0L, startTime.toEpochMilli());
+            long endTimeMillis = Math.max(startTimeMillis, endTime.toEpochMilli());
+            String url = String.format(
+                    "https://api.binance.us/api/v3/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d",
+                    symbol.toSymbol(),
+                    getBinanceInterval(interval),
+                    startTimeMillis,
+                    endTimeMillis,
+                    numCandles
+            );
 
-        return new ArrayList<>();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                logger.warn("Failed to fetch Binance US historical candles: {}", response.body());
+                return List.of();
+            }
+
+            JsonNode res = OBJECT_MAPPER.readTree(response.body());
+            List<CandleData> candles = new ArrayList<>();
+            for (JsonNode candle : res) {
+                candles.add(new CandleData(
+                        candle.get(1).asDouble(),
+                        candle.get(4).asDouble(),
+                        candle.get(2).asDouble(),
+                        candle.get(3).asDouble(),
+                        toEpochSeconds(candle.get(0).asLong()),
+                        candle.get(5).asDouble()
+                ));
+            }
+
+            candles.sort(Comparator.comparingLong(CandleData::getOpenTime));
+            return candles;
+        } catch (Exception e) {
+            logger.error("Error fetching Binance US historical candles for {}", symbol, e);
+            return List.of();
+        }
     }
 
     public CompletableFuture<Optional<CandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant start, long offset, int secondsPerCandle) {
-        return CompletableFuture.completedFuture(
-                Optional.empty()
-        );
+        return CompletableFuture.supplyAsync(() -> getHistoricalCandles(
+                        tradePair,
+                        start.minusSeconds(secondsPerCandle),
+                        start.plusSeconds(Math.max(offset, secondsPerCandle)),
+                        secondsPerCandle
+                ).stream()
+                .filter(candle -> candle.getOpenTime() >= start.getEpochSecond())
+                .max(Comparator.comparingInt(CandleData::getOpenTime)));
+    }
+
+    private int toEpochSeconds(long exchangeOpenTime) {
+        long epochSeconds = exchangeOpenTime > Integer.MAX_VALUE ? exchangeOpenTime / 1000L : exchangeOpenTime;
+        return Math.toIntExact(epochSeconds);
     }
 }

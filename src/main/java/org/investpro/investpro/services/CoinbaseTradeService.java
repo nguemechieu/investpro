@@ -55,21 +55,31 @@ public class CoinbaseTradeService {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     try {
+                        if (response.statusCode() != 200) {
+                            logger.warn("Unable to fetch Coinbase trades for {}. HTTP {}: {}", symbol, response.statusCode(), response.body());
+                            return Collections.<Trade>emptyList();
+                        }
+
                         JsonNode root = OBJECT_MAPPER.readTree(response.body());
                         List<Trade> trades = new ArrayList<>();
                         for (JsonNode node : root) {
                             Trade trade = new Trade();
-                            trade.setPrice(node.get("price").asDouble());
-                            trade.setAmount(node.get("size").asDouble());
-                            trade.setTimestamp(Instant.parse(node.get("time").asText()));
-                            trade.setSide("buy".equalsIgnoreCase(node.get("side").asText()) ? Side.BUY : Side.SELL);
+                            trade.setTradePair(tradePair);
+                            trade.setPrice(node.path("price").asDouble());
+                            trade.setAmount(node.path("size").asDouble());
+                            trade.setTimestamp(Instant.parse(node.path("time").asText()));
+                            trade.setSide("buy".equalsIgnoreCase(node.path("side").asText()) ? Side.BUY : Side.SELL);
                             trades.add(trade);
                         }
                         return trades;
                     } catch (Exception e) {
                         logger.error("Error parsing trades for {}", symbol, e);
-                        return Collections.emptyList();
+                        return Collections.<Trade>emptyList();
                     }
+                })
+                .exceptionally(throwable -> {
+                    logger.error("Unable to fetch Coinbase trades for {}", symbol, throwable);
+                    return Collections.<Trade>emptyList();
                 });
     }
 
@@ -82,40 +92,40 @@ public class CoinbaseTradeService {
                 .GET()
                 .build();
 
-        return CompletableFuture.completedFuture(
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    try {
+                        if (response.statusCode() != 200) {
+                            logger.warn("Unable to fetch Coinbase order book for {}. HTTP {}: {}", symbol, response.statusCode(), response.body());
+                            return List.<OrderBook>of();
+                        }
 
-                (List<OrderBook>) httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                        .thenApply(response -> {
-                            try {
-                                JsonNode json = OBJECT_MAPPER.readTree(response.body());
-                                OrderBook orderBook = new OrderBook();
-                                orderBook.setTradePair(tradePair);
-                                orderBook.setTimestamp(Instant.now());
+                        JsonNode json = OBJECT_MAPPER.readTree(response.body());
+                        OrderBook orderBook = new OrderBook();
+                        orderBook.setTradePair(tradePair);
+                        orderBook.setTimestamp(Instant.now());
 
-                                List<OrderBookEntry> bids = new ArrayList<>();
-                                List<OrderBookEntry> asks = new ArrayList<>();
+                        List<OrderBookEntry> bids = new ArrayList<>();
+                        List<OrderBookEntry> asks = new ArrayList<>();
+                        for (JsonNode bid : json.path("bids")) {
+                            bids.add(new OrderBookEntry(bid.get(0).asDouble(), bid.get(1).asDouble()));
+                        }
+                        for (JsonNode ask : json.path("asks")) {
+                            asks.add(new OrderBookEntry(ask.get(0).asDouble(), ask.get(1).asDouble()));
+                        }
 
-                                for (JsonNode bid : json.get("bids")) {
-                                    double price = bid.get(0).asDouble();
-                                    double size = bid.get(1).asDouble();
-                                    bids.add(new OrderBookEntry(price, size));
-                                }
-
-                                for (JsonNode ask : json.get("asks")) {
-                                    double price = ask.get(0).asDouble();
-                                    double size = ask.get(1).asDouble();
-                                    asks.add(new OrderBookEntry(price, size));
-                                }
-
-                                orderBook.setBidEntries(bids);
-                                orderBook.setAskEntries(asks);
-                                return orderBook;
-
-                            } catch (Exception e) {
-                                logger.error("Error parsing order book for {}", symbol, e);
-                                return new OrderBook();
-                            }
-                        }));
+                        orderBook.setBidEntries(bids);
+                        orderBook.setAskEntries(asks);
+                        return List.of(orderBook);
+                    } catch (Exception e) {
+                        logger.error("Error parsing order book for {}", symbol, e);
+                        return List.<OrderBook>of();
+                    }
+                })
+                .exceptionally(throwable -> {
+                    logger.error("Unable to fetch Coinbase order book for {}", symbol, throwable);
+                    return List.of();
+                });
     }
 
     public Optional<String> getRecentTrades(TradePair tradePair) {
@@ -123,7 +133,7 @@ public class CoinbaseTradeService {
             List<Trade> trades = fetchRecentTrades(tradePair).get();
             StringBuilder result = new StringBuilder("Recent Trades:\n");
             for (Trade trade : trades) {
-                result.append(trade.toString()).append("\n");
+                result.append(trade).append("\n");
             }
             return Optional.of(result.toString());
         } catch (Exception e) {
@@ -143,24 +153,27 @@ public class CoinbaseTradeService {
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                logger.warn("Unable to fetch Coinbase latest price for {}. HTTP {}: {}", pair, response.statusCode(), response.body());
+                return new Double[]{0.0, 0.0};
+            }
+
             JsonNode json = OBJECT_MAPPER.readTree(response.body());
-
-            double bid = json.get("bid").asDouble();
-            double ask = json.get("ask").asDouble();
+            double lastPrice = json.path("price").asDouble(0.0);
+            double bid = json.path("bid").asDouble(lastPrice);
+            double ask = json.path("ask").asDouble(lastPrice);
             return new Double[]{bid, ask};
-
         } catch (Exception e) {
-            logger.error("Failed to fetch latest price for {}: {}", pair, e.getMessage());
+            logger.error("Failed to fetch latest price for {}: {}", pair, e.getMessage(), e);
             return new Double[]{0.0, 0.0};
         }
     }
 
     public void streamLiveTrades(String symbol, InProgressCandleUpdater updater) {
-        logger.info("🔄 Live trade streaming not implemented for Coinbase yet.");
-        // TODO: Add WebSocket support if needed
+        logger.info("Coinbase live trade streaming is not enabled yet; using HTTP candle refresh fallback.");
     }
 
     public Optional<?> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant startTime, long epochSecond, int interval) {
-        return getRecentTrades(tradePair);
+        return Optional.empty();
     }
 }

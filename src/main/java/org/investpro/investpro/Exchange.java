@@ -16,7 +16,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -93,13 +97,20 @@ public abstract class Exchange implements
             ));
 
             HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                logger.warn("Failed to fetch coin info: status={}, body={}", response.statusCode(), response.body());
+                return Collections.emptyList();
+            }
+
             ObjectMapper objectMapper = new ObjectMapper();
             return objectMapper.readValue(response.body(), new TypeReference<>() {
             });
-
         } catch (IOException | InterruptedException e) {
-            logger.error("❌ Failed to fetch coin info: {}", e.getMessage());
-            throw new RuntimeException(e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            logger.error("Failed to fetch coin info", e);
+            return Collections.emptyList();
         }
     }
 
@@ -123,7 +134,7 @@ public abstract class Exchange implements
                 attempts++;
             }
         }
-        logger.error("❌ All {} retries failed for fetch operation", MAX_RETRIES);
+        logger.error("All {} retries failed for fetch operation", MAX_RETRIES);
         return Collections.emptyList();
     }
 

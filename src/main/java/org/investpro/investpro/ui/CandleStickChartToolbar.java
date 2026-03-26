@@ -13,10 +13,11 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Separator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Region;
 import javafx.util.Duration;
 import org.investpro.investpro.CandleStickChartOptions;
@@ -35,11 +36,9 @@ import java.util.Set;
 
 import static org.investpro.investpro.NavigationDirection.DOWN;
 import static org.investpro.investpro.NavigationDirection.UP;
-import static org.investpro.investpro.ui.CandleStickChartToolbar.Tool.LEFT;
-import static org.investpro.investpro.ui.CandleStickChartToolbar.Tool.RIGHT;
 
 public class CandleStickChartToolbar extends Region {
-    private final HBox toolbar;
+    private final FlowPane toolbar;
     private final PopOver optionsPopOver;
     Separator functionOptionsSeparator;
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
@@ -52,12 +51,13 @@ public class CandleStickChartToolbar extends Region {
         Objects.requireNonNull(containerHeight);
         Objects.requireNonNull(gran);
 
-        List<Node> toolbarNodes = new ArrayList<>((2 * gran.size()) + Tool.values().length + 1);
+        List<Integer> granularities = gran.stream().sorted().toList();
+        List<Node> toolbarNodes = new ArrayList<>((2 * granularities.size()) + Tool.values().length + 1);
         boolean passedMinuteHourBoundary = false;
         boolean passedHourDayBoundary = false;
         boolean passedDayWeekBoundary = false;
         boolean passedWeekMonthBoundary = false;
-        for (Integer granularity : gran) {
+        for (Integer granularity : granularities) {
             if (granularity < 60) {
                 toolbarNodes.add(new ToolbarButton(granularity + "s", granularity));
             } else if (granularity < 3600) {
@@ -96,7 +96,7 @@ public class CandleStickChartToolbar extends Region {
         functionOptionsSeparator.setPadding(new Insets(0, 20, 0, 0));
 
         optionsPopOver = new PopOver();
-        optionsPopOver.setTitle("Options");
+        optionsPopOver.setTitle("Chart & Indicators");
         optionsPopOver.setHeaderAlwaysVisible(true);
         for (Tool tool : Tool.values()) {
             ToolbarButton toolbarButton;
@@ -125,9 +125,14 @@ public class CandleStickChartToolbar extends Region {
             toolbarNodes.add(toolbarButton);
         }
 
-        toolbar = new HBox();
+        toolbar = new FlowPane();
+        toolbar.setHgap(8);
+        toolbar.setVgap(8);
+        toolbar.setPadding(new Insets(6, 10, 6, 10));
         toolbar.getChildren().addAll(toolbarNodes);
         toolbar.getStyleClass().add("candle-chart-toolbar");
+        toolbar.prefWrapLengthProperty().bind(widthProperty().subtract(20));
+        toolbar.setMaxWidth(Double.MAX_VALUE);
 
         BooleanProperty gotFirstSize = new SimpleBooleanProperty(false);
         final SizeChangeListener sizeListener = new SizeChangeListener(gotFirstSize, containerWidth,
@@ -163,18 +168,28 @@ public class CandleStickChartToolbar extends Region {
                     switch (tool.tool) {
                         case ZOOM_IN, ZOOM_OUT ->
                                 tool.setOnAction(_ -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
-                        case FULL_SCREEN -> tool.setOnAction(_ -> candleStickChart.setFullScreen(true));
+                        case FULL_SCREEN -> tool.setOnAction(_ -> candleStickChart.toggleFullScreen());
                         case PRINT_PDF -> tool.setOnAction(_ -> candleStickChart.exportAsPDF());
                         case SHARE -> tool.setOnAction(_ -> candleStickChart.shareLink());
                         case PRINT -> tool.setOnAction(_ -> candleStickChart.print());
+                        case REFRESH -> tool.setOnAction(_ -> candleStickChart.refreshChart());
+                        case AUTO_SCROLL -> tool.setOnAction(_ -> candleStickChart.jumpToLatestCandle());
                         case GRID_TOGGLE ->
                                 tool.setOnAction(_ -> candleStickChart.setShowGrid(!candleStickChart.isShowGrid()));
-                        case LEFT -> tool.setOnAction(_ -> candleStickChart.changeNavigation(LEFT));
-                        case RIGHT -> tool.setOnAction(_ -> candleStickChart.changeNavigation(RIGHT));
+                        case LEFT -> tool.setOnAction(_ -> candleStickChart.scroll(org.investpro.investpro.NavigationDirection.LEFT));
+                        case RIGHT -> tool.setOnAction(_ -> candleStickChart.scroll(org.investpro.investpro.NavigationDirection.RIGHT));
                         case UP, SCROLL_UP -> tool.setOnAction(_ -> candleStickChart.scroll(UP));
                         case DOWN, SCROLL_DOWN -> tool.setOnAction(_ -> candleStickChart.scroll(DOWN));
                         case SCREENSHOT -> tool.setOnAction(_ -> candleStickChart.captureScreenshot());
                         case OPTIONS -> tool.setOnAction(_ -> optionsPopOver.show(tool));
+                        case TRADE -> tool.setOnAction(_ -> candleStickChart.showTradeTicket());
+                        case AI_TOGGLE -> {
+                            tool.setActive(candleStickChart.isAiTradingEnabled());
+                            tool.setOnAction(_ -> {
+                                candleStickChart.toggleAiTrading();
+                                tool.setActive(candleStickChart.isAiTradingEnabled());
+                            });
+                        }
 ////                        case RSI_TOGGLE -> tool.setOnAction(_ -> candleStickChart.toggleRSI());
 //                        case MACD_TOGGLE -> tool.setOnAction(_ -> candleStickChart.toggleMACD());
 //                        case BB_TOGGLE -> tool.setOnAction(_ -> candleStickChart.toggleBollingerBands());
@@ -200,6 +215,8 @@ public class CandleStickChartToolbar extends Region {
         FULL_SCREEN("/img/fullscreen-solid.png"),
         PRINT_PDF("/img/pdf-solid.png"),
         SHARE("/img/share-solid.png"),
+        TRADE(null, "Trade"),
+        AI_TOGGLE(null, "AI"),
         LEFT("/img/left-solid.png"),
         RIGHT("/img/right-solid.png"),
         UP("/img/up-solid.png"),
@@ -213,13 +230,23 @@ public class CandleStickChartToolbar extends Region {
 //        BB_TOGGLE("/img/bollinger-icon.png");
 
         private final String img;
+        private final String label;
 
         Tool(String img) {
+            this(img, null);
+        }
+
+        Tool(String img, String label) {
             this.img = img;
+            this.label = label;
         }
 
         public @Nullable ZoomDirection getZoomDirection() {
             return this == ZOOM_IN ? ZoomDirection.IN : this == ZOOM_OUT ? ZoomDirection.OUT : null;
+        }
+
+        public String getLabel() {
+            return label == null ? name().replace('_', ' ') : label;
         }
     }
 
@@ -255,13 +282,17 @@ public class CandleStickChartToolbar extends Region {
         }
 
         private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
-            if (textLabel == null && img == null) {
+            String effectiveTextLabel = textLabel;
+            if (effectiveTextLabel == null && tool != null && img == null) {
+                effectiveTextLabel = tool.getLabel();
+            }
+            if (effectiveTextLabel == null && img == null) {
                 throw new IllegalArgumentException("textLabel and img were both null");
             }
-            this.textLabel = textLabel;
+            this.textLabel = effectiveTextLabel;
             this.tool = tool;
             this.duration = duration;
-            setText(textLabel == null ? "" : textLabel);
+            setText(effectiveTextLabel == null ? "" : effectiveTextLabel);
 
             if (img != null) {
                 graphicLabel = new ImageView(new Image(Objects.requireNonNull(ToolbarButton.class.getResourceAsStream(img))));
@@ -273,17 +304,31 @@ public class CandleStickChartToolbar extends Region {
                 graphicLabel = new ImageView();
             }
 
-            setMinSize(30, 30);
-            setMaxSize(40, 40);
+            if (effectiveTextLabel != null && img == null) {
+                setMinHeight(30);
+                setPrefWidth(Math.max(52, effectiveTextLabel.length() * 12));
+                setMaxWidth(Region.USE_COMPUTED_SIZE);
+            } else {
+                setMinSize(30, 30);
+                setMaxSize(40, 40);
+            }
             setPadding(new Insets(5, 5, 5, 5));
             textOverrunProperty().set(OverrunStyle.CLIP);
             setEllipsisString("");
             getStyleClass().add("candle-chart-toolbar-button");
+
+            if (tool != null) {
+                Tooltip.install(this, new Tooltip(tool.getLabel()));
+            } else if (effectiveTextLabel != null) {
+                Tooltip.install(this, new Tooltip("Switch to " + effectiveTextLabel + " candles"));
+            }
         }
 
         public void setActive(boolean b) {
             active.setValue(b);
-            setStyle(b ? "-fx-background-color: #16dda1" : "");
+            setStyle(b
+                    ? "-fx-background-color: linear-gradient(to bottom, #34d399, #0f766e); -fx-text-fill: #f8fafc; -fx-border-color: rgba(255,255,255,0.18);"
+                    : "");
         }
     }
 

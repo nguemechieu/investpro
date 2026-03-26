@@ -1,81 +1,61 @@
 package org.investpro.investpro.ui.chart;
 
 import javafx.beans.property.ReadOnlyDoubleProperty;
-import javafx.scene.control.Button;
 import javafx.scene.layout.Region;
 import lombok.Getter;
-import lombok.Setter;
-import org.investpro.investpro.CandleChartAIManager;
 import org.investpro.investpro.CandleDataSupplier;
 import org.investpro.investpro.Exchange;
-import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.model.TradePair;
-import org.investpro.investpro.ui.CandleStickChartToolbar;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.List;
-
 
 @Getter
-@Setter
 public class ChartLayout extends Region {
 
+    private final CandleStickChart chart;
 
-    CandleStickChart chart;
-    private CandleStickChart candleStickChart;
-    private Button exportButton;
-
-    private ChartSettingsPanel chartSettingsPanel;
-    private List<CandleData> loadedCandles;
-    private String currentInterval;
-    private String currentSymbol;
-    private PaginationManager paginationManager;
-    private IndicatorManager indicatorManager;
-
-    private Exchange exchange;
-    private CandleChartDataLoader dataLoader;
-    private CandleChartNavigator navigator;
-    private double baseCandleWidth = 5.0;
-    private LiveUpdateManager liveUpdateManager;
-    private CandleStickChartToolbar chartToolbar;
-    private Instant currentStartTime;
-    private Instant currentEndTime;
-    private ChartPerformanceOptimizer optimizer;
-    private ThemeManager themeManager;
-    private ChartAlertsManager alertsManager;
-    private CandleData lastCandle;
-
-    private CandleChartAIManager aiManager;
-
-
-    public ChartLayout(Exchange exchange, TradePair tradePair, CandleDataSupplier candleDataSupplier, boolean liveSyncing, int secondsPerCandle, ReadOnlyDoubleProperty widthProperty, ReadOnlyDoubleProperty heightProperty, String token) {
-
-        this.exchange = exchange;
-
-
-        //   this.themeManager = new ThemeManager(new Scene(this));
-
+    public ChartLayout(Exchange exchange,
+                       TradePair tradePair,
+                       CandleDataSupplier candleDataSupplier,
+                       boolean liveSyncing,
+                       int secondsPerCandle,
+                       ReadOnlyDoubleProperty widthProperty,
+                       ReadOnlyDoubleProperty heightProperty,
+                       String token) {
         try {
-            this.chart = new CandleStickChart(exchange, tradePair, candleDataSupplier, liveSyncing, secondsPerCandle, widthProperty, heightProperty, token);
-
-            //  themeManager.applyDarkTheme();
-
-//
-//            this.paginationManager = new PaginationManager(
-//                    chart,
-//                    (oldestTime, limit) -> dataLoader.loadMoreCandles(currentSymbol, oldestTime, currentInterval, limit),
-//                    this::appendCandles
-//            );
-
-
-            getChildren().addAll(chart
+            this.chart = new CandleStickChart(
+                    exchange,
+                    tradePair,
+                    candleDataSupplier,
+                    liveSyncing,
+                    secondsPerCandle,
+                    widthProperty,
+                    heightProperty,
+                    token
             );
+            chart.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            getChildren().setAll(chart);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Unable to create chart layout", e);
         }
-
     }
 
+    @Override
+    protected void layoutChildren() {
+        chart.resizeRelocate(0, 0, getWidth(), getHeight());
+    }
 
+    @Override
+    protected double computePrefWidth(double height) {
+        return chart.prefWidth(height);
+    }
+
+    @Override
+    protected double computePrefHeight(double width) {
+        return chart.prefHeight(width);
+    }
+
+    public void shutdown() {
+        chart.shutdown();
+    }
 }

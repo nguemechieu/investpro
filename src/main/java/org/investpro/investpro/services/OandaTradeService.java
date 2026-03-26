@@ -54,6 +54,11 @@ public class OandaTradeService {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     try {
+                        if (response.statusCode() != 200) {
+                            logger.warn("Unable to fetch OANDA trades for {}. HTTP {}: {}", instrument, response.statusCode(), response.body());
+                            return Collections.<Trade>emptyList();
+                        }
+
                         JsonNode root = OBJECT_MAPPER.readTree(response.body());
                         List<Trade> trades = new ArrayList<>();
                         JsonNode tradesNode = root.path("trades");
@@ -104,8 +109,15 @@ public class OandaTradeService {
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                logger.warn("Unable to fetch OANDA latest price for {}. HTTP {}: {}", pair, response.statusCode(), response.body());
+                return new Double[]{0.0, 0.0};
+            }
             JsonNode json = OBJECT_MAPPER.readTree(response.body());
             JsonNode priceNode = json.path("prices").get(0);
+            if (priceNode == null || priceNode.isMissingNode()) {
+                return new Double[]{0.0, 0.0};
+            }
 
             double bid = priceNode.path("bids").get(0).path("price").asDouble();
             double ask = priceNode.path("asks").get(0).path("price").asDouble();

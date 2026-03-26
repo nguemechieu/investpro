@@ -14,14 +14,18 @@ public class AppConfig {
     }
 
     public static Exchange getCoinbaseExchange() {
-        return new Coinbase("your-api-key", "your-api-secret");
+        return new Coinbase(
+                "organizations/your-org-id/apiKeys/your-key-id",
+                "-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n",
+                ""
+        );
     }
 
     public static ExchangeFactory getExchangeFactory() {
         return new ExchangeFactory(List.of(getBinanceExchange(), getCoinbaseExchange()));
     }
 
-    public static void main(String[] args) {
+    static void main() {
         ExchangeFactory factory = AppConfig.getExchangeFactory();
         Exchange exchange = factory.getExchange("Coinbase");
 

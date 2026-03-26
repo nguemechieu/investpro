@@ -3,6 +3,7 @@ package org.investpro.investpro.indicators;
 import org.investpro.investpro.model.CandleData;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class IndicatorCalculator {
@@ -93,5 +94,89 @@ public class IndicatorCalculator {
             sum += candles.get(i).getClosePrice();
         }
         return sum / period;
+    }
+
+    public static @NotNull List<Double> calculateSMASeries(@NotNull List<CandleData> candles, int period) {
+        List<Double> series = new ArrayList<>(candles.size());
+        double rollingSum = 0;
+
+        for (int i = 0; i < candles.size(); i++) {
+            rollingSum += candles.get(i).getClosePrice();
+            if (i >= period) {
+                rollingSum -= candles.get(i - period).getClosePrice();
+            }
+
+            if (i + 1 < period) {
+                series.add(null);
+            } else {
+                series.add(rollingSum / period);
+            }
+        }
+
+        return series;
+    }
+
+    public static @NotNull List<Double> calculateEMASeries(@NotNull List<CandleData> candles, int period) {
+        List<Double> series = new ArrayList<>(candles.size());
+        if (candles.size() < period) {
+            for (int i = 0; i < candles.size(); i++) {
+                series.add(null);
+            }
+            return series;
+        }
+
+        double multiplier = 2.0 / (period + 1);
+        double seed = 0;
+        for (int i = 0; i < period; i++) {
+            seed += candles.get(i).getClosePrice();
+            series.add(null);
+        }
+
+        double ema = seed / period;
+        series.set(period - 1, ema);
+
+        for (int i = period; i < candles.size(); i++) {
+            ema = ((candles.get(i).getClosePrice() - ema) * multiplier) + ema;
+            series.add(ema);
+        }
+
+        return series;
+    }
+
+    public static @NotNull BollingerBands calculateBollingerBandsSeries(@NotNull List<CandleData> candles, int period) {
+        List<Double> upperBand = new ArrayList<>(candles.size());
+        List<Double> middleBand = new ArrayList<>(candles.size());
+        List<Double> lowerBand = new ArrayList<>(candles.size());
+
+        for (int i = 0; i < candles.size(); i++) {
+            if (i + 1 < period) {
+                upperBand.add(null);
+                middleBand.add(null);
+                lowerBand.add(null);
+                continue;
+            }
+
+            double sum = 0;
+            for (int j = i - period + 1; j <= i; j++) {
+                sum += candles.get(j).getClosePrice();
+            }
+
+            double sma = sum / period;
+            double variance = 0;
+            for (int j = i - period + 1; j <= i; j++) {
+                double deviation = candles.get(j).getClosePrice() - sma;
+                variance += deviation * deviation;
+            }
+
+            double stdDev = Math.sqrt(variance / period);
+            middleBand.add(sma);
+            upperBand.add(sma + (2 * stdDev));
+            lowerBand.add(sma - (2 * stdDev));
+        }
+
+        return new BollingerBands(upperBand, middleBand, lowerBand);
+    }
+
+    public record BollingerBands(List<Double> upperBand, List<Double> middleBand, List<Double> lowerBand) {
     }
 }
