@@ -12,7 +12,6 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -83,9 +82,10 @@ public class ChartWorkspacePane extends VBox {
     private final Label statusValue = createMetricValue();
     private final ScheduledExecutorService refreshExecutor;
     private final AtomicBoolean disposed = new AtomicBoolean(false);
+    private volatile String lastMarketAvailabilityMessage = "";
 
     private volatile OrderBook latestOrderBook;
-    private volatile Double[] latestBidAsk = new Double[]{0.0, 0.0};
+    private volatile Double[] latestBidAsk = new Double[]{Double.NaN, Double.NaN};
 
     public ChartWorkspacePane(Exchange exchange,
                               TradePair tradePair,
@@ -112,13 +112,6 @@ public class ChartWorkspacePane extends VBox {
         VBox.setVgrow(workspaceTabs, Priority.ALWAYS);
 
         getChildren().setAll(workspaceTabs);
-
-        sceneProperty().addListener((_, _, newScene) -> {
-            if (newScene == null) {
-                shutdown();
-            }
-        });
-
         refreshExecutor.scheduleWithFixedDelay(this::refreshMarketSnapshot, 0, 5, TimeUnit.SECONDS);
     }
 
@@ -140,43 +133,35 @@ public class ChartWorkspacePane extends VBox {
     }
 
     private Node createCandlestickPane(CandleStickChartToolbar candlestickToolbar, Node candlestickContent) {
-        Label titleLabel = new Label("Timeframes & Tools");
-        titleLabel.getStyleClass().add("chart-section-title");
-
-        Label hintLabel = new Label("Change timeframe, zoom, pan, refresh, auto-scroll, and capture the chart from here.");
-        hintLabel.getStyleClass().add("chart-toolbar-hint");
-
-        VBox toolbarShell = new VBox(8, titleLabel, hintLabel, candlestickToolbar);
-        toolbarShell.getStyleClass().add("chart-surface");
-        toolbarShell.getStyleClass().add("chart-toolbar-panel");
-        toolbarShell.setPadding(new Insets(14));
+        candlestickToolbar.setManaged(false);
+        candlestickToolbar.setVisible(false);
 
         candlestickViewport.getStyleClass().add("chart-scroll-content");
         candlestickViewport.setAlignment(Pos.TOP_LEFT);
-        candlestickViewport.setMinSize(1400, 820);
-        candlestickViewport.setPrefSize(1400, 820);
+        candlestickViewport.setMinSize(0, 0);
+        candlestickViewport.setPrefSize(960, 640);
+        candlestickViewport.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         candlestickScrollPane.setContent(candlestickViewport);
         candlestickScrollPane.getStyleClass().add("chart-scroll-pane");
-        candlestickScrollPane.setFitToWidth(false);
-        candlestickScrollPane.setFitToHeight(false);
+        candlestickScrollPane.setFitToWidth(true);
+        candlestickScrollPane.setFitToHeight(true);
         candlestickScrollPane.setPannable(true);
         candlestickScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         candlestickScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         candlestickScrollPane.setFocusTraversable(false);
         candlestickScrollPane.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
-            double preferredWidth = Math.max(1400, newBounds.getWidth());
-            double preferredHeight = Math.max(820, newBounds.getHeight());
+            double preferredWidth = Math.max(860, newBounds.getWidth());
+            double preferredHeight = Math.max(540, newBounds.getHeight());
             candlestickViewport.setPrefSize(preferredWidth, preferredHeight);
             if (currentCandlestickContent instanceof Region region) {
+                region.setMinSize(0, 0);
                 region.setPrefSize(preferredWidth, preferredHeight);
+                region.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
             }
         });
 
         updateCandlestickViewport(candlestickContent);
-
-        Separator toolbarDivider = new Separator(Orientation.HORIZONTAL);
-        toolbarDivider.getStyleClass().add("chart-toolbar-divider");
 
         StackPane chartCanvasShell = new StackPane(candlestickScrollPane);
         chartCanvasShell.getStyleClass().add("chart-canvas-shell");
@@ -184,19 +169,20 @@ public class ChartWorkspacePane extends VBox {
         chartCanvasShell.setMinHeight(0);
         VBox.setVgrow(chartCanvasShell, Priority.ALWAYS);
 
-        VBox candlestickPane = new VBox(14, toolbarShell, toolbarDivider, chartCanvasShell);
+        VBox candlestickPane = new VBox(chartCanvasShell);
         candlestickPane.setFillWidth(true);
         candlestickPane.setMinHeight(0);
+        VBox.setVgrow(chartCanvasShell, Priority.ALWAYS);
         return candlestickPane;
     }
 
     private void updateCandlestickViewport(Node candlestickContent) {
         currentCandlestickContent = candlestickContent;
         if (candlestickContent instanceof Region region) {
-            region.setMinSize(1400, 820);
+            region.setMinSize(0, 0);
             region.setPrefSize(
-                    Math.max(1400, candlestickViewport.getPrefWidth()),
-                    Math.max(820, candlestickViewport.getPrefHeight())
+                    Math.max(860, candlestickViewport.getPrefWidth()),
+                    Math.max(540, candlestickViewport.getPrefHeight())
             );
             region.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         }
@@ -328,7 +314,7 @@ public class ChartWorkspacePane extends VBox {
             FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this),
                     () -> applyMarketSnapshot(latestPriceSnapshot, latestOrderBookSnapshot));
         } catch (Exception e) {
-            logger.warn("Unable to refresh market workspace for {}", tradePair, e);
+            logAvailabilityOnce("Unable to refresh market workspace for " + tradePair + ": " + e.getMessage(), e);
             FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this), () -> {
                 statusValue.setText("Unavailable");
                 updatedValue.setText("Refresh failed");
@@ -340,7 +326,13 @@ public class ChartWorkspacePane extends VBox {
 
     private OrderBook fetchLatestOrderBook()
             throws InterruptedException, ExecutionException, TimeoutException {
-        List<OrderBook> books = exchange.fetchOrderBook(tradePair).get(10, TimeUnit.SECONDS);
+        List<OrderBook> books;
+        try {
+            books = exchange.fetchOrderBook(tradePair).get(10, TimeUnit.SECONDS);
+        } catch (ExecutionException executionException) {
+            logAvailabilityOnce("Order book is unavailable for " + tradePair + ".", executionException);
+            return null;
+        }
         if (books == null || books.isEmpty()) {
             return null;
         }
@@ -352,12 +344,16 @@ public class ChartWorkspacePane extends VBox {
             return;
         }
         latestOrderBook = latestOrderBookSnapshot;
-        latestBidAsk = latestPriceSnapshot == null ? new Double[]{0.0, 0.0} : latestPriceSnapshot;
+        latestBidAsk = latestPriceSnapshot == null ? new Double[]{Double.NaN, Double.NaN} : latestPriceSnapshot;
 
         double bid = resolveBid(latestPriceSnapshot, latestOrderBookSnapshot);
         double ask = resolveAsk(latestPriceSnapshot, latestOrderBookSnapshot);
         double midpoint = bid > 0 && ask > 0 ? (bid + ask) / 2.0 : 0.0;
         double spread = bid > 0 && ask > 0 ? ask - bid : 0.0;
+        boolean hasPrice = Double.isFinite(bid) && bid > 0 && Double.isFinite(ask) && ask > 0;
+        boolean hasDepth = latestOrderBookSnapshot != null
+                && !latestOrderBookSnapshot.getBidEntries().isEmpty()
+                && !latestOrderBookSnapshot.getAskEntries().isEmpty();
 
         pairValue.setText(tradePair.toString('/'));
         bidValue.setText(formatPrice(bid));
@@ -370,11 +366,14 @@ public class ChartWorkspacePane extends VBox {
                 + latestOrderBookSnapshot.getAskEntries().size() + " asks");
         updatedValue.setText(UPDATED_AT_FORMATTER.format(Instant.now()));
         serviceValue.setText(exchange.getExchangeMessage());
-        statusValue.setText(latestOrderBookSnapshot == null ? "Partial" : "Live");
+        statusValue.setText(hasPrice && hasDepth ? "Live" : hasPrice || hasDepth ? "Partial" : "Unavailable");
 
         updateOrderBookTable(bidTable, latestOrderBookSnapshot == null ? List.of() : latestOrderBookSnapshot.getSortedBids(), true);
         updateOrderBookTable(askTable, latestOrderBookSnapshot == null ? List.of() : latestOrderBookSnapshot.getSortedAsks(), false);
         drawDepthChart(latestOrderBookSnapshot);
+        if (hasPrice || hasDepth) {
+            lastMarketAvailabilityMessage = "";
+        }
     }
 
     private void updateOrderBookTable(TableView<OrderBookRow> table,
@@ -522,27 +521,33 @@ public class ChartWorkspacePane extends VBox {
     }
 
     private double resolveBid(Double[] latestPriceSnapshot, OrderBook orderBook) {
-        if (latestPriceSnapshot != null && latestPriceSnapshot.length > 0 && latestPriceSnapshot[0] > 0) {
+        if (latestPriceSnapshot != null
+                && latestPriceSnapshot.length > 0
+                && Double.isFinite(latestPriceSnapshot[0])
+                && latestPriceSnapshot[0] > 0) {
             return latestPriceSnapshot[0];
         }
         if (orderBook != null && !orderBook.getBidEntries().isEmpty()) {
             return orderBook.getSortedBids().getFirst().getPrice();
         }
-        return 0.0;
+        return Double.NaN;
     }
 
     private double resolveAsk(Double[] latestPriceSnapshot, OrderBook orderBook) {
-        if (latestPriceSnapshot != null && latestPriceSnapshot.length > 1 && latestPriceSnapshot[1] > 0) {
+        if (latestPriceSnapshot != null
+                && latestPriceSnapshot.length > 1
+                && Double.isFinite(latestPriceSnapshot[1])
+                && latestPriceSnapshot[1] > 0) {
             return latestPriceSnapshot[1];
         }
         if (orderBook != null && !orderBook.getAskEntries().isEmpty()) {
             return orderBook.getSortedAsks().getFirst().getPrice();
         }
-        return 0.0;
+        return Double.NaN;
     }
 
     private String formatPrice(double value) {
-        if (value <= 0) {
+        if (!Double.isFinite(value) || value <= 0) {
             return "--";
         }
         if (value >= 1000) {
@@ -552,6 +557,14 @@ public class ChartWorkspacePane extends VBox {
             return String.format("%.4f", value);
         }
         return String.format("%.6f", value);
+    }
+
+    private void logAvailabilityOnce(String message, Exception exception) {
+        if (message.equals(lastMarketAvailabilityMessage)) {
+            return;
+        }
+        lastMarketAvailabilityMessage = message;
+        logger.warn(message, exception);
     }
 
     private static final class OrderBookRow {

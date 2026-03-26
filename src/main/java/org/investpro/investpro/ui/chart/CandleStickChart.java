@@ -617,7 +617,7 @@ public class CandleStickChart extends Region {
         yAxis.setForceZeroInRange(true);
         extraAxis.setForceZeroInRange(false);
 
-        xAxis.setSide(Side.TOP);
+        xAxis.setSide(Side.BOTTOM);
         yAxis.setSide(Side.RIGHT);
         extraAxis.setSide(Side.LEFT);
 

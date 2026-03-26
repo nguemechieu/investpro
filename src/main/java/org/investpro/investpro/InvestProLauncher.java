@@ -14,7 +14,7 @@ public final class InvestProLauncher {
     private InvestProLauncher() {
     }
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         Properties launchProperties = JavaFxRuntimeBootstrap.loadLaunchProperties();
         JavaFxRuntimeBootstrap.configurePrism(launchProperties);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

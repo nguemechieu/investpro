@@ -41,10 +41,15 @@ public abstract class Exchange implements
     protected static final int MAX_RETRIES = 5;
     protected final String apiSecret;
     protected final String apiKey;
+    private static final long COIN_INFO_CACHE_MS = 60_000;
+    private static final long COIN_INFO_RATE_LIMIT_COOLDOWN_MS = 180_000;
     private final HttpClient client = HttpClient.newHttpClient();
     private final HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
     private List<News> cachedNews = new ArrayList<>();
     private long lastNewsFetchTime = 0;
+    private List<CoinInfo> cachedCoinInfo = new ArrayList<>();
+    private long lastCoinInfoFetchTime = 0;
+    private long coinInfoCooldownUntil = 0;
 
     protected Exchange(String apiKey, String apiSecret) {
         this.apiKey = Objects.requireNonNull(apiKey, "API key must not be null");
@@ -91,26 +96,43 @@ public abstract class Exchange implements
 
     @Override
     public List<CoinInfo> getCoinInfoList() {
+        long now = System.currentTimeMillis();
+        if (!cachedCoinInfo.isEmpty() && (now - lastCoinInfoFetchTime) < COIN_INFO_CACHE_MS) {
+            return cachedCoinInfo;
+        }
+        if (coinInfoCooldownUntil > now) {
+            return cachedCoinInfo;
+        }
+
         try {
             requestBuilder.uri(URI.create(
                     "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"
             ));
 
             HttpResponse<String> response = client.send(requestBuilder.GET().build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 429) {
+                coinInfoCooldownUntil = now + COIN_INFO_RATE_LIMIT_COOLDOWN_MS;
+                logger.warn("CoinGecko rate limit hit. Reusing cached coin info for {} seconds.", COIN_INFO_RATE_LIMIT_COOLDOWN_MS / 1000);
+                return cachedCoinInfo;
+            }
             if (response.statusCode() != 200) {
                 logger.warn("Failed to fetch coin info: status={}, body={}", response.statusCode(), response.body());
-                return Collections.emptyList();
+                return cachedCoinInfo;
             }
 
             ObjectMapper objectMapper = new ObjectMapper();
-            return objectMapper.readValue(response.body(), new TypeReference<>() {
+            List<CoinInfo> latest = objectMapper.readValue(response.body(), new TypeReference<>() {
             });
+            cachedCoinInfo = latest;
+            lastCoinInfoFetchTime = now;
+            coinInfoCooldownUntil = 0;
+            return latest;
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             logger.error("Failed to fetch coin info", e);
-            return Collections.emptyList();
+            return cachedCoinInfo;
         }
     }
 

@@ -1,6 +1,13 @@
 package org.investpro.investpro.ui;
 
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -11,16 +18,19 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
@@ -34,25 +44,39 @@ import org.investpro.investpro.CandleStickChartOptions;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.FxLifecycle;
 import org.investpro.investpro.Messages;
+import org.investpro.investpro.ai.InvestProAIBacktester;
+import org.investpro.investpro.ai.InvestProAIPredictor;
+import org.investpro.investpro.model.Account;
+import org.investpro.investpro.model.Position;
 import org.investpro.investpro.model.TradePair;
 import org.investpro.investpro.ui.chart.CandleStickChartContainer;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.DecimalFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public class DisplayExchangeUI extends AnchorPane {
     private static final Logger logger = LoggerFactory.getLogger(DisplayExchangeUI.class);
+    private static final DecimalFormat PRICE_FORMAT = new DecimalFormat("#,##0.0000");
+    private static final DateTimeFormatter EVENT_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private static final Map<String, Integer> TIMEFRAME_SECONDS = Map.ofEntries(
             Map.entry("1m", 60),
@@ -69,11 +93,20 @@ public class DisplayExchangeUI extends AnchorPane {
     private final Exchange exchange;
     private final String tokens;
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final ScheduledExecutorService workspaceRefreshExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean disposed = new AtomicBoolean(false);
+    private static final List<String> STRATEGY_OPTIONS = List.of(
+            "AI Hybrid",
+            "Momentum Breakout",
+            "Trend Follow",
+            "Mean Reversion",
+            "Scalper",
+            "Market Making"
+    );
 
     private final ComboBox<String> symbolPicker = new ComboBox<>();
     private final ComboBox<String> autotradeScopePicker = new ComboBox<>();
-    private final ListView<String> marketWatchList = new ListView<>();
+    private final TableView<MarketWatchRow> marketWatchTable = new TableView<>();
     private final TabPane chartTabPane = new TabPane();
     private final TabPane leftDockTabs = new TabPane();
     private final TabPane rightDockTabs = new TabPane();
@@ -108,6 +141,18 @@ public class DisplayExchangeUI extends AnchorPane {
     private final CheckMenuItem sma20MenuItem = new CheckMenuItem("SMA 20");
     private final CheckMenuItem ema50MenuItem = new CheckMenuItem("EMA 50");
     private final CheckMenuItem bollingerMenuItem = new CheckMenuItem("Bollinger Bands");
+    private final ObservableList<SignalMonitorRow> signalMonitorRows = FXCollections.observableArrayList();
+    private final ObservableList<AgentTimelineRow> agentTimelineRows = FXCollections.observableArrayList();
+    private final ObservableList<MetricRow> quantPmRows = FXCollections.observableArrayList();
+    private final ObservableList<PositionAnalysisRow> positionAnalysisRows = FXCollections.observableArrayList();
+    private final ObservableList<StrategyInsightRow> strategyInsightRows = FXCollections.observableArrayList();
+    private final ObservableList<MarketWatchRow> marketWatchRows = FXCollections.observableArrayList();
+    private final ObservableList<StrategyAssignmentRow> strategyAssignmentRows = FXCollections.observableArrayList();
+    private final Map<String, String> signalSignatureBySymbol = new LinkedHashMap<>();
+    private final Map<String, Double[]> marketSnapshotCache = new LinkedHashMap<>();
+    private final Map<String, Stage> detachedToolWindows = new LinkedHashMap<>();
+    private final Map<String, StrategyAssignmentRow> strategyAssignmentsBySymbol = new LinkedHashMap<>();
+    private final Set<String> watchedSymbols = new LinkedHashSet<>();
 
     private final AccountSummaryUI accountSummaryUI;
     private final PositionsUI positionsUI;
@@ -154,6 +199,8 @@ public class DisplayExchangeUI extends AnchorPane {
 
         configureInteractiveState();
         loadTradePairs();
+        startWorkspaceRefreshLoop();
+        logAgentEvent("SYSTEM", "desk_boot", "Sopotek-style trading desk initialized.");
         appendConsole("Terminal ready for " + exchange.getClass().getSimpleName() + ".");
     }
 
@@ -162,13 +209,28 @@ public class DisplayExchangeUI extends AnchorPane {
         chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         chartTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> syncActiveChartState());
 
-        marketWatchList.getStyleClass().add("terminal-market-watch");
-        marketWatchList.setPlaceholder(new Label("Markets will appear here once the exchange responds."));
-        marketWatchList.setOnMouseClicked(event -> {
-            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
-                String selectedPair = marketWatchList.getSelectionModel().getSelectedItem();
-                if (selectedPair != null && !selectedPair.isBlank()) {
-                    addChart(selectedPair);
+        marketWatchTable.setItems(marketWatchRows);
+        marketWatchTable.getStyleClass().add("terminal-data-table");
+        marketWatchTable.setEditable(true);
+        marketWatchTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        marketWatchTable.setPlaceholder(new Label("Markets will appear here once the exchange responds."));
+        TableColumn<MarketWatchRow, Boolean> watchColumn = new TableColumn<>("Watch");
+        watchColumn.setCellValueFactory(cell -> cell.getValue().watchedProperty());
+        watchColumn.setCellFactory(CheckBoxTableCell.forTableColumn(watchColumn));
+        watchColumn.setEditable(true);
+        watchColumn.setSortable(false);
+        marketWatchTable.getColumns().setAll(
+                watchColumn,
+                textColumn("Symbol", MarketWatchRow::symbol),
+                textColumn("Bid", MarketWatchRow::bid),
+                textColumn("Ask", MarketWatchRow::ask),
+                textColumn("AI Training", MarketWatchRow::aiTraining)
+        );
+        marketWatchTable.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 1) {
+                MarketWatchRow selected = marketWatchTable.getSelectionModel().getSelectedItem();
+                if (selected != null && selected.symbol() != null && !selected.symbol().isBlank()) {
+                    openOrFocusChart(selected.symbol());
                 }
             }
         });
@@ -217,6 +279,7 @@ public class DisplayExchangeUI extends AnchorPane {
                 updateIndicatorSelection(options -> options.setShowBollingerBands(bollingerMenuItem.isSelected())));
 
         updateSystemStatus(null);
+        seedWorkspaceModels();
     }
 
     private Node createWorkspaceSplit() {
@@ -230,7 +293,9 @@ public class DisplayExchangeUI extends AnchorPane {
 
         leftDockTabs.getTabs().setAll(
                 createDockTab("Market Watch", buildMarketWatchPanel()),
+                createDockTab("AI Signal Monitor", buildSignalMonitorPanel()),
                 createDockTab("Strategy Scorecard", buildStrategyScorecardPanel()),
+                createDockTab("Strategy Debug", buildStrategyDebugPanel()),
                 createDockTab("Indicators", buildIndicatorPanel())
         );
         rightDockTabs.getTabs().setAll(
@@ -242,6 +307,9 @@ public class DisplayExchangeUI extends AnchorPane {
                 createDockTab("Positions", wrapDockContent(positionsUI)),
                 createDockTab("Open Orders", wrapDockContent(pendingOrdersUI)),
                 createDockTab("Trade Log", wrapDockContent(ordersUI)),
+                createDockTab("Live Agent", buildAgentTimelinePanel()),
+                createDockTab("Quant PM", buildQuantPmPanel()),
+                createDockTab("Position Analysis", buildPositionAnalysisPanel()),
                 createDockTab("News", wrapDockContent(newsUI)),
                 createDockTab("Research", wrapDockContent(browserUI)),
                 createDockTab("System Console", wrapDockContent(systemConsole))
@@ -308,31 +376,59 @@ public class DisplayExchangeUI extends AnchorPane {
 
     private Node buildMarketWatchPanel() {
         Label title = createPanelTitle("Market Watch");
-        Label copy = createPanelCopy("Double-click a symbol to open it in the terminal. This mirrors Sopotek's quick symbol launch behavior.");
+        Label copy = createPanelCopy("Sopotek-style symbol board with live quote slots, AI training state, and one-click chart focus.");
 
         Button openButton = createToolbarButton("Open Symbol");
         openButton.setOnAction(event -> {
-            String selectedPair = marketWatchList.getSelectionModel().getSelectedItem();
-            if (selectedPair != null && !selectedPair.isBlank()) {
-                addChart(selectedPair);
+            MarketWatchRow selectedRow = marketWatchTable.getSelectionModel().getSelectedItem();
+            if (selectedRow != null && selectedRow.symbol() != null && !selectedRow.symbol().isBlank()) {
+                openOrFocusChart(selectedRow.symbol());
             } else {
                 showError("Choose a market from Market Watch first.");
             }
         });
 
-        Button multiButton = createToolbarButton("Multi Chart");
-        multiButton.setOnAction(event -> multiChartLayout());
+        Button aiTrainingButton = createToolbarButton("AI Training");
+        aiTrainingButton.setOnAction(event -> openAiTrainingWindow());
 
-        Button refreshButton = createToolbarButton("Refresh Markets");
+        Button strategyButton = createToolbarButton("Strategy Assigner");
+        strategyButton.setOnAction(event -> openStrategyAssignerWindow());
+
+        Button signalButton = createToolbarButton("Signals");
+        signalButton.setOnAction(event -> openSignalMonitorWindow());
+
+        Button refreshButton = createToolbarButton("Refresh");
         refreshButton.setOnAction(event -> loadTradePairs());
 
-        HBox actions = new HBox(8, openButton, multiButton, refreshButton);
+        HBox actions = new HBox(8, openButton, aiTrainingButton, strategyButton, signalButton, refreshButton);
         actions.setAlignment(Pos.CENTER_LEFT);
 
-        VBox panel = new VBox(12, title, copy, marketWatchList, actions);
+        VBox panel = new VBox(12, title, copy, marketWatchTable, actions);
         panel.setMinSize(0, 0);
         panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        VBox.setVgrow(marketWatchList, Priority.ALWAYS);
+        VBox.setVgrow(marketWatchTable, Priority.ALWAYS);
+        return wrapDockContent(panel);
+    }
+
+    private Node buildSignalMonitorPanel() {
+        Label title = createPanelTitle("AI Signal Monitor");
+        Label copy = createPanelCopy("Live chart bias, AI state, and signal posture for the open Sopotek-style workspace.");
+        TableView<SignalMonitorRow> table = createSignalMonitorTable();
+        table.setItems(signalMonitorRows);
+
+        Button liveAgentButton = createToolbarButton("Live Agent");
+        liveAgentButton.setOnAction(event -> openLiveAgentWindow());
+
+        Button quantButton = createToolbarButton("Quant PM");
+        quantButton.setOnAction(event -> openQuantPmWindow());
+
+        Button strategyButton = createToolbarButton("Strategy Assigner");
+        strategyButton.setOnAction(event -> openStrategyAssignerWindow());
+
+        VBox panel = new VBox(12, title, copy, table, new HBox(8, liveAgentButton, strategyButton, quantButton));
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(table, Priority.ALWAYS);
         return wrapDockContent(panel);
     }
 
@@ -344,6 +440,12 @@ public class DisplayExchangeUI extends AnchorPane {
         Button autoButton = createToolbarButton("AI Toggle");
         autoButton.setOnAction(event -> setAutoTrading(!isAnyTargetChartAutoTrading()));
 
+        Button trainingButton = createToolbarButton("AI Training");
+        trainingButton.setOnAction(event -> openAiTrainingWindow());
+
+        Button strategyButton = createToolbarButton("Strategy Assigner");
+        strategyButton.setOnAction(event -> openStrategyAssignerWindow());
+
         VBox panel = new VBox(
                 12,
                 createPanelTitle("Strategy Scorecard"),
@@ -351,10 +453,32 @@ public class DisplayExchangeUI extends AnchorPane {
                 strategyHeadlineLabel,
                 strategyBodyLabel,
                 strategyMetaLabel,
-                new HBox(8, manualTradeButton, autoButton)
+                new HBox(8, manualTradeButton, autoButton, strategyButton, trainingButton)
         );
         panel.setMinSize(0, 0);
         panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        return wrapDockContent(panel);
+    }
+
+    private Node buildStrategyDebugPanel() {
+        Label title = createPanelTitle("Strategy Debug");
+        Label copy = createPanelCopy("Indicator posture, loaded-candle depth, and execution mode for the charts currently open in the desk.");
+        TableView<StrategyInsightRow> table = createStrategyInsightTable();
+        table.setItems(strategyInsightRows);
+
+        Button recommendationsButton = createToolbarButton("Recommendations");
+        recommendationsButton.setOnAction(event -> openSignalMonitorWindow());
+
+        Button aiTrainingButton = createToolbarButton("AI Training");
+        aiTrainingButton.setOnAction(event -> openAiTrainingWindow());
+
+        Button strategyButton = createToolbarButton("Strategy Assigner");
+        strategyButton.setOnAction(event -> openStrategyAssignerWindow());
+
+        VBox panel = new VBox(12, title, copy, table, new HBox(8, recommendationsButton, strategyButton, aiTrainingButton));
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(table, Priority.ALWAYS);
         return wrapDockContent(panel);
     }
 
@@ -400,6 +524,124 @@ public class DisplayExchangeUI extends AnchorPane {
         return wrapDockContent(panel);
     }
 
+    private Node buildAgentTimelinePanel() {
+        Label title = createPanelTitle("Live Agent Timeline");
+        Label copy = createPanelCopy("Watch the live multi-agent flow across symbols, from signal posture and strategy routing through chart state and AI execution.");
+        TextField filterField = new TextField();
+        filterField.setPromptText("Filter by symbol, event, strategy, timeframe, or detail");
+        filterField.getStyleClass().add("terminal-combo-box");
+
+        FilteredList<AgentTimelineRow> filteredRows = new FilteredList<>(agentTimelineRows, row -> true);
+        TableView<AgentTimelineRow> table = createAgentTimelineTable();
+        table.setItems(filteredRows);
+
+        Label assignmentLabel = createPanelCopy("Current Assignment: Select an event or symbol to inspect the active routing.");
+        Label detailLabel = createPanelCopy("Live Agent Detail: Select an event to inspect the chart, stage, and strategy context.");
+        assignmentLabel.setWrapText(true);
+        detailLabel.setWrapText(true);
+
+        Runnable refreshFilter = () -> {
+            String query = filterField.getText() == null ? "" : filterField.getText().trim().toLowerCase();
+            filteredRows.setPredicate(row -> query.isBlank()
+                    || row.symbol().toLowerCase().contains(query)
+                    || row.kind().toLowerCase().contains(query)
+                    || row.actorEvent().toLowerCase().contains(query)
+                    || row.stage().toLowerCase().contains(query)
+                    || row.strategy().toLowerCase().contains(query)
+                    || row.timeframe().toLowerCase().contains(query)
+                    || row.detail().toLowerCase().contains(query));
+        };
+        filterField.textProperty().addListener((obs, oldValue, newValue) -> refreshFilter.run());
+        refreshFilter.run();
+
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, row) -> {
+            if (row == null) {
+                assignmentLabel.setText("Current Assignment: Select an event or symbol to inspect the active routing.");
+                detailLabel.setText("Live Agent Detail: Select an event to inspect the chart, stage, and strategy context.");
+                return;
+            }
+            StrategyAssignmentRow assignment = strategyAssignmentsBySymbol.get(row.symbol());
+            assignmentLabel.setText("Current Assignment: "
+                    + (assignment == null
+                    ? "No explicit strategy assignment for " + row.symbol() + "."
+                    : row.symbol() + " -> " + assignment.strategy() + " / " + assignment.timeframe() + " / " + assignment.status()));
+            detailLabel.setText("Live Agent Detail: " + row.kind() + " | " + row.actorEvent() + " | " + row.stage()
+                    + " | " + row.strategy() + " | " + row.timeframe() + " | " + row.detail());
+        });
+
+        Button openChartButton = createToolbarButton("Open Symbol");
+        openChartButton.setOnAction(event -> {
+            AgentTimelineRow selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.symbol() != null && !selected.symbol().isBlank() && !"SYSTEM".equals(selected.symbol())) {
+                openOrFocusChart(selected.symbol());
+            } else {
+                showError("Select a symbol in Live Agent first.");
+            }
+        });
+
+        Button assignButton = createToolbarButton("Strategy Assigner");
+        assignButton.setOnAction(event -> {
+            AgentTimelineRow selected = table.getSelectionModel().getSelectedItem();
+            openStrategyAssignerWindow(selected == null ? resolvePreferredSymbol() : selected.symbol());
+        });
+
+        Button trainingButton = createToolbarButton("AI Training");
+        trainingButton.setOnAction(event -> openAiTrainingWindow());
+
+        Button clearButton = createToolbarButton("Clear Timeline");
+        clearButton.setOnAction(event -> agentTimelineRows.clear());
+
+        VBox panel = new VBox(
+                12,
+                title,
+                copy,
+                filterField,
+                table,
+                assignmentLabel,
+                detailLabel,
+                new HBox(8, openChartButton, assignButton, trainingButton, clearButton)
+        );
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        return wrapDockContent(panel);
+    }
+
+    private Node buildQuantPmPanel() {
+        Label title = createPanelTitle("Quant PM");
+        Label copy = createPanelCopy("Portfolio analytics, exposure posture, and desk-wide AI coverage similar to Sopotek's quant portfolio manager.");
+        TableView<MetricRow> table = createMetricTable();
+        table.setItems(quantPmRows);
+
+        Button positionButton = createToolbarButton("Position Analysis");
+        positionButton.setOnAction(event -> openPositionAnalysisWindow());
+
+        Button riskButton = createToolbarButton("Risk Workspace");
+        riskButton.setOnAction(event -> applyWorkspacePreset("risk"));
+
+        VBox panel = new VBox(12, title, copy, table, new HBox(8, positionButton, riskButton));
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        return wrapDockContent(panel);
+    }
+
+    private Node buildPositionAnalysisPanel() {
+        Label title = createPanelTitle("Position Analysis");
+        Label copy = createPanelCopy("Open exposure, direction bias, and per-position notes for the current broker/account session.");
+        TableView<PositionAnalysisRow> table = createPositionAnalysisTable();
+        table.setItems(positionAnalysisRows);
+
+        Button quantButton = createToolbarButton("Quant PM");
+        quantButton.setOnAction(event -> openQuantPmWindow());
+
+        VBox panel = new VBox(12, title, copy, table, quantButton);
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        return wrapDockContent(panel);
+    }
+
     private MenuBar createMenuBar() {
         Menu fileMenu = new Menu("File");
         fileMenu.getItems().addAll(
@@ -423,8 +665,22 @@ public class DisplayExchangeUI extends AnchorPane {
         Menu strategyMenu = new Menu("Strategy");
         strategyMenu.getItems().addAll(
                 createMenuItem("Strategy Scorecard", () -> selectDockTab(leftDockTabs, "Strategy Scorecard")),
-                createMenuItem("Strategy Debug", () -> selectDockTab(bottomDockTabs, "System Console")),
-                createMenuItem("Indicators", () -> selectDockTab(leftDockTabs, "Indicators"))
+                createMenuItem("Strategy Debug", () -> selectDockTab(leftDockTabs, "Strategy Debug")),
+                createMenuItem("Indicators", () -> selectDockTab(leftDockTabs, "Indicators")),
+                createMenuItem("Strategy Assigner", this::openStrategyAssignerWindow),
+                createMenuItem("AI Training", this::openAiTrainingWindow)
+        );
+
+        Menu workspaceMenu = new Menu("Workspace");
+        workspaceMenu.getItems().addAll(
+                createMenuItem("Trading Workspace", () -> applyWorkspacePreset("trading")),
+                createMenuItem("Research Workspace", () -> applyWorkspacePreset("research")),
+                createMenuItem("Risk Workspace", () -> applyWorkspacePreset("risk")),
+                createMenuItem("Review Workspace", () -> applyWorkspacePreset("review")),
+                new SeparatorMenuItem(),
+                createMenuItem("Market Watch", () -> selectDockTab(leftDockTabs, "Market Watch")),
+                createMenuItem("AI Signal Monitor", () -> selectDockTab(leftDockTabs, "AI Signal Monitor")),
+                createMenuItem("Position Analysis", () -> selectDockTab(bottomDockTabs, "Position Analysis"))
         );
 
         Menu chartsMenu = new Menu("Charts");
@@ -434,6 +690,8 @@ public class DisplayExchangeUI extends AnchorPane {
                 new SeparatorMenuItem(),
                 createMenuItem("Detach Current Tab", this::detachCurrentChartTab),
                 createMenuItem("Reattach Active Chart", this::reattachActiveChartWindow),
+                createMenuItem("Fit Active Chart", () ->
+                        withActiveChart(CandleStickChartContainer::fitChart, "Open a chart before fitting it.")),
                 createMenuItem("Tile Chart Windows", this::tileDetachedChartWindows),
                 createMenuItem("Cascade Chart Windows", this::cascadeDetachedChartWindows),
                 new SeparatorMenuItem(),
@@ -460,7 +718,9 @@ public class DisplayExchangeUI extends AnchorPane {
         riskMenu.getItems().addAll(
                 createMenuItem("Risk Heatmap", () -> selectDockTab(rightDockTabs, "Risk Heatmap")),
                 createMenuItem("System Status", () -> selectDockTab(rightDockTabs, "System Status")),
-                createMenuItem("Positions", () -> selectDockTab(bottomDockTabs, "Positions"))
+                createMenuItem("Positions", () -> selectDockTab(bottomDockTabs, "Positions")),
+                createMenuItem("Position Analysis", this::openPositionAnalysisWindow),
+                createMenuItem("Quant PM", this::openQuantPmWindow)
         );
 
         Menu reviewMenu = new Menu("Review");
@@ -474,14 +734,24 @@ public class DisplayExchangeUI extends AnchorPane {
         researchMenu.getItems().addAll(
                 createMenuItem("Sopotek Pilot", () -> selectDockTab(bottomDockTabs, "Research")),
                 createMenuItem("Orderbook", () -> selectDockTab(rightDockTabs, "Orderbook")),
-                createMenuItem("Market Watch", () -> selectDockTab(leftDockTabs, "Market Watch"))
+                createMenuItem("Market Watch", () -> selectDockTab(leftDockTabs, "Market Watch")),
+                createMenuItem("AI Signal Monitor", this::openSignalMonitorWindow),
+                createMenuItem("Live Agent Timeline", this::openLiveAgentWindow),
+                createMenuItem("Strategy Assigner", this::openStrategyAssignerWindow),
+                createMenuItem("Quant PM", this::openQuantPmWindow)
         );
 
         Menu toolsMenu = new Menu("Tools");
         toolsMenu.getItems().addAll(
                 createMenuItem("System Console", () -> selectDockTab(bottomDockTabs, "System Console")),
                 createMenuItem("System Status", () -> selectDockTab(rightDockTabs, "System Status")),
-                createMenuItem("Indicators", () -> selectDockTab(leftDockTabs, "Indicators"))
+                createMenuItem("Indicators", () -> selectDockTab(leftDockTabs, "Indicators")),
+                createMenuItem("AI Signal Monitor", this::openSignalMonitorWindow),
+                createMenuItem("Live Agent Timeline", this::openLiveAgentWindow),
+                createMenuItem("Strategy Assigner", this::openStrategyAssignerWindow),
+                createMenuItem("Position Analysis", this::openPositionAnalysisWindow),
+                createMenuItem("Quant PM", this::openQuantPmWindow),
+                createMenuItem("AI Training Desk", this::openAiTrainingWindow)
         );
 
         Menu helpMenu = new Menu("Help");
@@ -497,6 +767,7 @@ public class DisplayExchangeUI extends AnchorPane {
                 fileMenu,
                 tradingMenu,
                 strategyMenu,
+                workspaceMenu,
                 chartsMenu,
                 dataMenu,
                 riskMenu,
@@ -535,14 +806,43 @@ public class DisplayExchangeUI extends AnchorPane {
         latestButton.setOnAction(event ->
                 withActiveChart(CandleStickChartContainer::jumpToLatestCandle, "Open a chart before jumping to the latest candle."));
 
+        Button fitButton = createToolbarButton("Fit");
+        fitButton.setOnAction(event ->
+                withActiveChart(CandleStickChartContainer::fitChart, "Open a chart before fitting it."));
+
+        Button detachButton = createToolbarButton("Detach");
+        detachButton.setOnAction(event -> detachCurrentChartTab());
+
+        Button reattachButton = createToolbarButton("Reattach");
+        reattachButton.setOnAction(event -> reattachActiveChartWindow());
+
         Button autoButton = createToolbarButton("AUTO");
         autoButton.getStyleClass().add("terminal-auto-button");
         autoButton.setOnAction(event -> setAutoTrading(!isAnyTargetChartAutoTrading()));
 
+        Button signalButton = createToolbarButton("Signals");
+        signalButton.setOnAction(event -> openSignalMonitorWindow());
+
+        Button agentButton = createToolbarButton("Live Agent");
+        agentButton.setOnAction(event -> openLiveAgentWindow());
+
+        Button quantButton = createToolbarButton("Quant PM");
+        quantButton.setOnAction(event -> openQuantPmWindow());
+
+        Button positionButton = createToolbarButton("Pos Analysis");
+        positionButton.setOnAction(event -> openPositionAnalysisWindow());
+
         HBox executionBox = createToolbarBox(
                 manualTradeButton,
                 refreshButton,
-                latestButton
+                latestButton,
+                fitButton,
+                detachButton,
+                reattachButton,
+                signalButton,
+                agentButton,
+                quantButton,
+                positionButton
         );
 
         Label scopeLabel = createToolbarLabel("Scope");
@@ -691,12 +991,12 @@ public class DisplayExchangeUI extends AnchorPane {
 
                 FxLifecycle.runLaterIf(() -> !disposed.get(), () -> {
                     symbolPicker.setItems(FXCollections.observableArrayList(pairNames));
-                    marketWatchList.getItems().setAll(pairNames);
+                    marketWatchRows.setAll(buildMarketWatchRows(pairNames));
                     if (!pairNames.isEmpty() && symbolPicker.getValue() == null) {
                         symbolPicker.getSelectionModel().selectFirst();
                     }
-                    if (!pairNames.isEmpty() && marketWatchList.getSelectionModel().isEmpty()) {
-                        marketWatchList.getSelectionModel().selectFirst();
+                    if (!marketWatchRows.isEmpty() && marketWatchTable.getSelectionModel().isEmpty()) {
+                        marketWatchTable.getSelectionModel().selectFirst();
                     }
                     marketCountValueLabel.setText(Integer.toString(pairNames.size()));
                     serviceValueLabel.setText(exchange.getExchangeMessage());
@@ -722,7 +1022,28 @@ public class DisplayExchangeUI extends AnchorPane {
             showError("Choose a symbol before opening a chart.");
             return;
         }
-        addChart(selectedPair);
+        openOrFocusChart(selectedPair);
+    }
+
+    private void openOrFocusChart(String tradePairStr) {
+        Tab existingTab = findAttachedChartTab(tradePairStr);
+        if (existingTab != null) {
+            chartTabPane.getSelectionModel().select(existingTab);
+            syncActiveChartState();
+            logAgentEvent(tradePairStr, "chart_focus", "Focused attached chart.");
+            return;
+        }
+
+        DetachedChartWindow detachedWindow = findDetachedChartWindow(tradePairStr);
+        if (detachedWindow != null) {
+            detachedWindow.stage.show();
+            detachedWindow.stage.toFront();
+            detachedWindow.stage.requestFocus();
+            logAgentEvent(tradePairStr, "chart_focus", "Focused detached chart window.");
+            return;
+        }
+
+        addChart(tradePairStr);
     }
 
     private void addChart(String tradePairStr) {
@@ -745,6 +1066,7 @@ public class DisplayExchangeUI extends AnchorPane {
             chartTabPane.getSelectionModel().select(chartTab);
             syncActiveChartState();
             appendConsole("Opened chart " + tradePairStr + ".");
+            logAgentEvent(tradePairStr, "chart_open", "Opened chart in terminal workspace.");
         } catch (Exception e) {
             logger.error("Error adding chart", e);
             showError("Error adding chart: " + e.getMessage());
@@ -763,7 +1085,7 @@ public class DisplayExchangeUI extends AnchorPane {
     }
 
     private void multiChartLayout() {
-        List<String> markets = new ArrayList<>(marketWatchList.getItems());
+        List<String> markets = marketWatchRows.stream().map(MarketWatchRow::symbol).filter(Objects::nonNull).toList();
         if (markets.isEmpty()) {
             showError("Load markets before opening a multi-chart layout.");
             return;
@@ -771,9 +1093,10 @@ public class DisplayExchangeUI extends AnchorPane {
 
         int targetCount = Math.min(4, markets.size());
         for (int i = 0; i < targetCount; i++) {
-            addChart(markets.get(i));
+            openOrFocusChart(markets.get(i));
         }
         appendConsole("Built multi-chart layout for " + targetCount + " symbols.");
+        logAgentEvent("SYSTEM", "multi_chart", "Built a multi-chart layout for " + targetCount + " symbols.");
     }
 
     private void applyTimeframe(String timeframe) {
@@ -785,7 +1108,26 @@ public class DisplayExchangeUI extends AnchorPane {
             chart.setSecondsPerCandle(seconds);
             setActiveTimeframeButton(timeframe);
             appendConsole("Switched " + chart.getTradePair().toString('/') + " to " + timeframe + ".");
+            logAgentEvent(chart.getTradePair().toString('/'), "timeframe", "Changed timeframe to " + timeframe + ".");
         }, "Open a chart before changing the timeframe.");
+    }
+
+    private Tab findAttachedChartTab(String tradePairStr) {
+        for (Tab tab : chartTabPane.getTabs()) {
+            if (Objects.equals(tab.getText(), tradePairStr)) {
+                return tab;
+            }
+        }
+        return null;
+    }
+
+    private DetachedChartWindow findDetachedChartWindow(String tradePairStr) {
+        for (DetachedChartWindow window : detachedChartWindows.values()) {
+            if (Objects.equals(window.title, tradePairStr)) {
+                return window;
+            }
+        }
+        return null;
     }
 
     private void setActiveTimeframeButton(String activeTimeframe) {
@@ -865,7 +1207,7 @@ public class DisplayExchangeUI extends AnchorPane {
         if (!Objects.equals(symbolPicker.getValue(), tradePair)) {
             symbolPicker.setValue(tradePair);
         }
-        marketWatchList.getSelectionModel().select(tradePair);
+        selectMarketWatchRow(tradePair);
         aiActivityLabel.setText(activeChart.isAiTradingEnabled() ? "AI Active" : "AI Idle");
         setActiveTimeframeButton(resolveTimeframeLabel(activeChart.getSecondsPerCandle()));
 
@@ -877,14 +1219,19 @@ public class DisplayExchangeUI extends AnchorPane {
         bollingerMenuItem.setSelected(options.isShowBollingerBands());
 
         indicatorHost.getChildren().setAll(activeChart.createChartOptionsPane());
-        strategyHeadlineLabel.setText(tradePair + " • " + resolveTimeframeLabel(activeChart.getSecondsPerCandle()));
+        StrategyAssignmentRow assignment = strategyAssignmentsBySymbol.get(tradePair);
+        strategyHeadlineLabel.setText(tradePair + " | " + resolveTimeframeLabel(activeChart.getSecondsPerCandle())
+                + (assignment == null ? "" : " | " + assignment.strategy()));
         strategyBodyLabel.setText(activeChart.isAiTradingEnabled()
                 ? "AI trading is currently active for the selected chart."
-                : "Manual mode is active. Use the toolbar or Trading menu to arm AI execution.");
+                : assignment == null
+                ? "Manual mode is active. Use the toolbar or Trading menu to arm AI execution."
+                : "Assigned strategy: " + assignment.strategy() + " / " + assignment.timeframe() + " / " + assignment.status() + ".");
         strategyMetaLabel.setText("Indicators: "
                 + (options.isShowSma20() ? "SMA 20 " : "")
                 + (options.isShowEma50() ? "EMA 50 " : "")
-                + (options.isShowBollingerBands() ? "Bollinger " : "None"));
+                + (options.isShowBollingerBands() ? "Bollinger " : "None")
+                + (assignment == null ? "" : " | Note: " + assignment.note()));
         updateSystemStatus(activeChart);
     }
 
@@ -905,7 +1252,12 @@ public class DisplayExchangeUI extends AnchorPane {
         }
 
         if ("Watchlist".equals(scope)) {
-            targets.addAll(getAttachedCharts());
+            Set<String> watched = new LinkedHashSet<>(watchedSymbols);
+            for (CandleStickChartContainer chart : getAllOpenCharts()) {
+                if (watched.contains(chart.getTradePair().toString('/'))) {
+                    targets.add(chart);
+                }
+            }
             return targets;
         }
 
@@ -947,11 +1299,14 @@ public class DisplayExchangeUI extends AnchorPane {
 
         syncActiveChartState();
         appendConsole((enabled ? "Enabled" : "Disabled") + " AI trading for " + Math.max(changed, targets.size()) + " chart(s).");
+        logAgentEvent("SYSTEM", enabled ? "ai_enabled" : "ai_disabled",
+                (enabled ? "Enabled" : "Disabled") + " AI trading for " + Math.max(changed, targets.size()) + " chart(s).");
     }
 
     private void activateKillSwitch() {
         setAutoTrading(false);
         appendConsole("Emergency kill switch activated.");
+        logAgentEvent("SYSTEM", "kill_switch", "Disabled AI trading across the selected scope.");
     }
 
     private void detachCurrentChartTab() {
@@ -982,8 +1337,10 @@ public class DisplayExchangeUI extends AnchorPane {
         detachedChartWindows.put(stage, window);
         stage.setOnHidden(event -> handleDetachedWindowClosed(stage));
         stage.show();
+        FxLifecycle.runLaterIf(() -> !disposed.get(), chartContainer::fitChart);
 
         appendConsole("Detached chart " + title + ".");
+        logAgentEvent(title, "chart_detach", "Detached chart into its own window.");
         syncActiveChartState();
     }
 
@@ -1000,7 +1357,9 @@ public class DisplayExchangeUI extends AnchorPane {
         Tab reattachedTab = createChartTab(detachedWindow.title, detachedWindow.chartContainer);
         chartTabPane.getTabs().add(reattachedTab);
         chartTabPane.getSelectionModel().select(reattachedTab);
+        FxLifecycle.runLaterIf(() -> !disposed.get(), detachedWindow.chartContainer::fitChart);
         appendConsole("Reattached chart " + detachedWindow.title + ".");
+        logAgentEvent(detachedWindow.title, "chart_reattach", "Reattached detached chart window.");
         syncActiveChartState();
     }
 
@@ -1056,6 +1415,860 @@ public class DisplayExchangeUI extends AnchorPane {
         }
     }
 
+    private void startWorkspaceRefreshLoop() {
+        workspaceRefreshExecutor.scheduleAtFixedRate(() -> {
+            if (disposed.get()) {
+                return;
+            }
+            refreshWorkspaceModels();
+        }, 1, 5, TimeUnit.SECONDS);
+    }
+
+    private void seedWorkspaceModels() {
+        marketWatchRows.setAll(buildMarketWatchRows(symbolPicker.getItems()));
+        signalMonitorRows.setAll(List.of(
+                new SignalMonitorRow("No chart", "-", "Manual", "Neutral", "-", "-", "Open a symbol to start monitoring.")
+        ));
+        strategyInsightRows.setAll(List.of(
+                new StrategyInsightRow("No chart", "-", "Idle", "None", "Open a symbol to inspect strategies.")
+        ));
+        quantPmRows.setAll(List.of(
+                new MetricRow("Portfolio State", "Awaiting symbols", "Open charts and positions to activate Quant PM.")
+        ));
+        positionAnalysisRows.setAll(List.of(
+                new PositionAnalysisRow("No positions", "-", "-", "-", "Exposure will appear here when the broker returns positions.")
+        ));
+    }
+
+    private void refreshWorkspaceModels() {
+        List<CandleStickChartContainer> charts = getAllOpenCharts();
+        Map<String, CandleStickChartContainer> chartBySymbol = new LinkedHashMap<>();
+        for (CandleStickChartContainer chart : charts) {
+            chartBySymbol.put(chart.getTradePair().toString('/'), chart);
+        }
+        refreshMarketSnapshotCache(prioritizedSnapshotSymbols(symbolPicker.getItems(), chartBySymbol));
+        List<SignalMonitorRow> nextSignals = new ArrayList<>();
+        List<StrategyInsightRow> nextStrategies = new ArrayList<>();
+
+        for (CandleStickChartContainer chart : charts) {
+            String symbol = chart.getTradePair().toString('/');
+            String timeframe = resolveTimeframeLabel(chart.getSecondsPerCandle());
+            String mode = chart.isAiTradingEnabled() ? "AI" : "Manual";
+            String bias = chart.getSignalBias();
+            String price = formatPrice(chart.getLatestClosePrice());
+            String candleDepth = Integer.toString(chart.getLoadedCandleCount());
+            String status = chart.isAiTradingEnabled()
+                    ? "Watching live AI execution"
+                    : "Manual execution";
+            nextSignals.add(new SignalMonitorRow(symbol, timeframe, mode, bias, price, candleDepth, status));
+            nextStrategies.add(new StrategyInsightRow(
+                    symbol,
+                    timeframe,
+                    bias,
+                    summarizeIndicators(chart.getChartOptions()),
+                    status
+            ));
+
+            String signature = String.join("|", timeframe, mode, bias, price);
+            String previousSignature = signalSignatureBySymbol.put(symbol, signature);
+            if (!Objects.equals(previousSignature, signature)) {
+                logAgentEvent(symbol, "signal_update", mode + " / " + bias + " / " + price);
+            }
+        }
+
+        if (nextSignals.isEmpty()) {
+            nextSignals.add(new SignalMonitorRow("No chart", "-", "Manual", "Neutral", "-", "-", "Open a symbol to start monitoring."));
+        }
+        if (nextStrategies.isEmpty()) {
+            nextStrategies.add(new StrategyInsightRow("No chart", "-", "Idle", "None", "Open a symbol to inspect strategies."));
+        }
+
+        List<Account> accounts = safeAccounts();
+        List<Position> positions = safePositions();
+        List<MetricRow> nextQuantRows = buildQuantMetrics(charts, accounts, positions);
+        List<PositionAnalysisRow> nextPositionRows = buildPositionAnalysisRows(positions);
+        List<MarketWatchRow> nextMarketWatchRows = buildMarketWatchRows(symbolPicker.getItems(), chartBySymbol);
+
+        FxLifecycle.runLaterIf(() -> !disposed.get(), () -> {
+            marketWatchRows.setAll(nextMarketWatchRows);
+            selectMarketWatchRow(symbolPicker.getValue());
+            signalMonitorRows.setAll(nextSignals);
+            strategyInsightRows.setAll(nextStrategies);
+            quantPmRows.setAll(nextQuantRows);
+            positionAnalysisRows.setAll(nextPositionRows);
+        });
+    }
+
+    private List<MarketWatchRow> buildMarketWatchRows(List<String> symbols) {
+        if (symbols == null || symbols.isEmpty()) {
+            return List.of();
+        }
+        List<MarketWatchRow> rows = new ArrayList<>(symbols.size());
+        String activeSymbol = symbolPicker.getValue();
+        for (String symbol : symbols) {
+            rows.add(createMarketWatchRow(symbol, activeSymbol, null));
+        }
+        rows.sort(marketWatchComparator());
+        return rows;
+    }
+
+    private List<MarketWatchRow> buildMarketWatchRows(List<String> symbols,
+                                                      Map<String, CandleStickChartContainer> chartBySymbol) {
+        if (symbols == null || symbols.isEmpty()) {
+            return List.of();
+        }
+
+        List<MarketWatchRow> rows = new ArrayList<>(symbols.size());
+        String activeSymbol = symbolPicker.getValue();
+        for (String symbol : symbols) {
+            CandleStickChartContainer chart = chartBySymbol.get(symbol);
+            rows.add(createMarketWatchRow(symbol, activeSymbol, chart));
+        }
+        rows.sort(marketWatchComparator());
+        return rows;
+    }
+
+    private MarketWatchRow createMarketWatchRow(String symbol,
+                                                String activeSymbol,
+                                                CandleStickChartContainer chart) {
+        Double[] bidAsk = marketSnapshotCache.getOrDefault(symbol, new Double[]{Double.NaN, Double.NaN});
+        String status = Objects.equals(symbol, activeSymbol) ? "Active"
+                : chart != null ? "Open"
+                : watchedSymbols.contains(symbol) ? "Watch"
+                : "-";
+        MarketWatchRow row = new MarketWatchRow(
+                watchedSymbols.contains(symbol),
+                symbol,
+                formatPrice(bidAsk[0]),
+                formatPrice(bidAsk[1]),
+                describeAiTraining(symbol, chart)
+        );
+        row.statusProperty().set(status);
+        row.watchedProperty().addListener((obs, oldValue, newValue) ->
+                handleMarketWatchToggle(symbol, Boolean.TRUE.equals(newValue)));
+        return row;
+    }
+
+    private Comparator<MarketWatchRow> marketWatchComparator() {
+        String activeSymbol = symbolPicker.getValue();
+        return Comparator
+                .comparingInt((MarketWatchRow row) -> marketWatchPriority(row, activeSymbol))
+                .thenComparing(MarketWatchRow::symbol, String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private int marketWatchPriority(MarketWatchRow row, String activeSymbol) {
+        if (Objects.equals(row.symbol(), activeSymbol)) {
+            return 0;
+        }
+        if (row.watched()) {
+            return 1;
+        }
+        if (Objects.equals(row.status(), "Open")) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private void handleMarketWatchToggle(String symbol, boolean watched) {
+        boolean changed = watched ? watchedSymbols.add(symbol) : watchedSymbols.remove(symbol);
+        if (!changed) {
+            return;
+        }
+        appendConsole((watched ? "Added " : "Removed ") + symbol + (watched ? " to" : " from") + " the market watch list.");
+        logAgentEvent(symbol, watched ? "watch_add" : "watch_remove",
+                watched ? "Added symbol to market watch scope." : "Removed symbol from market watch scope.");
+        FxLifecycle.runLaterIf(() -> !disposed.get(), () -> {
+            marketWatchRows.sort(marketWatchComparator());
+            selectMarketWatchRow(symbolPicker.getValue());
+        });
+    }
+
+    private Set<String> prioritizedSnapshotSymbols(List<String> symbols,
+                                                   Map<String, CandleStickChartContainer> chartBySymbol) {
+        LinkedHashSet<String> prioritized = new LinkedHashSet<>();
+        if (symbolPicker.getValue() != null && !symbolPicker.getValue().isBlank()) {
+            prioritized.add(symbolPicker.getValue());
+        }
+        prioritized.addAll(watchedSymbols);
+        prioritized.addAll(chartBySymbol.keySet());
+        if (symbols != null) {
+            for (String symbol : symbols) {
+                prioritized.add(symbol);
+                if (prioritized.size() >= 36) {
+                    break;
+                }
+            }
+        }
+        return prioritized;
+    }
+
+    private void refreshMarketSnapshotCache(Set<String> symbols) {
+        for (String symbol : symbols) {
+            marketSnapshotCache.put(symbol, safeLatestPriceSnapshot(symbol));
+        }
+    }
+
+    private Double[] safeLatestPriceSnapshot(String symbol) {
+        try {
+            String[] parts = symbol.split("/");
+            if (parts.length != 2) {
+                return new Double[]{Double.NaN, Double.NaN};
+            }
+            Double[] latest = exchange.getLatestPrice(new TradePair(parts[0], parts[1]));
+            if (latest == null || latest.length < 2) {
+                return new Double[]{Double.NaN, Double.NaN};
+            }
+            return new Double[]{latest[0], latest[1]};
+        } catch (Exception ex) {
+            return new Double[]{Double.NaN, Double.NaN};
+        }
+    }
+
+    private String describeAiTraining(String symbol, CandleStickChartContainer chart) {
+        StrategyAssignmentRow assignment = strategyAssignmentsBySymbol.get(symbol);
+        if (chart != null && chart.isAiTradingEnabled()) {
+            return "AI Live";
+        }
+        if (assignment != null) {
+            return assignment.strategy() + " @ " + assignment.timeframe();
+        }
+        return "Ready";
+    }
+
+    private void selectMarketWatchRow(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return;
+        }
+        for (MarketWatchRow row : marketWatchRows) {
+            if (Objects.equals(row.symbol(), symbol)) {
+                marketWatchTable.getSelectionModel().select(row);
+                marketWatchTable.scrollTo(row);
+                return;
+            }
+        }
+    }
+
+    private String resolvePreferredSymbol() {
+        MarketWatchRow selectedMarket = marketWatchTable.getSelectionModel().getSelectedItem();
+        if (selectedMarket != null && selectedMarket.symbol() != null && !selectedMarket.symbol().isBlank()) {
+            return selectedMarket.symbol();
+        }
+        CandleStickChartContainer activeChart = getActiveChartContainer();
+        if (activeChart != null) {
+            return activeChart.getTradePair().toString('/');
+        }
+        return symbolPicker.getValue();
+    }
+
+    private CandleStickChartContainer findOpenChartBySymbol(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+        for (CandleStickChartContainer chart : getAllOpenCharts()) {
+            if (Objects.equals(chart.getTradePair().toString('/'), symbol)) {
+                return chart;
+            }
+        }
+        return null;
+    }
+
+    private String resolveTimeframeForSymbol(String symbol) {
+        CandleStickChartContainer chart = findOpenChartBySymbol(symbol);
+        if (chart != null) {
+            String timeframe = resolveTimeframeLabel(chart.getSecondsPerCandle());
+            if (timeframe != null) {
+                return timeframe;
+            }
+        }
+        StrategyAssignmentRow assignment = strategyAssignmentsBySymbol.get(symbol);
+        if (assignment != null && assignment.timeframe() != null && !assignment.timeframe().isBlank()) {
+            return assignment.timeframe();
+        }
+        return "1h";
+    }
+
+    private void upsertStrategyAssignment(StrategyAssignmentRow assignment) {
+        strategyAssignmentsBySymbol.put(assignment.symbol(), assignment);
+        int existingIndex = -1;
+        for (int i = 0; i < strategyAssignmentRows.size(); i++) {
+            if (Objects.equals(strategyAssignmentRows.get(i).symbol(), assignment.symbol())) {
+                existingIndex = i;
+                break;
+            }
+        }
+        if (existingIndex >= 0) {
+            strategyAssignmentRows.set(existingIndex, assignment);
+        } else {
+            strategyAssignmentRows.add(0, assignment);
+        }
+        if ("AI Live".equalsIgnoreCase(assignment.status())) {
+            watchedSymbols.add(assignment.symbol());
+        }
+        marketWatchRows.setAll(buildMarketWatchRows(symbolPicker.getItems(), buildChartMap()));
+        selectMarketWatchRow(assignment.symbol());
+    }
+
+    private Map<String, CandleStickChartContainer> buildChartMap() {
+        Map<String, CandleStickChartContainer> chartBySymbol = new LinkedHashMap<>();
+        for (CandleStickChartContainer chart : getAllOpenCharts()) {
+            chartBySymbol.put(chart.getTradePair().toString('/'), chart);
+        }
+        return chartBySymbol;
+    }
+
+    private List<CandleStickChartContainer> getAllOpenCharts() {
+        List<CandleStickChartContainer> charts = new ArrayList<>(getAttachedCharts());
+        for (DetachedChartWindow window : detachedChartWindows.values()) {
+            charts.add(window.chartContainer);
+        }
+        return charts;
+    }
+
+    private List<Account> safeAccounts() {
+        try {
+            return exchange.getAccountSummary();
+        } catch (RuntimeException ex) {
+            logger.debug("Unable to refresh account summary for Quant PM", ex);
+            return Collections.emptyList();
+        }
+    }
+
+    private List<Position> safePositions() {
+        try {
+            return exchange.getPositions();
+        } catch (Exception ex) {
+            logger.debug("Unable to refresh positions for Quant PM", ex);
+            return Collections.emptyList();
+        }
+    }
+
+    private List<MetricRow> buildQuantMetrics(List<CandleStickChartContainer> charts,
+                                              List<Account> accounts,
+                                              List<Position> positions) {
+        List<MetricRow> rows = new ArrayList<>();
+        long aiCharts = charts.stream().filter(CandleStickChartContainer::isAiTradingEnabled).count();
+        double totalEquity = accounts.stream().mapToDouble(Account::getEquity).sum();
+        double totalBalance = accounts.stream().mapToDouble(Account::getBalance).sum();
+        double totalNav = accounts.stream().mapToDouble(Account::getNAV).sum();
+        double totalPl = positions.stream().mapToDouble(Position::getProfitOrLoss).sum();
+        double grossExposure = positions.stream().mapToDouble(position -> Math.abs(position.getValue())).sum();
+        long longPositions = positions.stream().filter(this::hasLongExposure).count();
+        long shortPositions = positions.stream().filter(this::hasShortExposure).count();
+
+        rows.add(new MetricRow("Desk Coverage", charts.size() + " charts", aiCharts + " with live AI armed"));
+        rows.add(new MetricRow("Portfolio Equity", money(totalEquity), "Balance " + money(totalBalance) + " / NAV " + money(totalNav)));
+        rows.add(new MetricRow("Gross Exposure", money(grossExposure), "Long " + longPositions + " / Short " + shortPositions));
+        rows.add(new MetricRow("Net P/L", money(totalPl), positions.isEmpty() ? "No broker positions returned." : "Live position snapshot from the broker."));
+        rows.add(new MetricRow("Signal Coverage", Integer.toString(signalMonitorRows.isEmpty() ? charts.size() : signalMonitorRows.size()), "Synchronized to the open charts in the Java desk."));
+        return rows;
+    }
+
+    private List<PositionAnalysisRow> buildPositionAnalysisRows(List<Position> positions) {
+        if (positions.isEmpty()) {
+            return List.of(new PositionAnalysisRow("No positions", "-", "-", "-", "Broker returned no open exposure."));
+        }
+
+        List<PositionAnalysisRow> rows = new ArrayList<>();
+        for (Position position : positions) {
+            if (hasLongExposure(position)) {
+                rows.add(new PositionAnalysisRow(
+                        safeInstrument(position),
+                        "Long",
+                        money(Math.abs(position.getValue())),
+                        money(position.getLongPosition().getPl()),
+                        "Unrealized " + money(position.getLongPosition().getUnrealizedPL())
+                ));
+            }
+            if (hasShortExposure(position)) {
+                rows.add(new PositionAnalysisRow(
+                        safeInstrument(position),
+                        "Short",
+                        money(Math.abs(position.getValue())),
+                        money(position.getShortPosition().getPl()),
+                        "Unrealized " + money(position.getShortPosition().getUnrealizedPL())
+                ));
+            }
+        }
+        return rows;
+    }
+
+    private void logAgentEvent(String symbol, String stage, String detail) {
+        FxLifecycle.runLaterIf(() -> !disposed.get(), () -> {
+            StrategyAssignmentRow assignment = strategyAssignmentsBySymbol.get(symbol);
+            String strategy = assignment == null ? "-" : assignment.strategy();
+            String timeframe = assignment == null ? resolveTimeframeForSymbol(symbol) : assignment.timeframe();
+            agentTimelineRows.add(0, new AgentTimelineRow(
+                    EVENT_TIME_FORMATTER.format(LocalDateTime.now()),
+                    classifyEventKind(stage),
+                    symbol,
+                    assignment == null ? "Desk" : assignment.strategy(),
+                    stage,
+                    strategy,
+                    timeframe,
+                    detail
+            ));
+            if (agentTimelineRows.size() > 250) {
+                agentTimelineRows.remove(250, agentTimelineRows.size());
+            }
+        });
+    }
+
+    private String classifyEventKind(String stage) {
+        if (stage == null || stage.isBlank()) {
+            return "Desk";
+        }
+        if (stage.startsWith("ai_") || stage.contains("signal")) {
+            return "AI";
+        }
+        if (stage.startsWith("chart")) {
+            return "Chart";
+        }
+        if (stage.startsWith("watch")) {
+            return "Market";
+        }
+        if (stage.startsWith("strategy")) {
+            return "Strategy";
+        }
+        if (stage.startsWith("workspace")) {
+            return "Workspace";
+        }
+        return "Desk";
+    }
+
+    private void applyWorkspacePreset(String preset) {
+        switch (preset) {
+            case "research" -> {
+                selectDockTab(leftDockTabs, "AI Signal Monitor");
+                selectDockTab(bottomDockTabs, "Quant PM");
+                selectDockTab(rightDockTabs, "Orderbook");
+                openSignalMonitorWindow();
+            }
+            case "risk" -> {
+                selectDockTab(rightDockTabs, "Risk Heatmap");
+                selectDockTab(bottomDockTabs, "Position Analysis");
+                openPositionAnalysisWindow();
+            }
+            case "review" -> {
+                selectDockTab(leftDockTabs, "Strategy Debug");
+                selectDockTab(bottomDockTabs, "Live Agent");
+                selectDockTab(bottomDockTabs, "Trade Log");
+                openLiveAgentWindow();
+            }
+            default -> {
+                selectDockTab(leftDockTabs, "Market Watch");
+                selectDockTab(bottomDockTabs, "Positions");
+                selectDockTab(rightDockTabs, "System Status");
+            }
+        }
+        appendConsole("Applied " + preset + " workspace.");
+        logAgentEvent("SYSTEM", "workspace", "Applied " + preset + " workspace preset.");
+    }
+
+    private void openSignalMonitorWindow() {
+        showToolWindow("signal_monitor", "AI Signal Monitor", this::buildSignalMonitorPanel, 1040, 600);
+    }
+
+    private void openLiveAgentWindow() {
+        showToolWindow("live_agent", "Live Agent Timeline", this::buildAgentTimelinePanel, 1100, 620);
+    }
+
+    private void openQuantPmWindow() {
+        showToolWindow("quant_pm", "Quant PM", this::buildQuantPmPanel, 1040, 620);
+    }
+
+    private void openPositionAnalysisWindow() {
+        showToolWindow("position_analysis", "Position Analysis", this::buildPositionAnalysisPanel, 1040, 620);
+    }
+
+    private void openAiTrainingWindow() {
+        showToolWindow("ai_training", "AI Training Desk", this::buildAiTrainingPanel, 900, 520);
+    }
+
+    private void openStrategyAssignerWindow() {
+        openStrategyAssignerWindow(resolvePreferredSymbol());
+    }
+
+    private void openStrategyAssignerWindow(String preferredSymbol) {
+        final String key = "strategy_assigner";
+        Stage existing = detachedToolWindows.get(key);
+        if (existing != null) {
+            applyStrategyAssignerSelection(existing, preferredSymbol);
+            existing.show();
+            existing.toFront();
+            existing.requestFocus();
+            return;
+        }
+
+        StrategyAssignerPane pane = createStrategyAssignerPane(preferredSymbol);
+        StackPane root = new StackPane(pane.root());
+        root.setPadding(new Insets(14));
+        root.getStyleClass().add("terminal-detached-root");
+
+        Scene scene = new Scene(root, 1040, 620);
+        scene.getStylesheets().add(Objects.requireNonNull(
+                TradingWindow.class.getResource("/css/app.css")
+        ).toExternalForm());
+
+        Stage stage = new Stage();
+        stage.setTitle("InvestPro Terminal - Strategy Assigner");
+        stage.setScene(scene);
+        stage.setMinWidth(900);
+        stage.setMinHeight(520);
+        stage.getProperties().put("strategySymbolPicker", pane.symbolPicker());
+        stage.getProperties().put("strategyAssignmentTable", pane.table());
+        stage.setOnHidden(event -> detachedToolWindows.remove(key));
+        detachedToolWindows.put(key, stage);
+        stage.show();
+        logAgentEvent(preferredSymbol == null || preferredSymbol.isBlank() ? "SYSTEM" : preferredSymbol,
+                "strategy_assigner", "Opened Strategy Assigner.");
+    }
+
+    private StrategyAssignerPane createStrategyAssignerPane(String preferredSymbol) {
+        Label title = createPanelTitle("Strategy Assigner");
+        Label copy = createPanelCopy("Assign live routing, strategy bias, and timeframe the way Sopotek's desk promotes strategy ownership across Market Watch, Live Agent, and AI training.");
+        ComboBox<String> strategySymbolPicker = new ComboBox<>();
+        strategySymbolPicker.getStyleClass().add("terminal-combo-box");
+        strategySymbolPicker.setItems(symbolPicker.getItems());
+        strategySymbolPicker.setPromptText("Select symbol");
+        String initialSymbol = preferredSymbol == null || preferredSymbol.isBlank() ? resolvePreferredSymbol() : preferredSymbol;
+        if (initialSymbol != null && !initialSymbol.isBlank()) {
+            strategySymbolPicker.getSelectionModel().select(initialSymbol);
+        }
+
+        ComboBox<String> strategyPicker = new ComboBox<>();
+        strategyPicker.getStyleClass().add("terminal-combo-box");
+        strategyPicker.getItems().setAll(STRATEGY_OPTIONS);
+        strategyPicker.getSelectionModel().selectFirst();
+
+        ComboBox<String> timeframePicker = new ComboBox<>();
+        timeframePicker.getStyleClass().add("terminal-combo-box");
+        timeframePicker.getItems().setAll(TIMEFRAME_SECONDS.keySet());
+        timeframePicker.getSelectionModel().select("1h");
+
+        ComboBox<String> statusPicker = new ComboBox<>();
+        statusPicker.getStyleClass().add("terminal-combo-box");
+        statusPicker.getItems().setAll("Training", "Assigned", "Monitoring", "AI Live");
+        statusPicker.getSelectionModel().select("Training");
+
+        TextField noteField = new TextField();
+        noteField.getStyleClass().add("terminal-combo-box");
+        noteField.setPromptText("Notes for the live agent, PM, or operator");
+
+        TableView<StrategyAssignmentRow> table = createStrategyAssignmentTable();
+        table.setItems(strategyAssignmentRows);
+
+        Runnable syncSelection = () -> {
+            String symbol = strategySymbolPicker.getValue();
+            StrategyAssignmentRow assignment = symbol == null ? null : strategyAssignmentsBySymbol.get(symbol);
+            if (assignment == null) {
+                noteField.clear();
+                strategyPicker.getSelectionModel().selectFirst();
+                timeframePicker.getSelectionModel().select(resolveTimeframeForSymbol(symbol));
+                statusPicker.getSelectionModel().select("Training");
+                return;
+            }
+            strategyPicker.getSelectionModel().select(assignment.strategy());
+            timeframePicker.getSelectionModel().select(assignment.timeframe());
+            statusPicker.getSelectionModel().select(assignment.status());
+            noteField.setText(assignment.note());
+        };
+        strategySymbolPicker.valueProperty().addListener((obs, oldValue, newValue) -> syncSelection.run());
+        syncSelection.run();
+
+        Button assignButton = createToolbarButton("Assign Strategy");
+        assignButton.setOnAction(event -> {
+            String symbol = strategySymbolPicker.getValue();
+            if (symbol == null || symbol.isBlank()) {
+                showError("Select a symbol before assigning a strategy.");
+                return;
+            }
+            StrategyAssignmentRow assignment = new StrategyAssignmentRow(
+                    symbol,
+                    strategyPicker.getValue(),
+                    timeframePicker.getValue(),
+                    statusPicker.getValue(),
+                    noteField.getText() == null || noteField.getText().isBlank() ? "Operator assigned strategy workflow." : noteField.getText().trim()
+            );
+            upsertStrategyAssignment(assignment);
+            logAgentEvent(symbol, "strategy_assign",
+                    "Assigned " + assignment.strategy() + " / " + assignment.timeframe() + " / " + assignment.status() + ".");
+            appendConsole("Assigned " + assignment.strategy() + " to " + symbol + ".");
+            refreshWorkspaceModels();
+        });
+
+        Button openChartButton = createToolbarButton("Open Chart");
+        openChartButton.setOnAction(event -> {
+            if (strategySymbolPicker.getValue() == null || strategySymbolPicker.getValue().isBlank()) {
+                showError("Select a symbol before opening its chart.");
+                return;
+            }
+            openOrFocusChart(strategySymbolPicker.getValue());
+        });
+
+        Button armAiButton = createToolbarButton("Arm AI");
+        armAiButton.setOnAction(event -> {
+            if (strategySymbolPicker.getValue() == null || strategySymbolPicker.getValue().isBlank()) {
+                showError("Select a symbol before arming AI.");
+                return;
+            }
+            openOrFocusChart(strategySymbolPicker.getValue());
+            setAutoTrading(true);
+        });
+
+        VBox panel = new VBox(
+                12,
+                title,
+                copy,
+                new HBox(8,
+                        createToolbarLabel("Symbol"), strategySymbolPicker,
+                        createToolbarLabel("Strategy"), strategyPicker,
+                        createToolbarLabel("TF"), timeframePicker,
+                        createToolbarLabel("Status"), statusPicker),
+                noteField,
+                table,
+                new HBox(8, assignButton, openChartButton, armAiButton)
+        );
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        return new StrategyAssignerPane(wrapDockContent(panel), strategySymbolPicker, table);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void applyStrategyAssignerSelection(Stage stage, String preferredSymbol) {
+        if (preferredSymbol == null || preferredSymbol.isBlank()) {
+            return;
+        }
+        Object pickerNode = stage.getProperties().get("strategySymbolPicker");
+        if (pickerNode instanceof ComboBox<?> rawPicker) {
+            ((ComboBox<String>) rawPicker).getSelectionModel().select(preferredSymbol);
+        }
+        Object tableNode = stage.getProperties().get("strategyAssignmentTable");
+        if (tableNode instanceof TableView<?> rawTable) {
+            TableView<StrategyAssignmentRow> table = (TableView<StrategyAssignmentRow>) rawTable;
+            for (StrategyAssignmentRow row : strategyAssignmentRows) {
+                if (Objects.equals(row.symbol(), preferredSymbol)) {
+                    table.getSelectionModel().select(row);
+                    table.scrollTo(row);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void showToolWindow(String key, String title, java.util.function.Supplier<Node> contentSupplier, double width, double height) {
+        Stage existing = detachedToolWindows.get(key);
+        if (existing != null) {
+            existing.show();
+            existing.toFront();
+            existing.requestFocus();
+            return;
+        }
+
+        StackPane root = new StackPane(contentSupplier.get());
+        root.setPadding(new Insets(14));
+        root.getStyleClass().add("terminal-detached-root");
+
+        Scene scene = new Scene(root, width, height);
+        scene.getStylesheets().add(Objects.requireNonNull(
+                TradingWindow.class.getResource("/css/app.css")
+        ).toExternalForm());
+
+        Stage stage = new Stage();
+        stage.setTitle("InvestPro Terminal - " + title);
+        stage.setScene(scene);
+        stage.setMinWidth(Math.min(width, 860));
+        stage.setMinHeight(Math.min(height, 480));
+        stage.setOnHidden(event -> detachedToolWindows.remove(key));
+        detachedToolWindows.put(key, stage);
+        stage.show();
+        logAgentEvent("SYSTEM", "tool_open", "Opened " + title + ".");
+    }
+
+    private Node buildAiTrainingPanel() {
+        Label title = createPanelTitle("AI Training Desk");
+        Label copy = createPanelCopy("Backtest the active chart against the gRPC predictor, check model health, and arm live AI trading for the desk.");
+        Label status = createPanelCopy("Predictor host: " + System.getProperty("investpro.ai.host", "localhost")
+                + ":" + Integer.getInteger("investpro.ai.port", 50051));
+        status.getStyleClass().add("terminal-status-line");
+
+        Button healthButton = createToolbarButton("Health Check");
+        healthButton.setOnAction(event -> executorService.submit(() -> {
+            InvestProAIPredictor predictor = new InvestProAIPredictor(
+                    System.getProperty("investpro.ai.host", "localhost"),
+                    Integer.getInteger("investpro.ai.port", 50051)
+            );
+            boolean healthy = predictor.checkHealth();
+            predictor.shutdown();
+            FxLifecycle.runLaterIf(() -> !disposed.get(), () -> {
+                status.setText(healthy ? "Predictor healthy and reachable." : "Predictor unavailable.");
+                logAgentEvent("SYSTEM", "ai_health", status.getText());
+            });
+        }));
+
+        Button backtestButton = createToolbarButton("Backtest Active");
+        backtestButton.setOnAction(event -> withActiveChart(chart -> executorService.submit(() -> {
+            try {
+                FxLifecycle.runLaterIf(() -> !disposed.get(),
+                        () -> status.setText("Running AI backtest for " + chart.getTradePair().toString('/') + "..."));
+                new InvestProAIBacktester().runBacktest(chart.getChart().getCandleData());
+                FxLifecycle.runLaterIf(() -> !disposed.get(), () -> {
+                    status.setText("Backtest complete. Results exported to backtest_results.csv.");
+                    logAgentEvent(chart.getTradePair().toString('/'), "ai_backtest", "Completed AI backtest for active chart.");
+                });
+            } catch (RuntimeException ex) {
+                FxLifecycle.runLaterIf(() -> !disposed.get(), () -> status.setText("AI backtest failed: " + ex.getMessage()));
+            }
+        }), "Open a chart before running AI training."));
+
+        Button armAiButton = createToolbarButton("Arm AI");
+        armAiButton.setOnAction(event -> setAutoTrading(true));
+
+        Button stopAiButton = createToolbarButton("Stop AI");
+        stopAiButton.setOnAction(event -> setAutoTrading(false));
+
+        Button signalsButton = createToolbarButton("Signals");
+        signalsButton.setOnAction(event -> openSignalMonitorWindow());
+
+        Button strategyButton = createToolbarButton("Strategy Assigner");
+        strategyButton.setOnAction(event -> openStrategyAssignerWindow());
+
+        VBox panel = new VBox(
+                14,
+                title,
+                copy,
+                status,
+                new HBox(8, healthButton, backtestButton, armAiButton, stopAiButton, strategyButton, signalsButton)
+        );
+        panel.setPadding(new Insets(10));
+        panel.setMinSize(0, 0);
+        panel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        return wrapDockContent(panel);
+    }
+
+    private TableView<SignalMonitorRow> createSignalMonitorTable() {
+        TableView<SignalMonitorRow> table = new TableView<>();
+        table.getColumns().addAll(
+                textColumn("Symbol", SignalMonitorRow::symbol),
+                textColumn("TF", SignalMonitorRow::timeframe),
+                textColumn("Mode", SignalMonitorRow::mode),
+                textColumn("Bias", SignalMonitorRow::bias),
+                textColumn("Last", SignalMonitorRow::lastPrice),
+                textColumn("Candles", SignalMonitorRow::candles),
+                textColumn("Status", SignalMonitorRow::status)
+        );
+        return styleTerminalTable(table, "No signal rows yet.");
+    }
+
+    private TableView<StrategyInsightRow> createStrategyInsightTable() {
+        TableView<StrategyInsightRow> table = new TableView<>();
+        table.getColumns().addAll(
+                textColumn("Symbol", StrategyInsightRow::symbol),
+                textColumn("TF", StrategyInsightRow::timeframe),
+                textColumn("Bias", StrategyInsightRow::bias),
+                textColumn("Indicators", StrategyInsightRow::indicators),
+                textColumn("Execution", StrategyInsightRow::execution)
+        );
+        return styleTerminalTable(table, "Open a chart to inspect its strategy posture.");
+    }
+
+    private TableView<AgentTimelineRow> createAgentTimelineTable() {
+        TableView<AgentTimelineRow> table = new TableView<>();
+        table.getColumns().addAll(
+                textColumn("Time", AgentTimelineRow::time),
+                textColumn("Kind", AgentTimelineRow::kind),
+                textColumn("Symbol", AgentTimelineRow::symbol),
+                textColumn("Agent / Event", AgentTimelineRow::actorEvent),
+                textColumn("Stage", AgentTimelineRow::stage),
+                textColumn("Strategy", AgentTimelineRow::strategy),
+                textColumn("TF", AgentTimelineRow::timeframe),
+                textColumn("Detail", AgentTimelineRow::detail)
+        );
+        return styleTerminalTable(table, "Live agent events will appear here.");
+    }
+
+    private TableView<StrategyAssignmentRow> createStrategyAssignmentTable() {
+        TableView<StrategyAssignmentRow> table = new TableView<>();
+        table.getColumns().addAll(
+                textColumn("Symbol", StrategyAssignmentRow::symbol),
+                textColumn("Strategy", StrategyAssignmentRow::strategy),
+                textColumn("TF", StrategyAssignmentRow::timeframe),
+                textColumn("Status", StrategyAssignmentRow::status),
+                textColumn("Note", StrategyAssignmentRow::note)
+        );
+        return styleTerminalTable(table, "Assign a strategy to a symbol to activate live routing context.");
+    }
+
+    private TableView<MetricRow> createMetricTable() {
+        TableView<MetricRow> table = new TableView<>();
+        table.getColumns().addAll(
+                textColumn("Metric", MetricRow::name),
+                textColumn("Value", MetricRow::value),
+                textColumn("Note", MetricRow::note)
+        );
+        return styleTerminalTable(table, "Quant PM will populate once the desk is live.");
+    }
+
+    private TableView<PositionAnalysisRow> createPositionAnalysisTable() {
+        TableView<PositionAnalysisRow> table = new TableView<>();
+        table.getColumns().addAll(
+                textColumn("Symbol", PositionAnalysisRow::symbol),
+                textColumn("Side", PositionAnalysisRow::side),
+                textColumn("Exposure", PositionAnalysisRow::exposure),
+                textColumn("P/L", PositionAnalysisRow::pnl),
+                textColumn("Note", PositionAnalysisRow::note)
+        );
+        return styleTerminalTable(table, "Position analysis will appear here.");
+    }
+
+    private <T> TableView<T> styleTerminalTable(TableView<T> table, String emptyMessage) {
+        table.getStyleClass().add("terminal-data-table");
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPlaceholder(new Label(emptyMessage));
+        VBox.setVgrow(table, Priority.ALWAYS);
+        return table;
+    }
+
+    private <T> TableColumn<T, String> textColumn(String title, java.util.function.Function<T, String> mapper) {
+        TableColumn<T, String> column = new TableColumn<>(title);
+        column.setCellValueFactory(cell -> new ReadOnlyStringWrapper(mapper.apply(cell.getValue())));
+        return column;
+    }
+
+    private String summarizeIndicators(CandleStickChartOptions options) {
+        List<String> enabled = new ArrayList<>();
+        if (options.isShowSma20()) {
+            enabled.add("SMA20");
+        }
+        if (options.isShowEma50()) {
+            enabled.add("EMA50");
+        }
+        if (options.isShowBollingerBands()) {
+            enabled.add("Bollinger");
+        }
+        return enabled.isEmpty() ? "None" : String.join(", ", enabled);
+    }
+
+    private boolean hasLongExposure(Position position) {
+        return position.getLongPosition() != null && Math.abs(position.getLongPosition().getUnits()) > 0;
+    }
+
+    private boolean hasShortExposure(Position position) {
+        return position.getShortPosition() != null && Math.abs(position.getShortPosition().getUnits()) > 0;
+    }
+
+    private String safeInstrument(Position position) {
+        return position.getInstrument() == null || position.getInstrument().isBlank() ? "Unknown" : position.getInstrument();
+    }
+
+    private String money(double value) {
+        return String.format("$%,.2f", value);
+    }
+
+    private String formatPrice(double value) {
+        return Double.isFinite(value) ? PRICE_FORMAT.format(value) : "-";
+    }
+
     private void closeAllCharts() {
         List<Tab> attachedTabs = List.copyOf(chartTabPane.getTabs());
         for (Tab tab : attachedTabs) {
@@ -1075,6 +2288,7 @@ public class DisplayExchangeUI extends AnchorPane {
         }
 
         appendConsole("Closed all charts.");
+        logAgentEvent("SYSTEM", "chart_close_all", "Closed all attached and detached chart windows.");
         syncActiveChartState();
     }
 
@@ -1107,10 +2321,132 @@ public class DisplayExchangeUI extends AnchorPane {
         newsUI.shutdown();
 
         executorService.shutdownNow();
+        workspaceRefreshExecutor.shutdownNow();
         try {
             executorService.awaitTermination(5, TimeUnit.SECONDS);
+            workspaceRefreshExecutor.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+
+        List<Stage> toolStages = new ArrayList<>(detachedToolWindows.values());
+        detachedToolWindows.clear();
+        for (Stage stage : toolStages) {
+            stage.hide();
+        }
+    }
+
+    private record SignalMonitorRow(
+            String symbol,
+            String timeframe,
+            String mode,
+            String bias,
+            String lastPrice,
+            String candles,
+            String status
+    ) {
+    }
+
+    private record AgentTimelineRow(
+            String time,
+            String kind,
+            String symbol,
+            String actorEvent,
+            String stage,
+            String strategy,
+            String timeframe,
+            String detail
+    ) {
+    }
+
+    private record MetricRow(
+            String name,
+            String value,
+            String note
+    ) {
+    }
+
+    private record PositionAnalysisRow(
+            String symbol,
+            String side,
+            String exposure,
+            String pnl,
+            String note
+    ) {
+    }
+
+    private record StrategyInsightRow(
+            String symbol,
+            String timeframe,
+            String bias,
+            String indicators,
+            String execution
+    ) {
+    }
+
+    private record StrategyAssignmentRow(
+            String symbol,
+            String strategy,
+            String timeframe,
+            String status,
+            String note
+    ) {
+    }
+
+    private record StrategyAssignerPane(
+            Node root,
+            ComboBox<String> symbolPicker,
+            TableView<StrategyAssignmentRow> table
+    ) {
+    }
+
+    private static final class MarketWatchRow {
+        private final BooleanProperty watched;
+        private final StringProperty symbol;
+        private final StringProperty bid;
+        private final StringProperty ask;
+        private final StringProperty aiTraining;
+        private final StringProperty status;
+
+        private MarketWatchRow(boolean watched, String symbol, String bid, String ask, String aiTraining) {
+            this.watched = new SimpleBooleanProperty(watched);
+            this.symbol = new SimpleStringProperty(symbol);
+            this.bid = new SimpleStringProperty(bid);
+            this.ask = new SimpleStringProperty(ask);
+            this.aiTraining = new SimpleStringProperty(aiTraining);
+            this.status = new SimpleStringProperty("-");
+        }
+
+        private BooleanProperty watchedProperty() {
+            return watched;
+        }
+
+        private boolean watched() {
+            return watched.get();
+        }
+
+        private String symbol() {
+            return symbol.get();
+        }
+
+        private String bid() {
+            return bid.get();
+        }
+
+        private String ask() {
+            return ask.get();
+        }
+
+        private String aiTraining() {
+            return aiTraining.get();
+        }
+
+        private String status() {
+            return status.get();
+        }
+
+        private StringProperty statusProperty() {
+            return status;
         }
     }
 

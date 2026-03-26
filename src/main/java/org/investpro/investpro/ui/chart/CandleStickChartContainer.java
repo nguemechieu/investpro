@@ -95,12 +95,6 @@ public class CandleStickChartContainer extends Region {
         });
 
         secondsPerCandle.set(3600);
-
-        sceneProperty().addListener((_, _, newScene) -> {
-            if (newScene == null) {
-                shutdown();
-            }
-        });
     }
 
 
@@ -212,6 +206,10 @@ public class CandleStickChartContainer extends Region {
         getChart().jumpToLatestCandle();
     }
 
+    public void fitChart() {
+        getChart().fitChart();
+    }
+
     public void captureScreenshot() {
         getChart().captureScreenshot();
     }
@@ -228,6 +226,18 @@ public class CandleStickChartContainer extends Region {
         CandleStickChartOptions options = getChartOptions();
         options.setShowVolume(!options.isShowVolume());
         refreshChart();
+    }
+
+    public double getLatestClosePrice() {
+        return getChart().getLatestClosePrice();
+    }
+
+    public String getSignalBias() {
+        return getChart().getSignalBias();
+    }
+
+    public int getLoadedCandleCount() {
+        return getChart().getLoadedCandleCount();
     }
 
     public void shutdown() {

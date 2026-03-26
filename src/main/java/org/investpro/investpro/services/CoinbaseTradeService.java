@@ -24,6 +24,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 @Getter
 @Setter
@@ -31,6 +34,9 @@ public class CoinbaseTradeService {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseTradeService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final long UNAVAILABLE_PRODUCT_COOLDOWN_MS = TimeUnit.MINUTES.toMillis(5);
+    private static final long TRANSIENT_FAILURE_COOLDOWN_MS = TimeUnit.SECONDS.toMillis(30);
+    private static final ConcurrentMap<String, Long> PRICE_COOLDOWN_UNTIL = new ConcurrentHashMap<>();
     private final String apiKey;
     private final String apiSecret;
     private final HttpClient httpClient;
@@ -143,8 +149,11 @@ public class CoinbaseTradeService {
     }
 
     public Double[] getLatestPrice(TradePair pair) {
+        String symbol = pair.toString('-');
         try {
-            String symbol = pair.toString('-');
+            if (isCoolingDown(symbol)) {
+                return new Double[]{Double.NaN, Double.NaN};
+            }
             String url = baseUrl + "/products/" + symbol + "/ticker";
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -154,19 +163,57 @@ public class CoinbaseTradeService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
+                if (isUnavailableProductResponse(response.statusCode(), response.body())) {
+                    markUnavailable(symbol, "Coinbase latest price unavailable for " + pair + ". Using cooldown.");
+                    return new Double[]{Double.NaN, Double.NaN};
+                }
                 logger.warn("Unable to fetch Coinbase latest price for {}. HTTP {}: {}", pair, response.statusCode(), response.body());
-                return new Double[]{0.0, 0.0};
+                return new Double[]{Double.NaN, Double.NaN};
             }
 
+            PRICE_COOLDOWN_UNTIL.remove(symbol);
             JsonNode json = OBJECT_MAPPER.readTree(response.body());
             double lastPrice = json.path("price").asDouble(0.0);
             double bid = json.path("bid").asDouble(lastPrice);
             double ask = json.path("ask").asDouble(lastPrice);
             return new Double[]{bid, ask};
         } catch (Exception e) {
-            logger.error("Failed to fetch latest price for {}: {}", pair, e.getMessage(), e);
-            return new Double[]{0.0, 0.0};
+            markTransientFailure(symbol, "Coinbase latest price temporarily unavailable for " + pair + ".");
+            return new Double[]{Double.NaN, Double.NaN};
         }
+    }
+
+    private boolean isCoolingDown(String symbol) {
+        Long cooldownUntil = PRICE_COOLDOWN_UNTIL.get(symbol);
+        return cooldownUntil != null && cooldownUntil > System.currentTimeMillis();
+    }
+
+    private void markUnavailable(String symbol, String message) {
+        long now = System.currentTimeMillis();
+        Long previous = PRICE_COOLDOWN_UNTIL.put(symbol, now + UNAVAILABLE_PRODUCT_COOLDOWN_MS);
+        if (previous == null || previous <= now) {
+            logger.warn(message);
+        }
+    }
+
+    private void markTransientFailure(String symbol, String message) {
+        long now = System.currentTimeMillis();
+        Long previous = PRICE_COOLDOWN_UNTIL.put(symbol, now + TRANSIENT_FAILURE_COOLDOWN_MS);
+        if (previous == null || previous <= now) {
+            logger.warn(message);
+        }
+    }
+
+    private boolean isUnavailableProductResponse(int statusCode, String body) {
+        if (body == null) {
+            return statusCode == 404;
+        }
+        String normalized = body.toLowerCase();
+        return statusCode == 404
+                || normalized.contains("notfound")
+                || normalized.contains("not found")
+                || normalized.contains("delisted")
+                || normalized.contains("not allowed for delisted products");
     }
 
     public void streamLiveTrades(String symbol, InProgressCandleUpdater updater) {
