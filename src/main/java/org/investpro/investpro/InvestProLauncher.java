@@ -12,9 +12,11 @@ public final class InvestProLauncher {
     private static final Logger logger = LoggerFactory.getLogger(InvestProLauncher.class);
 
     private InvestProLauncher() {
+
+
     }
 
-    static void main(String[] args) {
+  public   static void main(String[] args) {
         Properties launchProperties = JavaFxRuntimeBootstrap.loadLaunchProperties();
         JavaFxRuntimeBootstrap.configurePrism(launchProperties);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

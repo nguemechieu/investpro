@@ -1,31 +1,20 @@
 package org.investpro.investpro;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
-import jakarta.persistence.EntityTransaction;
-import jakarta.persistence.FlushModeType;
-import jakarta.persistence.Persistence;
-import jakarta.persistence.TypedQuery;
+import jakarta.persistence.*;
 import jakarta.transaction.Transactional;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.Currency;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.Currency;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
-import java.sql.Connection;
-import java.sql.ConnectionBuilder;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.ShardingKeyBuilder;
-import java.sql.Statement;
+import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 
@@ -184,21 +173,27 @@ public class Db1 implements Db {
             return;
         }
 
-        String sql = """
-                CREATE TABLE IF NOT EXISTS currencies (
-                    currency_id VARCHAR(36) PRIMARY KEY,
-                    code VARCHAR(10) NOT NULL UNIQUE,
-                    currency_type VARCHAR(20) NOT NULL,
-                    fractional_digits INT NOT NULL,
-                    full_display_name VARCHAR(100) NOT NULL,
-                    image VARCHAR(255),
-                    short_display_name VARCHAR(50) NOT NULL,
-                    symbol VARCHAR(10) NOT NULL
-                );
-                """;
+        String currenciesSql = "CREATE TABLE IF NOT EXISTS currencies (\n" +
+                     "    currency_id VARCHAR(36) PRIMARY KEY,\n" +
+                     "    code VARCHAR(10) NOT NULL UNIQUE,\n" +
+                     "    currency_type VARCHAR(20) NOT NULL,\n" +
+                     "    fractional_digits INT NOT NULL,\n" +
+                     "    full_display_name VARCHAR(100) NOT NULL,\n" +
+                     "    image VARCHAR(255),\n" +
+                     "    short_display_name VARCHAR(50) NOT NULL,\n" +
+                     "    symbol VARCHAR(10) NOT NULL\n" +
+                     ");\n";
+
+        String marketSymbolsSql = "CREATE TABLE IF NOT EXISTS market_symbols (\n" +
+                                  "    exchange_name VARCHAR(80) NOT NULL,\n" +
+                                  "    symbol VARCHAR(40) NOT NULL,\n" +
+                                  "    updated_at BIGINT NOT NULL,\n" +
+                                  "    PRIMARY KEY (exchange_name, symbol)\n" +
+                                  ");\n";
         try (Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate(sql);
-            logger.info("Table 'currencies' created or already exists.");
+            stmt.executeUpdate(currenciesSql);
+            stmt.executeUpdate(marketSymbolsSql);
+            logger.info("Tables 'currencies' and 'market_symbols' created or already exist.");
         } catch (SQLException e) {
             logger.error("Error creating table: {}", e.getMessage(), e);
         }
@@ -319,6 +314,98 @@ public class Db1 implements Db {
             if (em.isOpen()) {
                 em.close();
             }
+        }
+    }
+
+    @Override
+    public List<String> loadMarketSymbols(String exchangeName) {
+        if (conn == null || exchangeName == null || exchangeName.isBlank()) {
+            return List.of();
+        }
+
+        ensureMarketSymbolsTable();
+        String sql = "SELECT symbol FROM market_symbols WHERE exchange_name = ? ORDER BY symbol";
+        List<String> symbols = new ArrayList<>();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, exchangeName);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    String symbol = rs.getString("symbol");
+                    if (symbol != null && !symbol.isBlank()) {
+                        symbols.add(symbol);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.warn("Unable to load cached market symbols for {}", exchangeName, e);
+            return List.of();
+        }
+        return symbols;
+    }
+
+    @Override
+    public void saveMarketSymbols(String exchangeName, List<String> symbols) {
+        if (conn == null || exchangeName == null || exchangeName.isBlank() || symbols == null || symbols.isEmpty()) {
+            return;
+        }
+
+        ensureMarketSymbolsTable();
+        LinkedHashSet<String> uniqueSymbols = new LinkedHashSet<>();
+        for (String symbol : symbols) {
+            if (symbol != null && !symbol.isBlank()) {
+                uniqueSymbols.add(symbol.trim());
+            }
+        }
+        if (uniqueSymbols.isEmpty()) {
+            return;
+        }
+
+        long updatedAt = System.currentTimeMillis();
+        String deleteSql = "DELETE FROM market_symbols WHERE exchange_name = ?";
+        String insertSql = "INSERT INTO market_symbols(exchange_name, symbol, updated_at) VALUES(?, ?, ?)";
+        try {
+            boolean previousAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+                deleteStmt.setString(1, exchangeName);
+                deleteStmt.executeUpdate();
+            }
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                for (String symbol : uniqueSymbols) {
+                    insertStmt.setString(1, exchangeName);
+                    insertStmt.setString(2, symbol);
+                    insertStmt.setLong(3, updatedAt);
+                    insertStmt.addBatch();
+                }
+                insertStmt.executeBatch();
+            }
+            conn.commit();
+            conn.setAutoCommit(previousAutoCommit);
+            logger.info("Cached {} market symbols for {}", uniqueSymbols.size(), exchangeName);
+        } catch (SQLException e) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackError) {
+                logger.debug("Ignoring market symbol cache rollback error", rollbackError);
+            }
+            logger.warn("Unable to cache market symbols for {}", exchangeName, e);
+        }
+    }
+
+    private void ensureMarketSymbolsTable() {
+        if (conn == null) {
+            return;
+        }
+        String sql = "CREATE TABLE IF NOT EXISTS market_symbols (\n" +
+                     "    exchange_name VARCHAR(80) NOT NULL,\n" +
+                     "    symbol VARCHAR(40) NOT NULL,\n" +
+                     "    updated_at BIGINT NOT NULL,\n" +
+                     "    PRIMARY KEY (exchange_name, symbol)\n" +
+                     ");\n";
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+        } catch (SQLException e) {
+            logger.warn("Unable to ensure market_symbols cache table exists", e);
         }
     }
 

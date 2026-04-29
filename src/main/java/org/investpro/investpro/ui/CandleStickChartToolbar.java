@@ -24,7 +24,7 @@ import org.investpro.investpro.CandleStickChartOptions;
 import org.investpro.investpro.PopOver;
 import org.investpro.investpro.SizeChangeListener;
 import org.investpro.investpro.ZoomDirection;
-import org.investpro.investpro.ui.chart.CandleStickChart;
+import org.investpro.investpro.ui.charts.CandleStickChart;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -103,7 +103,7 @@ public class CandleStickChartToolbar extends Region {
             if (tool == Tool.OPTIONS) {
                 toolbarNodes.add(functionOptionsSeparator);
                 toolbarButton = new ToolbarButton(Tool.OPTIONS);
-                toolbarButton.setOnMouseEntered(_ -> {
+                toolbarButton.setOnMouseEntered(event -> {
                     mouseInsideOptionsButton = true;
                     toolbarButton.graphicLabel = new ImageView();
                     toolbarButton.textLabel = Tool.OPTIONS.name();
@@ -112,7 +112,7 @@ public class CandleStickChartToolbar extends Region {
                         return;
                     optionsPopOver.show(toolbarButton);
                 });
-                toolbarButton.setOnMouseExited(_ -> {
+                toolbarButton.setOnMouseExited(event -> {
                     mouseInsideOptionsButton = false;
                     if (mouseExitedPopOverFilter == null) {
                         mouseExitedPopOverFilter = new MouseExitedPopOverFilter(getScene());
@@ -163,29 +163,29 @@ public class CandleStickChartToolbar extends Region {
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
                 if (tool.duration != -1) {
-                    tool.setOnAction(_ -> secondsPerCandle.setValue(tool.duration));
+                    tool.setOnAction(event -> secondsPerCandle.setValue(tool.duration));
                 } else if (tool.tool != null) {
                     switch (tool.tool) {
                         case ZOOM_IN, ZOOM_OUT ->
-                                tool.setOnAction(_ -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
-                        case FULL_SCREEN -> tool.setOnAction(_ -> candleStickChart.toggleFullScreen());
-                        case PRINT_PDF -> tool.setOnAction(_ -> candleStickChart.exportAsPDF());
-                        case SHARE -> tool.setOnAction(_ -> candleStickChart.shareLink());
-                        case PRINT -> tool.setOnAction(_ -> candleStickChart.print());
-                        case REFRESH -> tool.setOnAction(_ -> candleStickChart.refreshChart());
-                        case AUTO_SCROLL -> tool.setOnAction(_ -> candleStickChart.jumpToLatestCandle());
+                                tool.setOnAction(event -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
+                        case FULL_SCREEN -> tool.setOnAction(event -> candleStickChart.toggleFullScreen());
+                        case PRINT_PDF -> tool.setOnAction(event -> candleStickChart.exportAsPDF());
+                        case SHARE -> tool.setOnAction(event -> candleStickChart.shareLink());
+                        case PRINT -> tool.setOnAction(event -> candleStickChart.print());
+                        case REFRESH -> tool.setOnAction(event -> candleStickChart.refreshChart());
+                        case AUTO_SCROLL -> tool.setOnAction(event -> candleStickChart.jumpToLatestCandle());
                         case GRID_TOGGLE ->
-                                tool.setOnAction(_ -> candleStickChart.setShowGrid(!candleStickChart.isShowGrid()));
-                        case LEFT -> tool.setOnAction(_ -> candleStickChart.scroll(org.investpro.investpro.NavigationDirection.LEFT));
-                        case RIGHT -> tool.setOnAction(_ -> candleStickChart.scroll(org.investpro.investpro.NavigationDirection.RIGHT));
-                        case UP, SCROLL_UP -> tool.setOnAction(_ -> candleStickChart.scroll(UP));
-                        case DOWN, SCROLL_DOWN -> tool.setOnAction(_ -> candleStickChart.scroll(DOWN));
-                        case SCREENSHOT -> tool.setOnAction(_ -> candleStickChart.captureScreenshot());
-                        case OPTIONS -> tool.setOnAction(_ -> optionsPopOver.show(tool));
-                        case TRADE -> tool.setOnAction(_ -> candleStickChart.showTradeTicket());
+                                tool.setOnAction(event -> candleStickChart.setShowGrid(!candleStickChart.isShowGrid()));
+                        case LEFT -> tool.setOnAction(event -> candleStickChart.scroll(org.investpro.investpro.NavigationDirection.LEFT));
+                        case RIGHT -> tool.setOnAction(event -> candleStickChart.scroll(org.investpro.investpro.NavigationDirection.RIGHT));
+                        case UP, SCROLL_UP -> tool.setOnAction(event -> candleStickChart.scroll(UP));
+                        case DOWN, SCROLL_DOWN -> tool.setOnAction(event -> candleStickChart.scroll(DOWN));
+                        case SCREENSHOT -> tool.setOnAction(event -> candleStickChart.captureScreenshot());
+                        case OPTIONS -> tool.setOnAction(event -> optionsPopOver.show(tool));
+                        case TRADE -> tool.setOnAction(event -> candleStickChart.showTradeTicket());
                         case AI_TOGGLE -> {
                             tool.setActive(candleStickChart.isAiTradingEnabled());
-                            tool.setOnAction(_ -> {
+                            tool.setOnAction(event -> {
                                 candleStickChart.toggleAiTrading();
                                 tool.setActive(candleStickChart.isAiTradingEnabled());
                             });

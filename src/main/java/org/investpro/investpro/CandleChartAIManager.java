@@ -4,7 +4,7 @@ import javafx.application.Platform;
 import javafx.scene.chart.XYChart;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;

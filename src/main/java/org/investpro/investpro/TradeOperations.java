@@ -1,6 +1,8 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.models.Order;
+import org.investpro.investpro.models.Position;
+import org.investpro.investpro.models.TradePair;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;

@@ -4,29 +4,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.investpro.investpro.CreateOrderRequest;
-import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.ENUM_ORDER_STATUS;
+import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Coinbase;
-import org.investpro.investpro.model.Order;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.Order;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 public class CoinbaseOrderService {

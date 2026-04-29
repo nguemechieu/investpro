@@ -1,19 +1,17 @@
 package org.investpro.investpro.ai;
 
-import org.investpro.grpc.Predict;
-import org.investpro.investpro.ENUM_ORDER_TYPE;
-import org.investpro.investpro.Exchange;
-import org.investpro.investpro.Side;
-import org.investpro.investpro.TelegramClient;
+
+import org.investpro.investpro.*;
 import org.investpro.investpro.indicators.IndicatorCalculator;
-import org.investpro.investpro.model.Account;
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.TradePair;
-import org.investpro.investpro.ui.chart.CandleStickChart;
+import org.investpro.investpro.models.Account;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.TradePair;
+import org.investpro.investpro.ui.charts.CandleStickChart;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -60,7 +58,7 @@ public class InvestProAIAutotrader {
             }
 
             updateAccountBalance();
-            if (!predictor.checkHealth()) {
+            if (!PredictorRuntimeManager.ensureAvailable(Duration.ofSeconds(12)) || !predictor.checkHealth()) {
                 logger.debug("Skipping AI prediction because the predictor is unavailable.");
                 return;
             }
@@ -72,7 +70,7 @@ public class InvestProAIAutotrader {
             double stochastic = IndicatorCalculator.calculateStochastic(candles, 14);
             double rsi = IndicatorCalculator.calculateRSI(candles, 14);
 
-            Predict.MarketDataRequest marketDataRequest = Predict.MarketDataRequest.newBuilder()
+            InvestProAIPredictor.MarketDataRequest marketDataRequest = InvestProAIPredictor.MarketDataRequest.newBuilder()
                     .setAtr(atr)
                     .setBbLower(bbLower)
                     .setBbUpper(bbUpper)
@@ -86,25 +84,25 @@ public class InvestProAIAutotrader {
                     .setVolume(latestCandle.getVolume())
                     .build();
 
-            List<Predict.MarketDataRequest> requestList = new ArrayList<>();
+            List<InvestProAIPredictor.MarketDataRequest> requestList = new ArrayList<>();
             requestList.add(marketDataRequest);
 
-            CompletableFuture<List<Predict.PredictionResponse>> future = predictor.streamBatchPredict(requestList);
+            CompletableFuture<List<InvestProAIPredictor.PredictionResponse>> future = predictor.streamBatchPredict(requestList);
             future.thenAccept(responses -> {
                 if (responses.isEmpty()) {
                     logger.debug("AI predictor returned no responses.");
                     return;
                 }
 
-                Predict.PredictionResponse prediction = responses.get(0);
+                InvestProAIPredictor.PredictionResponse prediction = responses.getFirst();
                 double confidence = prediction.getConfidence();
                 String direction = prediction.getPrediction();
 
                 if (confidence >= confidenceThreshold) {
                     try {
-                        if ("up".equalsIgnoreCase(direction)) {
+                        if ("BUY".equalsIgnoreCase(direction) || "up".equalsIgnoreCase(direction)) {
                             executeOrder(BUY, latestCandle, candles);
-                        } else if ("down".equalsIgnoreCase(direction)) {
+                        } else if ("SELL".equalsIgnoreCase(direction) || "down".equalsIgnoreCase(direction)) {
                             executeOrder(SELL, latestCandle, candles);
                         }
                     } catch (Exception ex) {
@@ -192,6 +190,12 @@ public class InvestProAIAutotrader {
         String direction = side == BUY ? "BUY" : "SELL";
         String message = "[AI TRADE] " + direction + " @ " + entryPrice + " | Lot: " + lotSize;
         notifyTelegram(message);
+
+        if (TradingSession.isPaperTrading()) {
+            logger.info("Paper mode active; simulated AI {} order for {} @ {}", direction, pair, entryPrice);
+            notifyTelegram("[PAPER] " + message);
+            return;
+        }
 
         exchange.createOrder(pair, side, ENUM_ORDER_TYPE.STOP, entryPrice, lotSize, new Date(), sl, tp);
     }

@@ -1,6 +1,5 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.CurrencyType;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.Serial;

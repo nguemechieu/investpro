@@ -26,8 +26,8 @@ public class Browser extends AnchorPane {
         Button addTabButton = new Button("+");
         Button removeTabButton = new Button("-");
 
-        addTabButton.setOnAction(_ -> addNewTab());
-        removeTabButton.setOnAction(_ -> removeSelectedTab());
+        addTabButton.setOnAction(event -> addNewTab());
+        removeTabButton.setOnAction(event -> removeSelectedTab());
 
         mainToolbar.getItems().addAll(addTabButton, new Separator(Orientation.VERTICAL), removeTabButton);
         AnchorPane.setTopAnchor(tabPane, 40.0);
@@ -63,33 +63,33 @@ public class Browser extends AnchorPane {
         urlField.setPrefWidth(600);
 
         Button goButton = new Button("Go");
-        goButton.setOnAction(_ -> loadUrl(webEngine, urlField.getText()));
+        goButton.setOnAction(event -> loadUrl(webEngine, urlField.getText()));
 
         Button backButton = new Button("Back");
-        backButton.setOnAction(_ -> {
+        backButton.setOnAction(event -> {
             if (webEngine.getHistory().getCurrentIndex() > 0) {
                 webEngine.getHistory().go(-1);
             }
         });
 
         Button forwardButton = new Button("Forward");
-        forwardButton.setOnAction(_ -> {
+        forwardButton.setOnAction(event -> {
             if (webEngine.getHistory().getCurrentIndex() < webEngine.getHistory().getEntries().size() - 1) {
                 webEngine.getHistory().go(1);
             }
         });
 
         Button refreshButton = new Button("Refresh");
-        refreshButton.setOnAction(_ -> webEngine.reload());
+        refreshButton.setOnAction(event -> webEngine.reload());
 
         Button zoomInButton = new Button("+");
-        zoomInButton.setOnAction(_ -> {
+        zoomInButton.setOnAction(event -> {
             zoomLevel = Math.min(zoomLevel + 0.1, 3.0);
             webView.setZoom(zoomLevel);
         });
 
         Button zoomOutButton = new Button("-");
-        zoomOutButton.setOnAction(_ -> {
+        zoomOutButton.setOnAction(event -> {
             zoomLevel = Math.max(zoomLevel - 0.1, 0.5);
             webView.setZoom(zoomLevel);
         });

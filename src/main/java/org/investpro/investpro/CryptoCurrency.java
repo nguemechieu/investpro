@@ -2,8 +2,7 @@ package org.investpro.investpro;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.Currency;
-import org.jetbrains.annotations.NotNull;
+import org.investpro.investpro.models.Currency;
 
 import java.net.URI;
 import java.time.Instant;
@@ -37,17 +36,11 @@ public class CryptoCurrency extends Currency {
     protected CryptoCurrency(String fullDisplayName, String shortDisplayName, String code, int fractionalDigits,
                              String symbol, Algorithm algorithm, String homeUrl, String walletUrl,
                              long genesisTimeInEpochSeconds, int difficultyRetarget, String maxCoinsIssued) {
-
-        Objects.requireNonNull(algorithm, "algorithm must not be null");
-        Objects.requireNonNull(homeUrl, "homeUrl must not be null");
-        Objects.requireNonNull(walletUrl, "walletUrl must not be null");
-
-
         super(CurrencyType.CRYPTO.name(), fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, code);
 
-        this.algorithm = algorithm;
-        this.homeUrl = URI.create(homeUrl);
-        this.walletUrl = URI.create(walletUrl);
+        this.algorithm = Objects.requireNonNull(algorithm, "algorithm must not be null");
+        this.homeUrl = URI.create(Objects.requireNonNull(homeUrl, "homeUrl must not be null"));
+        this.walletUrl = URI.create(Objects.requireNonNull(walletUrl, "walletUrl must not be null"));
         this.genesisTime = Instant.ofEpochSecond(genesisTimeInEpochSeconds);
         this.difficultyRetarget = difficultyRetarget;
         this.maxCoinsIssued = maxCoinsIssued;

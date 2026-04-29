@@ -7,10 +7,10 @@ import lombok.Setter;
 import org.investpro.investpro.InProgressCandleUpdater;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Coinbase;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.OrderBookEntry;
-import org.investpro.investpro.model.Trade;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.OrderBook;
+import org.investpro.investpro.models.OrderBookEntry;
+import org.investpro.investpro.models.Trade;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -7,7 +7,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.util.Pair;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.ui.chart.CandleStickChart;
+import org.investpro.investpro.ui.charts.CandleStickChart;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.format.DateTimeFormatter;

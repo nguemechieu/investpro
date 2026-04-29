@@ -1,14 +1,15 @@
 package org.investpro.investpro.ai;
 
-import org.investpro.grpc.Predict;
+
 import org.investpro.investpro.indicators.IndicatorCalculator;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -37,7 +38,7 @@ public class InvestProAIBacktester {
             return;
         }
 
-        if (!aiClient.checkHealth()) {
+        if (!PredictorRuntimeManager.ensureAvailable(Duration.ofSeconds(12)) || !aiClient.checkHealth()) {
             logger.warn("Skipping AI backtest because the predictor is unavailable.");
             return;
         }
@@ -55,7 +56,7 @@ public class InvestProAIBacktester {
                 double stoch = IndicatorCalculator.calculateStochastic(recentCandles, 14);
                 double atr = calculateATR(recentCandles, 14);
 
-                Predict.MarketDataRequest request = Predict.MarketDataRequest.newBuilder()
+                InvestProAIPredictor.MarketDataRequest request = InvestProAIPredictor.MarketDataRequest.newBuilder()
                         .setOpen(latest.getOpenPrice())
                         .setHigh(latest.getHighPrice())
                         .setLow(latest.getLowPrice())
@@ -68,11 +69,11 @@ public class InvestProAIBacktester {
                         .setStoch(stoch)
                         .setMacd(macd)
                         .build();
-                List<Predict.MarketDataRequest> requestList = new ArrayList<>();
+                List<InvestProAIPredictor.MarketDataRequest> requestList = new ArrayList<>();
                 requestList.add(request);
 
-                CompletableFuture<List<Predict.PredictionResponse>> prediction = aiClient.streamBatchPredict(requestList);
-                List<Predict.PredictionResponse> predictionResponses = prediction.get(5, TimeUnit.SECONDS);
+                CompletableFuture<List<InvestProAIPredictor.PredictionResponse>> prediction = aiClient.streamBatchPredict(requestList);
+                List<InvestProAIPredictor.PredictionResponse> predictionResponses = prediction.get(5, TimeUnit.SECONDS);
                 if (predictionResponses.isEmpty()) {
                     logger.debug("Skipping backtest trade {} because no AI prediction was returned.", i - 19);
                     continue;
@@ -98,11 +99,13 @@ public class InvestProAIBacktester {
         if (prediction.equalsIgnoreCase("unknown") || prediction.equalsIgnoreCase("error")) return;
 
         totalTrades++;
-        boolean correct = prediction.equalsIgnoreCase("up") && exit.getClosePrice() > entry.getClosePrice()
-                || prediction.equalsIgnoreCase("down") && exit.getClosePrice() < entry.getClosePrice();
+        boolean bullish = prediction.equalsIgnoreCase("BUY") || prediction.equalsIgnoreCase("up");
+        boolean bearish = prediction.equalsIgnoreCase("SELL") || prediction.equalsIgnoreCase("down");
+        boolean correct = bullish && exit.getClosePrice() > entry.getClosePrice()
+                || bearish && exit.getClosePrice() < entry.getClosePrice();
 
         double pnl = exit.getClosePrice() - entry.getClosePrice();
-        if (prediction.equalsIgnoreCase("down")) pnl = -pnl;
+        if (bearish) pnl = -pnl;
 
         if (correct) {
             wins++;

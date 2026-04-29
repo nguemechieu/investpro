@@ -9,8 +9,8 @@ import org.investpro.investpro.ENUM_ORDER_STATUS;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.Order;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.Order;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

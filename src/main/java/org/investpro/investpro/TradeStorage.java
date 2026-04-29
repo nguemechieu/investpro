@@ -1,7 +1,7 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.Trade;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.Trade;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

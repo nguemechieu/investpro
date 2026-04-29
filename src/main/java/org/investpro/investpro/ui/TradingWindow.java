@@ -6,31 +6,10 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Control;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.Label;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
-import org.investpro.investpro.AppFiles;
-import org.investpro.investpro.CurrencyDataProvider;
-import org.investpro.investpro.DatabaseConfiguration;
-import org.investpro.investpro.Exchange;
-import org.investpro.investpro.ExchangeCredentialValidator;
-import org.investpro.investpro.Messages;
+import org.investpro.investpro.*;
 import org.investpro.investpro.exchanges.BinanceUS;
 import org.investpro.investpro.exchanges.Coinbase;
 import org.investpro.investpro.exchanges.Oanda;
@@ -45,12 +24,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.investpro.investpro.InvestPro.CONFIG_FILE;
-import static org.investpro.investpro.InvestPro.CONFIG_FILE2;
-import static org.investpro.investpro.InvestPro.db1;
-import static org.investpro.investpro.InvestPro.reinitializeDatabase;
+import static org.investpro.investpro.InvestPro.*;
 
-public class TradingWindow extends StackPane {
+public class TradingWindow extends AnchorPane {
 
     private static final Logger logger = LoggerFactory.getLogger(TradingWindow.class);
     private static final String STATUS_INFO = "status-info";
@@ -63,6 +39,7 @@ public class TradingWindow extends StackPane {
     private final PasswordField secretKeyTextField = new PasswordField();
     private final PasswordField passphraseTextField = new PasswordField();
     private final TextField tokensField = new TextField();
+    private final ComboBox<TradingMode> tradingModeBox = new ComboBox<>();
     private final Label exchangeStatusLabel = createStatusBanner();
     private Properties properties = loadProperties();
     private Exchange exchange;
@@ -133,11 +110,11 @@ public class TradingWindow extends StackPane {
 
         Button loginSubmitButton = createPrimaryButton("Continue to Desk");
         loginSubmitButton.setDefaultButton(true);
-        loginSubmitButton.setOnAction(event ->
+        loginSubmitButton.setOnAction(_ ->
                 handleLogin(loginUsernameField.getText(), loginPasswordField.getText()));
 
         Button signUpButton = createSecondaryButton("Create Account");
-        signUpButton.setOnAction(event -> createSignUpPage());
+        signUpButton.setOnAction(_ -> createSignUpPage());
 
         Button forgotPasswordButton = createGhostButton("Forgot password");
         forgotPasswordButton.setOnAction(event -> resetPasswordPage());
@@ -277,6 +254,11 @@ public class TradingWindow extends StackPane {
         tokensField.setPromptText("Optional Telegram bot token for AI alerts");
         tokensField.getStyleClass().add("input-field");
 
+        tradingModeBox.getItems().setAll(TradingMode.values());
+        tradingModeBox.getStyleClass().add("input-field");
+        tradingModeBox.setPromptText("Choose routing mode");
+        tradingModeBox.getSelectionModel().select(TradingMode.from(properties.getProperty("TRADING_MODE", "PAPER")));
+
         CheckBox rememberExchangeCheck = new CheckBox("Remember exchange credentials on this machine");
 
         comboBox.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
@@ -354,6 +336,7 @@ public class TradingWindow extends StackPane {
                 createField(apiKeyLabel, apiKeyTextField),
                 createField(secretKeyLabel, secretKeyTextField),
                 createField(passphraseLabel, passphraseTextField),
+                createField("Mode", tradingModeBox),
                 createField("Telegram Alerts (Optional)", tokensField),
                 credentialHelpLabel,
                 rememberExchangeCheck,
@@ -378,7 +361,7 @@ public class TradingWindow extends StackPane {
             showAlert("Email and New Password cannot be empty.");
             return;
         }
-        if (!ensureDatabaseAvailable()) {
+        if (ensureDatabaseAvailable()) {
             return;
         }
 
@@ -556,9 +539,9 @@ public class TradingWindow extends StackPane {
                     Alert.AlertType.ERROR,
                     "The database is unavailable. Open Database Settings and choose the local embedded database or configure your own JDBC database."
             );
-            return false;
+            return true;
         }
-        return true;
+        return false;
     }
 
     private boolean handleSignUp(@NotNull String username, @NotNull String password, @NotNull String email) {
@@ -566,7 +549,7 @@ public class TradingWindow extends StackPane {
             showAlert("Username, Password, and Email cannot be empty.");
             return false;
         }
-        if (!ensureDatabaseAvailable()) {
+        if (ensureDatabaseAvailable()) {
             return false;
         }
 
@@ -601,7 +584,7 @@ public class TradingWindow extends StackPane {
     }
 
     private void handleLogin(@NotNull String username, String password) {
-        if (!ensureDatabaseAvailable()) {
+        if (ensureDatabaseAvailable()) {
             return;
         }
         try {
@@ -702,12 +685,17 @@ public class TradingWindow extends StackPane {
             return;
         }
 
+        TradingMode tradingMode = tradingModeBox.getValue() == null
+                ? TradingMode.PAPER
+                : tradingModeBox.getValue();
+        TradingSession.setMode(tradingMode);
+
         String apiKey = apiKeyTextField.getText().trim();
         String apiSecret = secretKeyTextField.getText().trim();
         String passphrase = passphraseTextField.getText().trim();
         boolean coinbaseSelected = "COINBASE".equals(selectedExchange);
 
-        if ((!coinbaseSelected && (apiKey.isEmpty() || apiSecret.isEmpty()))
+        if (tradingMode.isLive() && (!coinbaseSelected && (apiKey.isEmpty() || apiSecret.isEmpty()))
                 || (coinbaseSelected && apiKey.isEmpty() && apiSecret.isEmpty() && passphrase.isEmpty())) {
             if ("OANDA".equals(selectedExchange)) {
                 setBannerState(exchangeStatusLabel, "Enter your OANDA account number and API key.", STATUS_WARNING);
@@ -720,10 +708,29 @@ public class TradingWindow extends StackPane {
         }
 
         properties.setProperty("TELEGRAM_BOT_TOKEN", tokensField.getText().trim());
+        properties.setProperty("TRADING_MODE", tradingMode.name());
         saveProperties(properties);
 
+        if (tradingMode.isPaper()) {
+            try {
+                exchange = createExchange(
+                        selectedExchange,
+                        apiKey.isBlank() ? "paper-demo" : apiKey,
+                        apiSecret.isBlank() ? "paper-demo" : apiSecret,
+                        passphrase
+                );
+                logger.info("Opening {} desk in paper mode", selectedExchange);
+                setBannerState(exchangeStatusLabel, "Paper mode selected. Orders will be simulated locally.", STATUS_SUCCESS);
+                openTradingStage(selectedExchange, tradingMode);
+            } catch (Exception e) {
+                logger.error("Error starting paper desk for {}", selectedExchange, e);
+                setBannerState(exchangeStatusLabel, "Error starting the desk: " + e.getMessage(), STATUS_ERROR);
+            }
+            return;
+        }
+
         startButton.setDisable(true);
-        startButton.setText("Verifying...");
+        startButton.setText("Authentition...");
         setBannerState(exchangeStatusLabel, "Checking " + selectedExchange + " credentials...", STATUS_INFO);
 
         CompletableFuture
@@ -754,7 +761,7 @@ public class TradingWindow extends StackPane {
                         exchange = createExchange(selectedExchange, apiKey, apiSecret, passphrase);
                         logger.info("Exchange instance created for {}", selectedExchange);
                         setBannerState(exchangeStatusLabel, "Credentials verified. Opening the trading desk...", STATUS_SUCCESS);
-                        openTradingStage(selectedExchange);
+                        openTradingStage(selectedExchange, tradingMode);
                     } catch (Exception e) {
                         logger.error("Error starting trading window for {}", selectedExchange, e);
                         setBannerState(exchangeStatusLabel, "Error starting the desk: " + e.getMessage(), STATUS_ERROR);
@@ -771,10 +778,10 @@ public class TradingWindow extends StackPane {
         };
     }
 
-    private void openTradingStage(String exchangeName) {
+    private void openTradingStage(String exchangeName, TradingMode tradingMode) {
         logger.info("Opening trading desk for {}", exchangeName);
 
-        DisplayExchangeUI display = new DisplayExchangeUI(exchange, tokensField.getText().trim());
+        DisplayExchangeUI display = new DisplayExchangeUI(exchange, tokensField.getText().trim(), tradingMode);
         Scene scene = new Scene(display, 1530, 780);
         scene.getStylesheets().add(
                 Objects.requireNonNull(TradingWindow.class.getResource("/css/app.css")).toExternalForm()

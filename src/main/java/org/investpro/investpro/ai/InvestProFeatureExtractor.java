@@ -1,7 +1,7 @@
 package org.investpro.investpro.ai;
 
 
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

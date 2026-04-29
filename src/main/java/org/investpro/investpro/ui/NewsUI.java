@@ -46,13 +46,13 @@ public class NewsUI extends VBox {
         statusLabel.getStyleClass().add("desk-section-status");
 
         newsListView.setPlaceholder(new Label("No recent news available"));
-        newsListView.setCellFactory(_ -> new NewsCell());
+        newsListView.setCellFactory(ignored -> new NewsCell());
 
         getChildren().addAll(titleLabel, statusLabel, newsListView);
         VBox.setVgrow(newsListView, Priority.ALWAYS);
 
         startUpdating();
-        sceneProperty().addListener((_, _, newScene) -> {
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene == null) {
                 shutdown();
             }

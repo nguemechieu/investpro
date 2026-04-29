@@ -3,7 +3,7 @@ package org.investpro.investpro;
 import org.investpro.investpro.components.ExchangeFactory;
 import org.investpro.investpro.exchanges.BinanceUS;
 import org.investpro.investpro.exchanges.Coinbase;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.TradePair;
 
 import java.util.List;
 

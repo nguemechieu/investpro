@@ -4,11 +4,7 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.scene.chart.BarChart;
-import javafx.scene.chart.CategoryAxis;
-import javafx.scene.chart.LineChart;
-import javafx.scene.chart.NumberAxis;
-import javafx.scene.chart.XYChart;
+import javafx.scene.chart.*;
 import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableColumn;
@@ -19,7 +15,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.FxLifecycle;
-import org.investpro.investpro.model.Position;
+import org.investpro.investpro.models.Position;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +87,7 @@ public class PositionsUI extends VBox {
         getChildren().addAll(titleLabel, statusLabel, splitPane);
 
         startUpdating();
-        sceneProperty().addListener((_, _, newScene) -> {
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene == null) {
                 shutdown();
             }

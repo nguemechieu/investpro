@@ -16,7 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Properties;
 
@@ -110,9 +109,9 @@ public class InvestPro extends Application {
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy"))));
 
             primaryStage.setResizable(true);
-            primaryStage.setOnCloseRequest(_ -> Platform.exit());
+            primaryStage.setOnCloseRequest(event -> Platform.exit());
 
-            primaryStage.fullScreenProperty().addListener((_, _, newValue) ->
+            primaryStage.fullScreenProperty().addListener((observable, oldValue, newValue) ->
                     primaryStage.setFullScreen(newValue));
 
             Image icon = new Image(

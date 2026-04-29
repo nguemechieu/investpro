@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.Account;
-import org.investpro.investpro.model.Fee;
-import org.investpro.investpro.model.Position;
+import org.investpro.investpro.models.Account;
+import org.investpro.investpro.models.Fee;
+import org.investpro.investpro.models.Position;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -2,9 +2,9 @@ package org.investpro.investpro.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.OrderBookEntry;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.OrderBook;
+import org.investpro.investpro.models.OrderBookEntry;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

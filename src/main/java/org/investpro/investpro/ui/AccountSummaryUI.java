@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.FxLifecycle;
-import org.investpro.investpro.model.Account;
+import org.investpro.investpro.models.Account;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +58,7 @@ public class AccountSummaryUI extends VBox {
         VBox.setVgrow(tableView, Priority.ALWAYS);
 
         Platform.runLater(this::startUpdating);
-        sceneProperty().addListener((_, _, newScene) -> {
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene == null) {
                 shutdown();
             }

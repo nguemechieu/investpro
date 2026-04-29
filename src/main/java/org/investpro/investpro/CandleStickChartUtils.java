@@ -1,17 +1,13 @@
 package org.investpro.investpro;
 
 import javafx.util.Pair;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * @author Noel Nguemechieu

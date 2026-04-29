@@ -10,7 +10,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.FxLifecycle;
-import org.investpro.investpro.model.Order;
+import org.investpro.investpro.models.Order;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -46,7 +46,7 @@ public class PendingOrdersUI extends Region {
         pendingOrdersView.setPrefWidth(1400);
         pendingOrdersView.setPrefHeight(700);
         pendingOrdersView.setPlaceholder(new Label("No pending orders available"));
-        pendingOrdersView.setCellFactory(_ -> new OrderCell());
+        pendingOrdersView.setCellFactory(ignored -> new OrderCell());
 
         ScrollPane scrollPane = new ScrollPane(pendingOrdersView);
         scrollPane.setFitToWidth(true);
@@ -58,7 +58,7 @@ public class PendingOrdersUI extends Region {
 
         startUpdating();
         getChildren().addAll(titleLabel, statusLabel, scrollPane);
-        sceneProperty().addListener((_, _, newScene) -> {
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene == null) {
                 shutdown();
             }

@@ -8,11 +8,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.CandleDataSupplier;
-import org.investpro.investpro.model.CandleData;
 import org.investpro.investpro.components.BinanceUSCandleDataSupplier;
-
-import org.investpro.investpro.model.TradePair;
-
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

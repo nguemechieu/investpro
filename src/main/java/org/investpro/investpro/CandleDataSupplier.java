@@ -6,9 +6,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.TradePair;
 
 import java.util.List;
 import java.util.Objects;
@@ -37,8 +36,8 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
         Objects.requireNonNull(endTime);
 
         if (secondsPerCandle <= 0) {
-            secondsPerCandle = 300;
-            // throw new IllegalArgumentException(String.format("secondsPerCandle must be positive but was: %d", secondsPerCandle));
+
+            throw new IllegalArgumentException(String.format("secondsPerCandle must be positive but was: %d", secondsPerCandle));
         }
 
 

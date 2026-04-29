@@ -1,6 +1,5 @@
 package org.investpro.investpro.ui;
 
-import javafx.application.Platform;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Region;
@@ -8,7 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.FxLifecycle;
-import org.investpro.investpro.model.Order;
+import org.investpro.investpro.models.Order;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +39,7 @@ public class OrdersUI extends Region {
 
         setupUI();
         startUpdating();
-        sceneProperty().addListener((_, _, newScene) -> {
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene == null) {
                 shutdown();
             }

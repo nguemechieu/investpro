@@ -1,7 +1,7 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.Currency;
-import org.investpro.investpro.model.FiatCurrency;
+import org.investpro.investpro.models.Currency;
+import org.investpro.investpro.models.FiatCurrency;
 
 import java.util.List;
 import java.util.Locale;

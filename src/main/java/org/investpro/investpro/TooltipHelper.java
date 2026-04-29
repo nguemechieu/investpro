@@ -1,7 +1,7 @@
 package org.investpro.investpro;
 
-import javafx.scene.control.Tooltip;
 import javafx.scene.Node;
+import javafx.scene.control.Tooltip;
 import javafx.util.Duration;
 
 public class TooltipHelper {

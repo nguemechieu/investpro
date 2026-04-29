@@ -1,9 +1,9 @@
 package org.investpro.investpro;
 
-import org.jetbrains.annotations.NotNull;
 import org.investpro.investpro.exchanges.Coinbase;
 import org.investpro.investpro.services.CoinbaseCredentials;
 import org.investpro.investpro.services.CoinbaseExchangeAuth;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +45,9 @@ public final class ExchangeCredentialValidator {
         try {
             return switch (exchangeName.trim().toUpperCase(Locale.ROOT)) {
                 case "BINANCE US", "BINANCEUS" -> validateBinanceUs(apiKey.trim(), apiSecret.trim());
+                case "BINANCE" -> ValidationResult.connectivityError(
+                        "Binance credential validation is not supported yet. Please verify your Binance API key and secret directly on the Binance website."
+                );
                 case "OANDA" -> validateOanda(apiKey.trim(), apiSecret.trim());
                 case "COINBASE" -> validateCoinbase(apiKey.trim(), apiSecret.trim(), passphrase.trim());
                 default -> ValidationResult.connectivityError(

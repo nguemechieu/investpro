@@ -33,6 +33,12 @@ public class CandleStickChartOptions {
             new SimpleBooleanProperty(this, "EMA 50", false);
     private final BooleanProperty showBollingerBands =
             new SimpleBooleanProperty(this, "Bollinger Bands", false);
+    private final BooleanProperty showRsi14 =
+            new SimpleBooleanProperty(this, "RSI 14", false);
+    private final BooleanProperty showMacd =
+            new SimpleBooleanProperty(this, "MACD", false);
+    private final BooleanProperty showStochastic14 =
+            new SimpleBooleanProperty(this, "Stochastic 14", false);
 
     public CandleStickChartOptions() {
         optionsPane = buildOptionsPane();
@@ -56,7 +62,10 @@ public class CandleStickChartOptions {
         GridPane indicatorGrid = createOptionGrid(List.of(
                 showSma20,
                 showEma50,
-                showBollingerBands
+                showBollingerBands,
+                showRsi14,
+                showMacd,
+                showStochastic14
         ));
 
         Label chartLabel = createSectionLabel("Chart");
@@ -143,6 +152,30 @@ public class CandleStickChartOptions {
         return showBollingerBands;
     }
 
+    public final boolean isShowRsi14() {
+        return showRsi14.get();
+    }
+
+    public final ReadOnlyBooleanProperty showRsi14Property() {
+        return showRsi14;
+    }
+
+    public final boolean isShowMacd() {
+        return showMacd.get();
+    }
+
+    public final ReadOnlyBooleanProperty showMacdProperty() {
+        return showMacd;
+    }
+
+    public final boolean isShowStochastic14() {
+        return showStochastic14.get();
+    }
+
+    public final ReadOnlyBooleanProperty showStochastic14Property() {
+        return showStochastic14;
+    }
+
     public void setVerticalGridLinesVisible(boolean visible) {
         verticalGridLinesVisible.set(visible);
     }
@@ -169,6 +202,36 @@ public class CandleStickChartOptions {
 
     public void setShowBollingerBands(boolean visible) {
         showBollingerBands.set(visible);
+    }
+
+    public void setShowRsi14(boolean visible) {
+        showRsi14.set(visible);
+    }
+
+    public void setShowMacd(boolean visible) {
+        showMacd.set(visible);
+    }
+
+    public void setShowStochastic14(boolean visible) {
+        showStochastic14.set(visible);
+    }
+
+    public void setAllIndicatorsVisible(boolean visible) {
+        showSma20.set(visible);
+        showEma50.set(visible);
+        showBollingerBands.set(visible);
+        showRsi14.set(visible);
+        showMacd.set(visible);
+        showStochastic14.set(visible);
+    }
+
+    public boolean areAllIndicatorsVisible() {
+        return showSma20.get()
+                && showEma50.get()
+                && showBollingerBands.get()
+                && showRsi14.get()
+                && showMacd.get()
+                && showStochastic14.get();
     }
 
     public boolean isGridVisible() {

@@ -5,13 +5,13 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.grpc.Predict;
 import org.investpro.investpro.TelegramClient;
 import org.investpro.investpro.indicators.IndicatorCalculator;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -51,13 +51,13 @@ public class InvestProAIPaperTradingBot {
             return;
         }
 
-        if (!aiClient.checkHealth()) {
+        if (!PredictorRuntimeManager.ensureAvailable(Duration.ofSeconds(12)) || !aiClient.checkHealth()) {
             logger.debug("Skipping paper-trading prediction because the predictor is unavailable.");
             return;
         }
 
-        Predict.MarketDataRequest request = buildRequest(recentCandles);
-        List<Predict.PredictionResponse> responses;
+        InvestProAIPredictor.MarketDataRequest request = buildRequest(recentCandles);
+        List<InvestProAIPredictor.PredictionResponse> responses;
         try {
             responses = aiClient.streamBatchPredict(List.of(request)).get(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
@@ -74,7 +74,7 @@ public class InvestProAIPaperTradingBot {
             return;
         }
 
-        Predict.PredictionResponse prediction = responses.getFirst();
+        InvestProAIPredictor.PredictionResponse prediction = responses.getFirst();
         if (prediction.getConfidence() < 0.7) {
             logger.info("Only trade high confidence signals");
             return;
@@ -84,10 +84,10 @@ public class InvestProAIPaperTradingBot {
         double entryPrice = latestCandle.getClosePrice();
         double tradeSize = (accountBalance * riskPerTrade) / (entryPrice * stopLossPercent);
 
-        if (prediction.getPrediction().equalsIgnoreCase("up")) {
+        if (prediction.isBuy() || prediction.getPrediction().equalsIgnoreCase("up")) {
             openTrades.add(new Trade("BUY", entryPrice, tradeSize));
             logger.info("AI Bot BUY @{} (size: {})", entryPrice, tradeSize);
-        } else if (prediction.getPrediction().equalsIgnoreCase("down")) {
+        } else if (prediction.isSell() || prediction.getPrediction().equalsIgnoreCase("down")) {
             openTrades.add(new Trade("SELL", entryPrice, tradeSize));
             logger.info("AI Bot SELL @{} (size: {})", entryPrice, tradeSize);
         }
@@ -142,11 +142,11 @@ public class InvestProAIPaperTradingBot {
         System.out.println("-------------------------------\n");
     }
 
-    private Predict.MarketDataRequest buildRequest(List<CandleData> recentCandles) {
+    private InvestProAIPredictor.MarketDataRequest buildRequest(List<CandleData> recentCandles) {
         List<CandleData> featureCandles = recentCandles.subList(recentCandles.size() - 20, recentCandles.size());
         CandleData latestCandle = recentCandles.getLast();
 
-        return Predict.MarketDataRequest.newBuilder()
+        return InvestProAIPredictor.MarketDataRequest.newBuilder()
                 .setOpen(latestCandle.getOpenPrice())
                 .setHigh(latestCandle.getHighPrice())
                 .setLow(latestCandle.getLowPrice())
@@ -154,10 +154,10 @@ public class InvestProAIPaperTradingBot {
                 .setVolume(latestCandle.getVolume())
                 .setAtr(calculateAtr(recentCandles, 14))
                 .setRsi(IndicatorCalculator.calculateRSI(recentCandles, 14))
+                .setMacd(IndicatorCalculator.calculateMACD(recentCandles))
+                .setStoch(IndicatorCalculator.calculateStochastic(recentCandles, 14))
                 .setBbUpper(IndicatorCalculator.calculateBollingerUpper(featureCandles, 20))
                 .setBbLower(IndicatorCalculator.calculateBollingerLower(featureCandles, 20))
-                .setStoch(IndicatorCalculator.calculateStochastic(recentCandles, 14))
-                .setMacd(IndicatorCalculator.calculateMACD(recentCandles))
                 .build();
     }
 

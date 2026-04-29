@@ -1,16 +1,13 @@
 # InvestPro
 
-![InvestPro, LLC](src/main/resources/investpro_icon.png)
-
+![Sopotek, inc](src/main/resources/investpro_icon.png)
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/maven-publish.yml/badge.svg)
 [![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/actions/workflows/docker-image.yml)
 [![license](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Upload coverage reports to Codecov](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml)
 
-## Welcome to InvestPro
-
-**InvestPro** is a powerful investment and utility software offering a range of features for managing investments, trading, and accessing financial data. It supports platforms like BINANCE US, COINBASE PRO, OANDA, TELEGRAM BOT, FOREX NEWS FACTORY, and provides features such as portfolio management, trade alerts, and trade signals.
-
+## What is InvestPro ?
+InvestPro is an AI-assisted investment research, portfolio monitoring, and trade decision-support platform designed for disciplined investors and active traders. It combines market data, portfolio analytics, risk controls, broker integrations, and intelligent agents into one professional command center.
 ## Supported Platforms
 
 - **BINANCE US**

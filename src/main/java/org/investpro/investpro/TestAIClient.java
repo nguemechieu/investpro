@@ -1,6 +1,5 @@
 package org.investpro.investpro;
 
-import org.investpro.grpc.Predict;
 import org.investpro.investpro.ai.InvestProAIPredictor;
 
 import java.util.ArrayList;
@@ -17,8 +16,9 @@ public class TestAIClient {
         int port = Integer.getInteger("investpro.ai.port", 50051);
         InvestProAIPredictor client = new InvestProAIPredictor(host, port);
 
-        Predict.MarketDataRequest request = Predict.MarketDataRequest.newBuilder()
+        InvestProAIPredictor.MarketDataRequest request = InvestProAIPredictor.MarketDataRequest.newBuilder()
                 .setOpen(29500.0)
+
                 .setClose(29350.0)
                 .setHigh(29600.0)
                 .setLow(29200.0)
@@ -31,7 +31,7 @@ public class TestAIClient {
                 .setBbLower(29400.0)
                 .build();
 
-        List<Predict.MarketDataRequest> featureList = new ArrayList<>();
+        List<InvestProAIPredictor.MarketDataRequest> featureList = new ArrayList<>();
         featureList.add(request);
 
         if (!client.checkHealth()) {
@@ -40,12 +40,12 @@ public class TestAIClient {
             return;
         }
 
-        CompletableFuture<List<Predict.PredictionResponse>> predictionResult = client.streamBatchPredict(featureList);
+        CompletableFuture<List<InvestProAIPredictor.PredictionResponse>> predictionResult = client.streamBatchPredict(featureList);
 
         try {
-            List<Predict.PredictionResponse> results = predictionResult.get(5, TimeUnit.SECONDS);
+            List<InvestProAIPredictor.PredictionResponse> results = predictionResult.get(5, TimeUnit.SECONDS);
             if (!results.isEmpty()) {
-                Predict.PredictionResponse last = results.getLast();
+                InvestProAIPredictor.PredictionResponse last = results.getLast();
                 System.out.println("Prediction: " + last.getPrediction());
                 System.out.println("Confidence: " + last.getConfidence());
             } else {

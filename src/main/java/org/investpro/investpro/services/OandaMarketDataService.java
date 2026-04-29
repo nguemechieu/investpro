@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.OrderBook;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

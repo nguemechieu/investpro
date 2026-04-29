@@ -13,7 +13,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
 import org.investpro.investpro.FxLifecycle;
-import org.investpro.investpro.model.CoinInfo;
+import org.investpro.investpro.models.CoinInfo;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalTime;
 import java.util.Comparator;
@@ -54,14 +55,14 @@ public class CoinInfoUI extends VBox {
         VBox.setVgrow(tableView, Priority.ALWAYS);
 
         fetchCoinData();
-        sceneProperty().addListener((_, _, newScene) -> {
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (newScene == null) {
                 shutdown();
             }
         });
     }
 
-    private TableView<CoinInfo> createTableView() {
+    private @NotNull TableView<CoinInfo> createTableView() {
         TableView<CoinInfo> table = new TableView<>();
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setPlaceholder(new Label("No market data available"));

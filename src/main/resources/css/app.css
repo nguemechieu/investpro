@@ -11,7 +11,7 @@
 }
 
 .app-shell {
-    -fx-background-color: transparent;
+    -fx-background-color: #050b14;
 }
 
 .auth-shell {
@@ -590,7 +590,7 @@
 }
 
 .terminal-root {
-    -fx-background-color: transparent;
+    -fx-background-color: #050b14;
 }
 
 .terminal-shell {
@@ -643,6 +643,11 @@
     -fx-spacing: 10;
 }
 
+.terminal-action-row {
+    -fx-hgap: 8;
+    -fx-vgap: 8;
+}
+
 .terminal-toolbar-box {
     -fx-spacing: 8;
     -fx-alignment: center-left;
@@ -664,9 +669,11 @@
     -fx-border-width: 1;
     -fx-border-radius: 10;
     -fx-background-radius: 10;
-    -fx-padding: 10 14 10 14;
+    -fx-padding: 8 12 8 12;
     -fx-font-size: 12px;
     -fx-font-weight: 800;
+    -fx-min-height: 34;
+    -fx-min-width: 58;
 }
 
 .terminal-toolbar-button:hover,
@@ -694,9 +701,11 @@
     -fx-border-width: 1;
     -fx-border-radius: 10;
     -fx-background-radius: 10;
-    -fx-padding: 9 10 9 10;
+    -fx-padding: 8 10 8 10;
     -fx-font-size: 12px;
     -fx-font-weight: 800;
+    -fx-min-width: 42;
+    -fx-min-height: 34;
 }
 
 .terminal-timeframe-button.active {
@@ -706,7 +715,7 @@
 }
 
 .terminal-badge {
-    -fx-padding: 8 12 8 12;
+    -fx-padding: 7 10 7 10;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
     -fx-font-size: 12px;
@@ -732,6 +741,33 @@
     -fx-text-fill: #cfe0f3;
 }
 
+/* MT4-style price display */
+.mt4-price-label {
+    -fx-background-color: rgba(30, 58, 138, 0.3);
+    -fx-border-color: rgba(59, 130, 246, 0.4);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-text-fill: #fbbf24;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-padding: 6 12 6 12;
+    -fx-alignment: center;
+    -fx-border-width: 1;
+}
+
+.mt4-bid-ask-label {
+    -fx-background-color: rgba(30, 58, 138, 0.2);
+    -fx-border-color: rgba(34, 197, 94, 0.3);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-text-fill: #86efac;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+    -fx-padding: 6 12 6 12;
+    -fx-alignment: center;
+    -fx-border-width: 1;
+}
+
 .terminal-kill-switch {
     -fx-background-color: #7f1d1d;
     -fx-border-color: #ef4444;
@@ -740,6 +776,9 @@
 
 .terminal-live-box {
     -fx-background-color: #0f1726;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 4 8 4 8;
 }
 
 .terminal-live-progress {
@@ -783,6 +822,8 @@
     -fx-border-color: #2d3a56;
     -fx-border-radius: 14 14 0 0;
     -fx-background-radius: 14 14 0 0;
+    -fx-padding: 2 10 2 10;
+    -fx-min-height: 32;
 }
 
 .terminal-dock-tabs .tab:selected,
@@ -795,6 +836,7 @@
 .terminal-chart-tabs .tab-label {
     -fx-text-fill: #dce7f8;
     -fx-font-weight: 700;
+    -fx-font-size: 12px;
 }
 
 .terminal-dock-tabs .tab-content-area,
@@ -886,10 +928,20 @@
     -fx-font-weight: 800;
 }
 
+.terminal-main-split,
+.terminal-bottom-split {
+    -fx-background-color: #050b14;
+}
+
 .terminal-main-split > .split-pane-divider,
 .terminal-bottom-split > .split-pane-divider {
-    -fx-background-color: transparent;
-    -fx-padding: 0 2 0 2;
+    -fx-background-color: #24324a;
+    -fx-padding: 0 3 0 3;
+}
+
+.terminal-main-split > .split-pane-divider:hover,
+.terminal-bottom-split > .split-pane-divider:hover {
+    -fx-background-color: #65a3ff;
 }
 
 .terminal-detached-root {

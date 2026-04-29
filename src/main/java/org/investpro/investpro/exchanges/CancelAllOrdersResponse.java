@@ -2,7 +2,7 @@ package org.investpro.investpro.exchanges;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.Order;
+import org.investpro.investpro.models.Order;
 
 @Getter
 @Setter

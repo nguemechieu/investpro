@@ -3,7 +3,7 @@ package org.investpro.investpro.exchanges;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.*;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.models.*;
 import org.investpro.investpro.services.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,9 +35,10 @@ public class Oanda extends Exchange {
     private TradePair tradePair;
 
     public Oanda(String accountId, String apiSecret) {
-        Objects.requireNonNull(accountId);
-        Objects.requireNonNull(apiSecret);
-        super(accountId, apiSecret);
+        super(
+                Objects.requireNonNull(accountId, "accountId must not be null"),
+                Objects.requireNonNull(apiSecret, "apiSecret must not be null")
+        );
         this.accountId = accountId;
         this.apiSecret = apiSecret;
         this.httpClient = HttpClient.newHttpClient();

@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.investpro.investpro.CandleDataSupplier;
 import org.investpro.investpro.components.OandaCandleDataSupplier;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.TradePair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -18,12 +18,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 public record OandaCandleService(@NotNull String accountId, @NotNull String apiSecret, @NotNull HttpClient client,
                                  int maxCandle) {

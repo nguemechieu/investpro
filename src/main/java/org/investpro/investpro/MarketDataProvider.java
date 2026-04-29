@@ -1,8 +1,8 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.CoinInfo;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.CoinInfo;
+import org.investpro.investpro.models.OrderBook;
+import org.investpro.investpro.models.TradePair;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

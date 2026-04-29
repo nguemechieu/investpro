@@ -3,7 +3,7 @@ package org.investpro.investpro.exchanges;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.*;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.models.*;
 import org.investpro.investpro.services.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -40,13 +40,13 @@ public class Coinbase extends Exchange {
     }
 
     public Coinbase(String apiKey, String apiSecret, String passphrase) {
-        Objects.requireNonNull(apiKey);
-        Objects.requireNonNull(apiSecret);
-        Objects.requireNonNull(passphrase);
-        super(apiKey, apiSecret);
+        super(
+                Objects.requireNonNull(apiKey, "apiKey must not be null"),
+                Objects.requireNonNull(apiSecret, "apiSecret must not be null")
+        );
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
-        this.passphrase = passphrase;
+        this.passphrase = Objects.requireNonNull(passphrase, "passphrase must not be null");
         this.httpClient = HttpClient.newHttpClient();
         this.orderService = new CoinbaseOrderService(apiKey, apiSecret, passphrase, httpClient);
         this.accountService = new CoinbaseAccountService(apiKey, apiSecret, passphrase, httpClient);

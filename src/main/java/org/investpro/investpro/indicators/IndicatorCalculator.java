@@ -1,6 +1,6 @@
 package org.investpro.investpro.indicators;
 
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -177,6 +177,71 @@ public class IndicatorCalculator {
         return new BollingerBands(upperBand, middleBand, lowerBand);
     }
 
-    public record BollingerBands(List<Double> upperBand, List<Double> middleBand, List<Double> lowerBand) {
+    public static @NotNull List<Double> calculateRSISeries(@NotNull List<CandleData> candles, int period) {
+        List<Double> series = new ArrayList<>(candles.size());
+        for (int i = 0; i < candles.size(); i++) {
+            if (i < period) {
+                series.add(null);
+                continue;
+            }
+
+            double gain = 0;
+            double loss = 0;
+            for (int j = i - period + 1; j <= i; j++) {
+                double change = candles.get(j).getClosePrice() - candles.get(j - 1).getClosePrice();
+                if (change > 0) {
+                    gain += change;
+                } else {
+                    loss -= change;
+                }
+            }
+
+            if (loss == 0) {
+                series.add(100.0);
+            } else {
+                double rs = gain / loss;
+                series.add(100 - (100 / (1 + rs)));
+            }
+        }
+        return series;
     }
-}
+
+    public static @NotNull List<Double> calculateStochasticSeries(@NotNull List<CandleData> candles, int period) {
+        List<Double> series = new ArrayList<>(candles.size());
+        for (int i = 0; i < candles.size(); i++) {
+            if (i + 1 < period) {
+                series.add(null);
+                continue;
+            }
+
+            double highestHigh = Double.MIN_VALUE;
+            double lowestLow = Double.MAX_VALUE;
+            for (int j = i - period + 1; j <= i; j++) {
+                highestHigh = Math.max(highestHigh, candles.get(j).getHighPrice());
+                lowestLow = Math.min(lowestLow, candles.get(j).getLowPrice());
+            }
+
+            double range = highestHigh - lowestLow;
+            if (range <= 0) {
+                series.add(null);
+            } else {
+                series.add((candles.get(i).getClosePrice() - lowestLow) / range * 100.0);
+            }
+        }
+        return series;
+    }
+
+    public static @NotNull List<Double> calculateMACDSeries(@NotNull List<CandleData> candles) {
+        List<Double> ema12 = calculateEMASeries(candles, 12);
+        List<Double> ema26 = calculateEMASeries(candles, 26);
+        List<Double> series = new ArrayList<>(candles.size());
+        for (int i = 0; i < candles.size(); i++) {
+            Double fast = ema12.get(i);
+            Double slow = ema26.get(i);
+            series.add(fast == null || slow == null ? null : fast - slow);
+        }
+        return series;
+    }
+
+    public record BollingerBands(List<Double> upperBand, List<Double> middleBand, List<Double> lowerBand) {
+    }}

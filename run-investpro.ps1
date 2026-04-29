@@ -1,3 +1,10 @@
+param(
+    [switch]$StartPredictor,
+    [string]$PredictorHost = "localhost",
+    [int]$PredictorPort = 50051,
+    [string]$Python = ""
+)
+
 $ErrorActionPreference = "Stop"
 
 if (-not $env:JAVA_HOME -or -not (Test-Path (Join-Path $env:JAVA_HOME "bin\\java.exe"))) {
@@ -35,13 +42,32 @@ if ((-not $env:JDK_JAVA_OPTIONS -or $env:JDK_JAVA_OPTIONS -notmatch '(^| )-Dpris
     }
 }
 
-if ((-not $env:JDK_JAVA_OPTIONS -or $env:JDK_JAVA_OPTIONS -notmatch '(^| )--enable-preview( |$)') -and
-    (-not $env:JAVA_TOOL_OPTIONS -or $env:JAVA_TOOL_OPTIONS -notmatch '(^| )--enable-preview( |$)')) {
-    if ($env:JDK_JAVA_OPTIONS) {
-        $env:JDK_JAVA_OPTIONS = "$env:JDK_JAVA_OPTIONS --enable-preview"
-    } else {
-        $env:JDK_JAVA_OPTIONS = "--enable-preview"
-    }
+$aiOptions = "-Dinvestpro.ai.host=$PredictorHost -Dinvestpro.ai.port=$PredictorPort"
+if ($env:JDK_JAVA_OPTIONS) {
+    $env:JDK_JAVA_OPTIONS = "$env:JDK_JAVA_OPTIONS $aiOptions"
+} else {
+    $env:JDK_JAVA_OPTIONS = $aiOptions
 }
 
-& ".\\mvnw.cmd" "-q" "-DskipTests" "javafx:run"
+$predictorProcess = $null
+try {
+    if ($StartPredictor) {
+        if (-not $Python) {
+            $venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+            if (Test-Path $venvPython) {
+                $Python = $venvPython
+            } else {
+                $Python = "python"
+            }
+        }
+        $predictorArgs = @("-m", "predictor", "--host", $PredictorHost, "--port", "$PredictorPort")
+        $predictorProcess = Start-Process -FilePath $Python -ArgumentList $predictorArgs -PassThru
+        Start-Sleep -Seconds 2
+    }
+
+    & ".\\mvnw.cmd" "-q" "-DskipTests" "javafx:run"
+} finally {
+    if ($predictorProcess -and -not $predictorProcess.HasExited) {
+        Stop-Process -Id $predictorProcess.Id
+    }
+}

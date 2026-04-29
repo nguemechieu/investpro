@@ -1,7 +1,7 @@
 package org.investpro.investpro.ai;
 
 import org.investpro.investpro.SIGNAL;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
