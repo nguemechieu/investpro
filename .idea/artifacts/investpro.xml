@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="javafx" name="investpro">
+    <output-path>$PROJECT_DIR$/out/artifacts/investpro</output-path>
+    <root id="root">
+      <element id="archive" name="investpro.jar">
+        <element id="module-output" name="investpro" />
+      </element>
+    </root>
+  </artifact>
+</component>
