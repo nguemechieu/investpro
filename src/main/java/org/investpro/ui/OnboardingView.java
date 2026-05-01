@@ -5,22 +5,30 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import org.investpro.service.UserAuthService;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.prefs.Preferences;
@@ -37,11 +45,13 @@ public class OnboardingView extends StackPane {
     private final TextField usernameField = new TextField();
     private final PasswordField passwordField = new PasswordField();
     private final TextField emailField = new TextField();
+    private final CheckBox rememberMeCheckBox = new CheckBox("Remember me");
     private final ComboBox<String> marketTypeBox = new ComboBox<>();
     private final ComboBox<String> venueBox = new ComboBox<>();
     private final ComboBox<String> exchangeBox = new ComboBox<>();
     private final Label statusLabel = new Label();
     private final ProgressBar progressBar = new ProgressBar(0);
+    private final UserAuthService authService = new UserAuthService();
     private MarketConfiguration configuration;
     private final TextField telegramToken =new TextField();
 
@@ -71,14 +81,18 @@ public class OnboardingView extends StackPane {
         emailField.setVisible(false);
         emailField.setManaged(false);
 
-        CheckBox rememberMeCheckBox = new CheckBox("Remember me");
         rememberMeCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
+        rememberMeCheckBox.setVisible(true);
+        rememberMeCheckBox.setManaged(true);
         
         Button forgetButton = new Button("Forget");
         forgetButton.setStyle("-fx-padding: 4 12; -fx-background-color: #1e40af; -fx-text-fill: white;");
         forgetButton.setOnAction(_ -> forgetCredentials());
 
-        HBox rememberBox = new HBox(10, rememberMeCheckBox, forgetButton);
+        Button forgotPasswordButton = new Button("Forgot Password");
+        forgotPasswordButton.setStyle("-fx-padding: 4 12; -fx-background-color: transparent; -fx-border-color: #475569; -fx-text-fill: #bfdbfe;");
+
+        HBox rememberBox = new HBox(10, rememberMeCheckBox, forgetButton, forgotPasswordButton);
         rememberBox.setAlignment(Pos.CENTER);
 
         Button loginButton = new Button("Log In");
@@ -93,21 +107,49 @@ public class OnboardingView extends StackPane {
         Label validation = new Label();
         validation.setStyle("-fx-text-fill: #ef4444;");
         validation.setAlignment(Pos.CENTER);
+        forgotPasswordButton.setOnAction(_ -> showForgotPasswordDialog(validation));
 
         createButton.setOnAction(_ -> {
-            emailField.setVisible(true);
-            emailField.setManaged(true);
-            validation.setText("Enter an email, username, and password, then continue.");
+            if (!emailField.isVisible()) {
+                emailField.setVisible(true);
+                emailField.setManaged(true);
+                validation.setStyle("-fx-text-fill: #fbbf24;");
+                validation.setText("Enter an email, username, and password, then create the account.");
+                return;
+            }
+
+            char[] password = passwordField.getText().toCharArray();
+            UserAuthService.AuthResult result = authService.register(
+                    usernameField.getText(),
+                    emailField.getText(),
+                    password
+            );
+            Arrays.fill(password, '\0');
+            validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
+            validation.setText(result.message());
+            if (result.success()) {
+                if (rememberMeCheckBox.isSelected()) {
+                    authService.rememberUser(usernameField.getText());
+                }
+                showConfigurationStep();
+            }
         });
 
         loginButton.setOnAction(_ -> {
-            if (usernameField.getText().isBlank() || passwordField.getText().isBlank()) {
-                validation.setText("Username and password are required.");
+            char[] password = passwordField.getText().toCharArray();
+            UserAuthService.AuthResult result = authService.signIn(usernameField.getText(), password);
+            Arrays.fill(password, '\0');
+            validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
+            validation.setText(result.message());
+            if (!result.success()) {
                 return;
             }
             if (rememberMeCheckBox.isSelected()) {
-                saveRememberedCredentials(usernameField.getText());
+                authService.rememberUser(usernameField.getText());
+            } else {
+                authService.forgetRememberedUser();
             }
+            passwordField.clear();
             showConfigurationStep();
         });
 
@@ -385,6 +427,79 @@ public class OnboardingView extends StackPane {
                 new KeyValue(progressBar.progressProperty(), progress));
     }
 
+    private void showForgotPasswordDialog(Label validation) {
+        TextInputDialog lookupDialog = new TextInputDialog(usernameField.getText());
+        lookupDialog.setTitle("Forgot Password");
+        lookupDialog.setHeaderText("Find your InvestPro account");
+        lookupDialog.setContentText("Username or email:");
+        lookupDialog.showAndWait().ifPresent(lookup -> {
+            UserAuthService.ResetTokenResult tokenResult = authService.beginPasswordReset(lookup);
+            if (!tokenResult.success()) {
+                validation.setStyle("-fx-text-fill: #ef4444;");
+                validation.setText(tokenResult.message());
+                return;
+            }
+
+            Alert tokenAlert = new Alert(Alert.AlertType.INFORMATION);
+            tokenAlert.setTitle("Reset Token");
+            tokenAlert.setHeaderText("Reset token created for %s".formatted(tokenResult.email()));
+            tokenAlert.setContentText("Use this token within 30 minutes:\n\n%s".formatted(tokenResult.token()));
+            tokenAlert.showAndWait();
+            showResetPasswordDialog(lookup, tokenResult.token(), validation);
+        });
+    }
+
+    private void showResetPasswordDialog(String lookup, String token, Label validation) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Reset Password");
+        dialog.setHeaderText("Enter your reset token and new password.");
+        ButtonType resetButtonType = new ButtonType("Reset Password", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(resetButtonType, ButtonType.CANCEL);
+
+        TextField accountField = new TextField(lookup);
+        accountField.setPromptText("Username or email");
+        TextField tokenField = new TextField(token);
+        tokenField.setPromptText("Reset token");
+        PasswordField newPasswordField = new PasswordField();
+        newPasswordField.setPromptText("New password");
+        PasswordField confirmPasswordField = new PasswordField();
+        confirmPasswordField.setPromptText("Confirm password");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        grid.addRow(0, new Label("Account"), accountField);
+        grid.addRow(1, new Label("Token"), tokenField);
+        grid.addRow(2, new Label("New Password"), newPasswordField);
+        grid.addRow(3, new Label("Confirm"), confirmPasswordField);
+        dialog.getDialogPane().setContent(grid);
+
+        Platform.runLater(newPasswordField::requestFocus);
+        dialog.showAndWait()
+                .filter(button -> button == resetButtonType)
+                .ifPresent(_ -> {
+                    if (!newPasswordField.getText().equals(confirmPasswordField.getText())) {
+                        validation.setStyle("-fx-text-fill: #ef4444;");
+                        validation.setText("New password and confirmation do not match.");
+                        return;
+                    }
+                    char[] password = newPasswordField.getText().toCharArray();
+                    UserAuthService.AuthResult result = authService.resetPassword(
+                            accountField.getText(),
+                            tokenField.getText(),
+                            password
+                    );
+                    Arrays.fill(password, '\0');
+                    validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
+                    validation.setText(result.message());
+                    if (result.success()) {
+                        usernameField.setText(accountField.getText().trim());
+                        passwordField.clear();
+                    }
+                });
+    }
+
     private void saveConfiguration(MarketConfiguration configuration) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         preferences.put("username", configuration.username());
@@ -412,25 +527,17 @@ public class OnboardingView extends StackPane {
     }
 
     private void saveRememberedCredentials(String username) {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
-        preferences.put("remembered_username", username);
-        preferences.putBoolean("remember_me_enabled", true);
+        authService.rememberUser(username);
     }
 
     private void loadRememberedCredentials() {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
-        if (preferences.getBoolean("remember_me_enabled", false)) {
-            String savedUsername = preferences.get("remembered_username", "");
-            if (!savedUsername.isEmpty()) {
-                usernameField.setText(savedUsername);
-            }
-        }
+        rememberMeCheckBox.setSelected(authService.isRememberMeEnabled());
+        authService.rememberedUsername().ifPresent(usernameField::setText);
     }
 
     private void forgetCredentials() {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
-        preferences.putBoolean("remember_me_enabled", false);
-        preferences.remove("remembered_username");
+        authService.forgetRememberedUser();
         // Clear all exchange credentials
         for (String exchange : new String[]{"COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA", "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX"}) {
             preferences.remove("exchange_api_key_" + exchange);
@@ -441,6 +548,7 @@ public class OnboardingView extends StackPane {
         }
         usernameField.clear();
         passwordField.clear();
+        rememberMeCheckBox.setSelected(false);
     }
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId, String token) {

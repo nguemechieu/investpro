@@ -57,7 +57,6 @@ public record InProgressCandleData(int openTime, double openPrice, double highPr
     public double getOpenPrice() {
         return openPrice;
 
-
     }
 
     public double getLastPrice() {

@@ -31,6 +31,9 @@ public class AgentEventBus {
         return thread;
     });
 
+    public AgentEventBus() {
+    }
+
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     public void start() {

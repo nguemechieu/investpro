@@ -1,5 +1,7 @@
 package org.investpro.core.agents.learning;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
@@ -9,6 +11,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Records learning observations from trade lifecycle outcomes.
  */
+@Getter
+@Setter
 public class LearningAgent implements Agent {
 
     private static final Logger logger = LoggerFactory.getLogger(LearningAgent.class);
@@ -25,16 +29,19 @@ public class LearningAgent implements Agent {
     public void start(AgentContext context) {
         this.context = context;
         this.running = true;
+        logger.info("LearningAgent started");
     }
 
     @Override
     public void stop() {
         running = false;
+        logger.info("LearningAgent stopped");
     }
 
     @Override
     public void onEvent(AgentEvent event) {
         if (!running || event == null) {
+            logger.error("LearningAgent event was null");
             return;
         }
 

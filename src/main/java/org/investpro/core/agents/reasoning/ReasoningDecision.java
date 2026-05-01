@@ -1,6 +1,7 @@
 package org.investpro.core.agents.reasoning;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.UUID;
  * AI/local reasoning decision after risk approval.
  */
 @Getter
+@Setter
 public class ReasoningDecision {
 
     private final String decisionId;

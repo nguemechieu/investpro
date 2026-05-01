@@ -3,6 +3,7 @@ package org.investpro.ui;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import lombok.Getter;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.Position;
 import org.slf4j.Logger;
@@ -20,21 +21,18 @@ import java.util.function.Consumer;
 public class PositionsDataManager {
 
     private static final Logger logger = LoggerFactory.getLogger(PositionsDataManager.class);
-    
+
+    /**
+     * -- GETTER --
+     *  Get the observable list of positions for binding to UI.
+     */
+    @Getter
     private final ObservableList<Position> positions = FXCollections.observableArrayList();
     private Timer refreshTimer;
-    private long refreshInterval = 5000; // 5 seconds default
     private Consumer<String> statusCallback;
     private Exchange currentExchange;
 
     public PositionsDataManager() {}
-
-    /**
-     * Get the observable list of positions for binding to UI.
-     */
-    public ObservableList<Position> getPositions() {
-        return positions;
-    }
 
     /**
      * Set callback for status messages.
@@ -123,7 +121,7 @@ public class PositionsDataManager {
     public void startAutoRefresh(Exchange exchange, long intervalMs) {
         stopAutoRefresh(); // Stop existing timer if any
 
-        this.refreshInterval = intervalMs;
+        // 5 seconds default
         this.currentExchange = exchange;
 
         refreshTimer = new Timer("PositionsAutoRefresh", true);

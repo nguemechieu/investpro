@@ -25,16 +25,15 @@ public class Db1 implements Db {
 
     public Db1(@NotNull Properties conf) throws ClassNotFoundException {
 
-        //Class.forName() to load the driver
         Class.forName(
                 "org.sqlite.JDBC"
         );
 
         try {
             String databaseFile = conf.getProperty("sqlite_db_file", "investpro_db.sql");
-            this.conn = DriverManager.getConnection("jdbc:sqlite:" + databaseFile);
+            this.conn = DriverManager.getConnection("jdbc:sqlite:%s".formatted(databaseFile));
         } catch (SQLException e) {
-            logger.error("Error connecting to the database\n" + e.getMessage());
+            logger.error("Error connecting to the database\n%s".formatted(e.getMessage()));
 
         }
     }
@@ -53,11 +52,10 @@ public class Db1 implements Db {
                     "symbol VARCHAR(255), " +
                     "image VARCHAR(255) " +
                     ")";
-            System.out.println(sql);
             this.conn.createStatement().executeUpdate(sql);
             ensureCurrencyColumns();
         } catch (SQLException e) {
-            logger.error("Error creating the database tables\n" + e.getMessage());
+            logger.error("Error creating the database tables\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -157,38 +155,15 @@ public class Db1 implements Db {
 
     }
 
-    @Override
-    public String getDriverClassName() {
-        return null;
-    }
 
-    @Override
-    public String getJdbcUrl() {
-        return null;
-    }
-
-    @Override
-    public String getJdbcUsername() {
-        return null;
-    }
-
-    @Override
-    public String getJdbcPassword() {
-        return null;
-    }
-
-    @Override
-    public String getJdbcDriverClassName() {
-        return null;
-    }
 
     @Override
     public int find(String table, String column, String value) {
         int da = 0;
         try {
-            da = conn.createStatement().executeUpdate("SELECT * FROM " + table + " WHERE " + column + " = '" + value + "'");
+            da = conn.createStatement().executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error finding the data\n" + e.getMessage());
+            logger.error("Error finding the data\n%s".formatted(e.getMessage()));
 
         }
 
@@ -198,9 +173,9 @@ public class Db1 implements Db {
     @Override
     public void findAll(String table, String column, String value) {
         try {
-            conn.createStatement().executeUpdate("SELECT * FROM " + table + " WHERE " + column + " = '" + value + "'");
+            conn.createStatement().executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error finding all the data\n" + e.getMessage());
+            logger.error("Error finding all the data\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -208,9 +183,9 @@ public class Db1 implements Db {
     @Override
     public void update(String table, String column, String value) {
         try {
-            conn.createStatement().executeUpdate("UPDATE " + table + " SET " + column + " = '" + value + "'");
+            conn.createStatement().executeUpdate("UPDATE %s SET %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error updating the database\n" + e.getMessage());
+            logger.error("Error updating the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -219,10 +194,10 @@ public class Db1 implements Db {
     @Override
     public void insert(String table, String column, String value) {
         try {
-            conn.createStatement().executeUpdate("INSERT INTO " + table + " (" + column + ") VALUES ('" + value + "')");
+            conn.createStatement().executeUpdate("INSERT INTO %s (%s) VALUES ('%s')".formatted(table, column, value));
         } catch (SQLException e) {
 
-            logger.error("Error inserting the database\n" + e.getMessage());
+            logger.error("Error inserting the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -230,9 +205,9 @@ public class Db1 implements Db {
     @Override
     public void delete(String table, String column, String value) {
         try {
-            conn.createStatement().executeUpdate("DELETE FROM " + table + " WHERE " + column + " = '" + value + "'");
+            conn.createStatement().executeUpdate("DELETE FROM %s WHERE %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error deleting the database\n" + e.getMessage());
+            logger.error("Error deleting the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -240,9 +215,9 @@ public class Db1 implements Db {
     @Override
     public void create(String table, String column, String value) {
         try {
-            conn.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS " + table + " (" + column + " VARCHAR(255))");
+            conn.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS %s (%s VARCHAR(255))".formatted(table, column));
         } catch (SQLException e) {
-            logger.error("Error creating the database table\n" + e.getMessage());
+            logger.error("Error creating the database table\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -250,14 +225,14 @@ public class Db1 implements Db {
     @Override
     public void findById(String table, String column, String value) {
         try {
-            conn.createStatement().executeUpdate("SELECT * FROM " + table + " WHERE " + column + " = '" + value + "'");
-            ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + table + " WHERE " + column + " = '" + value + "'");
+            conn.createStatement().executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
+            ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
             while (rs.next()) {
                 logger.info(rs.getString(column));
             }
 
         } catch (SQLException e) {
-            logger.error("Error finding the database\n" + e.getMessage());
+            logger.error("Error finding the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -330,7 +305,7 @@ public class Db1 implements Db {
             existing.setString(2, currency.getCurrencyType().name());
 
             if (existing.executeQuery().next()) {
-                logger.info("Currency already exists with code: " + currency.getCode());
+                logger.info("Currency already exists with code: %s".formatted(currency.getCode()));
             } else {
                 PreparedStatement insert = conn.prepareStatement(
                         "INSERT INTO currencies (currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image) " +
@@ -350,7 +325,7 @@ public class Db1 implements Db {
                 Currency.CURRENCIES.put(new SymmetricPair<>(currency.getCode(), type), currency);
 
                 logger.info(
-                        "New Currency with code: " + currency.getCode() + "was added  to the  database"
+                        "New Currency with code: %swas added  to the  database".formatted(currency.getCode())
                 );
 
 
@@ -365,14 +340,13 @@ public class Db1 implements Db {
     public Currency getCurrency(String code) throws SQLException {
         createTables();
         // Get currency from database
-        Currency newCurrency = null;
+        Currency newCurrency ;
 
         PreparedStatement statement = conn.prepareStatement("SELECT * FROM currencies WHERE code = ?");
         statement.setString(1, code);
         ResultSet check = statement.executeQuery();
         if (!check.next()) {
-            logger.info("Currency not found with code: " + code);
-            //new Message(Message.MESSAGE_TYPE.WARNING, STR."Currency with code: \{code} not found in database");
+            logger.info("Currency not found with code: %s".formatted(code));
 
             try {
 
@@ -394,7 +368,7 @@ public class Db1 implements Db {
             String symbol = check.getString("symbol");
             String image = check.getString("image");
             String currencyType = check.getString("currency_type");
-            logger.info("Currency found with code: " + code + " ");
+            logger.info("Currency found with code: %s ".formatted(code));
             String format = String.format("Currency with code: %s, full_display_name: %s,  short_display_name: %s, fractional_digits: %s, symbol: %s, image: %s, currency_type: %s",
                     code,
                     fullDisplayName,
@@ -405,7 +379,7 @@ public class Db1 implements Db {
                     currencyType);
             logger.info(format);
             CurrencyType type = CurrencyType.valueOf(currencyType);
-            logger.info("Currency Type: " + type);
+            logger.info("Currency Type: %s".formatted(type));
             newCurrency = new Currency(
                     type,
                     fullDisplayName,
@@ -414,12 +388,9 @@ public class Db1 implements Db {
                     fractionalDigits,
                     symbol,
                     image) {
-                public int compareTo(@NotNull Currency o) {
-                    return 0;
-                }
 
             };
-            logger.info("New Currency: " + newCurrency);
+            logger.info("New Currency: %s".formatted(newCurrency));
         }
         return newCurrency;
     }
@@ -439,8 +410,8 @@ public class Db1 implements Db {
             return;
         }
 
-        conn.createStatement().executeUpdate("ALTER TABLE currencies ADD COLUMN " + columnName + " " + columnType);
-        logger.info("Added missing currencies." + columnName + " column");
+        conn.createStatement().executeUpdate("ALTER TABLE currencies ADD COLUMN %s %s".formatted(columnName, columnType));
+        logger.info("Added missing currencies.%s column".formatted(columnName));
     }
 
     private boolean currencyColumnExists(String columnName) throws SQLException {
@@ -493,9 +464,9 @@ public class Db1 implements Db {
             pstmt.setDouble(9, order.getProfit());
             pstmt.setString(10, order.getStatus() != null ? order.getStatus() : "PENDING");
             pstmt.executeUpdate();
-            logger.info("Order saved: symbol=" + order.getSymbol() + ", type=" + order.getType());
+            logger.info("Order saved: symbol=%s, type=%s".formatted(order.getSymbol(), order.getType()));
         } catch (SQLException e) {
-            logger.error("Error saving order: " + e.getMessage(), e);
+            logger.error("Error saving order: %s".formatted(e.getMessage()), e);
             throw e;
         }
     }
@@ -517,7 +488,7 @@ public class Db1 implements Db {
                 return mapResultSetToOrder(rs);
             }
         } catch (SQLException e) {
-            logger.error("Error retrieving order: " + e.getMessage(), e);
+            logger.error("Error retrieving order: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return null;
@@ -540,9 +511,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found " + orders.size() + " orders for symbol: " + symbol);
+            logger.info("Found %d orders for symbol: %s".formatted(orders.size(), symbol));
         } catch (SQLException e) {
-            logger.error("Error retrieving orders by symbol: " + e.getMessage(), e);
+            logger.error("Error retrieving orders by symbol: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -565,9 +536,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found " + orders.size() + " orders with status: " + status);
+            logger.info("Found %d orders with status: %s".formatted(orders.size(), status));
         } catch (SQLException e) {
-            logger.error("Error retrieving orders by status: " + e.getMessage(), e);
+            logger.error("Error retrieving orders by status: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -592,9 +563,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found " + orders.size() + " orders in time range");
+            logger.info("Found %d orders in time range".formatted(orders.size()));
         } catch (SQLException e) {
-            logger.error("Error retrieving orders by time range: " + e.getMessage(), e);
+            logger.error("Error retrieving orders by time range: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -614,9 +585,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found " + orders.size() + " open orders");
+            logger.info("Found %d open orders".formatted(orders.size()));
         } catch (SQLException e) {
-            logger.error("Error retrieving open orders: " + e.getMessage(), e);
+            logger.error("Error retrieving open orders: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -692,9 +663,9 @@ public class Db1 implements Db {
             pstmt.setString(1, newStatus);
             pstmt.setString(2, orderId);
             pstmt.executeUpdate();
-            logger.info("Order " + orderId + " status updated to: " + newStatus);
+            logger.info("Order %s status updated to: %s".formatted(orderId, newStatus));
         } catch (SQLException e) {
-            logger.error("Error updating order status: " + e.getMessage(), e);
+            logger.error("Error updating order status: %s".formatted(e.getMessage()), e);
             throw e;
         }
     }

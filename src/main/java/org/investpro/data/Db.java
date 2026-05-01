@@ -47,15 +47,6 @@ public interface Db extends DataSource {
 
     void setUrl(String url);
 
-    String getDriverClassName();
-
-    String getJdbcUrl();
-
-    String getJdbcUsername();
-
-    String getJdbcPassword();
-
-    String getJdbcDriverClassName();
 
     int find(
             String table,

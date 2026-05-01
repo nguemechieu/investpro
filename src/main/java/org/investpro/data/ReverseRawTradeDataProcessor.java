@@ -98,7 +98,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         } catch (IOException exception) {
             throw new IllegalStateException(exception);
         } catch (RuntimeException exception) {
-            throw new RuntimeException("Unable to parse raw trade data from " + rawTradeData, exception);
+            throw new RuntimeException("Unable to parse raw trade data from %s".formatted(rawTradeData), exception);
         }
 
         List<CandleData> candleData = new ArrayList<>(numCandles);

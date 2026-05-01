@@ -93,7 +93,7 @@ public class ChartToolbar extends Region {
     private Separator functionOptionsSeparator;
 
     // Action buttons
-    private final Button screenshotButton = new Button("Screenshot");
+    private final Button screenshotButton = new ToolbarButton(Tool.SCREEN_SHOT);
 
     // Callbacks for button actions
     private Runnable onScreenshotAction;

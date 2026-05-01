@@ -1,5 +1,7 @@
 package org.investpro.core.agents.signal;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
@@ -15,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Creates simple deterministic signals from live market events.
  */
+@Getter
+@Setter
 public class SignalAgent implements Agent {
 
     private static final Logger logger = LoggerFactory.getLogger(SignalAgent.class);

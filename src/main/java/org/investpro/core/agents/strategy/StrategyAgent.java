@@ -1,5 +1,7 @@
 package org.investpro.core.agents.strategy;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
@@ -8,6 +10,8 @@ import org.investpro.core.agents.signal.Signal;
 /**
  * Filters and approves/rejects signals before risk review.
  */
+@Getter
+@Setter
 public class StrategyAgent implements Agent {
 
     private AgentContext context;

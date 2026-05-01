@@ -584,10 +584,10 @@ void dispose()
 
 ```java
 private void layoutChildren()
-protected double computeMinWidth(double height)
+private double computeMinWidth(double height)
 protected double computeMinHeight(double width)
 protected double computePrefWidth(double height)
-protected double computePrefHeight(doubl
+protected double computePrefHeight
 ```
 
 ## Version History

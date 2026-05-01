@@ -6,7 +6,6 @@ import java.util.List;
 
 /**
  * Placeholder client for future OpenAI integration.
- *
  * This class is intentionally deterministic and does not require an API key.
  */
 public class OpenAIReasoningClient {

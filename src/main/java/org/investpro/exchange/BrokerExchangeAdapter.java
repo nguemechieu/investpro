@@ -3,6 +3,7 @@ package org.investpro.exchange;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import javafx.beans.property.SimpleIntegerProperty;
 import org.investpro.data.Account;
+import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.OpenOrder;
@@ -729,7 +730,7 @@ public abstract class BrokerExchangeAdapter extends Exchange {
         }
 
         @Override
-        public java.util.concurrent.Future<List<org.investpro.data.CandleData>> get() {
+        public java.util.concurrent.@NotNull Future<List<CandleData>> get() {
             return CompletableFuture.completedFuture(List.of());
         }
     }

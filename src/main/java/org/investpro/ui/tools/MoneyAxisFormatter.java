@@ -12,7 +12,7 @@ import java.util.Objects;
  * @author NOEL NGUEMECHIEU
  */
 public class MoneyAxisFormatter extends StringConverter<Number> {
-    private final FastMoneyFormatter format;
+    public final FastMoneyFormatter format;
     private final Currency currency;
     private final int precision;
 

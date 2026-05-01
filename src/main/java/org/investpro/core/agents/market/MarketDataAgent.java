@@ -1,5 +1,7 @@
 package org.investpro.core.agents.market;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
@@ -9,6 +11,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Normalizes market/account stream events for downstream agents.
  */
+@Getter
+@Setter
 public class MarketDataAgent implements Agent {
 
     private static final Logger logger = LoggerFactory.getLogger(MarketDataAgent.class);
@@ -25,16 +29,20 @@ public class MarketDataAgent implements Agent {
     public void start(AgentContext context) {
         this.context = context;
         this.running = true;
+        logger.info("MarketDataAgent started");
     }
 
     @Override
     public void stop() {
         running = false;
+
+        logger.info("MarketDataAgent stopped");
     }
 
     @Override
     public void onEvent(AgentEvent event) {
         if (!running || event == null) {
+            logger.info("MarketDataAgent onEvent() called before stopping");
             return;
         }
 

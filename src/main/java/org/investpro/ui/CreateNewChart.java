@@ -56,7 +56,7 @@ public final class CreateNewChart {
             }
         }
 
-        chartDisplay = new CandleStickChartDisplay(tradePair, exchange);
+        chartDisplay = new CandleStickChartDisplay(tradePair, exchange, exchange.getTelegramToken());
 
         BorderPane content = new BorderPane(chartDisplay);
         content.setPadding(new Insets(4));
