@@ -22,6 +22,12 @@ public enum ENUM_EXCHANGE_LIST {
      ),
     BINANCE(
             "BINANCE", 14
+    ),
+    ALPACA(
+            "ALPACA", 15
+    ),
+    INTERACTIVE_BROKERS(
+            "INTERACTIVE BROKERS", 16
     );
 
 

@@ -23,14 +23,12 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.CandleStickChartOptions;
-import org.investpro.ui.tools.PriceLine;
 import org.investpro.utils.DelayedSizeChangeListener;
 import org.investpro.utils.PopOver;
 import org.investpro.utils.ZoomDirection;
@@ -96,7 +94,6 @@ public class ChartToolbar extends Region {
 
     // Action buttons
     private final Button screenshotButton = new Button("Screenshot");
-    private final Button autoTradeButton = new Button("Auto Trade");
 
     // Callbacks for button actions
     private Runnable onScreenshotAction;
@@ -128,7 +125,6 @@ public class ChartToolbar extends Region {
      * Adds action buttons (screenshot, auto-trade).
      */
     private void addActionButtons(@NotNull List<Node> toolbarNodes) {
-        toolbarNodes.add(autoTradeButton);
         toolbarNodes.add(screenshotButton);
         toolbarNodes.add(createInvisibleSeparator());
     }
@@ -380,7 +376,6 @@ public class ChartToolbar extends Region {
      */
     private void registerActionHandlers() {
         screenshotButton.setOnAction(_ -> executeScreenshotAction());
-        autoTradeButton.setOnAction(_ -> executeAutoTradeAction());
     }
 
     /**
@@ -405,117 +400,7 @@ public class ChartToolbar extends Region {
 
 
 
-    /**
-     * Shows or hides all price lines on the chart.
-     *
-     * @param visible true to show price lines, false to hide
-     */
-    public void setChartPriceLinesVisible(boolean visible) {
-        if (candleStickChart != null) {
-            candleStickChart.setPriceLinesVisible(visible);
-        }
-    }
 
-    /**
-     * Checks if price lines are currently visible.
-     *
-     * @return true if price lines are visible, false otherwise
-     */
-    public boolean isChartPriceLinesVisible() {
-        return candleStickChart != null && candleStickChart.isPriceLinesVisible();
-    }
-
-    public void toggleChartPriceLines() {
-        if (candleStickChart != null) {
-            candleStickChart.togglePriceLines();
-        }
-    }
-
-    /**
-     * Shows or hides the crosshair overlay.
-     *
-     * @param visible true to show crosshair, false to hide
-     */
-    public void setChartCrosshairVisible(boolean visible) {
-        if (candleStickChart != null) {
-            candleStickChart.setCrosshairVisible(visible);
-        }
-    }
-
-    /**
-     * Checks if the crosshair overlay is currently visible.
-     *
-     * @return true if crosshair is visible, false otherwise
-     */
-    public boolean isChartCrosshairVisible() {
-        return candleStickChart != null && candleStickChart.isCrosshairVisible();
-    }
-
-    public void toggleChartCrosshair() {
-        if (candleStickChart != null) {
-            candleStickChart.toggleCrosshair();
-        }
-    }
-
-    public void changeChartZoom(ZoomDirection zoomDirection) {
-        if (candleStickChart != null) {
-            candleStickChart.changeZoom(zoomDirection);
-        }
-    }
-
-
-
-    /**
-     * Refreshes the entire chart by reloading data.
-     */
-    public void refreshChart() {
-        if (candleStickChart != null) {
-            candleStickChart.refreshChart();
-        }
-    }
-
-    /**
-     * Jumps the view to the latest/most recent candle.
-     */
-    public void jumpToLatestCandle() {
-        if (candleStickChart != null) {
-            candleStickChart.jumpToLatestCandle();
-        }
-    }
-
-    /**
-     * Fits all available chart data into the current view.
-     */
-    public void fitChart() {
-        if (candleStickChart != null) {
-            candleStickChart.fitChart();
-        }
-    }
-
-    /**
-     * Applies adaptive scaling to optimize candle visibility.
-     */
-    public void applyAdaptiveScaling() {
-        if (candleStickChart != null) {
-            candleStickChart.applyAdaptiveScaling();
-        }
-    }
-
-    /**
-     * Gets the current zoom level index.
-     *
-     * @return the zoom level index, or -1 if chart is not ready
-     */
-    public int getCurrentChartZoomLevel() {
-        return candleStickChart != null ? candleStickChart.getCurrentZoomLevelIndex() : -1;
-    }
-
-    public void disposeChart() {
-        if (candleStickChart != null) {
-            candleStickChart.dispose();
-            candleStickChart = null;
-        }
-    }
 
 
 
@@ -533,13 +418,7 @@ public class ChartToolbar extends Region {
         }
     }
 
-    private void executeAutoTradeAction() {
-        if (onAutoTradeAction != null) {
-            onAutoTradeAction.run();
-        } else if (candleStickChart != null) {
-            candleStickChart.autoTrade();
-        }
-    }
+
 
     private void executePrintAction() {
         if (onPrintAction != null) {
@@ -935,7 +814,7 @@ public class ChartToolbar extends Region {
          * @param event the mouse event
          * @return true if the mouse is over the PopOver or buffer zone
          */
-        private boolean isMouseOverPopOver(MouseEvent event) {
+        private boolean isMouseOverPopOver(@NotNull MouseEvent event) {
             double bufferZone = optionsPopOver.getWidth() * (POPOVER_BUFFER_PERCENTAGE / 100.0);
             double minX = optionsPopOver.getX() - bufferZone;
             double maxX = optionsPopOver.getX() + optionsPopOver.getWidth() + bufferZone;

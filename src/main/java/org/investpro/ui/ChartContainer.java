@@ -19,8 +19,10 @@ import javafx.print.PrinterJob;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.util.Duration;
 import lombok.Getter;
+import org.investpro.data.ReverseRawTradeDataProcessor;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
+import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.utils.CandleAggregator;
 import org.investpro.utils.CandleDataSupplier;
@@ -29,6 +31,8 @@ import org.investpro.utils.PopOver;
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -124,6 +128,7 @@ public class ChartContainer extends Region {
     private final Exchange exchange;
     private TradePair tradePair;
     private final boolean liveSyncing;
+    private final TradingService tradingService;
 
     // State management
     private final SimpleIntegerProperty secondsPerCandle = new SimpleIntegerProperty(DEFAULT_SECONDS_PER_CANDLE);
@@ -145,19 +150,29 @@ public class ChartContainer extends Region {
     private Consumer<String> onChartError;
     private Runnable onChartCreated;
     private Runnable onChartDisposed;
+    private String telegramToken;
 
     /**
      * Creates a new chart container for the specified trading pair.
      *
-     * @param exchange the exchange to get candle data from
-     * @param tradePair the trading pair to display
-     * @param liveSyncing whether to sync live candle updates
+     * @param exchange      the exchange to get candle data from
+     * @param tradePair     the trading pair to display
+     * @param liveSyncing   whether to sync live candle updates
+     * @param telegramToken
      * @throws NullPointerException if exchange or tradePair is null
      */
-    public ChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing) {
+    public ChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing,
+                          String telegramToken) {
+        this(exchange, tradePair, liveSyncing, telegramToken, null);
+    }
+
+    public ChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing,
+                          String telegramToken, TradingService tradingService) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
         this.tradePair = Objects.requireNonNull(tradePair, "tradePair must not be null");
         this.liveSyncing = liveSyncing;
+        this.telegramToken = Objects.requireNonNull(telegramToken, "telegramToken must not be null");
+        this.tradingService = tradingService;
 
         initialize();
     }
@@ -178,9 +193,9 @@ public class ChartContainer extends Region {
         try {
             createInitialChart();
             registerTimeframeListener();
-            LOGGER.log(Level.INFO, "ChartContainer initialized successfully for " + tradePair);
+            LOGGER.log(Level.INFO, "ChartContainer initialized successfully for %s".formatted(tradePair));
         } catch (Exception e) {
-            handleChartError("Failed to initialize chart container: " + e.getMessage());
+            handleChartError("Failed to initialize chart container: %s".formatted(e.getMessage()));
         }
     }
 
@@ -213,8 +228,7 @@ public class ChartContainer extends Region {
     private void configureToolbar() {
         try {
             // Get supported granularities
-            CandleDataSupplier defaultSupplier = exchange.getCandleDataSupplier(
-                    secondsPerCandle.get(), tradePair);
+            CandleDataSupplier defaultSupplier = buildCandleDataSupplier(secondsPerCandle.get());
             supportedGranularities = Set.copyOf(defaultSupplier.getSupportedGranularities());
 
             // Create separator and popover for toolbar
@@ -376,13 +390,41 @@ public class ChartContainer extends Region {
 
         return new CandleStickChart(
                 exchange,
-                exchange.getCandleDataSupplier(durationSeconds, tradePair),
+                buildCandleDataSupplier(durationSeconds),
                 tradePair,
                 liveSyncing,
                 durationSeconds,
+                telegramToken,
+                tradingService,
                 candleChartContainer.widthProperty(),
                 candleChartContainer.heightProperty()
         );
+    }
+
+    private CandleDataSupplier buildCandleDataSupplier(int durationSeconds) {
+        Path rawTradeDataPath = configuredRawTradeDataPath();
+        if (rawTradeDataPath != null) {
+            try {
+                LOGGER.log(Level.INFO, "Using ReverseRawTradeDataProcessor for " + rawTradeDataPath);
+                return new ReverseRawTradeDataProcessor(rawTradeDataPath, durationSeconds, tradePair, exchange);
+            } catch (IOException exception) {
+                LOGGER.log(Level.WARNING, "Unable to use raw trade data processor; falling back to exchange supplier: " + exception.getMessage(), exception);
+            }
+        }
+        return exchange.getCandleDataSupplier(durationSeconds, tradePair);
+    }
+
+    private Path configuredRawTradeDataPath() {
+        String configuredPath = System.getProperty("investpro.rawTradeData", "");
+        if (configuredPath == null || configuredPath.isBlank()) {
+            configuredPath = System.getenv("INVESTPRO_RAW_TRADE_DATA");
+        }
+        if (configuredPath == null || configuredPath.isBlank()) {
+            return null;
+        }
+
+        Path path = Path.of(configuredPath.trim());
+        return Files.isRegularFile(path) ? path : null;
     }
 
     /**
@@ -460,7 +502,7 @@ public class ChartContainer extends Region {
             toolbar.setActiveToolbarButton(secondsPerCandle);
             toolbar.setOnScreenshotAction(this::saveChartSnapshot);
             toolbar.setOnPrintAction(this::printChart);
-            toolbar.setOnAutoTradeAction(() -> LOGGER.log(Level.INFO, "Auto Trade is controlled from the main terminal toolbar."));
+            toolbar.setOnAutoTradeAction(chart::autoTrade);
         } catch (Exception e) {
             handleChartError("Failed to register toolbar handlers: " + e.getMessage());
         }

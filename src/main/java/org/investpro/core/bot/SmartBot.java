@@ -27,6 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -67,7 +69,7 @@ public class SmartBot {
             this.description = description;
         }
     }
-
+    private  StreamingMode streamingMode;
     private static final Logger logger = LoggerFactory.getLogger(SmartBot.class);
 
     private final AgentEventBus eventBus;
@@ -205,6 +207,59 @@ public class SmartBot {
 
     public void startStreaming(TradePair tradePair) {
         startStreaming(tradePair, currentStreamingMode);
+    }
+
+    public void startStreaming(Collection<TradePair> tradePairs, StreamingMode mode) {
+        ensureStarted();
+
+        Set<TradePair> selectedPairs = new LinkedHashSet<>();
+        if (tradePairs != null) {
+            for (TradePair pair : tradePairs) {
+                if (pair != null) {
+                    selectedPairs.add(pair);
+                }
+            }
+        }
+
+        if (selectedPairs.isEmpty()) {
+            logger.warn("Cannot start SmartBot streaming: no symbols selected.");
+            notifyAllChannels("Streaming not started", "SmartBot streaming was not started because no symbols are selected.");
+            return;
+        }
+
+        stopStreaming();
+
+        StreamingMode safeMode = mode == null ? StreamingMode.EVERYTHING : mode;
+        this.currentStreamingMode = safeMode;
+
+        TradePair firstPair = selectedPairs.iterator().next();
+        context.setSelectedTradePair(firstPair);
+        context.setSelectedSymbol(tradePairText(firstPair));
+
+        activeSubscription = buildSubscription(selectedPairs, safeMode);
+        streamConsumer = createAgentStreamConsumer();
+
+        Exchange exchange = context.getExchange();
+
+        try {
+            exchange.stream(activeSubscription, streamConsumer);
+            streaming.set(true);
+
+            String message = "Streaming started using %s mode=%s for %d symbols".formatted(
+                    exchange.getStreamTransport(),
+                    safeMode.name(),
+                    selectedPairs.size()
+            );
+
+            publishSystemEvent("SMART_BOT_STREAMING_STARTED", message);
+            notifyAllChannels("Streaming started", message);
+            logger.info("SmartBot streaming started exchange={} symbols={} mode={}", exchange.getName(), selectedPairs.size(), safeMode);
+        } catch (Exception exception) {
+            streaming.set(false);
+            publishErrorEvent("SmartBot", exception, "Failed to start exchange streaming.");
+            notifyAllChannels("Streaming failed", "Failed to start streaming: %s".formatted(rootMessage(exception)));
+            logger.error("Failed to start SmartBot streaming", exception);
+        }
     }
 
     /**
@@ -411,11 +466,19 @@ public class SmartBot {
             TradePair tradePair,
             StreamingMode mode
     ) {
+        return buildSubscription(tradePair == null ? Set.of() : Set.of(tradePair), mode);
+    }
+
+    private ExchangeStreamSubscription buildSubscription(
+            Set<TradePair> tradePairs,
+            StreamingMode mode
+    ) {
         ExchangeStreamSubscription subscription = new ExchangeStreamSubscription();
+        Set<TradePair> pairs = tradePairs == null ? Set.of() : tradePairs;
 
         switch (mode) {
             case EVERYTHING -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setTicker(true);
                 subscription.setTrades(true);
                 subscription.setCandles(true);
@@ -427,14 +490,14 @@ public class SmartBot {
                 subscription.setBalances(true);
             }
             case MARKET_DATA -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setTicker(true);
                 subscription.setTrades(true);
                 subscription.setCandles(true);
                 subscription.setOrderBook(true);
             }
             case ACCOUNT_DATA -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setAccount(true);
                 subscription.setOrders(true);
                 subscription.setFills(true);
@@ -442,15 +505,15 @@ public class SmartBot {
                 subscription.setBalances(true);
             }
             case TICKER_ONLY -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setTicker(true);
             }
             case TRADES_ONLY -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setTrades(true);
             }
             case ORDER_BOOK_ONLY -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setOrderBook(true);
             }
             case CUSTOM -> {
@@ -458,11 +521,11 @@ public class SmartBot {
                  * CUSTOM is intentionally conservative here.
                  * Use streamCustom(...) when exact flags are needed.
                  */
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setTicker(true);
             }
             default -> {
-                subscription.setTradePairs(Set.of(tradePair));
+                subscription.setTradePairs(pairs);
                 subscription.setTicker(true);
                 subscription.setTrades(true);
             }

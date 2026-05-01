@@ -132,7 +132,7 @@ public class OnboardingView extends StackPane {
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
         exchangeBox.getItems().setAll(
                 "COINBASE", "BINANCE US", "BINANCE", "OANDA", "BITFINEX",
-                "INTERACTIVE BROKERS", "SCHWAB", "BITMEX", "BITSTAMP", "BITTREX"
+                "ALPACA", "INTERACTIVE BROKERS", "SCHWAB", "BITMEX", "BITSTAMP", "BITTREX"
         );
         marketTypeBox.getSelectionModel().select("Crypto");
         venueBox.getSelectionModel().select("US");
@@ -432,10 +432,12 @@ public class OnboardingView extends StackPane {
         preferences.putBoolean("remember_me_enabled", false);
         preferences.remove("remembered_username");
         // Clear all exchange credentials
-        for (String exchange : new String[]{"COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "BITMEX", "BITSTAMP", "BITTREX"}) {
+        for (String exchange : new String[]{"COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA", "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX"}) {
             preferences.remove("exchange_api_key_" + exchange);
             preferences.remove("exchange_api_secret_" + exchange);
             preferences.remove("exchange_account_id_" + exchange);
+            preferences.remove("exchange_venue_" + exchange);
+            preferences.remove("telegram_token_" + exchange);
         }
         usernameField.clear();
         passwordField.clear();

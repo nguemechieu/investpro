@@ -1,7 +1,8 @@
 package org.investpro.data;
 
 import javafx.beans.property.SimpleIntegerProperty;
-import org.investpro.models.currency.DefaultMoney;
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
@@ -12,161 +13,189 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.sql.SQLException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
-
+@Setter
+@Getter
 public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
-    private final ReversedLinesFileReader fileReader;
     private static final Logger logger = LoggerFactory.getLogger(ReverseRawTradeDataProcessor.class);
-    int tradeIndex = 1;
-    double volumeWeightedPriceTotal;
-    Exchange exchange;
-    String line;
-    private int start;
-    public ReverseRawTradeDataProcessor(Path rawTradeData, int secondsPerCandle, TradePair tradePair, Exchange exchange) throws IOException {
 
-        super(300, secondsPerCandle, tradePair, new SimpleIntegerProperty(secondsPerCandle));
-        fileReader = new ReversedLinesFileReader(rawTradeData, StandardCharsets.UTF_8);
-        this.exchange = exchange;
+    private final Path rawTradeData;
+    private final Exchange exchange;
+    private int start;
+
+    public ReverseRawTradeDataProcessor(Path rawTradeData, int secondsPerCandle, TradePair tradePair, Exchange exchange) throws IOException {
+        super(300, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
+        this.rawTradeData = Objects.requireNonNull(rawTradeData, "rawTradeData must not be null");
+        this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
 
         logger.info("Reading raw trade data from {}", rawTradeData);
     }
 
-    public Exchange getExchange() {
-        return exchange;
-    }
-
-    public void setExchange(Exchange exchange) {
-        this.exchange = exchange;
-    }
-
     @Override
     public Future<List<CandleData>> get() {
-        final Map<Integer, TreeSet<Trade>> candleTrades = new HashMap<>(numCandles);
+        Map<Integer, TreeSet<Trade>> candleTrades = new HashMap<>(numCandles);
+        long tradeId = 0;
 
-
-        try {
+        try (ReversedLinesFileReader fileReader = new ReversedLinesFileReader(rawTradeData, StandardCharsets.UTF_8)) {
+            String line;
             while ((line = fileReader.readLine()) != null) {
-                String[] commaSplitLine = line.split(",");
-                if (commaSplitLine.length != 3) {
-                    throw new IllegalArgumentException("raw trade data malformed");
+                String[] parts = line.split(",");
+                if (parts.length != 3) {
+                    logger.debug("Skipping malformed raw trade line: {}", line);
+                    continue;
                 }
 
-                final int timestamp = Integer.parseInt(commaSplitLine[0]);
+                int timestamp = Integer.parseInt(parts[0].trim());
+                double price = Double.parseDouble(parts[1].trim());
+                double amount = Double.parseDouble(parts[2].trim());
 
                 if (endTime.get() == -1) {
                     start = timestamp;
                     endTime.set(start - (secondsPerCandle * numCandles));
-                } else
+                } else if (start <= 0) {
+                    start = endTime.get() + (secondsPerCandle * numCandles);
+                }
 
                 if (timestamp < endTime.get()) {
                     break;
                 }
-
-
-                long trade_id = 0;
-                trade_id++;
-                Trade trade = new Trade(tradePair,
-                        exchange.getLivePrice(),
-                        exchange.getSize(),
-                        Side.SELL, trade_id
-                        ,
-                        Instant.ofEpochMilli(new Date().getTime()));
-
-
+                if (timestamp > start) {
+                    continue;
+                }
 
                 int candleIndex = (numCandles - ((start - timestamp) / secondsPerCandle)) - 1;
-                if (candleTrades.get(candleIndex) == null) {
-                    // noinspection Convert2Diamond
-                    candleTrades.put(candleIndex, new TreeSet<Trade>((t1, t2) ->
-                            Integer.compare(t2.getTimestamp().getNano(), t1.getTimestamp().getNano())));
-                } else {
-                    candleTrades.get(candleIndex).add(trade);
+                if (candleIndex < 0 || candleIndex >= numCandles) {
+                    continue;
                 }
+
+                Trade trade = new Trade(
+                        tradePair,
+                        price,
+                        amount,
+                        Side.SELL,
+                        ++tradeId,
+                        Instant.ofEpochSecond(timestamp)
+                );
+
+                candleTrades.computeIfAbsent(candleIndex, ignored -> new TreeSet<>(
+                        Comparator.comparing(Trade::getTimestamp)
+                                .thenComparingLong(Trade::getLocalTradeId)
+                )).add(trade);
             }
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-                } catch (RuntimeException e) {
-                    throw new RuntimeException(e);
-                }
-        double open = 0;
-        double high = -1;
-        double low = Double.MAX_VALUE;
-        double close = 0;
-        double volume = 0;
-        double priceTotal = 0;
-        final List<CandleData> candleData = new ArrayList<>(numCandles);
-        double lastClose = -1;
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        } catch (RuntimeException exception) {
+            throw new RuntimeException("Unable to parse raw trade data from " + rawTradeData, exception);
+        }
+
+        List<CandleData> candleData = new ArrayList<>(numCandles);
+        double lastClose = 0.0;
         for (int i = 0; i < numCandles; i++) {
-            int openTime = (start - secondsPerCandle) - (i * secondsPerCandle);
-            if (candleTrades.get(i) == null || candleTrades.get(i).isEmpty()) {
-                // no trades occurred during this candle
-                double volumeWeightedAveragePrice1 = (lastClose == -1) ? 0 : (lastClose - openTime) / volume;
-                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, volume, volumeWeightedAveragePrice1, volumeWeightedAveragePrice1, true));
-
-            } else {
-
-
-                for (Trade trade : candleTrades.get(i)) {
-                    if (tradeIndex == 0) {
-                        open = trade.getPrice();
-                    } else if (trade.getPrice() > high) {
-                        high = trade.getPrice();
-                    } else if (trade.getPrice() < low) {
-                        low = trade.getPrice();
-                    } else
-
-                    if (tradeIndex == candleTrades.get(i).size() - 1) {
-                        close = trade.getPrice();
-                    }
-
-                    priceTotal += trade.getPrice();
-                    volumeWeightedPriceTotal += trade.getPrice() * trade.getAmount();
-                    volume += trade.getAmount();
-                    tradeIndex++;
-                    lastClose = close;
-                }
-
-                double averagePrice = priceTotal / candleTrades.get(i).size();
-                double volumeWeightedAveragePrice = volumeWeightedPriceTotal / volume;
-
-                CandleData datum = new CandleData(open, close, Math.max(open, high), Math.min(open, low), openTime,
-                        volume, averagePrice, volumeWeightedAveragePrice, false);
-                candleData.add(datum);
+            int openTime = (start - (secondsPerCandle * numCandles)) + (i * secondsPerCandle);
+            TreeSet<Trade> trades = candleTrades.get(i);
+            if (trades == null || trades.isEmpty()) {
+                candleData.add(new CandleData(lastClose, lastClose, lastClose, lastClose, openTime, 0.0, lastClose, lastClose, true));
+                continue;
             }
+
+            double open = trades.first().getPrice();
+            double close = trades.last().getPrice();
+            double high = open;
+            double low = open;
+            double volume = 0.0;
+            double priceTotal = 0.0;
+            double volumeWeightedPriceTotal = 0.0;
+
+            for (Trade trade : trades) {
+                double price = trade.getPrice();
+                double amount = trade.getAmount();
+                high = Math.max(high, price);
+                low = Math.min(low, price);
+                volume += amount;
+                priceTotal += price;
+                volumeWeightedPriceTotal += price * amount;
+            }
+
+            double averagePrice = priceTotal / trades.size();
+            double volumeWeightedAveragePrice = volume > 0.0 ? volumeWeightedPriceTotal / volume : averagePrice;
+            candleData.add(new CandleData(open, close, high, low, openTime, volume, averagePrice, volumeWeightedAveragePrice, false));
+            lastClose = close;
         }
 
         start = endTime.get();
         endTime.set(endTime.get() - (secondsPerCandle * numCandles));
-        return CompletableFuture.completedFuture(candleData.stream().sorted(Comparator.comparingInt(
-                CandleData::getOpenTime)).collect(Collectors.toList()));
+        return CompletableFuture.completedFuture(candleData);
     }
 
     @Override
     public List<CandleData> getCandleData() {
-        return null;
+        try {
+            return get().get();
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to load candle data from raw trades", exception);
+        }
     }
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return null;
+        try {
+            return new ReverseRawTradeDataProcessor(rawTradeData, secondsPerCandle, tradePair, exchange);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to create raw trade data supplier", exception);
+        }
     }
 
     @Override
     public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return null;
+        return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        return null;
+        List<Trade> trades = new ArrayList<>();
+        long tradeId = 0;
+
+        try (ReversedLinesFileReader fileReader = new ReversedLinesFileReader(rawTradeData, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = fileReader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length != 3) {
+                    continue;
+                }
+
+                int timestamp = Integer.parseInt(parts[0].trim());
+                Instant instant = Instant.ofEpochSecond(timestamp);
+                if (stopAt != null && instant.isBefore(stopAt)) {
+                    break;
+                }
+
+                trades.add(new Trade(
+                        tradePair == null ? this.tradePair : tradePair,
+                        Double.parseDouble(parts[1].trim()),
+                        Double.parseDouble(parts[2].trim()),
+                        Side.SELL,
+                        ++tradeId,
+                        instant
+                ));
+            }
+        } catch (IOException exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+
+        trades.sort(Comparator.comparing(Trade::getTimestamp));
+        return CompletableFuture.completedFuture(trades);
     }
 }
