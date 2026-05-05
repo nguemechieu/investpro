@@ -34,6 +34,7 @@ build/
 ### VS Code ###
 .vscode/
 
+<<<<<<< HEAD
 ### Mac OS ###
 .DS_Store
 # Project exclude paths
@@ -42,3 +43,14 @@ build/
 
 investpro_db.sql
 investpro.log
+=======
+### Python predictor ###
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+### Mac OS ###
+.DS_Store
+>>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186

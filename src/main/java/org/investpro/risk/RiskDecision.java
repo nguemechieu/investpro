@@ -14,6 +14,8 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @Setter
+@Getter
+@ToString
 public class RiskDecision {
 
     // Primary decision

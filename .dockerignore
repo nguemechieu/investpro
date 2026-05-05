@@ -11,6 +11,10 @@
 **/*.dbmdl
 **/*.jfm
 **/bin
+<<<<<<< HEAD
+=======
+**/charts
+>>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
 **/docker-compose*
 **/compose*
 **/Dockerfile*

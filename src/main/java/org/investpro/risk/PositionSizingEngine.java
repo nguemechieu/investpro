@@ -43,7 +43,7 @@ public class PositionSizingEngine {
      *   b = odds (reward/risk)
      *   p = win probability
      *   q = loss probability (1 - p)
-     * 
+     * <p>
      * Applies 25% of full Kelly for safety ("fractional Kelly").
      * 
      * @param accountEquity Total account equity
@@ -146,6 +146,7 @@ public class PositionSizingEngine {
         // In low volatility (0.0-0.2), use full size
         double normalizedVolatility = Math.max(0.0, Math.min(1.0, volatility));
         double adjustment = 1.0 - (normalizedVolatility * 0.4);  // Range: 0.6 to 1.0
+
 
         return basePositionSize * adjustment;
     }

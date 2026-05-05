@@ -1,5 +1,6 @@
 package org.investpro.risk;
 
+import lombok.Setter;
 import org.investpro.models.trading.TradePair;
 import org.investpro.exchange.Exchange;
 import org.investpro.trading.MarketBehavior;
@@ -20,25 +21,18 @@ import java.util.Objects;
  * This is the PRIMARY GATEKEEPER for all trade decisions.
  * Integrates all risk dimensions into a cohesive framework.
  */
-public class RiskManagementSystem {
 
-    private final double defaultMaxRiskPerTrade;
-    private final double defaultMaxCumulativeRisk;
+public record RiskManagementSystem(double defaultMaxRiskPerTrade, double defaultMaxCumulativeRisk) {
 
     public RiskManagementSystem() {
-        this.defaultMaxRiskPerTrade = 2.0;       // 2% max per trade
-        this.defaultMaxCumulativeRisk = 10.0;    // 10% max cumulative
-    }
-
-    public RiskManagementSystem(double maxRiskPerTrade, double maxCumulativeRisk) {
-        this.defaultMaxRiskPerTrade = maxRiskPerTrade;
-        this.defaultMaxCumulativeRisk = maxCumulativeRisk;
+        // 2% max per trade
+        this(2.0, 10.0);    // 10% max cumulative
     }
 
     /**
      * PRIMARY GATEKEEPER: Evaluate a complete trade context and return decision.
      * This is the entry point for all trade evaluations.
-     * 
+     *
      * @param context Complete trade risk context
      * @return RiskDecision with approval status and detailed reasoning
      */
@@ -60,23 +54,23 @@ public class RiskManagementSystem {
 
         // 2. Block illiquid markets with market execution
         if (context.getLiquidityProfile() == LiquidityProfile.ILLIQUID &&
-            context.getExecutionStrategy() == ExecutionStrategy.MARKET_ORDER) {
+                context.getExecutionStrategy() == ExecutionStrategy.MARKET_ORDER) {
             blockers.add("ILLIQUID market with MARKET execution. Not viable. Use SCALED_ENTRY instead.");
         }
 
         // 3. Block impulsive/fearful psychology without capital protection
         if ((context.getPsychologyProfile() == PsychologyProfile.IMPULSIVE ||
-             context.getPsychologyProfile() == PsychologyProfile.FEARFUL) &&
-            context.getCapitalProtection() == CapitalProtection.NONE) {
+                context.getPsychologyProfile() == PsychologyProfile.FEARFUL) &&
+                context.getCapitalProtection() == CapitalProtection.NONE) {
             blockers.add("IMPULSIVE/FEARFUL trader with NO capital protection. Must activate stop-loss strategy.");
         }
 
         // 4. Block trades exceeding max leverage
         if (context.getRequestedLeverage() > context.getRiskProfile().getMaxLeverage()) {
             blockers.add(String.format(
-                "Requested leverage %.2fx exceeds profile max of %.2fx",
-                context.getRequestedLeverage(),
-                context.getRiskProfile().getMaxLeverage()
+                    "Requested leverage %.2fx exceeds profile max of %.2fx",
+                    context.getRequestedLeverage(),
+                    context.getRiskProfile().getMaxLeverage()
             ));
         }
 
@@ -85,9 +79,9 @@ public class RiskManagementSystem {
         double requestedRiskPercent = context.calculateTradeRiskPercent();
         if (requestedRiskPercent > maxPositionPercent) {
             blockers.add(String.format(
-                "Trade risk %.2f%% exceeds profile max of %.2f%%",
-                requestedRiskPercent,
-                maxPositionPercent
+                    "Trade risk %.2f%% exceeds profile max of %.2f%%",
+                    requestedRiskPercent,
+                    maxPositionPercent
             ));
         }
 
@@ -96,9 +90,9 @@ public class RiskManagementSystem {
         double maxHeat = context.getRiskProfile().getMaxPortfolioHeatPercent();
         if (portfolioHeat > maxHeat) {
             blockers.add(String.format(
-                "Portfolio heat %.2f%% exceeds limit of %.2f%%",
-                portfolioHeat,
-                maxHeat
+                    "Portfolio heat %.2f%% exceeds limit of %.2f%%",
+                    portfolioHeat,
+                    maxHeat
             ));
         }
 
@@ -106,8 +100,8 @@ public class RiskManagementSystem {
         double expectedValue = ExpectedValueCalculator.calculateExpectedValueFromContext(context);
         if (expectedValue < 0 && context.getRiskProfile() != RiskProfile.EXTREME) {
             blockers.add(String.format(
-                "Negative expected value: $%.2f. Probability of profit too low.",
-                expectedValue
+                    "Negative expected value: $%.2f. Probability of profit too low.",
+                    expectedValue
             ));
         }
 
@@ -155,9 +149,9 @@ public class RiskManagementSystem {
         if (!SlippageModel.isExecutionStrategyViable(context.getExecutionStrategy(), context.getLiquidityProfile())) {
             ExecutionStrategy recommended = SlippageModel.getRecommendedStrategy(context.getLiquidityProfile());
             recommendations.add(String.format(
-                "Current execution strategy not ideal for %s. Consider %s instead.",
-                context.getLiquidityProfile().getDisplayName(),
-                recommended.getDisplayName()
+                    "Current execution strategy not ideal for %s. Consider %s instead.",
+                    context.getLiquidityProfile().getDisplayName(),
+                    recommended.getDisplayName()
             ));
         }
 
@@ -169,8 +163,8 @@ public class RiskManagementSystem {
         // Expected value guidance
         if (expectedValue > 0 && expectedValue < 10) {
             recommendations.add(String.format(
-                "Expected value $%.2f is positive but modest. Ensure trade setup is high-confidence.",
-                expectedValue
+                    "Expected value $%.2f is positive but modest. Ensure trade setup is high-confidence.",
+                    expectedValue
             ));
         }
 
@@ -185,39 +179,39 @@ public class RiskManagementSystem {
 
         // Calculate other metrics
         double portfolioHeatFinal = PortfolioHeatCalculator.calculatePortfolioHeat(
-            context.calculateTradeRisk(),
-            context.getCurrentOpenRisk(),
-            context.getAccountEquity()
+                context.calculateTradeRisk(),
+                context.getCurrentOpenRisk(),
+                context.getAccountEquity()
         );
 
         ExecutionStrategy recommendedExecution = SlippageModel.getRecommendedStrategy(context.getLiquidityProfile());
         double estimatedSlippage = SlippageModel.calculateTotalSlippage(
-            recommendedExecution,
-            context.getLiquidityProfile(),
-            context.getVolatility()
+                recommendedExecution,
+                context.getLiquidityProfile(),
+                context.getVolatility()
         );
 
         return RiskDecision.builder()
-            .approved(approved)
-            .approvalReason(approvalReason)
-            .finalPositionSize(finalPositionSize)
-            .finalLeverage(finalLeverage)
-            .riskMultiplier(riskMultiplier)
-            .expectedValue(expectedValue)
-            .portfolioHeat(portfolioHeatFinal)
-            .estimatedSlippage(estimatedSlippage)
-            .recommendedExecutionStrategy(recommendedExecution)
-            .blockers(blockers)
-            .warnings(warnings)
-            .recommendations(recommendations)
-            .humanReadableSummary(buildHumanReadableSummary(context, approved, blockers, warnings, recommendations))
-            .build();
+                .approved(approved)
+                .approvalReason(approvalReason)
+                .finalPositionSize(finalPositionSize)
+                .finalLeverage(finalLeverage)
+                .riskMultiplier(riskMultiplier)
+                .expectedValue(expectedValue)
+                .portfolioHeat(portfolioHeatFinal)
+                .estimatedSlippage(estimatedSlippage)
+                .recommendedExecutionStrategy(recommendedExecution)
+                .blockers(blockers)
+                .warnings(warnings)
+                .recommendations(recommendations)
+                .humanReadableSummary(buildHumanReadableSummary(context, approved, blockers, warnings, recommendations))
+                .build();
     }
 
     /**
      * Calculate risk multiplier based on market conditions and trader profile.
      * Reduces or increases position size based on multiple factors.
-     * 
+     *
      * @param context Trade risk context
      * @return Risk multiplier (0.1 to 2.0 typical range)
      */
@@ -248,8 +242,8 @@ public class RiskManagementSystem {
 
     /**
      * Calculate final position size after all adjustments.
-     * 
-     * @param context Trade risk context
+     *
+     * @param context        Trade risk context
      * @param riskMultiplier Pre-calculated risk multiplier
      * @return Final position size in units
      */
@@ -260,11 +254,11 @@ public class RiskManagementSystem {
         }
 
         double baseSize = PositionSizingEngine.calculateFixedFractionSize(
-            context.getAccountEquity(),
-            maxRisk,
-            context.getEntryPrice(),
-            context.getStopLossPrice(),
-            context.getRiskProfile()
+                context.getAccountEquity(),
+                maxRisk,
+                context.getEntryPrice(),
+                context.getStopLossPrice(),
+                context.getRiskProfile()
         );
 
         // Apply all adjustments
@@ -284,8 +278,8 @@ public class RiskManagementSystem {
 
     /**
      * Calculate final leverage after all constraints applied.
-     * 
-     * @param context Trade risk context
+     *
+     * @param context           Trade risk context
      * @param finalPositionSize Final calculated position size
      * @return Final leverage (capped by profile)
      */
@@ -302,11 +296,11 @@ public class RiskManagementSystem {
 
     /**
      * Build human-readable summary of decision.
-     * 
-     * @param context Trade context
-     * @param approved Decision result
-     * @param blockers Blocker list
-     * @param warnings Warning list
+     *
+     * @param context         Trade context
+     * @param approved        Decision result
+     * @param blockers        Blocker list
+     * @param warnings        Warning list
      * @param recommendations Recommendation list
      * @return Formatted summary string
      */
@@ -352,8 +346,8 @@ public class RiskManagementSystem {
 
     /**
      * Generate comprehensive risk report for backtesting or trade logging.
-     * 
-     * @param context Trade context
+     *
+     * @param context  Trade context
      * @param decision Risk decision from evaluateTrade()
      * @return Professional risk report
      */
@@ -366,41 +360,41 @@ public class RiskManagementSystem {
         }
 
         return RiskReport.builder()
-            .symbol(context.getSymbol())
-            .timestamp(timestamp)
-            .riskProfileName(context.getRiskProfile().getDisplayName())
-            .marketBehaviorName(context.getMarketBehavior().getDisplayName())
-            .liquidityProfileName(context.getLiquidityProfile().getDisplayName())
-            .psychologyProfileName(context.getPsychologyProfile().getDisplayName())
-            .probabilityLevelName(context.getProbabilityLevel().getDisplayName())
-            .capitalProtectionName(context.getCapitalProtection().getDisplayName())
-            .executionStrategyName(decision.getRecommendedExecutionStrategy().getDisplayName())
-            .systemDesignName(context.getSystemDesign().getDisplayName())
-            .approved(decision.isApproved())
-            .decisionStatus(decision.isApproved() ? "✓ APPROVED" : "✗ BLOCKED")
-            .finalPositionSize(decision.getFinalPositionSize())
-            .finalLeverage(decision.getFinalLeverage())
-            .riskMultiplier(decision.getRiskMultiplier())
-            .accountEquity(context.getAccountEquity())
-            .tradeRiskAmount(context.calculateTradeRisk())
-            .tradeRiskPercent(context.calculateTradeRiskPercent())
-            .tradeRewardAmount(context.calculateTradeReward())
-            .tradeRewardPercent(context.calculateTradeRewardPercent())
-            .portfolioHeat(decision.getPortfolioHeat())
-            .maxAllowedHeat(context.getRiskProfile().getMaxPortfolioHeatPercent())
-            .recommendedExecutionStrategy(decision.getRecommendedExecutionStrategy().getDisplayName())
-            .estimatedSlippage(decision.getEstimatedSlippage())
-            .rewardRiskRatio(rewardRiskRatio)
-            .expectedValue(decision.getExpectedValue())
-            .blockers(formatFeedback(decision.getBlockers()))
-            .warnings(formatFeedback(decision.getWarnings()))
-            .recommendations(formatFeedback(decision.getRecommendations()))
-            .build();
+                .symbol(context.getSymbol())
+                .timestamp(timestamp)
+                .riskProfileName(context.getRiskProfile().getDisplayName())
+                .marketBehaviorName(context.getMarketBehavior().getDisplayName())
+                .liquidityProfileName(context.getLiquidityProfile().getDisplayName())
+                .psychologyProfileName(context.getPsychologyProfile().getDisplayName())
+                .probabilityLevelName(context.getProbabilityLevel().getDisplayName())
+                .capitalProtectionName(context.getCapitalProtection().getDisplayName())
+                .executionStrategyName(decision.getRecommendedExecutionStrategy().getDisplayName())
+                .systemDesignName(context.getSystemDesign().getDisplayName())
+                .approved(decision.isApproved())
+                .decisionStatus(decision.isApproved() ? "✓ APPROVED" : "✗ BLOCKED")
+                .finalPositionSize(decision.getFinalPositionSize())
+                .finalLeverage(decision.getFinalLeverage())
+                .riskMultiplier(decision.getRiskMultiplier())
+                .accountEquity(context.getAccountEquity())
+                .tradeRiskAmount(context.calculateTradeRisk())
+                .tradeRiskPercent(context.calculateTradeRiskPercent())
+                .tradeRewardAmount(context.calculateTradeReward())
+                .tradeRewardPercent(context.calculateTradeRewardPercent())
+                .portfolioHeat(decision.getPortfolioHeat())
+                .maxAllowedHeat(context.getRiskProfile().getMaxPortfolioHeatPercent())
+                .recommendedExecutionStrategy(decision.getRecommendedExecutionStrategy().getDisplayName())
+                .estimatedSlippage(decision.getEstimatedSlippage())
+                .rewardRiskRatio(rewardRiskRatio)
+                .expectedValue(decision.getExpectedValue())
+                .blockers(formatFeedback(decision.getBlockers()))
+                .warnings(formatFeedback(decision.getWarnings()))
+                .recommendations(formatFeedback(decision.getRecommendations()))
+                .build();
     }
 
     /**
      * Format feedback list as indented string.
-     * 
+     *
      * @param items List of feedback items
      * @return Formatted string
      */
@@ -417,12 +411,12 @@ public class RiskManagementSystem {
 
     /**
      * Assess risk for bot trading across multiple symbols.
-     * 
+     *
      * @param exchange Exchange being used for bot trading
-     * @param symbols Trading pairs for bot to trade
+     * @param symbols  Trading pairs for bot to trade
      * @return RiskDecision for bot trading approval
      */
-    public RiskDecision assessBotTradingRisk(Exchange exchange, java.util.List<TradePair> symbols) {
+    public RiskDecision assessBotTradingRisk(Exchange exchange, List<TradePair> symbols) {
         List<String> blockers = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
@@ -441,12 +435,12 @@ public class RiskManagementSystem {
         String reason = approved ? "Bot trading approved" : "Bot trading blocked: %s".formatted(String.join("; ", blockers));
 
         return RiskDecision.builder()
-            .approved(approved)
-            .approvalReason(reason)
-            .blockers(blockers)
-            .warnings(warnings)
-            .recommendations(java.util.List.of("Monitor bot trades closely", "Set daily loss limit"))
-            .build();
+                .approved(approved)
+                .approvalReason(reason)
+                .blockers(blockers)
+                .warnings(warnings)
+                .recommendations(List.of("Monitor bot trades closely", "Set daily loss limit"))
+                .build();
     }
 
     public RiskDecision assessCancelAllRisk(Exchange exchange) {
@@ -462,16 +456,12 @@ public class RiskManagementSystem {
         String reason = approved ? "Cancel-all operation approved" : "Cancel-all operation blocked: %s".formatted(String.join("; ", blockers));
 
         return RiskDecision.builder()
-            .approved(approved)
-            .approvalReason(reason)
-            .blockers(blockers)
-            .warnings(warnings)
-            .recommendations(java.util.List.of("Verify all positions before cancel-all"))
-            .build();
-    }
-
-    public double getDefaultMaxCumulativeRisk() {
-        return defaultMaxCumulativeRisk;
+                .approved(approved)
+                .approvalReason(reason)
+                .blockers(blockers)
+                .warnings(warnings)
+                .recommendations(List.of("Verify all positions before cancel-all"))
+                .build();
     }
 }
 

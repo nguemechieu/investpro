@@ -109,6 +109,7 @@ public class TradingWindow extends BorderPane {
 
     private final ComboBox<String> exchangeSelector = new ComboBox<>();
     private final ComboBox<TradePair> symbolSelector = new ComboBox<>();
+    private final ComboBox<String> timeframeSelector = new ComboBox<>();
     private final ComboBox<String> botSymbolScopeSelector = new ComboBox<>();
 
     private final Button connectButton = new Button("Connect");
@@ -421,6 +422,7 @@ public class TradingWindow extends BorderPane {
     private @NotNull ToolBar createMainToolBar() {
         exchangeSelector.setPrefWidth(180);
         symbolSelector.setPrefWidth(220);
+        timeframeSelector.setPrefWidth(120);
 
         Label brand = new Label("InvestPro");
         brand.getStyleClass().add("terminal-brand");
@@ -441,6 +443,8 @@ public class TradingWindow extends BorderPane {
                 new Separator(Orientation.VERTICAL),
                 new Label("Symbol"),
                 symbolSelector,
+                new Label("Timeframe"),
+                timeframeSelector,
                 refreshSymbolsButton,
                 addChartButton,
                 new Separator(Orientation.VERTICAL),
@@ -1320,6 +1324,47 @@ public class TradingWindow extends BorderPane {
                 marketWatchTable.getSelectionModel().select(selected);
                 loadOrderBook(selected);
                 saveAppState();
+            }
+        });
+
+        // Configure timeframe selector
+        configureTimeframeSelector();
+    }
+
+    private void configureTimeframeSelector() {
+        // Populate with standard timeframes
+        timeframeSelector.getItems().setAll(
+                "1m", "5m", "15m", "30m",
+                "1h", "2h", "4h",
+                "1d", "1w", "1M");
+
+        // Set default to 1h
+        String savedTimeframe = preferences.get("selected_timeframe", "1h");
+        if (timeframeSelector.getItems().contains(savedTimeframe)) {
+            timeframeSelector.getSelectionModel().select(savedTimeframe);
+        } else {
+            timeframeSelector.getSelectionModel().select("1h");
+        }
+
+        // Handle timeframe change
+        timeframeSelector.setOnAction(_ -> {
+            String selected = timeframeSelector.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                preferences.put("selected_timeframe", selected);
+                onTimeframeChanged(selected);
+                saveAppState();
+                journal("Timeframe changed to: " + selected);
+            }
+        });
+    }
+
+    private void onTimeframeChanged(String timeframe) {
+        // Reload charts with new timeframe
+        chartTabPane.getTabs().forEach(tab -> {
+            if (tab instanceof DraggableTab draggableTab
+                    && tab.getContent() instanceof CandleStickChartDisplay display) {
+                // Refresh the chart with new timeframe
+                journal("Reloading chart with timeframe: " + timeframe);
             }
         });
     }

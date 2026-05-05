@@ -1,5 +1,7 @@
 package org.investpro.risk;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.investpro.models.trading.TradePair;
@@ -9,6 +11,9 @@ import org.investpro.models.trading.Ticker;
  * Institutional Risk Management System
  * Calculates position size, stop loss, and take profit based on account risk parameters
  */
+@Getter
+@Setter
+
 public class RiskManager {
     private static final Logger logger = LoggerFactory.getLogger(RiskManager.class);
     

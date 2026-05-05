@@ -1,0 +1,4 @@
+- name: Build with Maven
+  run: mvn -B package --file pom.xml
+  env:
+    MAVEN_OPTS: "-Xmx1024m -XX:MaxPermSize=512m"

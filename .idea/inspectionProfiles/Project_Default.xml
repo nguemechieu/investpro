@@ -2,6 +2,7 @@
   <profile version="1.0">
     <option name="myName" value="Project Default" />
     <inspection_tool class="AutoCloseableResource" enabled="true" level="WARNING" enabled_by_default="true">
+<<<<<<< HEAD
       <option name="METHOD_MATCHER_CONFIG" value="java.util.Formatter,format,java.io.Writer,append,com.google.common.base.Preconditions,checkNotNull,org.hibernate.Session,close,java.io.PrintWriter,printf,java.io.PrintStream,printf,java.net.http.HttpClient,newHttpClient,java.net.http.HttpClient.Builder,build" />
     </inspection_tool>
     <inspection_tool class="ExtractMethodRecommender" enabled="true" level="WARNING" enabled_by_default="true">
@@ -37,17 +38,80 @@
           <option value="http://xmlns.jcp.org/" />
         </list>
       </option>
+=======
+      <option name="METHOD_MATCHER_CONFIG" value="java.util.Formatter,format,java.io.Writer,append,com.google.common.base.Preconditions,checkNotNull,org.hibernate.Session,close,java.io.PrintWriter,printf,java.io.PrintStream,printf,java.net.http.HttpClient,newHttpClient,java.net.http.HttpClient.Builder,build,org.hibernate.SessionFactory,openSession,java.util.concurrent.Executors,newSingleThreadScheduledExecutor" />
+    </inspection_tool>
+    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <Languages>
+        <language minSize="230" name="Java" />
+      </Languages>
+    </inspection_tool>
+    <inspection_tool class="ExtractMethodRecommender" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="minLength" value="1751" />
+      <option name="maxParameters" value="2" />
+>>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
     </inspection_tool>
     <inspection_tool class="IncorrectHttpHeaderInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="customHeaders">
         <set>
           <option value="CB-AFTER" />
+<<<<<<< HEAD
           <option value="Accept-Datetime-Format" />
+=======
+          <option value="CB-ACCESS-TIMESTAMP" />
+          <option value="CB-ACCESS-SIGN" />
+          <option value="CB-ACCESS-KEY" />
+          <option value="Sec-Fetch-Dest" />
+          <option value="exp" />
+          <option value="nbf" />
+          <option value="sub" />
+          <option value="X-MBX-APIKEY" />
+          <option value="TIMESTAMP" />
+          <option value="X-Ratelimit-Reset" />
+          <option value="X-Ratelimit-Limit" />
+          <option value="Accept-Datetime-Format" />
+          <option value="X-Ratelimit-Remaining" />
+          <option value="X-MBX-TIMESTAMP" />
+          <option value="X-MBX-SIGN" />
+          <option value="signature" />
+          <option value="X-MBX-SIGNATURE" />
+          <option value="timestamp" />
+          <option value="recvWindow" />
+        </set>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="InnerClassMayBeStatic" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignorableAnnotations">
+        <set>
+          <option value="lombok.Getter" />
+          <option value="org.junit.jupiter.api.Nested" />
+>>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
         </set>
       </option>
     </inspection_tool>
     <inspection_tool class="JavadocDeclaration" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ADDITIONAL_TAGS" value="Noel,Author" />
     </inspection_tool>
+<<<<<<< HEAD
+=======
+    <inspection_tool class="VulnerableLibrariesLocal" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="isIgnoringEnabled" value="true" />
+      <option name="ignoredModules">
+        <list>
+          <option value="investpro" />
+        </list>
+      </option>
+      <option name="ignoredPackages">
+        <list>
+          <option value="org.apache.commons:commons-compress:1.22" />
+        </list>
+      </option>
+      <option name="ignoredReasons">
+        <list>
+          <option value="Not exploitable" />
+        </list>
+      </option>
+    </inspection_tool>
+>>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
   </profile>
 </component>

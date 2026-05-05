@@ -1,5 +1,8 @@
 package org.investpro.ai;
 
+import org.investpro.risk.PositionSizingEngine;
+import org.investpro.risk.RiskProfile;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,9 +18,9 @@ import java.util.List;
  * Not a real AI, but produces sound recommendations based on risk factors.
  */
 public class LocalAiReasoningService implements AiReasoningService {
-    
+
     private static final String SERVICE_NAME = "Local Fallback";
-    
+
     @Override
     public AiTradeReviewResponse reviewTrade(AiTradeReviewRequest request) {
         if (request == null) {
@@ -37,17 +40,17 @@ public class LocalAiReasoningService implements AiReasoningService {
             return AiTradeReviewResponse.failedResponse(e.getMessage(), SERVICE_NAME);
         }
     }
-    
+
     @Override
     public boolean isAvailable() {
         return true; // Local fallback is always available
     }
-    
+
     @Override
     public String getServiceName() {
         return SERVICE_NAME;
     }
-    
+
     /**
      * Check if request has all required fields.
      */
@@ -59,7 +62,7 @@ public class LocalAiReasoningService implements AiReasoningService {
                 && request.getRiskDecision() != null
                 && request.getAccountEquity() > 0;
     }
-    
+
     /**
      * Deterministic trade evaluation logic.
      */
@@ -68,12 +71,12 @@ public class LocalAiReasoningService implements AiReasoningService {
         List<String> concerns = new ArrayList<>();
         List<String> blockers = new ArrayList<>();
         List<String> recommendations = new ArrayList<>();
-        
+
         // Check for hard blockers first
         if (request.getRiskDecision().getBlockers() != null && !request.getRiskDecision().getBlockers().isEmpty()) {
             blockers.addAll(request.getRiskDecision().getBlockers());
         }
-        
+
         // If RiskManagementSystem already blocked it, we cannot approve
         if (!blockers.isEmpty()) {
             return AiTradeReviewResponse.builder()
@@ -86,23 +89,25 @@ public class LocalAiReasoningService implements AiReasoningService {
                     .concerns(List.of("Risk blockers exist from RiskManagementSystem"))
                     .blockers(blockers)
                     .recommendations(List.of("Address risk blockers before trading"))
-                    .explanation("The RiskManagementSystem has identified hard blockers. These must be resolved before trading can proceed.")
+                    .explanation(
+                            "The RiskManagementSystem has identified hard blockers. These must be resolved before trading can proceed.")
                     .modelName(SERVICE_NAME)
                     .createdAt(LocalDateTime.now())
                     .processingTimeMs(System.currentTimeMillis())
                     .hadErrors(false)
                     .build();
         }
-        
+
         // Check signal confidence
         double confidence = calculateConfidence(request);
         if (request.getSignalConfidence() < 0.5) {
             concerns.add("Signal confidence is low (< 50%)");
             recommendations.add("Wait for higher confidence signal");
         } else {
-            confirmations.add("Signal confidence is acceptable (%s)".formatted(String.format("%.0f%%", request.getSignalConfidence() * 100)));
+            confirmations.add("Signal confidence is acceptable (%s)"
+                    .formatted(String.format("%.0f%%", request.getSignalConfidence() * 100)));
         }
-        
+
         // Check account drawdown
         double drawdown = request.getCurrentDrawdownPercent();
         if (drawdown > 20.0) {
@@ -113,7 +118,7 @@ public class LocalAiReasoningService implements AiReasoningService {
         } else {
             confirmations.add("Account drawdown is minimal");
         }
-        
+
         // Check portfolio heat
         double portfolioHeat = request.getPortfolioHeatPercent();
         if (portfolioHeat > 20.0) {
@@ -122,15 +127,16 @@ public class LocalAiReasoningService implements AiReasoningService {
         } else {
             confirmations.add("Portfolio heat is within acceptable range");
         }
-        
+
         // Check volatility
         if (request.getVolatilityPercent() > 30.0) {
-            concerns.add("Volatility is elevated (%s)".formatted(String.format("%.1f%%", request.getVolatilityPercent())));
+            concerns.add(
+                    "Volatility is elevated (%s)".formatted(String.format("%.1f%%", request.getVolatilityPercent())));
             recommendations.add("Use limit orders instead of market orders");
         } else {
             confirmations.add("Volatility is moderate");
         }
-        
+
         // Check liquidity
         if (request.getRiskContext() != null && request.getRiskContext().getLiquidityProfile() != null) {
             String liquidity = request.getRiskContext().getLiquidityProfile().toString();
@@ -141,7 +147,7 @@ public class LocalAiReasoningService implements AiReasoningService {
                 confirmations.add("Market liquidity is acceptable");
             }
         }
-        
+
         // Check psychology profile
         if (request.getRiskContext() != null && request.getRiskContext().getPsychologyProfile() != null) {
             String psychology = request.getRiskContext().getPsychologyProfile().toString();
@@ -150,10 +156,10 @@ public class LocalAiReasoningService implements AiReasoningService {
                 recommendations.add("Use stop losses and risk limits strictly");
             }
         }
-        
+
         // Determine decision based on factors
         AiDecision decision = determineDecision(request, blockers, concerns, drawdown, portfolioHeat);
-        
+
         // Build response
         return AiTradeReviewResponse.builder()
                 .decision(decision)
@@ -172,100 +178,165 @@ public class LocalAiReasoningService implements AiReasoningService {
                 .hadErrors(false)
                 .build();
     }
-    
+
     /**
      * Calculate overall confidence in the decision.
      */
     private double calculateConfidence(AiTradeReviewRequest request) {
         double baseConfidence = 0.7; // Base confidence
-        
+
         // Adjust by signal confidence
         baseConfidence += request.getSignalConfidence() * 0.2;
-        
+
         // Adjust by account state
         if (request.getCurrentDrawdownPercent() < 5.0) {
             baseConfidence += 0.05;
         } else if (request.getCurrentDrawdownPercent() > 15.0) {
             baseConfidence -= 0.1;
         }
-        
+
         return Math.min(1.0, baseConfidence);
     }
-    
+
     /**
      * Determine the AI decision based on risk factors.
      */
-    private AiDecision determineDecision(AiTradeReviewRequest request, 
-                                        List<String> blockers,
-                                        List<String> concerns,
-                                        double drawdown,
-                                        double portfolioHeat) {
+    private AiDecision determineDecision(AiTradeReviewRequest request,
+            List<String> blockers,
+            List<String> concerns,
+            double drawdown,
+            double portfolioHeat) {
         // If there are hard blockers, cannot approve
         if (!blockers.isEmpty()) {
             return AiDecision.WAIT;
         }
-        
+
         // If too many concerns, wait or reject
         if (concerns.size() >= 4) {
             return AiDecision.WAIT;
         }
-        
+
         // If significant drawdown, reduce size or wait
         if (drawdown > 15.0) {
             return AiDecision.APPROVE_WITH_REDUCED_SIZE;
         }
-        
+
         // If portfolio heat is high, reduce size
         if (portfolioHeat > 15.0) {
             return AiDecision.APPROVE_WITH_REDUCED_SIZE;
         }
-        
+
         // If signal confidence is low, wait
         if (request.getSignalConfidence() < 0.5) {
             return AiDecision.WAIT;
         }
-        
+
         // All checks pass, approve
         return AiDecision.APPROVE;
     }
-    
+
     /**
      * Calculate suggested risk multiplier based on account state.
      */
     private double calculateRiskMultiplier(AiTradeReviewRequest request, double drawdown, double portfolioHeat) {
         double multiplier = 1.0;
-        
+
         // Reduce for drawdown
         if (drawdown > 20.0) {
             multiplier *= 0.5;
         } else if (drawdown > 10.0) {
             multiplier *= 0.75;
         }
-        
+
         // Reduce for high portfolio heat
         if (portfolioHeat > 20.0) {
             multiplier *= 0.6;
         } else if (portfolioHeat > 15.0) {
             multiplier *= 0.8;
         }
-        
+
         // Reduce for high volatility
         if (request.getVolatilityPercent() > 30.0) {
             multiplier *= 0.9;
         }
-        
+
         return Math.min(1.0, multiplier);
     }
-    
+
     /**
-     * Calculate suggested position size.
+     * Calculate suggested position size using both risk multiplier and Kelly
+     * Criterion.
+     * Returns the more conservative of the two sizing methods.
      */
     private double calculateSuggestedPositionSize(AiTradeReviewRequest request, double drawdown, double portfolioHeat) {
+        // Method 1: Risk multiplier approach (simple)
         double riskMultiplier = calculateRiskMultiplier(request, drawdown, portfolioHeat);
-        double maxPositionSize = request.getRiskDecision().getFinalPositionSize();
-        return maxPositionSize * riskMultiplier;
+        double riskBasedPositionSize = request.getRiskDecision().getFinalPositionSize() * riskMultiplier;
+
+        // Method 2: Kelly Criterion approach (sophisticated)
+        double kellyBasedPositionSize = calculateKellyBasedPositionSize(request);
+
+        // Use the more conservative (smaller) of the two sizing methods
+        // Kelly is only used if we have sufficient context, otherwise fall back to risk
+        // multiplier
+        if (kellyBasedPositionSize > 0) {
+            return Math.min(riskBasedPositionSize, kellyBasedPositionSize);
+        }
+
+        return riskBasedPositionSize;
     }
-    
+
+    /**
+     * Calculate position size using Kelly Criterion formula.
+     * Estimates win rate from signal confidence to apply Kelly sizing.
+     * Returns 0 if insufficient data to apply Kelly.
+     */
+    private double calculateKellyBasedPositionSize(AiTradeReviewRequest request) {
+        try {
+            // Need valid risk context with price data
+            if (request.getRiskContext() == null) {
+                return 0;
+            }
+
+            // Get entry price from current market or from risk decision
+            double entryPrice = request.getCurrentPrice();
+            if (entryPrice <= 0) {
+                return 0;
+            }
+
+            // Estimate stop loss from ATR (typical professional approach)
+            double stopLossPrice = entryPrice - request.getAtr();
+            if (stopLossPrice <= 0) {
+                return 0; // Invalid stop loss
+            }
+
+            // Estimate take profit at 2x the risk (professional 1:2 reward:risk ratio)
+            double takeProfitPrice = entryPrice + (2 * request.getAtr());
+
+            // Estimate win rate from signal confidence
+            // Confidence 0.5 = 50% win rate (neutral), confidence 0.9 = 70% win rate
+            // (strong)
+            double estimatedWinRate = 0.5 + (request.getSignalConfidence() * 0.25);
+            estimatedWinRate = Math.min(0.8, estimatedWinRate); // Cap at 80% (realistic limit)
+
+            // Get or create a default risk profile
+            RiskProfile riskProfile = RiskProfile.MODERATE; // Use moderate as default
+
+            // Apply Kelly Criterion
+            return PositionSizingEngine.calculateKellyCriterion(
+                    request.getAccountEquity(),
+                    entryPrice,
+                    stopLossPrice,
+                    takeProfitPrice,
+                    estimatedWinRate,
+                    riskProfile);
+
+        } catch (Exception e) {
+            // If Kelly calculation fails, return 0 to fall back on risk multiplier method
+            return 0;
+        }
+    }
+
     /**
      * Recommend execution strategy based on market conditions.
      */
@@ -284,16 +355,17 @@ public class LocalAiReasoningService implements AiReasoningService {
         }
         return "MARKET_ORDER";
     }
-    
+
     /**
      * Build explanation text.
      */
     private String buildExplanation(AiTradeReviewRequest request, AiDecision decision, List<String> concerns) {
         StringBuilder sb = new StringBuilder();
-        
+
         switch (decision) {
             case APPROVE:
-                sb.append("Trade setup appears sound. Signal confidence is acceptable, risk metrics are within limits, and market conditions support entry. ");
+                sb.append(
+                        "Trade setup appears sound. Signal confidence is acceptable, risk metrics are within limits, and market conditions support entry. ");
                 sb.append("The risk framework has approved this trade through RiskManagementSystem.");
                 break;
             case APPROVE_WITH_REDUCED_SIZE:
@@ -323,7 +395,7 @@ public class LocalAiReasoningService implements AiReasoningService {
                 sb.append("Edge case or ambiguous data detected. Manual human review is recommended.");
                 break;
         }
-        
+
         return sb.toString();
     }
 }

@@ -1,6 +1,7 @@
 package org.investpro.risk;
 
 import lombok.Builder;
+import lombok.Getter;
 import lombok.Value;
 
 /**
@@ -9,10 +10,46 @@ import lombok.Value;
  */
 @Value
 @Builder
+@Getter
 public class RiskReport {
     // Header
     String symbol;
     String timestamp;
+
+    @Override
+    public String toString() {
+        return "RiskReport{" +
+                "symbol='" + symbol + '\'' +
+                ", timestamp='" + timestamp + '\'' +
+                ", riskProfileName='" + riskProfileName + '\'' +
+                ", marketBehaviorName='" + marketBehaviorName + '\'' +
+                ", liquidityProfileName='" + liquidityProfileName + '\'' +
+                ", psychologyProfileName='" + psychologyProfileName + '\'' +
+                ", probabilityLevelName='" + probabilityLevelName + '\'' +
+                ", capitalProtectionName='" + capitalProtectionName + '\'' +
+                ", executionStrategyName='" + executionStrategyName + '\'' +
+                ", systemDesignName='" + systemDesignName + '\'' +
+                ", approved=" + approved +
+                ", decisionStatus='" + decisionStatus + '\'' +
+                ", finalPositionSize=" + finalPositionSize +
+                ", finalLeverage=" + finalLeverage +
+                ", riskMultiplier=" + riskMultiplier +
+                ", accountEquity=" + accountEquity +
+                ", tradeRiskAmount=" + tradeRiskAmount +
+                ", tradeRiskPercent=" + tradeRiskPercent +
+                ", tradeRewardAmount=" + tradeRewardAmount +
+                ", tradeRewardPercent=" + tradeRewardPercent +
+                ", portfolioHeat=" + portfolioHeat +
+                ", maxAllowedHeat=" + maxAllowedHeat +
+                ", recommendedExecutionStrategy='" + recommendedExecutionStrategy + '\'' +
+                ", estimatedSlippage=" + estimatedSlippage +
+                ", rewardRiskRatio=" + rewardRiskRatio +
+                ", expectedValue=" + expectedValue +
+                ", blockers='" + blockers + '\'' +
+                ", warnings='" + warnings + '\'' +
+                ", recommendations='" + recommendations + '\'' +
+                '}';
+    }
 
     // Risk framework summary
     String riskProfileName;
