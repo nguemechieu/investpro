@@ -1,8 +1,8 @@
 package org.investpro.investpro;
 
 
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.Currency;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.Currency;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -87,4 +87,8 @@ public interface Db extends DataSource {
     Currency getCurrency(String code) throws SQLException;
 
     void save(CandleData candle);
+
+    List<String> loadMarketSymbols(String exchangeName);
+
+    void saveMarketSymbols(String exchangeName, List<String> symbols);
 }

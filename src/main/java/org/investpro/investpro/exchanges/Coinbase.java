@@ -3,7 +3,7 @@ package org.investpro.investpro.exchanges;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.*;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.models.*;
 import org.investpro.investpro.services.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -22,8 +22,10 @@ import java.util.concurrent.ExecutionException;
 public class Coinbase extends Exchange {
 
     public static final String API_URL = "https://api.exchange.coinbase.com";
+    public static final String BROKERAGE_API_URL = "https://api.coinbase.com/api/v3/brokerage";
     private final String apiKey;
     private final String apiSecret;
+    private final String passphrase;
     private final HttpClient httpClient;
 
     private final CoinbaseOrderService orderService;
@@ -34,14 +36,20 @@ public class Coinbase extends Exchange {
     private TradePair tradePair;
 
     public Coinbase(String apiKey, String apiSecret) {
-        Objects.requireNonNull(apiKey);
-        Objects.requireNonNull(apiSecret);
-        super(apiKey, apiSecret);
+        this(apiKey, apiSecret, "");
+    }
+
+    public Coinbase(String apiKey, String apiSecret, String passphrase) {
+        super(
+                Objects.requireNonNull(apiKey, "apiKey must not be null"),
+                Objects.requireNonNull(apiSecret, "apiSecret must not be null")
+        );
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
+        this.passphrase = Objects.requireNonNull(passphrase, "passphrase must not be null");
         this.httpClient = HttpClient.newHttpClient();
-        this.orderService = new CoinbaseOrderService(apiKey, apiSecret, httpClient);
-        this.accountService = new CoinbaseAccountService(apiKey, apiSecret, httpClient);
+        this.orderService = new CoinbaseOrderService(apiKey, apiSecret, passphrase, httpClient);
+        this.accountService = new CoinbaseAccountService(apiKey, apiSecret, passphrase, httpClient);
         this.marketDataService = new CoinbaseMarketDataService(apiKey, apiSecret, httpClient);
         this.candleService = new CoinbaseCandleService(apiKey, apiSecret, httpClient, 1000);
         this.tradeService = new CoinbaseTradeService(apiKey, apiSecret, httpClient);
@@ -49,7 +57,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public Set<Integer> granularity() {
-        return Set.of(60, 300, 900, 1800, 3600, 7200, 14400, 86400, 604800);
+        return Set.of(60, 300, 900, 3600, 21600, 86400);
     }
 
     @Override
@@ -59,7 +67,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public CompletableFuture<List<OrderBook>> getOrderBook(TradePair tradePair, Instant instant) {
-        return tradeService.getOrderBook(tradePair);
+        return marketDataService.fetchOrderBook(tradePair);
     }
 
     @Override
@@ -84,13 +92,28 @@ public class Coinbase extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        this.tradePair = tradePair;
         return candleService.getCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
     @Override
     public CompletableFuture<List<Optional<?>>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return CompletableFuture.completedFuture(List.of(tradeService.fetchCandleDataForInProgressCandle(tradePair, currentCandleStartedAt, secondsIntoCurrentCandle
-                , secondsPerCandle)));
+        try {
+            return CompletableFuture.completedFuture(List.of(
+                    candleService.fetchCandleDataForInProgressCandle(
+                            tradePair,
+                            currentCandleStartedAt,
+                            secondsIntoCurrentCandle,
+                            secondsPerCandle
+                    )
+            ));
+        } catch (ExecutionException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            logger.error("Unable to fetch in-progress candle data for {}", tradePair, e);
+            return CompletableFuture.completedFuture(List.of(Optional.empty()));
+        }
     }
 
 
@@ -106,7 +129,10 @@ public class Coinbase extends Exchange {
 
     @Override
     public CompletableFuture<Optional<?>> getHistoricalCandles(TradePair tradePair, Instant startTime, @NotNull Instant endTime, int interval) {
-        return CompletableFuture.completedFuture(tradeService.fetchCandleDataForInProgressCandle(tradePair, startTime, endTime.getEpochSecond(), interval));
+        List<CandleData> candles = candleService.getHistoricalCandles(tradePair.toString('-'), startTime, endTime, interval);
+        return CompletableFuture.completedFuture(
+                candles.isEmpty() ? Optional.empty() : Optional.of(candles)
+        );
 
     }
 

@@ -4,10 +4,6 @@ import javafx.animation.Interpolator;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
-import javafx.css.CssMetaData;
-import javafx.css.StyleConverter;
-import javafx.css.Styleable;
-import javafx.css.StyleableProperty;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.SkinBase;
@@ -17,36 +13,9 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 @Getter
 @Setter
 public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
-
-    protected static final CssMetaData<ToggleSwitch, Number> THUMB_MOVE_ANIMATION_TIME =
-            new CssMetaData<>("-thumb-move-animation-time", StyleConverter.getSizeConverter(), 300.0) {
-
-                @Override
-                public boolean isSettable(@NotNull ToggleSwitch control) {
-                    final ToggleSwitchSkin skin = (ToggleSwitchSkin) control.getSkin();
-                    return !skin.thumbMoveAnimationTime.isBound();
-                }
-
-                @Override
-                public StyleableProperty<Number> getStyleableProperty(ToggleSwitch control) {
-                    final ToggleSwitchSkin skin = (ToggleSwitchSkin) control.getSkin();
-                    return null;//(StyleableProperty<Number>) skin.thumbMoveAnimationTimeProperty();
-                }
-            };
-
-    private static final List<CssMetaData<? extends Styleable, ?>> STYLES;
-    static {
-        List<CssMetaData<? extends Styleable, ?>> styles = new ArrayList<>(SkinBase.getClassCssMetaData());
-        styles.add(THUMB_MOVE_ANIMATION_TIME);
-        STYLES = Collections.unmodifiableList(styles);
-    }
 
     private final StackPane thumb = new StackPane();
     private final StackPane thumbArea = new StackPane();
@@ -60,6 +29,8 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         super(control);
 
         transition = new TranslateTransition(Duration.millis(getThumbMoveAnimationTime()), thumb);
+        thumbMoveAnimationTime.addListener((observable, oldValue, newValue) ->
+                transition.setDuration(Duration.millis(newValue.doubleValue())));
 
         label.setText(control.getText());
         getChildren().addAll(labelContainer, thumbArea, thumb);
@@ -75,15 +46,6 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
 
         thumbArea.setOnMouseReleased(e -> toggleSwitchState(control));
         thumb.setOnMouseReleased(e -> toggleSwitchState(control));
-    }
-
-    public static List<CssMetaData<? extends Styleable, ?>> getClassCssMetaData() {
-        return STYLES;
-    }
-
-    @Override
-    public List<CssMetaData<? extends Styleable, ?>> getCssMetaData() {
-        return getClassCssMetaData();
     }
 
     private void updateLabel(@NotNull ToggleSwitch toggleSwitch) {
@@ -116,10 +78,6 @@ public class ToggleSwitchSkin extends SkinBase<ToggleSwitch> {
         transition.setInterpolator(Interpolator.EASE_IN);
         transition.setCycleCount(1);
         transition.play();
-    }
-
-    private DoubleProperty thumbMoveAnimationTimeProperty() {
-        return thumbMoveAnimationTime;
     }
 
     private double getThumbMoveAnimationTime() {

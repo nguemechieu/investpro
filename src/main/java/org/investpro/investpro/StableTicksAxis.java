@@ -81,19 +81,23 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     private static double calculateTickSpacing(double delta, int maxTicks) {
-
         delta = Math.abs(delta);
-
+        maxTicks = Math.max(1, maxTicks);
+        if (!Double.isFinite(delta) || delta == 0.0d) {
+            return 1.0d;
+        }
 
         int factor;
-        if ((int) delta != 0) {
+        if (delta >= 1.0d && delta <= Integer.MAX_VALUE) {
             factor = log10((int) delta, RoundingMode.DOWN);
+        } else if (delta >= 1.0d) {
+            factor = (int) Math.floor(Math.log10(delta));
         } else {
             factor = (int) Math.ceil(Math.log10(delta));
         }
         int divider = 0;
 
-        double numTicks = delta / (dividers[Math.abs(divider)] * powersOfTen[factor + powersOfTenOffset]);
+        double numTicks = delta / tickSpacingFor(divider, factor);
         // We don't have enough ticks, so increase ticks until we're over the limit, then back off once.
         if (numTicks < maxTicks) {
             while (numTicks < maxTicks) {
@@ -104,7 +108,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
                     divider = dividers.length - 1;
                 }
 
-                numTicks = delta / (dividers[divider] * powersOfTen[Math.abs(factor + powersOfTenOffset)]);
+                numTicks = delta / tickSpacingFor(divider, factor);
             }
 
             // Now back off once unless we hit exactly
@@ -125,11 +129,11 @@ public class StableTicksAxis extends ValueAxis<Number> {
                     divider = 0;
                 }
 
-                numTicks = delta / (dividers[divider] * powersOfTen[factor + powersOfTenOffset]);
+                numTicks = delta / tickSpacingFor(divider, factor);
             }
         }
 
-        return dividers[divider] * powersOfTen[factor + powersOfTenOffset];
+        return tickSpacingFor(divider, factor);
     }
 
     /**
@@ -225,7 +229,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     }
 
     @Override
-    protected Range autoRange(double minValue, double maxValue, double length, double labelSize) {
+    public Range autoRange(double minValue, double maxValue, double length, double labelSize) {
         // NOTE(dweil): if the range is very small, display it like a flat line, the scaling doesn't work very well at
         // these values. 1e-300 was chosen arbitrarily.
         if (Math.abs(minValue - maxValue) < 1e-300) {
@@ -302,7 +306,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
 
     @Override
     protected Range getRange() {
-        return getRange(getValue(), getMaxValue());
+        return getRange(getLowerBound(), getUpperBound());
     }
 
     private @NotNull Range getRange(double minValue, double maxValue) {
@@ -338,7 +342,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private double getLabelSize() {
         if (labelSize == -1) {
             Dimension2D dim = measureTickMarkLabelSize("-888.88E-88", getTickLabelRotation());
-            if (getSide().isHorizontal()) {
+            if (getSide() == null || getSide().isHorizontal()) {
                 labelSize = dim.getWidth();
             } else {
 
@@ -347,6 +351,14 @@ public class StableTicksAxis extends ValueAxis<Number> {
         }
 
         return labelSize;
+    }
+
+    private static double tickSpacingFor(int divider, int factor) {
+        return dividers[divider] * powerOfTen(factor);
+    }
+
+    private static double powerOfTen(int exponent) {
+        return Math.pow(10.0d, exponent);
     }
 
     @Override

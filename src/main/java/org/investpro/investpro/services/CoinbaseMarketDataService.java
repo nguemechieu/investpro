@@ -3,9 +3,9 @@ package org.investpro.investpro.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.investpro.investpro.exchanges.Coinbase;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.OrderBookEntry;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.OrderBook;
+import org.investpro.investpro.models.OrderBookEntry;
+import org.investpro.investpro.models.TradePair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -19,12 +19,18 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 
 public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpClient httpClient) {
 
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseMarketDataService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final long UNAVAILABLE_PRODUCT_COOLDOWN_MS = TimeUnit.MINUTES.toMillis(5);
+    private static final long TRANSIENT_FAILURE_COOLDOWN_MS = TimeUnit.SECONDS.toMillis(30);
+    private static final ConcurrentMap<String, Long> ORDER_BOOK_COOLDOWN_UNTIL = new ConcurrentHashMap<>();
 
     @Contract(pure = true)
     public @NotNull String getExchangeMessage() {
@@ -57,10 +63,15 @@ public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpCli
         }
     }
 
-    public CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
+    @Contract("_ -> new")
+    public @NotNull CompletableFuture<List<OrderBook>> fetchOrderBook(TradePair tradePair) {
         return CompletableFuture.supplyAsync(() -> {
+            String symbol = tradePair.toString('-');
+            if (isCoolingDown(symbol)) {
+                return List.<OrderBook>of();
+            }
             try {
-                String url = Coinbase.API_URL + "/products/" + tradePair.toString('-') + "/book?level=2";
+                String url = Coinbase.API_URL + "/products/" + symbol + "/book?level=2";
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(url))
                         .GET()
@@ -69,9 +80,15 @@ public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpCli
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
                 if (response.statusCode() != 200) {
-                    throw new RuntimeException("Failed to fetch order book: " + response.body());
+                    if (isUnavailableProductResponse(response.statusCode(), response.body())) {
+                        markUnavailable(symbol, "Coinbase order book unavailable for " + symbol + ". Using cooldown.");
+                        return List.<OrderBook>of();
+                    }
+                    logger.warn("Failed to fetch Coinbase order book for {}. HTTP {}: {}", symbol, response.statusCode(), response.body());
+                    return List.<OrderBook>of();
                 }
 
+                ORDER_BOOK_COOLDOWN_UNTIL.remove(symbol);
                 JsonNode root = OBJECT_MAPPER.readTree(response.body());
                 List<OrderBookEntry> bids = new ArrayList<>();
                 List<OrderBookEntry> asks = new ArrayList<>();
@@ -79,16 +96,50 @@ public record CoinbaseMarketDataService(String apiKey, String apiSecret, HttpCli
                 root.get("bids").forEach(b -> bids.add(new OrderBookEntry(b.get(0).asDouble(), b.get(1).asDouble())));
                 root.get("asks").forEach(a -> asks.add(new OrderBookEntry(a.get(0).asDouble(), a.get(1).asDouble())));
 
-                OrderBook cand = new OrderBook();
-                cand.getAskEntries().getLast().setAmount(asks.getLast().getAmount());
-                cand.getAskEntries().getLast().setPrice(asks.getLast().getPrice());
-                return List.of(cand);
+                OrderBook orderBook = new OrderBook(tradePair, java.time.Instant.now(), bids, asks);
+                return List.of(orderBook);
 
             } catch (IOException | InterruptedException e) {
-                logger.error("Failed to fetch order book", e);
-                throw new RuntimeException(e);
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                markTransientFailure(symbol, "Coinbase order book temporarily unavailable for " + symbol + ".");
+                return List.of();
             }
         });
+    }
+
+    private boolean isCoolingDown(String symbol) {
+        Long cooldownUntil = ORDER_BOOK_COOLDOWN_UNTIL.get(symbol);
+        return cooldownUntil != null && cooldownUntil > System.currentTimeMillis();
+    }
+
+    private void markUnavailable(String symbol, String message) {
+        long now = System.currentTimeMillis();
+        Long previous = ORDER_BOOK_COOLDOWN_UNTIL.put(symbol, now + UNAVAILABLE_PRODUCT_COOLDOWN_MS);
+        if (previous == null || previous <= now) {
+            logger.warn(message);
+        }
+    }
+
+    private void markTransientFailure(String symbol, String message) {
+        long now = System.currentTimeMillis();
+        Long previous = ORDER_BOOK_COOLDOWN_UNTIL.put(symbol, now + TRANSIENT_FAILURE_COOLDOWN_MS);
+        if (previous == null || previous <= now) {
+            logger.warn(message);
+        }
+    }
+
+    private boolean isUnavailableProductResponse(int statusCode, String body) {
+        if (body == null) {
+            return statusCode == 404;
+        }
+        String normalized = body.toLowerCase();
+        return statusCode == 404
+                || normalized.contains("notfound")
+                || normalized.contains("not found")
+                || normalized.contains("delisted")
+                || normalized.contains("not allowed for delisted products");
     }
 
     public List<TradePair> getTradePairs() {

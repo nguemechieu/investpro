@@ -7,16 +7,17 @@ import lombok.Setter;
 import org.investpro.investpro.InProgressCandleUpdater;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.Trade;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.Trade;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,6 +55,11 @@ public class OandaTradeService {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     try {
+                        if (response.statusCode() != 200) {
+                            logger.warn("Unable to fetch OANDA trades for {}. HTTP {}: {}", instrument, response.statusCode(), response.body());
+                            return Collections.emptyList();
+                        }
+
                         JsonNode root = OBJECT_MAPPER.readTree(response.body());
                         List<Trade> trades = new ArrayList<>();
                         JsonNode tradesNode = root.path("trades");
@@ -73,11 +79,6 @@ public class OandaTradeService {
                 });
     }
 
-    public CompletableFuture<List<OrderBook>> getOrderBook(String instrument) {
-        logger.info("🔄 Order book fetch not implemented for Oanda.");
-        return CompletableFuture.completedFuture(Collections.emptyList());
-    }
-
     public Optional<String> getRecentTrades(TradePair tradePair) {
         try {
             List<Trade> trades = fetchRecentTrades(tradePair).get();
@@ -95,24 +96,59 @@ public class OandaTradeService {
     public Double[] getLatestPrice(TradePair pair) {
         try {
             String instrument = pair.toString('_');
-            String url = baseUrl + "/accounts/" + apiKey + "/pricing?instruments=" + instrument;
+
+            String url = baseUrl
+                    + "/accounts/"
+                    + apiKey
+                    + "/pricing?instruments="
+                    + URLEncoder.encode(instrument, StandardCharsets.UTF_8);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Authorization", "Bearer " + apiSecret)
+                    .header("Accept", "application/json")
                     .GET()
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            JsonNode json = OBJECT_MAPPER.readTree(response.body());
-            JsonNode priceNode = json.path("prices").get(0);
+            HttpResponse<String> response = httpClient.send(
+                    request,
+                    HttpResponse.BodyHandlers.ofString()
+            );
 
-            double bid = priceNode.path("bids").get(0).path("price").asDouble();
-            double ask = priceNode.path("asks").get(0).path("price").asDouble();
+            if (response.statusCode() != 200) {
+                logger.warn(
+                        "Unable to fetch OANDA latest price for {}. HTTP {}: {}",
+                        pair,
+                        response.statusCode(),
+                        response.body()
+                );
+                return new Double[]{0.0, 0.0};
+            }
+
+            JsonNode json = OBJECT_MAPPER.readTree(response.body());
+            JsonNode prices = json.path("prices");
+
+            if (!prices.isArray() || prices.isEmpty()) {
+                logger.warn("No OANDA price returned for {}", pair);
+                return new Double[]{0.0, 0.0};
+            }
+
+            JsonNode priceNode = prices.get(0);
+            JsonNode bids = priceNode.path("bids");
+            JsonNode asks = priceNode.path("asks");
+
+            if (!bids.isArray() || bids.isEmpty() || !asks.isArray() || asks.isEmpty()) {
+                logger.warn("Missing bid/ask price for {}. Response: {}", pair, response.body());
+                return new Double[]{0.0, 0.0};
+            }
+
+            double bid = bids.get(0).path("price").asDouble(0.0);
+            double ask = asks.get(0).path("price").asDouble(0.0);
+
             return new Double[]{bid, ask};
 
         } catch (Exception e) {
-            logger.error("Failed to fetch latest price for {}: {}", pair, e.getMessage());
+            logger.error("Failed to fetch latest price for {}: {}", pair, e.getMessage(), e);
             return new Double[]{0.0, 0.0};
         }
     }

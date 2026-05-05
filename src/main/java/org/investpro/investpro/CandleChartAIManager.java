@@ -4,7 +4,7 @@ import javafx.application.Platform;
 import javafx.scene.chart.XYChart;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -62,7 +62,7 @@ public class CandleChartAIManager {
             series = new XYChart.Series<>();
             chart.getData().add(series);
         } else {
-            series = chart.getData().get(0); // Assume main series is at 0
+            series = chart.getData().getFirst(); // Assume main series is at 0
         }
 
         if (index >= series.getData().size()) return;

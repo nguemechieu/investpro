@@ -2,7 +2,6 @@ package org.investpro.investpro;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mysql.cj.x.protobuf.MysqlxExpr;
 import lombok.Getter;
 import lombok.Setter;
 

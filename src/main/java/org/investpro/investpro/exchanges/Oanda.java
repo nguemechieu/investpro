@@ -3,7 +3,7 @@ package org.investpro.investpro.exchanges;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.*;
-import org.investpro.investpro.model.*;
+import org.investpro.investpro.models.*;
 import org.investpro.investpro.services.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,9 +35,10 @@ public class Oanda extends Exchange {
     private TradePair tradePair;
 
     public Oanda(String accountId, String apiSecret) {
-        Objects.requireNonNull(accountId);
-        Objects.requireNonNull(apiSecret);
-        super(accountId, apiSecret);
+        super(
+                Objects.requireNonNull(accountId, "accountId must not be null"),
+                Objects.requireNonNull(apiSecret, "apiSecret must not be null")
+        );
         this.accountId = accountId;
         this.apiSecret = apiSecret;
         this.httpClient = HttpClient.newHttpClient();
@@ -63,7 +64,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<OrderBook>> getOrderBook(TradePair tradePair, Instant instant) {
-        return oandaTradeService.getOrderBook(tradePair.toString('_'));
+        return marketDataService.fetchOrderBook(tradePair);
     }
 
 
@@ -74,7 +75,7 @@ public class Oanda extends Exchange {
 
     @Override
     public void connectAndProcessTrades(String symbol, InProgressCandleUpdater updater) {
-
+        oandaTradeService.streamLiveTrades(symbol, updater);
     }
 
 
@@ -91,20 +92,20 @@ public class Oanda extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        this.tradePair = tradePair;
         return candleService.getCandleDataSupplier(secondsPerCandle, tradePair);
     }
 
     @Override
     public CompletableFuture<List<Optional<?>>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        //  try {
-        return null;// CompletableFuture.completedFuture(
-//                    (Optional<CandleData>) candleService.fetchCandleDataForInProgressCandle(tradePair,
-//                            currentCandleStartedAt, Instant.ofEpochSecond(secondsIntoCurrentCandle),
-//                            secondsPerCandle).get())
-
-//        } catch (InterruptedException | ExecutionException e) {
-//            throw new RuntimeException(e);
-//        }
+        return CompletableFuture.completedFuture(List.of(
+                candleService.fetchCandleDataForInProgressCandle(
+                        tradePair,
+                        currentCandleStartedAt,
+                        secondsIntoCurrentCandle,
+                        secondsPerCandle
+                )
+        ));
     }
 
     // --- Delegated Implementations ---
@@ -122,11 +123,8 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<Optional<?>> getHistoricalCandles(TradePair tradePair, Instant startTime, @NotNull Instant endTime, int interval) {
-        //return //candleService.fetchCandleDataForInProgressCandle(tradePair, startTime,
-
-        //      endTime, interval);
-
-        return null;
+        List<CandleData> candles = candleService.getHistoricalCandles(tradePair, startTime, endTime, interval);
+        return CompletableFuture.completedFuture(candles.isEmpty() ? Optional.empty() : Optional.of(candles));
     }
 
     @Override

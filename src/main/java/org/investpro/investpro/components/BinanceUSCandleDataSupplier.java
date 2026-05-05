@@ -4,9 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.investpro.investpro.CandleDataSupplier;
-
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +61,7 @@ public class BinanceUSCandleDataSupplier extends CandleDataSupplier {
             long startTimeMs = endTimeMs - ((long) secondsPerCandle * numCandles * 1000L);
 
             String interval = getIntervalLabel(secondsPerCandle);
-            String symbol = tradePair.toString().replace("/", "");
+            String symbol = tradePair.toSymbol();
             String url = String.format("%s?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d",
                     BASE_URL, symbol, interval, startTimeMs, endTimeMs, numCandles);
 
@@ -72,8 +71,13 @@ public class BinanceUSCandleDataSupplier extends CandleDataSupplier {
                     .build();
 
             return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenApply(HttpResponse::body)
-                    .thenApply(body -> {
+                    .thenApply(response -> {
+                        if (response.statusCode() != 200) {
+                            logger.warn("Failed to fetch Binance US candles: {}", response.body());
+                            return Collections.<CandleData>emptyList();
+                        }
+
+                        String body = response.body();
                         try {
                             JsonNode array = OBJECT_MAPPER.readTree(body);
                             List<CandleData> candles = new ArrayList<>();
@@ -85,13 +89,13 @@ public class BinanceUSCandleDataSupplier extends CandleDataSupplier {
                                         node.get(2).asDouble(),
 
                                         node.get(3).asDouble(),
-                                        node.get(0).asLong(),
+                                        toEpochSeconds(node.get(0).asLong()),
                                         node.get(5).asLong()
                                 ));
                             }
 
                             if (!candles.isEmpty()) {
-                                endTime.set((int) candles.getLast().getOpenTime());
+                                endTime.set(candles.getFirst().getOpenTime() - secondsPerCandle);
                             }
 
                             return candles;
@@ -104,5 +108,10 @@ public class BinanceUSCandleDataSupplier extends CandleDataSupplier {
             logger.error("Error fetching candle data from Binance US", e);
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
+    }
+
+    private int toEpochSeconds(long exchangeOpenTime) {
+        long epochSeconds = exchangeOpenTime > Integer.MAX_VALUE ? exchangeOpenTime / 1000L : exchangeOpenTime;
+        return Math.toIntExact(epochSeconds);
     }
 }

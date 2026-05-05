@@ -3,6 +3,9 @@ package org.investpro.investpro.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
+import org.investpro.investpro.Side;
+import org.investpro.investpro.models.Trade;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,9 +18,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -45,7 +48,7 @@ public class BinanceUSTradeService {
     }
 
     public Optional<String> getLatestPrice(String symbol) {
-        return sendGetRequest("/ticker/price?symbol=" + symbol);
+        return sendGetRequest("/ticker/bookTicker?symbol=" + symbol);
     }
 
     public Optional<String> getRecentTrades(String symbol) {
@@ -77,6 +80,40 @@ public class BinanceUSTradeService {
 
     public Optional<JsonNode> getRecentTradesAsJson(String symbol) {
         return getRecentTrades(symbol).flatMap(this::parseJson);
+    }
+
+    public CompletableFuture<List<Trade>> fetchRecentTrades(TradePair tradePair) {
+        String symbol = tradePair.toSymbol();
+        return CompletableFuture.supplyAsync(() -> getRecentTradesAsJson(symbol)
+                .map(jsonArray -> {
+                    List<Trade> trades = new ArrayList<>();
+                    if (!jsonArray.isArray()) {
+                        return trades;
+                    }
+
+                    for (JsonNode node : jsonArray) {
+                        Trade trade = new Trade();
+                        trade.setTradePair(tradePair);
+                        trade.setPrice(node.path("price").asDouble());
+                        trade.setAmount(node.path("qty").asDouble());
+                        trade.setTimestamp(Instant.ofEpochMilli(node.path("time").asLong()));
+                        trade.setSide(node.path("isBuyerMaker").asBoolean() ? Side.SELL : Side.BUY);
+                        trade.setLocalTradeId(node.path("id").asLong());
+                        trades.add(trade);
+                    }
+                    return trades;
+                })
+                .orElseGet(List::of));
+    }
+
+    public Double[] getLatestPrice(TradePair pair) {
+        String symbol = pair.toSymbol();
+        return getLatestPriceAsJson(symbol)
+                .map(node -> new Double[]{
+                        node.path("bidPrice").asDouble(0),
+                        node.path("askPrice").asDouble(0)
+                })
+                .orElseGet(() -> new Double[]{0.0, 0.0});
     }
 
     public CompletableFuture<Void> connectWebSocket(String symbol, WebSocket.Listener listener) {

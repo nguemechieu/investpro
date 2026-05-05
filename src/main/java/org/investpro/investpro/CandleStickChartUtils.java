@@ -1,13 +1,13 @@
 package org.investpro.investpro;
 
 import javafx.util.Pair;
-import org.investpro.investpro.model.CandleData;
+import org.investpro.investpro.models.CandleData;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.logging.ErrorManager;
-
 
 /**
  * @author Noel Nguemechieu
@@ -17,9 +17,9 @@ public final class CandleStickChartUtils {
     private static final int SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
     private static final int SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
     private static final int SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
-    private static final int SECONDS_PER_MONTH = 30 * SECONDS_PER_DAY; // Corrected to avoid overflow
+    private static final int SECONDS_PER_MONTH = 30 * SECONDS_PER_DAY;
     private static final int SECONDS_PER_YEAR = 12 * SECONDS_PER_MONTH;
-    static ErrorManager logger = new ErrorManager();
+    private static final Logger logger = LoggerFactory.getLogger(CandleStickChartUtils.class);
 
     private CandleStickChartUtils() {
     }
@@ -28,7 +28,6 @@ public final class CandleStickChartUtils {
      * Adds the sliding-window extrema (maps candle x-values to a pair of extrema for volume and high-low candle price)
      * to the given {@code extrema} map.
      */
-
     public static void putSlidingWindowExtrema(Map<Integer, Pair<Extrema, Extrema>> extrema,
                                                List<CandleData> candleData, int windowSize) {
         Objects.requireNonNull(extrema, "extrema map must not be null");
@@ -37,81 +36,115 @@ public final class CandleStickChartUtils {
         if (candleData.isEmpty()) {
             throw new RuntimeException("candleData must not be empty");
         }
-        if (windowSize > candleData.size()) {
-            logger.error("windowSize ({}) must be less than size of candleData ({})" + candleData.size(), new Exception(), 500);
-            return;
+        if (windowSize <= 0) {
+            throw new IllegalArgumentException("windowSize must be positive");
         }
 
-        final Deque<Integer> candleMinWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> candleMaxWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> volumeMinWindow = new ArrayDeque<>(windowSize);
-        final Deque<Integer> volumeMaxWindow = new ArrayDeque<>(windowSize);
+        int effectiveWindowSize = Math.min(windowSize, candleData.size());
+        if (effectiveWindowSize != windowSize) {
+            logger.debug(
+                    "Clamping windowSize from {} to {} for candleData size {}",
+                    windowSize,
+                    effectiveWindowSize,
+                    candleData.size()
+            );
+        }
 
-        for (int i = 0; i < windowSize; i++) {
+        final Deque<Integer> candleMinWindow = new ArrayDeque<>(effectiveWindowSize);
+        final Deque<Integer> candleMaxWindow = new ArrayDeque<>(effectiveWindowSize);
+        final Deque<Integer> volumeMinWindow = new ArrayDeque<>(effectiveWindowSize);
+        final Deque<Integer> volumeMaxWindow = new ArrayDeque<>(effectiveWindowSize);
+
+        for (int i = 0; i < effectiveWindowSize; i++) {
             updateDeques(candleData, volumeMinWindow, volumeMaxWindow, candleMinWindow, candleMaxWindow, i);
         }
 
-        for (int i = windowSize; i < candleData.size(); i++) {
-            // Store extrema for previous window
-            if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty() && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
-
-
-                extrema.put(candleData.get(i - windowSize).getOpenTime(), new Pair<>(
-                        new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                                Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                        new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                                Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+        for (int i = effectiveWindowSize; i < candleData.size(); i++) {
+            if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty()
+                    && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
+                extrema.put(candleData.get(i - effectiveWindowSize).getOpenTime(), new Pair<>(
+                        new Extrema(
+                                candleData.get(volumeMinWindow.peekFirst()).getVolume(),
+                                Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())
+                        ),
+                        new Extrema(
+                                candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
+                                Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice())
+                        ))); 
             }
 
-            removeOutdatedElements(volumeMinWindow, i - windowSize);
-            removeOutdatedElements(volumeMaxWindow, i - windowSize);
-            removeOutdatedElements(candleMinWindow, i - windowSize);
-            removeOutdatedElements(candleMaxWindow, i - windowSize);
+            removeOutdatedElements(volumeMinWindow, i - effectiveWindowSize);
+            removeOutdatedElements(volumeMaxWindow, i - effectiveWindowSize);
+            removeOutdatedElements(candleMinWindow, i - effectiveWindowSize);
+            removeOutdatedElements(candleMaxWindow, i - effectiveWindowSize);
 
             updateDeques(candleData, volumeMinWindow, volumeMaxWindow, candleMinWindow, candleMaxWindow, i);
         }
 
-        // Store extrema for the last window
-        if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty() && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
-            extrema.put(candleData.get(candleData.size() - windowSize).getOpenTime(), new Pair<>(
-                    new Extrema(candleData.get(volumeMinWindow.peekFirst()).getVolume(),
-                            Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())),
-                    new Extrema(candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
-                            Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice()))));
+        if (!volumeMinWindow.isEmpty() && !volumeMaxWindow.isEmpty()
+                && !candleMinWindow.isEmpty() && !candleMaxWindow.isEmpty()) {
+            extrema.put(candleData.getLast().getOpenTime(), new Pair<>(
+                    new Extrema(
+                            candleData.get(volumeMinWindow.peekFirst()).getVolume(),
+                            Math.ceil(candleData.get(volumeMaxWindow.peekFirst()).getVolume())
+                    ),
+                    new Extrema(
+                            candleData.get(candleMinWindow.peekFirst()).getLowPrice(),
+                            Math.ceil(candleData.get(candleMaxWindow.peekFirst()).getHighPrice())
+                    )));
         }
     }
-
 
     private static void updateDeques(List<CandleData> candleData, @NotNull Deque<Integer> volumeMinWindow,
                                      Deque<Integer> volumeMaxWindow, Deque<Integer> candleMinWindow,
                                      Deque<Integer> candleMaxWindow, int index) {
-        while (!volumeMinWindow.isEmpty() && candleData.get(index).getVolume() <=
-                candleData.get(volumeMinWindow.peekLast()).getVolume()) {
+        while (true) {
+            Integer lastIndex = volumeMinWindow.peekLast();
+            if (lastIndex == null || candleData.get(index).getVolume() >
+                    candleData.get(lastIndex).getVolume()) {
+                break;
+            }
             volumeMinWindow.pollLast();
         }
         volumeMinWindow.addLast(index);
 
-        while (!volumeMaxWindow.isEmpty() && candleData.get(index).getVolume() >=
-                candleData.get(volumeMaxWindow.peekLast()).getVolume()) {
+        while (true) {
+            Integer lastIndex = volumeMaxWindow.peekLast();
+            if (lastIndex == null || candleData.get(index).getVolume() <
+                    candleData.get(lastIndex).getVolume()) {
+                break;
+            }
             volumeMaxWindow.pollLast();
         }
         volumeMaxWindow.addLast(index);
 
-        while (!candleMinWindow.isEmpty() && candleData.get(index).getLowPrice() <=
-                candleData.get(candleMinWindow.peekLast()).getLowPrice()) {
+        while (true) {
+            Integer lastIndex = candleMinWindow.peekLast();
+            if (lastIndex == null || candleData.get(index).getLowPrice() >
+                    candleData.get(lastIndex).getLowPrice()) {
+                break;
+            }
             candleMinWindow.pollLast();
         }
         candleMinWindow.addLast(index);
 
-        while (!candleMaxWindow.isEmpty() && candleData.get(index).getHighPrice() >=
-                candleData.get(candleMaxWindow.peekLast()).getHighPrice()) {
+        while (true) {
+            Integer lastIndex = candleMaxWindow.peekLast();
+            if (lastIndex == null || candleData.get(index).getHighPrice() <
+                    candleData.get(lastIndex).getHighPrice()) {
+                break;
+            }
             candleMaxWindow.pollLast();
         }
         candleMaxWindow.addLast(index);
     }
 
     private static void removeOutdatedElements(@NotNull Deque<Integer> deque, int limit) {
-        while (!deque.isEmpty() && deque.peekFirst() <= limit) {
+        while (true) {
+            Integer firstIndex = deque.peekFirst();
+            if (firstIndex == null || firstIndex > limit) {
+                break;
+            }
             deque.pollFirst();
         }
     }

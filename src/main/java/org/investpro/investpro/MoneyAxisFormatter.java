@@ -1,7 +1,7 @@
 package org.investpro.investpro;
 
 import javafx.util.StringConverter;
-import org.investpro.investpro.model.Currency;
+import org.investpro.investpro.models.Currency;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

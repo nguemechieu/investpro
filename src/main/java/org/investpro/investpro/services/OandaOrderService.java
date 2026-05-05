@@ -5,11 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.CreateOrderRequest;
+import org.investpro.investpro.ENUM_ORDER_STATUS;
 import org.investpro.investpro.ENUM_ORDER_TYPE;
 import org.investpro.investpro.Side;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.Order;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.Order;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,9 +19,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 @Getter
 @Setter
@@ -61,8 +64,7 @@ public class OandaOrderService {
         List<Order> orders = new ArrayList<>();
         if (root.has("orders")) {
             for (JsonNode node : root.get("orders")) {
-                Order order = OBJECT_MAPPER.readValue(node.toString(), Order.class);
-                order.setLastTransactionID(root.get("lastTransactionID").asText());
+                Order order = mapOrder(node, root.path("lastTransactionID").asText(""), tradePair);
                 orders.add(order);
             }
         }
@@ -86,7 +88,7 @@ public class OandaOrderService {
         List<Order> orders = new ArrayList<>();
         JsonNode root = OBJECT_MAPPER.readTree(response.body());
         for (JsonNode node : root.get("orders")) {
-            orders.add(OBJECT_MAPPER.treeToValue(node, Order.class));
+            orders.add(mapOrder(node, root.path("lastTransactionID").asText(""), null));
         }
         return orders;
     }
@@ -138,6 +140,83 @@ public class OandaOrderService {
         }
 
         logger.info("All orders cancelled for account: {}", accountId);
+    }
+
+    private Order mapOrder(JsonNode node, String lastTransactionId, TradePair tradePair) {
+        Order order = new Order();
+        order.setLastTransactionID(lastTransactionId);
+
+        long orderId = node.path("id").asLong(-1);
+        if (orderId > -1) {
+            order.setOrderId(orderId);
+            order.setId(orderId);
+        }
+
+        String instrument = node.path("instrument").asText("");
+        if (instrument.isBlank() && tradePair != null) {
+            instrument = tradePair.toString('_');
+        }
+        order.setSymbol(instrument.isBlank() ? "N/A" : instrument);
+
+        String rawType = node.path("type").asText("LIMIT");
+        order.setOrderType(parseOrderType(rawType));
+
+        String rawState = node.path("state").asText("UNKNOWN");
+        order.setOrderStatus(parseOrderStatus(rawState));
+
+        if (node.hasNonNull("price")) {
+            double price = node.path("price").asDouble();
+            if (price > 0) {
+                order.setPrice(price);
+            }
+        }
+
+        double units = 0;
+        if (node.hasNonNull("units")) {
+            units = node.path("units").asDouble();
+        } else if (node.hasNonNull("currentUnits")) {
+            units = node.path("currentUnits").asDouble();
+        }
+
+        if (units != 0) {
+            order.setSize(Math.abs(units));
+            order.setSide(units > 0 ? Side.BUY : Side.SELL);
+        } else {
+            order.setSide(Side.UNKNOWN);
+        }
+
+        String timestamp = node.hasNonNull("createTime")
+                ? node.path("createTime").asText()
+                : node.path("time").asText("");
+        if (!timestamp.isBlank()) {
+            order.setTimestamp(Date.from(Instant.parse(timestamp)));
+        }
+
+        return order;
+    }
+
+    private ENUM_ORDER_TYPE parseOrderType(String rawType) {
+        try {
+            return ENUM_ORDER_TYPE.valueOf(rawType.toUpperCase(Locale.US));
+        } catch (IllegalArgumentException ignored) {
+            return ENUM_ORDER_TYPE.LIMIT;
+        }
+    }
+
+    private ENUM_ORDER_STATUS parseOrderStatus(String rawStatus) {
+        String normalized = rawStatus.toUpperCase(Locale.US);
+        if ("CANCELLED".equals(normalized)) {
+            return ENUM_ORDER_STATUS.CANCELLED;
+        }
+        if ("CANCELED".equals(normalized)) {
+            return ENUM_ORDER_STATUS.CANCELED;
+        }
+
+        try {
+            return ENUM_ORDER_STATUS.valueOf(normalized);
+        } catch (IllegalArgumentException ignored) {
+            return ENUM_ORDER_STATUS.UNKNOWN;
+        }
     }
 
 }

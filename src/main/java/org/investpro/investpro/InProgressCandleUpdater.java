@@ -1,7 +1,7 @@
 package org.investpro.investpro;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.investpro.investpro.model.InProgressCandle;
+import org.investpro.investpro.models.InProgressCandle;
 
 import java.math.BigDecimal;
 import java.time.Instant;

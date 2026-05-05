@@ -2,7 +2,7 @@ package org.investpro.investpro.services;
 
 
 import org.investpro.investpro.dao.UserDao;
-import org.investpro.investpro.model.User;
+import org.investpro.investpro.models.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

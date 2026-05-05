@@ -3,7 +3,7 @@ package org.investpro.investpro.dao;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.TypedQuery;
-import org.investpro.investpro.model.User;
+import org.investpro.investpro.models.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

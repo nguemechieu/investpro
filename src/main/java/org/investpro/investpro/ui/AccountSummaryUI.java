@@ -1,146 +1,135 @@
 package org.investpro.investpro.ui;
 
 import javafx.application.Platform;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.Region;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.Exchange;
-import org.investpro.investpro.model.Account;
+import org.investpro.investpro.FxLifecycle;
+import org.investpro.investpro.models.Account;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Getter
 @Setter
-public class AccountSummaryUI extends Region {
+public class AccountSummaryUI extends VBox {
     private static final Logger logger = LoggerFactory.getLogger(AccountSummaryUI.class);
+
     private final Exchange exchange;
-    private final ScrollPane scrollPane;
-    private final Canvas canvas;
+    private final TableView<Account> tableView;
+    private final Label statusLabel;
     private final ScheduledExecutorService scheduler;
-    private final List<Account> accountSummaryList;
+    private final ObservableList<Account> accountSummaryList;
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public AccountSummaryUI(Exchange exchange) {
         this.exchange = exchange;
-        this.canvas = new Canvas(1300, 780); // Increased width for better readability
-        this.scrollPane = createScrollPane();
+        this.tableView = createTableView();
+        this.statusLabel = new Label("Loading account summary...");
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
-        this.accountSummaryList = new CopyOnWriteArrayList<>();
-        Platform.runLater(() -> {
-        setupUI();
-            startUpdating();
+        this.accountSummaryList = FXCollections.observableArrayList();
+
+        setSpacing(12);
+        setPadding(new Insets(12));
+        getStyleClass().add("desk-table-panel");
+
+        Label titleLabel = new Label("Account Summary");
+        titleLabel.getStyleClass().add("desk-section-title");
+
+        statusLabel.getStyleClass().add("desk-section-status");
+        tableView.setItems(accountSummaryList);
+
+        getChildren().addAll(titleLabel, statusLabel, tableView);
+        VBox.setVgrow(tableView, Priority.ALWAYS);
+
+        Platform.runLater(this::startUpdating);
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene == null) {
+                shutdown();
+            }
         });
         logger.info("Account summary initialized.");
     }
 
-    /**
-     * ✅ Creates a scrollable container
-     */
-    private @NotNull ScrollPane createScrollPane() {
-        ScrollPane scrollPane = new ScrollPane(canvas);
-        scrollPane.setPrefSize(1300, 1000);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
-        scrollPane.setPannable(true);
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
-        scrollPane.setBackground(Background.fill(Color.DARKBLUE));  // ScrollPane background
-        return scrollPane;
+    private @NotNull TableView<Account> createTableView() {
+        TableView<Account> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPlaceholder(new Label("No account data available"));
+
+        table.getColumns().addAll(
+                textColumn("ID", account -> safe(account.getId())),
+                textColumn("Alias", account -> safe(account.getAlias())),
+                textColumn("Currency", account -> safe(account.getCurrency())),
+                textColumn("Balance", account -> money(account.getBalance())),
+                textColumn("Equity", account -> money(account.getEquity())),
+                textColumn("Available Margin", account -> money(account.getMarginAvailable())),
+                textColumn("Used Margin", account -> money(account.getMarginUsed())),
+                textColumn("NAV", account -> money(account.getNAV())),
+                textColumn("P/L", account -> money(account.getPl())),
+                textColumn("Unrealized P/L", account -> money(account.getUnrealizedPL())),
+                textColumn("Leverage", account -> account.getLeverage() + "x"),
+                textColumn("Open Positions", account -> Integer.toString(account.getOpenPositionCount())),
+                textColumn("Pending Orders", account -> Integer.toString(account.getPendingOrderCount()))
+        );
+
+        return table;
     }
 
-    /**
-     * ✅ Set up the UI
-     */
-    private void setupUI() {
-        getChildren().add(scrollPane);
+    private TableColumn<Account, String> textColumn(String title, java.util.function.Function<Account, String> mapper) {
+        TableColumn<Account, String> column = new TableColumn<>(title);
+        column.setCellValueFactory(cell -> new ReadOnlyStringWrapper(mapper.apply(cell.getValue())));
+        return column;
     }
 
-    /**
-     * ✅ Start fetching account summary updates
-     */
     private void startUpdating() {
         scheduler.scheduleAtFixedRate(() -> {
-
-
-            List<Account> updatedAccounts;
-            updatedAccounts = exchange.getAccountSummary();
-            synchronized (accountSummaryList) {
-                accountSummaryList.clear();
-                accountSummaryList.addAll(updatedAccounts);
+            if (disposed.get() || !FxLifecycle.isShowing(this)) {
+                return;
             }
+            try {
+                List<Account> updatedAccounts = exchange.getAccountSummary();
 
-            Platform.runLater(() -> {
-                synchronized (accountSummaryList) {
-                    drawAccountSummary(canvas.getGraphicsContext2D(), accountSummaryList);
-                }
-            });
-
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this), () -> {
+                    accountSummaryList.setAll(updatedAccounts);
+                    statusLabel.setText(updatedAccounts.isEmpty()
+                            ? "No account data returned by " + exchange.getClass().getSimpleName() + "."
+                            : "Updated " + java.time.LocalTime.now().withNano(0));
+                });
+            } catch (RuntimeException e) {
+                logger.warn("Unable to refresh account summary for {}", exchange.getClass().getSimpleName(), e);
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this),
+                        () -> statusLabel.setText("Account summary unavailable right now."));
+            }
         }, 0, 10, TimeUnit.SECONDS);
     }
 
-    /**
-     * ✅ Draws the account summary data
-     */
-    private void drawAccountSummary(@NotNull GraphicsContext gc, @NotNull List<Account> accounts) {
-        gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        gc.setFont(Font.font("Arial", 20));
-        canvas.getGraphicsContext2D().setStroke(Color.BLACK);
+    private String money(double value) {
+        return String.format("$%,.2f", value);
+    }
 
-        canvas.getGraphicsContext2D().fillRect(0, 0, 1300, 800);
+    private String safe(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
 
-
-        int yOffset = 50;
-        gc.setFill(Color.YELLOWGREEN);
-
-        gc.fillText("🔹 Account Summary", 50, yOffset);
-
-        gc.strokeLine(50, yOffset + 10, 1100, yOffset + 10);
-        yOffset += 40;
-
-
-        for (Account account : accounts) {
-            gc.strokeLine(50, yOffset, 1300, yOffset);
-            yOffset += 30;
-            gc.fillText("📌 Account ID: " + account.getId(), 50, yOffset);
-            gc.fillText("📌 Alias: " + account.getAlias(), 50, yOffset + 30);
-            gc.fillText("📌 Currency: " + account.getCurrency(), 50, yOffset + 60);
-            gc.fillText("📌 Balance: $" + String.format("%.2f", account.getBalance()), 50, yOffset + 90);
-            gc.fillText("📌 Equity: $" + String.format("%.2f", account.getEquity()), 50, yOffset + 120);
-            gc.fillText("📌 Free Margin: $" + String.format("%.2f", account.getMarginAvailable()), 50, yOffset + 150);
-            gc.fillText("📌 Margin Used: $" + String.format("%.2f", account.getMarginUsed()), 50, yOffset + 180);
-            gc.fillText("📌 NAV: $" + String.format("%.2f", account.getNAV()), 50, yOffset + 210);
-            gc.fillText("📌 Leverage: " + account.getLeverage() + "x", 50, yOffset + 240);
-            gc.fillText("📌 Open Positions: " + account.getOpenPositionCount(), 50, yOffset + 270);
-            gc.fillText("📌 Open Trades: " + account.getOpenTradeCount(), 50, yOffset + 300);
-            gc.fillText("📌 Pending Orders: " + account.getPendingOrderCount(), 50, yOffset + 330);
-            gc.fillText("📌 Profit/Loss: $" + String.format("%.2f", account.getPl()), 50, yOffset + 360);
-            gc.fillText("📌 Unrealized P/L: $" + String.format("%.2f", account.getUnrealizedPL()), 50, yOffset + 390);
-            gc.fillText("📌 Resettable P/L: $" + String.format("%.2f", account.getResettablePL()), 50, yOffset + 420);
-            gc.fillText("📌 Withdrawal Limit: $" + String.format("%.2f", account.getWithdrawalLimit()), 50, yOffset + 450);
-            gc.fillText("📌 Margin Closeout Percent: " + String.format("%.2f", account.getMarginCloseoutPercent()) + "%", 50, yOffset + 480);
-
-            // Separator for next account
-            gc.fillText("=====================================================================================", 50, yOffset + 500);
-            gc.setFill(Color.BLACK);
-            yOffset += 540; // Adjust for next account
+    public void shutdown() {
+        if (!disposed.compareAndSet(false, true)) {
+            return;
         }
-
-        // Adjust scroll area dynamically
-        canvas.setHeight(yOffset + 100);
+        scheduler.shutdownNow();
     }
 }

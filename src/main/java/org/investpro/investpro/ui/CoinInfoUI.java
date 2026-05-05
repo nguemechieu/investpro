@@ -1,118 +1,123 @@
 package org.investpro.investpro.ui;
 
-import javafx.application.Platform;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.Region;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.investpro.model.CoinInfo;
 import org.investpro.investpro.Exchange;
+import org.investpro.investpro.FxLifecycle;
+import org.investpro.investpro.models.CoinInfo;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Getter
 @Setter
-public class CoinInfoUI extends Region {
-    private final Canvas canvas;
-    private final ScrollPane scrollPane;
-    private final List<CoinInfo> coinInfoList;
+public class CoinInfoUI extends VBox {
+    private final TableView<CoinInfo> tableView;
+    private final ObservableList<CoinInfo> coinInfoList;
     private final ScheduledExecutorService scheduler;
     private final Exchange exchange;
+    private final Label statusLabel;
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
 
     public CoinInfoUI(Exchange exchange) {
         this.exchange = exchange;
-        this.canvas = new Canvas(1000, 800);
-        this.scrollPane = new ScrollPane(canvas);
-        this.coinInfoList = new CopyOnWriteArrayList<>();
+        this.tableView = createTableView();
+        this.coinInfoList = FXCollections.observableArrayList();
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        this.statusLabel = new Label("Loading market data...");
 
-        setupScrollPane();
+        setSpacing(12);
+        setPadding(new Insets(12));
+        getStyleClass().add("desk-table-panel");
 
-        fetchCoinData();  // Start updating after UI setup
-        getChildren().add(scrollPane);
+        Label titleLabel = new Label("Market Data");
+        titleLabel.getStyleClass().add("desk-section-title");
+
+        statusLabel.getStyleClass().add("desk-section-status");
+        tableView.setItems(coinInfoList);
+
+        getChildren().addAll(titleLabel, statusLabel, tableView);
+        VBox.setVgrow(tableView, Priority.ALWAYS);
+
+        fetchCoinData();
+        sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (newScene == null) {
+                shutdown();
+            }
+        });
     }
 
-    private void setupScrollPane() {
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
-        scrollPane.setPannable(true);
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
+    private @NotNull TableView<CoinInfo> createTableView() {
+        TableView<CoinInfo> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPlaceholder(new Label("No market data available"));
+        table.getColumns().addAll(
+                textColumn("Rank", coin -> Integer.toString(coin.getMarket_cap_rank())),
+                textColumn("Symbol", coin -> safe(coin.getSymbol()).toUpperCase()),
+                textColumn("Name", coin -> safe(coin.getName())),
+                textColumn("Price", coin -> String.format("$%,.6f", coin.getCurrent_price())),
+                textColumn("24h Change", coin -> String.format("%.2f%%", coin.getPrice_change_percentage_24h())),
+                textColumn("Market Cap", coin -> String.format("$%,d", coin.getMarket_cap())),
+                textColumn("Volume", coin -> String.format("$%,d", coin.getTotal_volume())),
+                textColumn("Updated", coin -> coin.getLast_updated() == null ? "-" : coin.getLast_updated().toString())
+        );
+        return table;
+    }
+
+    private TableColumn<CoinInfo, String> textColumn(String title, java.util.function.Function<CoinInfo, String> mapper) {
+        TableColumn<CoinInfo, String> column = new TableColumn<>(title);
+        column.setCellValueFactory(cell -> new ReadOnlyStringWrapper(mapper.apply(cell.getValue())));
+        return column;
     }
 
     private void fetchCoinData() {
         scheduler.scheduleAtFixedRate(() -> {
-            List<CoinInfo> updatedCoinInfo = exchange.getCoinInfoList();
-            if (!updatedCoinInfo.isEmpty()) {
-                synchronized (coinInfoList) {
-                    coinInfoList.clear();
-                    coinInfoList.addAll(updatedCoinInfo);
-                }
-
+            if (disposed.get() || !FxLifecycle.isShowing(this)) {
+                return;
             }
-            Platform.runLater(() -> drawCoinData(canvas.getGraphicsContext2D()));
+
+            try {
+                List<CoinInfo> updatedCoinInfo = exchange.getCoinInfoList()
+                        .stream()
+                        .sorted(Comparator.comparingInt(CoinInfo::getMarket_cap_rank))
+                        .toList();
+
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this), () -> {
+                    coinInfoList.setAll(updatedCoinInfo);
+                    statusLabel.setText(updatedCoinInfo.isEmpty()
+                            ? "No market data returned."
+                            : "Updated " + LocalTime.now().withNano(0));
+                });
+            } catch (RuntimeException e) {
+                FxLifecycle.runLaterIf(() -> !disposed.get() && FxLifecycle.isShowing(this),
+                        () -> statusLabel.setText("Market data unavailable right now."));
+            }
         }, 0, 10, TimeUnit.SECONDS);
     }
 
-    private void drawCoinData(@NotNull GraphicsContext gc) {
-        gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight()); // Clear before redrawing
-        gc.setFill(Color.BLACK);
-        gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight()); // Background color
-        gc.setFill(Color.YELLOWGREEN);
-        gc.setFont(Font.font("Arial", 18));
+    private String safe(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
 
-        int yOffset = 40;
-        gc.fillText("📊 Cryptocurrency Market Data 📊", 20, yOffset);
-        gc.strokeLine(20, yOffset + 10, 1400, yOffset + 10);
-        yOffset += 30;
-
-        // **If no data, show error message**
-        if (coinInfoList.isEmpty()) {
-            gc.setFill(Color.RED);
-            gc.fillText("❌ No market data available.", 20, yOffset);
+    public void shutdown() {
+        if (!disposed.compareAndSet(false, true)) {
             return;
         }
-
-        // **Table Headers**
-        gc.setFont(Font.font("Arial", 16));
-        gc.setFill(Color.WHEAT);
-        gc.fillText("ID", 20, yOffset);
-        gc.fillText("Symbol", 150, yOffset);
-        gc.fillText("Name", 250, yOffset);
-        gc.fillText("Current Price", 450, yOffset);
-        gc.fillText("Market Cap", 600, yOffset);
-        gc.fillText("Rank", 800, yOffset);
-        gc.fillText("Last Updated", 900, yOffset);
-        gc.strokeLine(20, yOffset + 10, 1400, yOffset + 10);
-        yOffset += 30;
-
-        // **Iterate over data**
-        for (CoinInfo coin : coinInfoList) {
-            gc.setFill(Color.GREEN);
-            gc.fillText(coin.getId(), 20, yOffset);
-            gc.fillText(coin.getSymbol(), 150, yOffset);
-            gc.fillText(coin.getName(), 250, yOffset);
-            gc.fillText(String.format("$%.2f", coin.getCurrent_price()), 450, yOffset);
-            gc.fillText(String.valueOf(coin.getMarket_cap()), 600, yOffset);
-            gc.fillText(String.valueOf(coin.getMarket_cap_rank()), 800, yOffset);
-            gc.fillText(String.valueOf(coin.getLast_updated()), 900, yOffset);
-
-            yOffset += 30;
-            gc.setStroke(Color.GRAY);
-            gc.strokeLine(20, yOffset, 1400, yOffset);
-            yOffset += 10;
-        }
-
-        // **Adjust canvas size based on content**
-        canvas.setHeight(yOffset + 50);
+        scheduler.shutdownNow();
     }
 }

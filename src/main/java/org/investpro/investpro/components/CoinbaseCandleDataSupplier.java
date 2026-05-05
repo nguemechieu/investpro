@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.investpro.investpro.CandleDataSupplier;
-import org.investpro.investpro.model.CandleData;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.CandleData;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,9 +36,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     int numCandles = 1000;
 
     public CoinbaseCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-
-        Objects.requireNonNull(tradePair);
-        super(secondsPerCandle, tradePair);
+        super(secondsPerCandle, Objects.requireNonNull(tradePair, "tradePair must not be null"));
     }
 
     @Override

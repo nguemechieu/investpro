@@ -3,7 +3,7 @@ package org.investpro.investpro;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.TradePair;
 
 import java.io.IOException;
 import java.math.BigDecimal;

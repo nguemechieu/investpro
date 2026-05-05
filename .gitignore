@@ -34,5 +34,12 @@ build/
 ### VS Code ###
 .vscode/
 
+### Python predictor ###
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
 ### Mac OS ###
 .DS_Store

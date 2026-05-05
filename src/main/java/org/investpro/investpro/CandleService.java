@@ -1,6 +1,6 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.TradePair;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;

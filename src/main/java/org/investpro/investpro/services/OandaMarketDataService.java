@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.investpro.exchanges.Oanda;
-import org.investpro.investpro.model.OrderBook;
-import org.investpro.investpro.model.TradePair;
+import org.investpro.investpro.models.OrderBook;
+import org.investpro.investpro.models.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +108,11 @@ public class OandaMarketDataService {
                 fetchWithRetries(url, tradePair, retryCount + 1, future);
                 return;
             }
+            if (response.statusCode() != 200) {
+                logger.warn("Unable to fetch OANDA order book for {}. HTTP {}: {}", tradePair, response.statusCode(), response.body());
+                future.complete(List.of());
+                return;
+            }
 
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
             List<OrderBook> books = new ArrayList<>();
@@ -133,6 +138,10 @@ public class OandaMarketDataService {
         String url = String.format("%s/accounts/%s/instruments", Oanda.API_URL, accountId);
         HttpRequest request = baseRequestBuilder.uri(URI.create(url)).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.warn("Unable to fetch OANDA trade pairs. HTTP {}: {}", response.statusCode(), response.body());
+            return List.of();
+        }
 
         JsonNode root = OBJECT_MAPPER.readTree(response.body());
         JsonNode instruments = root.get("instruments");

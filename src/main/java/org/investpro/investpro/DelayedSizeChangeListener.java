@@ -49,6 +49,11 @@ public abstract class DelayedSizeChangeListener implements ChangeListener<Number
 
     public abstract void resize() throws ExecutionException, InterruptedException;
 
+    public void dispose() {
+        timeline.stop();
+        timeline.getKeyFrames().clear();
+    }
+
     @Override
     public void changed(ObservableValue<? extends Number> observable, Number oldValue, final Number newValue) {
         if (timeline.getStatus() == Animation.Status.RUNNING) {

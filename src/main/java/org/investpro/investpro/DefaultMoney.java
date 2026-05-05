@@ -1,6 +1,6 @@
 package org.investpro.investpro;
 
-import org.investpro.investpro.model.Currency;
+import org.investpro.investpro.models.Currency;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
