@@ -1,6 +1,6 @@
 package org.investpro.data;
 
-import org.investpro.models.currency.Currency;
+import  org.investpro.models.currency.Currency;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;

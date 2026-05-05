@@ -1,7 +1,5 @@
 package org.investpro.core.agents;
 
-import lombok.Getter;
-import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,8 +15,7 @@ import java.util.function.Consumer;
 /**
  * Lightweight event bus for InvestPro agents.
  */
-@Getter
-@Setter
+
 public class AgentEventBus {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentEventBus.class);

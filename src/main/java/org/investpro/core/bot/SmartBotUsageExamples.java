@@ -1,14 +1,14 @@
 package org.investpro.core.bot;
 
 
+import org.investpro.repository.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.data.Db1;
 import org.investpro.exchange.Coinbase;
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.*;
 import org.investpro.service.CurrencyService;
 import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
@@ -18,12 +18,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.util.InvalidPropertiesFormatException;
 import java.util.Properties;
 
 /**
  * SmartBotUsageExamples demonstrates all available SmartBot streaming methods.
  * This shows how to use each factory method and streaming mode.
- *
  * Key Methods Demonstrated:
  * - startStreaming(pair) - Default mode (EVERYTHING)
  * - startStreaming(pair, mode) - Specific streaming mode
@@ -62,14 +62,14 @@ public class SmartBotUsageExamples {
         // Stream only: ticker, trades, candles, orderBook (no account data)
         bot.startStreaming(btcUsdt, SmartBot.StreamingMode.MARKET_DATA);
 
-        logger.info("Streaming: {}", bot.getSubscriptionSummary());
+        if (logger.isInfoEnabled()) logger.info("Streaming: {}", bot.getSubscriptionSummary());
     }
 
     /**
      * Example 3: Stream only account data (portfolio monitoring).
      * Useful when you don't need price data.
      */
-    public static void example3_AccountDataOnly(SmartBot bot) {
+    public static void example3_AccountDataOnly(@NotNull SmartBot bot) {
         logger.info("Example 3: Account data only mode");
 
         // Stream only account-level data: account, orders, fills, positions, balances
@@ -289,7 +289,7 @@ public class SmartBotUsageExamples {
     /**
      * Main method demonstrating all examples.
      */
-    static void main(String[] args) throws SQLException, ClassNotFoundException {
+    static void main(String[] args) throws SQLException, ClassNotFoundException, InvalidPropertiesFormatException {
         logger.info("=== SmartBot Streaming Methods - All Examples ===");
 
         // Initialize SmartBot

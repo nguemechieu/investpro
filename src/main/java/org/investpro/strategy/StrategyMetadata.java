@@ -1,0 +1,83 @@
+package org.investpro.strategy;
+
+import lombok.Builder;
+import lombok.Getter;
+import org.investpro.market.AssetClass;
+import org.investpro.market.ContractType;
+import org.investpro.timeframe.Timeframe;
+
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * Metadata describing a trading strategy.
+ * Defines capabilities, compatibility, and classification.
+ */
+@Getter
+@Builder
+public class StrategyMetadata {
+    private final String strategyId;
+    private final String displayName;
+    private final String description;
+    private final StrategyCategory category;
+
+    @Builder.Default
+    private final Set<AssetClass> supportedAssetClasses = new HashSet<>();
+
+    @Builder.Default
+    private final Set<ContractType> supportedContractTypes = new HashSet<>();
+
+    @Builder.Default
+    private final Set<Timeframe> supportedTimeframes = new HashSet<>();
+
+    @Builder.Default
+    private final int minimumBarsRequired = 50;
+
+    private final String expectedHoldingPeriod; // e.g., "minutes", "hours", "days"
+
+    @Builder.Default
+    private final RiskLevel riskLevel = RiskLevel.MEDIUM;
+
+    @Builder.Default
+    private final String version = "1.0.0";
+
+    private final String author;
+
+    @Builder.Default
+    private final boolean enabled = true;
+
+    public enum RiskLevel {
+        LOW("Low Risk", "Conservative strategy, low volatility expected"),
+        MEDIUM("Medium Risk", "Balanced strategy"),
+        HIGH("High Risk", "Aggressive strategy, high volatility expected"),
+        EXTREME("Extreme Risk", "Highly volatile or leveraged");
+
+        private final String displayName;
+        private final String description;
+
+        RiskLevel(String displayName, String description) {
+            this.displayName = displayName;
+            this.description = description;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    public boolean supportsAssetClass(AssetClass assetClass) {
+        return supportedAssetClasses.isEmpty() || supportedAssetClasses.contains(assetClass);
+    }
+
+    public boolean supportsContractType(ContractType contractType) {
+        return supportedContractTypes.isEmpty() || supportedContractTypes.contains(contractType);
+    }
+
+    public boolean supportsTimeframe(Timeframe timeframe) {
+        return supportedTimeframes.isEmpty() || supportedTimeframes.contains(timeframe);
+    }
+}

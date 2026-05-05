@@ -10,7 +10,8 @@ import java.util.Properties;
 
 /**
  * Factory for creating repository instances.
- * Manages the singleton Db1 instance and provides methods to create repository implementations.
+ * Manages the singleton Db1 instance and provides methods to create repository
+ * implementations.
  */
 public class RepositoryFactory {
     private static final Logger logger = LoggerFactory.getLogger(RepositoryFactory.class);
@@ -35,12 +36,16 @@ public class RepositoryFactory {
     private static @NotNull Db1 initializeDatabase() throws ClassNotFoundException {
         Properties conf = new Properties();
         try {
-            conf.load(RepositoryFactory.class.getClassLoader().getResourceAsStream("conf.properties"));
+            var resourceStream = RepositoryFactory.class.getClassLoader().getResourceAsStream("conf.properties");
+            if (resourceStream != null) {
+                conf.load(resourceStream);
+            } else {
+                logger.debug("conf.properties not found in classpath, using default database configuration");
+            }
         } catch (IOException e) {
-            logger.warn("Unable to load conf.properties, using default database file");
-            // Use default database file if conf.properties is not found
+            logger.warn("Failed to load conf.properties, using default database configuration", e);
         }
-        
+
         Db1 db1 = new Db1(conf);
         db1.createTables();
         return db1;

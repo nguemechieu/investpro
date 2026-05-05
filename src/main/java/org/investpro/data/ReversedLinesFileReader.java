@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.investpro.data;
+package  org.investpro.data;
 
 import org.jetbrains.annotations.Nullable;
 

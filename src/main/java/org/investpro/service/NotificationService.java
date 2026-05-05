@@ -103,10 +103,12 @@ public class NotificationService {
         notify(NotificationMessage.info(title, body).toEmailOnly());
     }
 
+    @SuppressWarnings("unused")
     public void notifyBoth(String title, String body) {
         notify(NotificationMessage.info(title, body).toBoth());
     }
 
+    @SuppressWarnings("unused")
     public void notifyAgentEvent(AgentEvent event) {
         if (event == null || !importantEvents.contains(event.type())) {
             return;

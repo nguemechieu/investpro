@@ -1,7 +1,7 @@
 package org.investpro.models.currency;
 
-import org.investpro.models.trading.CurrencyPosition;
-import org.investpro.utils.WholeNumberFractionalDigitAmount;
+import  org.investpro.models.trading.CurrencyPosition;
+import  org.investpro.utils.WholeNumberFractionalDigitAmount;
 
 import static java.lang.Math.min;
 

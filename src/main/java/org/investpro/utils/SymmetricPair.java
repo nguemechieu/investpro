@@ -52,7 +52,7 @@ public record SymmetricPair<F, S>(F first, S second) {
     /**
      * Compute a hash code using the hash codes of the underlying objects
      *
-     * @return a hashcode of the Pair
+     * @return a hashCode of the Pair
      */
     @Override
     public int hashCode() {

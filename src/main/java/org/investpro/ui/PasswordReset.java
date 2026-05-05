@@ -1,5 +1,6 @@
 package org.investpro.ui;
 
+import org.investpro.data.Db1;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -166,7 +167,7 @@ public class PasswordReset extends Stage {
         try {
             // Get database connection from Db1
             Properties dbConfig = new Properties();
-            org.investpro.data.Db1 db = new org.investpro.data.Db1(dbConfig);
+            Db1 db = new Db1(dbConfig);
             
             // Step 1: Verify that the username and email match in the database
             boolean userExists = verifyUserExists(db, username, email);
@@ -204,7 +205,7 @@ public class PasswordReset extends Stage {
     /**
      * Verify that the username and email match a record in the database.
      */
-    private boolean verifyUserExists(org.investpro.data.Db1 db, String username, String email) {
+    private boolean verifyUserExists(Db1 db, String username, String email) {
         try {
             String query = "SELECT COUNT(*) as count FROM users WHERE username = ? AND email = ?";
             java.sql.PreparedStatement stmt = db.getConnection().prepareStatement(query);
@@ -226,7 +227,7 @@ public class PasswordReset extends Stage {
     /**
      * Update the user's password in the database.
      */
-    private boolean updateUserPassword(org.investpro.data.Db1 db, String username, String hashedPassword) {
+    private boolean updateUserPassword(Db1 db, String username, String hashedPassword) {
         try {
             String query = "UPDATE users SET password = ? WHERE username = ?";
             java.sql.PreparedStatement stmt = db.getConnection().prepareStatement(query);

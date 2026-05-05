@@ -3,18 +3,23 @@ package org.investpro.exchange;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.data.Account;
-import org.investpro.data.InProgressCandleData;
-import org.investpro.models.trading.Order;
-import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.OpenOrder;
-import org.investpro.models.trading.Position;
-import org.investpro.models.trading.Ticker;
-import org.investpro.models.trading.Trade;
-import org.investpro.models.trading.TradePair;
-import org.investpro.utils.CandleDataSupplier;
-import org.investpro.utils.MARKET_TYPES;
-import org.investpro.utils.Side;
+import  org.investpro.data.Account;
+import  org.investpro.data.InProgressCandleData;
+import  org.investpro.models.trading.Order;
+import  org.investpro.models.trading.OrderBook;
+import  org.investpro.models.trading.OpenOrder;
+import  org.investpro.models.trading.Position;
+import  org.investpro.models.trading.Ticker;
+import  org.investpro.models.trading.Trade;
+import  org.investpro.models.trading.TradePair;
+import  org.investpro.utils.CandleDataSupplier;
+import  org.investpro.utils.MARKET_TYPES;
+import  org.investpro.utils.Side;
+import  org.investpro.exchange.websocket.ExchangeWebSocketClient;
+import  org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import  org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import  org.investpro.exchange.infrastructure.OrderCommandConsumer;
+import  org.investpro.exchange.infrastructure.StreamTransport;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
@@ -199,6 +204,14 @@ public abstract class Exchange {
 
     public abstract CompletableFuture<Account> fetchAccount();
 
+    public Account getAccount() {
+        try {
+            return getUserAccountDetails();
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
     public abstract CompletableFuture<Double> fetchAvailableBalance(String currencyCode);
 
     public abstract CompletableFuture<Double> fetchTotalBalance(String currencyCode);
@@ -255,6 +268,14 @@ public abstract class Exchange {
             double stopLoss,
             double takeProfit
     );
+
+    public CompletableFuture<String> submitOrder(Order order) {
+        try {
+            return createOrder(order);
+        } catch (Exception exception) {
+            return failedFuture(exception);
+        }
+    }
 
     public abstract CompletableFuture<String> cancelOrder(String orderId);
 
@@ -332,6 +353,10 @@ public abstract class Exchange {
     );
 
     public abstract void autoTrading(@NotNull Boolean auto, String signal);
+
+    public ExchangeStreamSubscription subscribe(String channel, ExchangeStreamConsumer consumer) {
+        return new ExchangeStreamSubscription();
+    }
 
     /**
      * Convenience overload.
@@ -485,6 +510,29 @@ public abstract class Exchange {
             ExchangeStreamSubscription subscription
     );
 
+    public CompletableFuture<List<Trade>> fetchTrades(TradePair tradePair) {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<List<Position>> fetchPositions() {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public void subscribeToOrderUpdates(TradePair tradePair, OrderCommandConsumer consumer) {
+    }
+
+    public void subscribeToBalance(ExchangeStreamConsumer consumer) {
+        streamBalances(consumer);
+    }
+
+    public void subscribeToCandles(TradePair tradePair, ExchangeStreamConsumer consumer) {
+        streamCandles(tradePair, 60, consumer);
+    }
+
+    public void subscribeToTrades(TradePair tradePair, ExchangeStreamConsumer consumer) {
+        streamTrades(tradePair, consumer);
+    }
+
     public abstract void stopAllStreams();
 
     public abstract void streamTicker(
@@ -585,6 +633,28 @@ public abstract class Exchange {
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
+
+    public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size,
+                                                    double price) {
+        return CompletableFuture.completedFuture(
+                tradePair != null
+                        && marketType != null
+                        && supportsMarketType(marketType)
+                        && size > 0
+                        && price >= 0
+        );
+    }
+
+    public void logExchangeProperties() {
+        System.out.printf(
+                "Exchange{name='%s', id='%s', displayName='%s', sandbox=%s, paperTrading=%s}%n",
+                getName(),
+                getExchangeId(),
+                getDisplayName(),
+                isSandbox(),
+                isPaperTrading()
+        );
+    }
 
     protected String safe(String value) {
         return value == null ? "" : value.trim();

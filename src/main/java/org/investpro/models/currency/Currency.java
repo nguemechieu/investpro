@@ -1,9 +1,9 @@
 package org.investpro.models.currency;
 
 import lombok.Getter;
-import org.investpro.data.Db1;
+import  org.investpro.data.Db1;
 
-import org.investpro.utils.SymmetricPair;
+import  org.investpro.utils.SymmetricPair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;

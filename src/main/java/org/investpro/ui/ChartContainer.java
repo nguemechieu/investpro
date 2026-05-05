@@ -7,6 +7,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.control.ComboBox;
+
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.image.WritableImage;
@@ -17,6 +18,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.print.PrinterJob;
 import javafx.embed.swing.SwingFXUtils;
+import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
 import lombok.Getter;
 import org.investpro.data.ReverseRawTradeDataProcessor;
@@ -141,6 +143,11 @@ public class ChartContainer extends Region {
     private final ComboBox<String> timeframeSelector = new ComboBox<>(
             FXCollections.observableArrayList(CandleAggregator.getSupportedTimeframes()));
 
+    /**
+     * -- GETTER --
+     *  Gets the toolbar for advanced customization.
+     *
+     */
     // Chart management
     private ChartToolbar toolbar;
     private CandleStickChart candleStickChart;
@@ -150,7 +157,10 @@ public class ChartContainer extends Region {
     private Consumer<String> onChartError;
     private Runnable onChartCreated;
     private Runnable onChartDisposed;
-    private String telegramToken;
+    private final String telegramToken;
+
+    // Screenshot configuration
+    private File lastScreenshotDirectory;
 
     /**
      * Creates a new chart container for the specified trading pair.
@@ -158,7 +168,7 @@ public class ChartContainer extends Region {
      * @param exchange      the exchange to get candle data from
      * @param tradePair     the trading pair to display
      * @param liveSyncing   whether to sync live candle updates
-     * @param telegramToken
+     * @param telegramToken telegram token
      * @throws NullPointerException if exchange or tradePair is null
      */
     public ChartContainer(Exchange exchange, TradePair tradePair, boolean liveSyncing,
@@ -385,7 +395,7 @@ public class ChartContainer extends Region {
      */
     private CandleStickChart buildChart(int durationSeconds) throws SQLException, ClassNotFoundException {
         if (durationSeconds <= 0) {
-            throw new IllegalArgumentException("secondsPerCandle must be positive but was: " + durationSeconds);
+            throw new IllegalArgumentException("secondsPerCandle must be positive but was: %d".formatted(durationSeconds));
         }
 
         return new CandleStickChart(
@@ -515,20 +525,49 @@ public class ChartContainer extends Region {
         }
 
         try {
-            WritableImage image = candleStickChart.snapshot(null, null);
-            File output = new File(
-                    System.getProperty("user.home"),
-                    "InvestPro-%s-%s.png".formatted(
-                            tradePair.toString('-'),
-                            SNAPSHOT_FORMAT.format(LocalDateTime.now())
-                    )
+            // Show directory chooser for user to select save location
+            DirectoryChooser directoryChooser = new DirectoryChooser();
+            directoryChooser.setTitle("Select Folder to Save Screenshot");
+            
+            // Set initial directory - use last selected or user home
+            if (lastScreenshotDirectory != null && lastScreenshotDirectory.exists()) {
+                directoryChooser.setInitialDirectory(lastScreenshotDirectory);
+            } else {
+                directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+            }
+            
+            // Show dialog
+            File selectedDirectory = directoryChooser.showDialog(
+                    candleStickChart.getScene() == null ? null : candleStickChart.getScene().getWindow()
             );
+            
+            // User cancelled the dialog
+            if (selectedDirectory == null) {
+                LOGGER.log(Level.INFO, "Screenshot save cancelled by user");
+                return;
+            }
+            
+            // Remember the selected directory for next time
+            lastScreenshotDirectory = selectedDirectory;
+            
+            // Generate screenshot filename
+            String filename = "InvestPro-%s-%s.png".formatted(
+                    tradePair.toString('-'),
+                    SNAPSHOT_FORMAT.format(LocalDateTime.now())
+            );
+            File output = new File(selectedDirectory, filename);
+            
+            // Capture and save screenshot
+            WritableImage image = candleStickChart.snapshot(null, null);
             ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", output);
+            
             LOGGER.log(Level.INFO, "Chart screenshot saved to " + output.getAbsolutePath());
         } catch (IOException exception) {
             handleChartError("Failed to save chart screenshot: " + exception.getMessage());
+            LOGGER.log(Level.SEVERE, "Screenshot save error", exception);
         }
     }
+
 
     private void printChart() {
         if (candleStickChart == null) {
@@ -645,15 +684,6 @@ public class ChartContainer extends Region {
      */
     public CandleStickChart getChart() {
         return candleStickChart;
-    }
-
-    /**
-     * Gets the toolbar for advanced customization.
-     *
-     * @return the ChartToolbar instance
-     */
-    public ChartToolbar getToolbar() {
-        return toolbar;
     }
 
     /**

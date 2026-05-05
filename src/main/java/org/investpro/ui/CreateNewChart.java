@@ -4,6 +4,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderPane;
 import javafx.geometry.Insets;
+import lombok.Getter;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.ui.charts.CandleStickChartDisplay;
@@ -18,6 +19,7 @@ import java.util.Objects;
  * <p>
  * This keeps TradingWindow cleaner and avoids repeating chart-tab logic.
  */
+@Getter
 public final class CreateNewChart {
 
     private static final Logger logger = LoggerFactory.getLogger(CreateNewChart.class);

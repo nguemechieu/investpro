@@ -109,6 +109,15 @@ public class OrderBook {
         }
     }
 
+    // Explicit getters (Lombok @Data not being invoked)
+    public List<PriceLevel> getBids() {
+        return bids;
+    }
+
+    public List<PriceLevel> getAsks() {
+        return asks;
+    }
+
     @Override
     public String toString() {
         return "OrderBook{" +

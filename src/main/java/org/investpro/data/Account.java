@@ -1,8 +1,7 @@
 package org.investpro.data;
 
-import lombok.Getter;
-import lombok.Setter;
-import org.investpro.exchange.Exchange;
+import lombok.Data;
+import  org.investpro.exchange.Exchange;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -17,19 +16,34 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * Broker-neutral account snapshot for InvestPro.
- *
+ * <p>
  * Designed to work with:
  * - Coinbase / Coinbase Advanced Trade
  * - Binance US
  * - OANDA
  * - future brokers: Alpaca, Schwab, Interactive Brokers, paper trading
- *
+ * <p>
  * Important:
  * This class is a data model. It can safely hold normalized account values
  * from different brokers without forcing every exchange to return the same fields.
  */
-@Getter
-@Setter
+
+//
+//Instead of TradeAdviser only asking:
+//
+//        “Should I buy or sell?”
+//
+//It can now ask:
+//
+//        “What kind of market is this?”
+//        “What kind of trader/user is operating?”
+//        “What risk profile is allowed?”
+//        “What execution style fits liquidity?”
+//        “How much capital can be exposed?”
+//        “What protection system should be active?”
+//        “Is this trade worth taking probabilistically?”
+
+@Data
 public class Account {
 
     private static final Logger logger = LoggerFactory.getLogger(Account.class);
@@ -108,7 +122,7 @@ private String destination = "";
 
     /**
      * Balances by currency.
-     *
+     * <p>
      * Example:
      * balances["BTC"] = 0.05
      * balances["USD"] = 1000.00
@@ -127,7 +141,7 @@ private String destination = "";
 
     /**
      * Extra broker-specific fields.
-     *
+     * <p>
      * Example:
      * OANDA: marginRate, hedgingEnabled
      * Coinbase: uuid, profileId
@@ -147,7 +161,7 @@ private String destination = "";
         this.password = safe(password);
         this.account = this.username;
 
-        hydrateFromExchange(exchange);
+        hydrateFromExchange(exchange, false);
 
         logger.info(
                 "Account created broker={} username={} accountId={}",
@@ -165,7 +179,7 @@ private String destination = "";
 
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
 
-        hydrateFromExchange(exchange);
+        hydrateFromExchange(exchange, false);
 
         if (source != null) {
             copyFrom(source);
@@ -175,12 +189,6 @@ private String destination = "";
     @Contract(" -> new")
     public static @NotNull Account empty() {
         return new Account();
-    }
-
-    public static @NotNull Account forExchange(@NotNull Exchange exchange) {
-        Account account = new Account();
-        account.hydrateFromExchange(exchange);
-        return account;
     }
 
     public static @NotNull Account coinbase(String accountId, String baseCurrency) {
@@ -213,11 +221,7 @@ private String destination = "";
         return account;
     }
 
-    /**
-     * Pull generic metadata from the exchange.
-     * Does not require every exchange to expose the same broker fields.
-     */
-    public final void hydrateFromExchange(@NotNull Exchange exchange) {
+    private void hydrateFromExchange(@NotNull Exchange exchange, boolean populateDetails) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
 
         try {
@@ -265,12 +269,13 @@ private String destination = "";
         }
 
         this.updatedAt = Instant.now();
-        populateFromExchangeDetails();
+        if (populateDetails) {
+            populateFromExchangeDetails();
+        }
     }
 
     /**
      * Optional blocking populate method.
-     *
      * Use carefully. Prefer exchange.fetchAccount() in UI/service code.
      */
     public void populateFromExchangeDetails() {
@@ -783,11 +788,12 @@ private String destination = "";
     // Internal helpers
     // ---------------------------------------------------------------------
 
-    private static String safe(String value) {
+    @Contract(pure = true)
+    private static @NotNull String safe(String value) {
         return value == null ? "" : value.trim();
     }
 
-    private static String normalizeCurrency(String value) {
+    private static @NotNull String normalizeCurrency(String value) {
         return safe(value).toUpperCase();
     }
 
@@ -807,7 +813,7 @@ private String destination = "";
         return value;
     }
 
-    private static Map<String, Double> cleanBalanceMap(Map<String, Double> source) {
+    private static @NotNull Map<String, Double> cleanBalanceMap(Map<String, Double> source) {
         Map<String, Double> cleaned = new LinkedHashMap<>();
 
         if (source == null || source.isEmpty()) {
@@ -826,4 +832,6 @@ private String destination = "";
 
         return cleaned;
     }
+
+
 }

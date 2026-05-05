@@ -158,6 +158,7 @@ public class ChartToolbar extends Region {
             Tool.CLEAR_PRICE_LINES,
             Tool.APPLY_SCALING,
             Tool.PRINT,
+            Tool.AUTO_TRADE,
             Tool.OPTIONS
         };
 
@@ -326,10 +327,15 @@ public class ChartToolbar extends Region {
 
                     // Other functions
                     case PRINT -> tool.setOnAction(_ -> executePrintAction());
+                    
+                    // OPTIONS button already has handlers from attachOptionsButtonBehavior - skip override
+                    case OPTIONS -> {
+                        // No action needed - OPTIONS button was already configured in attachOptionsButtonBehavior
+                    }
+                    
                     case null -> {
                         // No action for null tool (shouldn't happen)
                     }
-                    case OPTIONS -> tool.setOnAction(_ -> showOptionsPopOver(tool));
                 }
             }
         }

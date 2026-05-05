@@ -1,8 +1,9 @@
 package org.investpro.models.trading;
 import lombok.Data;
-import lombok.Getter;
-import org.investpro.models.currency.Money;
-import org.investpro.utils.Side;
+
+
+import  org.investpro.models.currency.Money;
+import  org.investpro.utils.Side;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -14,8 +15,9 @@ import java.util.Objects;
 
  */
 @Data
-@Getter
+
 public class Trade {
+    // Explicit getters (Lombok @Getter not being invoked during compilation)
     private TradePair tradePair;
     private double price;
     private double amount;
@@ -81,6 +83,5 @@ public class Trade {
                 Objects.equals(price, other.price) &&
                 Objects.equals(amount, other.amount);
     }
-
 
 }

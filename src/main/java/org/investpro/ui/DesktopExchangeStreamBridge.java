@@ -2,7 +2,7 @@ package org.investpro.ui;
 
 import javafx.application.Platform;
 import org.investpro.data.Account;
-import org.investpro.exchange.ExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
@@ -24,8 +24,8 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onConnected(String exchangeName) {
         runOnUiThread(() -> {
-            window.updateStreamingStatus("Streaming: " + exchangeName);
-            window.appendJournal("Stream connected: " + exchangeName);
+            window.updateStreamingStatus("Streaming: %s".formatted(exchangeName));
+            window.appendJournal("Stream connected: %s".formatted(exchangeName));
         });
     }
 

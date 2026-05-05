@@ -9,7 +9,7 @@ public enum MARKET_TYPES {
     METAL,
     STOCKS,
     FUTURES,
-    INDEX
+    SPOT, INDEX
 
 
 }

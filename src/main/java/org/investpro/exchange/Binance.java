@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.models.currency.CryptoCurrency;
@@ -13,6 +14,12 @@ import org.investpro.models.trading.*;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.investpro.exchange.binance.BinanceCandleDataSupplier;
+import org.investpro.exchange.websocket.BinanceWebSocketClient;
+import org.investpro.exchange.websocket.ExchangeWebSocketClient;
+import org.investpro.exchange.infrastructure.StreamTransport;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,29 +36,32 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+
 public class Binance extends Exchange {
 
-    private static final Logger logger = LoggerFactory.getLogger(Binance.class);
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final String BINANCE_WS_URL = "wss://stream.binance.com:9443/ws";
     private ExchangeWebSocketClient websocketClient;
-
+    private static  final Logger logger = LoggerFactory.getLogger(Binance.class);
     public Binance(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
 
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
-        
+
         try {
             this.websocketClient = createWebSocketClient();
         } catch (Exception ex) {
             logger.error("Failed to initialize Binance websocket client", ex);
         }
     }
-    
+
+
+
+
     /**
      * Constructor with Telegram token and email notification support
      */
@@ -60,13 +70,14 @@ public class Binance extends Exchange {
         this.setTelegramToken(telegramToken);
         this.setEmailNotification(emailNotification);
     }
-    
-    private ExchangeWebSocketClient createWebSocketClient() throws Exception {
+
+    private ExchangeWebSocketClient createWebSocketClient() {
         return new BinanceWebSocketClient(URI.create(BINANCE_WS_URL), new org.java_websocket.drafts.Draft_6455());
     }
 
     @Override
     public TradePair getSelecTradePair() {
+        logger.warn("getSelecTradePair() not implemented, returning null");
         return null;
     }
 
@@ -86,8 +97,11 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
-        return null;
+    public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size,
+            double side, double stopLoss, double takeProfit, double slippage) {
+        // Placeholder: validate order logic not yet implemented
+        logger.warn("validateOrder() not fully implemented, defaulting to true");
+        return CompletableFuture.completedFuture(true);
     }
 
     @Override
@@ -117,12 +131,14 @@ public class Binance extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchLeverage(TradePair tradePair) {
-        return null;
+        logger.warn("fetchLeverage() not implemented, returning 0.0");
+        return CompletableFuture.completedFuture(0.0);
     }
 
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
-        return null;
+        logger.warn("setLeverage() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
@@ -175,9 +191,6 @@ public class Binance extends Exchange {
         return false;
     }
 
-
-
-
     @Override
     public boolean supportsStocks() {
         return false;
@@ -190,7 +203,8 @@ public class Binance extends Exchange {
 
     @Override
     public StreamTransport getStreamTransport() {
-        return null;
+        logger.warn("getStreamTransport() not implemented for Binance");
+        return null; // No safe default for transport
     }
 
     @Override
@@ -504,28 +518,36 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle) {
-        return null;
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair,
+            Instant instant, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        logger.warn("fetchCandleDataForInProgressCandle() not implemented, returning empty");
+        return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant instant) {
-        return null;
+        logger.warn("fetchRecentTradesUntil() not implemented, returning empty list");
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
+
 
     @Override
     public String getTimestamp() {
-        return null;
+        return Instant.now().toString();
     }
 
     @Override
     public Instant now() {
-        return null;
+        return Instant.now();
     }
+
+
+
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
-        return null;
+        logger.warn("getSelectedTradePair() not implemented for Binance");
+        return null; // No safe default
     }
 
     @Override
@@ -535,54 +557,66 @@ public class Binance extends Exchange {
 
     @Override
     public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
-        return null;
+        logger.warn("createOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
-    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side, double stopLoss, double takeProfit, double slippage) {
-        return null;
+    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
+            double stopLoss, double takeProfit, double slippage) {
+        logger.warn("createOrder() not implemented for Binance");
+        return null; // No safe default
     }
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        return null;
+        logger.warn("createMarketOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
-    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount, double limitPrice) {
-        return null;
+    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
+            double limitPrice) {
+        logger.warn("createLimitOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
-        return null;
+        logger.warn("createStopOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
-    public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount, double entryPrice, double stopLoss, double takeProfit) {
-        return null;
+    public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount,
+            double entryPrice, double stopLoss, double takeProfit) {
+        logger.warn("createBracketOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
-        return null;
+        logger.warn("cancelOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
-        return null;
+        logger.warn("cancelOrders() not implemented for Binance");
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
     @Override
     public CompletableFuture<String> cancelAllOrders() {
-        return null;
+        logger.warn("cancelAllOrders() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
     public CompletableFuture<Optional<Order>> fetchOrder(String orderId) {
-        return null;
+        logger.warn("fetchOrder() not implemented for Binance");
+        return CompletableFuture.completedFuture(Optional.empty());
     }
-
 
     @Override
     public boolean supportsMarketType(MARKET_TYPES marketType) {
@@ -598,11 +632,19 @@ public class Binance extends Exchange {
     public void connect() {
         try {
             if (websocketClient != null && !websocketClient.isOpen()) {
-                websocketClient.connect();
-                logger.info("Connecting to Binance websocket");
+                // Use connectBlocking() to wait for actual connection establishment
+                // with timeout to prevent hanging on stuck connections
+                boolean connected = websocketClient.connectBlocking(10, java.util.concurrent.TimeUnit.SECONDS);
+                if (!connected) {
+                    throw new RuntimeException("WebSocket connection timeout after 10 seconds");
+                }
+                logger.info("Connected to Binance WebSocket");
             }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            logger.error("Binance WebSocket connection interrupted", exception);
         } catch (Exception exception) {
-            logger.warn("Unable to connect Binance websocket", exception);
+            logger.warn("Unable to connect Binance WebSocket", exception);
         }
     }
 
@@ -621,7 +663,7 @@ public class Binance extends Exchange {
         // Using Binance API to get all trading pairs
         String url = "https://api.binance.com/api/v3/exchangeInfo";
         ArrayList<TradePair> tradePairs = new ArrayList<>();
-        
+
         try {
             HttpClient client = HttpClient.newBuilder().build();
             HttpRequest request = HttpRequest.newBuilder()
@@ -629,54 +671,54 @@ public class Binance extends Exchange {
                     .header("User-Agent", "InvestPro/1.0")
                     .GET()
                     .build();
-            
+
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             JsonNode res = OBJECT_MAPPER.readTree(response.body());
             logger.info("Binance API response received");
-            
+
             // Check if response is an error message
             if (res.isObject() && res.has("code")) {
-                Integer errorCode = res.get("code").asInt();
+                int errorCode = res.get("code").asInt();
                 if (errorCode < 0) {
                     String errorMsg = res.has("msg") ? res.get("msg").asText() : "Unknown error";
-                    logger.warn("Binance API error " + errorCode + ": " + errorMsg);
-                    return tradePairs;  // Return empty list on API error
+                    logger.error("Binance API error " + errorCode + ": " + errorMsg);
+                    return tradePairs; // Return empty list on API error
                 }
             }
-            
+
             // Binance API response format: {"symbols": [...]}
             JsonNode symbolsNode = res.has("symbols") ? res.get("symbols") : res;
-            
+
             if (symbolsNode == null || !symbolsNode.isArray()) {
                 logger.warn("Binance API returned unexpected format");
                 return tradePairs;
             }
-            
+
             for (JsonNode symbol : symbolsNode) {
                 // Skip non-trading pairs
                 if (!symbol.has("status") || !symbol.get("status").asText().equals("TRADING")) {
                     continue;
                 }
-                
+
                 CryptoCurrency baseCurrency, counterCurrency;
-                
+
                 // Safely extract fields
                 JsonNode baseAssetNode = symbol.get("baseAsset");
                 JsonNode quoteAssetNode = symbol.get("quoteAsset");
-                
+
                 if (baseAssetNode == null || quoteAssetNode == null) {
                     logger.debug("Skipping symbol with missing currency fields");
                     continue;
                 }
-                
+
                 String baseAsset = baseAssetNode.asText();
                 String quoteAsset = quoteAssetNode.asText();
-                
+
                 try {
                     // Try to create currencies - may fail if currency is not recognized
                     baseCurrency = new CryptoCurrency(baseAsset, baseAsset, baseAsset, 8, baseAsset, baseAsset);
                     counterCurrency = new CryptoCurrency(quoteAsset, quoteAsset, quoteAsset, 8, quoteAsset, quoteAsset);
-                    
+
                     TradePair tp = new TradePair(baseCurrency, counterCurrency);
                     tradePairs.add(tp);
                     logger.debug("Added trade pair: " + tp);
@@ -689,7 +731,7 @@ public class Binance extends Exchange {
             // Return empty list instead of throwing exception
             return new ArrayList<>();
         }
-        
+
         return tradePairs;
     }
 
@@ -705,62 +747,74 @@ public class Binance extends Exchange {
 
     @Override
     public CompletableFuture<String> getOrderBook(TradePair tradePair) {
-        return null;
+        logger.warn("getOrderBook() not implemented for Binance");
+        return CompletableFuture.completedFuture("");
     }
 
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
-        return null;
+        logger.warn("getLivePrice() not implemented for Binance");
+        return null; // No safe default for Ticker
     }
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        return null;
+        logger.warn("fetchTicker() not implemented for Binance");
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
-        return null;
+        logger.warn("fetchTickers() not implemented for Binance");
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
     @Override
     public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
-        return null;
+        logger.warn("getTicker() not implemented for Binance");
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        return null;
+        logger.warn("fetchAccount() not implemented for Binance");
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
-        return null;
+        logger.warn("fetchAvailableBalance() not implemented for Binance");
+        return CompletableFuture.completedFuture(0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
-        return null;
+        logger.warn("fetchTotalBalance() not implemented for Binance");
+        return CompletableFuture.completedFuture(0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
-        return null;
+        logger.warn("fetchEquity() not implemented for Binance");
+        return CompletableFuture.completedFuture(0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchMarginUsed() {
-        return null;
+        logger.warn("fetchMarginUsed() not implemented for Binance");
+        return CompletableFuture.completedFuture(0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
-        return null;
+        logger.warn("fetchFreeMargin() not implemented for Binance");
+        return CompletableFuture.completedFuture(0.0);
     }
 
     @Override
     public Account getUserAccountDetails() {
-        return null;
+        logger.warn("getUserAccountDetails() not implemented for Binance");
+        return null; // No safe default
     }
 
     @Override
@@ -864,12 +918,14 @@ public class Binance extends Exchange {
     }
 
     @Override
-    public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+    public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
+            double takeProfit, double slippage) {
 
     }
 
     @Override
-    public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+    public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
+            double takeProfit, double slippage) {
 
     }
 

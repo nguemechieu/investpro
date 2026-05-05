@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import org.investpro.models.trading.*;
+import org.investpro.utils.ZoomDirection;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -39,8 +41,7 @@ import org.investpro.exchange.InteractiveBrokers;
 
 import org.investpro.exchange.Oanda;
 import org.investpro.models.currency.CryptoCurrency;
-import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.*;
+import org.investpro.models.trading.Position;
 import org.investpro.repository.CurrencyRepository;
 import org.investpro.repository.OrderRepository;
 import org.investpro.repository.RepositoryFactory;
@@ -71,11 +72,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
@@ -84,6 +85,9 @@ import java.util.function.Function;
 import java.util.prefs.Preferences;
 
 import javafx.embed.swing.SwingFXUtils;
+
+import static org.investpro.utils.Side.BUY;
+import static org.investpro.utils.Side.SELL;
 
 @Getter
 @Setter
@@ -102,7 +106,6 @@ public class TradingWindow extends BorderPane {
             "COINBASE", "BINANCE US", "BINANCE", "OANDA", "BITFINEX", "ALPACA", "INTERACTIVE BROKERS",
             "SCHWAB", "BITMEX", "BITSTAMP", "BITTREX"
     };
-
 
     private final ComboBox<String> exchangeSelector = new ComboBox<>();
     private final ComboBox<TradePair> symbolSelector = new ComboBox<>();
@@ -146,8 +149,10 @@ public class TradingWindow extends BorderPane {
     private final Label symbolCountLabel = new Label("Symbols: 0");
     private final Circle connectionIndicator = new Circle(6, Color.ORANGERED);
     private final TextArea journalArea = new TextArea();
-    private final ObservableList<String> agentActivityItems = FXCollections.observableArrayList("Agent activity will appear here.");
-    private final ObservableList<String> signalItems = FXCollections.observableArrayList("Signal engine idle.", "No signals loaded.");
+    private final ObservableList<String> agentActivityItems = FXCollections
+            .observableArrayList("Agent activity will appear here.");
+    private final ObservableList<String> signalItems = FXCollections.observableArrayList("Signal engine idle.",
+            "No signals loaded.");
     private final ListView<String> expertsListView = new ListView<>();
     private final ListView<String> alertsListView = new ListView<>();
     private final ListView<String> signalListView = new ListView<>();
@@ -187,20 +192,21 @@ public class TradingWindow extends BorderPane {
     }
 
     public TradingWindow() {
-        this(null, RepositoryFactory.createTradeRepository(), RepositoryFactory.createOrderRepository(), RepositoryFactory.createCurrencyRepository());
+        this(null, RepositoryFactory.createTradeRepository(), RepositoryFactory.createOrderRepository(),
+                RepositoryFactory.createCurrencyRepository());
     }
 
     public TradingWindow(MarketConfiguration configuration)
             throws ParseException, IOException, InterruptedException, ClassNotFoundException {
-        this(configuration, RepositoryFactory.createTradeRepository(), RepositoryFactory.createOrderRepository(), RepositoryFactory.createCurrencyRepository());
+        this(configuration, RepositoryFactory.createTradeRepository(), RepositoryFactory.createOrderRepository(),
+                RepositoryFactory.createCurrencyRepository());
     }
 
     public TradingWindow(
             MarketConfiguration configuration,
             TradeRepository tradeRepository,
             OrderRepository orderRepository,
-            CurrencyRepository currencyRepository
-    ) {
+            CurrencyRepository currencyRepository) {
         super();
         this.tradeRepository = Objects.requireNonNull(tradeRepository, "tradeRepository must not be null");
         this.orderRepository = Objects.requireNonNull(orderRepository, "orderRepository must not be null");
@@ -251,7 +257,8 @@ public class TradingWindow extends BorderPane {
         createInitialExchange(configuration);
         loadSymbolsForSelectedExchange();
         openInitialChartIfAvailable();
-        if (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem()) || hasConfiguredCredentials()) {
+        if (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem())
+                || hasConfiguredCredentials()) {
             proceedWithConnection();
         }
 
@@ -312,51 +319,59 @@ public class TradingWindow extends BorderPane {
     private MenuBar createMenuBar() {
         Menu fileMenu = new Menu("File");
         fileMenu.getItems().addAll(
-                menuItem("New Chart", new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN), this::openSelectedSymbolChart),
+                menuItem("New Chart", new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN),
+                        this::openSelectedSymbolChart),
                 menuItem("Refresh Symbols", new KeyCodeCombination(KeyCode.F5), this::loadSymbolsForSelectedExchange),
                 new SeparatorMenuItem(),
-                menuItem("Save Chart", new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN), this::saveActiveChartSnapshot),
-                menuItem("Export Chart", new KeyCodeCombination(KeyCode.E, KeyCombination.CONTROL_DOWN), this::saveActiveChartSnapshot),
+                menuItem("Save Chart", new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN),
+                        this::saveActiveChartSnapshot),
+                menuItem("Export Chart", new KeyCodeCombination(KeyCode.E, KeyCombination.CONTROL_DOWN),
+                        this::saveActiveChartSnapshot),
                 new SeparatorMenuItem(),
                 menuItem("Exit", new KeyCodeCombination(KeyCode.Q, KeyCombination.CONTROL_DOWN), () -> {
                     shutdown();
                     Platform.exit();
-                })
-        );
+                }));
 
         Menu editMenu = new Menu("Edit");
         editMenu.getItems().addAll(
-                menuItem("Undo", new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN), () -> withFocusedTextInput(TextInputControl::undo)),
-                menuItem("Redo", new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN), () -> withFocusedTextInput(TextInputControl::redo)),
+                menuItem("Undo", new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN),
+                        () -> withFocusedTextInput(TextInputControl::undo)),
+                menuItem("Redo", new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN),
+                        () -> withFocusedTextInput(TextInputControl::redo)),
                 new SeparatorMenuItem(),
-                menuItem("Cut", new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN), () -> withFocusedTextInput(TextInputControl::cut)),
-                menuItem("Copy", new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN), () -> withFocusedTextInput(TextInputControl::copy)),
-                menuItem("Paste", new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN), () -> withFocusedTextInput(TextInputControl::paste))
-        );
+                menuItem("Cut", new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN),
+                        () -> withFocusedTextInput(TextInputControl::cut)),
+                menuItem("Copy", new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN),
+                        () -> withFocusedTextInput(TextInputControl::copy)),
+                menuItem("Paste", new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN),
+                        () -> withFocusedTextInput(TextInputControl::paste)));
 
         Menu viewMenu = new Menu("View");
         viewMenu.getItems().addAll(
                 menuItem("Show Charts", null, chartTabPane::requestFocus),
                 menuItem("Show Market Watch", null, marketWatchTable::requestFocus),
                 menuItem("Show Terminal", null, () -> {
-                    if (!consoleVisible) toggleConsoleVisibility();
+                    if (!consoleVisible)
+                        toggleConsoleVisibility();
                 }),
                 menuItem("Hide Terminal", null, () -> {
-                    if (consoleVisible) toggleConsoleVisibility();
+                    if (consoleVisible)
+                        toggleConsoleVisibility();
                 }),
                 menuItem("Detach Terminal", null, this::detachConsoleWindow),
                 new SeparatorMenuItem(),
-                menuItem("Zoom In", new KeyCodeCombination(KeyCode.PLUS, KeyCombination.CONTROL_DOWN), () -> withActiveChart(chart -> chart.changeZoom(org.investpro.utils.ZoomDirection.IN))),
-                menuItem("Zoom Out", new KeyCodeCombination(KeyCode.MINUS, KeyCombination.CONTROL_DOWN), () -> withActiveChart(chart -> chart.changeZoom(org.investpro.utils.ZoomDirection.OUT)))
-        );
+                menuItem("Zoom In", new KeyCodeCombination(KeyCode.PLUS, KeyCombination.CONTROL_DOWN),
+                        () -> withActiveChart(chart -> chart.changeZoom(ZoomDirection.IN))),
+                menuItem("Zoom Out", new KeyCodeCombination(KeyCode.MINUS, KeyCombination.CONTROL_DOWN),
+                        () -> withActiveChart(chart -> chart.changeZoom(ZoomDirection.OUT))));
 
         Menu chartsMenu = new Menu("Charts");
         chartsMenu.getItems().addAll(
                 menuItem("Candlestick", null, this::openSelectedSymbolChart),
                 menuItem("Fit Active Chart", null, () -> withActiveChart(CandleStickChart::fitChart)),
                 menuItem("Refresh Active Chart", null, () -> withActiveChart(CandleStickChart::refreshChart)),
-                menuItem("Toggle Crosshair", null, () -> withActiveChart(CandleStickChart::toggleCrosshair))
-        );
+                menuItem("Toggle Crosshair", null, () -> withActiveChart(CandleStickChart::toggleCrosshair)));
 
         Menu toolsMenu = new Menu("Tools");
         toolsMenu.getItems().addAll(
@@ -366,27 +381,25 @@ public class TradingWindow extends BorderPane {
                 menuItem("Refresh Market Data", null, this::loadSymbolsForSelectedExchange),
                 menuItem("Refresh Account", null, this::refreshAccountWorkspace),
                 menuItem("Refresh Local Positions", null, this::refreshPositions),
-                menuItem("Cancel All Orders", null, this::cancelAllOrders)
-        );
+                menuItem("Cancel All Orders", null, this::cancelAllOrders));
 
         Menu settingsMenu = new Menu("Settings");
         settingsMenu.getItems().addAll(
                 menuItem("Application Settings", null, this::showSettingsDialog),
-                menuItem("Exchange Credentials", null, () -> showSettingsDialog())
-        );
+                menuItem("Exchange Credentials", null, this::showSettingsDialog));
 
         Menu windowMenu = new Menu("Window");
         windowMenu.getItems().addAll(
                 menuItem("Close All Charts", null, this::closeAllCharts),
-                menuItem("Detach Console", null, this::detachConsoleWindow)
-        );
+                menuItem("Detach Console", null, this::detachConsoleWindow));
 
         Menu helpMenu = new Menu("Help");
         helpMenu.getItems().addAll(
-                menuItem("Help", new KeyCodeCombination(KeyCode.F1), () -> showInfo("Help", "InvestPro Help - F5 refreshes data, Ctrl+` toggles terminal.")),
+                menuItem("Help", new KeyCodeCombination(KeyCode.F1),
+                        () -> showInfo("Help", "InvestPro Help - F5 refreshes data, Ctrl+` toggles terminal.")),
                 new SeparatorMenuItem(),
-                menuItem("About InvestPro", null, () -> showInfo("About InvestPro", "InvestPro - Professional Trading Terminal\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC"))
-        );
+                menuItem("About InvestPro", null, () -> showInfo("About InvestPro",
+                        "InvestPro - Professional Trading Terminal\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
 
         return new MenuBar(fileMenu, editMenu, viewMenu, chartsMenu, toolsMenu, settingsMenu, windowMenu, helpMenu);
     }
@@ -436,8 +449,7 @@ public class TradingWindow extends BorderPane {
                 cancelAllButton,
                 new Separator(Orientation.VERTICAL),
                 spacer,
-                new Label("AI Trading Terminal")
-        );
+                new Label("AI Trading Terminal"));
         toolBar.getStyleClass().add("main-trading-toolbar");
         return toolBar;
     }
@@ -576,20 +588,20 @@ public class TradingWindow extends BorderPane {
     }
 
     private void setupOrderBookTable(TableView<OrderBook.PriceLevel> table,
-                                     ObservableList<OrderBook.PriceLevel> items, boolean isBid) {
+            ObservableList<OrderBook.PriceLevel> items, boolean isBid) {
         table.setItems(items);
         table.getStyleClass().add(isBid ? "bid-table" : "ask-table");
 
         // Price Column
         TableColumn<OrderBook.PriceLevel, String> priceCol = new TableColumn<>("Price");
-        priceCol.setCellValueFactory(cellData ->
-                new ReadOnlyStringWrapper(String.format("%.8f", cellData.getValue().getPrice())));
+        priceCol.setCellValueFactory(
+                cellData -> new ReadOnlyStringWrapper(String.format("%.8f", cellData.getValue().getPrice())));
         priceCol.setPrefWidth(120);
 
         // Size Column
         TableColumn<OrderBook.PriceLevel, String> sizeCol = new TableColumn<>("Size");
-        sizeCol.setCellValueFactory(cellData ->
-                new ReadOnlyStringWrapper(String.format("%.8f", cellData.getValue().getSize())));
+        sizeCol.setCellValueFactory(
+                cellData -> new ReadOnlyStringWrapper(String.format("%.8f", cellData.getValue().getSize())));
         sizeCol.setPrefWidth(120);
 
         // Total Column
@@ -602,8 +614,8 @@ public class TradingWindow extends BorderPane {
 
         // Orders Count Column
         TableColumn<OrderBook.PriceLevel, String> ordersCol = new TableColumn<>("Orders");
-        ordersCol.setCellValueFactory(cellData ->
-                new ReadOnlyStringWrapper(String.valueOf(cellData.getValue().getNumOrders())));
+        ordersCol.setCellValueFactory(
+                cellData -> new ReadOnlyStringWrapper(String.valueOf(cellData.getValue().getNumOrders())));
         ordersCol.setPrefWidth(80);
 
         table.getColumns().clear();
@@ -618,10 +630,13 @@ public class TradingWindow extends BorderPane {
         TabPane navigatorTabs = new TabPane();
         navigatorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        ListView<String> navigationView = new ListView<>(FXCollections.observableArrayList("Default Account", "Balance", "Equity", "Margin", "Free Margin"));
-        ListView<String> overviewView = new ListView<>(FXCollections.observableArrayList("Upcoming events", "Economic calendar", "System announcements"));
+        ListView<String> navigationView = new ListView<>(
+                FXCollections.observableArrayList("Default Account", "Balance", "Equity", "Margin", "Free Margin"));
+        ListView<String> overviewView = new ListView<>(
+                FXCollections.observableArrayList("Upcoming events", "Economic calendar", "System announcements"));
 
         navigatorTabs.getTabs().setAll(
+                createFixedTab("Navigation", navigationView),
                 createFixedTab("Overview", overviewView),
                 createFixedTab("Balances", createAccountBalancesView()),
                 createFixedTab("Depth", createOrderBookPane()));
@@ -659,11 +674,12 @@ public class TradingWindow extends BorderPane {
     }
 
     private @NotNull Label valueLabel(String text,
-                                      String color) {
+            String color) {
         Label label = new Label(text);
-        label.getStyleClass().add("metric-value");
-        label.setStyle("-fx-text-fill: %s;".formatted(color));
-        label.getStyleClass().add("value-label");
+        label.getStyleClass().addAll("metric-value", "value-label");
+        if (color != null && !color.isEmpty()) {
+            label.setStyle("-fx-text-fill: %s;".formatted(color));
+        }
         return label;
     }
 
@@ -679,10 +695,14 @@ public class TradingWindow extends BorderPane {
         }
 
         safeAccountDouble(() -> currentExchange.fetchTotalBalance("USD"))
-                .thenCombine(safeAccountDouble(() -> currentExchange.fetchAvailableBalance("USD")), (balance, available) -> new double[]{balance, available})
-                .thenCombine(safeAccountDouble(currentExchange::fetchEquity), (values, equity) -> new double[]{values[0], values[1], equity})
-                .thenCombine(safeAccountDouble(currentExchange::fetchMarginUsed), (values, marginUsed) -> new double[]{values[0], values[1], values[2], marginUsed})
-                .thenCombine(safeAccountDouble(currentExchange::fetchFreeMargin), (values, freeMargin) -> new double[]{values[0], values[1], values[2], values[3], freeMargin})
+                .thenCombine(safeAccountDouble(() -> currentExchange.fetchAvailableBalance("USD")),
+                        (balance, available) -> new double[] { balance, available })
+                .thenCombine(safeAccountDouble(currentExchange::fetchEquity),
+                        (values, equity) -> new double[] { values[0], values[1], equity })
+                .thenCombine(safeAccountDouble(currentExchange::fetchMarginUsed),
+                        (values, marginUsed) -> new double[] { values[0], values[1], values[2], marginUsed })
+                .thenCombine(safeAccountDouble(currentExchange::fetchFreeMargin),
+                        (values, freeMargin) -> new double[] { values[0], values[1], values[2], values[3], freeMargin })
                 .thenAccept(values -> runOnFx(() -> {
                     balanceValueLabel.setText("$%s".formatted(money(values[0])));
                     availableValueLabel.setText("$%s".formatted(money(values[1])));
@@ -696,7 +716,8 @@ public class TradingWindow extends BorderPane {
                 });
     }
 
-    private CompletableFuture<Double> safeAccountDouble(java.util.function.Supplier<CompletableFuture<Double>> supplier) {
+    private CompletableFuture<Double> safeAccountDouble(
+            java.util.function.Supplier<CompletableFuture<Double>> supplier) {
         try {
             CompletableFuture<Double> future = supplier.get();
             if (future == null) {
@@ -790,7 +811,6 @@ public class TradingWindow extends BorderPane {
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("panel-header");
 
-
         terminalTabPane.setSide(Side.TOP);
         terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         terminalTabPane.getTabs().setAll(
@@ -806,8 +826,7 @@ public class TradingWindow extends BorderPane {
                 createDetachableTerminalTab("Chat ", createChatTab().getContent()),
                 createDetachableTerminalTab("Browser ", createMarketTab().getContent()),
                 createDetachableTerminalTab("Agents ", createAgentsTab().getContent()),
-                createDetachableTerminalTab("Journal ", createJournalTab().getContent())
-        );
+                createDetachableTerminalTab("Journal ", createJournalTab().getContent()));
 
         VBox console = new VBox(6, header, terminalTabPane);
         console.setPadding(new Insets(8));
@@ -840,7 +859,8 @@ public class TradingWindow extends BorderPane {
     }
 
     private void detachConsoleWindow() {
-        if (mainVerticalWorkbench == null || systemConsole == null || !mainVerticalWorkbench.getItems().contains(systemConsole)) {
+        if (mainVerticalWorkbench == null || systemConsole == null
+                || !mainVerticalWorkbench.getItems().contains(systemConsole)) {
             return;
         }
         mainVerticalWorkbench.getItems().remove(systemConsole);
@@ -885,10 +905,9 @@ public class TradingWindow extends BorderPane {
         return tab;
     }
 
-
     private Tab createPositionsTab() {
         Label title = new Label("Local Open Positions");
-        title.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+        title.getStyleClass().add("panel-title");
         Button refresh = new Button("Refresh");
         refresh.setOnAction(event -> refreshPositions());
         Button closeAll = new Button("Close All");
@@ -921,14 +940,16 @@ public class TradingWindow extends BorderPane {
     }
 
     private @NotNull Tab createAlertsTab() {
-        alertsListView.setItems(FXCollections.observableArrayList("No active alerts.", "Create alerts from chart or order panel."));
+        alertsListView.setItems(
+                FXCollections.observableArrayList("No active alerts.", "Create alerts from chart or order panel."));
         VBox content = new VBox(alertsListView);
         VBox.setVgrow(alertsListView, Priority.ALWAYS);
         return createFixedTab("Alerts", content);
     }
 
     private @NotNull Tab createMailboxTab() {
-        mailboxListView.setItems(FXCollections.observableArrayList("Mailbox is empty.", "Broker/system messages will appear here."));
+        mailboxListView.setItems(
+                FXCollections.observableArrayList("Mailbox is empty.", "Broker/system messages will appear here."));
         VBox content = new VBox(mailboxListView);
         VBox.setVgrow(mailboxListView, Priority.ALWAYS);
         return createFixedTab("Mailbox", content);
@@ -938,14 +959,13 @@ public class TradingWindow extends BorderPane {
         ListView<String> chatListView = new ListView<>();
         HBox inputArea = new HBox(5);
         inputArea.setPadding(new Insets(8));
-        inputArea.setStyle("-fx-border-color: #334155; -fx-border-width: 1 0 0 0;");
+        inputArea.getStyleClass().add("chat-input");
 
         TextField messageInput = new TextField();
         messageInput.setPromptText("Type message...");
-        messageInput.setStyle("-fx-padding: 8; -fx-font-size: 11;");
 
         Button sendButton = new Button("Send");
-        sendButton.setStyle("-fx-padding: 6 12; -fx-background-color: #3b82f6; -fx-text-fill: #ffffff;");
+        sendButton.getStyleClass().add("send-button");
         sendButton.setPrefWidth(70);
 
         ObservableList<String> chatMessages = FXCollections.observableArrayList();
@@ -1021,7 +1041,8 @@ public class TradingWindow extends BorderPane {
     }
 
     private @NotNull Tab createExpertsTab() {
-        expertsListView.setItems(FXCollections.observableArrayList("Experts console ready.", "Automations and execution notes will appear here."));
+        expertsListView.setItems(FXCollections.observableArrayList("Experts console ready.",
+                "Automations and execution notes will appear here."));
         VBox content = new VBox(expertsListView);
         VBox.setVgrow(expertsListView, Priority.ALWAYS);
         return createFixedTab("Experts", content);
@@ -1057,8 +1078,7 @@ public class TradingWindow extends BorderPane {
                 tableColumn("Change %", pair -> pair == null ? "" : percent(pair.getChangePercent()), 85),
                 tableColumn("High 24h", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 90),
                 tableColumn("Low 24h", pair -> pair == null ? "" : marketPrice(pair.getLow24h()), 90),
-                tableColumn("Updated", pair -> pair == null ? "" : updatedAt(pair), 95)
-        );
+                tableColumn("Updated", pair -> pair == null ? "" : updatedAt(pair), 95));
 
         table.setRowFactory(_ -> {
             TableRow<TradePair> row = new TableRow<>() {
@@ -1107,7 +1127,8 @@ public class TradingWindow extends BorderPane {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(8, new Label("Market Watch"), symbolCountLabelSnapshot(), spacer, openButton, refreshButton);
+        HBox header = new HBox(8, new Label("Market Watch"), symbolCountLabelSnapshot(), spacer, openButton,
+                refreshButton);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(8));
 
@@ -1139,8 +1160,7 @@ public class TradingWindow extends BorderPane {
                 tableColumn("Qty", order -> number(order.getQuantity()), 90),
                 tableColumn("Entry", order -> price(order.getPrice()), 90),
                 tableColumn("P&L", order -> money(order.getProfit()), 90),
-                tableColumn("Status", order -> safe(order.getStatus()), 90)
-        );
+                tableColumn("Status", order -> safe(order.getStatus()), 90));
     }
 
     private void configureAccountSummaryArea() {
@@ -1153,8 +1173,7 @@ public class TradingWindow extends BorderPane {
                         "-fx-font-size: 11px; " +
                         "-fx-padding: 10px; " +
                         "-fx-focus-color: transparent; " +
-                        "-fx-faint-focus-color: transparent;"
-        );
+                        "-fx-faint-focus-color: transparent;");
         accountSummaryArea.setText(
                 """
                         ═════════════════════════════════════════════════
@@ -1165,8 +1184,7 @@ public class TradingWindow extends BorderPane {
                         Select an exchange and click Connect to view account information.
 
                         ═════════════════════════════════════════════════
-                        """
-        );
+                        """);
     }
 
     private @NotNull TableView<Position> buildAccountPositionsTable() {
@@ -1174,17 +1192,16 @@ public class TradingWindow extends BorderPane {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No broker positions"));
         table.getColumns().setAll(
-                tableColumn("Symbol", position -> position.getTradePair() == null ? "" : position.getTradePair().getSymbol(), 110),
+                tableColumn("Symbol",
+                        position -> position.getTradePair() == null ? "" : position.getTradePair().getSymbol(), 110),
                 tableColumn("Side", position -> String.valueOf(position.getSide()), 80),
                 tableColumn("Units", position -> number(position.getQuantity()), 90),
                 tableColumn("Entry", position -> price(position.getEntryPrice()), 90),
                 tableColumn("Unrealized P/L", position -> money(position.getUnrealizedPnl()), 120),
                 tableColumn("Realized P/L", position -> money(position.getRealizedPnl()), 110),
-                tableColumn("Status", position -> position.isOpen() ? "OPEN" : "CLOSED", 80)
-        );
+                tableColumn("Status", position -> position.isOpen() ? "OPEN" : "CLOSED", 80));
         return table;
     }
-
 
     private @NotNull TableView<Trade> buildAccountTradesTable() {
         TableView<Trade> table = new TableView<>(accountTradeItems);
@@ -1192,13 +1209,13 @@ public class TradingWindow extends BorderPane {
         table.setPlaceholder(new Label("No account trades"));
         table.getColumns().setAll(
                 tableColumn("ID", trade -> String.valueOf(trade.getLocalTradeId()), 90),
-                tableColumn("Symbol", trade -> trade.getTradePair() == null ? "" : trade.getTradePair().getSymbol(), 110),
+                tableColumn("Symbol", trade -> trade.getTradePair() == null ? "" : trade.getTradePair().getSymbol(),
+                        110),
                 tableColumn("Side", trade -> String.valueOf(trade.getTransactionType()), 70),
                 tableColumn("Amount", trade -> number(trade.getAmount()), 90),
                 tableColumn("Price", trade -> price(trade.getPrice()), 90),
                 tableColumn("Fee", trade -> money(trade.getFee()), 80),
-                tableColumn("Time", trade -> String.valueOf(trade.getTimestamp()), 160)
-        );
+                tableColumn("Time", trade -> String.valueOf(trade.getTimestamp()), 160));
         return table;
     }
 
@@ -1213,14 +1230,14 @@ public class TradingWindow extends BorderPane {
                 tableColumn("Symbol", Order::getSymbol, 110),
                 tableColumn("Quantity", order -> number(order.getQuantity()), 90),
                 tableColumn("Price", order -> price(order.getPrice()), 90),
-                tableColumn("Status", Order::getStatus, 90)
-        );
+                tableColumn("Status", Order::getStatus, 90));
         return table;
     }
 
     private <T> @NotNull TableColumn<T, String> tableColumn(String title, Function<T, String> mapper, double width) {
         TableColumn<T, String> column = new TableColumn<>(title);
-        column.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue() == null ? "" : safe(mapper.apply(cell.getValue()))));
+        column.setCellValueFactory(
+                cell -> new ReadOnlyStringWrapper(cell.getValue() == null ? "" : safe(mapper.apply(cell.getValue()))));
         column.setPrefWidth(width);
         return column;
     }
@@ -1235,8 +1252,7 @@ public class TradingWindow extends BorderPane {
                 new Label("Status:"), connectionIndicator, connectionStatusLabel,
 
                 new Separator(Orientation.VERTICAL), symbolCountLabel,
-                spacer, new Label("Trading Console")
-        );
+                spacer, new Label("Trading Console"));
         return statusBar;
     }
 
@@ -1256,14 +1272,16 @@ public class TradingWindow extends BorderPane {
     private void updateConnectControl(boolean connected) {
         if (connected) {
             connectedBrokerLabel.setText("Connected");
-            connectedBrokerLabel.setStyle("-fx-padding: 8 15; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;");
+            connectedBrokerLabel.setStyle(
+                    "-fx-padding: 8 15; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;");
             connectedBrokerLabel.setVisible(true);
             connectedBrokerLabel.setManaged(true);
             connectButton.setVisible(false);
             connectButton.setManaged(false);
         } else {
             connectButton.setText("Connect");
-            connectButton.setStyle("-fx-padding: 8 15; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+            connectButton.setStyle(
+                    "-fx-padding: 8 15; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
             connectButton.setVisible(true);
             connectButton.setManaged(true);
             connectedBrokerLabel.setVisible(false);
@@ -1286,7 +1304,8 @@ public class TradingWindow extends BorderPane {
 
     private void configureSelectors(MarketConfiguration configuration) {
         exchangeSelector.getItems().setAll(SUPPORTED_EXCHANGES);
-        String configuredExchange = configuration == null ? preferences.get("selected_exchange", "") : safe(configuration.exchange());
+        String configuredExchange = configuration == null ? preferences.get("selected_exchange", "")
+                : safe(configuration.exchange());
         if (!configuredExchange.isBlank() && exchangeSelector.getItems().contains(configuredExchange)) {
             exchangeSelector.getSelectionModel().select(configuredExchange);
         } else {
@@ -1309,8 +1328,8 @@ public class TradingWindow extends BorderPane {
         refreshSymbolsButton.setOnAction(event -> loadSymbolsForSelectedExchange());
         addChartButton.setOnAction(event -> openSelectedSymbolChart());
         connectButton.setOnAction(event -> connectSelectedExchange());
-        buyButton.setOnAction(event -> submitMarketOrder(org.investpro.utils.Side.BUY));
-        sellButton.setOnAction(event -> submitMarketOrder(org.investpro.utils.Side.SELL));
+        buyButton.setOnAction(event -> submitMarketOrder(BUY));
+        sellButton.setOnAction(event -> submitMarketOrder(SELL));
         cancelAllButton.setOnAction(event -> cancelAllOrders());
     }
 
@@ -1330,8 +1349,7 @@ public class TradingWindow extends BorderPane {
         exchange = createExchange(
                 selectedExchange,
                 configuration == null ? configuredApiKey : safe(configuration.apiKey()),
-                configuration == null ? configuredApiSecret : safe(configuration.apiSecret())
-        );
+                configuration == null ? configuredApiSecret : safe(configuration.apiSecret()));
         setTelegramToken(telegramToken);
         brokerAccessGranted = false;
         updateConnectionStatus();
@@ -1517,11 +1535,13 @@ public class TradingWindow extends BorderPane {
             }
             exchange.createMarketOrder(selected, side, amount)
                     .thenAccept(orderId -> runOnFx(() -> {
-                        journal("%s market order submitted for %s: %s".formatted(side, selected.toString('/'), orderId));
+                        journal("%s market order submitted for %s: %s".formatted(side, selected.toString('/'),
+                                orderId));
                         refreshAccountWorkspace();
                     }))
                     .exceptionally(exception -> {
-                        runOnFx(() -> showWarning("Order Failed", "Order failed: %s".formatted(rootMessage(exception))));
+                        runOnFx(() -> showWarning("Order Failed",
+                                "Order failed: %s".formatted(rootMessage(exception))));
                         return null;
                     });
         });
@@ -1533,10 +1553,11 @@ public class TradingWindow extends BorderPane {
         }
 
         // Fetch orderbook asynchronously
-        exchange.fetchOrderBook(tradePair).thenAccept(orderBook -> Platform.runLater(() -> displayOrderBook(orderBook))).exceptionally(exception -> {
-            logger.debug("Failed to fetch orderbook for %s".formatted(tradePair), exception);
-            return null;
-        });
+        exchange.fetchOrderBook(tradePair).thenAccept(orderBook -> Platform.runLater(() -> displayOrderBook(orderBook)))
+                .exceptionally(exception -> {
+                    logger.debug("Failed to fetch orderbook for %s".formatted(tradePair), exception);
+                    return null;
+                });
     }
 
     private void displayOrderBook(OrderBook orderBook) {
@@ -1587,7 +1608,8 @@ public class TradingWindow extends BorderPane {
             smartBot.startStreaming(symbols, SmartBot.StreamingMode.EVERYTHING);
             withActiveChart(chart -> chart.setAutoTradeEnabled(true));
             botTradingEnabled = true;
-            appendAgentActivity("SmartBot enabled for %d symbol(s) using %s.".formatted(symbols.size(), botSymbolScopeSelector.getValue()));
+            appendAgentActivity("SmartBot enabled for %d symbol(s) using %s.".formatted(symbols.size(),
+                    botSymbolScopeSelector.getValue()));
             refreshBotTradeButton();
             saveAppState();
         } catch (Exception exception) {
@@ -1649,30 +1671,29 @@ public class TradingWindow extends BorderPane {
         String message = "[%s] %s connected. Active symbol: %s".formatted(
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                 exchange == null ? "Broker" : exchange.getDisplayName(),
-                symbol
-        );
+                symbol);
         appendBounded(signalItems, message, 200);
         appendAgentActivity("Broker session validated for %s.".formatted(exchangeSelector.getValue()));
     }
 
     private String formatAgentEvent(AgentEvent event) {
         return "[%s] %s | %s | %s".formatted(
-                DateTimeFormatter.ofPattern("HH:mm:ss").format(event.timestamp().atZone(java.time.ZoneId.systemDefault())),
+                DateTimeFormatter.ofPattern("HH:mm:ss")
+                        .format(event.timestamp().atZone(java.time.ZoneId.systemDefault())),
                 event.type(),
                 event.source(),
-                event.payload() == null ? "" : event.payload().toString()
-        );
+                event.payload() == null ? "" : event.payload().toString());
     }
 
     private String formatSignalEvent(AgentEvent event) {
         if (event.payload() instanceof Signal signal) {
             return "[%s] %s %s confidence %.0f%% via %s".formatted(
-                    DateTimeFormatter.ofPattern("HH:mm:ss").format(signal.getTimestamp().atZone(java.time.ZoneId.systemDefault())),
+                    DateTimeFormatter.ofPattern("HH:mm:ss")
+                            .format(signal.getTimestamp().atZone(java.time.ZoneId.systemDefault())),
                     signal.getTradePair() == null ? "-" : signal.getTradePair().toString('/'),
                     signal.getSide(),
                     signal.getConfidence() * 100.0,
-                    signal.getStrategyName()
-            );
+                    signal.getStrategyName());
         }
         return formatAgentEvent(event);
     }
@@ -1680,8 +1701,7 @@ public class TradingWindow extends BorderPane {
     private void appendAgentActivity(String message) {
         runOnFx(() -> appendBounded(agentActivityItems, "[%s] %s".formatted(
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
-                safe(message)
-        ), 300));
+                safe(message)), 300));
     }
 
     private void appendBounded(ObservableList<String> items, String value, int maxItems) {
@@ -1758,7 +1778,8 @@ public class TradingWindow extends BorderPane {
             tradePairs = fallbackMarketWatchPairs();
         }
         if (tradePairs.isEmpty()) {
-            showWarning("No Symbols", "Unable to fetch or build trade pairs for %s.".formatted(exchangeSelector.getValue()));
+            showWarning("No Symbols",
+                    "Unable to fetch or build trade pairs for %s.".formatted(exchangeSelector.getValue()));
             updateConnectionStatus();
             return;
         }
@@ -1783,16 +1804,16 @@ public class TradingWindow extends BorderPane {
 
     private List<TradePair> fallbackMarketWatchPairs() {
         String[][] defaults = {
-                {"BTC", "USD"},
-                {"ETH", "USD"},
-                {"SOL", "USD"},
-                {"XRP", "USD"},
-                {"ADA", "USD"},
-                {"DOGE", "USD"},
-                {"BTC", "USDT"},
-                {"ETH", "USDT"},
-                {"BNB", "USDT"},
-                {"EUR", "USD"}
+                { "BTC", "USD" },
+                { "ETH", "USD" },
+                { "SOL", "USD" },
+                { "XRP", "USD" },
+                { "ADA", "USD" },
+                { "DOGE", "USD" },
+                { "BTC", "USDT" },
+                { "ETH", "USDT" },
+                { "BNB", "USDT" },
+                { "EUR", "USD" }
         };
 
         List<TradePair> pairs = new ArrayList<>();
@@ -1800,8 +1821,7 @@ public class TradingWindow extends BorderPane {
             try {
                 pairs.add(new TradePair(
                         new CryptoCurrency(symbol[0], symbol[0], symbol[0], 8, symbol[0], symbol[0]),
-                        new CryptoCurrency(symbol[1], symbol[1], symbol[1], 8, symbol[1], symbol[1])
-                ));
+                        new CryptoCurrency(symbol[1], symbol[1], symbol[1], 8, symbol[1], symbol[1])));
             } catch (Exception exception) {
                 logger.debug("Skipping fallback market-watch pair {}/{}", symbol[0], symbol[1], exception);
             }
@@ -1836,7 +1856,8 @@ public class TradingWindow extends BorderPane {
                 }))
                 .exceptionally(exception -> {
                     logger.error("Failed to load all positions", exception);
-                    runOnFx(() -> showWarning("Positions", "Failed to load positions: %s".formatted(rootMessage(exception))));
+                    runOnFx(() -> showWarning("Positions",
+                            "Failed to load positions: %s".formatted(rootMessage(exception))));
                     return null;
                 });
     }
@@ -1868,19 +1889,16 @@ public class TradingWindow extends BorderPane {
         journal("Refreshing broker account tabs.");
         updateAccountBalance();
 
-
         exchange.fetchAccount()
                 .thenAccept(summary -> runOnFx(() ->
 
-                        accountSummaryArea.setText(
-                                summary.summary()
-                        )
+                accountSummaryArea.setText(
+                        summary.summary())
 
-
-
-                        ))
+                ))
                 .exceptionally(exception -> {
-                    runOnFx(() -> accountSummaryArea.setText("Account summary failed: %s".formatted(rootMessage(exception))));
+                    runOnFx(() -> accountSummaryArea
+                            .setText("Account summary failed: %s".formatted(rootMessage(exception))));
                     return null;
                 });
 
@@ -1928,7 +1946,6 @@ public class TradingWindow extends BorderPane {
                     });
         }
     }
-
 
     private void calculatePnL(List<Order> positions) {
         double longPnL = 0.0;
@@ -2014,7 +2031,8 @@ public class TradingWindow extends BorderPane {
                 return;
             }
         }
-        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(symbol, exchange, telegramToken, tradingService);
+        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(symbol, exchange, telegramToken,
+                tradingService);
 
         // Configure chart for live data display with visible axes
         CandleStickChart chart = chartDisplay.getChart();
@@ -2026,7 +2044,6 @@ public class TradingWindow extends BorderPane {
             // Apply adaptive scaling for better visualization
             chart.applyAdaptiveScaling();
         }
-
 
         BorderPane content = new BorderPane(chartDisplay);
         content.setPadding(new Insets(4));
@@ -2095,7 +2112,7 @@ public class TradingWindow extends BorderPane {
     }
 
     private void saveActiveChartSnapshot() {
-         selectedTab = chartTabPane.getSelectionModel().getSelectedItem();
+        selectedTab = chartTabPane.getSelectionModel().getSelectedItem();
         if (selectedTab == null || selectedTab.getContent() == null) {
             showWarning("Save Chart", "Open or select a chart first.");
             return;
@@ -2131,7 +2148,8 @@ public class TradingWindow extends BorderPane {
         }
         runOnFx(() -> {
             updateMarketWatchItem(pair, ticker);
-            journal("Tick %s bid %s ask %s".formatted(pair.toString('/'), price(ticker.getBidPrice()), price(ticker.getAskPrice())));
+            journal("Tick %s bid %s ask %s".formatted(pair.toString('/'), price(ticker.getBidPrice()),
+                    price(ticker.getAskPrice())));
         });
     }
 
@@ -2154,32 +2172,30 @@ public class TradingWindow extends BorderPane {
     }
 
     /**
-     * Starts automatic data refresh tasks for market watch, orderbook, and account data.
+     * Starts automatic data refresh tasks for market watch, orderbook, and account
+     * data.
      */
     private void startAutoRefreshTasks() {
         // Refresh market watch every 5 seconds
         autoRefreshExecutor.scheduleAtFixedRate(
                 this::autoRefreshMarketWatch,
-                2,      // Initial delay
-                5,      // Interval
-                TimeUnit.SECONDS
-        );
+                2, // Initial delay
+                5, // Interval
+                TimeUnit.SECONDS);
 
         // Refresh orderbook every 3 seconds
         autoRefreshExecutor.scheduleAtFixedRate(
                 this::autoRefreshOrderBook,
-                1,      // Initial delay
-                3,      // Interval
-                TimeUnit.SECONDS
-        );
+                1, // Initial delay
+                3, // Interval
+                TimeUnit.SECONDS);
 
         // Refresh account summary every 4 seconds
         autoRefreshExecutor.scheduleAtFixedRate(
                 this::autoRefreshAccountData,
-                1,      // Initial delay
-                4,      // Interval
-                TimeUnit.SECONDS
-        );
+                1, // Initial delay
+                4, // Interval
+                TimeUnit.SECONDS);
     }
 
     /**
@@ -2284,7 +2300,9 @@ public class TradingWindow extends BorderPane {
                             throw new RuntimeException(exception);
                         }
                     }, autoRefreshExecutor)
-                    .thenCompose(future -> Objects.requireNonNullElseGet(future, () -> CompletableFuture.failedFuture(new UnsupportedOperationException("Batch ticker refresh is not supported."))))
+                    .thenCompose(future -> Objects.requireNonNullElseGet(future,
+                            () -> CompletableFuture.failedFuture(
+                                    new UnsupportedOperationException("Batch ticker refresh is not supported."))))
                     .thenApply(tickers -> {
                         if (tickers == null) {
                             throw new IllegalStateException("Batch ticker refresh returned no data.");
@@ -2314,7 +2332,9 @@ public class TradingWindow extends BorderPane {
                                 throw new RuntimeException(exception);
                             }
                         }, autoRefreshExecutor)
-                        .thenCompose(future -> Objects.requireNonNullElseGet(future, () -> CompletableFuture.failedFuture(new UnsupportedOperationException("Ticker refresh is not supported."))))
+                        .thenCompose(future -> Objects.requireNonNullElseGet(future,
+                                () -> CompletableFuture.failedFuture(
+                                        new UnsupportedOperationException("Ticker refresh is not supported."))))
                         .thenAccept(ticker -> runOnFx(() -> updateMarketWatchItem(pair, ticker)))
                         .exceptionally(exception -> {
                             logger.debug("Failed to fetch ticker for %s".formatted(pair), exception);
@@ -2354,8 +2374,7 @@ public class TradingWindow extends BorderPane {
                 ticker.getVolume(),
                 ticker.getChangePercent(),
                 ticker.getHighPrice(),
-                ticker.getLowPrice()
-        );
+                ticker.getLowPrice());
     }
 
     private @Nullable TradePair findMarketWatchPair(TradePair pair) {
@@ -2528,7 +2547,8 @@ public class TradingWindow extends BorderPane {
         }
 
         sb.append("\n═════════════════════════════════════════════════\n");
-        sb.append("Last Updated: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
+        sb.append("Last Updated: ")
+                .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
 
         return sb.toString();
     }
@@ -2548,7 +2568,6 @@ public class TradingWindow extends BorderPane {
             logger.debug("Failed to stop position auto-refresh", exception);
         }
     }
-
 
     private void cancelAllOrders() {
         journal("Cancel-all requested.");
@@ -2607,7 +2626,8 @@ public class TradingWindow extends BorderPane {
 
         ComboBox<String> exchangeBox = new ComboBox<>();
         exchangeBox.getItems().setAll(SUPPORTED_EXCHANGES);
-        exchangeBox.getSelectionModel().select(safe(exchangeSelector.getValue()).isBlank() ? "COINBASE" : exchangeSelector.getValue());
+        exchangeBox.getSelectionModel()
+                .select(safe(exchangeSelector.getValue()).isBlank() ? "COINBASE" : exchangeSelector.getValue());
 
         TextField apiKeyField = new TextField();
         PasswordField apiSecretField = new PasswordField();
@@ -2737,7 +2757,8 @@ public class TradingWindow extends BorderPane {
         if (pair == null || pair.getUpdatedAt() == null || !pair.hasQuote()) {
             return "-";
         }
-        return pair.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        return pair.getUpdatedAt().atZone(java.time.ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("HH:mm:ss"));
     }
 
     private @NotNull String money(double value) {
@@ -2854,29 +2875,34 @@ public class TradingWindow extends BorderPane {
         TextField apiKeyField = new TextField();
         apiKeyField.setPromptText("API Key");
         apiKeyField.setText(preferences.get("exchange_api_key_" + exchange, ""));
-        apiKeyField.setStyle("-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        apiKeyField.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
         PasswordField apiSecretField = new PasswordField();
         apiSecretField.setPromptText("API Secret");
         apiSecretField.setText(preferences.get("exchange_api_secret_" + exchange, ""));
-        apiSecretField.setStyle("-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        apiSecretField.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
         ComboBox<String> venueBox = new ComboBox<>();
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
         String savedVenue = preferences.get("exchange_venue_" + exchange, "US");
         venueBox.getSelectionModel().select(venueBox.getItems().contains(savedVenue) ? savedVenue : "US");
-        venueBox.setStyle("-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        venueBox.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
         venueBox.setPrefWidth(300);
 
         TextField accountIdField = new TextField();
         accountIdField.setPromptText("Account ID (optional)");
         accountIdField.setText(preferences.get("exchange_account_id_" + exchange, ""));
-        accountIdField.setStyle("-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        accountIdField.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
         TextField telegramTokenField = new TextField();
         telegramTokenField.setPromptText("Telegram Bot Token (optional)");
         telegramTokenField.setText(preferences.get("telegram_token_" + exchange, ""));
-        telegramTokenField.setStyle("-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        telegramTokenField.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
         Label messageLabel = new Label();
         messageLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
@@ -2916,7 +2942,8 @@ public class TradingWindow extends BorderPane {
 
         // Create buttons
         Button saveButton = new Button("Save & Connect");
-        saveButton.setStyle("-fx-padding: 8 15; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
+        saveButton.setStyle(
+                "-fx-padding: 8 15; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
         saveButton.setPrefWidth(95);
 
         Button cancelButton = new Button("Cancel");

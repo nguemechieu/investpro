@@ -3,7 +3,7 @@ package org.investpro.models.trading;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.utils.Side;
+import  org.investpro.utils.Side;
 
 import java.util.Date;
 
@@ -63,6 +63,31 @@ public class Order {
 
     public void setType(String type) {
         this.orderType = type;
+    }
+
+    // Explicit getters (Lombok @Getter not being invoked)
+    public String getSymbol() {
+        return symbol;
+    }
+
+    public double getQuantity() {
+        return quantity;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public Date getDate() {
+        return date;
+    }
+
+    public Side getSide() {
+        return side;
     }
 
 }

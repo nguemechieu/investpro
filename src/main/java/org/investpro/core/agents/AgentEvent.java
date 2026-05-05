@@ -57,7 +57,6 @@ public record AgentEvent(
     public static final String LEARNING_OBSERVATION_CREATED = "LEARNING_OBSERVATION_CREATED";
 
     public static final String SMART_BOT_STARTED = "SMART_BOT_STARTED";
-    public static final String SMART_BOT_STOPPED = "SMART_BOT_STOPPED";
     public static final String SMART_BOT_STREAMING_STARTED = "SMART_BOT_STREAMING_STARTED";
     public static final String SMART_BOT_STREAMING_STOPPED = "SMART_BOT_STREAMING_STOPPED";
     public static final String AUTO_TRADING_ENABLED = "AUTO_TRADING_ENABLED";
@@ -144,39 +143,7 @@ public record AgentEvent(
         return new AgentEvent(ERROR, source, throwable, Instant.now(), metadata);
     }
 
-    public AgentEvent withMetadata(String key, Object value) {
-        if (key == null || key.isBlank()) {
-            return this;
-        }
 
-        Map<String, Object> updated = new LinkedHashMap<>(metadata);
-        updated.put(key, value);
-
-        return new AgentEvent(
-                type,
-                source,
-                payload,
-                timestamp,
-                updated
-        );
-    }
-
-    public AgentEvent withMetadata(Map<String, Object> extraMetadata) {
-        if (extraMetadata == null || extraMetadata.isEmpty()) {
-            return this;
-        }
-
-        Map<String, Object> updated = new LinkedHashMap<>(metadata);
-        updated.putAll(extraMetadata);
-
-        return new AgentEvent(
-                type,
-                source,
-                payload,
-                timestamp,
-                updated
-        );
-    }
 
     public Object metadataValue(String key) {
         if (key == null || key.isBlank()) {
@@ -186,30 +153,9 @@ public record AgentEvent(
         return metadata.get(key);
     }
 
-    public String metadataString(String key) {
-        Object value = metadataValue(key);
-        return value == null ? "" : String.valueOf(value);
-    }
 
-    public boolean isType(String expectedType) {
-        return Objects.equals(type, expectedType);
-    }
 
-    public boolean isMarketEvent() {
-        return type.startsWith("MARKET_")
-                || Objects.equals(type, ORDER_BOOK_UPDATE)
-                || Objects.equals(type, STREAM_CONNECTED)
-                || Objects.equals(type, STREAM_DISCONNECTED)
-                || Objects.equals(type, RAW_STREAM_MESSAGE);
-    }
 
-    public boolean isExecutionEvent() {
-        return Objects.equals(type, ORDER_SUBMITTED)
-                || Objects.equals(type, ORDER_ACCEPTED)
-                || Objects.equals(type, ORDER_REJECTED)
-                || Objects.equals(type, ORDER_FILLED)
-                || Objects.equals(type, ORDER_CANCELLED);
-    }
 
     public boolean isError() {
         return Objects.equals(type, ERROR);

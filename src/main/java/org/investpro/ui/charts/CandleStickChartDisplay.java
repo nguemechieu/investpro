@@ -5,8 +5,6 @@ import javafx.geometry.Insets;
 import javafx.scene.layout.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.core.TelegramNotifier;
-import org.investpro.core.bot.SmartBot;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;

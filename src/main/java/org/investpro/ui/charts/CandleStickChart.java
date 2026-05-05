@@ -1,5 +1,6 @@
 package org.investpro.ui.charts;
 
+import org.investpro.indicators.ChartIndicator;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -83,13 +84,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.investpro.ui.charts.ChartColors.AXIS_TICK_LABEL_COLOR;
-import static org.investpro.ui.charts.ChartColors.BEAR_CANDLE_BORDER_COLOR;
-import static org.investpro.ui.charts.ChartColors.BEAR_CANDLE_FILL_COLOR;
-import static org.investpro.ui.charts.ChartColors.BULL_CANDLE_BORDER_COLOR;
-import static org.investpro.ui.charts.ChartColors.BULL_CANDLE_FILL_COLOR;
-import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_BORDER_COLOR;
-import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
+import static  org.investpro.ui.charts.ChartColors.AXIS_TICK_LABEL_COLOR;
+import static  org.investpro.ui.charts.ChartColors.BEAR_CANDLE_BORDER_COLOR;
+import static  org.investpro.ui.charts.ChartColors.BEAR_CANDLE_FILL_COLOR;
+import static  org.investpro.ui.charts.ChartColors.BULL_CANDLE_BORDER_COLOR;
+import static  org.investpro.ui.charts.ChartColors.BULL_CANDLE_FILL_COLOR;
+import static  org.investpro.ui.charts.ChartColors.PLACE_HOLDER_BORDER_COLOR;
+import static  org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
 
 /**
  * Professional canvas-based candlestick chart for InvestPro.
@@ -177,6 +178,7 @@ public class CandleStickChart extends Region {
     private final Font canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 13);
 
     private final List<PriceLine> priceLines = new ArrayList<>();
+    private final List<ChartIndicator> indicators = new ArrayList<>();
 
     private Canvas canvas;
     private GraphicsContext graphicsContext;
@@ -555,7 +557,7 @@ public class CandleStickChart extends Region {
         }
         data.clear();
         for (CandleData candle : sanitizeAndSort(candles)) {
-            data.put(candle.getOpenTime(), candle);
+            data.put(candle.openTime(), candle);
         }
         fitLatestReadable();
         hideLoadingIndicator();
@@ -565,13 +567,13 @@ public class CandleStickChart extends Region {
     }
 
     private List<CandleData> sanitizeAndSort(List<CandleData> candles) {
-        return candles.stream().filter(Objects::nonNull).sorted(Comparator.comparingInt(CandleData::getOpenTime)).toList();
+        return candles.stream().filter(Objects::nonNull).sorted(Comparator.comparingInt(CandleData::openTime)).toList();
     }
 
     private void mergeCandles(List<CandleData> candles) {
         if (candles == null || candles.isEmpty()) return;
         for (CandleData candle : sanitizeAndSort(candles)) {
-            data.put(candle.getOpenTime(), candle);
+            data.put(candle.openTime(), candle);
         }
         if (!data.isEmpty()) {
             clampVisibleWindow();
@@ -651,8 +653,8 @@ public class CandleStickChart extends Region {
         if (visible.isEmpty()) return;
         CandleData first = visible.getFirst();
         CandleData last = visible.getLast();
-        xAxis.setLowerBound(first.getOpenTime());
-        xAxis.setUpperBound(last.getOpenTime() + secondsPerCandle);
+        xAxis.setLowerBound(first.openTime());
+        xAxis.setUpperBound(last.openTime() + secondsPerCandle);
         xAxis.setTickLabelFormatter(InstantAxisFormatter.of(selectTimePattern()));
     }
 
@@ -690,10 +692,10 @@ public class CandleStickChart extends Region {
         double max = Double.NEGATIVE_INFINITY;
         double maxVolume = 0.0;
         for (CandleData candle : visible) {
-            if (candle == null || candle.isPlaceHolder()) continue;
-            min = Math.min(min, candle.getLowPrice());
-            max = Math.max(max, candle.getHighPrice());
-            maxVolume = Math.max(maxVolume, candle.getVolume());
+            if (candle == null || candle.placeHolder()) continue;
+            min = Math.min(min, candle.lowPrice());
+            max = Math.max(max, candle.highPrice());
+            maxVolume = Math.max(maxVolume, candle.volume());
         }
         if (!Double.isFinite(min) || !Double.isFinite(max)) { min = 0.0; max = 1.0; }
         double delta = max - min;
@@ -763,16 +765,17 @@ public class CandleStickChart extends Region {
         for (int i = 0; i < visible.size(); i++) {
             CandleData candle = visible.get(i);
             if (candle == null) continue;
-            if (!candle.isPlaceHolder()) {
-                if (candle.getHighPrice() > high) { high = candle.getHighPrice(); highIndex = i; }
-                if (candle.getLowPrice() < low) { low = candle.getLowPrice(); lowIndex = i; }
+            if (!candle.placeHolder()) {
+                if (candle.highPrice() > high) { high = candle.highPrice(); highIndex = i; }
+                if (candle.lowPrice() < low) { low = candle.lowPrice(); lowIndex = i; }
             }
             drawCandle(candle, i, volumeScale, lastClose);
-            lastClose = candle.getClosePrice();
+            lastClose = candle.closePrice();
         }
         drawHighLowMarkers(high, low, highIndex, lowIndex);
         drawChartHeader(visible.getLast());
         if (showPriceLines) drawPriceLines();
+        drawIndicators();
         drawCurrentPriceBadge(visible.getLast());
         if (showCrosshair && crosshairMouseX >= 0 && crosshairMouseY >= 0) drawCrosshair();
     }
@@ -824,9 +827,9 @@ public class CandleStickChart extends Region {
         double wickX = snapPixel(centerX);
         double bodyX = snapPixel(centerX - (bodyWidth / 2.0));
         if (bodyX > canvas.getWidth() || bodyX + bodyWidth < 0) return;
-        double open = candle.getOpenPrice();
+        double open = candle.openPrice();
         if (chartOptions.isAlignOpenClose() && lastClose > 0) open = lastClose;
-        if (candle.isPlaceHolder()) {
+        if (candle.placeHolder()) {
             double y = priceToY(open);
             graphicsContext.setFill(PLACE_HOLDER_FILL_COLOR);
             graphicsContext.fillRect(bodyX, snapPixel(y), bodyWidth, 1);
@@ -834,9 +837,9 @@ public class CandleStickChart extends Region {
             graphicsContext.strokeRect(bodyX, snapPixel(y), bodyWidth, 1);
             return;
         }
-        double close = candle.getClosePrice();
-        double high = Math.max(candle.getHighPrice(), Math.max(open, close));
-        double low = Math.min(candle.getLowPrice(), Math.min(open, close));
+        double close = candle.closePrice();
+        double high = Math.max(candle.highPrice(), Math.max(open, close));
+        double low = Math.min(candle.lowPrice(), Math.min(open, close));
         boolean bearish = close < open;
         Paint fill = bearish ? BEAR_CANDLE_FILL_COLOR : BULL_CANDLE_FILL_COLOR;
         Paint stroke = bearish ? BEAR_CANDLE_BORDER_COLOR : BULL_CANDLE_BORDER_COLOR;
@@ -857,7 +860,7 @@ public class CandleStickChart extends Region {
 
     private void drawVolumeBar(CandleData candle, double x, double width, Paint fill, double volumeScale) {
         double maxH = canvas.getHeight() * VOLUME_AREA_RATIO;
-        double height = Math.min(maxH, Math.max(1.0, candle.getVolume() * volumeScale));
+        double height = Math.min(maxH, Math.max(1.0, candle.volume() * volumeScale));
         double y = canvas.getHeight() - height;
         graphicsContext.setGlobalAlpha(0.55);
         graphicsContext.setFill(fill);
@@ -886,7 +889,7 @@ public class CandleStickChart extends Region {
         graphicsContext.setTextBaseline(VPos.CENTER);
         graphicsContext.setFill(Color.rgb(248, 250, 252, 0.07));
         graphicsContext.fillText(tradePair.toString('/'), canvas.getWidth() / 2.0, canvas.getHeight() / 2.0);
-        boolean bullish = candle.getClosePrice() >= candle.getOpenPrice();
+        boolean bullish = candle.closePrice() >= candle.openPrice();
         Color closeColor = bullish ? Color.rgb(38, 166, 154) : Color.rgb(239, 83, 80);
         graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 13));
         graphicsContext.setTextAlign(TextAlignment.LEFT);
@@ -896,12 +899,12 @@ public class CandleStickChart extends Region {
         graphicsContext.setFill(Color.rgb(148, 163, 184));
         graphicsContext.fillText(exchange.supportsTimeframe(secondsPerCandle), 112, 18);
 
-        drawHeaderValue("O", candle.getOpenPrice(), 14, Color.rgb(203, 213, 225));
-        drawHeaderValue("H", candle.getHighPrice(), 142, Color.rgb(38, 166, 154));
-        drawHeaderValue("L", candle.getLowPrice(), 270, Color.rgb(239, 83, 80));
-        drawHeaderValue("C", candle.getClosePrice(), 398, closeColor);
+        drawHeaderValue("O", candle.openPrice(), 14, Color.rgb(203, 213, 225));
+        drawHeaderValue("H", candle.highPrice(), 142, Color.rgb(38, 166, 154));
+        drawHeaderValue("L", candle.lowPrice(), 270, Color.rgb(239, 83, 80));
+        drawHeaderValue("C", candle.closePrice(), 398, closeColor);
         graphicsContext.setFill(Color.rgb(148, 163, 184));
-        graphicsContext.fillText("Vol %s".formatted(compactNumber(candle.getVolume())), 526, 40);
+        graphicsContext.fillText("Vol %s".formatted(compactNumber(candle.volume())), 526, 40);
         graphicsContext.fillText("%sChange ".formatted(compactNumber(tradePair.getChange())), 626, 70);
 
         graphicsContext.setTextAlign(TextAlignment.LEFT);
@@ -938,11 +941,115 @@ public class CandleStickChart extends Region {
         }
     }
 
+    private void drawIndicators() {
+        if (indicators.isEmpty()) return;
+        
+        List<CandleData> visible = visibleCandlesSnapshot();
+        if (visible.isEmpty()) return;
+        
+        for (ChartIndicator indicator : List.copyOf(indicators)) {
+            java.util.Map<String, double[]> values = indicator.getValues();
+            if (values.isEmpty() || !indicator.isCalculated()) continue;
+            
+            java.util.Map<String, javafx.scene.paint.Color> lineColors = getIndicatorColors(indicator.getName());
+            
+            for (java.util.Map.Entry<String, double[]> entry : values.entrySet()) {
+                String lineName = entry.getKey();
+                double[] lineValues = entry.getValue();
+                javafx.scene.paint.Color color = lineColors.getOrDefault(lineName, javafx.scene.paint.Color.CYAN);
+                
+                double lastX = -1, lastY = -1;
+                for (int i = 0; i < visible.size() && i < lineValues.length; i++) {
+                    double value = lineValues[i];
+                    if (Double.isNaN(value) || Double.isInfinite(value)) {
+                        lastX = -1;
+                        lastY = -1;
+                        continue;
+                    }
+                    
+                    double y = priceToY(value);
+                    double x = candleCenterX(i);
+                    
+                    if (lastX >= 0 && lastY >= 0) {
+                        graphicsContext.setStroke(color);
+                        graphicsContext.setLineWidth(1.5);
+                        graphicsContext.strokeLine(snapPixel(lastX), snapPixel(lastY), snapPixel(x), snapPixel(y));
+                    }
+                    
+                    lastX = x;
+                    lastY = y;
+                }
+            }
+        }
+    }
+
+    private java.util.Map<String, javafx.scene.paint.Color> getIndicatorColors(String indicatorName) {
+        java.util.Map<String, javafx.scene.paint.Color> colors = new java.util.HashMap<>();
+        switch (indicatorName) {
+            case "SMA20" -> colors.put("SMA", javafx.scene.paint.Color.web("#87CEEB"));
+            case "EMA12" -> colors.put("EMA", javafx.scene.paint.Color.web("#FFA500"));
+            case "RSI14" -> colors.put("RSI", javafx.scene.paint.Color.web("#9370DB"));
+            case "MACD" -> {
+                colors.put("MACD", javafx.scene.paint.Color.web("#2ecc71"));
+                colors.put("Signal", javafx.scene.paint.Color.web("#e74c3c"));
+                colors.put("Histogram", javafx.scene.paint.Color.web("#3498db"));
+            }
+            case "Bollinger Bands" -> {
+                colors.put("MiddleBand", javafx.scene.paint.Color.web("#3498db"));
+                colors.put("UpperBand", javafx.scene.paint.Color.web("#95a5a6"));
+                colors.put("LowerBand", javafx.scene.paint.Color.web("#95a5a6"));
+            }
+            case "Stochastic14" -> {
+                colors.put("K", javafx.scene.paint.Color.web("#e74c3c"));
+                colors.put("D", javafx.scene.paint.Color.web("#3498db"));
+            }
+            case "ATR14" -> colors.put("ATR", javafx.scene.paint.Color.web("#e91e63"));
+            case "Parabolic SAR" -> colors.put("SAR", javafx.scene.paint.Color.web("#f1c40f"));
+            case "Fibonacci Retracement" -> {
+                colors.put("0%", javafx.scene.paint.Color.web("#7f8c8d"));
+                colors.put("23.6%", javafx.scene.paint.Color.web("#95a5a6"));
+                colors.put("38.2%", javafx.scene.paint.Color.web("#bdc3c7"));
+                colors.put("50%", javafx.scene.paint.Color.web("#e0e0e0"));
+                colors.put("61.8%", javafx.scene.paint.Color.web("#bdc3c7"));
+                colors.put("78.6%", javafx.scene.paint.Color.web("#95a5a6"));
+                colors.put("100%", javafx.scene.paint.Color.web("#7f8c8d"));
+            }
+            case "ADX" -> {
+                colors.put("+DI", javafx.scene.paint.Color.web("#2ecc71"));
+                colors.put("-DI", javafx.scene.paint.Color.web("#e74c3c"));
+                colors.put("ADX", javafx.scene.paint.Color.web("#3498db"));
+            }
+            case "CCI" -> colors.put("CCI", javafx.scene.paint.Color.web("#f39c12"));
+            case "Zigzag" -> colors.put("Zigzag", javafx.scene.paint.Color.web("#e74c3c"));
+            case "Fractal" -> {
+                colors.put("UpFractal", javafx.scene.paint.Color.web("#2ecc71"));
+                colors.put("DnFractal", javafx.scene.paint.Color.web("#e74c3c"));
+            }
+            case "Ichimoku Cloud" -> {
+                colors.put("TenkanSen", javafx.scene.paint.Color.web("#3498db"));
+                colors.put("KijunSen", javafx.scene.paint.Color.web("#f39c12"));
+                colors.put("SenkouSpanA", javafx.scene.paint.Color.web("#2ecc71"));
+                colors.put("SenkouSpanB", javafx.scene.paint.Color.web("#e74c3c"));
+                colors.put("ChikouSpan", javafx.scene.paint.Color.web("#9370DB"));
+            }
+            case "Volume Weighted Average Price" -> colors.put("VWAP", javafx.scene.paint.Color.web("#1abc9c"));
+            default -> colors.put("Line", javafx.scene.paint.Color.CYAN);
+        }
+        return colors;
+    }
+
+    private double getCandleWidth() {
+        List<CandleData> visible = visibleCandlesSnapshot();
+        if (visible.isEmpty()) return 10;
+        double totalWidth = canvas.getWidth();
+        return Math.max(2, totalWidth / visible.size() * 0.8);
+    }
+
     private void drawCurrentPriceBadge(CandleData candle) {
-        double price = candle.getClosePrice();
+        double price = candle.closePrice();
         double y = priceToY(price);
         if (y < 0 || y > canvas.getHeight()) return;
-        boolean bullish = candle.getClosePrice() >= candle.getOpenPrice();
+        boolean bullish = candle.closePrice() >= candle.openPrice();
         Color color = bullish ? Color.rgb(38, 166, 154) : Color.rgb(239, 83, 80);
         double x = canvas.getWidth() - PRICE_BADGE_WIDTH;
         double badgeY = clamp(y - PRICE_BADGE_HEIGHT / 2.0, HEADER_HEIGHT + 2, canvas.getHeight() - PRICE_BADGE_HEIGHT - 2);
@@ -971,7 +1078,7 @@ public class CandleStickChart extends Region {
         hoveredPrice = price;
         int index = clampInt((int) Math.floor(crosshairMouseX / Math.max(1.0, canvas.getWidth() / Math.max(1, visibleCandles))), 0, Math.max(0, visibleCandles - 1));
         List<CandleData> visible = visibleCandlesSnapshot();
-        if (index < visible.size()) hoveredTime = visible.get(index).getOpenTime();
+        if (index < visible.size()) hoveredTime = visible.get(index).openTime();
         drawLabelBadge(formatPrice(price), canvas.getWidth() - PRICE_BADGE_WIDTH, clamp(crosshairMouseY - PRICE_BADGE_HEIGHT / 2.0, HEADER_HEIGHT + 2, canvas.getHeight() - PRICE_BADGE_HEIGHT - 2), PRICE_BADGE_WIDTH);
         if (hoveredTime > 0) {
             String time = CROSSHAIR_TIME_FORMAT.format(Instant.ofEpochSecond(hoveredTime));
@@ -1007,7 +1114,7 @@ public class CandleStickChart extends Region {
             int delta = direction == ZoomDirection.IN ? -8 : 8;
             int nextVisible = clampInt(visibleCandles + delta, Math.min(MIN_VISIBLE_CANDLES, data.size()), Math.min(MAX_VISIBLE_CANDLES, data.size()));
             CandleData anchor = latestVisibleCandle().orElse(lastValue());
-            int anchorTime = anchor == null ? -1 : anchor.getOpenTime();
+            int anchorTime = anchor == null ? -1 : anchor.openTime();
             setVisibleCandleCount(nextVisible);
             if (anchorTime > 0) {
                 List<CandleData> all = new ArrayList<>(data.values());
@@ -1029,8 +1136,16 @@ public class CandleStickChart extends Region {
 
     private CandleData lastValue() { return data.isEmpty() ? null : data.lastEntry().getValue(); }
 
+    /**
+     * Gets all available candle data for indicator calculation.
+     * @return List of all CandleData sorted by open time
+     */
+    public List<CandleData> getAllCandleData() {
+        return new ArrayList<>(data.values());
+    }
+
     private int indexOfOpenTime(List<CandleData> candles, int openTime) {
-        for (int i = 0; i < candles.size(); i++) if (candles.get(i).getOpenTime() == openTime) return i;
+        for (int i = 0; i < candles.size(); i++) if (candles.get(i).openTime() == openTime) return i;
         return candles.size() - 1;
     }
 
@@ -1104,6 +1219,32 @@ public class CandleStickChart extends Region {
     public boolean isPriceLinesVisible() { return showPriceLines; }
     public void togglePriceLines() { setPriceLinesVisible(!showPriceLines); }
 
+    // Indicator management methods
+    public void addIndicator(ChartIndicator indicator) {
+        if (indicator != null && !indicators.stream().anyMatch(i -> i.getName().equals(indicator.getName()))) {
+            indicators.add(indicator);
+            requestChartRedraw();
+        }
+    }
+
+    public void removeIndicator(String indicatorName) {
+        indicators.removeIf(i -> i.getName().equals(indicatorName));
+        requestChartRedraw();
+    }
+
+    public void clearIndicators() {
+        indicators.clear();
+        requestChartRedraw();
+    }
+
+    public List<ChartIndicator> getIndicators() {
+        return List.copyOf(indicators);
+    }
+
+    public boolean hasIndicator(String indicatorName) {
+        return indicators.stream().anyMatch(i -> i.getName().equals(indicatorName));
+    }
+
     public void setCrosshairVisible(boolean visible) {
         showCrosshair = visible;
         if (!visible) { crosshairMouseX = -1; crosshairMouseY = -1; }
@@ -1111,7 +1252,7 @@ public class CandleStickChart extends Region {
     }
     public boolean isCrosshairVisible() { return showCrosshair; }
     public void toggleCrosshair() { setCrosshairVisible(!showCrosshair); }
-    public double getLatestClosePrice() { CandleData last = lastValue(); return last == null ? 0.0 : last.getClosePrice(); }
+    public double getLatestClosePrice() { CandleData last = lastValue(); return last == null ? 0.0 : last.closePrice(); }
 
     public void autoTrade() { setAutoTradeEnabled(!autoTradeEnabled); }
 

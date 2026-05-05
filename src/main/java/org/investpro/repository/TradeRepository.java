@@ -1,7 +1,7 @@
 package org.investpro.repository;
 
-import org.investpro.models.trading.Trade;
-import org.investpro.models.trading.TradePair;
+import  org.investpro.models.trading.Trade;
+import  org.investpro.models.trading.TradePair;
 
 import java.sql.SQLException;
 import java.time.Instant;

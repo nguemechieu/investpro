@@ -1,12 +1,18 @@
 package org.investpro.models.trading;
 
 import javafx.util.Pair;
-import lombok.*;
-import org.investpro.models.currency.CryptoCurrency;
-import org.investpro.models.currency.Currency;
-import org.investpro.models.currency.CurrencyNotFoundException;
-import org.investpro.models.currency.CurrencyType;
-import org.investpro.models.currency.FiatCurrency;
+
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import  org.investpro.models.currency.CryptoCurrency;
+import  org.investpro.models.currency.Currency;
+import  org.investpro.models.currency.CurrencyNotFoundException;
+import  org.investpro.models.currency.CurrencyType;
+import  org.investpro.models.currency.FiatCurrency;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -22,15 +28,19 @@ import java.util.regex.Pattern;
 /**
  * Represents a tradable market pair such as:
  * BTC/USD, EUR/USD, ETH/USDT.
- *
+ * <p>
  * This class is intentionally a model only.
  * It should not fetch data from exchanges directly.
- *
+ * <p>
  * Exchange adapters should update bid/ask/last/volume/change fields.
  */
+
+
 @EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
+@Slf4j
 @Data
-@Getter @Setter
 public class TradePair extends Pair<Currency, Currency> {
 
     private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
@@ -169,7 +179,7 @@ public class TradePair extends Pair<Currency, Currency> {
         return tradePair.split(Pattern.quote(separator));
     }
 
-    @SneakyThrows
+
     private static void validateExpectedCurrencyType(
             Currency currency,
             String code,
@@ -177,20 +187,36 @@ public class TradePair extends Pair<Currency, Currency> {
             boolean base
     ) {
         if (expectedType == null) {
-            validateAnyKnownCurrency(currency, code);
+            try {
+                validateAnyKnownCurrency(currency, code);
+            } catch (CurrencyNotFoundException e) {
+                throw new RuntimeException(e);
+            }
             return;
         }
 
         if (FiatCurrency.class.equals(expectedType)) {
-            if (Currency.of(code) == Currency.NULL_FIAT_CURRENCY) {
-                throw new CurrencyNotFoundException(CurrencyType.FIAT, code);
+            try {
+                if (Currency.of(code) == Currency.NULL_FIAT_CURRENCY) {
+                    try {
+                        throw new CurrencyNotFoundException(CurrencyType.FIAT, code);
+                    } catch (CurrencyNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
             return;
         }
 
         if (CryptoCurrency.class.equals(expectedType)) {
-            if (Currency.of(code) == Currency.NULL_CRYPTO_CURRENCY) {
-                throw new CurrencyNotFoundException(CurrencyType.CRYPTO, code);
+            try {
+                if (Currency.of(code) == Currency.NULL_CRYPTO_CURRENCY) {
+                    throw new CurrencyNotFoundException(CurrencyType.CRYPTO, code);
+                }
+            } catch (SQLException | CurrencyNotFoundException e) {
+                throw new RuntimeException(e);
             }
             return;
         }
@@ -299,6 +325,13 @@ public class TradePair extends Pair<Currency, Currency> {
         }
 
         return Math.max(bid, ask);
+    }
+
+    /**
+     * Get the last traded price. Falls back to mid-price if last price is not available.
+     */
+    public double getLastPrice() {
+        return last > 0 ? last : getMidPrice();
     }
 
     public double getSpread() {

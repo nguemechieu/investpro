@@ -1,6 +1,6 @@
 package org.investpro.models.currency;
 
-import org.investpro.backtesting.Algorithm;
+import  org.investpro.backtesting.Algorithm;
 
 import java.util.HashMap;
 import java.util.Map;

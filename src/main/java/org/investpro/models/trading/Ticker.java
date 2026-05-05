@@ -12,6 +12,7 @@ import java.time.Instant;
 @Data
 public class Ticker {
 
+    // Explicit getters (Lombok @Data not being invoked)
     private double lastPrice;
     private double bidPrice;
     private double askPrice;

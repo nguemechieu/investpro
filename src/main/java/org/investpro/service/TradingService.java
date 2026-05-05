@@ -1,7 +1,5 @@
 package org.investpro.service;
 
-import lombok.Setter;
-
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.Order;
 import org.investpro.models.trading.Trade;

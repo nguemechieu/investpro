@@ -1,7 +1,9 @@
 package org.investpro.models.trading;
 
 import javafx.scene.paint.Color;
+import lombok.Getter;
 
+@Getter
 public class Exposure {
 
 

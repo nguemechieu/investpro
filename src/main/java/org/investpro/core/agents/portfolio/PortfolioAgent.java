@@ -19,8 +19,8 @@ public class PortfolioAgent implements Agent {
 
     private AgentContext context;
     private boolean running;
-    private final AtomicReference<Object> lastAccount = new AtomicReference<>();
-    private final AtomicReference<Object> lastPositions = new AtomicReference<>();
+    AtomicReference<Object> lastAccount = new AtomicReference<>();
+     AtomicReference<Object> lastPositions = new AtomicReference<>();
 
     private static  final Logger logger = LoggerFactory.getLogger(PortfolioAgent.class);
 

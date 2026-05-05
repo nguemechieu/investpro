@@ -126,7 +126,7 @@ public final class CandleStickChartUtils {
             maxPrice = Math.max(maxPrice, highPrice(candle));
 
             extrema.put(
-                    candle.getOpenTime(),
+                    candle.openTime(),
                     new Pair<>(
                             new Extrema<>(minVolume, maxVolume),
                             new Extrema<>(minPrice, maxPrice)
@@ -180,7 +180,7 @@ public final class CandleStickChartUtils {
 
         return candleData.stream()
                 .filter(Objects::nonNull)
-                .sorted(Comparator.comparingInt(CandleData::getOpenTime))
+                .sorted(Comparator.comparingInt(CandleData::openTime))
                 .toList();
     }
 
@@ -203,7 +203,7 @@ public final class CandleStickChartUtils {
         CandleData windowStartCandle = candleData.get(windowStartIndex);
 
         extrema.put(
-                windowStartCandle.getOpenTime(),
+                windowStartCandle.openTime(),
                 new Pair<>(
                         new Extrema<>(
                                 volume(candleData.get(volumeMinDeque.peekFirst())),
@@ -254,27 +254,27 @@ public final class CandleStickChartUtils {
     }
 
     private static double volume(CandleData candle) {
-        if (candle == null || !Double.isFinite(candle.getVolume())) {
+        if (candle == null || !Double.isFinite(candle.volume())) {
             return 0.0;
         }
 
-        return candle.getVolume();
+        return candle.volume();
     }
 
     private static double lowPrice(CandleData candle) {
-        if (candle == null || !Double.isFinite(candle.getLowPrice())) {
+        if (candle == null || !Double.isFinite(candle.lowPrice())) {
             return 0.0;
         }
 
-        return candle.getLowPrice();
+        return candle.lowPrice();
     }
 
     private static double highPrice(CandleData candle) {
-        if (candle == null || !Double.isFinite(candle.getHighPrice())) {
+        if (candle == null || !Double.isFinite(candle.highPrice())) {
             return 0.0;
         }
 
-        return candle.getHighPrice();
+        return candle.highPrice();
     }
 
     @FunctionalInterface

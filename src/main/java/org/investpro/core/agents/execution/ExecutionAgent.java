@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Final execution gate.
- *
+ * <p>
  * This is the only agent that is allowed to call exchange.createOrder(...).
  */
 public class ExecutionAgent implements Agent {

@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import org.investpro.exchange.*;
+import org.investpro.exchange.core.VenueAwareExchange;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -25,10 +27,17 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.Cursor;
 import javafx.util.Duration;
+import org.investpro.data.Account;
+import org.investpro.exchange.coinbase.CoinbaseAuthProvider;
+import org.investpro.exchange.infrastructure.BrokerRouter;
+import org.investpro.exchange.core.BrokerVenue;
 import org.investpro.service.UserAuthService;
 
 import java.util.Arrays;
+import java.util.InvalidPropertiesFormatException;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.prefs.Preferences;
@@ -180,8 +189,8 @@ public class OnboardingView extends StackPane {
         venueBox.getSelectionModel().select("US");
         exchangeBox.getSelectionModel().select("COINBASE");
 
-        // Auto-load credentials when exchange changes
-        exchangeBox.setOnAction(event -> {
+        // Autoload credentials when exchange changes
+        exchangeBox.setOnAction(_ -> {
             if (marketTypeBox.getValue() != null && venueBox.getValue() != null && exchangeBox.getValue() != null) {
                 showExchangeCredentialsStep();
             }
@@ -340,6 +349,26 @@ public class OnboardingView extends StackPane {
                 );
             }
             
+            // Authenticate with broker before proceeding
+            validation.setStyle("-fx-text-fill: #fbbf24;");
+            validation.setText("Authenticating with %s...".formatted(selectedExchange));
+            
+            String apiKey;
+            apiKey = apiKeyField.getText().trim();
+            String apiSecret = selectedExchange.equals("OANDA") ? accountIdField.getText().trim() : apiSecretField.getText().trim();
+            
+            AuthenticationResult authResult = authenticateWithBroker(selectedExchange, apiKey, apiSecret);
+            
+            if (!authResult.success()) {
+                validation.setStyle("-fx-text-fill: #ef4444;");
+                validation.setText(authResult.message());
+                return;
+            }
+            
+            // Authentication successful - proceed with configuration
+            validation.setStyle("-fx-text-fill: #22c55e;");
+            validation.setText("Authentication successful!");
+            
             // Save exchange credentials if checkbox is selected
             if (rememberCredentialsCheckBox.isSelected()) {
                 saveRememberedExchangeCredentials(selectedExchange, 
@@ -366,13 +395,55 @@ public class OnboardingView extends StackPane {
         info.setWrapText(true);
         info.setMaxWidth(500);
         
-        if (selectedExchange.equals("OANDA")) {
-            info.setText("For OANDA: Enter your Bearer Token (API v3 authentication). Account ID is optional and will be auto-detected from your account.");
-        } else {
-            info.setText("Enter your API Key and Secret for " + selectedExchange + ".");
-        }
+        Button helpButton = new Button("? Format Help");
+        helpButton.setStyle("-fx-padding: 4 12; -fx-background-color: #1e40af; -fx-text-fill: #bfdbfe; -fx-border-color: #3b82f6; -fx-border-width: 1;");
+        helpButton.setCursor(Cursor.HAND);
+        
+        String infoText = switch (selectedExchange) {
+            case "COINBASE" -> """
+                    Coinbase Advanced Trade API:
+                    • API Key: Organization ID format (organizations/xxxxx/apiKeys/xxxxx)
+                    • API Secret: EC Private Key in PEM format (-----BEGIN EC PRIVATE KEY-----)
+                    Generate at: https://coinbase.com/settings/api""";
+            case "OANDA" -> """
+                    OANDA v3 API:
+                    • Token: Bearer token from Account Settings
+                    • Account ID: Optional (auto-detected if left blank)
+                    Generate at: https://www.oanda.com/account/tpa/personal-token""";
+            case "BINANCE", "BINANCE US" -> """
+                    Binance API:
+                    • API Key: Public key from API Management
+                    • API Secret: Secret key from API Management
+                    Generate at: https://www.binance.com/en/user/settings/api-management""";
+            case "BITFINEX" -> """
+                    Bitfinex API:
+                    • API Key: Public key from Settings → API
+                    • API Secret: Secret key from Settings → API
+                    Generate at: https://www.bitfinex.com/api""";
+            case "ALPACA" -> """
+                    Alpaca Trading API:
+                    • API Key: From Dashboard → API Keys
+                    • API Secret: From Dashboard → API Keys
+                    Generate at: https://app.alpaca.markets/""";
+            case "INTERACTIVE BROKERS" -> """
+                    Interactive Brokers:
+                    • API Key: Your IB account username or API key
+                    • API Secret: Your IB account password or secret
+                    Setup: Enable API at Account Management""";
+            default -> "Enter your API Key and API Secret for " + selectedExchange;
+        };
+        
+        info.setText(infoText);
+        
+        helpButton.setOnAction(_ -> {
+            Alert helpDialog = new Alert(Alert.AlertType.INFORMATION);
+            helpDialog.setTitle("Credential Format Help - " + selectedExchange);
+            helpDialog.setHeaderText("How to find your " + selectedExchange + " credentials");
+            helpDialog.setContentText(infoText);
+            helpDialog.showAndWait();
+        });
 
-        HBox buttonBox = new HBox(10, backButton, continueButton);
+        HBox buttonBox = new HBox(10, backButton, continueButton, helpButton);
         buttonBox.setAlignment(Pos.CENTER);
 
         VBox content = new VBox(18, title, subtitle, info, credGrid, rememberBox, buttonBox, validation);
@@ -540,11 +611,11 @@ public class OnboardingView extends StackPane {
         authService.forgetRememberedUser();
         // Clear all exchange credentials
         for (String exchange : new String[]{"COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA", "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX"}) {
-            preferences.remove("exchange_api_key_" + exchange);
-            preferences.remove("exchange_api_secret_" + exchange);
-            preferences.remove("exchange_account_id_" + exchange);
-            preferences.remove("exchange_venue_" + exchange);
-            preferences.remove("telegram_token_" + exchange);
+            preferences.remove("exchange_api_key_%s".formatted(exchange));
+            preferences.remove("exchange_api_secret_%s".formatted(exchange));
+            preferences.remove("exchange_account_id_%s".formatted(exchange));
+            preferences.remove("exchange_venue_%s".formatted(exchange));
+            preferences.remove("telegram_token_%s".formatted(exchange));
         }
         usernameField.clear();
         passwordField.clear();
@@ -553,18 +624,18 @@ public class OnboardingView extends StackPane {
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId, String token) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
-        preferences.put("exchange_api_key_" + exchange, apiKey);
-        preferences.put("exchange_api_secret_" + exchange, apiSecret);
-        preferences.put("exchange_account_id_" + exchange, accountId);
-        preferences.put("telegram_token_" + exchange, token);
+        preferences.put("exchange_api_key_%s".formatted(exchange), apiKey);
+        preferences.put("exchange_api_secret_%s".formatted(exchange), apiSecret);
+        preferences.put("exchange_account_id_%s".formatted(exchange), accountId);
+        preferences.put("telegram_token_%s".formatted(exchange), token);
     }
 
     private void loadRememberedExchangeCredentials(String exchange, TextField apiKeyField, PasswordField apiSecretField, TextField accountIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
-        String savedApiKey = preferences.get("exchange_api_key_" + exchange, "");
-        String savedApiSecret = preferences.get("exchange_api_secret_" + exchange, "");
-        String savedAccountId = preferences.get("exchange_account_id_" + exchange, "");
-        String savedTelegramToken = preferences.get("telegram_token_" + exchange, "");
+        String savedApiKey = preferences.get("exchange_api_key_%s".formatted(exchange), "");
+        String savedApiSecret = preferences.get("exchange_api_secret_%s".formatted(exchange), "");
+        String savedAccountId = preferences.get("exchange_account_id_%s".formatted(exchange), "");
+        String savedTelegramToken = preferences.get("telegram_token_%s".formatted(exchange), "");
         
         if (!savedApiKey.isEmpty()) {
             apiKeyField.setText(savedApiKey);
@@ -578,5 +649,204 @@ public class OnboardingView extends StackPane {
         if (!savedTelegramToken.isEmpty()) {
             telegramToken.setText(savedTelegramToken);
         }
+    }
+
+    /**
+     * Authenticates with the broker using the provided credentials.
+     * Creates an exchange instance and attempts to connect.
+     *
+     * @param exchangeName the name of the exchange
+     * @param apiKey the API key or token
+     * @param apiSecret the API secret (optional for some exchanges)
+     * @return a result object containing success status and message
+     */
+    private AuthenticationResult authenticateWithBroker(String exchangeName, String apiKey, String apiSecret) {
+        try {
+            if ("COINBASE".equalsIgnoreCase(safe(exchangeName))) {
+                String validationError = CoinbaseAuthProvider.validationError(apiKey, apiSecret, null);
+
+                if (validationError != null) {
+                    return new AuthenticationResult(false, validationError);
+                }
+
+                Coinbase coinbase = new Coinbase(apiKey, apiSecret);
+                Account account = coinbase.fetchAccount().join();
+
+                if (account == null) {
+                    return new AuthenticationResult(false, "Coinbase returned no account for these credentials.");
+                }
+
+                coinbase.disconnect();
+                return new AuthenticationResult(true, "Successfully authenticated with Coinbase");
+            }
+
+            // Create exchange instance with provided credentials
+            Exchange exchange = createExchange(exchangeName, apiKey, apiSecret);
+            
+            if (exchange == null) {
+                return new AuthenticationResult(false, "Failed to create exchange instance for %s".formatted(exchangeName));
+            }
+            
+            // Attempt to connect and verify credentials
+            exchange.connect();
+            
+            // Check if connection was successful
+            Boolean isConnected = exchange.isConnected();
+            if (isConnected == null || !isConnected) {
+                exchange.disconnect();
+                return new AuthenticationResult(false, "Connection to %s failed. Please verify your credentials.".formatted(exchangeName));
+            }
+            
+            exchange.disconnect();
+            return new AuthenticationResult(true, "Successfully authenticated with %s".formatted(exchangeName));
+            
+        } catch (RuntimeException e) {
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Authentication failed";
+            if (errorMessage.contains("timeout")) {
+                return new AuthenticationResult(false, "Connection timeout. Check your network and try again.");
+            } else if (errorMessage.contains("Unauthorized") || errorMessage.contains("403") || errorMessage.contains("401")) {
+                return new AuthenticationResult(false, "Invalid credentials. Please check your API key and secret.");
+            } else if (errorMessage.contains("refused")) {
+                return new AuthenticationResult(false, "Connection refused. %s might be temporarily unavailable.".formatted(exchangeName));
+            }
+            return new AuthenticationResult(false, "Authentication failed: %s".formatted(errorMessage));
+        } catch (Exception e) {
+            return new AuthenticationResult(false, "Unexpected error during authentication: %s".formatted(e.getMessage()));
+        }
+    }
+
+    /**
+     * Creates an exchange instance based on the exchange name and credentials.
+     */
+    private Exchange createExchange(String exchangeName, String apiKey, String apiSecret) throws InvalidPropertiesFormatException {
+        String name = safe(exchangeName).toUpperCase();
+        return switch (name) {
+            case "BINANCE US" -> new BinanceUs(apiKey, apiSecret);
+            case "BINANCE" -> new Binance(apiKey, apiSecret);
+            case "OANDA" -> new Oanda(apiKey, apiSecret);
+            case "BITFINEX" -> new Bitfinex(apiKey, apiSecret);
+            case "ALPACA" -> new Alpaca(apiKey, apiSecret);
+            case "INTERACTIVE BROKERS", "IBKR" -> new InteractiveBrokers(apiKey, apiSecret);
+            case "COINBASE" -> new Coinbase(apiKey, apiSecret);
+            default ->null;
+        };
+    }
+
+    /**
+     * Safely trims a string, returning empty string if null.
+     */
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    /**
+     * Result of a broker authentication attempt.
+     */
+    private record AuthenticationResult(boolean success, String message) {
+    }
+
+    // ============================================================================
+    // New Venue-Aware Broker Architecture Support
+    // ============================================================================
+
+    /**
+     * Authenticate using the new venue-aware broker router.
+     * Supports venue selection for brokers that have multiple venues.
+     */
+    public AuthenticationResult authenticateWithVenueAwareBroker(String brokerName, 
+                                                                 String venueName,
+                                                                 String apiKey, 
+                                                                 String apiSecret) {
+        AuthenticationResult result;
+        try {
+            // Import the necessary classes
+            BrokerRouter router = new BrokerRouter();
+            BrokerVenue venue = parseVenue(brokerName, venueName);
+            
+            if (venue == BrokerVenue.UNKNOWN) {
+                result = new AuthenticationResult(false, "Unknown venue: %s".formatted(venueName));
+            } else {// Get the venue-aware exchange
+                VenueAwareExchange exchange =
+                    router.getExchange(brokerName, venue, apiKey, apiSecret);// Attempt connection
+                if (exchange == null) {
+                    result = new AuthenticationResult(false,
+                            "Failed to create %s/%s instance".formatted(brokerName, venueName));
+                } else // Verify connection
+                    if (!exchange.connect()) {
+                        result = new AuthenticationResult(false,
+                                "Failed to authenticate with %s. Please verify your credentials.".formatted(exchange.getVenueName()));
+                    } else if (!exchange.isConnected()) {
+                    exchange.disconnect();
+                        result = new AuthenticationResult(false,
+                                "Connection to %s failed".formatted(exchange.getVenueName()));
+                    } else {
+                        exchange.disconnect();
+                        result = new AuthenticationResult(true,
+                                "Successfully authenticated with %s".formatted(exchange.getVenueName()));
+                    }
+            }
+
+        } catch (RuntimeException e) {
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Authentication failed";
+            if (errorMessage.contains("timeout")) {
+                result = new AuthenticationResult(false,
+                        "Connection timeout. Check your network and try again.");
+            } else if (errorMessage.contains("Unauthorized") || errorMessage.contains("403") || 
+                       errorMessage.contains("401")) {
+                result = new AuthenticationResult(false,
+                        "Invalid credentials. Please check your API key and secret.");
+            } else if (errorMessage.contains("refused")) {
+                result = new AuthenticationResult(false,
+                        "Connection refused. %s might be temporarily unavailable.".formatted(brokerName));
+            } else {
+                result = new AuthenticationResult(false, "Authentication failed: %s".formatted(errorMessage));
+            }
+        } catch (Exception e) {
+            result = new AuthenticationResult(false,
+                    "Unexpected error during authentication: %s".formatted(e.getMessage()));
+        }
+        return result;
+    }
+
+    /**
+     * Get available venues for a broker.
+     */
+    public java.util.List<String> getAvailableVenues(String brokerName) {
+        return switch (brokerName.toUpperCase()) {
+            case "COINBASE" -> java.util.Arrays.asList("Spot", "US Futures", "International Perpetuals");
+            case "OANDA" -> List.of("FX/CFD");
+            case "BINANCE" -> java.util.Arrays.asList("Spot", "Futures");
+            case "BINANCE US" -> List.of("Spot");
+            case "BITFINEX" -> java.util.Arrays.asList("Spot", "Derivatives");
+            case "ALPACA" -> java.util.Arrays.asList("Stocks", "Crypto");
+            case "INTERACTIVE BROKERS", "IBKR" -> Arrays.asList("Stocks", "Forex");
+            default -> List.of("Default");
+        };
+    }
+
+    /**
+     * Parse venue name string to BrokerVenue enum.
+     */
+    private BrokerVenue parseVenue(String brokerName, String venueName) {
+        String broker = brokerName.toUpperCase();
+        String venue = venueName.toUpperCase();
+
+        return switch (broker) {
+            case "COINBASE" -> switch (venue) {
+                case "SPOT" -> BrokerVenue.COINBASE_SPOT;
+                case "US FUTURES", "FUTURES" -> BrokerVenue.COINBASE_US_FUTURES;
+                case "INTERNATIONAL PERPETUALS", "PERPETUALS" ->
+                        BrokerVenue.COINBASE_INTERNATIONAL_PERPETUALS;
+                default -> BrokerVenue.UNKNOWN;
+            };
+            case "OANDA" -> BrokerVenue.OANDA_FX_CFD;
+            case "BINANCE" -> switch (venue) {
+                case "SPOT" -> BrokerVenue.BINANCE_SPOT;
+                case "FUTURES" -> BrokerVenue.BINANCE_FUTURES;
+                default -> BrokerVenue.UNKNOWN;
+            };
+            default -> BrokerVenue.UNKNOWN;
+        };
+
     }
 }

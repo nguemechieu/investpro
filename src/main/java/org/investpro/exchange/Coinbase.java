@@ -6,25 +6,33 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.investpro.models.trading.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.models.currency.CryptoCurrency;
-import org.investpro.models.trading.Order;
 import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
-import org.investpro.models.trading.Ticker;
-import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.CoinbaseJwtSigner;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.investpro.exchange.coinbase.CoinbaseCandleDataSupplier;
+import org.investpro.exchange.websocket.CoinbaseExchangeWebSocketClient;
+import org.investpro.exchange.websocket.ExchangeWebSocketClient;
+import org.investpro.exchange.infrastructure.PollingExchangeStreamer;
+import org.investpro.exchange.infrastructure.BotTradingConfig;
+import org.investpro.exchange.infrastructure.SignalProcessor;
+import org.investpro.exchange.infrastructure.OrderCommandConsumer;
+import org.investpro.exchange.infrastructure.StreamTransport;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,17 +47,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -75,7 +73,9 @@ public class Coinbase extends Exchange {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final HttpClient httpClient;
+    private HttpRequest.Builder requestBuilder;
     private final CoinbaseJwtSigner jwtSigner;
+
     private final PollingExchangeStreamer pollingStreamer;
 
     private ExchangeWebSocketClient websocketClient;
@@ -84,11 +84,37 @@ public class Coinbase extends Exchange {
     private String apiSecret;
     private String apiKey;
 
+    // Bot trading components
+
+    private final BotTradingConfig botConfig;
+    private final SignalProcessor signalProcessor;
+
     public Coinbase(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
 
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.apiSecret = apiSecret == null ? "" : apiSecret.trim();
+        // Try to load credentials from environment variables first (most secure)
+        // COINBASE_KEY_NAME: organizations/{org_id}/apiKeys/{key_id}
+        // COINBASE_PRIVATE_KEY: EC private key in PEM format
+        String envKeyName = CoinbaseCredentialProvider.getKeyName();
+        String envPrivateKey = CoinbaseCredentialProvider.getPrivateKey();
+
+        if (envKeyName != null && !envKeyName.isBlank() && envPrivateKey != null && !envPrivateKey.isBlank()) {
+            // Use environment variable credentials (preferred)
+            this.apiKey = envKeyName.trim();
+            this.apiSecret = envPrivateKey.trim();
+            logger.info(
+                    "Coinbase: Using credentials from environment variables (COINBASE_KEY_NAME, COINBASE_PRIVATE_KEY)");
+        } else {
+            // Fall back to provided parameters (UI input or programmatic)
+            this.apiKey = apiKey == null ? "" : apiKey.trim();
+            this.apiSecret = apiSecret == null ? "" : apiSecret.trim();
+            if (!this.apiKey.isEmpty() && !this.apiSecret.isEmpty()) {
+                logger.info("Coinbase: Using credentials from provided parameters");
+            } else {
+                logger.warn(
+                        "Coinbase: No credentials provided. Set COINBASE_KEY_NAME and COINBASE_PRIVATE_KEY environment variables, or provide apiKey/apiSecret parameters.");
+            }
+        }
 
         this.jwtSigner = createJwtSigner(this.apiKey, this.apiSecret);
 
@@ -98,19 +124,28 @@ public class Coinbase extends Exchange {
 
         this.pollingStreamer = new PollingExchangeStreamer(this);
 
+        // Initialize bot trading components
+        this.botConfig = new BotTradingConfig();
+        // Try to get account balance for risk management, default to $10k if
+        // unavailable
+        double accountBalance = 500.0;
+        try {
+            Account account = getUserAccountDetails();
+            if (account != null) {
+                accountBalance = account.getAvailableBalance();
+            }
+        } catch (Exception e) {
+            logger.debug("Could not fetch account balance, using default $10k: {}", e.getMessage());
+        }
+
+        this.signalProcessor = new SignalProcessor(this, this.botConfig, accountBalance);
+
+        String jwt = websocketJwt();
+        logger.info("Coinbase WebSocket JWT created: {} characters, null={}", jwt.length(), jwt.isEmpty());
         this.websocketClient = new CoinbaseExchangeWebSocketClient(
                 URI.create(MARKET_DATA_WS_URL),
-                new Draft_6455()
-        );
-    }
-
-    /**
-     * Constructor with Telegram token and email notification support
-     */
-    public Coinbase(String apiKey, String apiSecret, String telegramToken, String emailNotification) {
-        this(apiKey, apiSecret);
-        this.setTelegramToken(telegramToken);
-        this.setEmailNotification(emailNotification);
+                new Draft_6455(),
+                jwt);
     }
 
     @Override
@@ -150,7 +185,7 @@ public class Coinbase extends Exchange {
         }
 
         String name = marketType.name().toUpperCase(Locale.ROOT);
-        return name.contains("CRYPTO") || name.contains("SPOT");
+        return name.contains("CRYPTO") || name.contains("SPOT") || name.contains("DERIVATIVE");
     }
 
     @Override
@@ -169,11 +204,28 @@ public class Coinbase extends Exchange {
     @Override
     public void connect() {
         try {
+            logger.info("Coinbase connect() called. websocketClient={}, isOpen={}",
+                    websocketClient, websocketClient != null ? websocketClient.isOpen() : "null");
+
             if (websocketClient != null && !websocketClient.isOpen()) {
-                websocketClient.connect();
+                logger.info("Attempting to establish WebSocket connection to Coinbase...");
+                // Use connectBlocking() to wait for actual connection establishment
+                // with timeout to prevent hanging on stuck connections
+                boolean connected = websocketClient.connectBlocking(10, java.util.concurrent.TimeUnit.SECONDS);
+                if (!connected) {
+                    logger.error("WebSocket connection timeout after 10 seconds");
+                    throw new RuntimeException("WebSocket connection timeout after 10 seconds");
+                }
+                logger.info("Successfully connected to Coinbase WebSocket");
             }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            logger.error("Coinbase WebSocket connection interrupted", exception);
+            throw new RuntimeException("Coinbase WebSocket connection interrupted", exception);
         } catch (Exception exception) {
-            logger.warn("Unable to connect Coinbase websocket", exception);
+            logger.error("Unable to connect Coinbase WebSocket: {}", exception.getMessage(), exception);
+            throw new RuntimeException("Unable to connect Coinbase WebSocket: %s".formatted(exception.getMessage()),
+                    exception);
         }
     }
 
@@ -194,10 +246,12 @@ public class Coinbase extends Exchange {
     public void reconnect() {
         disconnect();
 
+        // Pass JWT token to WebSocket client for authenticated endpoints
+        String jwt = websocketJwt();
         websocketClient = new CoinbaseExchangeWebSocketClient(
                 URI.create(MARKET_DATA_WS_URL),
-                new Draft_6455()
-        );
+                new Draft_6455(),
+                jwt);
 
         connect();
     }
@@ -239,16 +293,9 @@ public class Coinbase extends Exchange {
     }
 
     @Override
-    public TradePair getSelectedTradePair()  {
+    public TradePair getSelectedTradePair() {
         return tradePair;
     }
-
-    @Override
-    public TradePair getSelecTradePair() {
-        return tradePair;
-    }
-
-
 
     @Override
     public double getLivePrice() {
@@ -287,6 +334,8 @@ public class Coinbase extends Exchange {
                 .timeout(Duration.ofSeconds(30))
                 .header("Accept", "application/json")
                 .header("User-Agent", "InvestPro/1.0")
+                .header("Accept-Encoding", "gzip, deflate")
+                .header("Accept-Language", "en-US,en;q=0.5")
                 .header("Cache-Control", "no-cache");
     }
 
@@ -303,33 +352,52 @@ public class Coinbase extends Exchange {
     }
 
     private CoinbaseJwtSigner createJwtSigner(String keyName, String secret) {
-        if (keyName == null || keyName.isBlank() || !looksLikePrivateKey(secret)) {
+        logger.debug("Creating JWT signer: keyName={}, secretLength={}", keyName, secret == null ? 0 : secret.length());
+
+        if (keyName == null || keyName.isBlank()) {
+            logger.warn("Coinbase API key name is blank or null");
+            return null;
+        }
+
+        if (!looksLikePrivateKey(secret)) {
+            logger.warn("Coinbase API secret does not look like a valid EC private key");
             return null;
         }
 
         try {
-            return new CoinbaseJwtSigner(keyName, secret);
+            CoinbaseJwtSigner signer = new CoinbaseJwtSigner(keyName, secret);
+            logger.info("Successfully created Coinbase JWT signer");
+            return signer;
         } catch (RuntimeException exception) {
             logger.warn(
-                    "Coinbase API secret is not a usable CDP EC private key. Falling back to bearer-token mode.",
-                    exception
-            );
+                    "Coinbase API secret is not a usable CDP EC private key. Authenticated Coinbase endpoints will be unavailable until credentials are fixed. Error: {}",
+                    exception.getMessage());
             return null;
         }
     }
 
     private boolean looksLikePrivateKey(String value) {
-        return value != null
+        boolean result = value != null
                 && value.contains("BEGIN")
                 && value.contains("PRIVATE KEY");
+        if (!result) {
+            logger.debug("Private key validation failed: contains BEGIN={}, contains PRIVATE KEY={}",
+                    value != null && value.contains("BEGIN"),
+                    value != null && value.contains("PRIVATE KEY"));
+        }
+        return result;
     }
 
     private String websocketJwt() {
         if (jwtSigner == null) {
+            logger.warn(
+                    "JWT signer is null - unable to generate WebSocket JWT. Public channels will work but authenticated channels won't.");
             return "";
         }
 
-        return jwtSigner.buildWebSocketJwt();
+        String jwt = jwtSigner.buildWebSocketJwt();
+        logger.debug("Generated WebSocket JWT: {} characters", jwt.length());
+        return jwt;
     }
 
     private String authorizationHeader(String method, String url) {
@@ -346,7 +414,7 @@ public class Coinbase extends Exchange {
         return "";
     }
 
-    private String bearerToken() {
+    private @NotNull String bearerToken() {
         String token = apiSecret == null ? "" : apiSecret.trim();
 
         if (looksLikePrivateKey(token)) {
@@ -367,25 +435,22 @@ public class Coinbase extends Exchange {
     private void requirePrivateEndpointAuth(String action) {
         if (!hasPrivateEndpointAuth()) {
             throw new IllegalStateException(
-                    "%s requires Coinbase Advanced Trade authentication. Set apiKey to the CDP key name and apiSecret to the EC private key PEM, or pass a prebuilt Bearer JWT as apiSecret.".formatted(action)
-            );
+                    "%s requires Coinbase Advanced Trade authentication. Set apiKey to the CDP key name and apiSecret to the EC private key PEM, or pass a prebuilt Bearer JWT as apiSecret."
+                            .formatted(action));
         }
     }
 
-    private HttpResponse<String> send(HttpRequest request) {
+    private @NotNull HttpResponse<String> send(HttpRequest request) {
         try {
             HttpResponse<String> httpResponse = httpClient.send(
                     request,
-                    HttpResponse.BodyHandlers.ofString()
-            );
+                    HttpResponse.BodyHandlers.ofString());
 
             if (httpResponse.statusCode() >= 400) {
-                logger.warn(
-                        "Coinbase HTTP {} for {}: {}",
-                        httpResponse.statusCode(),
-                        request.uri(),
-                        httpResponse.body()
-                );
+                String errorMsg = "Coinbase HTTP %d for %s: %s"
+                        .formatted(httpResponse.statusCode(), request.uri(), httpResponse.body());
+                logger.error(errorMsg);
+                throw new RuntimeException(errorMsg);
             }
 
             return httpResponse;
@@ -403,8 +468,7 @@ public class Coinbase extends Exchange {
                     if (httpResponse.statusCode() >= 400) {
                         throw new RuntimeException(
                                 "Coinbase HTTP %d for %s: %s"
-                                        .formatted(httpResponse.statusCode(), request.uri(), httpResponse.body())
-                        );
+                                        .formatted(httpResponse.statusCode(), request.uri(), httpResponse.body()));
                     }
 
                     return httpResponse.body();
@@ -453,14 +517,11 @@ public class Coinbase extends Exchange {
                     normalized,
                     fractionalDigits,
                     normalized,
-                    normalized
-            );
+                    normalized);
         } catch (SQLException | ClassNotFoundException exception) {
             throw new RuntimeException(exception);
         }
     }
-
-
 
     private String firstText(JsonNode node, String... names) {
         if (node == null || names == null) {
@@ -540,7 +601,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public List<TradePair> getTradePairSymbol() {
-        HttpRequest request = authenticatedRequest("GET",PUBLIC_PRODUCTS_URL)
+        HttpRequest request = authenticatedRequest("GET", PUBLIC_PRODUCTS_URL)
                 .GET()
                 .build();
 
@@ -577,15 +638,13 @@ public class Coinbase extends Exchange {
                     product,
                     "base_currency_id",
                     "base_currency",
-                    "base_currency_code"
-            );
+                    "base_currency_code");
 
             String quoteCode = firstText(
                     product,
                     "quote_currency_id",
                     "quote_currency",
-                    "quote_currency_code"
-            );
+                    "quote_currency_code");
 
             if (baseCode.isBlank() || quoteCode.isBlank()) {
                 continue;
@@ -637,7 +696,7 @@ public class Coinbase extends Exchange {
         String url = "%s?product_id=%s&limit=50"
                 .formatted(PUBLIC_PRODUCT_BOOK_URL, encode(productId(tradePair)));
 
-        HttpRequest request = authenticatedRequest("GET",url)
+        HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
 
@@ -653,7 +712,7 @@ public class Coinbase extends Exchange {
         String product = productId(tradePair);
         String url = "%s?product_id=%s&limit=50".formatted(PUBLIC_PRODUCT_BOOK_URL, encode(product));
 
-        HttpRequest request = authenticatedRequest("GET",url)
+        HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
 
@@ -666,7 +725,7 @@ public class Coinbase extends Exchange {
 
         String url = "%s/%s/ticker".formatted(PUBLIC_PRODUCTS_URL, encode(productId(tradePair)));
 
-        HttpRequest request =authenticatedRequest("GET",url)
+        HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
 
@@ -729,8 +788,7 @@ public class Coinbase extends Exchange {
                         .filter(Objects::nonNull)
                         .map(this::getLivePrice)
                         .filter(Objects::nonNull)
-                        .toList()
-        );
+                        .toList());
     }
 
     @Override
@@ -750,7 +808,7 @@ public class Coinbase extends Exchange {
         return CompletableFuture.supplyAsync(() -> {
             String url = "%s/%s/ticker?limit=100".formatted(PUBLIC_PRODUCTS_URL, encode(productId(tradePair)));
 
-            HttpRequest request = authenticatedRequest("GET",url)
+            HttpRequest request = authenticatedRequest("GET", url)
                     .GET()
                     .build();
 
@@ -789,16 +847,16 @@ public class Coinbase extends Exchange {
                         size,
                         side,
                         tradeId,
-                        time
-                ));
+                        time));
             }
 
             return trades;
         });
     }
-    private String granularityName(int seconds) {
+
+    @Contract(pure = true)
+    private @NotNull String granularityName(int seconds) {
         return switch (seconds) {
-            case 60->"ONE_MINUTE";
             case 300 -> "FIVE_MINUTE";
             case 900 -> "FIFTEEN_MINUTE";
             case 1800 -> "THIRTY_MINUTE";
@@ -810,13 +868,13 @@ public class Coinbase extends Exchange {
             default -> "ONE_MINUTE";
         };
     }
+
     @Override
     public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             TradePair tradePair,
             Instant currentCandleStartedAt,
             long secondsIntoCurrentCandle,
-            int secondsPerCandle
-    ) {
+            int secondsPerCandle) {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(currentCandleStartedAt, "currentCandleStartedAt must not be null");
 
@@ -829,9 +887,10 @@ public class Coinbase extends Exchange {
                 .min(Comparator.comparingInt(value -> Math.abs(value - Math.max(60, secondsPerCandle / 10))))
                 .orElse(secondsPerCandle);
 
-        String url = "%s/%s/candles?start=%d&end=%d&granularity=%s".formatted(PUBLIC_PRODUCTS_URL, encode(productId(tradePair)), startEpoch, endEpoch, encode(granularityName(closestGranularity)));
+        String url = "%s/%s/candles?start=%d&end=%d&granularity=%s".formatted(PUBLIC_PRODUCTS_URL,
+                encode(productId(tradePair)), startEpoch, endEpoch, encode(granularityName(closestGranularity)));
 
-        HttpRequest request =  authenticatedRequest("GET",url)
+        HttpRequest request = authenticatedRequest("GET", url)
 
                 .GET()
                 .build();
@@ -840,7 +899,8 @@ public class Coinbase extends Exchange {
             JsonNode root = readJson(String.valueOf(body));
 
             if (root.has("message")) {
-                throw new RuntimeException("Invalid Coinbase candle response: %s".formatted(root.get("message").asText()));
+                throw new RuntimeException(
+                        "Invalid Coinbase candle response: %s".formatted(root.get("message").asText()));
             }
 
             JsonNode candles = root.has("candles") ? root.get("candles") : root;
@@ -904,8 +964,7 @@ public class Coinbase extends Exchange {
                     lowSoFar,
                     currentTill,
                     lastTradePrice,
-                    volumeSoFar
-            ));
+                    volumeSoFar));
         });
     }
 
@@ -944,28 +1003,6 @@ public class Coinbase extends Exchange {
             return OBJECT_MAPPER.readValue(response.body(), Account.class);
         } catch (JsonProcessingException exception) {
             throw new RuntimeException("Unable to parse Coinbase accounts response", exception);
-        }
-    }
-
-    public Account getAccount(String accountId) {
-        Objects.requireNonNull(accountId, "accountId must not be null");
-
-        requirePrivateEndpointAuth("Coinbase account lookup");
-
-        String url = "%s/%s".formatted(ACCOUNTS_URL, encode(accountId));
-
-        HttpRequest request = authenticatedRequest("GET", url)
-                .GET()
-                .build();
-
-        HttpResponse<String> response = send(request);
-
-        try {
-            JsonNode root = readJson(response.body());
-            JsonNode accountNode = root.has("account") ? root.get("account") : root;
-            return OBJECT_MAPPER.treeToValue(accountNode, Account.class);
-        } catch (JsonProcessingException exception) {
-            throw new RuntimeException("Unable to parse Coinbase account response", exception);
         }
     }
 
@@ -1063,8 +1100,7 @@ public class Coinbase extends Exchange {
             Side side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
 
         Order order = new Order();
@@ -1083,8 +1119,7 @@ public class Coinbase extends Exchange {
     public CompletableFuture<String> createMarketOrder(
             TradePair tradePair,
             Side side,
-            double amount
-    ) {
+            double amount) {
         Order order = createOrder(
                 0,
                 tradePair,
@@ -1094,8 +1129,7 @@ public class Coinbase extends Exchange {
                 side,
                 0.0,
                 0.0,
-                0.0
-        );
+                0.0);
 
         try {
             return createOrder(order);
@@ -1109,8 +1143,7 @@ public class Coinbase extends Exchange {
             TradePair tradePair,
             Side side,
             double amount,
-            double limitPrice
-    ) {
+            double limitPrice) {
         Order order = createOrder(
                 UUID.randomUUID().hashCode(),
                 tradePair,
@@ -1120,8 +1153,7 @@ public class Coinbase extends Exchange {
                 side,
                 0.0,
                 0.0,
-                0.0
-        );
+                0.0);
 
         try {
             return createOrder(order);
@@ -1135,11 +1167,9 @@ public class Coinbase extends Exchange {
             TradePair tradePair,
             Side side,
             double amount,
-            double stopPrice
-    ) {
+            double stopPrice) {
         return failedFuture(
-                new UnsupportedOperationException("Coinbase stop order helper is not implemented yet.")
-        );
+                new UnsupportedOperationException("Coinbase stop order helper is not implemented yet."));
     }
 
     @Override
@@ -1149,8 +1179,7 @@ public class Coinbase extends Exchange {
             double amount,
             double entryPrice,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         if (entryPrice > 0) {
             return createLimitOrder(tradePair, side, amount, entryPrice);
         }
@@ -1324,7 +1353,8 @@ public class Coinbase extends Exchange {
                         return CompletableFuture.completedFuture("No open orders to cancel.");
                     }
 
-                    return cancelOrders(orderIds).thenApply(cancelled -> "Cancelled %d orders.".formatted(cancelled.size()));
+                    return cancelOrders(orderIds)
+                            .thenApply(cancelled -> "Cancelled %d orders.".formatted(cancelled.size()));
                 });
     }
 
@@ -1445,7 +1475,8 @@ public class Coinbase extends Exchange {
                             JsonNode orderConfig = node.path("order_configuration");
 
                             double size = parseDouble(firstText(node, "base_size", "size", "filled_size"), 0.0);
-                            double price = parseDouble(firstText(node, "limit_price", "price", "average_filled_price"), 0.0);
+                            double price = parseDouble(firstText(node, "limit_price", "price", "average_filled_price"),
+                                    0.0);
 
                             if (size <= 0) {
                                 size = parseDouble(orderConfig.findPath("base_size").asText("0"), 0.0);
@@ -1515,18 +1546,14 @@ public class Coinbase extends Exchange {
     public CompletableFuture<String> closePosition(TradePair tradePair) {
         return failedFuture(
                 new UnsupportedOperationException(
-                        "Coinbase closePosition requires confirmed base balance mapping before execution."
-                )
-        );
+                        "Coinbase closePosition requires confirmed base balance mapping before execution."));
     }
 
     @Override
     public CompletableFuture<String> closeAllPositions() {
         return failedFuture(
                 new UnsupportedOperationException(
-                        "Coinbase closeAllPositions is disabled until position-to-order sizing is fully mapped."
-                )
-        );
+                        "Coinbase closeAllPositions is disabled until position-to-order sizing is fully mapped."));
     }
 
     @Override
@@ -1565,8 +1592,7 @@ public class Coinbase extends Exchange {
     public CompletableFuture<List<Trade>> fetchAccountTradesBetween(
             TradePair tradePair,
             Instant from,
-            Instant to
-    ) {
+            Instant to) {
         if (tradePair == null || from == null || to == null) {
             return failedFuture(new IllegalArgumentException("tradePair, from, and to must not be null"));
         }
@@ -1596,8 +1622,7 @@ public class Coinbase extends Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         createBracketOrder(tradePair, Side.BUY, size, 0.0, stopLoss, takeProfit)
                 .thenAccept(orderId -> logger.info("Coinbase BUY submitted: {}", orderId))
                 .exceptionally(exception -> {
@@ -1614,8 +1639,7 @@ public class Coinbase extends Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         createBracketOrder(tradePair, Side.SELL, size, 0.0, stopLoss, takeProfit)
                 .thenAccept(orderId -> logger.info("Coinbase SELL submitted: {}", orderId))
                 .exceptionally(exception -> {
@@ -1626,11 +1650,33 @@ public class Coinbase extends Exchange {
 
     @Override
     public void autoTrading(@NotNull Boolean auto, String signal) {
-        logger.info(
-                "Coinbase auto trading {} signal={}",
-                auto ? "enabled" : "disabled",
-                signal
-        );
+        if (auto) {
+            // Enable bot trading and process signal
+            botConfig.setEnabled(true);
+            logger.info("Bot trading ENABLED for Coinbase. Configured symbols: {}",
+                    signalProcessor.getConfiguredSymbolsAsString());
+
+            // Process signal if provided
+            if (signal != null && !signal.isBlank()) {
+                logger.info("Processing signal: {}", signal);
+                signalProcessor.processSignal(signal);
+            }
+        } else {
+            // Disable bot trading
+            botConfig.setEnabled(false);
+            logger.info("Bot trading DISABLED for Coinbase");
+        }
+    }
+
+    /**
+     * Process incoming trading signal
+     */
+    public void processTradeSignal(String signal) {
+        if (botConfig.isEnabled()) {
+            signalProcessor.processSignal(signal);
+        } else {
+            logger.debug("Bot trading is disabled, ignoring signal: {}", signal);
+        }
     }
 
     @Override
@@ -1641,8 +1687,7 @@ public class Coinbase extends Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         boolean valid = tradePair != null
                 && supportsMarketType(marketType)
                 && size >= getMinOrderAmount(tradePair)
@@ -1694,8 +1739,7 @@ public class Coinbase extends Exchange {
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
         return failedFuture(
-                new UnsupportedOperationException("Coinbase spot trading does not support per-symbol leverage.")
-        );
+                new UnsupportedOperationException("Coinbase spot trading does not support per-symbol leverage."));
     }
 
     // ---------------------------------------------------------------------
@@ -1721,7 +1765,8 @@ public class Coinbase extends Exchange {
                                 orderId = root.path("success_response").path("order_id").asText("");
                             }
                         } catch (Exception exception) {
-                            logger.debug("Unable to parse Coinbase order id from response: {}", orderResponse, exception);
+                            logger.debug("Unable to parse Coinbase order id from response: {}", orderResponse,
+                                    exception);
                         }
 
                         if (consumer != null) {
@@ -1753,26 +1798,6 @@ public class Coinbase extends Exchange {
         return sendAsync(request);
     }
 
-    public CompletableFuture<String> getProduct(TradePair tradePair) {
-        String url = "%s/%s".formatted(PUBLIC_PRODUCTS_URL, encode(productId(tradePair)));
-
-        HttpRequest request = authenticatedRequest("GET",url)
-                .GET()
-                .build();
-
-        return sendAsync(request);
-    }
-
-    public CompletableFuture<String> getBestBidAsk(TradePair tradePair) {
-        String url = "%s/%s/ticker".formatted(PUBLIC_PRODUCTS_URL, encode(productId(tradePair)));
-
-        HttpRequest request = authenticatedRequest("GET",url)
-                .GET()
-                .build();
-
-        return sendAsync(request);
-    }
-
     public CompletableFuture<String> listAccountsRaw() {
         requirePrivateEndpointAuth("Coinbase list accounts");
 
@@ -1783,14 +1808,12 @@ public class Coinbase extends Exchange {
         return sendAsync(request);
     }
 
-    public CompletableFuture<JsonNode> getAccountsInfo() {
-        return listAccountsRaw().thenApply(this::readJson);
-    }
-
     public CompletableFuture<String> listOrdersRaw() {
         requirePrivateEndpointAuth("Coinbase list orders");
 
-        HttpRequest request = authenticatedRequest("GET", "%s/orders/historical/batch".formatted(REST_BASE_URL))
+        String url = "%s/orders/historical/batch".formatted(REST_BASE_URL);
+
+        HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
 
@@ -1804,24 +1827,7 @@ public class Coinbase extends Exchange {
 
         HttpRequest request = authenticatedRequest(
                 "GET",
-                "%s/orders/historical/%s".formatted(REST_BASE_URL, encode(orderId))
-        ).GET().build();
-
-        return sendAsync(request);
-    }
-
-    public CompletableFuture<String> listFillsRaw(TradePair tradePair) {
-        requirePrivateEndpointAuth("Coinbase list fills");
-
-        String url = "%s/orders/historical/fills".formatted(REST_BASE_URL);
-
-        if (tradePair != null) {
-            url += "?product_id=%s".formatted(encode(productId(tradePair)));
-        }
-
-        HttpRequest request = authenticatedRequest("GET", url)
-                .GET()
-                .build();
+                "%s/orders/historical/%s".formatted(REST_BASE_URL, encode(orderId))).GET().build();
 
         return sendAsync(request);
     }
@@ -1839,7 +1845,6 @@ public class Coinbase extends Exchange {
     public boolean supportsPaperTradingMode() {
         return false;
     }
-
 
     @Override
     public boolean supportsOrderBook() {
@@ -1886,7 +1891,6 @@ public class Coinbase extends Exchange {
         return false;
     }
 
-
     @Override
     public boolean supportsCrypto() {
         return true;
@@ -1915,7 +1919,6 @@ public class Coinbase extends Exchange {
     public boolean supportsPollingFallback() {
         return false;
     }
-
 
     @Override
     public void connectStream() {
@@ -2053,7 +2056,7 @@ public class Coinbase extends Exchange {
 
         websocketClient.setTradePair(tradePair);
 
-        websocketClient.streamLiveTrades(tradePair, new org.investpro.models.trading.LiveTradesConsumer() {
+        websocketClient.streamLiveTrades(tradePair, new LiveTradesConsumer() {
             @Override
             public boolean containsKey(TradePair pair) {
                 return pair != null && pair.equals(tradePair);
@@ -2097,8 +2100,7 @@ public class Coinbase extends Exchange {
     public void streamCandles(
             TradePair tradePair,
             int secondsPerCandle,
-            ExchangeStreamConsumer consumer
-    ) {
+            ExchangeStreamConsumer consumer) {
         logger.debug("Coinbase streamCandles currently no-op for {} {}", tradePair, secondsPerCandle);
     }
 
@@ -2209,7 +2211,6 @@ public class Coinbase extends Exchange {
         return false;
     }
 
-
     @Override
     public boolean supportsTradeStreaming() {
         return true;
@@ -2235,7 +2236,8 @@ public class Coinbase extends Exchange {
             case 21600 -> "SIX_HOUR";
             case 86400 -> "ONE_DAY";
             default -> {
-                logger.warn("Unsupported Coinbase timeframe: {} seconds. Falling back to ONE_MINUTE.", secondsPerCandle);
+                logger.warn("Unsupported Coinbase timeframe: {} seconds. Falling back to ONE_MINUTE.",
+                        secondsPerCandle);
                 yield "ONE_MINUTE";
             }
         };
@@ -2255,12 +2257,12 @@ public class Coinbase extends Exchange {
     // Parsing helpers
     // ---------------------------------------------------------------------
 
-    private OrderBook parseOrderBook(String jsonResponse, TradePair tradePair) {
+    private @NotNull OrderBook parseOrderBook(String jsonResponse, TradePair tradePair) {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
             OrderBook orderBook = new OrderBook(tradePair);
 
-            JsonNode priceBook = root.has("pricebook") ? root.get("pricebook") : root;
+            JsonNode priceBook = root.has("product_book") ? root.get("product_book") : root;
 
             JsonNode bidsNode = priceBook.path("bids");
 
@@ -2329,7 +2331,7 @@ public class Coinbase extends Exchange {
         return orders;
     }
 
-    private List<OpenOrder> parseOpenOrdersAll(String jsonResponse) {
+    private @NotNull List<OpenOrder> parseOpenOrdersAll(String jsonResponse) {
         List<OpenOrder> orders = new ArrayList<>();
 
         try {
@@ -2371,7 +2373,8 @@ public class Coinbase extends Exchange {
             String orderTypeText = firstText(node, "order_type", "type");
             if (!orderTypeText.isBlank()) {
                 try {
-                    order.setOrderType(OpenOrder.OrderType.valueOf(orderTypeText.toUpperCase(Locale.ROOT).replace("-", "_")));
+                    order.setOrderType(
+                            OpenOrder.OrderType.valueOf(orderTypeText.toUpperCase(Locale.ROOT).replace("-", "_")));
                 } catch (Exception ignored) {
                     // Keep default if model has one.
                 }
@@ -2418,7 +2421,8 @@ public class Coinbase extends Exchange {
             return parseOpenOrderNode(node, pair);
         } catch (Exception exception) {
             logger.debug("Failed to parse Coinbase open order node with pair: {}", node, exception);
-            return null;
+            throw new RuntimeException("Failed to parse Coinbase open order node with pair: %s".formatted(node),
+                    exception);
         }
     }
 
@@ -2453,7 +2457,7 @@ public class Coinbase extends Exchange {
         return positions;
     }
 
-    private List<Position> parseAllPositionsFromAccounts(String jsonResponse) {
+    private @NotNull List<Position> parseAllPositionsFromAccounts(String jsonResponse) {
         List<Position> positions = new ArrayList<>();
 
         try {
@@ -2476,7 +2480,7 @@ public class Coinbase extends Exchange {
         return positions;
     }
 
-    private Position parsePositionFromAccount(JsonNode accountNode, TradePair tradePair) {
+    private @Nullable Position parsePositionFromAccount(JsonNode accountNode, TradePair tradePair) {
         try {
             double balance = accountBalance(accountNode);
 
@@ -2502,7 +2506,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private Position parsePositionFromAccountAll(JsonNode accountNode) {
+    private @Nullable Position parsePositionFromAccountAll(JsonNode accountNode) {
         try {
             double balance = accountBalance(accountNode);
 
@@ -2530,7 +2534,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private double accountBalance(JsonNode accountNode) {
+    private double accountBalance(@NotNull JsonNode accountNode) {
         JsonNode available = accountNode.path("available_balance").path("value");
 
         if (!available.isMissingNode()) {
@@ -2569,7 +2573,7 @@ public class Coinbase extends Exchange {
         return trades;
     }
 
-    private Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
+    private @Nullable Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
         try {
             double price = parseDouble(firstText(fillNode, "price"), 0.0);
             double size = parseDouble(firstText(fillNode, "size"), 0.0);
@@ -2585,8 +2589,7 @@ public class Coinbase extends Exchange {
                     size,
                     side,
                     tradeId,
-                    timestamp
-            );
+                    timestamp);
 
             try {
                 trade.setFee(parseDouble(firstText(fillNode, "commission", "fee"), 0.0));
@@ -2601,7 +2604,9 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private TradePair parseTradePairFromProductId(String productId) throws SQLException, ClassNotFoundException {
+    @Contract("_ -> new")
+    private @NotNull TradePair parseTradePairFromProductId(String productId)
+            throws SQLException, ClassNotFoundException {
         String[] parts = productId == null ? new String[0] : productId.split("-");
 
         if (parts.length >= 2) {

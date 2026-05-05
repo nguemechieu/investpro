@@ -13,6 +13,12 @@ import org.investpro.models.trading.*;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.investpro.exchange.bitfinex.BitfinexCandleDataSupplier;
+import org.investpro.exchange.websocket.BitfinexWebSocketClient;
+import org.investpro.exchange.websocket.ExchangeWebSocketClient;
+import org.investpro.exchange.infrastructure.StreamTransport;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -210,11 +216,19 @@ public class Bitfinex extends Exchange {
     public void connect() {
         try {
             if (websocketClient != null && !websocketClient.isOpen()) {
-                websocketClient.connect();
-                logger.info("Connecting to Bitfinex websocket");
+                // Use connectBlocking() to wait for actual connection establishment
+                // with timeout to prevent hanging on stuck connections
+                boolean connected = websocketClient.connectBlocking(10, java.util.concurrent.TimeUnit.SECONDS);
+                if (!connected) {
+                    throw new RuntimeException("WebSocket connection timeout after 10 seconds");
+                }
+                logger.info("Connected to Bitfinex WebSocket");
             }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            logger.error("Bitfinex WebSocket connection interrupted", exception);
         } catch (Exception exception) {
-            logger.warn("Unable to connect Bitfinex websocket", exception);
+            logger.warn("Unable to connect Bitfinex WebSocket", exception);
         }
     }
 

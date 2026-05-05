@@ -34,12 +34,11 @@ public class InvestPro extends Application {
     private static final double MIN_HEIGHT = 720;
 
     private Stage primaryStage;
-    private Scene scene;
     private final AnchorPane root = new AnchorPane();
 
     private TradingWindow tradingWindow;
 
-    static void main(String[] args) {
+   public static void main(String[] args) {
         launch(args);
     }
 
@@ -67,16 +66,20 @@ public class InvestPro extends Application {
         primaryStage.setHeight(DEFAULT_HEIGHT);
         primaryStage.setResizable(true);
 
-        primaryStage.setOnCloseRequest(event -> {
+        primaryStage.setOnCloseRequest(_ -> {
             shutdownTradingTerminal();
             Platform.exit();
         });
     }
 
     private void configureRootScene() {
-        root.setStyle("-fx-background-color: #0f172a;");
+//        root.setStyle("-fx-background-color: #0f172a;");
 
-        scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+
+        root.getChildren().clear();
+        root.getStyleClass().add("root");
+
+        Scene scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
         installStylesheet(scene);
 
         primaryStage.setScene(scene);
@@ -85,7 +88,7 @@ public class InvestPro extends Application {
     public void showOnboarding() {
         OnboardingView onboardingView = new OnboardingView(this::showTradingTerminal);
         setRootContent(onboardingView);
-        primaryStage.setTitle(buildWindowTitle() + " - Onboarding");
+        primaryStage.setTitle("%s - Onboarding".formatted(buildWindowTitle()));
     }
 
     private void showTradingTerminal(MarketConfiguration configuration) {
@@ -95,7 +98,7 @@ public class InvestPro extends Application {
             tradingWindow = new TradingWindow(configuration);
             setRootContent(tradingWindow);
 
-            primaryStage.setTitle(buildWindowTitle() + " - Terminal");
+            primaryStage.setTitle("%s - Terminal".formatted(buildWindowTitle()));
 
         } catch (ParseException | IOException | InterruptedException | ClassNotFoundException exception) {
             Thread.currentThread().interrupt();
@@ -127,13 +130,13 @@ public class InvestPro extends Application {
     private void installStylesheet(Scene scene) {
         try {
             String cssResource = Objects.requireNonNull(
-                    InvestPro.class.getResource("/app.css"),
+                    InvestPro.class.getResource("..\\..\\app.css"),
                     "Missing /app.css resource"
             ).toExternalForm();
 
             scene.getStylesheets().setAll(cssResource);
         } catch (Exception exception) {
-            System.err.println("Unable to load /app.css: " + exception.getMessage());
+            throw new RuntimeException("Unable to load /app.css: %s%n", exception);
         }
     }
 
@@ -170,8 +173,8 @@ public class InvestPro extends Application {
         }
     }
 
-    private String buildWindowTitle() {
-        return "InvestPro - Professional Trading Terminal | © 2020-%d TradeAdviser.LLC"
+    private @NotNull String buildWindowTitle() {
+        return "Professional Trading Terminal | © 2020-%d InvestPro .Inc"
                 .formatted(LocalDate.now().getYear());
     }
 

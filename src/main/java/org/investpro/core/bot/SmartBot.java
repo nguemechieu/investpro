@@ -12,8 +12,9 @@ import org.investpro.core.TelegramNotifier;
 import org.investpro.data.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.Exchange;
-import org.investpro.exchange.ExchangeStreamConsumer;
-import org.investpro.exchange.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.BotTradingConfig;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
@@ -70,6 +71,7 @@ public class SmartBot {
         }
     }
     private  StreamingMode streamingMode;
+    private BotTradingConfig botConfig = new BotTradingConfig();
     private static final Logger logger = LoggerFactory.getLogger(SmartBot.class);
 
     private final AgentEventBus eventBus;
@@ -92,7 +94,7 @@ public class SmartBot {
     private String toEmail = "";
 
     public SmartBot() {
-        this(new AgentRuntime(), new AgentEventBus());
+        this(AgentRuntime.createDefault(), new AgentEventBus());
     }
 
     public SmartBot(
@@ -103,6 +105,15 @@ public class SmartBot {
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
 
 
+    }
+
+    // Explicit getter (Lombok @Getter not being invoked)
+    public AgentEventBus getEventBus() {
+        return eventBus;
+    }
+
+    public AgentRuntime getRuntime() {
+        return runtime;
     }
 
     /**
@@ -375,7 +386,7 @@ public class SmartBot {
 
     /**
      * Enable or disable autonomous execution.
-     *
+     * <p>
      * When disabled:
      * - agents can still analyze
      * - signals can still be produced
@@ -851,7 +862,11 @@ public class SmartBot {
         }
     }
 
-    // ---------------------------------------------------------------------
+    public boolean isRunning() {
+        return started.get();
+    }
+
+    // -------------------------------------------------------------------------------------------------------------------------------
     // Convenience streaming methods
     // ---------------------------------------------------------------------
 

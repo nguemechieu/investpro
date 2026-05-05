@@ -1,27 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- Console appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <!-- Suppress noisy JavaFX logs -->
-    <logger name="javafx" level="WARN"/>
-    <logger name="com.sun.javafx" level="WARN"/>
-    <logger name="javafx.scene.control.skin" level="ERROR"/>
-    
-    <!-- Suppress JavaFX WebKit media player errors (YouTube codec issues) -->
-    <logger name="com.sun.javafx.webkit.prism" level="ERROR"/>
+    <!-- File appender -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/investpro.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/investpro.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
 
-    <!-- Suppress database connection logs -->
-    <logger name="org.sqlite" level="WARN"/>
-    
-    <!-- Suppress SLF4J initialization -->
-    <logger name="org.slf4j" level="ERROR"/>
-
-    <!-- Root logger set to INFO level -->
+    <!-- Root logger -->
     <root level="INFO">
-        <appender-ref ref="console"/>
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="FILE" />
     </root>
-</configuration>
 
+    <!-- Application loggers -->
+    <logger name="org.investpro" level="DEBUG" />
+    
+    <!-- Third-party loggers -->
+    <logger name="org.springframework" level="INFO" />
+    <logger name="org.hibernate" level="WARN" />
+</configuration>

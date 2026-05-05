@@ -2,7 +2,6 @@ package org.investpro.utils;
 
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.Trade;
-import org.investpro.models.trading.TradePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

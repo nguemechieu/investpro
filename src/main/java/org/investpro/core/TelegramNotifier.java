@@ -96,6 +96,7 @@ public class TelegramNotifier {
         return chatId != null && !chatId.isBlank();
     }
 
+    @SuppressWarnings("unused")
     public void setChatId(String chatIdOrChannelId) {
         this.chatId = normalizeChatId(chatIdOrChannelId);
     }
@@ -232,6 +233,7 @@ public class TelegramNotifier {
         return postForm("sendMessage", body);
     }
 
+    @SuppressWarnings("unused")
     public boolean sendHtml(String htmlMessage) {
         if (htmlMessage == null || htmlMessage.isBlank()) {
             return false;
@@ -255,6 +257,7 @@ public class TelegramNotifier {
     /**
      * Send a photo by local path.
      */
+    @SuppressWarnings("unused")
     public boolean sendPhoto(Path photoPath, String caption) {
         if (photoPath == null || !Files.exists(photoPath)) {
             logger.warn("Telegram photo skipped because file does not exist: {}", photoPath);
@@ -264,9 +267,8 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            if (logger.isWarnEnabled())
-                logger.warn("""
-                        Telegram photo skipped because no chat_id/channel_id is available.""");
+            if (logger.isWarnEnabled()) logger.warn("""
+                    Telegram photo skipped because no chat_id/channel_id is available.""");
             return false;
         }
 
@@ -287,6 +289,7 @@ public class TelegramNotifier {
     /**
      * Send a photo by public URL or Telegram file_id.
      */
+    @SuppressWarnings("unused")
     public boolean sendPhoto(String photoUrlOrFileId, String caption) {
         if (photoUrlOrFileId == null || photoUrlOrFileId.isBlank()) {
             return false;
@@ -311,6 +314,7 @@ public class TelegramNotifier {
     /**
      * Send a document by local path.
      */
+    @SuppressWarnings("unused")
     public boolean sendDocument(Path documentPath, String caption) {
         if (documentPath == null || !Files.exists(documentPath)) {
             logger.warn("Telegram document skipped because file does not exist: {}", documentPath);
@@ -342,6 +346,7 @@ public class TelegramNotifier {
     /**
      * Send a document by public URL or Telegram file_id.
      */
+    @SuppressWarnings("unused")
     public boolean sendDocument(String documentUrlOrFileId, String caption) {
         if (documentUrlOrFileId == null || documentUrlOrFileId.isBlank()) {
             return false;
@@ -646,6 +651,7 @@ public class TelegramNotifier {
      *
      * @param apiKey the OpenAI API key
      */
+    @SuppressWarnings("unused")
     public void initializeChatGPT(String apiKey) {
         if (apiKey != null && !apiKey.isBlank()) {
             this.openaiApiKey = apiKey.trim();
@@ -659,6 +665,7 @@ public class TelegramNotifier {
      * Polls for new messages and processes them based on user queries.
      * Supports: market info, news, trade queries, positions, orders, risk management, profitability questions.
      */
+    @SuppressWarnings("unused")
     public void pollAndProcessUserMessages() {
         if (!isEnabled()) {
             logger.warn("Cannot poll messages: bot token not configured");

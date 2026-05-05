@@ -1,6 +1,6 @@
 package org.investpro.models.trading;
 
-import org.investpro.utils.Side;
+import  org.investpro.utils.Side;
 
 import java.util.TreeMap;
 

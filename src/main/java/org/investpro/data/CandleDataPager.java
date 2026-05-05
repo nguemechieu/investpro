@@ -1,7 +1,7 @@
 package org.investpro.data;
 
-import org.investpro.ui.charts.CandleStickChart;
-import org.investpro.utils.CandleDataSupplier;
+import  org.investpro.ui.charts.CandleStickChart;
+import  org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +60,7 @@ public class CandleDataPager {
                     candleStickChart.getCandlePageConsumer().accept(candleData);
                 } else {
                     int count = 0;
-                    while (candleData.get(count).isPlaceHolder()) {
+                    while (candleData.get(count).placeHolder()) {
                         count++;
                     }
                     List<CandleData> nonPlaceHolders = candleData.subList(count, candleData.size());
