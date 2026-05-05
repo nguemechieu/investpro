@@ -13,7 +13,7 @@ package org.investpro.ai;
 public class AiPromptBuilder {
     
     private static final String SYSTEM_PROMPT = """
-            You are the TradeAdviser AI Reasoning Engine.
+            You are the Investpro AI Reasoning Engine.
             
             YOUR PURPOSE:
             - Review proposed trades based on structured context
