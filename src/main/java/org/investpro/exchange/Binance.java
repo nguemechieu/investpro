@@ -142,6 +142,30 @@ public class Binance extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        logger.warn("modifyStopLoss() not implemented for Binance");
+        return failedFuture(unsupported("modifyStopLoss"));
+    }
+
+    @Override
+    public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        logger.warn("closePartialPosition() not implemented for Binance");
+        return failedFuture(unsupported("closePartialPosition"));
+    }
+
+    @Override
+    public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        logger.warn("modifyTakeProfit() not implemented for Binance");
+        return failedFuture(unsupported("modifyTakeProfit"));
+    }
+
+    @Override
+    public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        logger.warn("enableTrailingStop() not implemented for Binance");
+        return failedFuture(unsupported("enableTrailingStop"));
+    }
+
+    @Override
     public boolean supportsLiveTrading() {
         return true;
     }

@@ -4,90 +4,90 @@ import lombok.Getter;
 
 /**
  * Recommended actions for open positions from AI position manager.
+ *
  * AI may recommend these actions, but RiskManagementSystem and FinalRiskGate retain final authority.
- * AI cannot directly execute these actions—only approved PositionActionIntent objects are executed.
+ * AI cannot directly execute these actions. Only approved PositionActionIntent objects are executed.
  */
 public enum AiPositionAction {
-    /**
-     * Hold the position. Current levels are optimal.
-     * Risk is acceptable, profit protection is adequate, thesis remains valid.
-     */
-    HOLD("Hold position", false, false, false, false, false),
 
     /**
-     * Reduce position size. Lower risk exposure while keeping position alive.
-     * Usually recommended when: risk is elevated, profit is significant but momentum weakens.
-     * Reduces exposure and locks in partial gains.
+     * Hold the position. Current levels are acceptable.
      */
-    REDUCE_SIZE("Reduce position size", true, false, false, false, false),
+    HOLD("Hold position", false, false, false, false, false, false),
 
     /**
-     * Take partial profit. Close a portion of the position at current favorable price.
-     * Usually recommended when: position is in profit, momentum shows signs of weakness,
-     * profit target is reached, or market conditions become less favorable.
+     * Reduce position size. Lowers risk exposure while keeping the position alive.
      */
-    TAKE_PARTIAL_PROFIT("Take partial profit", true, false, false, true, false),
+    REDUCE_SIZE("Reduce position size", true, false, false, false, false, false),
 
     /**
-     * Move stop loss up/down to better level.
-     * Usually recommended when: price movement invalidates original stop logic,
-     * support/resistance changes, or portfolio risk needs rebalancing.
+     * Take partial profit. Closes a portion of the position.
      */
-    MOVE_STOP_LOSS("Move stop loss", false, true, false, false, false),
+    TAKE_PARTIAL_PROFIT("Take partial profit", true, false, false, true, false, false),
+
+    /**
+     * Move stop loss to a better level.
+     *
+     * Warning:
+     * This can reduce or increase risk depending on direction, so the validator
+     * must check whether the new stop is safer than the old stop.
+     */
+    MOVE_STOP_LOSS("Move stop loss", false, true, false, false, false, false),
 
     /**
      * Implement or tighten trailing stop loss.
-     * Usually recommended when: position is in profit and momentum is strong,
-     * to protect gains while allowing upside potential.
      */
-    TRAIL_STOP("Implement/tighten trailing stop", false, true, false, false, false),
+    TRAIL_STOP("Implement/tighten trailing stop", true, true, false, false, false, false),
 
     /**
      * Move take-profit level.
-     * Usually recommended when: market conditions change profit projections,
-     * momentum suggests higher targets, or risk/reward shifts.
      */
-    MOVE_TAKE_PROFIT("Move take-profit level", false, false, false, false, false),
+    MOVE_TAKE_PROFIT("Move take-profit level", false, false, false, true, false, false),
 
     /**
      * Close the entire position.
-     * Triggered when: risk rules require exit, thesis is invalidated, stop loss is hit,
-     * take profit is reached, or emergency conditions occur.
      */
-    CLOSE_POSITION("Close position", true, false, true, true, false),
+    CLOSE_POSITION("Close position", true, false, true, true, false, false),
 
     /**
-     * Open a hedge position (if broker supports).
-     * Usually recommended when: directional risk is very high, volatility spikes,
-     * or tail risk protection is needed without closing the original position.
-     * Requires broker hedging capability.
+     * Open a hedge position if supported.
+     *
+     * This is complex and should require manual approval unless you later build
+     * full broker/account hedge-mode validation.
      */
-    HEDGE("Open hedge position", false, false, false, false, false),
+    HEDGE("Open hedge position", false, false, false, false, true, true),
 
     /**
      * Escalate to manual human review.
-     * Triggered when: AI cannot make high-confidence decision, edge case detected,
-     * unusual market conditions, or data is incomplete.
-     * Trader must manually review and decide.
      */
-    ESCALATE_TO_MANUAL_REVIEW("Escalate to manual review", false, false, false, false, true);
+    ESCALATE_TO_MANUAL_REVIEW("Escalate to manual review", false, false, false, false, true, false);
 
     @Getter
     private final String description;
+
     private final boolean reducesRisk;
     private final boolean modifiesStop;
     private final boolean closesPosition;
     private final boolean affectsProfit;
     private final boolean requiresManualApproval;
+    private final boolean increasesComplexity;
 
-    AiPositionAction(String description, boolean reducesRisk, boolean modifiesStop, 
-                     boolean closesPosition, boolean affectsProfit, boolean requiresManualApproval) {
+    AiPositionAction(
+            String description,
+            boolean reducesRisk,
+            boolean modifiesStop,
+            boolean closesPosition,
+            boolean affectsProfit,
+            boolean requiresManualApproval,
+            boolean increasesComplexity
+    ) {
         this.description = description;
         this.reducesRisk = reducesRisk;
         this.modifiesStop = modifiesStop;
         this.closesPosition = closesPosition;
         this.affectsProfit = affectsProfit;
         this.requiresManualApproval = requiresManualApproval;
+        this.increasesComplexity = increasesComplexity;
     }
 
     public boolean reducesRisk() {
@@ -108,5 +108,27 @@ public enum AiPositionAction {
 
     public boolean requiresManualApproval() {
         return requiresManualApproval;
+    }
+
+    public boolean increasesComplexity() {
+        return increasesComplexity;
+    }
+
+    /**
+     * Returns true when this action is defensive and can generally be considered
+     * safer than adding risk, assuming FinalRiskGate approves it.
+     */
+    public boolean isDefensiveAction() {
+        return reducesRisk || closesPosition || this == TRAIL_STOP || this == TAKE_PARTIAL_PROFIT;
+    }
+
+    /**
+     * Returns true when this action should never be auto-executed without extra validation.
+     */
+    public boolean requiresStrictValidation() {
+        return this == MOVE_STOP_LOSS
+                || this == MOVE_TAKE_PROFIT
+                || this == HEDGE
+                || requiresManualApproval;
     }
 }

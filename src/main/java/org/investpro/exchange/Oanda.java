@@ -1370,6 +1370,26 @@ public class Oanda extends Exchange {
         return failedFuture(new UnsupportedOperationException("OANDA leverage is account/regulation controlled and not set per order here."));
     }
 
+    @Override
+    public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        return failedFuture(new UnsupportedOperationException("OANDA position modification requires order management."));
+    }
+
+    @Override
+    public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        return failedFuture(new UnsupportedOperationException("OANDA partial position closure requires trade-level management."));
+    }
+
+    @Override
+    public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        return failedFuture(new UnsupportedOperationException("OANDA position modification requires order management."));
+    }
+
+    @Override
+    public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        return failedFuture(new UnsupportedOperationException("OANDA trailing stop must be configured through order types, not position modification."));
+    }
+
     // ---------------------------------------------------------------------
     // Capabilities
     // ---------------------------------------------------------------------

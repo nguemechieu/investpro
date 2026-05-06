@@ -37,7 +37,8 @@ import java.util.function.BiConsumer;
  * - sends photos
  * - sends documents
  * - multi-user bot with ChatGPT integration for intelligent responses
- * - handles queries about market, news, trades, positions, orders, risk management
+ * - handles queries about market, news, trades, positions, orders, risk
+ * management
  * - processes order comments from multiple users
  *
  * Important:
@@ -70,7 +71,7 @@ public class TelegramNotifier {
 
     private volatile String chatId;
     private volatile long lastUpdateId = -1L;
-    
+
     // Multi-user support
     private final Map<String, UserContext> userContexts = new ConcurrentHashMap<>();
     private volatile String openaiApiKey;
@@ -111,7 +112,8 @@ public class TelegramNotifier {
         Set<String> detected = detectChatIds();
 
         if (detected.isEmpty()) {
-            logger.warn("Telegram chat detection found no chats. Send /start to the bot or add it to a group/channel first.");
+            logger.warn(
+                    "Telegram chat detection found no chats. Send /start to the bot or add it to a group/channel first.");
             return Optional.empty();
         }
 
@@ -206,10 +208,7 @@ public class TelegramNotifier {
 
         String body = "chat_id=%s&text=%s&parse_mode=Markdown".formatted(
                 encode(target.get()),
-                encode(escapeMarkdown(message))
-        );
-
-
+                encode(escapeMarkdown(message)));
 
         return postForm("sendMessage", body);
     }
@@ -228,8 +227,7 @@ public class TelegramNotifier {
 
         String body = "chat_id=%s&text=%s&parse_mode=Markdown".formatted(
                 encode(target.get()),
-                encode(markdownMessage)
-        );
+                encode(markdownMessage));
 
         return postForm("sendMessage", body);
     }
@@ -249,14 +247,14 @@ public class TelegramNotifier {
 
         String body = "chat_id=%s&text=%s&parse_mode=HTML".formatted(
                 encode(target.get()),
-                encode(htmlMessage)
-        );
+                encode(htmlMessage));
 
         return postForm("sendMessage", body);
     }
 
     /**
-     * Send typing/action indicator to show user that bot is processing their request.
+     * Send typing/action indicator to show user that bot is processing their
+     * request.
      * Useful for long-running operations to give visual feedback.
      */
     public boolean sendChatAction(String targetChatId, ENUM_CHAT_ACTION action) {
@@ -268,8 +266,7 @@ public class TelegramNotifier {
             String actionValue = action.toString().toLowerCase();
             String body = "chat_id=%s&action=%s".formatted(
                     encode(targetChatId),
-                    encode(actionValue)
-            );
+                    encode(actionValue));
             return postForm("sendChatAction", body);
         } catch (Exception e) {
             logger.debug("Error sending chat action: {}", e.getMessage());
@@ -290,8 +287,9 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            if (logger.isWarnEnabled()) logger.warn("""
-                    Telegram photo skipped because no chat_id/channel_id is available.""");
+            if (logger.isWarnEnabled())
+                logger.warn("""
+                        Telegram photo skipped because no chat_id/channel_id is available.""");
             return false;
         }
 
@@ -301,8 +299,7 @@ public class TelegramNotifier {
                     target.get(),
                     "photo",
                     photoPath,
-                    caption
-            );
+                    caption);
         } catch (Exception exception) {
             logger.warn("Telegram sendPhoto failed", exception);
             return false;
@@ -328,8 +325,7 @@ public class TelegramNotifier {
         String body = "chat_id=%s&photo=%s&caption=%s&parse_mode=Markdown".formatted(
                 encode(target.get()),
                 encode(photoUrlOrFileId),
-                encode(escapeMarkdown(safe(caption)))
-        );
+                encode(escapeMarkdown(safe(caption))));
 
         return postForm("sendPhoto", body);
     }
@@ -358,8 +354,7 @@ public class TelegramNotifier {
                     target.get(),
                     "document",
                     documentPath,
-                    caption
-            );
+                    caption);
         } catch (Exception exception) {
             logger.warn("Telegram sendDocument failed", exception);
             return false;
@@ -385,8 +380,7 @@ public class TelegramNotifier {
         String body = "chat_id=%s&document=%s&caption=%s&parse_mode=Markdown".formatted(
                 encode(target.get()),
                 encode(documentUrlOrFileId),
-                encode(escapeMarkdown(safe(caption)))
-        );
+                encode(escapeMarkdown(safe(caption))));
 
         return postForm("sendDocument", body);
     }
@@ -477,8 +471,7 @@ public class TelegramNotifier {
             String chatId,
             String fileFieldName,
             Path filePath,
-            String caption
-    ) throws IOException {
+            String caption) throws IOException {
         String boundary = "----InvestProTelegramBoundary%d".formatted(Instant.now().toEpochMilli());
 
         byte[] body = buildMultipartBody(
@@ -486,8 +479,7 @@ public class TelegramNotifier {
                 chatId,
                 fileFieldName,
                 filePath,
-                caption
-        );
+                caption);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(apiUrl(method)))
@@ -504,8 +496,7 @@ public class TelegramNotifier {
             String chatId,
             String fileFieldName,
             Path filePath,
-            String caption
-    ) throws IOException {
+            String caption) throws IOException {
         String fileName = filePath.getFileName().toString();
         String contentType = detectContentType(filePath);
 
@@ -602,7 +593,6 @@ public class TelegramNotifier {
          */
         return text;
 
-
     }
 
     private String detectContentType(Path path) {
@@ -670,7 +660,8 @@ public class TelegramNotifier {
 
     /**
      * Initialize ChatGPT integration for intelligent bot responses.
-     * Bot will use ChatGPT to answer questions about market, news, trades, positions, orders, etc.
+     * Bot will use ChatGPT to answer questions about market, news, trades,
+     * positions, orders, etc.
      *
      * @param apiKey the OpenAI API key
      */
@@ -686,7 +677,8 @@ public class TelegramNotifier {
     /**
      * Process incoming messages from multiple users.
      * Polls for new messages and processes them based on user queries.
-     * Supports: market info, news, trade queries, positions, orders, risk management, profitability questions.
+     * Supports: market info, news, trade queries, positions, orders, risk
+     * management, profitability questions.
      */
     @SuppressWarnings("unused")
     public void pollAndProcessUserMessages() {
@@ -761,7 +753,7 @@ public class TelegramNotifier {
         // Show typing indicator while processing
         sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
 
-        String response ;
+        String response;
 
         // Check if it's an order comment
         if (message.text.startsWith("/comment")) {
@@ -803,8 +795,7 @@ public class TelegramNotifier {
     private boolean sendMessageToChat(String targetChatId, String text) {
         String body = "chat_id=%s&text=%s&parse_mode=Markdown".formatted(
                 encode(targetChatId),
-                encode(escapeMarkdown(text))
-        );
+                encode(escapeMarkdown(text)));
         return postForm("sendMessage", body);
     }
 
@@ -909,7 +900,8 @@ public class TelegramNotifier {
             ArrayNode messages = requestBody.putArray("messages");
             ObjectNode sysMsg = messages.addObject();
             sysMsg.put("role", "system");
-            sysMsg.put("content", "You are a helpful trading and investment advisor. Provide concise, practical advice in under 100 words.");
+            sysMsg.put("content",
+                    "You are a helpful trading and investment advisor. Provide concise, practical advice in under 100 words.");
 
             ObjectNode userMsg = messages.addObject();
             userMsg.put("role", "user");
@@ -1025,8 +1017,8 @@ public class TelegramNotifier {
     }
 
     /**
-         * User message container.
-         */
-        private record UserMessage(String userId, String userName, String chatId, String text, long timestamp) {
+     * User message container.
+     */
+    private record UserMessage(String userId, String userName, String chatId, String text, long timestamp) {
     }
 }

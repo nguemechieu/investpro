@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 /**
  * Validates AI position management recommendations.
  * Enforces safety rules to prevent AI from making unsafe position modifications.
- *
+ * <p>
  * Rules:
  * - AI cannot remove stop loss
  * - AI cannot increase leverage

@@ -3,6 +3,7 @@ package org.investpro.core.agents.signal;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.models.trading.TradePair;
+import org.investpro.utils.Side;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,16 +18,16 @@ public class Signal {
 
     private final String signalId;
     private final TradePair tradePair;
-    private final String side;
+    private final Side side;
     private final double confidence;
     private final String strategyName;
     private final List<String> reasons;
     private final Instant timestamp;
 
-    public Signal(TradePair tradePair, String side, double confidence, String strategyName, List<String> reasons) {
+    public Signal(TradePair tradePair, Side side, double confidence, String strategyName, List<String> reasons) {
         this.signalId = UUID.randomUUID().toString();
         this.tradePair = tradePair;
-        this.side = side == null ? "HOLD" : side.toUpperCase();
+        this.side = side ;
         this.confidence = Math.max(0.0, Math.min(1.0, confidence));
         this.strategyName = strategyName == null || strategyName.isBlank() ? "unknown" : strategyName;
         this.reasons = List.copyOf(reasons == null ? List.of() : reasons);

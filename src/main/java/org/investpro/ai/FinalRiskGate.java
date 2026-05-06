@@ -1,129 +1,200 @@
 package org.investpro.ai;
 
 import lombok.Getter;
+import org.investpro.risk.RiskDecision;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.investpro.risk.RiskDecision;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
- * Final risk gate that combines RiskManagementSystem and AI reasoning decisions.
- *
- * FinalRiskGate is the ultimate authority on whether a trade can execute.
- * It enforces the rule: Deterministic risk blockers ALWAYS win.
- *
- * Logic:
- * 1. If RiskDecision has blockers → REJECT (even if AI approves)
- * 2. If AI says REJECT → REJECT (override trading logic)
- * 3. If AI says WAIT → DO_NOT_SEND_ORDER (user can retry)
- * 4. If AI says ESCALATE_TO_MANUAL_REVIEW → DO_NOT_SEND_ORDER (await manual decision)
- * 5. If RiskDecision approves AND AI approves → APPROVE (all checks pass)
- *
- * No order is ever sent unless both RiskDecision and AI agree.
+ * Final risk gate that combines deterministic risk and AI reasoning decisions.
+ * <p>
+ * FinalRiskGate is the final authority on whether a trade can execute.
+ * <p>
+ * Core rule:
+ * Deterministic risk blockers ALWAYS win.
+ * <p>
+ * Additional safety rule:
+ * AI can reduce risk, wait, reject, or escalate.
+ * AI cannot increase position size, leverage, or risk beyond RiskDecision limits.
  */
-public class FinalRiskGate {
+public final class FinalRiskGate {
 
     private static final Logger logger = LoggerFactory.getLogger(FinalRiskGate.class);
 
+    private FinalRiskGate() {
+    }
+
     public enum OrderApprovalStatus {
-        /** Order is approved for execution */
         APPROVED,
-
-        /** Order is rejected due to risk blockers */
         REJECTED,
-
-        /** Order should wait for better conditions */
         WAIT,
-
-        /** Order requires manual human review */
         ESCALATE_TO_MANUAL_REVIEW
     }
 
     /**
-     * Make final decision on whether to approve an order.
-     * Combines RiskDecision (deterministic guardrails) and AiTradeReviewResponse (AI reasoning).
+     * Makes the final decision on whether to approve an order.
      *
-     * @param riskDecision From RiskManagementSystem
-     * @param aiResponse From AiReasoningService
-     * @return Final approval status and reasoning
+     * @param riskDecision deterministic decision from RiskManagementSystem
+     * @param aiResponse AI reasoning response
+     * @return final approval decision
      */
-    public static OrderApprovalDecision makeDecision(RiskDecision riskDecision, AiTradeReviewResponse aiResponse) {
-        if (riskDecision == null || aiResponse == null) {
+    public static OrderApprovalDecision makeDecision(
+            RiskDecision riskDecision,
+            AiTradeReviewResponse aiResponse
+    ) {
+        if (riskDecision == null) {
             return OrderApprovalDecision.rejected(
-                    "Invalid decision objects",
-                    "RiskDecision or AiResponse was null"
+                    "Missing RiskDecision",
+                    "RiskDecision was null. No order can be approved without deterministic risk validation."
             );
         }
 
-        // Rule 1: Deterministic risk blockers ALWAYS win
-        if (riskDecision.getBlockers() != null && !riskDecision.getBlockers().isEmpty()) {
+        if (aiResponse == null) {
+            return OrderApprovalDecision.escalate(
+                    "Missing AI response",
+                    "AI response was null. Trade requires manual review or fallback validation."
+            );
+        }
+
+        List<String> riskBlockers = riskDecision.getBlockers();
+
+        // Rule 1: deterministic risk blockers always win.
+        if (riskBlockers != null && !riskBlockers.isEmpty()) {
             logger.warn("RiskManagementSystem has hard blockers. Order rejected.");
             return OrderApprovalDecision.rejected(
                     "Hard blockers from RiskManagementSystem",
-                    "Risk blockers: %s".formatted(String.join("; ", riskDecision.getBlockers()))
+                    "Risk blockers: %s".formatted(String.join("; ", riskBlockers))
             );
         }
 
-        // Rule 2: If AI says REJECT, respect it
-        if (aiResponse.getDecision() == AiDecision.REJECT) {
-            logger.info("AI rejected trade. Order rejected.");
-            return OrderApprovalDecision.rejected(
-                    "AI reasoning rejected the trade",
-                    aiResponse.getExplanation()
-            );
-        }
+        AiDecision aiDecision = aiResponse.getDecision();
 
-        // Rule 3: If AI says WAIT, don't send order
-        if (aiResponse.getDecision() == AiDecision.WAIT) {
-            logger.info("AI recommends waiting. Order not sent.");
-            return OrderApprovalDecision.wait(
-                    "Market conditions not optimal",
-                    aiResponse.getExplanation()
-            );
-        }
-
-        // Rule 4: If AI says ESCALATE_TO_MANUAL_REVIEW, don't send order
-        if (aiResponse.getDecision() == AiDecision.ESCALATE_TO_MANUAL_REVIEW) {
-            logger.info("AI escalated to manual review. Order not sent.");
+        if (aiDecision == null) {
+            logger.warn("AI decision was null. Escalating to manual review.");
             return OrderApprovalDecision.escalate(
-                    "AI requires manual review",
-                    aiResponse.getExplanation()
+                    "Invalid AI decision",
+                    "AI response did not include a valid decision."
             );
         }
 
-        // Rule 5: If RiskDecision is not approved, don't send order
+        // Rule 2: if deterministic risk says cannot proceed, reject.
         if (!riskDecision.canProceed()) {
             logger.warn("RiskDecision indicated trade cannot proceed. Order rejected.");
             return OrderApprovalDecision.rejected(
                     "RiskDecision cannot proceed",
-                    "Risk assessment indicated trade should not proceed"
+                    "Risk assessment indicated the trade should not proceed."
             );
         }
 
-        // Rule 6: Both RiskDecision and AI must approve
-        if (riskDecision.canProceed() &&
-            (aiResponse.getDecision() == AiDecision.APPROVE ||
-             aiResponse.getDecision() == AiDecision.APPROVE_WITH_REDUCED_SIZE)) {
-            logger.info("Both RiskManagementSystem and AI approve. Order approved for execution.");
-            return OrderApprovalDecision.approved(
-                    "All risk checks passed",
-                    aiResponse.getExplanation(),
+        // Rule 3: AI can reject.
+        if (aiDecision == AiDecision.REJECT) {
+            logger.info("AI rejected trade. Order rejected.");
+            return OrderApprovalDecision.rejected(
+                    "AI reasoning rejected the trade",
+                    safeExplanation(aiResponse)
+            );
+        }
+
+        // Rule 4: AI can wait.
+        if (aiDecision == AiDecision.WAIT) {
+            logger.info("AI recommends waiting. Order not sent.");
+            return OrderApprovalDecision.wait(
+                    "Market conditions not optimal",
+                    safeExplanation(aiResponse)
+            );
+        }
+
+        // Rule 5: AI can escalate.
+        if (aiDecision == AiDecision.ESCALATE_TO_MANUAL_REVIEW) {
+            logger.info("AI escalated trade to manual review. Order not sent.");
+            return OrderApprovalDecision.escalate(
+                    "AI requires manual review",
+                    safeExplanation(aiResponse)
+            );
+        }
+
+        // Rule 6: APPROVE or APPROVE_WITH_REDUCED_SIZE can continue, but values must be clamped.
+        if (aiDecision == AiDecision.APPROVE || aiDecision == AiDecision.APPROVE_WITH_REDUCED_SIZE) {
+            double approvedPositionSize = clampPositionSize(
                     aiResponse.getSuggestedPositionSize(),
+                    riskDecision.getFinalPositionSize()
+            );
+
+            double approvedRiskMultiplier = clampRiskMultiplier(
                     aiResponse.getSuggestedRiskMultiplier(),
-                    aiResponse.getRecommendedExecutionStrategy()
+                    riskDecision.getRiskMultiplier()
+            );
+
+            String executionStrategy = aiResponse.getRecommendedExecutionStrategy();
+
+            if (approvedPositionSize <= 0) {
+                return OrderApprovalDecision.escalate(
+                        "Invalid approved position size",
+                        "AI/risk approved flow produced a non-positive position size."
+                );
+            }
+
+            if (aiDecision == AiDecision.APPROVE_WITH_REDUCED_SIZE
+                    && approvedPositionSize >= riskDecision.getFinalPositionSize()) {
+                logger.warn("AI selected APPROVE_WITH_REDUCED_SIZE but did not reduce size. Clamped to risk-approved size.");
+            }
+
+            logger.info("FinalRiskGate approved order. positionSize={}, riskMultiplier={}, executionStrategy={}",
+                    approvedPositionSize, approvedRiskMultiplier, executionStrategy);
+
+            return OrderApprovalDecision.approved(
+                    "All final risk checks passed",
+                    safeExplanation(aiResponse),
+                    approvedPositionSize,
+                    approvedRiskMultiplier,
+                    executionStrategy
             );
         }
 
-        // If we get here, something unexpected happened
-        logger.warn("Unexpected gate state: RiskDecision.canProceed={}, AI Decision={}",
-                riskDecision.canProceed(), aiResponse.getDecision());
+        logger.warn("Unexpected gate state: riskCanProceed={}, aiDecision={}",
+                riskDecision.canProceed(), aiDecision);
+
         return OrderApprovalDecision.escalate(
                 "Unexpected decision state",
-                "Unexpected combination of RiskDecision and AI reasoning states"
+                "Unexpected combination of RiskDecision and AI reasoning states."
         );
+    }
+
+    private static double clampPositionSize(double aiSuggestedSize, double riskApprovedSize) {
+        if (riskApprovedSize <= 0) {
+            return 0.0;
+        }
+
+        if (aiSuggestedSize <= 0) {
+            return riskApprovedSize;
+        }
+
+        return Math.min(aiSuggestedSize, riskApprovedSize);
+    }
+
+    private static double clampRiskMultiplier(double aiSuggestedMultiplier, double riskApprovedMultiplier) {
+        if (riskApprovedMultiplier <= 0) {
+            return 0.0;
+        }
+
+        if (aiSuggestedMultiplier <= 0) {
+            return riskApprovedMultiplier;
+        }
+
+        return Math.min(aiSuggestedMultiplier, riskApprovedMultiplier);
+    }
+
+    private static String safeExplanation(AiTradeReviewResponse aiResponse) {
+        if (aiResponse == null || aiResponse.getExplanation() == null || aiResponse.getExplanation().isBlank()) {
+            return "No AI explanation provided.";
+        }
+
+        return aiResponse.getExplanation();
     }
 
     /**
@@ -139,9 +210,14 @@ public class FinalRiskGate {
         private final String recommendedExecutionStrategy;
         private final LocalDateTime decidedAt;
 
-        private OrderApprovalDecision(OrderApprovalStatus status, String summary, String explanation,
-                                     double suggestedPositionSize, double suggestedRiskMultiplier,
-                                     String recommendedExecutionStrategy) {
+        private OrderApprovalDecision(
+                OrderApprovalStatus status,
+                String summary,
+                String explanation,
+                double suggestedPositionSize,
+                double suggestedRiskMultiplier,
+                String recommendedExecutionStrategy
+        ) {
             this.status = status;
             this.summary = summary;
             this.explanation = explanation;
@@ -151,76 +227,74 @@ public class FinalRiskGate {
             this.decidedAt = LocalDateTime.now();
         }
 
-        // Explicit getters (Lombok @Getter not being invoked)
-        public OrderApprovalStatus getStatus() {
-            return status;
-        }
-
-        public String getSummary() {
-            return summary;
-        }
-
-        public String getExplanation() {
-            return explanation;
-        }
-
-        public double getSuggestedPositionSize() {
-            return suggestedPositionSize;
-        }
-
-        public double getSuggestedRiskMultiplier() {
-            return suggestedRiskMultiplier;
-        }
-
-        public String getRecommendedExecutionStrategy() {
-            return recommendedExecutionStrategy;
-        }
-
-        public LocalDateTime getDecidedAt() {
-            return decidedAt;
-        }
-
         public boolean isApproved() {
             return status == OrderApprovalStatus.APPROVED;
         }
 
-        @SuppressWarnings("unused")
         public boolean requiresManualReview() {
             return status == OrderApprovalStatus.ESCALATE_TO_MANUAL_REVIEW;
         }
 
-        @SuppressWarnings("unused")
         public boolean shouldWait() {
             return status == OrderApprovalStatus.WAIT;
         }
 
-        @SuppressWarnings("unused")
         public boolean isRejected() {
             return status == OrderApprovalStatus.REJECTED;
         }
 
-        // Factory methods
         @Contract("_, _, _, _, _ -> new")
-        static @NotNull OrderApprovalDecision approved(String summary, String explanation,
-                                                       double positionSize, double riskMultiplier,
-                                                       String executionStrategy) {
-            return new OrderApprovalDecision(OrderApprovalStatus.APPROVED, "%s\nAll risk checks passed".formatted(summary), explanation,
-                    positionSize, riskMultiplier, executionStrategy);
+        static @NotNull OrderApprovalDecision approved(
+                String summary,
+                String explanation,
+                double positionSize,
+                double riskMultiplier,
+                String executionStrategy
+        ) {
+            return new OrderApprovalDecision(
+                    OrderApprovalStatus.APPROVED,
+                    summary,
+                    explanation,
+                    positionSize,
+                    riskMultiplier,
+                    executionStrategy
+            );
         }
 
         @Contract("_, _ -> new")
         static @NotNull OrderApprovalDecision rejected(String summary, String explanation) {
-            return new OrderApprovalDecision(OrderApprovalStatus.REJECTED, summary, explanation, 0.0, 0.0, null);
+            return new OrderApprovalDecision(
+                    OrderApprovalStatus.REJECTED,
+                    summary,
+                    explanation,
+                    0.0,
+                    0.0,
+                    null
+            );
         }
 
         @Contract("_, _ -> new")
         static @NotNull OrderApprovalDecision wait(String summary, String explanation) {
-            return new OrderApprovalDecision(OrderApprovalStatus.WAIT, "%s\nMarket conditions not optimal".formatted(summary), explanation, 0.0, 0.0, null);
+            return new OrderApprovalDecision(
+                    OrderApprovalStatus.WAIT,
+                    summary,
+                    explanation,
+                    0.0,
+                    0.0,
+                    null
+            );
         }
 
         @Contract("_, _ -> new")
         static @NotNull OrderApprovalDecision escalate(String summary, String explanation) {
-            return new OrderApprovalDecision(OrderApprovalStatus.ESCALATE_TO_MANUAL_REVIEW, summary, explanation, 0.0, 0.0, null);
+            return new OrderApprovalDecision(
+                    OrderApprovalStatus.ESCALATE_TO_MANUAL_REVIEW,
+                    summary,
+                    explanation,
+                    0.0,
+                    0.0,
+                    null
+            );
         }
     }
 }

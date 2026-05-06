@@ -7,7 +7,8 @@ import java.util.Locale;
 
 public enum Side {
     BUY,
-    SELL;
+    SELL,HOLD;
+
 
     public static Side getSide(@NotNull String type) {
         if (type.equalsIgnoreCase("BUY")) {

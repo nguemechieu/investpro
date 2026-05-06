@@ -12,6 +12,7 @@ import  org.investpro.models.trading.Position;
 import  org.investpro.models.trading.Ticker;
 import  org.investpro.models.trading.Trade;
 import  org.investpro.models.trading.TradePair;
+import org.investpro.strategy.StrategySignal;
 import  org.investpro.utils.CandleDataSupplier;
 import  org.investpro.utils.MARKET_TYPES;
 import  org.investpro.utils.Side;
@@ -82,7 +83,17 @@ public abstract class Exchange {
     public abstract boolean supportsMarketType(MARKET_TYPES marketType);
 
     public abstract List<MARKET_TYPES> getSupportedMarketTypes();
+  public abstract CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity);
 
+    public abstract   CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice);
+
+    public abstract  CompletableFuture<String> closePosition(TradePair symbol, String positionId);
+
+    public abstract   CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity);
+
+    public abstract  CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss);
+
+    public abstract  CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit);
     // ---------------------------------------------------------------------
     // Notification settings
     // ---------------------------------------------------------------------
@@ -693,4 +704,9 @@ public abstract class Exchange {
                 ? current.getClass().getSimpleName()
                 : message;
     }
+
+    public abstract CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) ;
+
+
+
 }

@@ -517,4 +517,25 @@ public class Alpaca extends BrokerExchangeAdapter {
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
         return failedFuture(unsupported("setLeverage"));
-    }}
+    }
+
+    @Override
+    public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        return failedFuture(unsupported("modifyStopLoss"));
+    }
+
+    @Override
+    public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        return failedFuture(unsupported("closePartialPosition"));
+    }
+
+    @Override
+    public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        return failedFuture(unsupported("modifyTakeProfit"));
+    }
+
+    @Override
+    public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        return failedFuture(unsupported("enableTrailingStop"));
+    }
+}

@@ -7,6 +7,8 @@ import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
 
+import static org.investpro.utils.Side.HOLD;
+
 /**
  * Filters and approves/rejects signals before risk review.
  */
@@ -43,7 +45,7 @@ public class StrategyAgent implements Agent {
             return;
         }
 
-        if (signal.getConfidence() >= 0.50 && !"HOLD".equalsIgnoreCase(signal.getSide())) {
+        if (signal.getConfidence() >= 0.50 && !HOLD.equals(signal.getSide())) {
             context.getEventBus().publishAsync(AgentEvent.of(AgentEvent.STRATEGY_SIGNAL_APPROVED, name(), signal));
         } else {
             context.getEventBus().publishAsync(AgentEvent.of(AgentEvent.STRATEGY_SIGNAL_REJECTED, name(), signal));

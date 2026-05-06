@@ -7,12 +7,15 @@ import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
+import org.investpro.utils.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static org.investpro.utils.Side.*;
 
 /**
  * Creates simple deterministic signals from live market events.
@@ -38,6 +41,7 @@ public class SignalAgent implements Agent {
         this.running = true;
     }
 
+    Signal signal;
     @Override
     public void stop() {
         running = false;
@@ -64,20 +68,20 @@ public class SignalAgent implements Agent {
             return;
         }
 
-        Double previous = lastPrices.put(pair, price);
-        if (previous == null || previous <= 0) {
+        double previous = lastPrices.put(pair, price);
+        if ( previous <= 0) {
             return;
         }
 
-        double change = (price - previous) / previous;
-        Signal signal;
 
+        double change = (price - previous) / previous;
+        double min = Math.min(0.95, 0.55 + Math.abs(change * 100));
         if (change > 0.0005) {
-            signal = new Signal(pair, "BUY", Math.min(0.95, 0.55 + Math.abs(change * 100)), "momentum", List.of("Price momentum is positive."));
+            signal = new Signal(pair, BUY, min, "momentum", List.of("Price momentum is positive."));
         } else if (change < -0.0005) {
-            signal = new Signal(pair, "SELL", Math.min(0.95, 0.55 + Math.abs(change * 100)), "momentum", List.of("Price momentum is negative."));
+            signal = new Signal(pair, SELL, min, "momentum", List.of("Price momentum is negative."));
         } else {
-            signal = new Signal(pair, "HOLD", 0.50, "momentum", List.of("Price movement is neutral."));
+            signal = new Signal(pair, HOLD, 0.50, "momentum", List.of("Price movement is neutral."));
         }
 
         logger.debug("Created signal {}", signal);

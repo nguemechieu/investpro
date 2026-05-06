@@ -1742,6 +1742,30 @@ public class Coinbase extends Exchange {
                 new UnsupportedOperationException("Coinbase spot trading does not support per-symbol leverage."));
     }
 
+    @Override
+    public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
+        return failedFuture(
+                new UnsupportedOperationException("Coinbase does not support position modification API."));
+    }
+
+    @Override
+    public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
+        return failedFuture(
+                new UnsupportedOperationException("Coinbase does not support partial position closure API."));
+    }
+
+    @Override
+    public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
+        return failedFuture(
+                new UnsupportedOperationException("Coinbase does not support position modification API."));
+    }
+
+    @Override
+    public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
+        return failedFuture(
+                new UnsupportedOperationException("Coinbase does not support trailing stop orders."));
+    }
+
     // ---------------------------------------------------------------------
     // Order command consumer
     // ---------------------------------------------------------------------

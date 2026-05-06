@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Value;
 import org.investpro.risk.RiskDecision;
 import org.investpro.risk.TradeRiskContext;
+import org.investpro.strategy.StrategySignal;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.LocalDateTime;
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 /**
  * Immutable request object passed to AiReasoningService for trade review.
  * Contains all context needed for AI to make an informed, risk-aware decision.
- *
+ * <p>
  * The AI uses this to analyze the trade setup without modifying any state.
  */
 @Value
@@ -111,4 +112,7 @@ public class AiTradeReviewRequest {
     
     /** Timestamp when request was created */
     LocalDateTime createdAt;
+
+    public static AiTradeReviewRequest from(StrategySignal signal, TradeRiskContext riskContext, RiskDecision riskDecision) {
+    }
 }

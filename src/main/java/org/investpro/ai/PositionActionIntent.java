@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.models.trading.TradePair;
 import org.investpro.risk.ExecutionStrategy;
 
 /**
@@ -32,7 +33,7 @@ public class PositionActionIntent {
     private String positionId;
     
     /** Symbol being managed */
-    private String symbol;
+    private TradePair symbol;
     
     // =========================================================================
     // Action Details
@@ -96,7 +97,8 @@ public class PositionActionIntent {
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime approvedAt;
     private String source; // "AI", "MANUAL", "AUTOMATIC", etc.
-    
+    private double trailingStopDistance;
+
     // =========================================================================
     // Validation
     // =========================================================================
@@ -106,7 +108,7 @@ public class PositionActionIntent {
      */
     public boolean isValid() {
         return positionId != null && !positionId.isBlank()
-                && symbol != null && !symbol.isBlank()
+                && symbol != null
                 && action != null
                 && approved
                 && executionStrategy != null;
@@ -152,5 +154,13 @@ public class PositionActionIntent {
 
     public double getSuggestedTakeProfit() {
         return newTakeProfit != null ? newTakeProfit : 0.0;
+    }
+
+    public double getSuggestedCloseQuantity() {
+        return  quantityToClose != null ? quantityToClose : 0.0;
+    }
+
+    public double getTrailingDistance() {
+        return  trailingStopDistance;
     }
 }

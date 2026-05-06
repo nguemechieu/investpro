@@ -2,12 +2,16 @@ package org.investpro.strategy;
 
 import lombok.Builder;
 import lombok.Getter;
+import org.investpro.models.trading.TradePair;
 import org.investpro.timeframe.Timeframe;
 import org.investpro.trading.MarketBehavior;
+import org.investpro.utils.Side;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.investpro.utils.Side.HOLD;
 
 /**
  * Normalized signal returned by all trading strategies.
@@ -16,12 +20,12 @@ import java.util.List;
 @Getter
 @Builder
 public class StrategySignal {
-    private final String symbol;
+    private final TradePair symbol;
     private final Timeframe timeframe;
     private final String strategyId;
     
     @Builder.Default
-    private final SignalSide side = SignalSide.HOLD;
+    private final Side side = HOLD;
     
     @Builder.Default
     private final double confidence = 0.0; // 0.0 to 1.0
@@ -52,44 +56,16 @@ public class StrategySignal {
     @Builder.Default
     private final SignalMetadata metadata = SignalMetadata.builder().build();
 
-    public enum SignalSide {
-        BUY("BUY"),
-        SELL("SELL"),
-        HOLD("HOLD");
 
-        private final String label;
-
-        SignalSide(String label) {
-            this.label = label;
-        }
-
-        public String getLabel() {
-            return label;
-        }
-    }
 
     public boolean isValid() {
         if (validUntil != null && Instant.now().isAfter(validUntil)) {
             return false;
         }
-        return side != SignalSide.HOLD;
+        return side != HOLD;
     }
 
-    public boolean hasStopLoss() {
-        return stopLoss != null;
-    }
 
-    public boolean hasTakeProfit() {
-        return takeProfit != null;
-    }
-
-    public boolean isHighConfidence() {
-        return confidence >= 0.7;
-    }
-
-    public boolean hasSeriousWarnings() {
-        return !warnings.isEmpty();
-    }
 
     @Getter
     @Builder
