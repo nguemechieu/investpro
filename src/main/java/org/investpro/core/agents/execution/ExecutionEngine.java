@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 public class ExecutionEngine {
 
     private Exchange exchange;
-    // private SymbolExecutionFilter symbolFilter; // TODO: SymbolExecutionFilter
+    private SymbolExecutionFilter symbolFilter; // TODO: SymbolExecutionFilter
     // class not found
     private static final Logger logger = LoggerFactory.getLogger(ExecutionEngine.class);
 
@@ -60,9 +60,9 @@ public class ExecutionEngine {
      * is initialized).
      */
     // TODO: SymbolExecutionFilter class not found - method commented out
-    // public void setSymbolFilter(@Nullable SymbolExecutionFilter symbolFilter) {
-    // this.symbolFilter = symbolFilter;
-    // }
+     public void setSymbolFilter(@Nullable SymbolExecutionFilter symbolFilter) {
+     this.symbolFilter = symbolFilter;
+     }
 
     /**
      * Execute an approved position action intent.
@@ -80,14 +80,14 @@ public class ExecutionEngine {
         try {
             // Step 1: Validate symbol is enabled for trading
             // TODO: symbolFilter removed - SymbolExecutionFilter class not found
-            // if (symbolFilter != null &&
-            // !symbolFilter.isSymbolEligible(intent.getSymbol())) {
-            // String reason = symbolFilter.getEligibilityReason(intent.getSymbol());
-            // logger.warn("ExecutionEngine: Symbol {} rejected by filter. Reason: {}",
-            // intent.getSymbol(), reason);
-            // return CompletableFuture.completedFuture(
-            // new PositionExecutionResult(false, null, "Symbol rejected: " + reason));
-            // }
+             if (symbolFilter != null &&
+             !symbolFilter.isSymbolEligible(intent.getSymbol())) {
+             String reason = symbolFilter.getEligibilityReason(intent.getSymbol());
+             logger.warn("ExecutionEngine: Symbol {} rejected by filter. Reason: {}",
+             intent.getSymbol(), reason);
+             return CompletableFuture.completedFuture(
+             new PositionExecutionResult(false, null, "Symbol rejected: " + reason));
+             }
 
             logger.info("ExecutionEngine: Executing approved action: {} for {}",
                     intent.getAction(), intent.getSymbol());

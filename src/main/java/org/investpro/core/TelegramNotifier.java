@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.investpro.utils.ENUM_CHAT_ACTION;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -252,6 +253,28 @@ public class TelegramNotifier {
         );
 
         return postForm("sendMessage", body);
+    }
+
+    /**
+     * Send typing/action indicator to show user that bot is processing their request.
+     * Useful for long-running operations to give visual feedback.
+     */
+    public boolean sendChatAction(String targetChatId, ENUM_CHAT_ACTION action) {
+        if (targetChatId == null || targetChatId.isBlank() || action == null) {
+            return false;
+        }
+
+        try {
+            String actionValue = action.toString().toLowerCase();
+            String body = "chat_id=%s&action=%s".formatted(
+                    encode(targetChatId),
+                    encode(actionValue)
+            );
+            return postForm("sendChatAction", body);
+        } catch (Exception e) {
+            logger.debug("Error sending chat action: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -734,6 +757,9 @@ public class TelegramNotifier {
      */
     private void processUserMessage(UserContext context, UserMessage message) {
         logger.info("Processing message from user {} ({}): {}", message.userId, message.userName, message.text);
+
+        // Show typing indicator while processing
+        sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
 
         String response ;
 
