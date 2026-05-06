@@ -529,6 +529,11 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
+        return failedFuture(unsupported("closePosition"));
+    }
+
+    @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
         return failedFuture(unsupported("modifyTakeProfit"));
     }

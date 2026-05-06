@@ -1381,6 +1381,11 @@ public class Oanda extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
+        return failedFuture(new UnsupportedOperationException("OANDA position closure by ID requires trade-level query."));
+    }
+
+    @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
         return failedFuture(new UnsupportedOperationException("OANDA position modification requires order management."));
     }

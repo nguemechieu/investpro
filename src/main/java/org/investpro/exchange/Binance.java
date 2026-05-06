@@ -154,6 +154,12 @@ public class Binance extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
+        logger.warn("closePosition(symbol, positionId) not implemented for Binance");
+        return failedFuture(unsupported("closePosition"));
+    }
+
+    @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
         logger.warn("modifyTakeProfit() not implemented for Binance");
         return failedFuture(unsupported("modifyTakeProfit"));

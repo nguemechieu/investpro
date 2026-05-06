@@ -1755,6 +1755,12 @@ public class Coinbase extends Exchange {
     }
 
     @Override
+    public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
+        return failedFuture(
+                new UnsupportedOperationException("Coinbase does not support position closure by ID."));
+    }
+
+    @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
         return failedFuture(
                 new UnsupportedOperationException("Coinbase does not support position modification API."));
