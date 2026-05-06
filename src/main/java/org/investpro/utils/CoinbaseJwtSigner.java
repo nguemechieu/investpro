@@ -283,19 +283,14 @@ public final class CoinbaseJwtSigner {
             JcaPEMKeyConverter converter = new JcaPEMKeyConverter()
                     .setProvider(BOUNCY_CASTLE_PROVIDER);
 
-            PrivateKey privateKey;
-
-            if (parsed instanceof PEMKeyPair pemKeyPair) {
-                privateKey = converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
-            } else if (parsed instanceof PrivateKeyInfo privateKeyInfo) {
-                privateKey = converter.getPrivateKey(privateKeyInfo);
-            } else if (parsed instanceof PrivateKey parsedPrivateKey) {
-                privateKey = parsedPrivateKey;
-            } else {
-                throw new IllegalArgumentException(
+            PrivateKey privateKey = switch (parsed) {
+                case PEMKeyPair pemKeyPair -> converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
+                case PrivateKeyInfo privateKeyInfo -> converter.getPrivateKey(privateKeyInfo);
+                case PrivateKey parsedPrivateKey -> parsedPrivateKey;
+                default -> throw new IllegalArgumentException(
                         "Unsupported Coinbase private key format: " + parsed.getClass().getName()
                 );
-            }
+            };
 
             KeyFactory keyFactory = KeyFactory.getInstance("EC");
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey.getEncoded());
@@ -324,8 +319,8 @@ public final class CoinbaseJwtSigner {
      * java org.investpro.exchange.CoinbaseJwtSigner GET /api/v3/brokerage/accounts
      */
     static void main(String @NotNull [] args) {
-        String keyName = System.getenv("COINBASE_KEY_NAME");
-        String privateKey = System.getenv("COINBASE_PRIVATE_KEY");
+        String keyName = "organizations/a8dd6d6f-375a-4f4b-b0b0-75f829b998eb/apiKeys/efd80950-544c-4051-9911-b41b8d32bc67";//System.getenv("COINBASE_KEY_NAME");
+        String privateKey = "-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEIOtcCOGlCU6sv8fQsUkxliRPkmtZIzjKq7VETXKpukW5oAoGCCqGSM49\\nAwEHoUQDQgAEpIxDQbb9Raa2N0MFzUBho/sEuU6C1GwA0qP58/5t9G24iu31q+K9\\n4VF+Hq1v4opkoJROToqMqyu9UIZHsYl8pg==\\n-----END EC PRIVATE KEY-----\\n";//System.getenv("COINBASE_PRIVATE_KEY");
 
         String method = args.length > 0 ? args[0] : "GET";
         String path = args.length > 1 ? args[1] : "/api/v3/brokerage/accounts";

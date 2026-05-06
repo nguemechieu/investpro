@@ -65,12 +65,13 @@ public class RiskAgent implements Agent {
         double approvedSize = Math.max(0.0, context.getMaxRiskPerTrade());
         reasons.add("Risk approved with conservative sizing.");
 
-        RiskDecision decision = new RiskDecision(true, signal.getSide(), approvedSize, context.getMaxRiskPerTrade(), reasons, signal);
+        RiskDecision decision = new RiskDecision(true, signal.getSide().toString(), approvedSize,
+                context.getMaxRiskPerTrade(), reasons, signal);
         context.getEventBus().publishAsync(AgentEvent.risk(AgentEvent.RISK_APPROVED, name(), decision));
     }
 
     private void publishRejected(Signal signal, List<String> reasons) {
-        RiskDecision decision = new RiskDecision(false, signal.getSide(), 0.0, 0.0, reasons, signal);
+        RiskDecision decision = new RiskDecision(false, signal.getSide().toString(), 0.0, 0.0, reasons, signal);
         context.getEventBus().publishAsync(AgentEvent.risk(AgentEvent.RISK_REJECTED, name(), decision));
     }
 }

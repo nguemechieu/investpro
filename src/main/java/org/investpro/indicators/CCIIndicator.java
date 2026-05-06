@@ -11,10 +11,7 @@ import java.util.List;
  */
 public class CCIIndicator extends BaseIndicator {
     
-    public CCIIndicator() {
-        this(20);
-    }
-    
+
     public CCIIndicator(int period) {
         super("CCI", period);
     }

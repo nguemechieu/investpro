@@ -12,7 +12,7 @@ import  org.investpro.models.trading.Position;
 import  org.investpro.models.trading.Ticker;
 import  org.investpro.models.trading.Trade;
 import  org.investpro.models.trading.TradePair;
-import org.investpro.strategy.StrategySignal;
+
 import  org.investpro.utils.CandleDataSupplier;
 import  org.investpro.utils.MARKET_TYPES;
 import  org.investpro.utils.Side;
@@ -673,6 +673,17 @@ public abstract class Exchange {
 
     protected boolean hasCredentials() {
         return !safe(apiKey).isEmpty() && !safe(apiSecret).isEmpty();
+    }
+
+    public boolean canSubmitLiveOrders() {
+        return supportsLiveTrading()
+                && Boolean.TRUE.equals(isConnected())
+                && !isPaperTrading();
+    }
+
+    public boolean canSubmitOrders() {
+        return Boolean.TRUE.equals(isConnected())
+                && (canSubmitLiveOrders() || (supportsPaperTradingMode() && isPaperTrading()));
     }
 
     protected UnsupportedOperationException unsupported(String methodName) {

@@ -1,0 +1,180 @@
+/*******************************************************************************
+ * RESPONSIVE DESIGN & BREAKPOINTS
+ * Adaptive styling for different screen sizes and layouts
+ ******************************************************************************/
+
+/* ============================================================================
+   LARGE SCREENS (1920px+)
+   ============================================================================ */
+
+@media (min-width: 1920px) {
+    .root {
+        -fx-font-size: 13px;
+    }
+    
+    .panel-title {
+        -fx-font-size: 15px;
+    }
+    
+    .table-cell {
+        -fx-padding: 6 8 6 8;
+    }
+    
+    .chart-title {
+        -fx-font-size: 16px;
+    }
+}
+
+/* ============================================================================
+   MEDIUM SCREENS (1366px - 1920px)
+   ============================================================================ */
+
+@media (min-width: 1366px) and (max-width: 1919px) {
+    .root {
+        -fx-font-size: 12px;
+    }
+    
+    .compact-panels .panel {
+        -fx-padding: 8 8 8 8;
+    }
+}
+
+/* ============================================================================
+   SMALL SCREENS (1024px - 1366px)
+   ============================================================================ */
+
+@media (max-width: 1365px) {
+    .root {
+        -fx-font-size: 11px;
+    }
+    
+    .button {
+        -fx-padding: 5 10 5 10;
+    }
+    
+    .buy-button,
+    .sell-button {
+        -fx-padding: 6 16 6 16;
+        -fx-font-size: 12px;
+    }
+    
+    .panel-title {
+        -fx-font-size: 12px;
+    }
+    
+    .table-row-cell {
+        -fx-cell-size: 24px;
+    }
+}
+
+/* ============================================================================
+   MOBILE SCREENS (480px - 1024px)
+   ============================================================================ */
+
+@media (max-width: 1023px) {
+    .root {
+        -fx-font-size: 10px;
+    }
+    
+    .button {
+        -fx-padding: 4 8 4 8;
+        -fx-font-size: 10px;
+    }
+    
+    .tab {
+        -fx-padding: 5 10 5 10;
+    }
+    
+    .table-cell {
+        -fx-padding: 3 4 3 4;
+    }
+    
+    .chart-title {
+        -fx-font-size: 12px;
+    }
+}
+
+/* ============================================================================
+   ULTRA-SMALL SCREENS (480px or less)
+   ============================================================================ */
+
+@media (max-width: 479px) {
+    .root {
+        -fx-font-size: 9px;
+    }
+    
+    .button {
+        -fx-padding: 3 6 3 6;
+        -fx-font-size: 9px;
+    }
+    
+    .workspace-title {
+        -fx-font-size: 12px;
+    }
+    
+    .table-view {
+        -fx-font-size: 9px;
+    }
+    
+    .tool-bar {
+        -fx-padding: 4 5 4 5;
+        -fx-spacing: 4;
+    }
+}
+
+/* ============================================================================
+   PORTRAIT ORIENTATION
+   ============================================================================ */
+
+@media (orientation: portrait) {
+    .split-pane {
+        -fx-orientation: vertical;
+    }
+    
+    .toolbar-horizontal {
+        -fx-orientation: vertical;
+    }
+}
+
+/* ============================================================================
+   LANDSCAPE ORIENTATION
+   ============================================================================ */
+
+@media (orientation: landscape) {
+    .split-pane {
+        -fx-orientation: horizontal;
+    }
+    
+    .chart-container {
+        -fx-min-height: 400;
+    }
+}
+
+/* ============================================================================
+   HIGH DPI DISPLAYS (Retina / High Density)
+   ============================================================================ */
+
+.root.high-dpi {
+    -fx-font-size: 13px;
+    -fx-border-width: 2;
+}
+
+.root.high-dpi .button {
+    -fx-border-width: 2;
+}
+
+/* ============================================================================
+   LOW POWER MODE (Reduced animations)
+   ============================================================================ */
+
+.root.low-power-mode {
+    --animation-duration: 0;
+}
+
+.root.low-power-mode .button:hover {
+    -fx-effect: null;
+}
+
+.root.low-power-mode .table-row-cell:hover {
+    -fx-effect: null;
+}

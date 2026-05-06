@@ -1,5 +1,7 @@
 package org.investpro.ai;
 
+import lombok.Getter;
+
 /**
  * AI reasoning engine decision on whether to approve, modify, wait, reject, or escalate a proposed trade.
  * This enum represents the final decision from the AI layer after risk review.
@@ -41,16 +43,13 @@ public enum AiDecision {
      */
     ESCALATE_TO_MANUAL_REVIEW("Trade requires manual human review", false);
 
+    @Getter
     private final String description;
     private final boolean allowsExecution;
 
     AiDecision(String description, boolean allowsExecution) {
         this.description = description;
         this.allowsExecution = allowsExecution;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     public boolean allowsExecution() {

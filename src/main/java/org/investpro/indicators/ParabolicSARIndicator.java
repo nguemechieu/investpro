@@ -1,5 +1,7 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import java.util.List;
 
@@ -7,15 +9,14 @@ import java.util.List;
  * Parabolic SAR (Stop and Reverse) Indicator
  * Provides entry and exit points, showing trend reversals.
  */
+@Getter
+@Setter
 public class ParabolicSARIndicator extends BaseIndicator {
     
     private double initialAF;
     private double maxAF;
     
-    public ParabolicSARIndicator() {
-        this(0.02, 0.20);
-    }
-    
+
     public ParabolicSARIndicator(double initialAF, double maxAF) {
         super("Parabolic SAR", 1);
         this.initialAF = initialAF;

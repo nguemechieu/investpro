@@ -4,12 +4,14 @@ import org.investpro.market.AssetClass;
 import org.investpro.market.ContractType;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyMetadata;
-import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.trading.MarketBehavior;
+import org.investpro.utils.Side;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
+
+import static org.investpro.utils.Side.HOLD;
 
 /**
  * Base abstract class for trading strategy implementations.
@@ -17,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
  */
 @Slf4j
 public abstract class BaseStrategy implements TradingStrategy {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BaseStrategy.class);
     protected final StrategyMetadata metadata;
     protected String lastSignalDescription;
 
@@ -58,7 +61,7 @@ public abstract class BaseStrategy implements TradingStrategy {
 
     @Override
     public void validateConfiguration() throws IllegalStateException {
-        if (metadata == null || metadata.getStrategyId() == null) {
+        if (metadata.getStrategyId() == null) {
             throw new IllegalStateException("Strategy metadata or ID is missing");
         }
         if (metadata.getSupportedTimeframes().isEmpty()) {
@@ -76,17 +79,11 @@ public abstract class BaseStrategy implements TradingStrategy {
     }
 
     protected boolean hasEnoughBars(StrategyContext context) {
-        return context.hasEnoughBars(requiredWarmupBars());
+        return !context.hasEnoughBars(requiredWarmupBars());
     }
 
-    protected StrategySignal noSignal(StrategyContext context, String reason) {
+    protected Side noSignal(StrategyContext context, String reason) {
         updateSignalDescription("No signal: " + reason);
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.HOLD)
-                .reasons(java.util.List.of(reason))
-                .build();
+        return HOLD;
     }
 }

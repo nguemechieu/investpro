@@ -49,11 +49,7 @@ public class SlippageModel {
         }
 
         // Market orders risky in thin liquidity
-        if (executionStrategy == ExecutionStrategy.MARKET_ORDER && liquidityProfile == LiquidityProfile.THIN_LIQUIDITY) {
-            return false;  // Still return false - not recommended
-        }
-
-        return true;
+        return executionStrategy != ExecutionStrategy.MARKET_ORDER || liquidityProfile != LiquidityProfile.THIN_LIQUIDITY;  // Still return false - not recommended
     }
 
     /**

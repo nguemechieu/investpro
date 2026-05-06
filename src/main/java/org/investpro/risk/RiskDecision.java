@@ -15,11 +15,30 @@ import java.util.List;
 @AllArgsConstructor
 @Setter
 @Getter
-@ToString
+
 public class RiskDecision {
 
     // Primary decision
     boolean approved;
+
+    @Override
+    public String toString() {
+        return "RiskDecision{" +
+                "approved=" + approved +
+                ", approvalReason='" + approvalReason + '\'' +
+                ", finalPositionSize=" + finalPositionSize +
+                ", finalLeverage=" + finalLeverage +
+                ", riskMultiplier=" + riskMultiplier +
+                ", expectedValue=" + expectedValue +
+                ", portfolioHeat=" + portfolioHeat +
+                ", estimatedSlippage=" + estimatedSlippage +
+                ", recommendedExecutionStrategy=" + recommendedExecutionStrategy +
+                ", blockers=" + blockers +
+                ", warnings=" + warnings +
+                ", recommendations=" + recommendations +
+                ", humanReadableSummary='" + humanReadableSummary + '\'' +
+                '}';
+    }
 
     @Builder.Default
     String approvalReason = "";

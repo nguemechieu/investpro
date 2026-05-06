@@ -1,106 +1,145 @@
 package org.investpro.core.agents.execution;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.FinalRiskGate;
 import org.investpro.ai.PositionActionIntent;
+import org.investpro.data.Db1;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.trading.TradePair;
+import org.investpro.repository.CurrencyRepository;
+import org.investpro.repository.CurrencyRepositoryImpl;
+import org.investpro.repository.OrderRepository;
+import org.investpro.repository.OrderRepositoryImpl;
+import org.investpro.repository.TradeRepository;
+import org.investpro.repository.TradeRepositoryImpl;
 import org.investpro.risk.TradeRiskContext;
+import org.investpro.service.CurrencyService;
+import org.investpro.service.OrderService;
+import org.investpro.service.TradeService;
+import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.sql.SQLException;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * ExecutionEngine - The Operator Role in Position Management.
-
- * Executes only approved PositionActionIntent objects passed from FinalRiskGate.
- * Never executes unverified or unapproved position actions.
+ * ExecutionEngine - the operator layer of TradeAdviser / InvestPro.
+ *
+ * Responsibilities:
+ * - execute only approved new-order decisions from FinalRiskGate
+ * - execute only approved open-position actions from FinalRiskGate
+ * - call the Exchange adapter for real broker/network operations
+ * - apply symbol execution filtering
+ * - reject unsupported/manual-review actions safely
+ *
+ * This class must NOT:
+ * - generate signals
+ * - decide risk
+ * - ask AI for decisions
+ * - bypass FinalRiskGate
  */
 @Slf4j
+@Getter
+@Setter
 public class ExecutionEngine {
 
     private Exchange exchange;
     private SymbolExecutionFilter symbolFilter;
 
+    private TradingService tradingService;
+    private TradeRepository tradeRepository;
+    private OrderRepository orderRepository;
+    private CurrencyRepository currencyRepository;
+
     public ExecutionEngine() {
-        this(null, new SymbolExecutionFilter(true));
+        this(null, new SymbolExecutionFilter(true), null);
     }
 
     public ExecutionEngine(@Nullable Exchange exchange) {
-        this(exchange, new SymbolExecutionFilter(true));
+        this(exchange, new SymbolExecutionFilter(true), null);
     }
 
     public ExecutionEngine(
             @Nullable Exchange exchange,
-            @Nullable SymbolExecutionFilter symbolFilter
+            @Nullable SymbolExecutionFilter symbolFilter,
+            @Nullable Db1 db
     ) {
         this.exchange = exchange;
-        this.symbolFilter = symbolFilter;
+        this.symbolFilter = symbolFilter == null ? new SymbolExecutionFilter(true) : symbolFilter;
+        initializeServices(db);
     }
 
-    /**
-     * Set the exchange for this execution engine.
-     */
-    public void setExchange(@Nullable Exchange exchange) {
-        this.exchange = exchange;
+    private void initializeServices(@Nullable Db1 db) {
+        this.tradeRepository = new TradeRepositoryImpl(db);
+        this.orderRepository = new OrderRepositoryImpl(db);
+        this.currencyRepository = new CurrencyRepositoryImpl(db);
+
+        this.tradingService = new TradingService(
+                new TradeService(tradeRepository),
+                new OrderService(orderRepository),
+                new CurrencyService(currencyRepository)
+        );
     }
 
-    /**
-     * Set the symbol filter for this execution engine.
-     */
-    public void setSymbolFilter(@Nullable SymbolExecutionFilter symbolFilter) {
-        this.symbolFilter = symbolFilter;
-    }
+    // =========================================================================
+    // Open-position action execution
+    // =========================================================================
 
     /**
      * Execute an approved position action intent.
      *
-     * @param intent approved position action from FinalRiskGate
-     * @return execution result
+     * Used for managing existing positions:
+     * - reduce size
+     * - take partial profit
+     * - close position
+     * - move stop loss
+     * - move take profit
+     * - enable trailing stop
      */
     public CompletableFuture<PositionExecutionResult> execute(@NotNull PositionActionIntent intent) {
         try {
-            PositionExecutionResult validationFailure = validateIntent(intent);
+            PositionExecutionResult validationFailure = validatePositionIntent(intent);
             if (validationFailure != null) {
                 return CompletableFuture.completedFuture(validationFailure);
             }
 
-            if (symbolFilter != null && symbolFilter.isSymbolEligible(intent.getSymbol())) {
-                String reason = symbolFilter.getEligibilityReason(intent.getSymbol());
-                log.warn("ExecutionEngine: Symbol {} rejected by filter. Reason: {}", intent.getSymbol(), reason);
-
-                return CompletableFuture.completedFuture(
-                        PositionExecutionResult.failed("Symbol rejected: " + reason)
-                );
+            PositionExecutionResult symbolFailure = validateSymbolEligibility(intent.getSymbol());
+            if (symbolFailure != null) {
+                return CompletableFuture.completedFuture(symbolFailure);
             }
 
-            log.info("ExecutionEngine: Executing approved action={} symbol={} positionId={}",
-                    intent.getAction(), intent.getSymbol(), intent.getPositionId());
+            log.info(
+                    "ExecutionEngine: Executing approved position action. action={} symbol={} positionId={}",
+                    intent.getAction(),
+                    intent.getSymbol(),
+                    intent.getPositionId()
+            );
 
             return executeInternal(intent)
                     .thenApply(orderId -> {
-                        log.info("ExecutionEngine: Action executed successfully. orderId={}", orderId);
+                        log.info("ExecutionEngine: Position action executed successfully. resultId={}", orderId);
                         return PositionExecutionResult.success(orderId);
                     })
                     .exceptionally(exception -> {
                         String message = rootMessage(exception);
-                        log.warn("ExecutionEngine: Action execution failed: {}", message);
+                        log.warn("ExecutionEngine: Position action execution failed: {}", message, exception);
                         return PositionExecutionResult.failed(message);
                     });
 
         } catch (Exception exception) {
-            log.error("ExecutionEngine: Unexpected error during execution", exception);
-            return CompletableFuture.completedFuture(
-                    PositionExecutionResult.failed(exception.getMessage())
-            );
+            log.error("ExecutionEngine: Unexpected error during position action execution", exception);
+            return CompletableFuture.completedFuture(PositionExecutionResult.failed(rootMessage(exception)));
         }
     }
 
-    /**
-     * Validates intent before execution.
-     */
-    private @Nullable PositionExecutionResult validateIntent(@Nullable PositionActionIntent intent) {
+    private @Nullable PositionExecutionResult validatePositionIntent(@Nullable PositionActionIntent intent) {
         if (intent == null) {
             return PositionExecutionResult.failed("PositionActionIntent was null");
         }
@@ -113,16 +152,13 @@ public class ExecutionEngine {
             return PositionExecutionResult.failed("Position action is missing");
         }
 
-        if (intent.getSymbol() == null ) {
+        if (intent.getSymbol() == null || isBlank(toSymbolText(intent.getSymbol()))) {
             return PositionExecutionResult.failed("Symbol is missing");
         }
 
         return null;
     }
 
-    /**
-     * Internal execution logic based on action type.
-     */
     private CompletableFuture<String> executeInternal(@NotNull PositionActionIntent intent) {
         return switch (intent.getAction()) {
             case HOLD -> hold(intent);
@@ -141,152 +177,432 @@ public class ExecutionEngine {
         };
     }
 
-    private CompletableFuture<String> hold(@NotNull PositionActionIntent intent) {
+    private @NotNull CompletableFuture<String> hold(@NotNull PositionActionIntent intent) {
         log.info("ExecutionEngine: HOLD maintained for {}", intent.getSymbol());
         return CompletableFuture.completedFuture("HOLD_MAINTAINED");
     }
 
-    /**
-     * Reduce an open position by a requested quantity or risk reduction percent.
-     */
     private CompletableFuture<String> reduceSize(@NotNull PositionActionIntent intent) {
         requireExchange();
-
-        if (intent.getPositionId() == null || intent.getPositionId().isBlank()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("REDUCE_SIZE requires positionId")
-            );
-        }
+        requirePositionId(intent, "REDUCE_SIZE");
 
         double closeQuantity = resolveCloseQuantity(intent);
-
-        if (closeQuantity <= 0) {
+        if (closeQuantity <= 0.0) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("REDUCE_SIZE requires suggestedCloseQuantity or suggestedRiskReductionPercent")
             );
         }
 
-        log.info("ExecutionEngine: Reducing position for {} positionId={} quantity={}",
-                intent.getSymbol(), intent.getPositionId(), closeQuantity);
+        TradePair symbol = intent.getSymbol();
 
-        return exchange.closePartialPosition(
-                intent.getSymbol(),
+        log.info(
+                "ExecutionEngine: Reducing position. symbol={} positionId={} quantity={}",
+                symbol,
                 intent.getPositionId(),
                 closeQuantity
         );
+
+        return exchange.closePartialPosition(symbol, intent.getPositionId(), closeQuantity);
     }
 
-    /**
-     * Take partial profit by closing part of an open position.
-     */
     private CompletableFuture<String> takePartialProfit(@NotNull PositionActionIntent intent) {
         requireExchange();
-
-        if (intent.getPositionId() == null || intent.getPositionId().isBlank()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("TAKE_PARTIAL_PROFIT requires positionId")
-            );
-        }
+        requirePositionId(intent, "TAKE_PARTIAL_PROFIT");
 
         double closeQuantity = resolveCloseQuantity(intent);
-
-        if (closeQuantity <= 0) {
+        if (closeQuantity <= 0.0) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("TAKE_PARTIAL_PROFIT requires suggestedCloseQuantity")
             );
         }
 
-        log.info("ExecutionEngine: Taking partial profit for {} positionId={} quantity={}",
-                intent.getSymbol(), intent.getPositionId(), closeQuantity);
+        TradePair symbol = intent.getSymbol();
 
-        return exchange.closePartialPosition(
-                intent.getSymbol(),
+        log.info(
+                "ExecutionEngine: Taking partial profit. symbol={} positionId={} quantity={}",
+                symbol,
                 intent.getPositionId(),
                 closeQuantity
         );
+
+        return exchange.closePartialPosition(symbol, intent.getPositionId(), closeQuantity);
     }
-    /**
-     * Close an open position.
-     */
+
     private CompletableFuture<String> closePosition(@NotNull PositionActionIntent intent) {
         requireExchange();
+        requirePositionId(intent, "CLOSE_POSITION");
+        TradePair symbol = intent.getSymbol();
 
-        if (intent.getPositionId() == null || intent.getPositionId().isBlank()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("CLOSE_POSITION requires positionId")
-            );
-        }
+        log.info(
+                "ExecutionEngine: Closing position. symbol={} positionId={}",
+                symbol,
+                intent.getPositionId()
+        );
 
-        log.info("ExecutionEngine: Closing position for {} positionId={}",
-                intent.getSymbol(), intent.getPositionId());
-
-        return exchange.closePosition(intent.getSymbol(), intent.getPositionId());
+        return exchange.closePosition(symbol, intent.getPositionId());
     }
 
-    /**
-     * Move stop loss to a new level.
-     */
     private CompletableFuture<String> moveStopLoss(@NotNull PositionActionIntent intent) {
         requireExchange();
+        requirePositionId(intent, "MOVE_STOP_LOSS");
 
-        if (intent.getPositionId() == null || intent.getPositionId().isBlank()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("MOVE_STOP_LOSS requires positionId")
-            );
-        }
-
-        if ( intent.getSuggestedStopLoss() <= 0) {
+        double suggestedStopLoss = intent.getSuggestedStopLoss();
+        if (suggestedStopLoss <= 0.0 || !Double.isFinite(suggestedStopLoss)) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("MOVE_STOP_LOSS requires suggestedStopLoss > 0")
             );
         }
 
-        log.info("ExecutionEngine: Moving stop loss for {} positionId={} to {}",
-                intent.getSymbol(), intent.getPositionId(), intent.getSuggestedStopLoss());
+        TradePair symbol = intent.getSymbol();
+        
+        
 
-        return exchange.modifyStopLoss(
-                intent.getSymbol(),
+        log.info(
+                "ExecutionEngine: Moving stop loss. symbol={} positionId={} stopLoss={}",
+                symbol,
                 intent.getPositionId(),
-                intent.getSuggestedStopLoss()
+                suggestedStopLoss
         );
+
+        return exchange.modifyStopLoss(symbol, intent.getPositionId(), suggestedStopLoss);
     }
 
-    /**
-     * Move take profit to a new level.
-     */
     private CompletableFuture<String> moveTakeProfit(@NotNull PositionActionIntent intent) {
         requireExchange();
+        requirePositionId(intent, "MOVE_TAKE_PROFIT");
 
-        if ( intent.getSuggestedTakeProfit() <= 0) {
+        double suggestedTakeProfit = intent.getSuggestedTakeProfit();
+        if (suggestedTakeProfit <= 0.0 || !Double.isFinite(suggestedTakeProfit)) {
             return CompletableFuture.failedFuture(
                     new IllegalArgumentException("MOVE_TAKE_PROFIT requires suggestedTakeProfit > 0")
             );
         }
 
-        log.info("ExecutionEngine: Moving take profit for {} to {}",
-                intent.getSymbol(), intent.getSuggestedTakeProfit());
+        TradePair symbol = intent.getSymbol();
 
+        log.info(
+                "ExecutionEngine: Moving take profit. symbol={} positionId={} takeProfit={}",
+                symbol,
+                intent.getPositionId(),
+                suggestedTakeProfit
+        );
 
+        return exchange.modifyTakeProfit(symbol, intent.getPositionId(), suggestedTakeProfit);
+    }
 
-         return exchange.modifyTakeProfit(intent.getSymbol(), intent.getPositionId(), intent.getSuggestedTakeProfit());
+    private CompletableFuture<String> trailStop(@NotNull PositionActionIntent intent) {
+        requireExchange();
+        requirePositionId(intent, "TRAIL_STOP");
 
+        double trailingDistance = intent.getTrailingDistance();
+        if (trailingDistance <= 0.0 || !Double.isFinite(trailingDistance)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("TRAIL_STOP requires trailingDistance > 0")
+            );
+        }
 
+        TradePair symbol = intent.getSymbol();
 
+        log.info(
+                "ExecutionEngine: Enabling trailing stop. symbol={} positionId={} trailingDistance={}",
+                symbol,
+                intent.getPositionId(),
+                trailingDistance
+        );
+
+        return exchange.enableTrailingStop(symbol, intent.getPositionId(), trailingDistance);
+    }
+
+    // =========================================================================
+    // New-order execution
+    // =========================================================================
+
+    /**
+     * Preferred method for opening new positions.
+     *
+     * This is called after:
+     * StrategySignal
+     * -> RiskManagementSystem
+     * -> AiReasoningService
+     * -> FinalRiskGate
+     */
+    public CompletableFuture<PositionExecutionResult> executeApprovedOrder(
+            @NotNull StrategySignal signal,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision
+    ) {
+        Objects.requireNonNull(signal, "signal cannot be null");
+        Objects.requireNonNull(riskContext, "riskContext cannot be null");
+        Objects.requireNonNull(finalDecision, "finalDecision cannot be null");
+
+        TradePair symbol = resolveOrderSymbol(signal, riskContext);
+        double entryPrice = signal.getEntryPrice() > 0.0 ? signal.getEntryPrice() : riskContext.getEntryPrice();
+
+        return executeApprovedOrderInternal(
+                signal.getSide(),
+                symbol,
+                entryPrice,
+                riskContext,
+                finalDecision,
+                signal.getStrategyId()
+        );
     }
 
     /**
-     * Trail the stop loss as price moves favorably.
+     * Compatibility overload for older code that only passes Side.
+     * Prefer executeApprovedOrder(StrategySignal, TradeRiskContext, OrderApprovalDecision).
      */
-    private CompletableFuture<String> trailStop(@NotNull PositionActionIntent intent) {
+    public CompletableFuture<PositionExecutionResult> executeApprovedOrder(
+            @NotNull Side side,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision
+    ) {
+        Objects.requireNonNull(side, "side cannot be null");
+        Objects.requireNonNull(riskContext, "riskContext cannot be null");
+        Objects.requireNonNull(finalDecision, "finalDecision cannot be null");
+
+        return executeApprovedOrderInternal(
+                side,
+                riskContext.getSymbol(),
+                riskContext.getEntryPrice(),
+                riskContext,
+                finalDecision,
+                "LEGACY_SIDE_SIGNAL"
+        );
+    }
+
+    private CompletableFuture<PositionExecutionResult> executeApprovedOrderInternal(
+            @Nullable Side side,
+            @Nullable TradePair symbol,
+            double entryPrice,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision,
+            @Nullable String strategyId
+    ) {
+        try {
+            PositionExecutionResult validationFailure = validateNewOrder(side, symbol, finalDecision);
+            if (validationFailure != null) {
+                return CompletableFuture.completedFuture(validationFailure);
+            }
+
+            PositionExecutionResult symbolFailure = validateSymbolEligibility(symbol);
+            if (symbolFailure != null) {
+                return CompletableFuture.completedFuture(symbolFailure);
+            }
+
+            requireExchange();
+
+            log.info(
+                    "ExecutionEngine: Executing approved NEW order. symbol={} side={} size={} strategy={} execution={}",
+                    symbol,
+                    side,
+                    finalDecision.getSuggestedPositionSize(),
+                    strategyId,
+                    finalDecision.getRecommendedExecutionStrategy()
+            );
+
+            return executeNewOrder(side, symbol, entryPrice, riskContext, finalDecision)
+                    .thenApply(orderId -> {
+                        log.info("ExecutionEngine: New order executed successfully. orderId={}", orderId);
+                        return PositionExecutionResult.success(orderId);
+                    })
+                    .exceptionally(exception -> {
+                        String message = rootMessage(exception);
+                        log.warn("ExecutionEngine: New order execution failed: {}", message, exception);
+                        return PositionExecutionResult.failed(message);
+                    });
+
+        } catch (Exception exception) {
+            log.error("ExecutionEngine: Unexpected error during approved order execution", exception);
+            return CompletableFuture.completedFuture(PositionExecutionResult.failed(rootMessage(exception)));
+        }
+    }
+
+    private @Nullable PositionExecutionResult validateNewOrder(
+            @Nullable Side side,
+            @Nullable TradePair symbol,
+            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision
+    ) {
+        if (!finalDecision.isApproved()) {
+            return PositionExecutionResult.failed("FinalRiskGate did not approve this order");
+        }
+
+        if (side == null) {
+            return PositionExecutionResult.failed("Order side is missing");
+        }
+
+        if (side == Side.HOLD) {
+            return PositionExecutionResult.failed("HOLD is not an executable new-order side");
+        }
+
+        if (symbol == null || isBlank(toSymbolText(symbol))) {
+            return PositionExecutionResult.failed("Symbol is missing");
+        }
+
+        double positionSize = finalDecision.getSuggestedPositionSize();
+        if (positionSize <= 0.0 || !Double.isFinite(positionSize)) {
+            return PositionExecutionResult.failed("Approved position size must be greater than zero and finite");
+        }
+
+        return null;
+    }
+
+    private CompletableFuture<String> executeNewOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            double entryPrice,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision
+    ) {
         requireExchange();
 
-        log.info("ExecutionEngine: Initiating trailing stop for {}", intent.getSymbol());
+        String executionStrategy = finalDecision.getRecommendedExecutionStrategy();
+        if (isBlank(executionStrategy)) {
+            executionStrategy = "MARKET";
+        }
 
+        double positionSize = finalDecision.getSuggestedPositionSize();
+        String normalizedStrategy = executionStrategy.trim().toUpperCase(Locale.ROOT);
 
-          return exchange.enableTrailingStop(intent.getSymbol(), intent.getPositionId(), intent.getTrailingDistance());
-
-
+        return switch (normalizedStrategy) {
+            case "MARKET", "MARKET_ORDER" -> placeMarketOrder(side, symbol, positionSize);
+            case "LIMIT", "LIMIT_ORDER" -> placeLimitOrder(side, symbol, entryPrice, positionSize);
+            case "VWAP" -> placeVwapOrder(side, symbol, riskContext, positionSize);
+            case "TWAP" -> placeTwapOrder(side, symbol, riskContext, positionSize);
+            case "ICEBERG" -> placeIcebergOrder(side, symbol, riskContext, positionSize);
+            case "SCALED", "SCALED_ENTRY" -> placeScaledEntryOrder(side, symbol, riskContext, positionSize);
+            case "ALGORITHMIC", "ALGO" -> placeAlgorithmicOrder(side, symbol, riskContext, positionSize);
+            default -> CompletableFuture.failedFuture(
+                    new UnsupportedOperationException("Unsupported execution strategy: " + executionStrategy)
+            );
+        };
     }
+
+    private CompletableFuture<String> placeMarketOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            double positionSize
+    ) {
+        log.info("ExecutionEngine: Placing MARKET order. symbol={} side={} size={}", symbol, side, positionSize);
+        return exchange.placeMarketOrder(symbol, side, positionSize);
+    }
+
+    private CompletableFuture<String> placeLimitOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            double limitPrice,
+            double positionSize
+    ) {
+        if (limitPrice <= 0.0 || !Double.isFinite(limitPrice)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("LIMIT order requires valid entry price")
+            );
+        }
+
+        log.info(
+                "ExecutionEngine: Placing LIMIT order. symbol={} side={} size={} price={}",
+                symbol,
+                side,
+                positionSize,
+                limitPrice
+        );
+
+        return exchange.placeLimitOrder(symbol, side, positionSize, limitPrice);
+    }
+
+    /**
+     * Placeholder until Exchange supports native VWAP execution.
+     * Currently falls back to MARKET order after logging the execution intent.
+     */
+    private CompletableFuture<String> placeVwapOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            @NotNull TradeRiskContext riskContext,
+            double positionSize
+    ) {
+        log.info("ExecutionEngine: VWAP requested. Falling back to MARKET. symbol={} side={} size={}", symbol, side, positionSize);
+        return placeMarketOrder(side, symbol, positionSize);
+    }
+
+    /**
+     * Placeholder until Exchange supports native TWAP execution.
+     * Currently falls back to MARKET order after logging the execution intent.
+     */
+    private CompletableFuture<String> placeTwapOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            @NotNull TradeRiskContext riskContext,
+            double positionSize
+    ) {
+        log.info("ExecutionEngine: TWAP requested. Falling back to MARKET. symbol={} side={} size={}", symbol, side, positionSize);
+        return placeMarketOrder(side, symbol, positionSize);
+    }
+
+    /**
+     * Placeholder until Exchange supports native ICEBERG execution.
+     * Currently falls back to LIMIT if entry price exists, otherwise MARKET.
+     */
+    private CompletableFuture<String> placeIcebergOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            @NotNull TradeRiskContext riskContext,
+            double positionSize
+    ) {
+        log.info("ExecutionEngine: ICEBERG requested. symbol={} side={} size={}", symbol, side, positionSize);
+
+        double entryPrice = riskContext.getEntryPrice();
+        if (entryPrice > 0.0 && Double.isFinite(entryPrice)) {
+            return placeLimitOrder(side, symbol, entryPrice, positionSize);
+        }
+
+        return placeMarketOrder(side, symbol, positionSize);
+    }
+
+    /**
+     * Placeholder scaled-entry implementation.
+     * Currently places the first chunk as a market order.
+     */
+    private CompletableFuture<String> placeScaledEntryOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            @NotNull TradeRiskContext riskContext,
+            double positionSize
+    ) {
+        double firstChunk = Math.max(positionSize / 3.0, 0.0);
+        if (firstChunk <= 0.0) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("SCALED_ENTRY requires positive position size")
+            );
+        }
+
+        log.info(
+                "ExecutionEngine: SCALED_ENTRY requested. Placing first chunk. symbol={} side={} chunk={} total={}",
+                symbol,
+                side,
+                firstChunk,
+                positionSize
+        );
+
+        return placeMarketOrder(side, symbol, firstChunk);
+    }
+
+    /**
+     * Placeholder algorithmic order implementation.
+     * Currently falls back to MARKET order.
+     */
+    private CompletableFuture<String> placeAlgorithmicOrder(
+            @NotNull Side side,
+            @NotNull TradePair symbol,
+            @NotNull TradeRiskContext riskContext,
+            double positionSize
+    ) {
+        log.info("ExecutionEngine: ALGORITHMIC requested. Falling back to MARKET. symbol={} side={} size={}", symbol, side, positionSize);
+        return placeMarketOrder(side, symbol, positionSize);
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     private void requireExchange() {
         if (exchange == null) {
@@ -294,20 +610,128 @@ public class ExecutionEngine {
         }
     }
 
-    private double resolveCloseQuantity(@NotNull PositionActionIntent intent) {
-        if (intent.getSuggestedCloseQuantity() > 0) {
-            return intent.getSuggestedCloseQuantity();
+    private void requirePositionId(@NotNull PositionActionIntent intent, @NotNull String actionName) {
+        if (isBlank(intent.getPositionId())) {
+            throw new IllegalArgumentException(actionName + " requires positionId");
+        }
+    }
+
+    private @Nullable PositionExecutionResult validateSymbolEligibility(@Nullable TradePair symbol) {
+        if (symbolFilter == null) {
+            return null;
         }
 
-        /*
-         * If your PositionActionIntent contains currentPositionQuantity, use it here:
-         *
-         * if (intent.getCurrentPositionQuantity() != null && intent.getSuggestedRiskReductionPercent() != null) {
-         *     return intent.getCurrentPositionQuantity() * (intent.getSuggestedRiskReductionPercent() / 100.0);
-         * }
-         */
+        if (symbol == null || isBlank(toSymbolText(symbol))) {
+            return PositionExecutionResult.failed("Symbol is missing");
+        }
+
+        try {
+            if (!symbolFilter.isSymbolEligible(symbol)) {
+                String reason = symbolFilter.getEligibilityReason(symbol);
+                log.warn("ExecutionEngine: Symbol {} rejected by filter. Reason: {}", symbol, reason);
+                return PositionExecutionResult.failed("Symbol rejected: " + reason);
+            }
+        } catch (Exception exception) {
+            String message = "Failed to validate symbol eligibility: " + rootMessage(exception);
+            log.warn(message, exception);
+            return PositionExecutionResult.failed(message);
+        }
+
+        return null;
+    }
+
+    private double resolveCloseQuantity(@NotNull PositionActionIntent intent) {
+        double suggestedCloseQuantity = intent.getSuggestedCloseQuantity();
+        if (suggestedCloseQuantity > 0.0 && Double.isFinite(suggestedCloseQuantity)) {
+            return suggestedCloseQuantity;
+        }
+
+        double currentPositionQuantity = intent.getCurrentPositionQuantity();
+        double suggestedRiskReductionPercent = intent.getSuggestedRiskReductionPercent();
+
+        if (currentPositionQuantity > 0.0
+                && suggestedRiskReductionPercent > 0.0
+                && Double.isFinite(currentPositionQuantity)
+                && Double.isFinite(suggestedRiskReductionPercent)) {
+            return currentPositionQuantity * (suggestedRiskReductionPercent / 100.0);
+        }
 
         return 0.0;
+    }
+
+    private TradePair resolveOrderSymbol(@NotNull StrategySignal signal, @NotNull TradeRiskContext riskContext) {
+        if (riskContext.getSymbol() != null) {
+            return riskContext.getSymbol();
+        }
+
+        return convertSymbolToTradePair(signal.getSymbol());
+    }
+
+    /**
+     * Convert symbol text to TradePair.
+     *
+     * Supported examples:
+     * - BTC/USD
+     * - BTC-USD
+     * - BTC_USD
+     * - BTCUSDT when quote can be inferred as USDT
+     */
+    private TradePair convertSymbolToTradePair(String symbol) {
+        if (isBlank(symbol)) {
+            throw new IllegalArgumentException("Symbol cannot be null or empty");
+        }
+
+        String normalized = symbol.trim().toUpperCase(Locale.ROOT);
+        String[] parts;
+
+        if (normalized.contains("/")) {
+            parts = normalized.split("/");
+        } else if (normalized.contains("-")) {
+            parts = normalized.split("-");
+        } else if (normalized.contains("_")) {
+            parts = normalized.split("_");
+        } else {
+            parts = inferPairParts(normalized);
+        }
+
+        if (parts.length != 2 || isBlank(parts[0]) || isBlank(parts[1])) {
+            throw new IllegalArgumentException("Invalid symbol format: " + symbol + " (expected BASE/QUOTE)");
+        }
+
+        try {
+            return TradePair.of(parts[0].trim(), parts[1].trim());
+        } catch (SQLException | ClassNotFoundException exception) {
+            throw new IllegalStateException("Failed to create TradePair from symbol: " + symbol, exception);
+        }
+    }
+
+    private String[] inferPairParts(String normalizedSymbol) {
+        String[] commonQuotes = {"USDT", "USDC", "USD", "EUR", "GBP", "JPY", "BTC", "ETH"};
+
+        for (String quote : commonQuotes) {
+            if (normalizedSymbol.endsWith(quote) && normalizedSymbol.length() > quote.length()) {
+                String base = normalizedSymbol.substring(0, normalizedSymbol.length() - quote.length());
+                return new String[]{base, quote};
+            }
+        }
+
+        return new String[]{normalizedSymbol};
+    }
+
+    private String toSymbolText(@Nullable TradePair symbol) {
+        if (symbol == null) {
+            return "";
+        }
+
+        try {
+            return symbol.toString('/');
+        } catch (Exception exception) {
+            return symbol.toString();
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static String rootMessage(Throwable throwable) {
@@ -322,214 +746,7 @@ public class ExecutionEngine {
 
         return cause.getMessage() == null ? cause.toString() : cause.getMessage();
     }
-    /**
-     * Execute a newly approved trade order.
-     *
-     * This is for NEW trade entries after:
-     * StrategySignal
-     * → RiskManagementSystem
-     * → AiReasoningService
-     * → FinalRiskGate
-     * <p>
-     * PositionActionIntent is for managing existing positions.
-     * This method is for opening new positions.
-     */
-    public CompletableFuture<PositionExecutionResult> executeApprovedOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision
-    ) {
-        try {
-            if (!finalDecision.isApproved()) {
-                return CompletableFuture.completedFuture(
-                        PositionExecutionResult.failed("FinalRiskGate did not approve this order")
-                );
-            }
 
-            if (signal.getSymbol() == null ) {
-                return CompletableFuture.completedFuture(
-                        PositionExecutionResult.failed("Signal symbol is missing")
-                );
-            }
-
-            if (signal.getSide() == null) {
-                return CompletableFuture.completedFuture(
-                        PositionExecutionResult.failed("Signal side is missing")
-                );
-            }
-
-            if (finalDecision.getSuggestedPositionSize() <= 0) {
-                return CompletableFuture.completedFuture(
-                        PositionExecutionResult.failed("Approved position size must be greater than zero")
-                );
-            }
-
-            if (symbolFilter != null && symbolFilter.isSymbolEligible(signal.getSymbol())) {
-                String reason = symbolFilter.getEligibilityReason(signal.getSymbol());
-                log.warn("ExecutionEngine: Symbol {} rejected by filter. Reason: {}", signal.getSymbol(), reason);
-
-                return CompletableFuture.completedFuture(
-                        PositionExecutionResult.failed("Symbol rejected: " + reason)
-                );
-            }
-
-            requireExchange();
-
-            log.info(
-                    "ExecutionEngine: Executing approved NEW order. symbol={} side={} size={} strategy={} execution={}",
-                    signal.getSymbol(),
-                    signal.getSide(),
-                    finalDecision.getSuggestedPositionSize(),
-                    signal.getStrategyId(),
-                    finalDecision.getRecommendedExecutionStrategy()
-            );
-
-            return executeNewOrder(signal, riskContext, finalDecision)
-                    .thenApply(orderId -> {
-                        log.info("ExecutionEngine: New order executed successfully. orderId={}", orderId);
-                        return PositionExecutionResult.success(orderId);
-                    })
-                    .exceptionally(exception -> {
-                        String message = rootMessage(exception);
-                        log.warn("ExecutionEngine: New order execution failed: {}", message);
-                        return PositionExecutionResult.failed(message);
-                    });
-
-        } catch (Exception exception) {
-            log.error("ExecutionEngine: Unexpected error during approved order execution", exception);
-            return CompletableFuture.completedFuture(
-                    PositionExecutionResult.failed(exception.getMessage())
-            );
-        }
-    }
-    /**
-     * Internal new-order execution logic.
-     * <p>
-     * Replace placeholders with your real Exchange adapter methods once available.
-     */
-    private CompletableFuture<String> executeNewOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            @NotNull FinalRiskGate.OrderApprovalDecision finalDecision
-    ) {
-        requireExchange();
-
-        String executionStrategy = finalDecision.getRecommendedExecutionStrategy();
-
-        if (executionStrategy == null || executionStrategy.isBlank()) {
-            executionStrategy = "MARKET";
-        }
-
-        double positionSize = finalDecision.getSuggestedPositionSize();
-
-        return switch (executionStrategy.toUpperCase()) {
-            case "LIMIT", "LIMIT_ORDER" -> placeLimitOrder(signal, riskContext, positionSize);
-            case "MARKET", "MARKET_ORDER" -> placeMarketOrder(signal, riskContext, positionSize);
-            case "VWAP" -> placeVwapOrder(signal, riskContext, positionSize);
-            case "TWAP" -> placeTwapOrder(signal, riskContext, positionSize);
-            case "ICEBERG" -> placeIcebergOrder(signal, riskContext, positionSize);
-            case "SCALED", "SCALED_ENTRY" -> placeScaledEntryOrder(signal, riskContext, positionSize);
-            case "ALGORITHMIC" -> placeAlgorithmicOrder(signal, riskContext, positionSize);
-            default -> CompletableFuture.failedFuture(
-                    new UnsupportedOperationException("Unsupported execution strategy: " + executionStrategy)
-            );
-        };
-    }
-    private CompletableFuture<String> placeMarketOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        log.info("ExecutionEngine: Placing MARKET order symbol={} side={} size={}",
-                signal.getSymbol(), signal.getSide(), positionSize);
-
-
-        return exchange.placeMarketOrder(signal.getSymbol(), signal.getSide(), positionSize);
-
-    }
-
-    private CompletableFuture<String> placeLimitOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        double limitPrice = signal.getEntryPrice() > 0
-                ? signal.getEntryPrice()
-                : riskContext.getEntryPrice();
-
-        if (limitPrice <= 0) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("LIMIT order requires valid entry price")
-            );
-        }
-
-        log.info("ExecutionEngine: Placing LIMIT order symbol={} side={} size={} price={}",
-                signal.getSymbol(), signal.getSide(), positionSize, limitPrice);
-
-         return exchange.placeLimitOrder(signal.getSymbol(), signal.getSide(), positionSize, limitPrice);
-
-
-
-    }
-
-    private CompletableFuture<String> placeVwapOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        log.info("ExecutionEngine: Placing VWAP order symbol={} side={} size={}",
-                signal.getSymbol(), signal.getSide(), positionSize);
-
-        return CompletableFuture.completedFuture("VWAP_ORDER_STARTED");
-    }
-
-    private CompletableFuture<String> placeTwapOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        log.info("ExecutionEngine: Placing TWAP order symbol={} side={} size={}",
-                signal.getSymbol(), signal.getSide(), positionSize);
-
-        return CompletableFuture.completedFuture("TWAP_ORDER_STARTED");
-    }
-
-    private CompletableFuture<String> placeIcebergOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        log.info("ExecutionEngine: Placing ICEBERG order symbol={} side={} size={}",
-                signal.getSymbol(), signal.getSide(), positionSize);
-        log.info(riskContext.toString());
-
-        return CompletableFuture.completedFuture("ICEBERG_ORDER_STARTED");
-    }
-
-    private @NotNull CompletableFuture<String> placeScaledEntryOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        log.info("ExecutionEngine: Placing SCALED_ENTRY order symbol={} side={} size={}",
-                signal.getSymbol(), signal.getSide(), positionSize);
-        log.info(riskContext.toString());
-
-        return CompletableFuture.completedFuture("SCALED_ENTRY_STARTED");
-    }
-
-    private @NotNull CompletableFuture<String> placeAlgorithmicOrder(
-            @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext,
-            double positionSize
-    ) {
-        log.info("ExecutionEngine: Placing ALGORITHMIC order symbol={} side={} size={}",
-                signal.getSymbol(), signal.getSide(), positionSize);
-        log.info(riskContext.toString());
-
-
-        return CompletableFuture.completedFuture("ALGORITHMIC_ORDER_STARTED");
-    }
     /**
      * Execution result record.
      */

@@ -10,10 +10,7 @@ import java.util.List;
  */
 public class ExponentialMovingAverageIndicator extends BaseIndicator {
     
-    public ExponentialMovingAverageIndicator() {
-        this(12);
-    }
-    
+
     public ExponentialMovingAverageIndicator(int period) {
         super("EMA" + period, period);
     }

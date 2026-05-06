@@ -21,6 +21,7 @@ import java.util.Set;
  */
 @Slf4j
 public class SymbolExecutionFilter {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SymbolExecutionFilter.class);
 
     private final Set<String> enabledSymbols = new HashSet<>();
     private final Set<String> disabledSymbols = new HashSet<>();
@@ -44,7 +45,6 @@ public class SymbolExecutionFilter {
     }
 
     public @NotNull SymbolExecutionDecision getDecision(@NotNull TradePair symbol) {
-
 
         String normalized = normalize(symbol.toString('/'));
 
@@ -84,9 +84,6 @@ public class SymbolExecutionFilter {
         log.info("Symbol execution rule removed: {}", normalized);
     }
 
-
-
-
     private static @NotNull String normalize(@NotNull String symbol) {
         return Objects.requireNonNull(symbol, "symbol cannot be null")
                 .trim()
@@ -96,8 +93,7 @@ public class SymbolExecutionFilter {
 
     public record SymbolExecutionDecision(
             boolean eligible,
-            @NotNull String reason
-    ) {
+            @NotNull String reason) {
         public static @NotNull SymbolExecutionDecision approved(@NotNull String reason) {
             return new SymbolExecutionDecision(true, reason);
         }

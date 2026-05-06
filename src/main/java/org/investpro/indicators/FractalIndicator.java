@@ -11,10 +11,7 @@ import java.util.List;
  */
 public class FractalIndicator extends BaseIndicator {
     
-    public FractalIndicator() {
-        this(2);
-    }
-    
+
     public FractalIndicator(int lookback) {
         super("Fractal", lookback);
     }

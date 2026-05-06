@@ -11,16 +11,33 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Trade;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 public class InteractiveBrokers extends BrokerExchangeAdapter {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(InteractiveBrokers.class);
+
+    // Paper trading state
+    private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<String, String> orders = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.List<Position> positions = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private long nextOrderId = 1000;
 
     public InteractiveBrokers(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
+        initializePaperTradingAccount();
+    }
+
+    private void initializePaperTradingAccount() {
+        balances.put("USD", 100000.0);
     }
 
     @Override
@@ -48,11 +65,21 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
         return List.of(MARKET_TYPES.STOCKS, MARKET_TYPES.FOREX);
     }
 
+    @Override
+    public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
+        return createMarketOrder(symbol, side, quantity);
+    }
+
+    @Override
+    public CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
+        return createLimitOrder(symbol, side, quantity, limitPrice);
+    }
+
     // --------- Capability Methods ---------
 
     @Override
     public boolean supportsLiveTrading() {
-        return true;
+        return false;
     }
 
     @Override
@@ -332,13 +359,88 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
     // --------- Order Creation Methods ---------
 
     @Override
+    public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        return CompletableFuture.supplyAsync(() -> {
+            String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
+            double fillPrice = 150.0;
+            if (side == Side.BUY) {
+                double cost = amount * fillPrice;
+                Double balance = balances.getOrDefault("USD", 0.0);
+                if (balance < cost) {
+                    throw new RuntimeException("Insufficient buying power");
+                }
+                balances.put("USD", balance - cost);
+                balances.put(tradePair.getBaseCode(),
+                        balances.getOrDefault(tradePair.getBaseCode(), 0.0) + amount);
+            } else {
+                Double baseBalance = balances.getOrDefault(tradePair.getBaseCode(), 0.0);
+                if (baseBalance < amount) {
+                    throw new RuntimeException("Insufficient position");
+                }
+                balances.put(tradePair.getBaseCode(), baseBalance - amount);
+                balances.put("USD", balances.getOrDefault("USD", 0.0) + (amount * fillPrice));
+            }
+            // Record trade in history
+            Trade trade = new Trade();
+            trade.setTradePair(tradePair);
+            trade.setPrice(fillPrice);
+            trade.setAmount(amount);
+            trade.setTransactionType(side);
+            trade.setLocalTradeId(System.nanoTime());
+            trade.setTimestamp(java.time.Instant.now());
+            trade.setFee(0.0);
+            trade.setStopLoss(0.0);
+            trade.setTakeProfit(0.0);
+            trade.setSwap(0.0);
+            trade.setProfit(0.0);
+            tradeHistory.add(trade);
+            orders.put(orderId, "FILLED");
+            return orderId;
+        });
+    }
+
+    @Override
     public CompletableFuture<String> createLimitOrder(
             TradePair tradePair,
             Side side,
             double amount,
-            double limitPrice
-    ) {
-        return failedFuture(unsupported("createLimitOrder"));
+            double limitPrice) {
+        return CompletableFuture.supplyAsync(() -> {
+            String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
+            if (side == Side.BUY) {
+                double cost = amount * limitPrice;
+                Double balance = balances.getOrDefault("USD", 0.0);
+                if (balance < cost) {
+                    throw new RuntimeException("Insufficient buying power");
+                }
+                balances.put("USD", balance - cost);
+                balances.put(tradePair.getBaseCode(),
+                        balances.getOrDefault(tradePair.getBaseCode(), 0.0) + amount);
+            } else {
+                Double baseBalance = balances.getOrDefault(tradePair.getBaseCode(), 0.0);
+                if (baseBalance < amount) {
+                    throw new RuntimeException("Insufficient position");
+                }
+                balances.put(tradePair.getBaseCode(), baseBalance - amount);
+                balances.put("USD", balances.getOrDefault("USD", 0.0) + (amount * limitPrice));
+            }
+            // Record trade in history
+            Trade trade = new Trade();
+            trade.setTradePair(tradePair);
+            trade.setPrice(limitPrice);
+            trade.setAmount(amount);
+            trade.setTransactionType(side);
+            trade.setLocalTradeId(System.nanoTime());
+            trade.setTimestamp(java.time.Instant.now());
+            trade.setFee(0.0);
+            trade.setStopLoss(0.0);
+            trade.setTakeProfit(0.0);
+            trade.setSwap(0.0);
+            trade.setProfit(0.0);
+            tradeHistory.add(trade);
+            orders.put(orderId, "FILLED");
+            return orderId;
+        });
     }
 
     @Override
@@ -346,8 +448,7 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
             TradePair tradePair,
             Side side,
             double amount,
-            double stopPrice
-    ) {
+            double stopPrice) {
         return failedFuture(unsupported("createStopOrder"));
     }
 
@@ -358,8 +459,7 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
             double amount,
             double entryPrice,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         return failedFuture(unsupported("createBracketOrder"));
     }
 
@@ -433,21 +533,36 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTrades(TradePair tradePair) {
-        return failedFuture(unsupported("fetchAccountTrades"));
+        if (tradePair == null) {
+            return CompletableFuture.completedFuture(new ArrayList<>(tradeHistory));
+        }
+        return CompletableFuture.completedFuture(
+                tradeHistory.stream()
+                        .filter(t -> t.getTradePair() != null && t.getTradePair().equals(tradePair))
+                        .toList());
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesSince(TradePair tradePair, Instant since) {
-        return failedFuture(unsupported("fetchAccountTradesSince"));
+        List<Trade> result = tradeHistory.stream()
+                .filter(t -> since == null || (t.getTimestamp() != null && t.getTimestamp().isAfter(since)))
+                .filter(t -> tradePair == null || (t.getTradePair() != null && t.getTradePair().equals(tradePair)))
+                .toList();
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesBetween(
             TradePair tradePair,
             Instant from,
-            Instant to
-    ) {
-        return failedFuture(unsupported("fetchAccountTradesBetween"));
+            Instant to) {
+        List<Trade> result = tradeHistory.stream()
+                .filter(t -> t.getTimestamp() != null &&
+                        (from == null || t.getTimestamp().isAfter(from)) &&
+                        (to == null || t.getTimestamp().isBefore(to)))
+                .filter(t -> tradePair == null || (t.getTradePair() != null && t.getTradePair().equals(tradePair)))
+                .toList();
+        return CompletableFuture.completedFuture(result);
     }
 
     // --------- Manual Trading Methods ---------
@@ -460,8 +575,7 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         // Not implemented for Interactive Brokers yet
     }
 
@@ -473,13 +587,12 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         // Not implemented for Interactive Brokers yet
     }
 
     @Override
-    public void autoTrading(Boolean auto, String signal) {
+    public void autoTrading(@NotNull Boolean auto, String signal) {
         // Not implemented for Interactive Brokers yet
     }
 
@@ -493,8 +606,7 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         boolean valid = tradePair != null
                 && supportsMarketType(marketType)
                 && size >= getMinOrderAmount(tradePair);

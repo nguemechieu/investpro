@@ -1,5 +1,7 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import java.util.List;
 
@@ -7,12 +9,14 @@ import java.util.List;
  * Volume Weighted Average Price (VWAP) Indicator
  * Average price weighted by volume, useful for intraday trading.
  */
+@Getter
+@Setter
 public class VWAPIndicator extends BaseIndicator {
     
     public VWAPIndicator() {
         super("VWAP", 1);
     }
-    
+
     @Override
     public void calculate(List<CandleData> candles) {
         if (candles == null || candles.isEmpty()) {

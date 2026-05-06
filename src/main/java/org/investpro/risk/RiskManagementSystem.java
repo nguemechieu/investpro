@@ -1,6 +1,5 @@
 package org.investpro.risk;
 
-import lombok.Setter;
 import org.investpro.models.trading.TradePair;
 import org.investpro.exchange.Exchange;
 import org.investpro.trading.MarketBehavior;
@@ -26,7 +25,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
 
     public RiskManagementSystem() {
         // 2% max per trade
-        this(2.0, 10.0);    // 10% max cumulative
+        this(2.0, 10.0); // 10% max cumulative
     }
 
     /**
@@ -70,8 +69,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
             blockers.add(String.format(
                     "Requested leverage %.2fx exceeds profile max of %.2fx",
                     context.getRequestedLeverage(),
-                    context.getRiskProfile().getMaxLeverage()
-            ));
+                    context.getRiskProfile().getMaxLeverage()));
         }
 
         // 5. Block trades exceeding max position size
@@ -81,8 +79,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
             blockers.add(String.format(
                     "Trade risk %.2f%% exceeds profile max of %.2f%%",
                     requestedRiskPercent,
-                    maxPositionPercent
-            ));
+                    maxPositionPercent));
         }
 
         // 6. Block trades exceeding portfolio heat limit
@@ -92,23 +89,23 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
             blockers.add(String.format(
                     "Portfolio heat %.2f%% exceeds limit of %.2f%%",
                     portfolioHeat,
-                    maxHeat
-            ));
+                    maxHeat));
         }
 
-        // 7. Block negative expected value trades (unless overridden by extreme profile)
+        // 7. Block negative expected value trades (unless overridden by extreme
+        // profile)
         double expectedValue = ExpectedValueCalculator.calculateExpectedValueFromContext(context);
         if (expectedValue < 0 && context.getRiskProfile() != RiskProfile.EXTREME) {
             blockers.add(String.format(
                     "Negative expected value: $%.2f. Probability of profit too low.",
-                    expectedValue
-            ));
+                    expectedValue));
         }
 
         // ===== WARNINGS (allow but alert) =====
 
         // High volatility
-        if (Objects.equals(context.getMarketBehavior().getDisplayName(), MarketBehavior.HIGH_VOLATILITY.getDisplayName())) {
+        if (Objects.equals(context.getMarketBehavior().getDisplayName(),
+                MarketBehavior.HIGH_VOLATILITY.getDisplayName())) {
             warnings.add("HIGH_VOLATILITY market detected. Position size will be reduced. Monitor closely.");
         }
 
@@ -137,11 +134,14 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         // Market behavior based recommendation
         if (Objects.equals(context.getMarketBehavior().getDisplayName(), MarketBehavior.TRENDING_UP.getDisplayName())) {
             recommendations.add("Market is TRENDING_UP. Bias toward BUY entries and trend-following.");
-        } else if (Objects.equals(context.getMarketBehavior().getDisplayName(), MarketBehavior.TRENDING_DOWN.getDisplayName())) {
+        } else if (Objects.equals(context.getMarketBehavior().getDisplayName(),
+                MarketBehavior.TRENDING_DOWN.getDisplayName())) {
             recommendations.add("Market is TRENDING_DOWN. Bias toward SELL entries and shorting.");
-        } else if (Objects.equals(context.getMarketBehavior().getDisplayName(), MarketBehavior.RANGING.getDisplayName())) {
+        } else if (Objects.equals(context.getMarketBehavior().getDisplayName(),
+                MarketBehavior.RANGING.getDisplayName())) {
             recommendations.add("Market is RANGING. Use mean-reversion strategies, not breakout.");
-        } else if (Objects.equals(context.getMarketBehavior().getDisplayName(), MarketBehavior.BREAKOUT.getDisplayName())) {
+        } else if (Objects.equals(context.getMarketBehavior().getDisplayName(),
+                MarketBehavior.BREAKOUT.getDisplayName())) {
             recommendations.add("Market in BREAKOUT. Use momentum strategies, tight stops required.");
         }
 
@@ -151,8 +151,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
             recommendations.add(String.format(
                     "Current execution strategy not ideal for %s. Consider %s instead.",
                     context.getLiquidityProfile().getDisplayName(),
-                    recommended.getDisplayName()
-            ));
+                    recommended.getDisplayName()));
         }
 
         // Position size reduction recommendations
@@ -164,8 +163,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         if (expectedValue > 0 && expectedValue < 10) {
             recommendations.add(String.format(
                     "Expected value $%.2f is positive but modest. Ensure trade setup is high-confidence.",
-                    expectedValue
-            ));
+                    expectedValue));
         }
 
         // Decision: Approved if no blockers
@@ -181,15 +179,13 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         double portfolioHeatFinal = PortfolioHeatCalculator.calculatePortfolioHeat(
                 context.calculateTradeRisk(),
                 context.getCurrentOpenRisk(),
-                context.getAccountEquity()
-        );
+                context.getAccountEquity());
 
         ExecutionStrategy recommendedExecution = SlippageModel.getRecommendedStrategy(context.getLiquidityProfile());
         double estimatedSlippage = SlippageModel.calculateTotalSlippage(
                 recommendedExecution,
                 context.getLiquidityProfile(),
-                context.getVolatility()
-        );
+                context.getVolatility());
 
         return RiskDecision.builder()
                 .approved(approved)
@@ -226,9 +222,9 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
 
         // Volatility adjustment
         if (context.getVolatility() > 0.7) {
-            multiplier *= 0.7;  // High volatility = smaller position
+            multiplier *= 0.7; // High volatility = smaller position
         } else if (context.getVolatility() < 0.3) {
-            multiplier *= 1.1;  // Low volatility = slightly larger
+            multiplier *= 1.1; // Low volatility = slightly larger
         }
 
         // Liquidity adjustment
@@ -248,7 +244,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
      * @return Final position size in units
      */
     private double calculateFinalPositionSize(TradeRiskContext context, double riskMultiplier) {
-        double maxRisk = defaultMaxRiskPerTrade;  // 2% default
+        double maxRisk = defaultMaxRiskPerTrade; // 2% default
         if (context.getMaxRiskPerTrade() > 0) {
             maxRisk = context.getMaxRiskPerTrade();
         }
@@ -258,8 +254,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
                 maxRisk,
                 context.getEntryPrice(),
                 context.getStopLossPrice(),
-                context.getRiskProfile()
-        );
+                context.getRiskProfile());
 
         // Apply all adjustments
         double adjusted = PositionSizingEngine.applyPsychologyAdjustment(baseSize, context.getPsychologyProfile());
@@ -270,7 +265,8 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         adjusted = adjusted * riskMultiplier;
 
         // Enforce max position size from profile
-        double maxPositionAmount = context.getAccountEquity() * (context.getRiskProfile().getMaxPositionSizePercent() / 100.0);
+        double maxPositionAmount = context.getAccountEquity()
+                * (context.getRiskProfile().getMaxPositionSizePercent() / 100.0);
         double maxPositionUnits = maxPositionAmount / context.getEntryPrice();
 
         return Math.min(adjusted, maxPositionUnits);
@@ -360,7 +356,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         }
 
         return RiskReport.builder()
-                .symbol(context.getSymbol())
+                .symbol(context.getSymbol().toString())
                 .timestamp(timestamp)
                 .riskProfileName(context.getRiskProfile().getDisplayName())
                 .marketBehaviorName(context.getMarketBehavior().getDisplayName())
@@ -432,7 +428,8 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         }
 
         boolean approved = blockers.isEmpty();
-        String reason = approved ? "Bot trading approved" : "Bot trading blocked: %s".formatted(String.join("; ", blockers));
+        String reason = approved ? "Bot trading approved"
+                : "Bot trading blocked: %s".formatted(String.join("; ", blockers));
 
         return RiskDecision.builder()
                 .approved(approved)
@@ -453,7 +450,8 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         }
 
         boolean approved = blockers.isEmpty();
-        String reason = approved ? "Cancel-all operation approved" : "Cancel-all operation blocked: %s".formatted(String.join("; ", blockers));
+        String reason = approved ? "Cancel-all operation approved"
+                : "Cancel-all operation blocked: %s".formatted(String.join("; ", blockers));
 
         return RiskDecision.builder()
                 .approved(approved)
@@ -464,4 +462,3 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
                 .build();
     }
 }
-

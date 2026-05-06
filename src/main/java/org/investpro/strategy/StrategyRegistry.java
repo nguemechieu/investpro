@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 public class StrategyRegistry {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyRegistry.class);
     private static StrategyRegistry instance;
     private final Map<String, TradingStrategy> strategiesById = new ConcurrentHashMap<>();
 
@@ -158,7 +159,7 @@ public class StrategyRegistry {
      * Gets count of enabled strategies.
      */
     public int getEnabledStrategyCount() {
-        return (int) getEnabledStrategies().size();
+        return getEnabledStrategies().size();
     }
 
     /**

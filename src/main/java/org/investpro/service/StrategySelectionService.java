@@ -15,18 +15,21 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Service for selecting and assigning the best strategy for each symbol/timeframe.
- * Manages automatic selection, manual override, and strategy assignment history.
+ * Service for selecting and assigning the best strategy for each
+ * symbol/timeframe.
+ * Manages automatic selection, manual override, and strategy assignment
+ * history.
  */
 @Slf4j
 public class StrategySelectionService {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategySelectionService.class);
     private static StrategySelectionService instance;
     private final StrategyRegistry registry;
     private final StrategyAssignmentRepository assignmentRepository;
     private final Map<String, List<StrategyBacktestResult>> backtestResults = new ConcurrentHashMap<>();
     private final Map<String, StrategyAssignmentHistory> assignmentHistory = new ConcurrentHashMap<>();
 
-    private StrategySelectionService() {
+    protected StrategySelectionService() {
         this.registry = StrategyRegistry.getInstance();
         this.assignmentRepository = StrategyAssignmentRepository.getInstance();
     }
@@ -63,7 +66,8 @@ public class StrategySelectionService {
         // Check for existing locked assignment
         StrategyAssignment current = getCurrentAssignment(symbol, timeframe);
         if (current != null && current.isLocked()) {
-            log.info("Symbol {} timeframe {} has locked assignment: {}", symbol, timeframe.getCode(), current.getStrategyId());
+            log.info("Symbol {} timeframe {} has locked assignment: {}", symbol, timeframe.getCode(),
+                    current.getStrategyId());
             return current;
         }
 
@@ -191,7 +195,8 @@ public class StrategySelectionService {
 
     private void recordHistory(@NotNull StrategyAssignment assignment, String note) {
         String key = assignment.getSymbol() + "_" + assignment.getTimeframe().getCode();
-        StrategyAssignmentHistory history = assignmentHistory.computeIfAbsent(key, k -> new StrategyAssignmentHistory());
+        StrategyAssignmentHistory history = assignmentHistory.computeIfAbsent(key,
+                k -> new StrategyAssignmentHistory());
         history.addEntry(assignment, note);
     }
 
@@ -209,7 +214,8 @@ public class StrategySelectionService {
             return new ArrayList<>(entries);
         }
 
-        public record HistoryEntry(String strategyId, StrategyAssignment.StrategyAssignmentMode mode, Instant timestamp, String note) {
+        public record HistoryEntry(String strategyId, StrategyAssignment.StrategyAssignmentMode mode, Instant timestamp,
+                String note) {
         }
     }
 }

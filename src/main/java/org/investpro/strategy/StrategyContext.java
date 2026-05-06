@@ -17,8 +17,8 @@ import java.util.List;
 @Getter
 @Builder
 public class StrategyContext {
-    private final String symbol;
-    private final TradePair tradePair;
+    private final TradePair symbol;
+
     private final Timeframe timeframe;
     
     // Market data
@@ -43,7 +43,7 @@ public class StrategyContext {
         if (candles == null || candles.isEmpty()) {
             return null;
         }
-        return candles.get(candles.size() - 1);
+        return candles.getLast();
     }
 
     public CandleData getPreviousCandle(int barsBack) {

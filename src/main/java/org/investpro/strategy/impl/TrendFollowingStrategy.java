@@ -3,17 +3,20 @@ package org.investpro.strategy.impl;
 import org.investpro.strategy.StrategyCategory;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyMetadata;
-import org.investpro.strategy.StrategySignal;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.market.AssetClass;
 import org.investpro.market.ContractType;
 import org.investpro.timeframe.Timeframe;
 import org.investpro.trading.MarketBehavior;
+import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.investpro.utils.Side.BUY;
+import static org.investpro.utils.Side.SELL;
 
 /**
  * Trend Following Strategy
@@ -23,6 +26,7 @@ import java.util.Set;
  */
 @Slf4j
 public class TrendFollowingStrategy extends BaseStrategy {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TrendFollowingStrategy.class);
 
     public TrendFollowingStrategy() {
         super(buildMetadata());
@@ -62,9 +66,8 @@ public class TrendFollowingStrategy extends BaseStrategy {
     }
 
     @Override
-    @NotNull
-    public StrategySignal generateSignal(@NotNull StrategyContext context) {
-        if (!hasEnoughBars(context)) {
+    public @NotNull Side generateSignal(@NotNull StrategyContext context) {
+        if (hasEnoughBars(context)) {
             return noSignal(context, "Insufficient bars for analysis");
         }
 
@@ -100,6 +103,16 @@ public class TrendFollowingStrategy extends BaseStrategy {
     }
 
     @Override
+    public boolean supportsMarketBehavior(org.investpro.risk.MarketBehavior marketBehavior) {
+        return false;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return super.isEnabled();
+    }
+
+    @Override
     public boolean supportsMarketBehavior(@NotNull MarketBehavior marketBehavior) {
         // Trend following works best in trending markets
         return true; // Works in most market conditions
@@ -116,39 +129,11 @@ public class TrendFollowingStrategy extends BaseStrategy {
         return count > 0 ? sum / count : 0;
     }
 
-    private StrategySignal buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        double rr = (takeProfit - entry) / (entry - stopLoss);
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.BUY)
-                .confidence(0.65)
-                .entryPrice(entry)
-                .stopLoss(stopLoss)
-                .takeProfit(takeProfit)
-                .riskRewardRatio(rr)
-                .expectedValue(2.0) // 2% expected return
-                .reasons(java.util.List.of("Uptrend confirmed", "Price above moving averages"))
-                .marketBehavior(context.getMarketBehavior())
-                .build();
+    private Side buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
+        return BUY;
     }
 
-    private StrategySignal buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        double rr = (entry - takeProfit) / (stopLoss - entry);
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.SELL)
-                .confidence(0.65)
-                .entryPrice(entry)
-                .stopLoss(stopLoss)
-                .takeProfit(takeProfit)
-                .riskRewardRatio(rr)
-                .expectedValue(2.0)
-                .reasons(java.util.List.of("Downtrend confirmed", "Price below moving averages"))
-                .marketBehavior(context.getMarketBehavior())
-                .build();
+    private Side buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
+        return SELL;
     }
 }

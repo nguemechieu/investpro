@@ -12,10 +12,7 @@ public class FibonacciRetracementIndicator extends BaseIndicator {
     
     private final int lookbackPeriod;
     
-    public FibonacciRetracementIndicator() {
-        this(20);
-    }
-    
+
     public FibonacciRetracementIndicator(int lookbackPeriod) {
         super("Fibonacci Retracement", lookbackPeriod);
         this.lookbackPeriod = lookbackPeriod;

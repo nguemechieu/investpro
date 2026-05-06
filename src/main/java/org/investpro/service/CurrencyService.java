@@ -37,7 +37,7 @@ public class CurrencyService implements CrudService<Currency, String> {
     }
     
     @Override
-    public List<Currency> saveAll(List<Currency> currencies) throws SQLException, ClassNotFoundException {
+    public List<Currency> saveAll(List<Currency> currencies) throws SQLException {
         if (currencies == null || currencies.isEmpty()) {
             throw new IllegalArgumentException("currencies list must not be null or empty");
         }

@@ -1,5 +1,7 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +10,8 @@ import java.util.List;
  * MACD (Moving Average Convergence Divergence) Indicator
  * Trend-following momentum indicator showing relationship between two moving averages.
  */
+@Getter
+@Setter
 public class MACDIndicator extends BaseIndicator {
     
     private int fastPeriod;

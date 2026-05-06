@@ -3,6 +3,7 @@ package org.investpro.strategy;
 import lombok.Builder;
 import lombok.Getter;
 import  org.investpro.timeframe.Timeframe;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
@@ -47,6 +48,7 @@ public class StrategyAssignment {
     @Builder.Default
     private final boolean locked = false; // locked prevents auto-replacement
 
+    @Getter
     public enum StrategyAssignmentMode {
         AUTO("Automatic", "Strategy selected automatically by system"),
         MANUAL("Manual", "User manually selected this strategy"),
@@ -61,15 +63,9 @@ public class StrategyAssignment {
             this.description = description;
         }
 
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getDescription() {
-            return description;
-        }
     }
 
+    @Getter
     public enum AssignedBy {
         AUTO("Automatic Selection"),
         USER("User Selection"),
@@ -82,24 +78,21 @@ public class StrategyAssignment {
             this.displayName = displayName;
         }
 
-        public String getDisplayName() {
-            return displayName;
-        }
     }
 
     public boolean isExpired() {
         if (expiresAt == null) {
-            return false;
+            return true;
         }
-        return Instant.now().isAfter(expiresAt);
+        return !Instant.now().isAfter(expiresAt);
     }
 
     public boolean isValid() {
-        return active && !isExpired() && mode != StrategyAssignmentMode.DISABLED;
+        return active && isExpired() && mode != StrategyAssignmentMode.DISABLED;
     }
 
-    public static String generateId() {
-        return "assign_" + UUID.randomUUID().toString();
+    public static @NotNull String generateId() {
+        return "assign_" + UUID.randomUUID();
     }
 
     @Override

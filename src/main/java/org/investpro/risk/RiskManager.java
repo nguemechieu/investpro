@@ -23,10 +23,9 @@ public class RiskManager {
     private double rewardRiskRatio = 2.0; // Risk-reward ratio (1:2)
     private boolean useVolatilityBased = true;
     private double maxPositionSize = 10.0; // Max position size in base units
-    
+
     // Volatility calculation period
-    private static final int VOLATILITY_PERIOD = 14;
-    
+
     public RiskManager(double accountBalance) {
         this.accountBalance = Math.max(100, accountBalance);
         logger.info("RiskManager initialized with account balance: ${}", accountBalance);
@@ -183,13 +182,7 @@ public class RiskManager {
         this.useVolatilityBased = use;
         logger.info("Volatility-based stops: {}", use ? "ENABLED" : "DISABLED");
     }
-    
-    public double getAccountBalance() { return accountBalance; }
-    public double getRiskPercentage() { return riskPercentage; }
-    public double getRewardRiskRatio() { return rewardRiskRatio; }
-    public double getMaxPositionSize() { return maxPositionSize; }
-    public boolean isUsingVolatilityBased() { return useVolatilityBased; }
-    
+
     @Override
     public String toString() {
         return String.format("RiskManager{balance=$%.2f, risk=%.1f%%, ratio=1:%.1f, maxSize=%.4f}",

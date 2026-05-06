@@ -1,5 +1,7 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,12 +10,11 @@ import java.util.List;
  * Relative Strength Index (RSI) Indicator
  * Momentum oscillator measuring speed and magnitude of price changes (0-100).
  */
+@Getter
+@Setter
 public class RSIIndicator extends BaseIndicator {
     
-    public RSIIndicator() {
-        this(14);
-    }
-    
+
     public RSIIndicator(int period) {
         super("RSI" + period, period);
     }

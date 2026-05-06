@@ -13,10 +13,7 @@ public class IchimokuIndicator extends BaseIndicator {
     private final int basePeriod;
     private final int leadingSpanPeriod;
     
-    public IchimokuIndicator() {
-        this(9, 26, 52);
-    }
-    
+
     public IchimokuIndicator(int conversionPeriod, int basePeriod, int leadingSpanPeriod) {
         super("Ichimoku", basePeriod);
         this.conversionPeriod = conversionPeriod;

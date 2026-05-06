@@ -9,11 +9,7 @@ import java.util.List;
  * Measures market volatility using average of true range values.
  */
 public class ATRIndicator extends BaseIndicator {
-    
-    public ATRIndicator() {
-        this(14);
-    }
-    
+
     public ATRIndicator(int period) {
         super("ATR" + period, period);
     }

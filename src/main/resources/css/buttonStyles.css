@@ -1,0 +1,248 @@
+/*******************************************************************************
+ * BUTTON STYLES - COMPREHENSIVE TRADING BUTTON VARIANTS
+ * Supports multiple button types with consistent styling and interactions
+ ******************************************************************************/
+
+/* ============================================================================
+   BASE BUTTON STYLES
+   ============================================================================ */
+
+.button {
+    -fx-background-color: linear-gradient(to bottom, #334155, #1e293b);
+    -fx-text-fill: #f8fafc;
+    -fx-font-weight: 700;
+    -fx-font-size: 12;
+    -fx-padding: 7 14 7 14;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-border-color: #475569;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+    -fx-effect: null;
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom, #475569, #334155);
+    -fx-border-color: #60a5fa;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.25), 6, 0, 0, 2);
+}
+
+.button:pressed {
+    -fx-background-color: #0f172a;
+    -fx-translate-y: 1;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.15), 3, 0, 0, 1);
+}
+
+.button:disabled {
+    -fx-opacity: 0.45;
+    -fx-cursor: default;
+}
+
+.button:focused {
+    -fx-border-color: #60a5fa;
+    -fx-border-width: 2;
+}
+
+/* ============================================================================
+   BUY BUTTON (GREEN)
+   ============================================================================ */
+
+.button.buy-button,
+.buy-button {
+    -fx-background-color: linear-gradient(to bottom, #22c55e, #15803d);
+    -fx-border-color: #4ade80;
+    -fx-text-fill: white;
+    -fx-font-size: 13;
+    -fx-font-weight: 900;
+    -fx-padding: 8 22 8 22;
+}
+
+.button.buy-button:hover,
+.buy-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #4ade80, #16a34a);
+    -fx-border-color: #86efac;
+    -fx-effect: dropshadow(gaussian, rgba(34, 197, 94, 0.4), 8, 0, 0, 3);
+}
+
+.button.buy-button:pressed,
+.buy-button:pressed {
+    -fx-background-color: #15803d;
+    -fx-translate-y: 2;
+}
+
+.button.buy-button:disabled,
+.buy-button:disabled {
+    -fx-opacity: 0.5;
+}
+
+/* ============================================================================
+   SELL BUTTON (RED)
+   ============================================================================ */
+
+.button.sell-button,
+.sell-button {
+    -fx-background-color: linear-gradient(to bottom, #ef4444, #b91c1c);
+    -fx-border-color: #f87171;
+    -fx-text-fill: white;
+    -fx-font-size: 13;
+    -fx-font-weight: 900;
+    -fx-padding: 8 22 8 22;
+}
+
+.button.sell-button:hover,
+.sell-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #f87171, #dc2626);
+    -fx-border-color: #fca5a5;
+    -fx-effect: dropshadow(gaussian, rgba(239, 68, 68, 0.4), 8, 0, 0, 3);
+}
+
+.button.sell-button:pressed,
+.sell-button:pressed {
+    -fx-background-color: #b91c1c;
+    -fx-translate-y: 2;
+}
+
+.button.sell-button:disabled,
+.sell-button:disabled {
+    -fx-opacity: 0.5;
+}
+
+/* ============================================================================
+   PRIMARY BUTTON (BLUE)
+   ============================================================================ */
+
+.button.primary-button,
+.primary-button {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
+    -fx-font-weight: 800;
+    -fx-padding: 8 20 8 20;
+}
+
+.button.primary-button:hover,
+.primary-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #3b82f6, #2563eb);
+    -fx-border-color: #93c5fd;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
+}
+
+.button.primary-button:pressed,
+.primary-button:pressed {
+    -fx-background-color: #1d4ed8;
+    -fx-translate-y: 2;
+}
+
+/* ============================================================================
+   SUCCESS BUTTON (GREEN - ALTERNATIVE)
+   ============================================================================ */
+
+.button.success-button,
+.success-button {
+    -fx-background-color: linear-gradient(to bottom, #22c55e, #15803d);
+    -fx-border-color: #4ade80;
+    -fx-text-fill: white;
+}
+
+.button.success-button:hover,
+.success-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #4ade80, #16a34a);
+    -fx-effect: dropshadow(gaussian, rgba(34, 197, 94, 0.3), 6, 0, 0, 2);
+}
+
+/* ============================================================================
+   DANGER BUTTON (RED - ALTERNATIVE)
+   ============================================================================ */
+
+.button.danger-button,
+.danger-button {
+    -fx-background-color: linear-gradient(to bottom, #ef4444, #991b1b);
+    -fx-border-color: #f87171;
+    -fx-text-fill: white;
+}
+
+.button.danger-button:hover,
+.danger-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #f87171, #dc2626);
+    -fx-effect: dropshadow(gaussian, rgba(239, 68, 68, 0.3), 6, 0, 0, 2);
+}
+
+/* ============================================================================
+   WARNING BUTTON (AMBER - AUTO TRADING)
+   ============================================================================ */
+
+.button.auto-button,
+.auto-button {
+    -fx-background-color: linear-gradient(to bottom, #fbbf24, #d97706);
+    -fx-border-color: #fde68a;
+    -fx-text-fill: #111827;
+    -fx-font-weight: 900;
+    -fx-padding: 8 20 8 20;
+}
+
+.button.auto-button:hover,
+.auto-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #fde68a, #f59e0b);
+    -fx-border-color: #fcd34d;
+    -fx-effect: dropshadow(gaussian, rgba(245, 158, 11, 0.3), 6, 0, 0, 2);
+}
+
+.button.auto-button:pressed,
+.auto-button:pressed {
+    -fx-background-color: #d97706;
+    -fx-translate-y: 2;
+}
+
+/* ============================================================================
+   SECONDARY BUTTON (MUTED)
+   ============================================================================ */
+
+.button.secondary-button,
+.secondary-button {
+    -fx-background-color: linear-gradient(to bottom, #475569, #334155);
+    -fx-border-color: #64748b;
+    -fx-text-fill: #e2e8f0;
+    -fx-padding: 6 14 6 14;
+}
+
+.button.secondary-button:hover,
+.secondary-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #64748b, #475569);
+    -fx-border-color: #94a3b8;
+}
+
+/* ============================================================================
+   SMALL BUTTON VARIANT
+   ============================================================================ */
+
+.button.small-button,
+.small-button {
+    -fx-font-size: 11;
+    -fx-padding: 5 10 5 10;
+}
+
+/* ============================================================================
+   LARGE BUTTON VARIANT
+   ============================================================================ */
+
+.button.large-button,
+.large-button {
+    -fx-font-size: 14;
+    -fx-padding: 10 24 10 24;
+}
+
+/* ============================================================================
+   TOGGLE BUTTON
+   ============================================================================ */
+
+.toggle-button {
+    -fx-background-color: linear-gradient(to bottom, #334155, #1e293b);
+    -fx-text-fill: #f8fafc;
+    -fx-border-color: #475569;
+}
+
+.toggle-button:selected {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-text-fill: white;
+    -fx-border-color: #60a5fa;
+}

@@ -1,11 +1,12 @@
 package org.investpro.exchange;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 
 /**
  * Secure provider for Coinbase API credentials from environment variables.
@@ -13,25 +14,27 @@ import java.util.logging.Logger;
  * Supports two credential formats:
  * 
  * 1. Advanced Trade API (EC Private Key):
- *    COINBASE_KEY_NAME="organizations/{org_id}/apiKeys/{key_id}"
- *    COINBASE_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----"
+ * COINBASE_KEY_NAME="organizations/{org_id}/apiKeys/{key_id}"
+ * COINBASE_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC
+ * PRIVATE KEY-----"
  * 
  * 2. Legacy REST API (API Key + Secret):
- *    COINBASE_API_KEY="your-api-key"
- *    COINBASE_API_SECRET="your-api-secret"
+ * COINBASE_API_KEY="your-api-key"
+ * COINBASE_API_SECRET="your-api-secret"
  * 
  * Store credentials in a .env file (NOT in version control):
  * .env:
- *   COINBASE_KEY_NAME=organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID
- *   COINBASE_PRIVATE_KEY=-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----
+ * COINBASE_KEY_NAME=organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID
+ * COINBASE_PRIVATE_KEY=-----BEGIN EC PRIVATE
+ * KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----
  * 
  * Then load from environment in your terminal before running the application:
  * Unix/Linux/MacOS: source .env
- * PowerShell: Get-Content .env | ForEach-Object { $parts = $_ -split '='; [Environment]::SetEnvironmentVariable($parts[0], $parts[1]) }
+ * PowerShell: Get-Content .env | ForEach-Object { $parts = $_ -split '=';
+ * [Environment]::SetEnvironmentVariable($parts[0], $parts[1]) }
  */
-
+@Slf4j
 public class CoinbaseCredentialProvider {
-    private static final Logger logger = Logger.getLogger(CoinbaseCredentialProvider.class.getName());
     private static final Map<String, String> DOTENV_CACHE = new ConcurrentHashMap<>();
     private static volatile boolean dotenvLoaded;
 
@@ -40,7 +43,8 @@ public class CoinbaseCredentialProvider {
     }
 
     /**
-     * Get Coinbase Advanced Trade API key name (organizations/{org_id}/apiKeys/{key_id})
+     * Get Coinbase Advanced Trade API key name
+     * (organizations/{org_id}/apiKeys/{key_id})
      * from COINBASE_KEY_NAME environment variable.
      * 
      * @return API key name or null if not configured
@@ -85,8 +89,8 @@ public class CoinbaseCredentialProvider {
     public static boolean hasAdvancedTradeCredentials() {
         String keyName = getKeyName();
         String privateKey = getPrivateKey();
-        return keyName != null && !keyName.trim().isEmpty() && 
-               privateKey != null && !privateKey.trim().isEmpty();
+        return keyName != null && !keyName.trim().isEmpty() &&
+                privateKey != null && !privateKey.trim().isEmpty();
     }
 
     /**
@@ -97,8 +101,8 @@ public class CoinbaseCredentialProvider {
     public static boolean hasLegacyCredentials() {
         String apiKey = getApiKey();
         String apiSecret = getApiSecret();
-        return apiKey != null && !apiKey.trim().isEmpty() && 
-               apiSecret != null && !apiSecret.trim().isEmpty();
+        return apiKey != null && !apiKey.trim().isEmpty() &&
+                apiSecret != null && !apiSecret.trim().isEmpty();
     }
 
     /**
@@ -107,14 +111,16 @@ public class CoinbaseCredentialProvider {
     public static void logCredentialStatus() {
         boolean advancedTrade = hasAdvancedTradeCredentials();
         boolean legacy = hasLegacyCredentials();
-        
-        logger.info("Coinbase Credential Status:");
-        logger.info("  Advanced Trade (EC Key): " + (advancedTrade ? "CONFIGURED" : "NOT CONFIGURED"));
+
+        log.info("Coinbase Credential Status:");
+        log.info("  Advanced Trade (EC Key): " + (advancedTrade ? "CONFIGURED" : "NOT CONFIGURED"));
         if (advancedTrade) {
             String keyName = getKeyName();
-            logger.info("    Key Name: " + (keyName != null ? "%s...".formatted(keyName.substring(0, Math.min(30, keyName.length()))) : "null"));
+            log.info("    Key Name: "
+                    + (keyName != null ? "%s...".formatted(keyName.substring(0, Math.min(30, keyName.length())))
+                            : "null"));
         }
-        logger.info("  Legacy REST API: " + (legacy ? "CONFIGURED" : "NOT CONFIGURED"));
+        log.info("  Legacy REST API: " + (legacy ? "CONFIGURED" : "NOT CONFIGURED"));
     }
 
     private static String getConfigValue(String name) {
@@ -187,7 +193,7 @@ public class CoinbaseCredentialProvider {
                 DOTENV_CACHE.putIfAbsent(name, value);
             }
         } catch (IOException exception) {
-            logger.warning("Unable to load .env file for Coinbase credentials: " + exception.getMessage());
+            log.warn("Unable to load .env file for Coinbase credentials: " + exception.getMessage());
         }
     }
 }

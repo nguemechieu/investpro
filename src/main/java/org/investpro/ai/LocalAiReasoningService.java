@@ -55,7 +55,7 @@ public class LocalAiReasoningService implements AiReasoningService {
      * Check if request has all required fields.
      */
     private boolean isRequestComplete(AiTradeReviewRequest request) {
-        return request.getSymbol() != null && !request.getSymbol().isBlank()
+        return request.getSymbol() != null
                 && request.getSignalSide() != null && !request.getSignalSide().isBlank()
                 && request.getStrategyName() != null && !request.getStrategyName().isBlank()
                 && request.getRiskContext() != null

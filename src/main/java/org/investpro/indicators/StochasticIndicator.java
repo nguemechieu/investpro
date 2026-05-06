@@ -1,5 +1,7 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +10,8 @@ import java.util.List;
  * Stochastic Oscillator Indicator
  * Momentum indicator comparing closing price to price range (0-100).
  */
+@Getter
+@Setter
 public class StochasticIndicator extends BaseIndicator {
     
     private int kPeriod;

@@ -1,8 +1,11 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+
 /**
  * Enumeration of supported technical indicators
  */
+@Getter
 public enum IndicatorType {
     NONE("None", "No indicator"),
     SMA("SMA", "Simple Moving Average"),
@@ -18,14 +21,6 @@ public enum IndicatorType {
     IndicatorType(String displayName, String description) {
         this.displayName = displayName;
         this.description = description;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     @Override

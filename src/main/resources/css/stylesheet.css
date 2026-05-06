@@ -1,0 +1,148 @@
+
+/*******************************************************************************
+ * INVESTPRO STYLESHEET - LEGACY COMPATIBILITY LAYER
+ * This file maintains backward compatibility with older UI components.
+ * For new components, prefer using the primary app.css file.
+ ******************************************************************************/
+
+/* ============================================================================
+   BUTTON STYLES
+   ============================================================================ */
+
+.button {
+    -fx-text-fill: white;
+    -fx-border-radius: 5;
+    -fx-border-color: #2959ea;
+    -fx-border-width: 2;
+    -fx-background-radius: 5;
+    -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    -fx-font-size: 11;
+    -fx-background-color: #3366ff;
+    -fx-font-weight: bold;
+    -fx-padding: 7 14 7 14;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #4d7aff;
+    -fx-border-color: #60a5fa;
+}
+
+.button:pressed {
+    -fx-background-color: #1d4ed8;
+    -fx-translate-y: 1;
+}
+
+.button:disabled {
+    -fx-opacity: 0.45;
+    -fx-cursor: default;
+}
+
+/* ============================================================================
+   TAB PANE STYLES
+   ============================================================================ */
+
+.tab-pane {
+    -fx-tab-min-width: 80;
+    -fx-tab-max-width: 200;
+    -fx-tab-pref-width: 120;
+    -fx-tab-min-height: 30;
+    -fx-tab-max-height: 30;
+}
+
+.tab-header-background {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 5;
+}
+
+.tab {
+    -fx-text-fill: white;
+    -fx-background-color: #111827;
+    -fx-background-radius: 5 5 0 0;
+    -fx-padding: 4 10 5 10;
+}
+
+.tab:hover {
+    -fx-background-color: #334155;
+}
+
+.tab:selected {
+    -fx-background-color: #243244;
+    -fx-border-color: #60a5fa;
+    -fx-border-width: 0 0 3 0;
+}
+
+.tab:selected .focus-indicator {
+    -fx-border-radius: 10 10 0 0;
+    -fx-border-insets: -7 -8 -8 -9, -5 -8 -7 -7;
+    -fx-background-color: #243244;
+    -fx-background-radius: 10 10 0 0;
+}
+
+/* ============================================================================
+   LABEL STYLES
+   ============================================================================ */
+
+.label {
+    -fx-background-color: #d4d4d4;
+    -fx-border-color: #d4d4d4;
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+    -fx-text-fill: #111827;
+    -fx-padding: 4 8 4 8;
+}
+
+.label:hover {
+    -fx-background-color: #e0e0e0;
+}
+		-fx-background-color:derive(#2959ea,20.0%);
+		-fx-opacity:0.9;
+
+		-fx-border-radius: 10.0;
+}
+ 
+#settingTabPane .tab:hover{
+ -fx-background-color:derive(#2959ea,10.0%);
+ 
+}
+#settingTabPane
+ .tab:focused,
+#settingTabPane  .tab:default:focused{
+ 	-fx-background-color:derive(#2959ea,20.0%);
+}
+
+/*******************************************************************************
+ *                                                                             *
+ * Label  			                                                       *
+ *                                                                             *
+ ******************************************************************************/
+
+#header .label:hover {
+     -fx-background-color: derive(#777777,80.0%);
+    
+}
+
+/*******************************************************************************
+ *                                                                             *
+ * ScrollBar 			                                                       *
+ *                                                                             *
+ ******************************************************************************/
+
+
+.scroll-bar:vertical > .thumb,
+.scroll-bar:horizontal > .thumb {
+	    -fx-background-color: derive(#bbbbbb,5.0%);
+}
+
+.scroll-bar:hover > .increment-button, 
+.scroll-bar:hover > .decrement-button {
+	
+     	-fx-background-color: derive(#bbbbbb,30.0%);
+     	
+}
+
+
+#righDrawerVbox{
+	-fx-padding: 10.0,10.0,10.0,10.0;
+}
+

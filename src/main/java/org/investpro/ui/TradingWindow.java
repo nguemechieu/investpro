@@ -1,7 +1,5 @@
 package org.investpro.ui;
 
-import org.investpro.models.trading.*;
-import org.investpro.utils.ZoomDirection;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -11,7 +9,6 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.WritableImage;
@@ -21,43 +18,43 @@ import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.web.WebView;
 import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.core.chat.News;
-import org.investpro.core.chat.NewsDataProvider;
+import org.investpro.core.EmailNotifier;
+import org.investpro.core.SystemCore;
+import org.investpro.core.TelegramNotifier;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
-import org.investpro.core.bot.SmartBot;
-import org.investpro.data.Account;
-import org.investpro.exchange.Alpaca;
-import org.investpro.exchange.Binance;
-import org.investpro.exchange.BinanceUs;
-import org.investpro.exchange.Bitfinex;
-import org.investpro.exchange.Coinbase;
-import org.investpro.exchange.Exchange;
-import org.investpro.exchange.InteractiveBrokers;
 
-import org.investpro.exchange.Oanda;
-import org.investpro.models.currency.CryptoCurrency;
-import org.investpro.models.trading.Position;
+import org.investpro.models.market.NewsEvent;
+import org.investpro.service.NewsDataProvider;
+import org.investpro.data.Account;
+import org.investpro.data.CandleData;
+import org.investpro.exchange.*;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.models.trading.*;
 import org.investpro.repository.CurrencyRepository;
 import org.investpro.repository.OrderRepository;
 import org.investpro.repository.RepositoryFactory;
 import org.investpro.repository.TradeRepository;
+import org.investpro.risk.PositionHealthScore;
 import org.investpro.service.CurrencyService;
+import org.investpro.service.NotificationService;
 import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
-import org.investpro.ui.charts.CandleStickChartDisplay;
+import org.investpro.ui.charts.DepthChart;
+import org.investpro.ui.charts.NewsEventOverlay;
+import org.investpro.ui.panels.ManualTradePanel;
+import org.investpro.ui.panels.NewsCalendarPanel;
 import org.investpro.utils.DraggableTab;
+import org.investpro.utils.ZoomDirection;
+
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
 import java.awt.Desktop;
@@ -65,30 +62,35 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.text.ParseException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.prefs.Preferences;
 
 import javafx.embed.swing.SwingFXUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.investpro.utils.Side.BUY;
 import static org.investpro.utils.Side.SELL;
 
+/**
+ * Main InvestPro / TradeAdviser trading terminal window.
+ *
+ * This version is wired to SystemCore:
+ * - TradingWindow owns the UI.
+ * - SystemCore owns SmartBot, streaming, strategy engine, risk, AI, execution,
+ * and notifications.
+ * - SmartBot is no longer controlled directly from the UI.
+ */
+@Slf4j
 @Getter
 @Setter
 public class TradingWindow extends BorderPane {
@@ -99,18 +101,28 @@ public class TradingWindow extends BorderPane {
     private static final double DEFAULT_HEIGHT = 820;
     private static final double LEFT_PANEL_WIDTH = 310;
     private static final double CONSOLE_HEIGHT = 250;
-    private static final int MARKET_WATCH_TICKER_REFRESH_LIMIT = 40;
     private static final String ENV_TELEGRAM_TOKEN = "INVESTPRO_TELEGRAM_BOT_TOKEN";
     private static final DateTimeFormatter SNAPSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+
+    /**
+     * Keep this list aligned with createExchange(...).
+     * Do not show unsupported brokers until their adapters exist.
+     */
     private static final String[] SUPPORTED_EXCHANGES = {
-            "COINBASE", "BINANCE US", "BINANCE", "OANDA", "BITFINEX", "ALPACA", "INTERACTIVE BROKERS",
-            "SCHWAB", "BITMEX", "BITSTAMP", "BITTREX"
+            "COINBASE",
+            "BINANCE US",
+            "BINANCE",
+            "OANDA",
+            "BITFINEX",
+            "ALPACA",
+            "INTERACTIVE BROKERS"
     };
 
     private final ComboBox<String> exchangeSelector = new ComboBox<>();
     private final ComboBox<TradePair> symbolSelector = new ComboBox<>();
     private final ComboBox<String> timeframeSelector = new ComboBox<>();
     private final ComboBox<String> botSymbolScopeSelector = new ComboBox<>();
+    private final ComboBox<String> orderTypeSelector = new ComboBox<>();
 
     private final Button connectButton = new Button("Connect");
     private final Label connectedBrokerLabel = new Label("Connected");
@@ -124,19 +136,28 @@ public class TradingWindow extends BorderPane {
 
     private final TabPane chartTabPane = new TabPane();
     private final TabPane terminalTabPane = new TabPane();
+
     private final ObservableList<TradePair> marketWatchItems = FXCollections.observableArrayList();
     private final TableView<TradePair> marketWatchTable = new TableView<>(marketWatchItems);
+
     private final ObservableList<OrderBook.PriceLevel> orderBookBids = FXCollections.observableArrayList();
     private final ObservableList<OrderBook.PriceLevel> orderBookAsks = FXCollections.observableArrayList();
     private final TableView<OrderBook.PriceLevel> orderBookBidsTable = new TableView<>(orderBookBids);
     private final TableView<OrderBook.PriceLevel> orderBookAsksTable = new TableView<>(orderBookAsks);
+
     private final ObservableList<Order> positionsItems = FXCollections.observableArrayList();
     private final TableView<Order> positionsTable = new TableView<>(positionsItems);
+
     private final ObservableList<Position> accountPositionItems = FXCollections.observableArrayList();
     private final ObservableList<OpenOrder> accountOpenOrderItems = FXCollections.observableArrayList();
     private final ObservableList<Trade> accountTradeItems = FXCollections.observableArrayList();
     private final ObservableList<Order> accountHistoryItems = FXCollections.observableArrayList();
+
+    private final ObservableList<PositionHealthScore> positionHealthItems = FXCollections.observableArrayList();
+    private final TableView<PositionHealthScore> positionHealthTable = new TableView<>(positionHealthItems);
+
     private final PositionsDataManager positionsDataManager = new PositionsDataManager();
+
     private final TextArea accountSummaryArea = new TextArea();
     private final Label longPnLLabel = new Label("Long P&L: $0.00");
     private final Label shortPnLLabel = new Label("Short P&L: $0.00");
@@ -146,18 +167,22 @@ public class TradingWindow extends BorderPane {
     private final Label equityValueLabel = valueLabel("$0.00", "#3b82f6");
     private final Label marginUsedValueLabel = valueLabel("$0.00", "#ef4444");
     private final Label freeMarginValueLabel = valueLabel("$0.00", "#f59e0b");
+
     private final Label connectionStatusLabel = new Label("Disconnected");
     private final Label symbolCountLabel = new Label("Symbols: 0");
     private final Circle connectionIndicator = new Circle(6, Color.ORANGERED);
+
     private final TextArea journalArea = new TextArea();
     private final ObservableList<String> agentActivityItems = FXCollections
             .observableArrayList("Agent activity will appear here.");
     private final ObservableList<String> signalItems = FXCollections.observableArrayList("Signal engine idle.",
             "No signals loaded.");
+
     private final ListView<String> expertsListView = new ListView<>();
     private final ListView<String> alertsListView = new ListView<>();
     private final ListView<String> signalListView = new ListView<>();
     private final ListView<String> mailboxListView = new ListView<>();
+
     private final TradeRepository tradeRepository;
     private final OrderRepository orderRepository;
     private final CurrencyRepository currencyRepository;
@@ -165,41 +190,54 @@ public class TradingWindow extends BorderPane {
     private final OrderService orderService;
     private final CurrencyService currencyService;
     private final TradingService tradingService;
+    private final NotificationService notificationService;
     private final Preferences preferences = Preferences.userNodeForPackage(TradingWindow.class);
-    // Auto-refresh scheduling
-    private final ScheduledExecutorService autoRefreshExecutor = Executors.newScheduledThreadPool(3, r -> {
-        Thread t = new Thread(r, "TradingWindow-AutoRefresh");
-        t.setDaemon(true);
-        return t;
+
+    private final ScheduledExecutorService autoRefreshExecutor = Executors.newScheduledThreadPool(3, runnable -> {
+        Thread thread = new Thread(runnable, "TradingWindow-AutoRefresh");
+        thread.setDaemon(true);
+        return thread;
     });
+
     private SplitPane mainVerticalWorkbench;
     private SplitPane horizontalWorkbench;
     private VBox systemConsole;
     private boolean consoleVisible = true;
+
     private Exchange exchange;
     private final Map<String, BrokerSession> brokerSessions = new HashMap<>();
-    private SmartBot smartBot;
-    private boolean smartBotEventsSubscribed;
+    private SystemCore systemCore;
+    private boolean systemCoreEventsSubscribed;
+    private final NewsDataProvider newsDataProvider = new NewsDataProvider();
+
     private boolean botTradingEnabled;
     private boolean brokerAccessGranted;
     private String configuredApiKey = "";
     private String configuredApiSecret = "";
     private String telegramToken = "";
     private boolean initialized;
+
     private OrderBook currentOrderBook = new OrderBook();
-    private Tab selectedTab;
+    private DepthChart depthChart;
+    private NewsCalendarPanel newsCalendarPanel;
+    private MarketInfoPanel marketInfoPanel;
+    private ManualTradePanel manualTradePanel;
 
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
     }
 
     public TradingWindow() {
-        this(null, RepositoryFactory.createTradeRepository(), RepositoryFactory.createOrderRepository(),
+        this(null,
+                RepositoryFactory.createTradeRepository(),
+                RepositoryFactory.createOrderRepository(),
                 RepositoryFactory.createCurrencyRepository());
     }
 
     public TradingWindow(MarketConfiguration configuration)
             throws ParseException, IOException, InterruptedException, ClassNotFoundException {
-        this(configuration, RepositoryFactory.createTradeRepository(), RepositoryFactory.createOrderRepository(),
+        this(configuration,
+                RepositoryFactory.createTradeRepository(),
+                RepositoryFactory.createOrderRepository(),
                 RepositoryFactory.createCurrencyRepository());
     }
 
@@ -209,6 +247,7 @@ public class TradingWindow extends BorderPane {
             OrderRepository orderRepository,
             CurrencyRepository currencyRepository) {
         super();
+
         this.tradeRepository = Objects.requireNonNull(tradeRepository, "tradeRepository must not be null");
         this.orderRepository = Objects.requireNonNull(orderRepository, "orderRepository must not be null");
         this.currencyRepository = Objects.requireNonNull(currencyRepository, "currencyRepository must not be null");
@@ -218,8 +257,14 @@ public class TradingWindow extends BorderPane {
         this.currencyService = new CurrencyService(this.currencyRepository);
         this.tradingService = new TradingService(this.tradeService, this.orderService, this.currencyService);
 
+        // Initialize NotificationService (disabled by default, can be enabled via
+        // settings)
+        this.notificationService = NotificationService.disabled();
+
         initialize(configuration);
     }
+
+    private NewsEventOverlay newsEventOverlay;
 
     private void initialize(MarketConfiguration configuration) {
         if (initialized) {
@@ -249,6 +294,7 @@ public class TradingWindow extends BorderPane {
         setTop(createTopSection());
         setCenter(createMainWorkbench());
         setBottom(createStatusBar());
+
         if (preferences.getBoolean("remember_console_visible", true)
                 && !preferences.getBoolean("console_visible", true)) {
             toggleConsoleVisibility();
@@ -258,13 +304,16 @@ public class TradingWindow extends BorderPane {
         createInitialExchange(configuration);
         loadSymbolsForSelectedExchange();
         openInitialChartIfAvailable();
+
         if (hasExchangeCredentials(exchangeSelector.getSelectionModel().getSelectedItem())
                 || hasConfiguredCredentials()) {
             proceedWithConnection();
         }
 
-        // Start automatic data refresh
         startAutoRefreshTasks();
+
+        // Load sample news calendar on startup
+        newsDataProvider.loadSampleCalendar();
 
         logger.info("TradingWindow initialized.");
     }
@@ -286,6 +335,7 @@ public class TradingWindow extends BorderPane {
 
         connectControl.getChildren().setAll(connectButton, connectedBrokerLabel);
         connectControl.setMinWidth(108);
+
         connectedBrokerLabel.setMinWidth(108);
         connectedBrokerLabel.setAlignment(Pos.CENTER);
         connectedBrokerLabel.setVisible(false);
@@ -387,7 +437,9 @@ public class TradingWindow extends BorderPane {
         Menu settingsMenu = new Menu("Settings");
         settingsMenu.getItems().addAll(
                 menuItem("Application Settings", null, this::showSettingsDialog),
-                menuItem("Exchange Credentials", null, this::showSettingsDialog));
+                menuItem("Exchange Credentials", null, this::showSettingsDialog),
+                new SeparatorMenuItem(),
+                menuItem("Reset Password", null, this::openPasswordReset));
 
         Menu windowMenu = new Menu("Window");
         windowMenu.getItems().addAll(
@@ -448,6 +500,8 @@ public class TradingWindow extends BorderPane {
                 refreshSymbolsButton,
                 addChartButton,
                 new Separator(Orientation.VERTICAL),
+                new Label("Order Type"),
+                orderTypeSelector,
                 buyButton,
                 sellButton,
                 cancelAllButton,
@@ -527,7 +581,9 @@ public class TradingWindow extends BorderPane {
         TabPane watchTabs = new TabPane();
         watchTabs.getStyleClass().add("compact-tabs");
         watchTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        watchTabs.getTabs().setAll(new Tab("Symbols", marketWatchTable), new Tab("Quick View", chartsScrollPane));
+        watchTabs.getTabs().setAll(
+                new Tab("Symbols", marketWatchTable),
+                new Tab("Quick View", chartsScrollPane));
 
         VBox box = new VBox(8, header, watchTabs);
         box.setPadding(new Insets(8));
@@ -540,10 +596,13 @@ public class TradingWindow extends BorderPane {
         Label symbolLabel = new Label(pair == null ? "-" : pair.toString('/'));
         symbolLabel.getStyleClass().add("symbol-name");
         symbolLabel.setMinWidth(88);
+
         Label bidLabel = new Label("Bid: %s".formatted(pair == null ? "-" : price(pair.getBid())));
         bidLabel.getStyleClass().add("symbol-bid");
+
         Label askLabel = new Label("Ask: %s".formatted(pair == null ? "-" : price(pair.getAsk())));
         askLabel.getStyleClass().add("symbol-ask");
+
         Button viewButton = new Button("View");
         viewButton.getStyleClass().add("terminal-button");
         viewButton.setOnAction(event -> {
@@ -552,6 +611,7 @@ public class TradingWindow extends BorderPane {
                 openSelectedSymbolChart();
             }
         });
+
         HBox row = new HBox(10, symbolLabel, bidLabel, askLabel, viewButton);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(6));
@@ -559,106 +619,54 @@ public class TradingWindow extends BorderPane {
         return row;
     }
 
-    private VBox createOrderBookPane() {
-        // Configure Bid Table
-        setupOrderBookTable(orderBookBidsTable, orderBookBids, true);
-
-        // Configure Ask Table
-        setupOrderBookTable(orderBookAsksTable, orderBookAsks, false);
-
-        // Create layout with bids on left, asks on right
-        Label bidsLabel = new Label("Bids");
-        bidsLabel.getStyleClass().addAll("panel-title", "book-bid-title");
-
-        Label asksLabel = new Label("Asks");
-        asksLabel.getStyleClass().addAll("panel-title", "book-ask-title");
-
-        VBox bidsContainer = new VBox(6, bidsLabel, orderBookBidsTable);
-        VBox.setVgrow(orderBookBidsTable, Priority.ALWAYS);
-        bidsContainer.setPadding(new Insets(8));
-
-        VBox asksContainer = new VBox(6, asksLabel, orderBookAsksTable);
-        VBox.setVgrow(orderBookAsksTable, Priority.ALWAYS);
-        asksContainer.setPadding(new Insets(8));
-
-        HBox orderBookContent = new HBox(8, bidsContainer, asksContainer);
-        HBox.setHgrow(bidsContainer, Priority.ALWAYS);
-        HBox.setHgrow(asksContainer, Priority.ALWAYS);
-
-        VBox container = new VBox(orderBookContent);
-        container.getStyleClass().addAll("order-book-pane", "pro-panel");
-        VBox.setVgrow(orderBookContent, Priority.ALWAYS);
-        return container;
-    }
-
-    private void setupOrderBookTable(TableView<OrderBook.PriceLevel> table,
-            ObservableList<OrderBook.PriceLevel> items, boolean isBid) {
-        table.setItems(items);
-        table.getStyleClass().add(isBid ? "bid-table" : "ask-table");
-
-        // Price Column
-        TableColumn<OrderBook.PriceLevel, String> priceCol = new TableColumn<>("Price");
-        priceCol.setCellValueFactory(
-                cellData -> new ReadOnlyStringWrapper(String.format("%.8f", cellData.getValue().getPrice())));
-        priceCol.setPrefWidth(120);
-
-        // Size Column
-        TableColumn<OrderBook.PriceLevel, String> sizeCol = new TableColumn<>("Size");
-        sizeCol.setCellValueFactory(
-                cellData -> new ReadOnlyStringWrapper(String.format("%.8f", cellData.getValue().getSize())));
-        sizeCol.setPrefWidth(120);
-
-        // Total Column
-        TableColumn<OrderBook.PriceLevel, String> totalCol = new TableColumn<>("Total");
-        totalCol.setCellValueFactory(cellData -> {
-            double total = cellData.getValue().getPrice() * cellData.getValue().getSize();
-            return new ReadOnlyStringWrapper(String.format("%.8f", total));
-        });
-        totalCol.setPrefWidth(120);
-
-        // Orders Count Column
-        TableColumn<OrderBook.PriceLevel, String> ordersCol = new TableColumn<>("Orders");
-        ordersCol.setCellValueFactory(
-                cellData -> new ReadOnlyStringWrapper(String.valueOf(cellData.getValue().getNumOrders())));
-        ordersCol.setPrefWidth(80);
-
-        table.getColumns().clear();
-        table.getColumns().add(priceCol);
-        table.getColumns().add(sizeCol);
-        table.getColumns().add(totalCol);
-        table.getColumns().add(ordersCol);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-    }
-
     private @NotNull TabPane createNavigatorTabs() {
         TabPane navigatorTabs = new TabPane();
         navigatorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        ListView<String> navigationView = new ListView<>(
-                FXCollections.observableArrayList("Default Account", "Balance", "Equity", "Margin", "Free Margin"));
-        ListView<String> overviewView = new ListView<>(
-                FXCollections.observableArrayList("Upcoming events", "Economic calendar", "System announcements"));
+        ListView<String> navigationView = new ListView<>(FXCollections.observableArrayList(
+                "Market Info", "Balance", "Equity", "Margin", "Free Margin"));
+
+        ListView<String> overviewView = new ListView<>(FXCollections.observableArrayList(
+                "Upcoming events", "Economic calendar", "System announcements"));
+
+        depthChart = new DepthChart();
+        depthChart.update(currentOrderBook == null ? new OrderBook() : currentOrderBook);
+
+        // Initialize news calendar and manual trade panels
+        newsCalendarPanel = new NewsCalendarPanel(newsDataProvider);
+
+        newsEventOverlay = new NewsEventOverlay(newsDataProvider, 400, 400);
+        newsCalendarPanel.getChildren().add(newsEventOverlay);
+        TradePair selectedPair = symbolSelector.getValue();
+        if (selectedPair != null && exchange != null) {
+            manualTradePanel = new ManualTradePanel(exchange, selectedPair, this::refreshAccountWorkspace,
+                    notificationService);
+        }
+        marketInfoPanel = new MarketInfoPanel();
+        marketInfoPanel.updateForPair(selectedPair);
 
         navigatorTabs.getTabs().setAll(
-                createFixedTab("Navigation", navigationView),
+                createFixedTab("MarketInfo", marketInfoPanel),
                 createFixedTab("Overview", overviewView),
                 createFixedTab("Balances", createAccountBalancesView()),
-                createFixedTab("Depth", createOrderBookPane()));
+                createFixedTab("Depth", depthChart),
+                createFixedTab("News Calendar", newsCalendarPanel),
+                manualTradePanel != null ? createFixedTab("Manual Trade", manualTradePanel)
+                        : createFixedTab("Manual Trade", new Label("Select a trading pair first")));
         navigatorTabs.getStyleClass().add("compact-tabs");
-
         return navigatorTabs;
     }
 
     private @NotNull VBox createAccountBalancesView() {
         VBox container = new VBox(12);
         container.setPadding(new Insets(12));
-        Label title = new Label("Balances ");
+        Label title = new Label("Balances");
         title.getStyleClass().add("panel-title");
+
         GridPane grid = new GridPane();
         grid.setHgap(16);
         grid.setVgap(12);
         grid.getStyleClass().add("account-metrics");
-
         grid.addRow(0, metricLabel("Total Balance"), balanceValueLabel);
         grid.addRow(1, metricLabel("Available Balance"), availableValueLabel);
         grid.addRow(2, metricLabel("Equity"), equityValueLabel);
@@ -677,8 +685,7 @@ public class TradingWindow extends BorderPane {
         return label;
     }
 
-    private @NotNull Label valueLabel(String text,
-            String color) {
+    private @NotNull Label valueLabel(String text, String color) {
         Label label = new Label(text);
         label.getStyleClass().addAll("metric-value", "value-label");
         if (color != null && !color.isEmpty()) {
@@ -746,13 +753,14 @@ public class TradingWindow extends BorderPane {
         Label context = new Label("Multi-symbol market workspace");
         context.getStyleClass().add("workspace-subtitle");
         VBox titleBlock = new VBox(1, title, context);
+
         Button fitButton = new Button("Fit");
         fitButton.getStyleClass().add("terminal-button");
-        fitButton.setOnAction(_ -> withActiveChart(CandleStickChart::fitChart));
+        fitButton.setOnAction(event -> withActiveChart(CandleStickChart::fitChart));
 
         Button refreshButton = new Button("Refresh");
         refreshButton.getStyleClass().add("terminal-button");
-        refreshButton.setOnAction(_ -> withActiveChart(CandleStickChart::refreshChart));
+        refreshButton.setOnAction(event -> withActiveChart(CandleStickChart::refreshChart));
 
         Button crosshairButton = new Button("Crosshair");
         crosshairButton.getStyleClass().add("terminal-button");
@@ -773,8 +781,7 @@ public class TradingWindow extends BorderPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox header = new HBox(
-                8,
+        HBox header = new HBox(8,
                 titleBlock,
                 spacer,
                 fitButton,
@@ -786,6 +793,7 @@ public class TradingWindow extends BorderPane {
                 closeAllButton);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("workspace-header");
+
         chartTabPane.setSide(Side.TOP);
         chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         chartTabPane.getStyleClass().add("chart-tabs");
@@ -793,6 +801,7 @@ public class TradingWindow extends BorderPane {
         BorderPane workspacePane = new BorderPane();
         workspacePane.getStyleClass().add("workspace-pane");
         workspacePane.setCenter(chartTabPane);
+
         workspace.setTop(header);
         workspace.setCenter(workspacePane);
         return workspace;
@@ -802,12 +811,14 @@ public class TradingWindow extends BorderPane {
         Label title = new Label("Terminal");
         title.getStyleClass().add("terminal-title");
         VBox titleBlock = new VBox(1, title);
+
         Button detachButton = new Button("Detach");
         detachButton.getStyleClass().add("terminal-button");
-        detachButton.setOnAction(_ -> detachConsoleWindow());
+        detachButton.setOnAction(event -> detachConsoleWindow());
+
         Button closeButton = new Button("Close");
         closeButton.getStyleClass().add("terminal-button");
-        closeButton.setOnAction(_ -> toggleConsoleVisibility());
+        closeButton.setOnAction(event -> toggleConsoleVisibility());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -818,26 +829,25 @@ public class TradingWindow extends BorderPane {
         terminalTabPane.setSide(Side.TOP);
         terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         terminalTabPane.getTabs().setAll(
-                createFixedTab("Account ", accountSummaryArea),
-                createFixedTab("Orders ", buildAccountPositionsTable()),
-                createFixedTab("History ", buildOrderHistoryTable()),
-                createFixedTab("Trades ", buildAccountTradesTable()),
-                createDetachableTerminalTab("Positions history", createPositionsTab().getContent()),
-                createDetachableTerminalTab("Signals ", createSignalTab().getContent()),
-                createDetachableTerminalTab("News ", createNewsTab().getContent()),
-                createDetachableTerminalTab("Alerts ", createAlertsTab().getContent()),
-                createDetachableTerminalTab("Mailbox ", createMailboxTab().getContent()),
-                createDetachableTerminalTab("Chat ", createChatTab().getContent()),
-                createDetachableTerminalTab("Browser ", createMarketTab().getContent()),
-                createDetachableTerminalTab("Agents ", createAgentsTab().getContent()),
-                createDetachableTerminalTab("Journal ", createJournalTab().getContent()));
+                createFixedTab("Account", accountSummaryArea),
+                createFixedTab("Trades", buildAccountTradesTable()),
+                createFixedTab("History", buildOrderHistoryTable()),
+                createDetachableTerminalTab("Positions", createPositionsTab().getContent()),
+                createDetachableTerminalTab("Risk Monitor", createPositionRiskMonitorTab().getContent()),
+                createDetachableTerminalTab("Signals", createSignalTab().getContent()),
+                createDetachableTerminalTab("News", createNewsTab().getContent()),
+                createDetachableTerminalTab("Alerts", createAlertsTab().getContent()),
+                createDetachableTerminalTab("Mailbox", createMailboxTab().getContent()),
+                createDetachableTerminalTab("Chat", createChatTab().getContent()),
+                createDetachableTerminalTab("Browser", createMarketTab().getContent()),
+                createDetachableTerminalTab("Agents", createAgentsTab().getContent()),
+                createDetachableTerminalTab("Journal", createJournalTab().getContent()));
 
         VBox console = new VBox(6, header, terminalTabPane);
         console.setPadding(new Insets(8));
         console.setPrefHeight(CONSOLE_HEIGHT);
         console.getStyleClass().addAll("system-console", "bottom-terminal");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
-
         return console;
     }
 
@@ -845,6 +855,7 @@ public class TradingWindow extends BorderPane {
         if (mainVerticalWorkbench == null || systemConsole == null) {
             return;
         }
+
         if (consoleVisible) {
             mainVerticalWorkbench.getItems().remove(systemConsole);
             consoleVisible = false;
@@ -855,6 +866,7 @@ public class TradingWindow extends BorderPane {
             mainVerticalWorkbench.setDividerPositions(0.68);
             consoleVisible = true;
         }
+
         mainVerticalWorkbench.layout();
         if (horizontalWorkbench != null) {
             horizontalWorkbench.layout();
@@ -867,6 +879,7 @@ public class TradingWindow extends BorderPane {
                 || !mainVerticalWorkbench.getItems().contains(systemConsole)) {
             return;
         }
+
         mainVerticalWorkbench.getItems().remove(systemConsole);
         consoleVisible = false;
         mainVerticalWorkbench.layout();
@@ -874,10 +887,12 @@ public class TradingWindow extends BorderPane {
         Stage stage = new Stage();
         stage.setTitle("InvestPro - System Console");
         stage.setScene(new Scene(systemConsole, 980, 540));
+
         if (getScene() != null && getScene().getWindow() != null) {
             stage.setX(getScene().getWindow().getX() + 100);
             stage.setY(getScene().getWindow().getY() + 100);
         }
+
         stage.setOnCloseRequest(event -> reattachConsole());
         stage.show();
         journal("Console detached.");
@@ -888,6 +903,7 @@ public class TradingWindow extends BorderPane {
         if (mainVerticalWorkbench == null || systemConsole == null) {
             return;
         }
+
         if (!mainVerticalWorkbench.getItems().contains(systemConsole)) {
             mainVerticalWorkbench.getItems().add(systemConsole);
         }
@@ -912,12 +928,16 @@ public class TradingWindow extends BorderPane {
     private Tab createPositionsTab() {
         Label title = new Label("Local Open Positions");
         title.getStyleClass().add("panel-title");
+
         Button refresh = new Button("Refresh");
         refresh.setOnAction(event -> refreshPositions());
+
         Button closeAll = new Button("Close All");
         closeAll.setOnAction(event -> closeAllPositions());
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
         HBox header = new HBox(8, title, spacer, refresh, closeAll);
         HBox pnl = new HBox(16, longPnLLabel, shortPnLLabel, totalPnLLabel);
         pnl.setPadding(new Insets(8));
@@ -929,10 +949,10 @@ public class TradingWindow extends BorderPane {
     }
 
     private @NotNull Tab createNewsTab() {
-        ListView<News> newsListView = new ListView<>();
-        List<News> newsData;
+        ListView<NewsEvent> newsListView = new ListView<>();
+        List<NewsEvent> newsData;
         try {
-            newsData = new NewsDataProvider().getNews();
+            newsData = new NewsDataProvider().getUpcomingNewsEvents();
         } catch (Exception exception) {
             logger.warn("Unable to load news.", exception);
             newsData = Collections.emptyList();
@@ -940,7 +960,7 @@ public class TradingWindow extends BorderPane {
         newsListView.setItems(FXCollections.observableArrayList(newsData));
         VBox content = new VBox(newsListView);
         VBox.setVgrow(newsListView, Priority.ALWAYS);
-        return createFixedTab("News", content);
+        return createFixedTab("News Events", content);
     }
 
     private @NotNull Tab createAlertsTab() {
@@ -972,12 +992,12 @@ public class TradingWindow extends BorderPane {
         sendButton.getStyleClass().add("send-button");
         sendButton.setPrefWidth(70);
 
-        ObservableList<String> chatMessages = FXCollections.observableArrayList();
-        chatMessages.add("Chat initialized - Ready to receive messages");
+        ObservableList<String> chatMessages = FXCollections
+                .observableArrayList("Chat initialized - Ready to receive messages");
         chatListView.setItems(chatMessages);
 
         sendButton.setOnAction(event -> {
-            String message = messageInput.getText().trim();
+            String message = safe(messageInput.getText());
             if (!message.isBlank()) {
                 chatMessages.add("[You]: %s".formatted(message));
                 chatListView.scrollTo(chatMessages.size() - 1);
@@ -985,7 +1005,6 @@ public class TradingWindow extends BorderPane {
                 messageInput.requestFocus();
             }
         });
-
         messageInput.setOnAction(event -> sendButton.fire());
 
         HBox.setHgrow(messageInput, Priority.ALWAYS);
@@ -994,39 +1013,41 @@ public class TradingWindow extends BorderPane {
         VBox content = new VBox(chatListView, inputArea);
         VBox.setVgrow(chatListView, Priority.ALWAYS);
         content.setStyle("-fx-background-color: #0f172a;");
-
         return createFixedTab("Chat", content);
     }
 
     private @NotNull Tab createMarketTab() {
-        WebView marketView = new WebView();
-        marketView.getEngine().load("https://www.google.com");
+        Label marketInfo = new Label(
+                "Market Information\n\nClick 'Open in Browser' to view market data in your default browser.");
+        marketInfo.setStyle("-fx-font-size: 14; -fx-text-fill: #64748b; -fx-padding: 20;");
+        marketInfo.setWrapText(true);
+
         TextField searchField = new TextField();
-        searchField.setPromptText("Search market information...");
+        searchField.setPromptText("Search market information (opens in browser)...");
+
         Button openBrowserButton = new Button("Open in Browser");
-        openBrowserButton.setOnAction(event -> {
+
+        openBrowserButton.setOnAction(_ -> {
             try {
-                String currentUrl = marketView.getEngine().getLocation();
-                if (currentUrl == null || currentUrl.isBlank()) {
-                    showInfo("Browser", "No page loaded yet.");
+                String query = safe(searchField.getText());
+                if (query.isBlank()) {
+                    openInSystemBrowser("https://www.google.com");
                 } else {
-                    openInSystemBrowser(currentUrl);
+                    openInSystemBrowser("https://www.google.com/search?q=%s".formatted(query.replace(" ", "+")));
                 }
             } catch (Exception exception) {
                 showWarning("Browser", "Could not open browser: %s".formatted(exception.getMessage()));
             }
         });
-        searchField.setOnAction(event -> {
-            String query = safe(searchField.getText());
-            if (!query.isBlank()) {
-                marketView.getEngine().load("https://www.google.com/search?q=%s".formatted(query.replace(" ", "+")));
-            }
-        });
+
+        searchField.setOnAction(event -> openBrowserButton.fire());
+
         HBox toolbar = new HBox(8, searchField, openBrowserButton);
         toolbar.setPadding(new Insets(8));
         HBox.setHgrow(searchField, Priority.ALWAYS);
-        VBox content = new VBox(6, toolbar, marketView);
-        VBox.setVgrow(marketView, Priority.ALWAYS);
+
+        VBox content = new VBox(6, toolbar, marketInfo);
+        VBox.setVgrow(marketInfo, Priority.ALWAYS);
         return createFixedTab("Market", content);
     }
 
@@ -1044,12 +1065,33 @@ public class TradingWindow extends BorderPane {
         return createFixedTab("Agents", content);
     }
 
-    private @NotNull Tab createExpertsTab() {
-        expertsListView.setItems(FXCollections.observableArrayList("Experts console ready.",
-                "Automations and execution notes will appear here."));
-        VBox content = new VBox(expertsListView);
-        VBox.setVgrow(expertsListView, Priority.ALWAYS);
-        return createFixedTab("Experts", content);
+    private @NotNull Tab createPositionRiskMonitorTab() {
+        positionHealthTable.setItems(positionHealthItems);
+        positionHealthTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        positionHealthTable.setPlaceholder(new Label("No position health data."));
+
+        TableColumn<PositionHealthScore, String> statusCol = tableColumn("Status",
+                score -> String.valueOf(score.getStatus()), 100);
+        TableColumn<PositionHealthScore, String> scoreCol = tableColumn("Health",
+                score -> number(score.getOverallScore()), 85);
+        TableColumn<PositionHealthScore, String> pnlCol = tableColumn("PnL", score -> number(score.getPnlScore()), 75);
+        TableColumn<PositionHealthScore, String> riskCol = tableColumn("Risk", score -> number(score.getRiskScore()),
+                75);
+        TableColumn<PositionHealthScore, String> technicalCol = tableColumn("Technical",
+                score -> number(score.getTechnicalScore()), 90);
+        TableColumn<PositionHealthScore, String> liquidityCol = tableColumn("Liquidity",
+                score -> number(score.getLiquidityScore()), 90);
+        TableColumn<PositionHealthScore, String> portfolioCol = tableColumn("Portfolio",
+                score -> number(score.getPortfolioScore()), 90);
+        TableColumn<PositionHealthScore, String> summaryCol = tableColumn("Summary", PositionHealthScore::getSummary,
+                320);
+
+        positionHealthTable.getColumns().setAll(statusCol, scoreCol, pnlCol, riskCol, technicalCol, liquidityCol,
+                portfolioCol, summaryCol);
+
+        VBox content = new VBox(positionHealthTable);
+        VBox.setVgrow(positionHealthTable, Priority.ALWAYS);
+        return createFixedTab("Risk Monitor", content);
     }
 
     private @NotNull Tab createJournalTab() {
@@ -1063,39 +1105,34 @@ public class TradingWindow extends BorderPane {
 
     private void configureMarketWatchTable() {
         configureMarketWatchTableView(marketWatchTable);
+        // Add selection listener to load order book when a symbol is selected
+        marketWatchTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                loadOrderBook(newVal);
+            }
+        });
     }
 
     private void configureMarketWatchTableView(TableView<TradePair> table) {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No symbols loaded"));
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-
         table.getColumns().setAll(
-                tableColumn("Symbol", pair -> pair == null ? "" : pair.toString('/'), 105),
-                tableColumn("Base", pair -> pair == null ? "" : pair.getBaseCode(), 70),
-                tableColumn("Quote", pair -> pair == null ? "" : pair.getCounterCode(), 70),
-                tableColumn("Bid", pair -> pair == null ? "" : marketPrice(pair.getBid()), 90),
-                tableColumn("Ask", pair -> pair == null ? "" : marketPrice(pair.getAsk()), 90),
-                tableColumn("Last", pair -> pair == null ? "" : marketPrice(pair.getLast()), 90),
+                tableColumn("Symbol", pair -> pair == null ? "" : pair.toString('/'), 110),
+                tableColumn("Price", pair -> pair == null ? "" : marketPrice(midPrice(pair)), 95),
+                tableColumn("Bid", pair -> pair == null ? "" : marketPrice(pair.getBid()), 95),
+                tableColumn("Ask", pair -> pair == null ? "" : marketPrice(pair.getAsk()), 95),
                 tableColumn("Spread", pair -> pair == null ? "" : marketPrice(pair.getSpread()), 80),
-                tableColumn("Volume", pair -> pair == null ? "" : compactMarketNumber(pair.getVolume()), 95),
                 tableColumn("Change %", pair -> pair == null ? "" : percent(pair.getChangePercent()), 85),
-                tableColumn("High 24h", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 90),
-                tableColumn("Low 24h", pair -> pair == null ? "" : marketPrice(pair.getLow24h()), 90),
-                tableColumn("Updated", pair -> pair == null ? "" : updatedAt(pair), 95));
+                tableColumn("Volume", pair -> pair == null ? "" : compactMarketNumber(pair.getVolume()), 95));
 
-        table.setRowFactory(_ -> {
+        table.setRowFactory(view -> {
             TableRow<TradePair> row = new TableRow<>() {
                 @Override
                 protected void updateItem(TradePair item, boolean empty) {
                     super.updateItem(item, empty);
-                    if (item != null && item.getChangePercent() != 0) {
-                        // Color code positive/negative changes
-                        if (item.getChangePercent() > 0) {
-                            setStyle("-fx-text-fill: #10b981;");
-                        } else if (item.getChangePercent() < 0) {
-                            setStyle("-fx-text-fill: #ef4444;");
-                        }
+                    if (!empty && item != null && item.getChangePercent() != 0) {
+                        setStyle(item.getChangePercent() > 0 ? "-fx-text-fill: #10b981;" : "-fx-text-fill: #ef4444;");
                     } else {
                         setStyle("");
                     }
@@ -1111,13 +1148,25 @@ public class TradingWindow extends BorderPane {
         });
     }
 
+    private double midPrice(TradePair pair) {
+        if (pair == null) {
+            return 0.0;
+        }
+        double bid = pair.getBid();
+        double ask = pair.getAsk();
+        if (bid > 0 && ask > 0) {
+            return (bid + ask) / 2.0;
+        }
+        return pair.getLast();
+    }
+
     private void detachMarketWatch() {
         TableView<TradePair> detachedTable = new TableView<>(marketWatchItems);
         configureMarketWatchTableView(detachedTable);
 
         Button openButton = new Button("Open");
         openButton.getStyleClass().add("terminal-button");
-        openButton.setOnAction(_ -> {
+        openButton.setOnAction(event -> {
             TradePair selected = detachedTable.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 symbolSelector.getSelectionModel().select(selected);
@@ -1127,7 +1176,7 @@ public class TradingWindow extends BorderPane {
 
         Button refreshButton = new Button("Refresh");
         refreshButton.getStyleClass().add("terminal-button");
-        refreshButton.setOnAction(_ -> loadSymbolsForSelectedExchange());
+        refreshButton.setOnAction(event -> loadSymbolsForSelectedExchange());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -1157,7 +1206,6 @@ public class TradingWindow extends BorderPane {
         positionsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         positionsTable.setPlaceholder(new Label("No open positions"));
         positionsTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-
         positionsTable.getColumns().setAll(
                 tableColumn("Symbol", order -> safe(order.getSymbol()), 90),
                 tableColumn("Type", order -> safe(order.getType()), 70),
@@ -1178,33 +1226,16 @@ public class TradingWindow extends BorderPane {
                         "-fx-padding: 10px; " +
                         "-fx-focus-color: transparent; " +
                         "-fx-faint-focus-color: transparent;");
-        accountSummaryArea.setText(
-                """
-                        ═════════════════════════════════════════════════
-                                        ACCOUNT SUMMARY
-                        ═════════════════════════════════════════════════
+        accountSummaryArea.setText("""
+                ═════════════════════════════════════════════════
+                                ACCOUNT SUMMARY
+                ═════════════════════════════════════════════════
 
-                        Waiting for connection...
-                        Select an exchange and click Connect to view account information.
+                Waiting for connection...
+                Select an exchange and click Connect to view account information.
 
-                        ═════════════════════════════════════════════════
-                        """);
-    }
-
-    private @NotNull TableView<Position> buildAccountPositionsTable() {
-        TableView<Position> table = new TableView<>(accountPositionItems);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.setPlaceholder(new Label("No broker positions"));
-        table.getColumns().setAll(
-                tableColumn("Symbol",
-                        position -> position.getTradePair() == null ? "" : position.getTradePair().getSymbol(), 110),
-                tableColumn("Side", position -> String.valueOf(position.getSide()), 80),
-                tableColumn("Units", position -> number(position.getQuantity()), 90),
-                tableColumn("Entry", position -> price(position.getEntryPrice()), 90),
-                tableColumn("Unrealized P/L", position -> money(position.getUnrealizedPnl()), 120),
-                tableColumn("Realized P/L", position -> money(position.getRealizedPnl()), 110),
-                tableColumn("Status", position -> position.isOpen() ? "OPEN" : "CLOSED", 80));
-        return table;
+                ═════════════════════════════════════════════════
+                """);
     }
 
     private @NotNull TableView<Trade> buildAccountTradesTable() {
@@ -1212,14 +1243,17 @@ public class TradingWindow extends BorderPane {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No account trades"));
         table.getColumns().setAll(
-                tableColumn("ID", trade -> String.valueOf(trade.getLocalTradeId()), 90),
+                tableColumn("Time", trade -> dateTime(trade.getTimestamp()), 140),
+                tableColumn("Type", trade -> String.valueOf(trade.getTransactionType()), 70),
+                tableColumn("Size", trade -> number(trade.getAmount()), 80),
                 tableColumn("Symbol", trade -> trade.getTradePair() == null ? "" : trade.getTradePair().getSymbol(),
-                        110),
-                tableColumn("Side", trade -> String.valueOf(trade.getTransactionType()), 70),
-                tableColumn("Amount", trade -> number(trade.getAmount()), 90),
+                        100),
                 tableColumn("Price", trade -> price(trade.getPrice()), 90),
-                tableColumn("Fee", trade -> money(trade.getFee()), 80),
-                tableColumn("Time", trade -> String.valueOf(trade.getTimestamp()), 160));
+                tableColumn("SL", trade -> formatPrice(trade.getStopLoss()), 80),
+                tableColumn("TP", trade -> formatPrice(trade.getTakeProfit()), 80),
+                tableColumn("Commission", trade -> money(trade.getFee()), 90),
+                tableColumn("Swap", trade -> money(trade.getSwap()), 80),
+                tableColumn("Profit", trade -> formatProfit(trade.getProfit()), 90));
         return table;
     }
 
@@ -1240,8 +1274,8 @@ public class TradingWindow extends BorderPane {
 
     private <T> @NotNull TableColumn<T, String> tableColumn(String title, Function<T, String> mapper, double width) {
         TableColumn<T, String> column = new TableColumn<>(title);
-        column.setCellValueFactory(
-                cell -> new ReadOnlyStringWrapper(cell.getValue() == null ? "" : safe(mapper.apply(cell.getValue()))));
+        column.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue() == null ? "" : safe(mapper.apply(cell.getValue()))));
         column.setPrefWidth(width);
         return column;
     }
@@ -1253,18 +1287,22 @@ public class TradingWindow extends BorderPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         statusBar.getChildren().setAll(
-                new Label("Status:"), connectionIndicator, connectionStatusLabel,
-
-                new Separator(Orientation.VERTICAL), symbolCountLabel,
-                spacer, new Label("Trading Console"));
+                new Label("Status:"),
+                connectionIndicator,
+                connectionStatusLabel,
+                new Separator(Orientation.VERTICAL),
+                symbolCountLabel,
+                spacer,
+                new Label("Trading Console"));
         return statusBar;
     }
 
     private void updateConnectionStatus() {
-        boolean connected = false;
+        boolean connected;
         try {
             connected = hasBrokerAccess();
         } catch (Exception exception) {
+            connected = false;
             logger.debug("Unable to determine connection status.", exception);
         }
         connectionIndicator.setFill(connected ? Color.LIMEGREEN : Color.ORANGERED);
@@ -1298,7 +1336,20 @@ public class TradingWindow extends BorderPane {
         return brokerAccessGranted && exchange != null && Boolean.TRUE.equals(exchange.isConnected());
     }
 
+    private boolean hasOrderSubmissionAccess() {
+        try {
+            return hasBrokerAccess() && exchange != null && exchange.canSubmitOrders();
+        } catch (Exception exception) {
+            logger.debug("Unable to check order submission access", exception);
+            return false;
+        }
+    }
+
     private boolean hasConfiguredCredentials() {
+        String selectedExchange = safe(exchangeSelector.getSelectionModel().getSelectedItem());
+        if ("OANDA".equalsIgnoreCase(selectedExchange)) {
+            return !safe(configuredApiKey).isBlank();
+        }
         return !safe(configuredApiKey).isBlank() && !safe(configuredApiSecret).isBlank();
     }
 
@@ -1310,44 +1361,53 @@ public class TradingWindow extends BorderPane {
         exchangeSelector.getItems().setAll(SUPPORTED_EXCHANGES);
         String configuredExchange = configuration == null ? preferences.get("selected_exchange", "")
                 : safe(configuration.exchange());
+
         if (!configuredExchange.isBlank() && exchangeSelector.getItems().contains(configuredExchange)) {
             exchangeSelector.getSelectionModel().select(configuredExchange);
         } else {
             exchangeSelector.getSelectionModel().selectFirst();
         }
 
-        exchangeSelector.setOnAction(_ -> onExchangeChanged());
+        exchangeSelector.setOnAction(event -> onExchangeChanged());
 
-        symbolSelector.setOnAction(_ -> {
+        symbolSelector.setOnAction(event -> {
             TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 marketWatchTable.getSelectionModel().select(selected);
                 loadOrderBook(selected);
+                updateManualTradePanelForSymbol(selected);
+                if (marketInfoPanel != null) {
+                    marketInfoPanel.updateForPair(selected);
+                }
                 saveAppState();
             }
         });
 
-        // Configure timeframe selector
+        configureOrderTypeSelector();
         configureTimeframeSelector();
     }
 
+    private void configureOrderTypeSelector() {
+        orderTypeSelector.getItems().setAll("MARKET", "LIMIT", "STOP", "BRACKET");
+        String savedOrderType = preferences.get("selected_order_type", "MARKET");
+        orderTypeSelector.getSelectionModel()
+                .select(orderTypeSelector.getItems().contains(savedOrderType) ? savedOrderType : "MARKET");
+        orderTypeSelector.setOnAction(event -> {
+            String selected = orderTypeSelector.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                preferences.put("selected_order_type", selected);
+                journal("Order type changed to: " + selected);
+            }
+        });
+        orderTypeSelector.setPrefWidth(100);
+    }
+
     private void configureTimeframeSelector() {
-        // Populate with standard timeframes
-        timeframeSelector.getItems().setAll(
-                "1m", "5m", "15m", "30m",
-                "1h", "2h", "4h",
-                "1d", "1w", "1M");
-
-        // Set default to 1h
+        timeframeSelector.getItems().setAll("1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1w", "1M");
         String savedTimeframe = preferences.get("selected_timeframe", "1h");
-        if (timeframeSelector.getItems().contains(savedTimeframe)) {
-            timeframeSelector.getSelectionModel().select(savedTimeframe);
-        } else {
-            timeframeSelector.getSelectionModel().select("1h");
-        }
-
-        // Handle timeframe change
-        timeframeSelector.setOnAction(_ -> {
+        timeframeSelector.getSelectionModel()
+                .select(timeframeSelector.getItems().contains(savedTimeframe) ? savedTimeframe : "1h");
+        timeframeSelector.setOnAction(event -> {
             String selected = timeframeSelector.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 preferences.put("selected_timeframe", selected);
@@ -1359,12 +1419,14 @@ public class TradingWindow extends BorderPane {
     }
 
     private void onTimeframeChanged(String timeframe) {
-        // Reload charts with new timeframe
         chartTabPane.getTabs().forEach(tab -> {
-            if (tab instanceof DraggableTab draggableTab
-                    && tab.getContent() instanceof CandleStickChartDisplay display) {
-                // Refresh the chart with new timeframe
-                journal("Reloading chart with timeframe: " + timeframe);
+            if (tab.getContent() instanceof ChartContainer container) {
+                Integer seconds = org.investpro.utils.CandleAggregator.TIMEFRAME_SECONDS.get(timeframe);
+                if (seconds != null && seconds > 0) {
+                    container.setSecondsPerCandle(seconds);
+                }
+            } else if (tab.getContent() instanceof CandleStickChart chart) {
+                chart.refreshChart();
             }
         });
     }
@@ -1382,19 +1444,21 @@ public class TradingWindow extends BorderPane {
         chartTabPane.setSide(Side.TOP);
         chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         chartTabPane.setMinHeight(0);
-
         DraggableTab.registerTabPane(chartTabPane);
     }
 
     private void createInitialExchange(MarketConfiguration configuration) {
         String selectedExchange = exchangeSelector.getSelectionModel().getSelectedItem();
+
         if (configuration == null && hasExchangeCredentials(selectedExchange)) {
             loadExchangeCredentials(selectedExchange);
         }
+
         exchange = createExchange(
                 selectedExchange,
                 configuration == null ? configuredApiKey : safe(configuration.apiKey()),
                 configuration == null ? configuredApiSecret : safe(configuration.apiSecret()));
+
         setTelegramToken(telegramToken);
         brokerAccessGranted = false;
         updateConnectionStatus();
@@ -1416,13 +1480,21 @@ public class TradingWindow extends BorderPane {
 
         stopActiveStreaming();
         brokerAccessGranted = false;
-        if (smartBot != null) {
-            smartBot.stop();
-            smartBot = null;
-            smartBotEventsSubscribed = false;
+
+        if (systemCore != null) {
+            try {
+                systemCore.stop();
+            } catch (Exception exception) {
+                logger.debug("Failed to stop SystemCore bot during exchange change", exception);
+            }
+            systemCore = null;
+            systemCoreEventsSubscribed = false;
         }
+
         disablePositionAutoRefresh();
+
         BrokerSession existingSession = brokerSessions.get(safe(selectedExchange));
+
         if (existingSession != null && existingSession.accessGranted()) {
             exchange = existingSession.exchange();
             brokerAccessGranted = true;
@@ -1436,12 +1508,16 @@ public class TradingWindow extends BorderPane {
             }
             exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret);
         }
+
         setTelegramToken(telegramToken);
+
         accountPositionItems.clear();
         accountOpenOrderItems.clear();
         accountTradeItems.clear();
         accountHistoryItems.clear();
+        positionHealthItems.clear();
         accountSummaryArea.clear();
+
         loadSymbolsForSelectedExchange();
         updateConnectionStatus();
         journal("Exchange changed to %s".formatted(selectedExchange));
@@ -1451,6 +1527,8 @@ public class TradingWindow extends BorderPane {
             if (existingSession != null && existingSession.account() != null) {
                 updateAccountSummary(existingSession.account());
             }
+            systemCore = createSystemCore(exchange);
+            systemCoreEventsSubscribed = false;
             enablePositionAutoRefresh(exchange, 5000);
             refreshAccountWorkspace();
         } else if (hasExchangeCredentials(selectedExchange)) {
@@ -1463,19 +1541,16 @@ public class TradingWindow extends BorderPane {
     private void connectSelectedExchange() {
         String selectedExchange = exchangeSelector.getSelectionModel().getSelectedItem();
 
-        if (selectedExchange == null) {
+        if (selectedExchange == null || selectedExchange.isBlank()) {
             showWarning("Connection", "No exchange selected.");
             return;
         }
 
-        // Check if credentials exist for this exchange
         if (!hasExchangeCredentials(selectedExchange)) {
-            // Prompt for credentials
             showExchangeCredentialDialog(selectedExchange);
             return;
         }
 
-        // Credentials exist, proceed with connection
         loadExchangeCredentials(selectedExchange);
         exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret);
         setTelegramToken(telegramToken);
@@ -1518,24 +1593,43 @@ public class TradingWindow extends BorderPane {
 
         brokerAccessGranted = true;
         brokerSessions.put(safe(exchangeSelector.getValue()), new BrokerSession(exchange, true, account));
+
+        systemCore = createSystemCore(exchange);
+        systemCoreEventsSubscribed = false;
+
         connectButton.setDisable(false);
         journal("Credentials validated for %s".formatted(exchangeSelector.getValue()));
+
         updateAccountSummary(account);
         updateAccountBalance();
         publishConnectionSignal();
         enablePositionAutoRefresh(exchange, 5000);
         refreshAccountWorkspace();
+
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
         if (selected != null) {
             loadOrderBook(selected);
         }
+
         updateConnectionStatus();
     }
 
     private void rejectConnectionValidation(Throwable throwable) {
         brokerAccessGranted = false;
         brokerSessions.remove(safe(exchangeSelector.getValue()));
+
+        if (systemCore != null) {
+            try {
+                systemCore.stop();
+            } catch (Exception exception) {
+                logger.debug("Failed to stop SystemCore after validation failure", exception);
+            }
+            systemCore = null;
+            systemCoreEventsSubscribed = false;
+        }
+
         connectButton.setDisable(false);
+
         try {
             if (exchange != null) {
                 exchange.stopAllStreams();
@@ -1545,11 +1639,15 @@ public class TradingWindow extends BorderPane {
         } catch (Exception exception) {
             logger.debug("Failed to disconnect after credential validation failure", exception);
         }
+
         accountSummaryArea.setText("Broker access blocked. Check credentials and try again.");
         updateConnectionStatus();
+
         logger.warn("Broker credential validation failed for {}", exchangeSelector.getValue(), throwable);
-        showWarning("Connection Failed", "Broker credentials were rejected for %s: %s"
-                .formatted(exchangeSelector.getValue(), rootMessage(throwable)));
+        showWarning(
+                "Connection Failed",
+                "Broker credentials were rejected for %s: %s".formatted(exchangeSelector.getValue(),
+                        rootMessage(throwable)));
     }
 
     private void submitMarketOrder(org.investpro.utils.Side side) {
@@ -1557,15 +1655,30 @@ public class TradingWindow extends BorderPane {
             showWarning("Order", "Connect to an exchange before submitting orders.");
             return;
         }
+
+        if (!hasOrderSubmissionAccess()) {
+            showWarning("Order", "%s is connected, but this adapter is not ready for order submission."
+                    .formatted(exchange.getDisplayName()));
+            return;
+        }
+
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
         if (selected == null) {
             showWarning("Order", "Select a symbol before submitting an order.");
             return;
         }
+
+        String orderType = orderTypeSelector.getSelectionModel().getSelectedItem();
+        if (orderType == null || orderType.isBlank()) {
+            showWarning("Order", "Select an order type before submitting an order.");
+            return;
+        }
+
         TextInputDialog dialog = new TextInputDialog("1");
-        dialog.setTitle("%s Market Order".formatted(side));
+        dialog.setTitle("%s %s Order".formatted(side, orderType));
         dialog.setHeaderText("%s %s".formatted(side, selected.toString('/')));
         dialog.setContentText("Amount:");
+
         dialog.showAndWait().ifPresent(amountText -> {
             double amount;
             try {
@@ -1578,10 +1691,57 @@ public class TradingWindow extends BorderPane {
                 showWarning("Order", "Amount must be greater than zero.");
                 return;
             }
-            exchange.createMarketOrder(selected, side, amount)
+
+            submitOrderByType(orderType, selected, side, amount);
+        });
+    }
+
+    private void submitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
+            double amount) {
+        switch (orderType) {
+            case "MARKET" -> submitMarketOrderInternal(tradePair, side, amount);
+            case "LIMIT" -> showLimitOrderDialog(tradePair, side, amount);
+            case "STOP" -> showStopOrderDialog(tradePair, side, amount);
+            case "BRACKET" -> showBracketOrderDialog(tradePair, side, amount);
+            default -> showWarning("Order", "Unknown order type: " + orderType);
+        }
+    }
+
+    private void submitMarketOrderInternal(TradePair tradePair, org.investpro.utils.Side side, double amount) {
+        exchange.createMarketOrder(tradePair, side, amount)
+                .thenAccept(orderId -> runOnFx(() -> {
+                    journal("%s market order submitted for %s: %s".formatted(side, tradePair.toString('/'), orderId));
+                    refreshAccountWorkspace();
+                }))
+                .exceptionally(exception -> {
+                    runOnFx(() -> showWarning("Order Failed", "Order failed: %s".formatted(rootMessage(exception))));
+                    return null;
+                });
+    }
+
+    private void showLimitOrderDialog(TradePair tradePair, org.investpro.utils.Side side, double amount) {
+        TextInputDialog priceDialog = new TextInputDialog("0.00");
+        priceDialog.setTitle("Limit Order Price");
+        priceDialog.setHeaderText("Enter limit price for %s %s".formatted(side, tradePair.toString('/')));
+        priceDialog.setContentText("Price:");
+
+        priceDialog.showAndWait().ifPresent(priceText -> {
+            double price;
+            try {
+                price = Double.parseDouble(priceText.trim());
+            } catch (NumberFormatException exception) {
+                showWarning("Order", "Price must be a number.");
+                return;
+            }
+            if (price <= 0) {
+                showWarning("Order", "Price must be greater than zero.");
+                return;
+            }
+
+            exchange.createLimitOrder(tradePair, side, amount, price)
                     .thenAccept(orderId -> runOnFx(() -> {
-                        journal("%s market order submitted for %s: %s".formatted(side, selected.toString('/'),
-                                orderId));
+                        journal("%s limit order submitted for %s at $%.2f: %s".formatted(side, tradePair.toString('/'),
+                                price, orderId));
                         refreshAccountWorkspace();
                     }))
                     .exceptionally(exception -> {
@@ -1592,13 +1752,106 @@ public class TradingWindow extends BorderPane {
         });
     }
 
+    private void showStopOrderDialog(TradePair tradePair, org.investpro.utils.Side side, double amount) {
+        TextInputDialog stopDialog = new TextInputDialog("0.00");
+        stopDialog.setTitle("Stop Order Price");
+        stopDialog.setHeaderText("Enter stop price for %s %s".formatted(side, tradePair.toString('/')));
+        stopDialog.setContentText("Stop Price:");
+
+        stopDialog.showAndWait().ifPresent(stopText -> {
+            double stopPrice;
+            try {
+                stopPrice = Double.parseDouble(stopText.trim());
+            } catch (NumberFormatException exception) {
+                showWarning("Order", "Stop price must be a number.");
+                return;
+            }
+            if (stopPrice <= 0) {
+                showWarning("Order", "Stop price must be greater than zero.");
+                return;
+            }
+
+            exchange.createStopOrder(tradePair, side, amount, stopPrice)
+                    .thenAccept(orderId -> runOnFx(() -> {
+                        journal("%s stop order submitted for %s at $%.2f: %s".formatted(side, tradePair.toString('/'),
+                                stopPrice, orderId));
+                        refreshAccountWorkspace();
+                    }))
+                    .exceptionally(exception -> {
+                        runOnFx(() -> showWarning("Order Failed",
+                                "Order failed: %s".formatted(rootMessage(exception))));
+                        return null;
+                    });
+        });
+    }
+
+    private void showBracketOrderDialog(TradePair tradePair, org.investpro.utils.Side side, double amount) {
+        TextInputDialog takeProfitDialog = new TextInputDialog("0.00");
+        takeProfitDialog.setTitle("Bracket Order - Take Profit");
+        takeProfitDialog.setHeaderText("Enter take profit price for %s %s".formatted(side, tradePair.toString('/')));
+        takeProfitDialog.setContentText("Take Profit Price:");
+
+        takeProfitDialog.showAndWait().ifPresent(takeProfitText -> {
+            double takeProfitPrice;
+            try {
+                takeProfitPrice = Double.parseDouble(takeProfitText.trim());
+            } catch (NumberFormatException exception) {
+                showWarning("Order", "Take profit price must be a number.");
+                return;
+            }
+            if (takeProfitPrice <= 0) {
+                showWarning("Order", "Take profit price must be greater than zero.");
+                return;
+            }
+
+            TextInputDialog stopLossDialog = new TextInputDialog("0.00");
+            stopLossDialog.setTitle("Bracket Order - Stop Loss");
+            stopLossDialog.setHeaderText("Enter stop loss price for %s %s".formatted(side, tradePair.toString('/')));
+            stopLossDialog.setContentText("Stop Loss Price:");
+
+            stopLossDialog.showAndWait().ifPresent(stopLossText -> {
+                double stopLossPrice;
+                try {
+                    stopLossPrice = Double.parseDouble(stopLossText.trim());
+                } catch (NumberFormatException exception) {
+                    showWarning("Order", "Stop loss price must be a number.");
+                    return;
+                }
+                if (stopLossPrice <= 0) {
+                    showWarning("Order", "Stop loss price must be greater than zero.");
+                    return;
+                }
+
+                // Use current market price as entry price
+                double entryPrice = midPrice(tradePair);
+                if (entryPrice <= 0) {
+                    showWarning("Order", "Cannot determine current market price for bracket order.");
+                    return;
+                }
+
+                exchange.createBracketOrder(tradePair, side, amount, entryPrice, stopLossPrice, takeProfitPrice)
+                        .thenAccept(orderId -> runOnFx(() -> {
+                            journal("%s bracket order submitted for %s - Entry: $%.2f, TP: $%.2f, SL: $%.2f: %s"
+                                    .formatted(side, tradePair.toString('/'), entryPrice, takeProfitPrice,
+                                            stopLossPrice, orderId));
+                            refreshAccountWorkspace();
+                        }))
+                        .exceptionally(exception -> {
+                            runOnFx(() -> showWarning("Order Failed",
+                                    "Order failed: %s".formatted(rootMessage(exception))));
+                            return null;
+                        });
+            });
+        });
+    }
+
     private void loadOrderBook(TradePair tradePair) {
-        if (!hasBrokerAccess()) {
+        if (!hasBrokerAccess() || exchange == null || tradePair == null) {
             return;
         }
 
-        // Fetch orderbook asynchronously
-        exchange.fetchOrderBook(tradePair).thenAccept(orderBook -> Platform.runLater(() -> displayOrderBook(orderBook)))
+        exchange.fetchOrderBook(tradePair)
+                .thenAccept(this::displayOrderBook)
                 .exceptionally(exception -> {
                     logger.debug("Failed to fetch orderbook for %s".formatted(tradePair), exception);
                     return null;
@@ -1606,71 +1859,99 @@ public class TradingWindow extends BorderPane {
     }
 
     private void displayOrderBook(OrderBook orderBook) {
-        if (orderBook == null) {
-            orderBookBids.clear();
-            orderBookAsks.clear();
-            currentOrderBook = null;
-            return;
-        }
+        runOnFx(() -> {
+            if (orderBook == null) {
+                orderBookBids.clear();
+                orderBookAsks.clear();
+                currentOrderBook = new OrderBook();
+                if (depthChart != null) {
+                    depthChart.update(currentOrderBook);
+                }
+                return;
+            }
 
-        currentOrderBook = orderBook;
+            currentOrderBook = orderBook;
+            orderBookBids.setAll(orderBook.getBids() == null ? List.of() : orderBook.getBids());
+            orderBookAsks.setAll(orderBook.getAsks() == null ? List.of() : orderBook.getAsks());
 
-        // Update bids (reverse order - highest first)
-        Platform.runLater(() -> {
-            orderBookBids.setAll(orderBook.getBids());
-            orderBookAsks.setAll(orderBook.getAsks());
+            if (depthChart != null) {
+                depthChart.update(orderBook);
+            }
         });
     }
 
-    private void toggleBotTrading() {
-        if (botTradingEnabled) {
-            botTradingEnabled = false;
-            if (smartBot != null) {
-                smartBot.setAutoTradingEnabled(false);
-                smartBot.stopStreaming();
+    private void updateManualTradePanelForSymbol(TradePair selectedPair) {
+        if (selectedPair == null || exchange == null) {
+            return;
+        }
+
+        // Create or update manual trade panel for the selected pair
+        manualTradePanel = new ManualTradePanel(exchange, selectedPair, this::refreshAccountWorkspace,
+                notificationService);
+
+        // Update the Manual Trade tab in navigator
+        TabPane navigatorTabs = null;
+        for (var node : this.getChildren()) {
+            if (node instanceof TabPane && node.getStyleClass().contains("compact-tabs")) {
+                navigatorTabs = (TabPane) node;
+                break;
             }
-            withActiveChart(chart -> chart.setAutoTradeEnabled(false));
-            appendAgentActivity("SmartBot auto trading disabled.");
-            refreshBotTradeButton();
-            saveAppState();
-            return;
         }
 
-        if (!hasBrokerAccess()) {
-            showWarning("Bot Trading", "Validate broker credentials before starting the bot.");
-            return;
-        }
-
-        List<TradePair> symbols = selectedBotSymbols();
-        if (symbols.isEmpty()) {
-            showWarning("Bot Trading", "No symbols are available for the selected bot scope.");
-            return;
-        }
-
-        try {
-            ensureSmartBotStarted(symbols.get(0));
-            smartBot.setAutoTradingEnabled(true);
-            smartBot.startStreaming(symbols, SmartBot.StreamingMode.EVERYTHING);
-            withActiveChart(chart -> chart.setAutoTradeEnabled(true));
-            botTradingEnabled = true;
-            appendAgentActivity("SmartBot enabled for %d symbol(s) using %s.".formatted(symbols.size(),
-                    botSymbolScopeSelector.getValue()));
-            refreshBotTradeButton();
-            saveAppState();
-        } catch (Exception exception) {
-            logger.error("Failed to toggle bot trading", exception);
-            showWarning("Bot Trading", "Could not start bot trading: %s".formatted(rootMessage(exception)));
+        if (navigatorTabs != null) {
+            for (Tab tab : navigatorTabs.getTabs()) {
+                if ("Manual Trade".equals(tab.getText())) {
+                    tab.setContent(manualTradePanel);
+                    break;
+                }
+            }
         }
     }
 
-    private void ensureSmartBotStarted(TradePair selectedPair) {
-        if (smartBot == null || !smartBot.isStarted()) {
-            smartBot = new SmartBot();
-            smartBot.start(exchange, tradingService, selectedPair, telegramToken);
+    private SystemCore createSystemCore(Exchange exchange) {
+        if (exchange == null) {
+            throw new IllegalArgumentException("exchange cannot be null");
         }
-        if (!smartBotEventsSubscribed) {
-            smartBot.getEventBus().subscribeAll(this::displayAgentEvent);
-            smartBotEventsSubscribed = true;
+
+        Properties config = new Properties();
+        config.setProperty("telegram_token", safe(telegramToken));
+
+        String openAiKey = safe(System.getenv("OPENAI_API_KEY"));
+        if (!openAiKey.isBlank()) {
+            config.setProperty("ai.provider", "openai");
+            config.setProperty("openai.api_key", openAiKey);
+        } else {
+            config.setProperty("ai.provider", "local");
+        }
+
+        return new SystemCore(exchange, config);
+    }
+
+    private void ensureSystemCoreStarted(TradePair selectedPair) {
+        if (exchange == null) {
+            throw new IllegalStateException("Exchange is not initialized.");
+        }
+        if (selectedPair == null) {
+            throw new IllegalArgumentException("selectedPair cannot be null.");
+        }
+
+        boolean coreMissing = systemCore == null;
+        boolean botMissing = !coreMissing && systemCore.getSmartBot() == null;
+        boolean botNotStarted = !coreMissing && systemCore.getSmartBot() != null
+                && !systemCore.getSmartBot().isStarted();
+
+        if (coreMissing || botMissing || botNotStarted) {
+            systemCore = createSystemCore(exchange);
+            systemCore.start(tradingService, selectedPair);
+            systemCore.getSmartBot().setSelectedTradePair(selectedPair);
+
+            systemCore.getSmartBot().setAiReasoningEnabled(true);
+            systemCoreEventsSubscribed = false;
+        }
+
+        if (!systemCoreEventsSubscribed) {
+            systemCore.getSmartBot().getEventBus().subscribeAll(this::displayAgentEvent);
+            systemCoreEventsSubscribed = true;
         }
     }
 
@@ -1723,8 +2004,7 @@ public class TradingWindow extends BorderPane {
 
     private String formatAgentEvent(AgentEvent event) {
         return "[%s] %s | %s | %s".formatted(
-                DateTimeFormatter.ofPattern("HH:mm:ss")
-                        .format(event.timestamp().atZone(java.time.ZoneId.systemDefault())),
+                DateTimeFormatter.ofPattern("HH:mm:ss").format(event.timestamp().atZone(ZoneId.systemDefault())),
                 event.type(),
                 event.source(),
                 event.payload() == null ? "" : event.payload().toString());
@@ -1734,7 +2014,7 @@ public class TradingWindow extends BorderPane {
         if (event.payload() instanceof Signal signal) {
             return "[%s] %s %s confidence %.0f%% via %s".formatted(
                     DateTimeFormatter.ofPattern("HH:mm:ss")
-                            .format(signal.getTimestamp().atZone(java.time.ZoneId.systemDefault())),
+                            .format(signal.getTimestamp().atZone(ZoneId.systemDefault())),
                     signal.getTradePair() == null ? "-" : signal.getTradePair().toString('/'),
                     signal.getSide(),
                     signal.getConfidence() * 100.0,
@@ -1744,12 +2024,15 @@ public class TradingWindow extends BorderPane {
     }
 
     private void appendAgentActivity(String message) {
-        runOnFx(() -> appendBounded(agentActivityItems, "[%s] %s".formatted(
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
-                safe(message)), 300));
+        runOnFx(() -> appendBounded(agentActivityItems,
+                "[%s] %s".formatted(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), safe(message)),
+                300));
     }
 
     private void appendBounded(ObservableList<String> items, String value, int maxItems) {
+        if (items == null || value == null) {
+            return;
+        }
         if (items.size() == 1 && items.get(0).contains("will appear here")) {
             items.clear();
         }
@@ -1788,17 +2071,23 @@ public class TradingWindow extends BorderPane {
         if (chart != null) {
             chart.setAutoTradeEnabled(false);
         }
+
         botTradingEnabled = false;
-        if (smartBot != null) {
+
+        if (systemCore != null) {
             try {
-                smartBot.stopStreaming();
-                if (smartBot.isAutoTradingEnabled()) {
-                    smartBot.setAutoTradingEnabled(false);
+                systemCore.stopStreaming();
+                if (systemCore.getSmartBot() != null
+                        && systemCore.getSmartBot().isStarted()
+                        && systemCore.getSmartBot().isAutoTradingEnabled()) {
+                    systemCore.setAutoTradingEnabled(false);
+
                 }
             } catch (Exception exception) {
-                logger.debug("Failed to stop SmartBot streaming", exception);
+                logger.debug("Failed to stop SystemCore streaming", exception);
             }
         }
+
         refreshBotTradeButton();
         saveAppState();
     }
@@ -1806,10 +2095,12 @@ public class TradingWindow extends BorderPane {
     private void loadSymbolsForSelectedExchange() {
         marketWatchItems.clear();
         symbolSelector.getItems().clear();
+
         if (exchange == null) {
             updateConnectionStatus();
             return;
         }
+
         List<TradePair> tradePairs;
         try {
             tradePairs = exchange.getTradePairSymbol();
@@ -1819,923 +2110,571 @@ public class TradingWindow extends BorderPane {
             showWarning("API Error", "Failed to load live trade pairs from %s: %s. Showing default symbols."
                     .formatted(exchangeSelector.getValue(), rootMessage(exception)));
         }
+
         if (tradePairs == null || tradePairs.isEmpty()) {
             tradePairs = fallbackMarketWatchPairs();
         }
+
         if (tradePairs.isEmpty()) {
             showWarning("No Symbols",
                     "Unable to fetch or build trade pairs for %s.".formatted(exchangeSelector.getValue()));
             updateConnectionStatus();
             return;
         }
+
         marketWatchItems.setAll(tradePairs);
         symbolSelector.getItems().setAll(tradePairs);
+
         String rememberedSymbol = preferences.get("selected_symbol_" + safe(exchangeSelector.getValue()), "");
         TradePair rememberedPair = tradePairs.stream()
                 .filter(pair -> Objects.equals(pair.toString('/'), rememberedSymbol))
                 .findFirst()
                 .orElse(null);
-        if (rememberedPair != null) {
-            symbolSelector.getSelectionModel().select(rememberedPair);
-            marketWatchTable.getSelectionModel().select(rememberedPair);
-        } else {
-            symbolSelector.getSelectionModel().selectFirst();
-        }
-        journal("Loaded %d symbols from %s".formatted(tradePairs.size(), exchangeSelector.getValue()));
+
+        TradePair selected = rememberedPair != null ? rememberedPair : tradePairs.getFirst();
+        symbolSelector.getSelectionModel().select(selected);
+        marketWatchTable.getSelectionModel().select(selected);
+        symbolCountLabel.setText("Symbols: %d".formatted(tradePairs.size()));
+
         updateConnectionStatus();
-        hydrateMarketWatchTickers();
-        saveAppState();
+
     }
 
     private List<TradePair> fallbackMarketWatchPairs() {
-        String[][] defaults = {
-                { "BTC", "USD" },
-                { "ETH", "USD" },
-                { "SOL", "USD" },
-                { "XRP", "USD" },
-                { "ADA", "USD" },
-                { "DOGE", "USD" },
-                { "BTC", "USDT" },
-                { "ETH", "USDT" },
-                { "BNB", "USDT" },
-                { "EUR", "USD" }
-        };
-
-        List<TradePair> pairs = new ArrayList<>();
-        for (String[] symbol : defaults) {
-            try {
-                pairs.add(new TradePair(
-                        new CryptoCurrency(symbol[0], symbol[0], symbol[0], 8, symbol[0], symbol[0]),
-                        new CryptoCurrency(symbol[1], symbol[1], symbol[1], 8, symbol[1], symbol[1])));
-            } catch (Exception exception) {
-                logger.debug("Skipping fallback market-watch pair {}/{}", symbol[0], symbol[1], exception);
-            }
+        try {
+            List<TradePair> pairs = new ArrayList<>();
+            pairs.add(new TradePair("BTC", "USD"));
+            pairs.add(new TradePair("ETH", "USD"));
+            pairs.add(new TradePair("SOL", "USD"));
+            pairs.add(new TradePair("EUR", "USD"));
+            pairs.add(new TradePair("AAPL", "USD"));
+            return pairs;
+        } catch (Exception exception) {
+            logger.debug("Unable to build fallback pairs", exception);
+            return List.of();
         }
-
-        return pairs;
     }
 
     private void openInitialChartIfAvailable() {
-        if (!symbolSelector.getItems().isEmpty()) {
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        if (selected != null) {
             openSelectedSymbolChart();
         }
     }
 
-    private void refreshPositions() {
-        if (!hasBrokerAccess()) {
-            showInfo("Info", "Validate broker credentials before loading positions.");
-            return;
-        }
-
-        // Fetch all positions including both open and closed
-        exchange.fetchOrderHistory(null, null)
-                .thenAccept(allOrders -> runOnFx(() -> {
-                    if (allOrders != null) {
-                        positionsItems.setAll(allOrders);
-                        calculatePnL(positionsItems);
-                        journal("Loaded %d total positions (open and closed).".formatted(positionsItems.size()));
-                    } else {
-                        positionsItems.clear();
-                        journal("No positions found.");
-                    }
-                }))
-                .exceptionally(exception -> {
-                    logger.error("Failed to load all positions", exception);
-                    runOnFx(() -> showWarning("Positions",
-                            "Failed to load positions: %s".formatted(rootMessage(exception))));
-                    return null;
-                });
-    }
-
-    private void closeAllPositions() {
-        if (!hasBrokerAccess()) {
-            showInfo("Info", "Validate broker credentials before closing positions.");
-            return;
-        }
-        exchange.closeAllPositions()
-                .thenAccept(result -> runOnFx(() -> {
-                    journal("Close-all positions submitted: " + result);
-                    refreshPositions();
-                    refreshAccountWorkspace();
-                }))
-                .exceptionally(exception -> {
-                    runOnFx(() -> showWarning("Close All", "Close-all failed: %s".formatted(rootMessage(exception))));
-                    return null;
-                });
-    }
-
-    private void refreshAccountWorkspace() {
-        if (!hasBrokerAccess()) {
-            showInfo("Info", "Validate broker credentials before opening account data.");
-            return;
-        }
-        TradePair selectedPair = symbolSelector.getSelectionModel().getSelectedItem();
-        accountSummaryArea.setText("Loading account data...");
-        journal("Refreshing broker account tabs.");
-        updateAccountBalance();
-
-        exchange.fetchAccount()
-                .thenAccept(summary -> runOnFx(() ->
-
-                accountSummaryArea.setText(
-                        summary.summary())
-
-                ))
-                .exceptionally(exception -> {
-                    runOnFx(() -> accountSummaryArea
-                            .setText("Account summary failed: %s".formatted(rootMessage(exception))));
-                    return null;
-                });
-
-        exchange.fetchAllPositions()
-                .thenAccept(this::updatePositionsFromStream)
-                .exceptionally(exception -> {
-                    logger.warn("Broker positions refresh failed", exception);
-                    runOnFx(() -> journal("Broker positions refresh failed: %s".formatted(rootMessage(exception))));
-                    return null;
-                });
-
-        exchange.fetchAllOpenOrders()
-                .thenAccept(openOrders -> runOnFx(() -> {
-                    accountOpenOrderItems.setAll(openOrders == null ? Collections.emptyList() : openOrders);
-                    journal("Loaded %d broker open orders.".formatted(accountOpenOrderItems.size()));
-                }))
-                .exceptionally(exception -> {
-                    logger.warn("Broker open orders refresh failed", exception);
-                    runOnFx(() -> journal("Broker open orders refresh failed: %s".formatted(rootMessage(exception))));
-                    return null;
-                });
-
-        // Load all order history (not specific to a trading pair)
-        exchange.fetchOrderHistory(null, null)
-                .thenAccept(history -> runOnFx(() -> {
-                    accountHistoryItems.setAll(history == null ? Collections.emptyList() : history);
-                    journal("Loaded %d order history items.".formatted(accountHistoryItems.size()));
-                }))
-                .exceptionally(exception -> {
-                    logger.warn("Account history refresh failed", exception);
-                    runOnFx(() -> journal("Account history refresh failed: %s".formatted(rootMessage(exception))));
-                    return null;
-                });
-
-        if (selectedPair != null) {
-            exchange.fetchAccountTrades(selectedPair)
-                    .thenAccept(trades -> runOnFx(() -> {
-                        accountTradeItems.setAll(trades == null ? Collections.emptyList() : trades);
-                        journal("Loaded %d account trades.".formatted(accountTradeItems.size()));
-                    }))
-                    .exceptionally(exception -> {
-                        logger.warn("Account trades refresh failed", exception);
-                        runOnFx(() -> journal("Account trades refresh failed: %s".formatted(rootMessage(exception))));
-                        return null;
-                    });
-        }
-    }
-
-    private void calculatePnL(List<Order> positions) {
-        double longPnL = 0.0;
-        double shortPnL = 0.0;
-        if (positions != null) {
-            for (Order position : positions) {
-                if (position == null) {
-                    continue;
-                }
-                if ("BUY".equalsIgnoreCase(position.getType())) {
-                    longPnL += position.getProfit();
-                } else if ("SELL".equalsIgnoreCase(position.getType())) {
-                    shortPnL += position.getProfit();
-                }
-            }
-        }
-        updatePnLLabels(longPnL, shortPnL);
-    }
-
-    private void calculateBrokerPnL(List<Position> positions) {
-        double longPnL = 0.0;
-        double shortPnL = 0.0;
-        if (positions != null) {
-            for (Position position : positions) {
-                if (position == null) {
-                    continue;
-                }
-                double pnl = position.getUnrealizedPnl() + position.getRealizedPnl();
-                String side = String.valueOf(position.getSide());
-                if ("BUY".equalsIgnoreCase(side) || "LONG".equalsIgnoreCase(side)) {
-                    longPnL += pnl;
-                } else if ("SELL".equalsIgnoreCase(side) || "SHORT".equalsIgnoreCase(side)) {
-                    shortPnL += pnl;
-                }
-            }
-        }
-        updatePnLLabels(longPnL, shortPnL);
-    }
-
-    private void updatePnLLabels(double longPnL, double shortPnL) {
-        double totalPnL = longPnL + shortPnL;
-        longPnLLabel.setText("Long P&L: $" + money(longPnL));
-        shortPnLLabel.setText("Short P&L: $" + money(shortPnL));
-        totalPnLLabel.setText("Total P&L: $" + money(totalPnL));
-        longPnLLabel.setStyle(longPnL >= 0 ? greenStyle() : redStyle());
-        shortPnLLabel.setStyle(shortPnL >= 0 ? greenStyle() : redStyle());
-        totalPnLLabel.setStyle(totalPnL >= 0 ? greenStyle() : redStyle());
-    }
-
-    private String greenStyle() {
-        return "-fx-text-fill: #22c55e; -fx-font-weight: bold;";
-    }
-
-    private String redStyle() {
-        return "-fx-text-fill: #ef4444; -fx-font-weight: bold;";
-    }
-
     private void openSelectedFromMarketWatch() {
         TradePair selected = marketWatchTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            showWarning("No Symbol Selected", "Please select a symbol from Market Watch.");
-            return;
+        if (selected != null) {
+            symbolSelector.getSelectionModel().select(selected);
+            openSelectedSymbolChart();
         }
-        symbolSelector.getSelectionModel().select(selected);
-        openSelectedSymbolChart();
     }
 
     private void openSelectedSymbolChart() {
-        TradePair symbol = symbolSelector.getSelectionModel().getSelectedItem();
-        if (symbol == null) {
-            showWarning("No Symbol Selected", "Please select a trade pair first.");
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showWarning("Chart", "Select a symbol before opening a chart.");
             return;
         }
         if (exchange == null) {
-            showWarning("No Exchange", "Please select an exchange first.");
+            showWarning("Chart", "No exchange is available.");
             return;
         }
-        String tabTitle = exchangeSelector.getValue() + " - " + symbol.toString('/');
+
+        String title = selected.toString('/');
+
         for (Tab tab : chartTabPane.getTabs()) {
-            String existingTitle = tab instanceof DraggableTab draggableTab ? draggableTab.getTitle() : tab.getText();
-            if (Objects.equals(existingTitle, tabTitle)) {
+            if (Objects.equals(tab.getText(), title)) {
                 chartTabPane.getSelectionModel().select(tab);
                 return;
             }
         }
-        CandleStickChartDisplay chartDisplay = new CandleStickChartDisplay(symbol, exchange, telegramToken,
-                tradingService);
 
-        // Configure chart for live data display with visible axes
-        CandleStickChart chart = chartDisplay.getChart();
-        if (chart != null) {
-            // Fit chart to display all data
-            chart.fitChart();
-            // Jump to latest candle
-            chart.jumpToLatestCandle();
-            // Apply adaptive scaling for better visualization
-            chart.applyAdaptiveScaling();
+        ChartContainer container = new ChartContainer(exchange, selected, true, telegramToken, tradingService);
+        container.setOnChartError(this::journal);
+        container.setOnAutoTradeAction(() -> startBotFromChart(selected, container));
+
+        Tab tab = createDetachableTerminalTab(title, container);
+        tab.setOnClosed(_ -> container.dispose());
+        chartTabPane.getTabs().add(tab);
+        chartTabPane.getSelectionModel().select(tab);
+        saveAppState();
+    }
+
+    private void startBotFromChart(TradePair selected, ChartContainer container) {
+        symbolSelector.getSelectionModel().select(selected);
+
+        try {
+            if (!hasBrokerAccess()) {
+                showWarning("Bot Trading", "Validate broker credentials before starting the bot.");
+                return;
+            }
+            if (!hasOrderSubmissionAccess()) {
+                showWarning("Bot Trading",
+                        "%s is connected, but this adapter cannot submit orders.".formatted(exchange.getDisplayName()));
+                return;
+            }
+
+            ensureSystemCoreStarted(selected);
+            systemCore.setAutoTradingEnabled(true);
+            systemCore.startStreaming(selected, SystemCore.StreamingMode.EVERYTHING);
+
+            CandleStickChart chart = container.getChart();
+            if (chart != null) {
+                chart.setAutoTradeEnabled(true);
+            }
+
+            botTradingEnabled = true;
+            appendAgentActivity("SystemCore bot enabled from chart toolbar for " + selected.toString('/'));
+            refreshBotTradeButton();
+            saveAppState();
+        } catch (Exception exception) {
+            logger.error("Failed to start chart auto trading", exception);
+            showWarning("Bot Trading", "Could not start bot trading: %s".formatted(rootMessage(exception)));
         }
+    }
 
-        BorderPane content = new BorderPane(chartDisplay);
-        content.setPadding(new Insets(4));
-        content.setMinHeight(300);
-        content.setPrefHeight(500);
+    private CandleStickChart getActiveChart() {
+        Tab selected = chartTabPane.getSelectionModel().getSelectedItem();
+        if (selected == null || selected.getContent() == null) {
+            return null;
+        }
+        if (selected.getContent() instanceof ChartContainer container) {
+            return container.getChart();
+        }
+        if (selected.getContent() instanceof CandleStickChart chart) {
+            return chart;
+        }
+        return null;
+    }
 
-        DraggableTab chartTab = new DraggableTab(tabTitle, content);
-        chartTab.setClosable(true);
-        chartTab.setOnClosed(event -> disposeChartContent(content));
-        chartTabPane.getTabs().add(chartTab);
-        chartTabPane.getSelectionModel().select(chartTab);
-        journal("Opened chart: %s".formatted(tabTitle));
+    private void withActiveChart(java.util.function.Consumer<CandleStickChart> consumer) {
+        CandleStickChart chart = getActiveChart();
+        if (chart != null && consumer != null) {
+            consumer.accept(chart);
+        }
     }
 
     private void closeAllCharts() {
-        for (Tab tab : List.copyOf(chartTabPane.getTabs())) {
-            disposeChartContent(tab.getContent());
-        }
-        chartTabPane.getTabs().clear();
-        journal("All charts closed.");
-    }
-
-    private void withActiveChart(java.util.function.Consumer<CandleStickChart> action) {
-        CandleStickChart chart = getActiveChart();
-        if (chart == null) {
-            showWarning("Chart", "Open or select a chart first.");
-            return;
-        }
-        action.accept(chart);
-    }
-
-    private void withFocusedTextInput(java.util.function.Consumer<TextInputControl> action) {
-        if (getScene() != null && getScene().getFocusOwner() instanceof TextInputControl input) {
-            action.accept(input);
-        }
-    }
-
-    private @Nullable CandleStickChart getActiveChart() {
-        Tab selectedTab = chartTabPane.getSelectionModel().getSelectedItem();
-        return selectedTab == null ? null : findChart(selectedTab.getContent());
-    }
-
-    private CandleStickChart findChart(Node node) {
-        if (node instanceof CandleStickChart chart) {
-            return chart;
-        }
-        if (node instanceof CandleStickChartDisplay display) {
-            return display.getChart();
-        }
-        if (node instanceof Parent parent) {
-            for (Node child : parent.getChildrenUnmodifiable()) {
-                CandleStickChart chart = findChart(child);
-                if (chart != null) {
-                    return chart;
-                }
+        for (Tab tab : new ArrayList<>(chartTabPane.getTabs())) {
+            if (tab.getContent() instanceof ChartContainer container) {
+                container.dispose();
+            } else if (tab.getContent() instanceof CandleStickChart chart) {
+                chart.dispose();
             }
         }
-        return null;
-    }
-
-    private void disposeChartContent(Node node) {
-        CandleStickChart chart = findChart(node);
-        if (chart != null) {
-            chart.dispose();
-        }
+        chartTabPane.getTabs().clear();
     }
 
     private void saveActiveChartSnapshot() {
-        selectedTab = chartTabPane.getSelectionModel().getSelectedItem();
-        if (selectedTab == null || selectedTab.getContent() == null) {
-            showWarning("Save Chart", "Open or select a chart first.");
+        Node node = null;
+        Tab selectedTab = chartTabPane.getSelectionModel().getSelectedItem();
+        if (selectedTab != null) {
+            node = selectedTab.getContent();
+        }
+        if (node == null) {
+            showWarning("Snapshot", "No active chart to save.");
             return;
         }
         try {
-            File directory = new File("snapshots");
-            if (!directory.exists() && !directory.mkdirs()) {
-                throw new IOException("Unable to create snapshots directory.");
-            }
-            String name = "chart-%s.png".formatted(SNAPSHOT_FORMAT.format(LocalDateTime.now()));
-            File file = new File(directory, name);
-            WritableImage image = selectedTab.getContent().snapshot(null, null);
-            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
-            journal("Saved chart snapshot: %s".formatted(file.getAbsolutePath()));
-            showInfo("Chart Saved", "Snapshot saved to:\n%s".formatted(file.getAbsolutePath()));
-        } catch (Exception exception) {
-            logger.error("Failed to save chart snapshot", exception);
-            showWarning("Save Chart", "Failed to save chart: %s".formatted(rootMessage(exception)));
+            WritableImage image = node.snapshot(null, null);
+            String fileName = "InvestPro-%s.png".formatted(SNAPSHOT_FORMAT.format(LocalDateTime.now()));
+            File output = new File(System.getProperty("user.home"), fileName);
+            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", output);
+            journal("Chart snapshot saved: " + output.getAbsolutePath());
+        } catch (IOException exception) {
+            showWarning("Snapshot", "Failed to save snapshot: %s".formatted(exception.getMessage()));
         }
     }
 
-    public void appendJournal(String message) {
-        runOnFx(() -> journal(message));
-    }
-
-    public void updateStreamingStatus(String message) {
-        runOnFx(() -> connectionStatusLabel.setText(safe(message)));
-    }
-
-    public void updateTickerFromStream(TradePair pair, Ticker ticker) {
-        if (pair == null || ticker == null) {
+    protected void refreshAccountWorkspace() {
+        if (!hasBrokerAccess() || exchange == null) {
             return;
         }
-        runOnFx(() -> {
-            updateMarketWatchItem(pair, ticker);
-            journal("Tick %s bid %s ask %s".formatted(pair.toString('/'), price(ticker.getBidPrice()),
-                    price(ticker.getAskPrice())));
-        });
-    }
-
-    public void updatePositionsFromStream(List<Position> positions) {
-        List<Position> safePositions = positions == null ? Collections.emptyList() : positions;
-        runOnFx(() -> {
-            positionsDataManager.updateFromStream(safePositions);
-            accountPositionItems.setAll(safePositions);
-            calculateBrokerPnL(safePositions);
-            journal("Positions update: %d broker positions.".formatted(safePositions.size()));
-        });
-    }
-
-    public void updateOpenOrdersFromStream(List<OpenOrder> orders) {
-        List<OpenOrder> safeOrders = orders == null ? Collections.emptyList() : orders;
-        runOnFx(() -> {
-            accountOpenOrderItems.setAll(safeOrders);
-            journal("Open orders update: %d broker orders.".formatted(safeOrders.size()));
-        });
-    }
-
-    /**
-     * Starts automatic data refresh tasks for market watch, orderbook, and account
-     * data.
-     */
-    private void startAutoRefreshTasks() {
-        // Refresh market watch every 5 seconds
-        autoRefreshExecutor.scheduleAtFixedRate(
-                this::autoRefreshMarketWatch,
-                2, // Initial delay
-                5, // Interval
-                TimeUnit.SECONDS);
-
-        // Refresh orderbook every 3 seconds
-        autoRefreshExecutor.scheduleAtFixedRate(
-                this::autoRefreshOrderBook,
-                1, // Initial delay
-                3, // Interval
-                TimeUnit.SECONDS);
-
-        // Refresh account summary every 4 seconds
-        autoRefreshExecutor.scheduleAtFixedRate(
-                this::autoRefreshAccountData,
-                1, // Initial delay
-                4, // Interval
-                TimeUnit.SECONDS);
-    }
-
-    /**
-     * Auto-refresh market watch with latest ticker data for selected symbol.
-     */
-    private void autoRefreshMarketWatch() {
+        updateAccountBalance();
         try {
-            if (!canUseAutoRefreshExecutor() || exchange == null) {
-                return;
-            }
-
-            hydrateMarketWatchTickers();
-        } catch (Exception e) {
-            logger.debug("Market watch auto-refresh failed", e);
-        }
-    }
-
-    /**
-     * Update a specific market watch item with new ticker data.
-     */
-    private void updateMarketWatchItem(TradePair pair, Ticker ticker) {
-        if (pair == null || ticker == null) {
-            return;
-        }
-
-        TradePair marketPair = findMarketWatchPair(pair);
-        if (marketPair == null) {
-            return;
-        }
-
-        applyTickerToTradePair(marketPair, ticker);
-        int index = marketWatchItems.indexOf(marketPair);
-        if (index >= 0) {
-            marketWatchItems.set(index, marketPair);
-            marketWatchTable.refresh();
-        }
-    }
-
-    private void hydrateMarketWatchTickers() {
-        if (!canUseAutoRefreshExecutor()) {
-            return;
-        }
-
-        if (!Platform.isFxApplicationThread()) {
-            runOnFx(this::hydrateMarketWatchTickers);
-            return;
-        }
-
-        if (exchange == null || marketWatchItems.isEmpty()) {
-            return;
-        }
-
-        List<TradePair> pairs = marketWatchPairsToRefresh();
-        if (pairs.isEmpty()) {
-            return;
-        }
-
-        CompletableFuture<List<Ticker>> batchFuture = safeFetchTickers(pairs);
-        batchFuture.thenAccept(tickers -> runOnFx(() -> applyTickerBatch(pairs, tickers)))
-                .exceptionally(exception -> {
-                    logger.debug("Batch ticker refresh failed", exception);
-                    refreshTickersIndividually(pairs);
-                    return null;
-                });
-    }
-
-    private List<TradePair> marketWatchPairsToRefresh() {
-        TradePair selectedPair = symbolSelector.getSelectionModel().getSelectedItem();
-        List<TradePair> pairs = new java.util.ArrayList<>();
-
-        if (selectedPair != null) {
-            TradePair marketPair = findMarketWatchPair(selectedPair);
-            if (marketPair != null) {
-                pairs.add(marketPair);
-            }
-        }
-
-        for (TradePair pair : marketWatchItems) {
-            if (pair == null || pairs.contains(pair)) {
-                continue;
-            }
-            pairs.add(pair);
-            if (pairs.size() >= MARKET_WATCH_TICKER_REFRESH_LIMIT) {
-                break;
-            }
-        }
-
-        return pairs;
-    }
-
-    private CompletableFuture<List<Ticker>> safeFetchTickers(List<TradePair> pairs) {
-        if (!canUseAutoRefreshExecutor()) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Ticker refresh is stopped."));
-        }
-
-        try {
-            return CompletableFuture
-                    .supplyAsync(() -> {
-                        try {
-                            return exchange.fetchTickers(pairs);
-                        } catch (Exception exception) {
-                            throw new RuntimeException(exception);
-                        }
-                    }, autoRefreshExecutor)
-                    .thenCompose(future -> Objects.requireNonNullElseGet(future,
-                            () -> CompletableFuture.failedFuture(
-                                    new UnsupportedOperationException("Batch ticker refresh is not supported."))))
-                    .thenApply(tickers -> {
-                        if (tickers == null) {
-                            throw new IllegalStateException("Batch ticker refresh returned no data.");
-                        }
-                        return tickers;
-                    });
-        } catch (java.util.concurrent.RejectedExecutionException exception) {
-            return CompletableFuture.failedFuture(exception);
-        }
-    }
-
-    private void refreshTickersIndividually(List<TradePair> pairs) {
-        if (!canUseAutoRefreshExecutor()) {
-            return;
-        }
-
-        for (TradePair pair : pairs) {
-            if (!canUseAutoRefreshExecutor()) {
-                return;
-            }
-            try {
-                CompletableFuture
-                        .supplyAsync(() -> {
-                            try {
-                                return exchange.fetchTicker(pair);
-                            } catch (Exception exception) {
-                                throw new RuntimeException(exception);
-                            }
-                        }, autoRefreshExecutor)
-                        .thenCompose(future -> Objects.requireNonNullElseGet(future,
-                                () -> CompletableFuture.failedFuture(
-                                        new UnsupportedOperationException("Ticker refresh is not supported."))))
-                        .thenAccept(ticker -> runOnFx(() -> updateMarketWatchItem(pair, ticker)))
-                        .exceptionally(exception -> {
-                            logger.debug("Failed to fetch ticker for %s".formatted(pair), exception);
-                            return null;
-                        });
-            } catch (java.util.concurrent.RejectedExecutionException exception) {
-                logger.debug("Ticker refresh skipped because executor is stopped.", exception);
-                return;
-            }
-        }
-    }
-
-    private void applyTickerBatch(List<TradePair> pairs, List<Ticker> tickers) {
-        if (pairs == null || tickers == null || tickers.isEmpty()) {
-            return;
-        }
-
-        int count = Math.min(pairs.size(), tickers.size());
-        for (int i = 0; i < count; i++) {
-            TradePair pair = pairs.get(i);
-            Ticker ticker = tickers.get(i);
-            TradePair marketPair = findMarketWatchPair(pair);
-            if (marketPair != null && ticker != null) {
-                applyTickerToTradePair(marketPair, ticker);
-            }
-        }
-
-        marketWatchTable.refresh();
-    }
-
-    private void applyTickerToTradePair(TradePair pair, Ticker ticker) {
-        double last = ticker.getLastPrice() > 0 ? ticker.getLastPrice() : ticker.getMidPrice();
-        pair.updateTicker(
-                ticker.getBidPrice(),
-                ticker.getAskPrice(),
-                last,
-                ticker.getVolume(),
-                ticker.getChangePercent(),
-                ticker.getHighPrice(),
-                ticker.getLowPrice());
-    }
-
-    private @Nullable TradePair findMarketWatchPair(TradePair pair) {
-        if (pair == null) {
-            return null;
-        }
-
-        for (TradePair candidate : marketWatchItems) {
-            if (sameTradePair(candidate, pair)) {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private boolean sameTradePair(TradePair left, TradePair right) {
-        return left != null
-                && right != null
-                && Objects.equals(left.getBaseCode(), right.getBaseCode())
-                && Objects.equals(left.getCounterCode(), right.getCounterCode());
-    }
-
-    /**
-     * Auto-refresh orderbook data for the selected symbol.
-     */
-    private void autoRefreshOrderBook() {
-        try {
-            if (!canUseAutoRefreshExecutor() || !hasBrokerAccess()) {
-                return;
-            }
-
-            TradePair selectedPair = symbolSelector.getSelectionModel().getSelectedItem();
-            if (selectedPair == null) {
-                return;
-            }
-
-            CompletableFuture<OrderBook> orderBookFuture = exchange.fetchOrderBook(selectedPair);
-            if (orderBookFuture != null) {
-                orderBookFuture.thenAccept(orderBook -> {
-                    if (orderBook instanceof OrderBook ob) {
-                        Platform.runLater(() -> displayOrderBook(ob));
-                    }
-                });
-            }
-        } catch (Exception e) {
-            logger.debug("OrderBook auto-refresh failed", e);
-        }
-    }
-
-    /**
-     * Auto-refresh account summary data (positions, balances, P&L).
-     */
-    private void autoRefreshAccountData() {
-        try {
-            if (!canUseAutoRefreshExecutor() || !hasBrokerAccess()) {
-                return;
-            }
-
-            // Update account positions
-            try {
-                if (exchange.supportsPositions()) {
-                    CompletableFuture<List<Position>> positionsFuture = exchange.fetchAllPositions();
-                    if (positionsFuture != null) {
-                        positionsFuture.thenAccept(positions -> {
-                            if (positions != null) {
-                                Platform.runLater(() -> updatePositionsFromStream(positions));
-                            }
-                        });
-                    }
-                }
-            } catch (Exception e) {
-                logger.debug("Failed to fetch positions", e);
-            }
-
-            // Update account info
-            try {
-                CompletableFuture<Account> accountFuture = exchange.fetchAccount();
-                if (accountFuture != null) {
-                    accountFuture.thenAccept(info -> {
-                        if (info != null) {
-                            Platform.runLater(() -> updateAccountSummary(info));
-                        }
-                    }).exceptionally(ex -> {
-                        logger.debug("Failed to fetch account info from future", ex);
+            exchange.fetchAccount()
+                    .thenAccept(account -> runOnFx(() -> updateAccountSummary(account)))
+                    .exceptionally(exception -> {
+                        logger.debug("Failed to refresh account", exception);
                         return null;
                     });
-                }
-            } catch (Exception e) {
-                logger.debug("Failed to fetch account info", e);
-            }
-        } catch (Exception e) {
-            logger.debug("Account data auto-refresh failed", e);
+        } catch (Exception exception) {
+            logger.debug("Account refresh unavailable", exception);
+        }
+
+        // Fetch all positions
+        try {
+            exchange.fetchAllPositions()
+                    .thenAccept(positions -> runOnFx(() -> updateAccountPositions(positions)))
+                    .exceptionally(exception -> {
+                        logger.debug("Failed to fetch positions", exception);
+                        return null;
+                    });
+        } catch (Exception exception) {
+            logger.debug("Fetch positions unavailable", exception);
+        }
+
+        // Fetch all trades
+        try {
+            exchange.fetchAccountTrades(null)
+                    .thenAccept(trades -> runOnFx(() -> updateAccountTrades(trades)))
+                    .exceptionally(exception -> {
+                        logger.debug("Failed to fetch trades", exception);
+                        return null;
+                    });
+        } catch (Exception exception) {
+            logger.debug("Fetch trades unavailable", exception);
+        }
+
+        // Fetch risk monitoring data (position health scores)
+        try {
+            exchange.fetchAllPositions()
+                    .thenAccept(positions -> runOnFx(() -> updatePositionHealthScores(positions)))
+                    .exceptionally(exception -> {
+                        logger.debug("Failed to fetch risk data", exception);
+                        return null;
+                    });
+        } catch (Exception exception) {
+            logger.debug("Fetch risk data unavailable", exception);
         }
     }
 
-    /**
-     * Update account summary text area with latest data, formatted nicely.
-     */
-    private void updateAccountSummary(Account account) {
-        Platform.runLater(() -> {
-            if (account != null) {
-                String formatted = formatAccountSummary(account);
-                accountSummaryArea.setText(formatted);
-            }
-        });
-    }
-
-    /**
-     * Format account data into a readable display format.
-     */
-    private String formatAccountSummary(Account account) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("═════════════════════════════════════════════════\n");
-        sb.append("                ACCOUNT SUMMARY\n");
-        sb.append("═════════════════════════════════════════════════\n\n");
-
-        // User Info
-        if (account.getUsername() != null && !account.getUsername().isBlank()) {
-            sb.append("User Information:\n");
-            sb.append("  • Username: ").append(account.getUsername()).append("\n");
-            if (account.getFirstName() != null) {
-                sb.append("  • Name: ").append(account.getFirstName());
-                if (account.getLastName() != null) {
-                    sb.append(" ").append(account.getLastName());
-                }
-                sb.append("\n");
-            }
-            if (account.getEmail() != null) {
-                sb.append("  • Email: ").append(account.getEmail()).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        // Account Details
-        sb.append("Account Details:\n");
-        if (account.getExchange() != null) {
-            sb.append("  • Exchange: ").append(account.getExchange().getName()).append("\n");
-        }
-        if (account.getAccount() != null && !account.getAccount().isBlank()) {
-            sb.append("  • Account ID: ").append(account.getAccount()).append("\n");
-        }
-
-        // Contact Info
-        if ((account.getPhone() != null && !account.getPhone().isBlank()) ||
-                (account.getAddress() != null && !account.getAddress().isBlank()) ||
-                (account.getCity() != null && !account.getCity().isBlank())) {
-            sb.append("\nContact Information:\n");
-            if (account.getPhone() != null && !account.getPhone().isBlank()) {
-                sb.append("  • Phone: ").append(account.getPhone()).append("\n");
-            }
-            if (account.getAddress() != null && !account.getAddress().isBlank()) {
-                sb.append("  • Address: ").append(account.getAddress()).append("\n");
-            }
-            if (account.getCity() != null && !account.getCity().isBlank()) {
-                sb.append("  • City: ").append(account.getCity()).append("\n");
-            }
-        }
-
-        // Notification Settings
-        if ((account.getTelegramToken() != null && !account.getTelegramToken().isBlank()) ||
-                (account.getEmailNotification() != null && !account.getEmailNotification().isBlank())) {
-            sb.append("\nNotification Settings:\n");
-            if (account.getTelegramToken() != null && !account.getTelegramToken().isBlank()) {
-                sb.append("  • Telegram: Configured ✓\n");
-            }
-            if (account.getEmailNotification() != null && !account.getEmailNotification().isBlank()) {
-                sb.append("  • Email: ").append(account.getEmailNotification()).append("\n");
-            }
-        }
-
-        sb.append("\n═════════════════════════════════════════════════\n");
-        sb.append("Last Updated: ")
-                .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
-
-        return sb.toString();
-    }
-
-    public void enablePositionAutoRefresh(Exchange exchange, long intervalMs) {
-        if (exchange == null || intervalMs <= 0) {
+    private void updateAccountPositions(List<Position> positions) {
+        if (positions == null) {
+            accountPositionItems.clear();
             return;
         }
-        positionsDataManager.startAutoRefresh(exchange, intervalMs);
-        journal("Position auto-refresh enabled: %s seconds.".formatted(intervalMs / 1000.0));
+        // Replace all positions with fetched data
+        accountPositionItems.setAll(positions);
+        journal("Positions updated: " + positions.size() + " position(s)");
     }
 
-    public void disablePositionAutoRefresh() {
-        try {
-            positionsDataManager.stopAutoRefresh();
-        } catch (Exception exception) {
-            logger.debug("Failed to stop position auto-refresh", exception);
+    private void updateAccountTrades(List<Trade> trades) {
+        if (trades == null) {
+            accountTradeItems.clear();
+            return;
         }
+        // Calculate profit locally for each trade before displaying
+        List<Trade> tradesWithProfit = trades.stream()
+                .peek(this::calculateTradeProfit)
+                .toList();
+        // Replace all trades with fetched data (reverse order to show newest first)
+        accountTradeItems.setAll(tradesWithProfit.reversed());
+        journal("Trades updated: " + tradesWithProfit.size() + " trade(s)");
+    }
+
+    private void calculateTradeProfit(Trade trade) {
+        if (trade == null) {
+            return;
+        }
+
+        // Calculate trade P&L locally based on entry price, fees, and swap costs
+        // This provides a transparent view of actual costs incurred in each trade
+        double profit = 0;
+
+        if (trade.getPrice() > 0 && trade.getAmount() > 0) {
+            // Calculate P&L based on notional value minus costs
+            double notionalValue = trade.getPrice() * trade.getAmount();
+            double totalCosts = trade.getFee() + Math.abs(trade.getSwap());
+
+            // For BUY trades: profit = notional value - costs
+            // For SELL trades: profit = notional value - costs
+            // (costs are always negative impacts on profit)
+            profit = notionalValue - totalCosts;
+
+            // Adjust sign based on transaction type to reflect actual P&L
+            if (trade.getTransactionType() != null && trade.getTransactionType().isSell()) {
+                // For SELL: subtract costs from the proceeds
+                profit = notionalValue - totalCosts;
+            } else if (trade.getTransactionType() != null && trade.getTransactionType().isBuy())
+
+            {
+                // For BUY: represent as investment made
+                profit = notionalValue - totalCosts;
+            }
+        } else {
+            // If price/amount unavailable, just show negative impact of costs
+            profit = -(trade.getFee() + Math.abs(trade.getSwap()));
+        }
+
+        // Set the calculated profit (will be displayed in Profit column)
+        trade.setProfit(profit);
+    }
+
+    private void updatePositionHealthScores(List<Position> positions) {
+        if (positions == null) {
+            positionHealthItems.clear();
+            return;
+        }
+        // Generate position health scores from positions
+        List<PositionHealthScore> healthScores = positions.stream()
+                .map(this::createPositionHealthScore)
+                .toList();
+        positionHealthItems.setAll(healthScores);
+        journal("Risk monitor updated: " + positions.size() + " position(s) analyzed");
+    }
+
+    private PositionHealthScore createPositionHealthScore(Position position) {
+        if (position == null) {
+            return new PositionHealthScore();
+        }
+        // Create a health score based on position data
+        PositionHealthScore.PositionHealthScoreBuilder builder = PositionHealthScore.builder();
+
+        double profit = position.getUnrealizedPnl();
+        double score = calculateHealthScore(profit);
+
+        builder.overallScore(score);
+        builder.status(PositionHealthScore.statusFromScore(score));
+        builder.pnlScore(Math.min(1.0, Math.max(0.0, (profit + 1000) / 2000)));
+        builder.riskScore(profit > 0 ? 0.8 : 0.5);
+        builder.summary("Position: " + position.getTradePair() + " - P&L: " + String.format("%.2f", profit));
+        builder.calculatedAt(LocalDateTime.now());
+
+        return builder.build();
+    }
+
+    private double calculateHealthScore(double profit) {
+        // Simple health calculation based on profit/loss
+        // Returns value between 0.0 and 1.0
+        if (profit > 500) {
+            return 0.95;
+        } else if (profit > 200) {
+            return 0.85;
+        } else if (profit > 0) {
+            return 0.75;
+        } else if (profit > -100) {
+            return 0.60;
+        } else if (profit > -300) {
+            return 0.40;
+        } else {
+            return 0.15;
+        }
+    }
+
+    private void updateAccountSummary(Account account) {
+        if (account == null) {
+            accountSummaryArea.setText("Account data unavailable.");
+            return;
+        }
+        accountSummaryArea.setText("""
+                ═════════════════════════════════════════════════
+                                ACCOUNT SUMMARY
+                ═════════════════════════════════════════════════
+
+                Broker: %s
+                Account: %s
+                Connected: %s
+
+                Updated: %s
+                ═════════════════════════════════════════════════
+                """.formatted(
+                exchange == null ? "-" : exchange.getDisplayName(),
+                account,
+                hasBrokerAccess(),
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
+    }
+
+    private void refreshPositions() {
+        positionsDataManager.refreshLocalPositions(positionsItems);
+        updatePositionPnlLabels();
+    }
+
+    private void closeAllPositions() {
+        positionsItems.clear();
+        updatePositionPnlLabels();
+        journal("Local positions cleared.");
+    }
+
+    private void updatePositionPnlLabels() {
+        double longPnl = positionsItems.stream()
+                .filter(order -> "BUY"
+                        .equalsIgnoreCase(safe(order.getSide() == null ? "" : order.getSide().toString())))
+                .mapToDouble(Order::getProfit)
+                .sum();
+        double shortPnl = positionsItems.stream()
+                .filter(order -> "SELL"
+                        .equalsIgnoreCase(safe(order.getSide() == null ? "" : order.getSide().toString())))
+                .mapToDouble(Order::getProfit)
+                .sum();
+        double total = longPnl + shortPnl;
+        longPnLLabel.setText("Long P&L: $%s".formatted(money(longPnl)));
+        shortPnLLabel.setText("Short P&L: $%s".formatted(money(shortPnl)));
+        totalPnLLabel.setText("Total P&L: $%s".formatted(money(total)));
     }
 
     private void cancelAllOrders() {
-        journal("Cancel-all requested.");
-        if (exchange == null) {
-            showWarning("Cancel All", "No exchange selected.");
+        if (!hasBrokerAccess()) {
+            showWarning("Orders", "Connect to an exchange first.");
             return;
         }
         try {
-            exchange.cancelALL();
-            journal("Cancel-all sent to exchange.");
-            refreshAccountWorkspace();
+            exchange.cancelAllOrders()
+                    .thenRun(() -> runOnFx(() -> {
+                        journal("Cancel-all orders request sent.");
+                        refreshAccountWorkspace();
+                    }))
+                    .exceptionally(exception -> {
+                        runOnFx(() -> showWarning("Orders", "Cancel-all failed: %s".formatted(rootMessage(exception))));
+                        return null;
+                    });
         } catch (Exception exception) {
-            logger.error("Cancel-all failed", exception);
-            showWarning("Cancel All", "Cancel-all failed: %s".formatted(rootMessage(exception)));
+            showWarning("Orders", "Cancel-all is not supported by this adapter yet.");
         }
     }
 
-    private void openInSystemBrowser(String url) throws Exception {
-        String target = safe(url);
-        if (target.isBlank()) {
-            showInfo("Browser", "No URL to open.");
+    private void enablePositionAutoRefresh(Exchange exchange, long intervalMillis) {
+        if (!canUseAutoRefreshExecutor()) {
             return;
         }
-        if (!target.startsWith("http://") && !target.startsWith("https://")) {
-            target = "https://%s".formatted(target);
-        }
-        if (!Desktop.isDesktopSupported()) {
-            throw new UnsupportedOperationException("Desktop API is not supported on this system.");
-        }
-        Desktop desktop = Desktop.getDesktop();
-        if (!desktop.isSupported(Desktop.Action.BROWSE)) {
-            throw new UnsupportedOperationException("Desktop browse action is not supported.");
-        }
-        desktop.browse(URI.create(target));
-        journal("Opened URL in browser: %s".formatted(target));
+        autoRefreshExecutor.scheduleAtFixedRate(() -> {
+            if (hasBrokerAccess()) {
+                refreshAccountWorkspace();
+            }
+        }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
     }
 
-    private void runOnFx(Runnable runnable) {
-        if (runnable == null) {
+    private void disablePositionAutoRefresh() {
+        // This executor is shared by the window. Individual scheduled tasks are
+        // defensive and check connection state.
+    }
+
+    private void startAutoRefreshTasks() {
+        if (!canUseAutoRefreshExecutor()) {
             return;
         }
-        if (Platform.isFxApplicationThread()) {
-            runnable.run();
-        } else {
-            Platform.runLater(runnable);
-        }
+        autoRefreshExecutor.scheduleAtFixedRate(() -> runOnFx(this::updateConnectionStatus), 2, 5, TimeUnit.SECONDS);
+        autoRefreshExecutor.scheduleAtFixedRate(() -> {
+            TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+            if (selected != null && hasBrokerAccess()) {
+                loadOrderBook(selected);
+            }
+        }, 3, 8, TimeUnit.SECONDS);
+        // Refresh account data (positions, trades, history) every 120 seconds (less
+        // frequent for stability)
+        autoRefreshExecutor.scheduleAtFixedRate(() -> {
+            if (hasBrokerAccess()) {
+                runOnFx(this::refreshAccountWorkspace);
+            }
+        }, 10, 120, TimeUnit.SECONDS);
     }
 
     private void showSettingsDialog() {
-        Stage settingsStage = new Stage();
-        settingsStage.setTitle("InvestPro Settings");
-        if (getScene() != null && getScene().getWindow() != null) {
-            settingsStage.initOwner(getScene().getWindow());
-        }
-        settingsStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
-
-        ComboBox<String> exchangeBox = new ComboBox<>();
-        exchangeBox.getItems().setAll(SUPPORTED_EXCHANGES);
-        exchangeBox.getSelectionModel()
-                .select(safe(exchangeSelector.getValue()).isBlank() ? "COINBASE" : exchangeSelector.getValue());
-
-        TextField apiKeyField = new TextField();
-        PasswordField apiSecretField = new PasswordField();
-        TextField accountIdField = new TextField();
-        TextField venueField = new TextField();
-        TextField telegramTokenField = new TextField();
-        CheckBox restoreConsoleCheck = new CheckBox("Remember console visibility");
-        restoreConsoleCheck.setSelected(preferences.getBoolean("remember_console_visible", true));
-
-        Runnable loadFields = () -> {
-            String name = safe(exchangeBox.getValue());
-            apiKeyField.setText(preferences.get("exchange_api_key_" + name, ""));
-            apiSecretField.setText(preferences.get("exchange_api_secret_" + name, ""));
-            accountIdField.setText(preferences.get("exchange_account_id_" + name, ""));
-            venueField.setText(preferences.get("exchange_venue_" + name, ""));
-            telegramTokenField.setText(preferences.get("telegram_token_" + name, ""));
-        };
-        exchangeBox.setOnAction(event -> loadFields.run());
-        loadFields.run();
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("InvestPro Settings");
+        dialog.setHeaderText("Application and broker settings");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
-        grid.setPadding(new Insets(16));
-        grid.addRow(0, new Label("Exchange"), exchangeBox);
-        grid.addRow(1, new Label("API Key"), apiKeyField);
-        grid.addRow(2, new Label("API Secret"), apiSecretField);
-        grid.addRow(3, new Label("Account ID"), accountIdField);
-        grid.addRow(4, new Label("Venue"), venueField);
-        grid.addRow(5, new Label("Telegram Token"), telegramTokenField);
-        grid.add(restoreConsoleCheck, 1, 6);
+        grid.setPadding(new Insets(12));
+
+        TextField apiKeyField = new TextField(configuredApiKey);
+        PasswordField secretField = new PasswordField();
+        secretField.setText(configuredApiSecret);
+        TextField telegramField = new TextField(telegramToken);
+
+        grid.addRow(0, new Label("API Key"), apiKeyField);
+        grid.addRow(1, new Label("API Secret / Account ID"), secretField);
+        grid.addRow(2, new Label("Telegram Token"), telegramField);
 
         Button saveButton = new Button("Save");
-        saveButton.getStyleClass().add("primary-button");
-        Button closeButton = new Button("Close");
-        closeButton.getStyleClass().add("terminal-button");
-        HBox actions = new HBox(8, closeButton, saveButton);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-        grid.add(actions, 1, 7);
-
         saveButton.setOnAction(event -> {
-            String name = safe(exchangeBox.getValue());
-            preferences.put("exchange_api_key_" + name, safe(apiKeyField.getText()));
-            preferences.put("exchange_api_secret_" + name, safe(apiSecretField.getText()));
-            preferences.put("exchange_account_id_" + name, safe(accountIdField.getText()));
-            preferences.put("exchange_venue_" + name, safe(venueField.getText()));
-            preferences.put("telegram_token_" + name, safe(telegramTokenField.getText()));
-            preferences.putBoolean("remember_console_visible", restoreConsoleCheck.isSelected());
-            try {
-                preferences.sync();
-            } catch (Exception exception) {
-                logger.warn("Failed to sync settings", exception);
-            }
-            if (Objects.equals(name, exchangeSelector.getValue())) {
-                loadExchangeCredentials(name);
-            }
-            saveAppState();
-            journal("Settings saved for %s".formatted(name));
+            configuredApiKey = safe(apiKeyField.getText());
+            configuredApiSecret = safe(secretField.getText());
+            setTelegramToken(telegramField.getText());
+            saveExchangeCredentials(safe(exchangeSelector.getValue()));
+            journal("Settings saved.");
+            dialog.close();
         });
-        closeButton.setOnAction(event -> settingsStage.close());
 
-        settingsStage.setScene(new Scene(grid, 520, 360));
-        settingsStage.show();
+        VBox box = new VBox(10, grid, saveButton);
+        dialog.getDialogPane().setContent(box);
+        dialog.showAndWait();
+    }
+
+    private void openPasswordReset() {
+        new PasswordReset();
+    }
+
+    private void showExchangeCredentialDialog(String selectedExchange) {
+        if (selectedExchange == null || selectedExchange.isBlank()) {
+            showWarning("Credentials", "No exchange selected.");
+            return;
+        }
+
+        Dialog<Boolean> dialog = new Dialog<>();
+        dialog.setTitle("Exchange Credentials");
+        dialog.setHeaderText("Enter credentials for " + selectedExchange);
+
+        ButtonType connectType = new ButtonType("Save & Connect", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(connectType, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+
+        TextField apiKeyField = new TextField(configuredApiKey);
+        PasswordField secretField = new PasswordField();
+        secretField.setText(configuredApiSecret);
+        TextField telegramField = new TextField(telegramToken);
+
+        boolean oanda = "OANDA".equalsIgnoreCase(selectedExchange);
+        apiKeyField.setPromptText(oanda ? "OANDA Token" : "API Key");
+        secretField.setPromptText(oanda ? "Account ID optional" : "API Secret");
+        telegramField.setPromptText("Telegram Token optional");
+
+        grid.addRow(0, new Label(oanda ? "Token" : "API Key"), apiKeyField);
+        grid.addRow(1, new Label(oanda ? "Account ID" : "API Secret"), secretField);
+        grid.addRow(2, new Label("Telegram Token"), telegramField);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == connectType) {
+                configuredApiKey = safe(apiKeyField.getText());
+                configuredApiSecret = safe(secretField.getText());
+                telegramToken = safe(telegramField.getText());
+                saveExchangeCredentials(selectedExchange);
+                return true;
+            }
+            return false;
+        });
+
+        dialog.showAndWait().ifPresent(saved -> {
+            if (saved) {
+                exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret);
+                setTelegramToken(telegramToken);
+                proceedWithConnection();
+            }
+        });
+    }
+
+    private boolean hasExchangeCredentials(String exchangeName) {
+        loadExchangeCredentials(exchangeName);
+        if ("OANDA".equalsIgnoreCase(exchangeName)) {
+            return !configuredApiKey.isBlank();
+        }
+        return !configuredApiKey.isBlank() && !configuredApiSecret.isBlank();
+    }
+
+    private void loadExchangeCredentials(String exchangeName) {
+        String key = safe(exchangeName);
+        configuredApiKey = preferences.get("exchange_api_key_" + key, configuredApiKey);
+        configuredApiSecret = preferences.get("exchange_api_secret_" + key, configuredApiSecret);
+        telegramToken = preferences.get("telegram_token_" + key, telegramToken);
+    }
+
+    private void saveExchangeCredentials(String exchangeName) {
+        String key = safe(exchangeName);
+        if (key.isBlank()) {
+            return;
+        }
+        preferences.put("exchange_api_key_" + key, configuredApiKey);
+        preferences.put("exchange_api_secret_" + key, configuredApiSecret);
+        preferences.put("telegram_token_" + key, telegramToken);
     }
 
     @Contract("null, _, _ -> new")
@@ -2756,61 +2695,55 @@ public class TradingWindow extends BorderPane {
         };
     }
 
-    @Contract(pure = true)
-    private @NotNull String safe(String value) {
-        return value == null ? "" : value.trim();
-    }
-
-    private @NotNull String number(double value) {
-        return Double.isFinite(value) ? String.format("%.4f", value) : "0.0000";
-    }
-
-    private @NotNull String price(double value) {
-        return Double.isFinite(value) ? String.format("%.5f", value) : "0.00000";
-    }
-
-    private @NotNull String marketPrice(double value) {
-        return Double.isFinite(value) && value > 0.0 ? price(value) : "-";
-    }
-
-    private @NotNull String compactMarketNumber(double value) {
-        if (!Double.isFinite(value) || value <= 0.0) {
-            return "-";
+    private void openInSystemBrowser(String url) throws IOException {
+        if (!Desktop.isDesktopSupported()) {
+            showWarning("Browser", "Desktop browser integration is not supported on this system.");
+            return;
         }
-
-        double abs = Math.abs(value);
-        if (abs >= 1_000_000_000.0) {
-            return "%.2fB".formatted(value / 1_000_000_000.0);
-        }
-        if (abs >= 1_000_000.0) {
-            return "%.2fM".formatted(value / 1_000_000.0);
-        }
-        if (abs >= 1_000.0) {
-            return "%.2fK".formatted(value / 1_000.0);
-        }
-        return number(value);
+        Desktop.getDesktop().browse(URI.create(url));
     }
 
-    private @NotNull String percent(double value) {
-        if (!Double.isFinite(value) || value == 0.0) {
-            return "-";
+    private void withFocusedTextInput(java.util.function.Consumer<TextInputControl> action) {
+        Node focusOwner = getScene() == null ? null : getScene().getFocusOwner();
+        if (focusOwner instanceof TextInputControl control && action != null) {
+            action.accept(control);
         }
-        return "%+.2f%%".formatted(value);
     }
 
-    private @NotNull String updatedAt(TradePair pair) {
-        if (pair == null || pair.getUpdatedAt() == null || !pair.hasQuote()) {
-            return "-";
+    private void runOnFx(Runnable runnable) {
+        if (runnable == null) {
+            return;
         }
-        return pair.getUpdatedAt().atZone(java.time.ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        if (Platform.isFxApplicationThread()) {
+            runnable.run();
+        } else {
+            Platform.runLater(runnable);
+        }
     }
 
-    private @NotNull String money(double value) {
-        return Double.isFinite(value) ? String.format("%.2f", value) : "0.00";
+    private void showInfo(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(title);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
-    private @NotNull String rootMessage(Throwable throwable) {
+    private void showWarning(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle(title);
+        alert.setHeaderText(title);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private void journal(String message) {
+        runOnFx(() -> journalArea.appendText("[%s] %s%n".formatted(
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+                safe(message))));
+    }
+
+    private String rootMessage(Throwable throwable) {
         if (throwable == null) {
             return "Unknown error";
         }
@@ -2822,259 +2755,387 @@ public class TradingWindow extends BorderPane {
         return message == null || message.isBlank() ? current.getClass().getSimpleName() : message;
     }
 
-    private void journal(String message) {
-        String line = "[%s] %s%n".formatted(new Date(), message == null ? "" : message);
-        if (Platform.isFxApplicationThread()) {
-            journalArea.appendText(line);
-        } else {
-            Platform.runLater(() -> journalArea.appendText(line));
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String price(double value) {
+        return value <= 0 || !Double.isFinite(value) ? "-" : String.format("%.5f", value);
+    }
+
+    private String marketPrice(double value) {
+        return value <= 0 || !Double.isFinite(value) ? "-" : String.format("%.5f", value);
+    }
+
+    private String formatPrice(double value) {
+        return value <= 0 || !Double.isFinite(value) ? "-" : String.format("%.5f", value);
+    }
+
+    private String money(double value) {
+        return !Double.isFinite(value) ? "0.00" : String.format("%.2f", value);
+    }
+
+    private String number(double value) {
+        return !Double.isFinite(value) ? "0" : String.format("%.4f", value);
+    }
+
+    private String percent(double value) {
+        return !Double.isFinite(value) ? "0.00%" : String.format("%.2f%%", value);
+    }
+
+    private String compactMarketNumber(double value) {
+        if (!Double.isFinite(value))
+            return "-";
+        if (Math.abs(value) >= 1_000_000)
+            return String.format("%.2fM", value / 1_000_000.0);
+        if (Math.abs(value) >= 1_000)
+            return String.format("%.2fK", value / 1_000.0);
+        return String.format("%.2f", value);
+    }
+
+    private String formatProfit(double value) {
+        if (!Double.isFinite(value)) {
+            return "$0.00";
         }
-        logger.info(message == null ? "" : message);
+        return (value >= 0 ? "+$" : "-$") + String.format("%.2f", Math.abs(value));
     }
 
-    private void showInfo(String title, String content) {
-        runOnFx(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle(title);
-            alert.setHeaderText(null);
-            alert.setContentText(content);
-            alert.showAndWait();
-        });
-    }
-
-    private void showWarning(String title, String content) {
-        runOnFx(() -> {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle(title);
-            alert.setHeaderText(null);
-            alert.setContentText(content);
-            alert.showAndWait();
-        });
+    private String dateTime(Object timestamp) {
+        return timestamp == null ? "" : String.valueOf(timestamp);
     }
 
     /**
-     * Check if saved credentials exist for the given exchange.
+     * Kept for compatibility with the existing UI code.
      */
-    private boolean hasExchangeCredentials(String exchange) {
-        if (exchange == null || exchange.isBlank()) {
-            return false;
+    private static final class PositionsDataManager {
+        private java.util.function.Consumer<String> statusCallback;
+
+        void setStatusCallback(java.util.function.Consumer<String> callback) {
+            this.statusCallback = callback;
         }
+
+        void refreshLocalPositions(ObservableList<Order> target) {
+            if (statusCallback != null) {
+                statusCallback.accept("Local positions refreshed.");
+            }
+        }
+    }
+
+    public void updateStreamingStatus(String status) {
+        connectionStatusLabel.setText(status == null || status.isBlank() ? "Streaming" : status);
+    }
+
+    public void appendJournal(String message) {
+        journal(message);
+    }
+
+    public void updateTickerFromStream(TradePair tradePair, Ticker ticker) {
+        if (tradePair == null || ticker == null) {
+            return;
+        }
+
+        // Update the TradePair with ticker data
+        tradePair.setBid(ticker.getBidPrice());
+        tradePair.setAsk(ticker.getAskPrice());
+        tradePair.setLast(ticker.getLastPrice());
+        tradePair.setVolume(ticker.getVolume());
+        tradePair.setUpdatedAt(Instant.now());
+
+        int index = marketWatchItems.indexOf(tradePair);
+
+        if (index >= 0) {
+            // Force UI update by setting the item
+            TradePair updated = marketWatchItems.get(index);
+            updated.setBid(ticker.getBidPrice());
+            updated.setAsk(ticker.getAskPrice());
+            updated.setLast(ticker.getLastPrice());
+            updated.setVolume(ticker.getVolume());
+            updated.setUpdatedAt(Instant.now());
+            marketWatchItems.set(index, updated);
+        }
+
+        symbolCountLabel.setText("Symbols: %d".formatted(marketWatchItems.size()));
+    }
+
+    public void updateTradeFromStream(TradePair tradePair, Trade trade) {
+        if (trade != null) {
+            accountTradeItems.add(0, trade);
+
+            while (accountTradeItems.size() > 500) {
+                accountTradeItems.remove(accountTradeItems.size() - 1);
+            }
+        }
+    }
+
+    public void updateOrderBookFromStream(TradePair tradePair, OrderBook orderBook) {
+        displayOrderBook(orderBook);
+    }
+
+    public void updateCandleFromStream(TradePair tradePair, CandleData candleData) {
+        CandleStickChart chart = getActiveChart();
+
+        if (chart != null) {
+            chart.refreshChart();
+        }
+    }
+
+    public void updateAccountFromStream(Account account) {
+        updateAccountSummary(account);
+        updateAccountBalance();
+    }
+
+    public void updateOpenOrderFromStream(OpenOrder order) {
+        if (order == null) {
+            return;
+        }
+
+        accountOpenOrderItems.addFirst(order);
+
+        while (accountOpenOrderItems.size() > 500) {
+            accountOpenOrderItems.removeLast();
+        }
+    }
+
+    public void updatePositionFromStream(Position position) {
+        if (position == null) {
+            return;
+        }
+
+        accountPositionItems.addFirst(position);
+
+        while (accountPositionItems.size() > 500) {
+            accountPositionItems.removeLast();
+        }
+    }
+
+    /*
+     * TradingWindow UI-independent streaming patch
+     *
+     * Goal:
+     * - Desktop UI updates must NOT depend on SmartBot/SystemCore bot streaming.
+     * - UI stream is owned directly by TradingWindow using
+     * DesktopExchangeStreamBridge.
+     * - Bot stream is owned by SystemCore only when auto-trading is enabled.
+     *
+     * Apply these changes inside TradingWindow.java.
+     */
+
+    // ============================================================================
+    // 1. Add these fields near your other TradingWindow fields
+    // ============================================================================
+
+    private ExchangeStreamSubscription desktopStreamSubscription;
+    private DesktopExchangeStreamBridge desktopStreamBridge;
+    private boolean desktopStreaming;
+
+    // ============================================================================
+    // 3. Add these UI-only stream lifecycle methods inside TradingWindow
+    // ============================================================================
+
+    private void startDesktopStream(TradePair tradePair) {
+        if (!hasBrokerAccess()) {
+            return;
+        }
+
+        if (exchange == null || tradePair == null) {
+            return;
+        }
+
+        /*
+         * Never run the UI stream while bot trading is active.
+         * During bot trading, SystemCore owns the execution stream.
+         */
+        if (botTradingEnabled) {
+            return;
+        }
+
+        stopDesktopStream();
+
+        desktopStreamBridge = new DesktopExchangeStreamBridge(this);
+        desktopStreamSubscription = new ExchangeStreamSubscription();
+        desktopStreamSubscription.setTradePairs(Set.of(tradePair));
+        desktopStreamSubscription.setTicker(true);
+        desktopStreamSubscription.setTrades(true);
+        desktopStreamSubscription.setCandles(true);
+        desktopStreamSubscription.setOrderBook(true);
+        desktopStreamSubscription.setAccount(true);
+        desktopStreamSubscription.setOrders(true);
+        desktopStreamSubscription.setFills(true);
+        desktopStreamSubscription.setPositions(true);
+        desktopStreamSubscription.setBalances(true);
 
         try {
-            String savedApiKey = preferences.get("exchange_api_key_%s".formatted(exchange), "");
-            String savedApiSecret = preferences.get("exchange_api_secret_%s".formatted(exchange), "");
-            return !savedApiKey.isBlank() && !savedApiSecret.isBlank();
-        } catch (Exception e) {
-            logger.warn("Failed to check credentials for exchange: %s".formatted(exchange), e);
-            return false;
+            exchange.stream(desktopStreamSubscription, desktopStreamBridge);
+            desktopStreaming = true;
+            updateStreamingStatus("UI stream: " + tradePair.toString('/'));
+            appendJournal("Desktop UI stream started for " + tradePair.toString('/'));
+        } catch (Exception exception) {
+            desktopStreaming = false;
+            desktopStreamSubscription = null;
+            desktopStreamBridge = null;
+            appendJournal("Desktop UI stream failed: " + rootMessage(exception));
         }
     }
 
-    /**
-     * Load saved credentials for the selected exchange from preferences.
-     * If no saved credentials exist, keeps current values.
+    private void stopDesktopStream() {
+        if (exchange != null && desktopStreamSubscription != null) {
+            try {
+                exchange.stopStreaming(desktopStreamSubscription);
+            } catch (Exception exception) {
+                logger.debug("Failed to stop desktop UI stream", exception);
+            }
+        }
+
+        desktopStreamSubscription = null;
+        desktopStreamBridge = null;
+        desktopStreaming = false;
+    }
+
+    // ============================================================================
+    // 4. In completeConnectionValidation(...), start UI-only stream after
+    // connection
+    // ============================================================================
+
+    /*
+     * Find this existing block:
+     *
+     * TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+     * if (selected != null) {
+     * loadOrderBook(selected);
+     * }
+     * updateConnectionStatus();
+     *
+     * Replace it with this:
      */
-    private void loadExchangeCredentials(String exchange) {
-        if (exchange == null || exchange.isBlank()) {
+
+    // ============================================================================
+    // 5. Replace toggleBotTrading() with this bot/UI-safe version
+    // ============================================================================
+
+    private void toggleBotTrading() {
+        if (botTradingEnabled) {
+            botTradingEnabled = false;
+
+            if (systemCore != null) {
+                try {
+                    systemCore.setAutoTradingEnabled(false);
+                    systemCore.stopStreaming();
+                } catch (Exception exception) {
+                    logger.debug("Failed to stop SystemCore streaming", exception);
+                }
+            }
+
+            withActiveChart(chart -> chart.setAutoTradeEnabled(false));
+            appendAgentActivity("SystemCore bot auto trading disabled.");
+            refreshBotTradeButton();
+            saveAppState();
+
+            /*
+             * After bot stream stops, restart UI-only stream so the desktop keeps updating.
+             */
+            TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+            if (selected != null && hasBrokerAccess()) {
+                startDesktopStream(selected);
+            }
+
+            return;
+        }
+
+        if (!hasBrokerAccess()) {
+            showWarning("Bot Trading", "Validate broker credentials before starting the bot.");
+            return;
+        }
+
+        if (!hasOrderSubmissionAccess()) {
+            showWarning(
+                    "Bot Trading",
+                    "%s is connected, but this adapter cannot submit orders."
+                            .formatted(exchange.getDisplayName()));
+            return;
+        }
+
+        List<TradePair> symbols = selectedBotSymbols();
+        if (symbols.isEmpty()) {
+            showWarning("Bot Trading", "No symbols are available for the selected bot scope.");
             return;
         }
 
         try {
-            String savedApiKey = preferences.get("exchange_api_key_%s".formatted(exchange), "");
-            String savedApiSecret = preferences.get("exchange_api_secret_%s".formatted(exchange), "");
-            String savedTelegramToken = preferences.get("telegram_token_%s".formatted(exchange), "");
+            TradePair primarySymbol = symbols.getFirst();
 
-            if (!savedApiKey.isEmpty()) {
-                configuredApiKey = savedApiKey;
-                journal("Loaded API Key for %s".formatted(exchange));
-            }
-            if (!savedApiSecret.isEmpty()) {
-                configuredApiSecret = savedApiSecret;
-                journal("Loaded API Secret for %s".formatted(exchange));
-            }
-            if (!savedTelegramToken.isEmpty()) {
-                telegramToken = savedTelegramToken;
-                journal("Loaded Telegram Token for %s".formatted(exchange));
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to load credentials for exchange: %s".formatted(exchange), e);
+            /*
+             * Prevent duplicate exchange streams:
+             * - UI-only stream OFF
+             * - SystemCore bot stream ON
+             */
+            stopDesktopStream();
+
+            ensureSystemCoreStarted(primarySymbol);
+            systemCore.setAutoTradingEnabled(true);
+            systemCore.startStreaming(symbols, SystemCore.StreamingMode.EVERYTHING);
+
+            withActiveChart(chart -> chart.setAutoTradeEnabled(true));
+
+            botTradingEnabled = true;
+
+            appendAgentActivity(
+                    "SystemCore bot enabled for %d symbol(s) using %s."
+                            .formatted(symbols.size(), botSymbolScopeSelector.getValue()));
+
+            refreshBotTradeButton();
+            saveAppState();
+
+        } catch (Exception exception) {
+            logger.error("Failed to toggle bot trading", exception);
+            showWarning(
+                    "Bot Trading",
+                    "Could not start bot trading: %s".formatted(rootMessage(exception)));
         }
     }
 
-    /**
-     * Show credential input dialog for the selected exchange.
-     * Saves credentials to preferences and connects after user input.
+    // ============================================================================
+    // 9. Update shutdown() to stop both UI stream and bot stream
+    // ============================================================================
+
+    /*
+     * Add stopDesktopStream() at the beginning of shutdown():
      */
-    private void showExchangeCredentialDialog(String exchange) {
-        // Create a popup Stage window (400x400)
-        Stage credentialStage = new Stage();
-        credentialStage.setTitle("Enter Credentials - " + exchange);
-        credentialStage.setWidth(400);
-        credentialStage.setHeight(400);
-        credentialStage.setResizable(false);
-        credentialStage.initOwner(this.getScene().getWindow());
-        credentialStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
-        credentialStage.setOnCloseRequest(e -> journal("Credential input cancelled for %s".formatted(exchange)));
-
-        // Create credential input fields
-        TextField apiKeyField = new TextField();
-        apiKeyField.setPromptText("API Key");
-        apiKeyField.setText(preferences.get("exchange_api_key_" + exchange, ""));
-        apiKeyField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        PasswordField apiSecretField = new PasswordField();
-        apiSecretField.setPromptText("API Secret");
-        apiSecretField.setText(preferences.get("exchange_api_secret_" + exchange, ""));
-        apiSecretField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        ComboBox<String> venueBox = new ComboBox<>();
-        venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
-        String savedVenue = preferences.get("exchange_venue_" + exchange, "US");
-        venueBox.getSelectionModel().select(venueBox.getItems().contains(savedVenue) ? savedVenue : "US");
-        venueBox.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-        venueBox.setPrefWidth(300);
-
-        TextField accountIdField = new TextField();
-        accountIdField.setPromptText("Account ID (optional)");
-        accountIdField.setText(preferences.get("exchange_account_id_" + exchange, ""));
-        accountIdField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        TextField telegramTokenField = new TextField();
-        telegramTokenField.setPromptText("Telegram Bot Token (optional)");
-        telegramTokenField.setText(preferences.get("telegram_token_" + exchange, ""));
-        telegramTokenField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        Label messageLabel = new Label();
-        messageLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-        messageLabel.setWrapText(true);
-
-        // Create dialog content
-        GridPane gridPane = new GridPane();
-        gridPane.setHgap(10);
-        gridPane.setVgap(12);
-        gridPane.setPadding(new Insets(15));
-        gridPane.setStyle("-fx-background-color: #0f172a;");
-
-        Label titleLabel = new Label("Credentials: %s".formatted(exchange));
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
-        gridPane.add(titleLabel, 0, 0, 2, 1);
-
-        gridPane.add(new Label("API Key"), 0, 1);
-        gridPane.add(apiKeyField, 1, 1);
-        apiKeyField.setPrefWidth(220);
-
-        gridPane.add(new Label("API Secret"), 0, 2);
-        gridPane.add(apiSecretField, 1, 2);
-        apiSecretField.setPrefWidth(220);
-
-        gridPane.add(new Label("Venue"), 0, 3);
-        gridPane.add(venueBox, 1, 3);
-
-        gridPane.add(new Label("Account ID"), 0, 4);
-        gridPane.add(accountIdField, 1, 4);
-        accountIdField.setPrefWidth(220);
-
-        gridPane.add(new Label("Telegram"), 0, 5);
-        gridPane.add(telegramTokenField, 1, 5);
-        telegramTokenField.setPrefWidth(220);
-
-        gridPane.add(messageLabel, 0, 6, 2, 1);
-
-        // Create buttons
-        Button saveButton = new Button("Save & Connect");
-        saveButton.setStyle(
-                "-fx-padding: 8 15; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
-        saveButton.setPrefWidth(95);
-
-        Button cancelButton = new Button("Cancel");
-        cancelButton.setStyle("-fx-padding: 8 15; -fx-background-color: #1e40af; -fx-text-fill: white;");
-        cancelButton.setPrefWidth(95);
-
-        HBox buttonBox = new HBox(10, cancelButton, saveButton);
-        buttonBox.setAlignment(Pos.CENTER);
-        GridPane.setConstraints(buttonBox, 0, 7, 2, 1);
-        gridPane.getChildren().add(buttonBox);
-
-        // Handle button actions
-        saveButton.setOnAction(event -> {
-            if (apiKeyField.getText().isBlank() || apiSecretField.getText().isBlank()) {
-                messageLabel.setText("API Key and Secret are required.");
-                return;
-            }
-
-            // Save credentials to preferences
-            try {
-                preferences.put("exchange_api_key_" + exchange, apiKeyField.getText().trim());
-                preferences.put("exchange_api_secret_" + exchange, apiSecretField.getText().trim());
-                preferences.put("exchange_account_id_" + exchange, accountIdField.getText().trim());
-                preferences.put("exchange_venue_" + exchange, safe(venueBox.getValue()));
-                if (!telegramTokenField.getText().isBlank()) {
-                    preferences.put("telegram_token_" + exchange, telegramTokenField.getText().trim());
-                }
-                preferences.sync();
-
-                // Load the saved credentials
-                loadExchangeCredentials(exchange);
-                if (safe(exchange).equals(safe(exchangeSelector.getSelectionModel().getSelectedItem()))) {
-                    brokerAccessGranted = false;
-                    brokerSessions.remove(safe(exchange));
-                    this.exchange = createExchange(exchange, configuredApiKey, configuredApiSecret);
-                    setTelegramToken(telegramToken);
-                    updateConnectionStatus();
-                }
-
-                // Close dialog and proceed with connection
-                credentialStage.close();
-                journal("Credentials saved for " + exchange);
-                proceedWithConnection();
-
-            } catch (Exception e) {
-                logger.error("Failed to save credentials", e);
-                messageLabel.setText("Error: " + rootMessage(e));
-            }
-        });
-
-        cancelButton.setOnAction(event -> {
-            credentialStage.close();
-            journal("Credential input cancelled for " + exchange);
-        });
-
-        ScrollPane scrollPane = new ScrollPane(gridPane);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: #0f172a; -fx-control-inner-background: #0f172a;");
-
-        Scene scene = new Scene(scrollPane);
-        credentialStage.setScene(scene);
-        credentialStage.show();
-    }
 
     public void shutdown() {
         journal("Shutting down TradingWindow.");
+
+        stopDesktopStream();
         stopActiveStreaming();
-        if (smartBot != null) {
+
+        if (systemCore != null) {
             try {
-                smartBot.stop();
+                systemCore.stop();
             } catch (Exception exception) {
-                logger.debug("Failed to stop SmartBot", exception);
+                logger.debug("Failed to stop SystemCore bot", exception);
             }
+
+            try {
+                systemCore.disconnect();
+            } catch (Exception exception) {
+                logger.debug("Failed to disconnect SystemCore", exception);
+            }
+
+            systemCore = null;
+            systemCoreEventsSubscribed = false;
         }
+
         disablePositionAutoRefresh();
         closeAllCharts();
 
-        // Stop auto-refresh tasks
         try {
             autoRefreshExecutor.shutdown();
             if (!autoRefreshExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
                 autoRefreshExecutor.shutdownNow();
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
             autoRefreshExecutor.shutdownNow();
-            logger.debug("Auto-refresh executor interrupted during shutdown", e);
+            logger.debug("Auto-refresh executor interrupted during shutdown", exception);
         }
 
         try {
@@ -3087,4 +3148,5 @@ public class TradingWindow extends BorderPane {
             logger.warn("Failed to close exchange cleanly", exception);
         }
     }
+
 }

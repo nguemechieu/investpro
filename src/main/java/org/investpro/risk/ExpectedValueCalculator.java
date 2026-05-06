@@ -38,9 +38,8 @@ public class ExpectedValueCalculator {
             return 0;
         }
 
-        double tradeRisk = context.calculateTradeRisk();
-        double avgWin = tradeRisk * context.getExpectedRewardRiskRatio();
-        double avgLoss = tradeRisk;
+        double avgLoss = context.calculateTradeRisk();
+        double avgWin = avgLoss * context.getExpectedRewardRiskRatio();
 
         return calculateExpectedValue(context.getExpectedWinRate() * 100.0, avgWin, avgLoss);
     }

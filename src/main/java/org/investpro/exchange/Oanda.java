@@ -69,7 +69,7 @@ public class Oanda extends Exchange {
     private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
 
     private static final String OANDA_API_URL = "https://api-fxtrade.oanda.com";
-   // "https://stream-fxtrade.oanda.com/v3/accounts/<ACCOUNT>/pricing/stream?instruments=EUR_USD%2CUSD_CAD"
+    // "https://stream-fxtrade.oanda.com/v3/accounts/<ACCOUNT>/pricing/stream?instruments=EUR_USD%2CUSD_CAD"
 
     private static final String OANDA_STREAM_URL = "https://stream-fxtrade.oanda.com";
 
@@ -105,10 +105,11 @@ public class Oanda extends Exchange {
 
         /*
          * For this adapter:
-         * - apiKey    = OANDA token
+         * - apiKey = OANDA token
          * - apiSecret = OANDA account id, if known
          *
-         * If apiSecret is blank, the adapter will auto-detect account id from /v3/accounts.
+         * If apiSecret is blank, the adapter will auto-detect account id from
+         * /v3/accounts.
          */
         this.accountId = safe(apiSecret);
 
@@ -121,12 +122,12 @@ public class Oanda extends Exchange {
         try {
             this.websocketClient = new OandaWebSocketClient(
                     URI.create(OANDA_STREAM_URL + "/v3/accounts/%s/pricing/stream".formatted(this.accountId)),
-                    new Draft_6455()
-            );
+                    new Draft_6455());
             this.websocketClient.addHeader("Authorization", "Bearer %s".formatted(this.apiKey));
             this.websocketAvailable = false;
         } catch (Exception exception) {
-            logger.warn("OANDA WebSocket-style client unavailable. Polling/HTTP streaming fallback will be used.", exception);
+            logger.warn("OANDA WebSocket-style client unavailable. Polling/HTTP streaming fallback will be used.",
+                    exception);
             this.websocketAvailable = false;
         }
     }
@@ -185,8 +186,17 @@ public class Oanda extends Exchange {
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
         return List.of(
-                MARKET_TYPES.FOREX
-        );
+                MARKET_TYPES.FOREX);
+    }
+
+    @Override
+    public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
+        return createMarketOrder(symbol, side, quantity);
+    }
+
+    @Override
+    public CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
+        return createLimitOrder(symbol, side, quantity, limitPrice);
     }
 
     // ---------------------------------------------------------------------
@@ -243,8 +253,9 @@ public class Oanda extends Exchange {
     public boolean supportsWebSocket() {
         return false;
     }
-   @Override
-   public boolean isWebsocketAvailable() {
+
+    @Override
+    public boolean isWebsocketAvailable() {
         return websocketAvailable
                 && websocketClient != null
                 && websocketClient.isOpen();
@@ -379,8 +390,7 @@ public class Oanda extends Exchange {
             TradePair tradePair,
             Instant currentCandleStartedAt,
             long secondsIntoCurrentCandle,
-            int secondsPerCandle
-    ) {
+            int secondsPerCandle) {
         if (tradePair == null || currentCandleStartedAt == null) {
             return failedFuture(new IllegalArgumentException("tradePair and currentCandleStartedAt must not be null"));
         }
@@ -388,7 +398,8 @@ public class Oanda extends Exchange {
         int granularitySeconds = getCandleDataSupplier(secondsPerCandle, tradePair)
                 .getSupportedGranularities()
                 .stream()
-                .min(Comparator.comparingInt(value -> Math.abs(value - Math.max(5, (int) secondsIntoCurrentCandle / 100))))
+                .min(Comparator
+                        .comparingInt(value -> Math.abs(value - Math.max(5, (int) secondsIntoCurrentCandle / 100))))
                 .orElseThrow(() -> new NoSuchElementException("Supported granularity was empty"));
 
         String granularity = toOandaGranularity(granularitySeconds);
@@ -405,7 +416,8 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.warn("OANDA in-progress candle failed HTTP {}: {}", response.statusCode(), response.body());
+                        logger.warn("OANDA in-progress candle failed HTTP {}: {}", response.statusCode(),
+                                response.body());
                         return Optional.empty();
                     }
 
@@ -439,7 +451,8 @@ public class Oanda extends Exchange {
                             close = mid.path("c").asDouble(close);
                             volume += candle.path("volume").asDouble(0);
 
-                            Instant candleTime = Instant.parse(candle.path("time").asText(currentCandleStartedAt.toString()));
+                            Instant candleTime = Instant
+                                    .parse(candle.path("time").asText(currentCandleStartedAt.toString()));
                             currentTill = (int) candleTime.getEpochSecond();
                         }
 
@@ -456,8 +469,7 @@ public class Oanda extends Exchange {
                                 low,
                                 currentTill,
                                 close,
-                                volume
-                        ));
+                                volume));
 
                     } catch (Exception exception) {
                         throw new RuntimeException(exception);
@@ -576,7 +588,8 @@ public class Oanda extends Exchange {
 
                         double bid = firstPrice(price.path("bids"));
                         double ask = firstPrice(price.path("asks"));
-                        long timestamp = Instant.parse(price.path("time").asText(Instant.now().toString())).toEpochMilli();
+                        long timestamp = Instant.parse(price.path("time").asText(Instant.now().toString()))
+                                .toEpochMilli();
 
                         Ticker ticker = new Ticker();
                         ticker.setBidPrice(bid);
@@ -731,7 +744,8 @@ public class Oanda extends Exchange {
 
                 String url = "%s/v3/accounts/%s/orders".formatted(OANDA_API_URL, account);
 
-                String instrument = safe(order.getSymbol()).replace("/", "_").replace("-", "_").toUpperCase(Locale.ROOT);
+                String instrument = safe(order.getSymbol()).replace("/", "_").replace("-", "_")
+                        .toUpperCase(Locale.ROOT);
                 if (instrument.isBlank()) {
                     instrument = tradePair == null ? "EUR_USD" : toInstrument(tradePair);
                 }
@@ -804,8 +818,7 @@ public class Oanda extends Exchange {
             Side side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         Order order = new Order();
         order.setSymbol(tradePair == null ? "" : toInstrument(tradePair));
         order.setType(side == Side.SELL ? "SELL" : "BUY");
@@ -825,10 +838,12 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount, double limitPrice) {
+    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
+            double limitPrice) {
         /*
          * You can later convert this to OANDA LIMIT order payload.
-         * For now return unsupported explicitly instead of silently sending wrong order type.
+         * For now return unsupported explicitly instead of silently sending wrong order
+         * type.
          */
         return failedFuture(new UnsupportedOperationException("OANDA limit order adapter is not implemented yet"));
     }
@@ -845,8 +860,7 @@ public class Oanda extends Exchange {
             double amount,
             double entryPrice,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         Order order = createOrder(0, tradePair, "MARKET", entryPrice, amount, side, stopLoss, takeProfit, 0);
         return createOrder(order);
     }
@@ -1036,7 +1050,8 @@ public class Oanda extends Exchange {
         }
 
         String instrumentQuery = tradePair == null ? "" : "&instrument=%s".formatted(toInstrument(tradePair));
-        String url = "%s/v3/accounts/%s/orders?state=ALL&count=100%s".formatted(OANDA_API_URL, account, instrumentQuery);
+        String url = "%s/v3/accounts/%s/orders?state=ALL&count=100%s".formatted(OANDA_API_URL, account,
+                instrumentQuery);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -1168,8 +1183,7 @@ public class Oanda extends Exchange {
 
         Map<String, Object> body = Map.of(
                 "longUnits", "ALL",
-                "shortUnits", "ALL"
-        );
+                "shortUnits", "ALL");
 
         try {
             HttpRequest request = requestBuilder(url)
@@ -1231,8 +1245,7 @@ public class Oanda extends Exchange {
                                     Math.abs(units),
                                     units < 0 ? Side.SELL : Side.BUY,
                                     parseLong(node.path("id").asText("0")),
-                                    parseInstant(node.path("openTime").asText(""))
-                            );
+                                    parseInstant(node.path("openTime").asText("")));
                             trade.setFee(node.path("financing").asDouble(0.0));
                             result.add(trade);
                         }
@@ -1253,7 +1266,8 @@ public class Oanda extends Exchange {
 
         return fetchAccountTrades(tradePair)
                 .thenApply(trades -> trades.stream()
-                        .filter(trade -> trade != null && trade.getTimestamp() != null && trade.getTimestamp().isAfter(since))
+                        .filter(trade -> trade != null && trade.getTimestamp() != null
+                                && trade.getTimestamp().isAfter(since))
                         .toList());
     }
 
@@ -1282,8 +1296,7 @@ public class Oanda extends Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         createBracketOrder(tradePair, Side.BUY, size, 0.0, stopLoss, takeProfit)
                 .thenAccept(id -> logger.info("OANDA BUY submitted id={}", id));
     }
@@ -1296,8 +1309,7 @@ public class Oanda extends Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         createBracketOrder(tradePair, Side.SELL, size, 0.0, stopLoss, takeProfit)
                 .thenAccept(id -> logger.info("OANDA SELL submitted id={}", id));
     }
@@ -1315,8 +1327,7 @@ public class Oanda extends Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         boolean valid = tradePair != null
                 && supportsMarketType(marketType)
                 && size > 0
@@ -1367,32 +1378,38 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
-        return failedFuture(new UnsupportedOperationException("OANDA leverage is account/regulation controlled and not set per order here."));
+        return failedFuture(new UnsupportedOperationException(
+                "OANDA leverage is account/regulation controlled and not set per order here."));
     }
 
     @Override
     public CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss) {
-        return failedFuture(new UnsupportedOperationException("OANDA position modification requires order management."));
+        return failedFuture(
+                new UnsupportedOperationException("OANDA position modification requires order management."));
     }
 
     @Override
     public CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity) {
-        return failedFuture(new UnsupportedOperationException("OANDA partial position closure requires trade-level management."));
+        return failedFuture(
+                new UnsupportedOperationException("OANDA partial position closure requires trade-level management."));
     }
 
     @Override
     public CompletableFuture<String> closePosition(TradePair symbol, String positionId) {
-        return failedFuture(new UnsupportedOperationException("OANDA position closure by ID requires trade-level query."));
+        return failedFuture(
+                new UnsupportedOperationException("OANDA position closure by ID requires trade-level query."));
     }
 
     @Override
     public CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit) {
-        return failedFuture(new UnsupportedOperationException("OANDA position modification requires order management."));
+        return failedFuture(
+                new UnsupportedOperationException("OANDA position modification requires order management."));
     }
 
     @Override
     public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
-        return failedFuture(new UnsupportedOperationException("OANDA trailing stop must be configured through order types, not position modification."));
+        return failedFuture(new UnsupportedOperationException(
+                "OANDA trailing stop must be configured through order types, not position modification."));
     }
 
     // ---------------------------------------------------------------------
@@ -1459,7 +1476,6 @@ public class Oanda extends Exchange {
         return false;
     }
 
-
     // ---------------------------------------------------------------------
     // Streaming
     // ---------------------------------------------------------------------
@@ -1483,7 +1499,6 @@ public class Oanda extends Exchange {
     public boolean supportsPollingFallback() {
         return false;
     }
-
 
     @Override
     public void connectStream() {
@@ -1706,8 +1721,6 @@ public class Oanda extends Exchange {
         return true;
     }
 
-
-
     @Override
     public boolean supportsOrderBookStreaming() {
         return true;
@@ -1778,7 +1791,6 @@ public class Oanda extends Exchange {
     public boolean supportsFillStreaming() {
         return false;
     }
-
 
     @Override
     public boolean supportsPositionStreaming() {
@@ -1851,8 +1863,7 @@ public class Oanda extends Exchange {
 
         return "%s_%s".formatted(
                 pair.getBaseCurrency().getCode().replace("/", "").replace("-", "").toUpperCase(Locale.ROOT),
-                pair.getCounterCurrency().getCode().replace("/", "").replace("-", "").toUpperCase(Locale.ROOT)
-        );
+                pair.getCounterCurrency().getCode().replace("/", "").replace("-", "").toUpperCase(Locale.ROOT));
     }
 
     private TradePair instrumentToTradePair(String instrument) {
@@ -1860,7 +1871,7 @@ public class Oanda extends Exchange {
         String[] parts = normalized.split("_");
 
         if (parts.length < 2 || parts[0].isBlank() || parts[1].isBlank()) {
-            parts = new String[]{"EUR", "USD"};
+            parts = new String[] { "EUR", "USD" };
         }
 
         try {
@@ -1871,7 +1882,8 @@ public class Oanda extends Exchange {
             try {
                 return new TradePair("EUR", "USD");
             } catch (Exception fallbackException) {
-                throw new IllegalStateException("Unable to create OANDA trade pair for %s".formatted(instrument), fallbackException);
+                throw new IllegalStateException("Unable to create OANDA trade pair for %s".formatted(instrument),
+                        fallbackException);
             }
         }
     }

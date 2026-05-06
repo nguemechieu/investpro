@@ -267,7 +267,7 @@ public class ChartToolbar extends Region {
      * @param secondsPerCandle the selected candle duration in seconds
      * @throws NullPointerException if secondsPerCandle is null
      */
-    void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
+    public void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(secondsPerCandle, "secondsPerCandle must not be null");
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
@@ -284,7 +284,7 @@ public class ChartToolbar extends Region {
      * @param secondsPerCandle the property tracking the current candle duration
      * @throws NullPointerException if either parameter is null
      */
-    void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
+    public void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(candleStickChart, "candleStickChart must not be null");
         Objects.requireNonNull(secondsPerCandle, "secondsPerCandle must not be null");
 
@@ -390,7 +390,7 @@ public class ChartToolbar extends Region {
      * @param chartOptions the chart options UI component
      * @throws NullPointerException if chartOptions is null
      */
-    void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
+    public void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
         Objects.requireNonNull(chartOptions, "chartOptions must not be null");
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
@@ -787,9 +787,9 @@ public class ChartToolbar extends Region {
          */
         private void updateSeparatorPadding(boolean isLargeScreen, double width) {
             if (isLargeScreen) {
-                functionOptionsSeparator.setPadding(new Insets( width,0, 0, 0));
+                functionOptionsSeparator.setPadding(new Insets( width+2,0, 0, 0));
             } else {
-                functionOptionsSeparator.setPadding(new Insets(width, 2, 0, 0));
+                functionOptionsSeparator.setPadding(new Insets(width+1, 2, 0, 0));
             }
         }
     }

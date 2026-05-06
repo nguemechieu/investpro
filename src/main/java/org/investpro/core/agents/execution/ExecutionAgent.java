@@ -56,6 +56,14 @@ public class ExecutionAgent implements Agent {
             return;
         }
 
+        if (!context.getExchange().canSubmitOrders()) {
+            context.getEventBus().publishAsync(AgentEvent.execution(
+                    AgentEvent.ORDER_REJECTED,
+                    name(),
+                    "Exchange is connected but not ready for order submission."));
+            return;
+        }
+
         ReasoningDecision reasoningDecision = (ReasoningDecision) event.payload();
         RiskDecision riskDecision = reasoningDecision.getSourcePayload() instanceof RiskDecision rd ? rd : null;
         Signal signal = riskDecision != null && riskDecision.getSourcePayload() instanceof Signal s ? s : null;

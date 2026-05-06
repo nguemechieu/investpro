@@ -10,7 +10,7 @@ import java.util.List;
  */
 public class BollingerBandsIndicator extends BaseIndicator {
     
-    private double stdDevMultiplier;
+    private final double stdDevMultiplier;
     
     public BollingerBandsIndicator() {
         this(20, 2.0);

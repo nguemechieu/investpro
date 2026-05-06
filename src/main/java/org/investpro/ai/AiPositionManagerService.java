@@ -1,42 +1,38 @@
 package org.investpro.ai;
 
 /**
- * Interface for AI-based position management recommendations.
- * <p>
- * AI can review open positions and recommend actions (hold, reduce, close, etc.)
- * but CANNOT directly execute orders or bypass risk controls.
- * <p>
- * Implementations must:
- * - Return structured recommendations only
- * - Never send execution orders
- * - Handle errors gracefully (ESCALATE_TO_MANUAL_REVIEW on uncertainty)
- * - Respect the RiskManagementSystem and FinalRiskGate authority
+ * Interface for AI-based position management services.
+ * Provides recommendations for open positions based on market conditions and
+ * risk analysis.
  */
 public interface AiPositionManagerService {
-    
+
     /**
-     * Review an open position and provide management recommendation.
+     * Review an open position and provide a management action.
      *
-     * @param request Complete position management context
-     * @return AI recommendation with confidence and reasoning
-     *
-     * Never returns null. Returns failedResponse() if unable to process.
-     * Does not modify position state or execute orders.
+     * @param request The position management request with position details
+     * @return The AI's response with recommended actions
      */
     AiPositionManagementResponse reviewOpenPosition(AiPositionManagementRequest request);
-    
+
     /**
-     * Get the name of this AI service (e.g., "gpt-4-turbo", "local-fallback").
+     * Get the model name used by this service.
+     *
+     * @return The model name
      */
     String getModelName();
-    
+
     /**
-     * Check if this service is currently available/operational.
+     * Check if this service is available and operational.
+     *
+     * @return true if the service is available
      */
     boolean isAvailable();
-    
+
     /**
-     * Get average processing time in milliseconds.
+     * Get the average processing time in milliseconds.
+     *
+     * @return Average processing time
      */
     long getAverageProcessingTimeMs();
 }

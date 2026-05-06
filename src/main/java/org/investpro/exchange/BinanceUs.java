@@ -20,23 +20,30 @@ import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.jetbrains.annotations.NotNull;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+@Slf4j
 public class BinanceUs extends Exchange {
     private static final Logger logger = LoggerFactory.getLogger(BinanceUs.class);
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
@@ -44,18 +51,45 @@ public class BinanceUs extends Exchange {
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final String BINANCE_US_WS_URL = "wss://stream.binance.us:9443/ws";
+    private static final String BINANCE_US_REST_URL = "https://api.binance.us";
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
     private ExchangeWebSocketClient websocketClient;
+    private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
+            false);
+
+    // Paper trading state
+    private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<String, String> orders = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.List<Position> positions = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private long nextOrderId = 1000;
 
     public BinanceUs(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
+        initializePaperTradingAccount();
 
         try {
             this.websocketClient = createWebSocketClient();
         } catch (Exception ex) {
             logger.error("Failed to initialize BinanceUs websocket client", ex);
         }
+    }
+
+    private void initializePaperTradingAccount() {
+        // Initialize with $10,000 USD for paper trading
+        balances.put("USDT", 10000.0);
+        balances.put("USD", 10000.0);
+        balances.put("BTC", 0.0);
+        balances.put("ETH", 0.0);
+        logger.info("BinanceUs paper trading account initialized with $10,000 USDT");
+    }
+
+    private String normalizeCurrency(String currencyCode) {
+        return currencyCode == null || currencyCode.isBlank()
+                ? "USDT"
+                : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
     /**
@@ -73,8 +107,7 @@ public class BinanceUs extends Exchange {
 
     @Override
     public TradePair getSelecTradePair() throws SQLException, ClassNotFoundException {
-        logger.warn("getSelecTradePair() not implemented for BinanceUS");
-        return null; // No safe default
+        return getSelectedTradePair();
     }
 
     @Override
@@ -95,45 +128,45 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size,
             double side, double stopLoss, double takeProfit, double slippage) {
-        logger.warn("validateOrder() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture(true);
+        return CompletableFuture.completedFuture(tradePair != null
+                && size >= getMinOrderAmount(tradePair)
+                && supportsMarketType(marketType));
     }
 
     @Override
     public double normalizeAmount(TradePair tradePair, double amount) {
-        return 0;
+        return Double.isFinite(amount) && amount > 0 ? amount : 0.0;
     }
 
     @Override
     public double normalizePrice(TradePair tradePair, double price) {
-        return 0;
+        return Double.isFinite(price) && price >= 0 ? price : 0.0;
     }
 
     @Override
     public double getMinOrderAmount(TradePair tradePair) {
-        return 0;
+        return 0.00000001;
     }
 
     @Override
     public double getMinOrderNotional(TradePair tradePair) {
-        return 0;
+        return 1.0;
     }
 
     @Override
     public double getMaxLeverage(TradePair tradePair) {
-        return 0;
+        return 1.0;
     }
 
     @Override
     public CompletableFuture<Double> fetchLeverage(TradePair tradePair) {
-        logger.warn("fetchLeverage() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture(0.0);
+        return CompletableFuture.completedFuture(1.0);
     }
 
     @Override
     public CompletableFuture<String> setLeverage(TradePair tradePair, double leverage) {
         logger.warn("setLeverage() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture("");
+        return failedFuture(unsupported("setLeverage"));
     }
 
     @Override
@@ -168,17 +201,17 @@ public class BinanceUs extends Exchange {
 
     @Override
     public boolean supportsLiveTrading() {
-        return false;
+        return hasCredentials();
     }
 
     @Override
     public boolean supportsPaperTradingMode() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean supportsOrderBook() {
-        return false;
+        return true;
     }
 
     @Override
@@ -223,18 +256,17 @@ public class BinanceUs extends Exchange {
 
     @Override
     public boolean supportsCrypto() {
-        return false;
+        return true;
     }
 
     @Override
     public StreamTransport getStreamTransport() {
-        logger.warn("getStreamTransport() not implemented for BinanceUS");
-        return null; // No safe default
+        return StreamTransport.WEBSOCKET;
     }
 
     @Override
     public boolean supportsNativeWebSocket() {
-        return false;
+        return true;
     }
 
     @Override
@@ -244,7 +276,7 @@ public class BinanceUs extends Exchange {
 
     @Override
     public boolean supportsPollingFallback() {
-        return false;
+        return true;
     }
 
     @Override
@@ -538,9 +570,10 @@ public class BinanceUs extends Exchange {
     @Override
     public Boolean isConnected() {
         try {
-            return websocketClient != null
-                    && websocketClient.connectionEstablished != null
-                    && websocketClient.connectionEstablished.get();
+            return connected.get()
+                    || websocketClient != null
+                            && websocketClient.connectionEstablished != null
+                            && websocketClient.connectionEstablished.get();
         } catch (Exception exception) {
             return false;
         }
@@ -582,41 +615,33 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
         Objects.requireNonNull(order, "order must not be null");
-        logger.warn("createOrder not yet fully implemented for BinanceUs");
-        return CompletableFuture.completedFuture(java.util.UUID.randomUUID().toString());
+        String type = order.getType() == null ? "MARKET" : order.getType().trim().toUpperCase(java.util.Locale.ROOT);
+        Side side = order.getSide() == null ? Side.BUY : order.getSide();
+        if ("LIMIT".equals(type)) {
+            return createLimitOrder(tradePairFromSymbol(order.getSymbol(), "USDT"), side, order.getQuantity(),
+                    order.getPrice());
+        }
+        return createMarketOrder(tradePairFromSymbol(order.getSymbol(), "USDT"), side, order.getQuantity());
     }
 
     @Override
     public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
             double stopLoss, double takeProfit, double slippage) {
         logger.warn("createOrder() not implemented for BinanceUS");
-        return null; // No safe default
-    }
-
-    @Override
-    public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        logger.warn("createMarketOrder() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture("");
-    }
-
-    @Override
-    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
-            double limitPrice) {
-        logger.warn("createLimitOrder() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture("");
+        return super.createOrder((long) id, tradePair, type, price, amount, side, stopLoss, takeProfit, slippage);
     }
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
         logger.warn("createStopOrder() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture("");
+        return failedFuture(unsupported("createStopOrder"));
     }
 
     @Override
     public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount,
             double entryPrice, double stopLoss, double takeProfit) {
         logger.warn("createBracketOrder() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture("");
+        return failedFuture(unsupported("createBracketOrder"));
     }
 
     @Override
@@ -665,26 +690,153 @@ public class BinanceUs extends Exchange {
 
     @Override
     public boolean isSandbox() {
-        return false;
+        return isPaperTrading();
     }
 
     @Override
     public boolean isPaperTrading() {
-        return false;
+        return !hasCredentials();
     }
 
     @Override
     public boolean supportsMarketType(MARKET_TYPES marketType) {
-        return false;
+        if (marketType == null) {
+            return false;
+        }
+        String name = marketType.name().toUpperCase(java.util.Locale.ROOT);
+        return name.contains("CRYPTO") || name.contains("SPOT");
     }
 
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
-        return List.of();
+        return java.util.Arrays.stream(MARKET_TYPES.values())
+                .filter(this::supportsMarketType)
+                .toList();
+    }
+
+    @Override
+    public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
+        return createMarketOrder(symbol, side, quantity);
+    }
+
+    @Override
+    public CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
+        return createLimitOrder(symbol, side, quantity, limitPrice);
+    }
+
+    @Override
+    public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
+        if (hasCredentials()) {
+            return submitBinanceUsOrder(tradePair, side, amount, 0.0, "MARKET");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
+            double fillPrice = 50000.0; // Simulated market price
+
+            if (side == Side.BUY) {
+                double cost = amount * fillPrice;
+                Double balance = balances.getOrDefault("USDT", 0.0);
+                if (balance < cost) {
+                    throw new RuntimeException(
+                            "Insufficient balance for market order. Required: " + cost + ", Available: " + balance);
+                }
+                balances.put("USDT", balance - cost);
+                balances.put(tradePair.getBaseCode(),
+                        balances.getOrDefault(tradePair.getBaseCode(), 0.0) + amount);
+            } else {
+                Double baseBalance = balances.getOrDefault(tradePair.getBaseCode(), 0.0);
+                if (baseBalance < amount) {
+                    throw new RuntimeException(
+                            "Insufficient " + tradePair.getBaseCode() + " balance for market order.");
+                }
+                balances.put(tradePair.getBaseCode(), baseBalance - amount);
+                balances.put("USDT", balances.getOrDefault("USDT", 0.0) + (amount * fillPrice));
+            }
+
+            // Record trade in history
+            Trade trade = new Trade();
+            trade.setTradePair(tradePair);
+            trade.setPrice(fillPrice);
+            trade.setAmount(amount);
+            trade.setTransactionType(side);
+            trade.setLocalTradeId(System.nanoTime());
+            trade.setTimestamp(java.time.Instant.now());
+            trade.setFee(0.0);
+            trade.setStopLoss(0.0);
+            trade.setTakeProfit(0.0);
+            trade.setSwap(0.0);
+            trade.setProfit(0.0);
+            tradeHistory.add(trade);
+
+            orders.put(orderId, "FILLED");
+            logger.info("[PAPER] Market order {} executed: {} {} at ${}", orderId, side, amount, fillPrice);
+            return orderId;
+        });
+    }
+
+    @Override
+    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
+            double limitPrice) {
+        if (hasCredentials()) {
+            return submitBinanceUsOrder(tradePair, side, amount, limitPrice, "LIMIT");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            String orderId = "ORDER-" + (nextOrderId++) + "-" + System.currentTimeMillis();
+
+            if (side == Side.BUY) {
+                double cost = amount * limitPrice;
+                Double balance = balances.getOrDefault("USDT", 0.0);
+                if (balance < cost) {
+                    throw new RuntimeException(
+                            "Insufficient balance for limit order. Required: " + cost + ", Available: " + balance);
+                }
+                balances.put("USDT", balance - cost);
+                balances.put(tradePair.getBaseCode(),
+                        balances.getOrDefault(tradePair.getBaseCode(), 0.0) + amount);
+            } else {
+                Double baseBalance = balances.getOrDefault(tradePair.getBaseCode(), 0.0);
+                if (baseBalance < amount) {
+                    throw new RuntimeException(
+                            "Insufficient " + tradePair.getBaseCode() + " balance for limit order.");
+                }
+                balances.put(tradePair.getBaseCode(), baseBalance - amount);
+                balances.put("USDT", balances.getOrDefault("USDT", 0.0) + (amount * limitPrice));
+            }
+
+            // Record trade in history
+            Trade trade = new Trade();
+            trade.setTradePair(tradePair);
+            trade.setPrice(limitPrice);
+            trade.setAmount(amount);
+            trade.setTransactionType(side);
+            trade.setLocalTradeId(System.nanoTime());
+            trade.setTimestamp(java.time.Instant.now());
+            trade.setFee(0.0);
+            trade.setStopLoss(0.0);
+            trade.setTakeProfit(0.0);
+            trade.setSwap(0.0);
+            trade.setProfit(0.0);
+            tradeHistory.add(trade);
+
+            orders.put(orderId, "FILLED");
+            logger.info("[PAPER] Limit order {} executed: {} {} at limit ${}", orderId, side, amount, limitPrice);
+            return orderId;
+        });
     }
 
     @Override
     public void connect() {
+        if (hasCredentials()) {
+            try {
+                fetchAccount().join();
+                connected.set(true);
+                logger.info("Connected to Binance US REST API");
+                return;
+            } catch (Exception exception) {
+                connected.set(false);
+                logger.warn("Unable to connect Binance US REST API", exception);
+            }
+        }
         try {
             if (websocketClient != null && !websocketClient.isOpen()) {
                 // Use connectBlocking() to wait for actual connection establishment
@@ -700,23 +852,31 @@ public class BinanceUs extends Exchange {
             logger.error("BinanceUs WebSocket connection interrupted", exception);
         } catch (Exception exception) {
             logger.warn("Unable to connect BinanceUs WebSocket", exception);
+        } finally {
+            if (isPaperTrading()) {
+                connected.set(true);
+            }
         }
     }
 
     @Override
     public void disconnect() {
-
+        connected.set(false);
+        if (websocketClient != null) {
+            websocketClient.close();
+        }
     }
 
     @Override
     public void reconnect() {
-
+        disconnect();
+        connect();
     }
 
     @Override
     public List<TradePair> getTradePairSymbol() {
         // Using Binance US API to get all trading pairs
-        String url = "https://api.binanceapius.com/api/v3/exchangeInfo";
+        String url = BINANCE_US_REST_URL + "/api/v3/exchangeInfo";
         ArrayList<TradePair> tradePairs = new ArrayList<>();
 
         try {
@@ -792,56 +952,40 @@ public class BinanceUs extends Exchange {
 
     @Override
     public List<TradePair> getTradablePairs() {
-        return List.of();
+        return getTradePairSymbol();
     }
 
     @Override
     public boolean supportsTradePair(TradePair tradePair) {
-        return false;
+        return tradePair != null;
     }
 
     @Override
-    public CompletableFuture<String> getOrderBook(TradePair tradePair) {
+    public CompletableFuture<OrderBook> getOrderBook(TradePair tradePair) {
         if (tradePair == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("TradePair cannot be null"));
         }
-        return CompletableFuture.completedFuture("{}");
+        return fetchOrderBook(tradePair);
     }
 
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
-        if (tradePair == null) {
-            return null;
-        }
-        try {
-            Ticker ticker = new Ticker();
-
-            ticker.setBidPrice(0.0);
-            ticker.setAskPrice(0.0);
-            ticker.setLastPrice(0.0);
-            ticker.setVolume(0.0);
-            ticker.setTimestamp(System.currentTimeMillis());
-            CompletableFuture<Ticker> tickers = fetchTicker(tradePair);
-            tickers.complete(ticker);
-
-            return tickers.get();
-        } catch (Exception ex) {
-            logger.error("Error getting live price", ex);
-            return null;
-        }
+        if (tradePair == null)
+            return Ticker.empty();
+        Ticker ticker = new Ticker();
+        // Simulated prices
+        double price = tradePair.getBaseCode().equals("BTC") ? 50000.0 : 3000.0;
+        ticker.setLastPrice(price);
+        ticker.setBidPrice(price * 0.999);
+        ticker.setAskPrice(price * 1.001);
+        ticker.setVolume(1000000.0);
+        ticker.setTimestamp(System.currentTimeMillis());
+        return ticker;
     }
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        if (tradePair == null) {
-            return CompletableFuture.completedFuture(null);
-        }
-        try {
-            return CompletableFuture.completedFuture(getLivePrice(tradePair));
-        } catch (Exception ex) {
-            logger.error("Error fetching ticker", ex);
-            return CompletableFuture.completedFuture(null);
-        }
+        return CompletableFuture.completedFuture(getLivePrice(tradePair));
     }
 
     @Override
@@ -858,33 +1002,46 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
-        logger.warn("getTicker() not implemented for BinanceUS");
-        return CompletableFuture.completedFuture(Collections.emptyList());
+        return fetchTickers(pair == null ? List.of() : List.of(pair));
     }
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        try {
-            return CompletableFuture.completedFuture(getUserAccountDetails());
-        } catch (Exception ex) {
-            logger.error("Error fetching account", ex);
-            return CompletableFuture.completedFuture(null);
+        if (hasCredentials()) {
+            return CompletableFuture.supplyAsync(this::fetchLiveAccount);
         }
+        return CompletableFuture.supplyAsync(() -> {
+            Account account = new Account();
+            double equity = balances.values().stream().mapToDouble(Double::doubleValue).sum();
+            account.setTotalBalance(balances.getOrDefault("USDT", 0.0));
+            account.setAvailableBalance(balances.getOrDefault("USDT", 0.0));
+            account.setEquity(equity);
+            account.setBalances(new java.util.LinkedHashMap<>(balances));
+            account.setAvailableBalances(new java.util.LinkedHashMap<>(balances));
+            account.setExchangeId("binanceus");
+            account.setBrokerName("Binance US");
+            account.setPaperTrading(true);
+            account.setConnected(true);
+            account.setUpdatedAt(java.time.Instant.now());
+            logger.debug("[PAPER] Account summary: Equity=${}, Balance=${}", equity,
+                    balances.getOrDefault("USDT", 0.0));
+            return account;
+        });
     }
 
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
-        return CompletableFuture.completedFuture(0.0);
+        return CompletableFuture.completedFuture(balances.getOrDefault(normalizeCurrency(currencyCode), 0.0));
     }
 
     @Override
     public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
-        return CompletableFuture.completedFuture(0.0);
+        return CompletableFuture.completedFuture(balances.getOrDefault(normalizeCurrency(currencyCode), 0.0));
     }
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
-        return CompletableFuture.completedFuture(0.0);
+        return CompletableFuture.supplyAsync(() -> balances.values().stream().mapToDouble(Double::doubleValue).sum());
     }
 
     @Override
@@ -894,7 +1051,7 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
-        return CompletableFuture.completedFuture(0.0);
+        return fetchEquity();
     }
 
     @Override
@@ -924,9 +1081,6 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
-        if (tradePair == null) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("TradePair cannot be null"));
-        }
         return CompletableFuture.completedFuture(java.util.Collections.emptyList());
     }
 
@@ -942,15 +1096,12 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
-        if (tradePair == null) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("TradePair cannot be null"));
-        }
         return CompletableFuture.completedFuture(java.util.Collections.emptyList());
     }
 
     @Override
     public CompletableFuture<List<Position>> fetchAllPositions() {
-        return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+        return CompletableFuture.completedFuture(new ArrayList<>(positions));
     }
 
     @Override
@@ -960,33 +1111,44 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CompletableFuture<String> closePosition(TradePair tradePair) {
-        return CompletableFuture.completedFuture("");
+        return failedFuture(unsupported("closePosition"));
     }
 
     @Override
     public CompletableFuture<String> closeAllPositions() {
-        return CompletableFuture.completedFuture("");
+        positions.clear();
+        return CompletableFuture.completedFuture("Closed all Binance US paper positions.");
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTrades(TradePair tradePair) {
         if (tradePair == null) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("TradePair cannot be null"));
+            return CompletableFuture.completedFuture(new ArrayList<>(tradeHistory));
         }
-        return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+        return CompletableFuture.completedFuture(
+                tradeHistory.stream()
+                        .filter(t -> t.getTradePair() != null && t.getTradePair().equals(tradePair))
+                        .toList());
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesSince(TradePair tradePair, Instant since) {
-        if (tradePair == null || since == null) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("TradePair and since cannot be null"));
-        }
-        return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+        List<Trade> result = tradeHistory.stream()
+                .filter(t -> since == null || (t.getTimestamp() != null && t.getTimestamp().isAfter(since)))
+                .filter(t -> tradePair == null || (t.getTradePair() != null && t.getTradePair().equals(tradePair)))
+                .toList();
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesBetween(TradePair tradePair, Instant from, Instant to) {
-        return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+        List<Trade> result = tradeHistory.stream()
+                .filter(t -> t.getTimestamp() != null &&
+                        (from == null || t.getTimestamp().isAfter(from)) &&
+                        (to == null || t.getTimestamp().isBefore(to)))
+                .filter(t -> tradePair == null || (t.getTradePair() != null && t.getTradePair().equals(tradePair)))
+                .toList();
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -999,6 +1161,142 @@ public class BinanceUs extends Exchange {
     public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
             double takeProfit, double slippage) {
 
+    }
+
+    private CompletableFuture<String> submitBinanceUsOrder(
+            TradePair tradePair,
+            Side side,
+            double amount,
+            double limitPrice,
+            String type) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Map<String, String> params = new LinkedHashMap<>();
+                params.put("symbol", binanceSymbol(tradePair));
+                params.put("side", side == Side.SELL ? "SELL" : "BUY");
+                params.put("type", type);
+                params.put("quantity", decimal(amount));
+                if ("LIMIT".equals(type)) {
+                    params.put("timeInForce", "GTC");
+                    params.put("price", decimal(limitPrice));
+                }
+                params.put("recvWindow", "5000");
+                params.put("timestamp", Long.toString(System.currentTimeMillis()));
+                JsonNode response = sendSignedBinanceUsRequest("POST", "/api/v3/order", params);
+                JsonNode orderId = response.get("orderId");
+                return orderId == null ? response.toString() : orderId.asText();
+            } catch (Exception exception) {
+                throw new IllegalStateException("Binance US order submission failed.", exception);
+            }
+        });
+    }
+
+    private Account fetchLiveAccount() {
+        try {
+            JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/account", new LinkedHashMap<>());
+            Map<String, Double> liveBalances = new LinkedHashMap<>();
+            Map<String, Double> availableBalances = new LinkedHashMap<>();
+            JsonNode balancesNode = response.get("balances");
+            if (balancesNode != null && balancesNode.isArray()) {
+                for (JsonNode balance : balancesNode) {
+                    String asset = balance.path("asset").asText();
+                    double free = balance.path("free").asDouble(0.0);
+                    double locked = balance.path("locked").asDouble(0.0);
+                    if (free != 0.0 || locked != 0.0) {
+                        liveBalances.put(asset, free + locked);
+                        availableBalances.put(asset, free);
+                    }
+                }
+            }
+            Account account = new Account();
+            account.setBalances(liveBalances);
+            account.setAvailableBalances(availableBalances);
+            account.setTotalBalance(availableBalances.getOrDefault("USDT", 0.0));
+            account.setAvailableBalance(availableBalances.getOrDefault("USDT", 0.0));
+            account.setEquity(liveBalances.values().stream().mapToDouble(Double::doubleValue).sum());
+            account.setExchangeId("binanceus");
+            account.setBrokerName("Binance US");
+            account.setPaperTrading(false);
+            account.setConnected(true);
+            account.setUpdatedAt(java.time.Instant.now());
+            return account;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to fetch Binance US account.", exception);
+        }
+    }
+
+    private JsonNode sendSignedBinanceUsRequest(String method, String path, Map<String, String> params)
+            throws Exception {
+        Map<String, String> signedParams = new LinkedHashMap<>(params);
+        signedParams.putIfAbsent("timestamp", Long.toString(System.currentTimeMillis()));
+        String query = formEncode(signedParams);
+        String signature = ExchangeSigning.hmacHex("HmacSHA256", apiSecret, query);
+        String signedQuery = query + "&signature=" + signature;
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .header("X-MBX-APIKEY", apiKey)
+                .header("User-Agent", "InvestPro/1.0");
+        if ("GET".equals(method)) {
+            builder.uri(URI.create(BINANCE_US_REST_URL + path + "?" + signedQuery)).GET();
+        } else {
+            builder.uri(URI.create(BINANCE_US_REST_URL + path))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .method(method, HttpRequest.BodyPublishers.ofString(signedQuery));
+        }
+        HttpResponse<String> response = HTTP_CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        JsonNode body = OBJECT_MAPPER.readTree(response.body());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IllegalStateException(
+                    "Binance US API returned HTTP %d: %s".formatted(response.statusCode(), body));
+        }
+        return body;
+    }
+
+    private static String binanceSymbol(TradePair tradePair) {
+        if (tradePair == null) {
+            throw new IllegalArgumentException("tradePair must not be null");
+        }
+        return (tradePair.getBaseCode() + tradePair.getCounterCode()).toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static TradePair tradePairFromSymbol(String symbol, String defaultQuote) {
+        if (symbol == null || symbol.isBlank()) {
+            throw new IllegalArgumentException("order symbol must not be blank");
+        }
+        String normalized = symbol.trim().replace("-", "/").toUpperCase(java.util.Locale.ROOT);
+        String base;
+        String quote;
+        if (normalized.contains("/")) {
+            String[] parts = normalized.split("/", 2);
+            base = parts[0];
+            quote = parts[1];
+        } else {
+            quote = List.of("USDT", "USDC", "USD", "BTC", "ETH", "EUR").stream()
+                    .filter(normalized::endsWith)
+                    .findFirst()
+                    .orElse(defaultQuote);
+            base = normalized.endsWith(quote) ? normalized.substring(0, normalized.length() - quote.length())
+                    : normalized;
+        }
+        try {
+            return TradePair.of(base, quote);
+        } catch (SQLException | ClassNotFoundException exception) {
+            throw new IllegalArgumentException("Unable to resolve order symbol: " + symbol, exception);
+        }
+    }
+
+    private static String decimal(double value) {
+        if (!Double.isFinite(value) || value <= 0) {
+            throw new IllegalArgumentException("Order amount and price values must be positive.");
+        }
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    private static String formEncode(Map<String, String> params) {
+        return params.entrySet().stream()
+                .map(entry -> URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8)
+                        + "="
+                        + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
+                .collect(java.util.stream.Collectors.joining("&"));
     }
 
     @Override

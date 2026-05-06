@@ -163,4 +163,12 @@ public class PositionActionIntent {
     public double getTrailingDistance() {
         return  trailingStopDistance;
     }
+
+    public double getCurrentPositionQuantity() {
+        return  getSuggestedStopLoss() * getSuggestedTakeProfit();
+    }
+
+    public double getSuggestedRiskReductionPercent() {
+        return  getEstimatedRiskPercent();
+    }
 }

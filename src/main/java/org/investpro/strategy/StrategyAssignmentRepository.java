@@ -11,10 +11,13 @@ import java.util.stream.Collectors;
 
 /**
  * Repository for managing strategy assignments.
- * In-memory implementation suitable for production use with optional persistence.
+ * In-memory implementation suitable for production use with optional
+ * persistence.
  */
 @Slf4j
 public class StrategyAssignmentRepository {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory
+            .getLogger(StrategyAssignmentRepository.class);
     private static StrategyAssignmentRepository instance;
     private final Map<String, StrategyAssignment> assignmentsById = new ConcurrentHashMap<>();
     private final Map<String, List<StrategyAssignment>> assignmentsBySymbol = new ConcurrentHashMap<>();
@@ -62,7 +65,7 @@ public class StrategyAssignmentRepository {
         List<StrategyAssignment> assignments = assignmentsBySymbol.getOrDefault(key, new ArrayList<>());
         return assignments.stream()
                 .filter(StrategyAssignment::isValid)
-                .filter(a -> !a.isExpired())
+                .filter(StrategyAssignment::isExpired)
                 .findFirst()
                 .orElse(null);
     }
@@ -135,7 +138,7 @@ public class StrategyAssignmentRepository {
      * Gets count of active assignments.
      */
     public int getActiveCount() {
-        return (int) getAllActive().size();
+        return getAllActive().size();
     }
 
     /**

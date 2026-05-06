@@ -1,10 +1,12 @@
 package org.investpro.ui;
 
+import org.investpro.models.trading.TradePair;
 import org.investpro.risk.*;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 
@@ -214,7 +216,7 @@ public class BacktestingPanel extends VBox {
         return box;
     }
 
-    private void displayRiskReport() {
+    private void displayRiskReport() throws SQLException, ClassNotFoundException {
         if (riskProfileCombo.getValue() == null) {
             return;
         }
@@ -381,7 +383,13 @@ public class BacktestingPanel extends VBox {
         riskReportButton = new Button("Generate Risk Report");
         riskReportButton.setPrefWidth(200);
         riskReportButton.setStyle("-fx-padding: 10px 20px; -fx-font-size: 12; -fx-background-color: #3b82f6; -fx-text-fill: white;");
-        riskReportButton.setOnAction(e -> displayRiskReport());
+        riskReportButton.setOnAction(_ -> {
+            try {
+                displayRiskReport();
+            } catch (SQLException | ClassNotFoundException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
         
         riskValidationLabel = new Label("Configuration: Unvalidated");
         riskValidationLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #ff9800; -fx-font-weight: bold;");
@@ -475,9 +483,9 @@ public class BacktestingPanel extends VBox {
     /**
      * Build a TradeRiskContext from UI selections and backtest parameters.
      */
-    private TradeRiskContext buildTradeRiskContext(double initialBalance) {
+    private TradeRiskContext buildTradeRiskContext(double initialBalance) throws SQLException, ClassNotFoundException {
         return TradeRiskContext.builder()
-            .symbol(pairCombo.getValue() != null ? pairCombo.getValue() : "BTC/USD")
+            .symbol(new TradePair(pairCombo.getValue().split("/")[0] , pairCombo.getValue().split("/")[1]))
             .assetClass("CRYPTO")
             .contractType("SPOT")
             .broker("SIMULATED")

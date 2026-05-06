@@ -17,8 +17,7 @@ import org.investpro.models.trading.TradePair;
 public class MarketInfoPanel extends ScrollPane {
     
     private final VBox contentBox;
-    private TradePair currentPair;
-    
+
     public MarketInfoPanel() {
         contentBox = new VBox(12);
         contentBox.setPadding(new Insets(16));
@@ -35,7 +34,6 @@ public class MarketInfoPanel extends ScrollPane {
      * Update market info for a specific trading pair
      */
     public void updateForPair(TradePair pair) {
-        this.currentPair = pair;
         contentBox.getChildren().clear();
         
         if (pair == null) {

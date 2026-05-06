@@ -10,11 +10,7 @@ import java.util.List;
  * ADX above 25 indicates strong trend, below 20 indicates weak trend.
  */
 public class ADXIndicator extends BaseIndicator {
-    
-    public ADXIndicator() {
-        this(14);
-    }
-    
+
     public ADXIndicator(int period) {
         super("ADX", period);
     }

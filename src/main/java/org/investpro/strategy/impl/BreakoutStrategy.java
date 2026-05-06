@@ -3,18 +3,21 @@ package org.investpro.strategy.impl;
 import org.investpro.strategy.StrategyCategory;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyMetadata;
-import org.investpro.strategy.StrategySignal;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.market.AssetClass;
 import org.investpro.market.ContractType;
 import org.investpro.timeframe.Timeframe;
 import org.investpro.trading.MarketBehavior;
+import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static org.investpro.utils.Side.BUY;
+import static org.investpro.utils.Side.SELL;
 
 /**
  * Breakout Strategy
@@ -23,6 +26,7 @@ import java.util.Set;
  */
 @Slf4j
 public class BreakoutStrategy extends BaseStrategy {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BreakoutStrategy.class);
 
     public BreakoutStrategy() {
         super(buildMetadata());
@@ -63,9 +67,8 @@ public class BreakoutStrategy extends BaseStrategy {
     }
 
     @Override
-    @NotNull
-    public StrategySignal generateSignal(@NotNull StrategyContext context) {
-        if (!hasEnoughBars(context)) {
+    public @NotNull Side generateSignal(@NotNull StrategyContext context) {
+        if (hasEnoughBars(context)) {
             return noSignal(context, "Insufficient bars");
         }
 
@@ -100,6 +103,16 @@ public class BreakoutStrategy extends BaseStrategy {
     }
 
     @Override
+    public boolean supportsMarketBehavior(org.investpro.risk.MarketBehavior marketBehavior) {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return super.isEnabled();
+    }
+
+    @Override
     public boolean supportsMarketBehavior(@NotNull MarketBehavior marketBehavior) {
         // Breakout works in trending and volatile markets
         return true;
@@ -118,35 +131,11 @@ public class BreakoutStrategy extends BaseStrategy {
         return new double[] { highest, lowest };
     }
 
-    private StrategySignal buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.BUY)
-                .confidence(0.68)
-                .entryPrice(entry)
-                .stopLoss(stopLoss)
-                .takeProfit(takeProfit)
-                .expectedValue(3.0)
-                .reasons(List.of("Breakout above resistance", "High probability breakout continuation"))
-                .marketBehavior(context.getMarketBehavior())
-                .build();
+    private Side buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
+        return BUY;
     }
 
-    private StrategySignal buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.SELL)
-                .confidence(0.68)
-                .entryPrice(entry)
-                .stopLoss(stopLoss)
-                .takeProfit(takeProfit)
-                .expectedValue(3.0)
-                .reasons(List.of("Breakout below support", "High probability breakout continuation"))
-                .marketBehavior(context.getMarketBehavior())
-                .build();
+    private Side buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
+        return SELL;
     }
 }

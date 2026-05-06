@@ -1,8 +1,7 @@
 package org.investpro.risk;
 
 import org.investpro.data.CandleData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,8 +11,7 @@ import java.util.List;
  * ATR is an institutional standard for volatility measurement
  */
 public class VolatilityCalculator {
-    private static final Logger logger = LoggerFactory.getLogger(VolatilityCalculator.class);
-    
+
     private static final int DEFAULT_PERIOD = 14;
     
     /**

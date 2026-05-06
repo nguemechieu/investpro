@@ -1,7 +1,10 @@
 package org.investpro.indicators;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -9,14 +12,12 @@ import java.util.List;
  * Shows trend direction by connecting significant highs and lows.
  * Filters out minor price movements based on threshold percentage.
  */
+@Getter
+@Setter
 public class ZigzagIndicator extends BaseIndicator {
     
     private double thresholdPercent;
-    
-    public ZigzagIndicator() {
-        this(5.0);
-    }
-    
+
     public ZigzagIndicator(double thresholdPercent) {
         super("Zigzag", 1);
         this.thresholdPercent = thresholdPercent;
@@ -32,16 +33,14 @@ public class ZigzagIndicator extends BaseIndicator {
         double[] zigzag = new double[n];
         
         // Initialize with NaN values
-        for (int i = 0; i < n; i++) {
-            zigzag[i] = Double.NaN;
-        }
+        Arrays.fill(zigzag, Double.NaN);
         
         // Find zigzag turning points
         List<Integer> turnPoints = new ArrayList<>();
         List<Double> turnValues = new ArrayList<>();
         
         boolean isUptrend = true;
-        double lastValue = candles.get(0).lowPrice();
+        double lastValue = candles.getFirst().lowPrice();
         int lastIndex = 0;
         turnPoints.add(0);
         turnValues.add(lastValue);
@@ -92,7 +91,7 @@ public class ZigzagIndicator extends BaseIndicator {
         }
         
         // Add final point if not already added
-        if (lastIndex != turnPoints.get(turnPoints.size() - 1)) {
+        if (lastIndex != turnPoints.getLast()) {
             turnPoints.add(lastIndex);
             turnValues.add(lastValue);
             zigzag[lastIndex] = lastValue;

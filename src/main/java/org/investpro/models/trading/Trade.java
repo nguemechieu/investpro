@@ -1,21 +1,23 @@
 package org.investpro.models.trading;
+
 import lombok.Data;
 
-
-import  org.investpro.models.currency.Money;
-import  org.investpro.utils.Side;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.models.currency.Money;
+import org.investpro.utils.Side;
 
 import java.time.Instant;
 import java.util.Objects;
 
 /**
- * A Trade represents a completed order (then called a trade), which is an transaction where one
+ * A Trade represents a completed order (then called a trade), which is an
+ * transaction where one
  * party buys and the other one sells some amount of currency at a fixed price.
  *
-
+ *
  */
 @Data
-
+@Slf4j
 public class Trade {
     // Explicit getters (Lombok @Getter not being invoked during compilation)
     private TradePair tradePair;
@@ -25,6 +27,12 @@ public class Trade {
     private long localTradeId;
     private Instant timestamp;
     private double fee;
+
+    // Additional trading fields
+    private double stopLoss;
+    private double takeProfit;
+    private double swap;
+    private double profit;
 
     public Trade() {
         super();
@@ -37,15 +45,18 @@ public class Trade {
         this.transactionType = side;
         this.localTradeId = tradeId;
         this.timestamp = time;
+        log.debug("{this}");
     }
 
     /**
-     * Represents one line of the raw trade data. We use doubles because the results don't need to be
+     * Represents one line of the raw trade data. We use doubles because the results
+     * don't need to be
      * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
      */
 
     // 1315922016,5.800000000000,1.000000000000
-    public Trade(TradePair tradePair, int timestamp, Money price, double amount, Side transactionType, long localTradeId, double fee) {
+    public Trade(TradePair tradePair, int timestamp, Money price, double amount, Side transactionType,
+            long localTradeId, double fee) {
         this.tradePair = tradePair;
         this.timestamp = Instant.ofEpochSecond(timestamp);
         this.price = price.toDouble();
@@ -54,7 +65,6 @@ public class Trade {
         this.localTradeId = localTradeId;
         this.fee = fee;
     }
-
 
     @Override
     public String toString() {

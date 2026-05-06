@@ -3,18 +3,21 @@ package org.investpro.strategy.impl;
 import org.investpro.strategy.StrategyCategory;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyMetadata;
-import org.investpro.strategy.StrategySignal;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.market.AssetClass;
 import org.investpro.market.ContractType;
 import org.investpro.timeframe.Timeframe;
 import org.investpro.trading.MarketBehavior;
+import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static org.investpro.utils.Side.BUY;
+import static org.investpro.utils.Side.SELL;
 
 /**
  * Mean Reversion Strategy
@@ -23,6 +26,7 @@ import java.util.Set;
  */
 @Slf4j
 public class MeanReversionStrategy extends BaseStrategy {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MeanReversionStrategy.class);
 
     public MeanReversionStrategy() {
         super(buildMetadata());
@@ -61,15 +65,14 @@ public class MeanReversionStrategy extends BaseStrategy {
     }
 
     @Override
-    @NotNull
-    public StrategySignal generateSignal(@NotNull StrategyContext context) {
-        if (!hasEnoughBars(context)) {
+    public @NotNull Side generateSignal(@NotNull StrategyContext context) {
+        if (hasEnoughBars(context)) {
             return noSignal(context, "Insufficient bars");
         }
 
         try {
             List<CandleData> candles = context.getCandles();
-            CandleData latest = candles.get(candles.size() - 1);
+            CandleData latest = candles.getLast();
             double currentPrice = context.getCurrentPrice();
 
             // Calculate SMA(20) and Bollinger Bands
@@ -98,6 +101,11 @@ public class MeanReversionStrategy extends BaseStrategy {
             log.error("Error in mean reversion signal", e);
             return noSignal(context, "Analysis error");
         }
+    }
+
+    @Override
+    public boolean supportsMarketBehavior(org.investpro.risk.MarketBehavior marketBehavior) {
+        return false;
     }
 
     @Override
@@ -143,35 +151,11 @@ public class MeanReversionStrategy extends BaseStrategy {
         return 100 - (100 / (1 + rs));
     }
 
-    private StrategySignal buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.BUY)
-                .confidence(0.60)
-                .entryPrice(entry)
-                .stopLoss(stopLoss)
-                .takeProfit(takeProfit)
-                .expectedValue(1.5)
-                .reasons(List.of("Oversold condition", "Bollinger Band bounce setup"))
-                .marketBehavior(context.getMarketBehavior())
-                .build();
+    private Side buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
+        return BUY;
     }
 
-    private StrategySignal buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        return StrategySignal.builder()
-                .symbol(context.getSymbol())
-                .timeframe(context.getTimeframe())
-                .strategyId(metadata.getStrategyId())
-                .side(StrategySignal.SignalSide.SELL)
-                .confidence(0.60)
-                .entryPrice(entry)
-                .stopLoss(stopLoss)
-                .takeProfit(takeProfit)
-                .expectedValue(1.5)
-                .reasons(List.of("Overbought condition", "Bollinger Band bounce setup"))
-                .marketBehavior(context.getMarketBehavior())
-                .build();
+    private Side buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
+        return SELL;
     }
 }

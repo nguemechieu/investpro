@@ -34,9 +34,13 @@ public abstract class BrokerExchangeAdapter extends Exchange {
 
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final PollingExchangeStreamer pollingStreamer = new PollingExchangeStreamer(this);
+    private final java.util.Map<String, Double> paperBalances = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<String, String> paperOrders = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong nextPaperOrderId = new java.util.concurrent.atomic.AtomicLong(1000);
 
     protected BrokerExchangeAdapter(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
+        paperBalances.put("USD", 10000.0);
     }
 
     @Override
@@ -199,22 +203,34 @@ public abstract class BrokerExchangeAdapter extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        return CompletableFuture.completedFuture(new Account());
+        Account account = new Account();
+        double equity = paperBalances.values().stream().mapToDouble(Double::doubleValue).sum();
+        account.setTotalBalance(paperBalances.getOrDefault("USD", 0.0));
+        account.setAvailableBalance(paperBalances.getOrDefault("USD", 0.0));
+        account.setEquity(equity);
+        account.setBalances(new java.util.LinkedHashMap<>(paperBalances));
+        account.setAvailableBalances(new java.util.LinkedHashMap<>(paperBalances));
+        account.setExchangeId(getExchangeId());
+        account.setBrokerName(getDisplayName());
+        account.setPaperTrading(isPaperTrading());
+        account.setConnected(Boolean.TRUE.equals(isConnected()));
+        account.setUpdatedAt(Instant.now());
+        return CompletableFuture.completedFuture(account);
     }
 
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
-        return CompletableFuture.completedFuture(0.0);
+        return CompletableFuture.completedFuture(paperBalances.getOrDefault(normalizeCurrency(currencyCode), 0.0));
     }
 
     @Override
     public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
-        return CompletableFuture.completedFuture(0.0);
+        return fetchAvailableBalance(currencyCode);
     }
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
-        return CompletableFuture.completedFuture(0.0);
+        return CompletableFuture.completedFuture(paperBalances.values().stream().mapToDouble(Double::doubleValue).sum());
     }
 
     @Override
@@ -224,7 +240,7 @@ public abstract class BrokerExchangeAdapter extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
-        return CompletableFuture.completedFuture(0.0);
+        return fetchEquity();
     }
 
     @Override
@@ -239,7 +255,12 @@ public abstract class BrokerExchangeAdapter extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        return failedFuture(unsupported("createMarketOrder"));
+        return createPaperOrder(tradePair, side, amount, 1.0, "MARKET");
+    }
+
+    @Override
+    public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount, double limitPrice) {
+        return createPaperOrder(tradePair, side, amount, limitPrice, "LIMIT");
     }
 
     public void stopAllStreams() {
@@ -259,5 +280,56 @@ public abstract class BrokerExchangeAdapter extends Exchange {
     @Override
     public boolean supportsOrderBookStreaming() {
         return false;
+    }
+
+    private CompletableFuture<String> createPaperOrder(
+            TradePair tradePair,
+            Side side,
+            double amount,
+            double price,
+            String type) {
+        if (!supportsPaperTradingMode() || !isPaperTrading()) {
+            return failedFuture(unsupported("create%sOrder".formatted(type)));
+        }
+        if (tradePair == null) {
+            return failedFuture(new IllegalArgumentException("Trade pair is required."));
+        }
+        if (!Double.isFinite(amount) || amount <= 0) {
+            return failedFuture(new IllegalArgumentException("Order amount must be greater than zero."));
+        }
+        if (!Double.isFinite(price) || price <= 0) {
+            return failedFuture(new IllegalArgumentException("Order price must be greater than zero."));
+        }
+
+        String base = tradePair.getBaseCode();
+        String quote = tradePair.getCounterCode();
+        String orderId = "%s-PAPER-%d".formatted(getExchangeId().toUpperCase(java.util.Locale.ROOT),
+                nextPaperOrderId.incrementAndGet());
+
+        if (side == Side.SELL) {
+            double baseBalance = paperBalances.getOrDefault(base, 0.0);
+            if (baseBalance < amount) {
+                return failedFuture(new IllegalStateException("Insufficient %s paper balance.".formatted(base)));
+            }
+            paperBalances.put(base, baseBalance - amount);
+            paperBalances.merge(quote, amount * price, Double::sum);
+        } else {
+            double quoteCost = amount * price;
+            double quoteBalance = paperBalances.getOrDefault(quote, 0.0);
+            if (quoteBalance < quoteCost) {
+                return failedFuture(new IllegalStateException("Insufficient %s paper balance.".formatted(quote)));
+            }
+            paperBalances.put(quote, quoteBalance - quoteCost);
+            paperBalances.merge(base, amount, Double::sum);
+        }
+
+        paperOrders.put(orderId, "FILLED");
+        return CompletableFuture.completedFuture(orderId);
+    }
+
+    private String normalizeCurrency(String currencyCode) {
+        return currencyCode == null || currencyCode.isBlank()
+                ? "USD"
+                : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
     }
 }

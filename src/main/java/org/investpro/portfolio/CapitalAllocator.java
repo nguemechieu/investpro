@@ -4,11 +4,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Allocates position size and leverage based on risk state, capital, and strategy.
+ * Allocates position size and leverage based on risk state, capital, and
+ * strategy.
  */
 @Slf4j
 public class CapitalAllocator {
-    
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(CapitalAllocator.class);
+
     /**
      * Allocate capital for a candidate trade based on portfolio state.
      */
@@ -17,34 +19,34 @@ public class CapitalAllocator {
             double requestedCapital,
             double portfolioHeat,
             double concentrationRiskScore) {
-        
+
         double allocatedCapital = requestedCapital;
-        
+
         // Reduce during drawdown
         allocatedCapital *= getDrawdownReductionFactor(context.getCurrentDrawdownPercent());
-        
+
         // Reduce during high heat
         allocatedCapital *= getHeatReductionFactor(portfolioHeat);
-        
+
         // Reduce during high concentration risk
         allocatedCapital *= getConcentrationReductionFactor(concentrationRiskScore);
-        
+
         // Reduce based on available capital
         if (allocatedCapital > context.getAvailableCash()) {
             allocatedCapital = context.getAvailableCash();
             log.debug("Reduced allocation to available cash: {}", allocatedCapital);
         }
-        
+
         // Apply risk profile limits
         allocatedCapital *= getRiskProfileFactor(context.getRiskProfile());
-        
+
         // Reduce during high market volatility
         allocatedCapital *= getVolatilityReductionFactor(context.getMarketVolatilityLevel());
-        
+
         log.info("Allocated capital: {} (from requested {})", allocatedCapital, requestedCapital);
         return Math.max(0, allocatedCapital);
     }
-    
+
     /**
      * Allocate leverage based on risk state.
      */
@@ -52,26 +54,26 @@ public class CapitalAllocator {
             @NotNull PortfolioContext context,
             double requestedLeverage,
             double portfolioHeat) {
-        
+
         double allocatedLeverage = requestedLeverage;
-        
+
         // Never allocate more leverage than account profile allows
         double maxLeverage = getMaxLeverageForProfile(context.getRiskProfile());
         allocatedLeverage = Math.min(allocatedLeverage, maxLeverage);
-        
+
         // Reduce during drawdown
         allocatedLeverage *= getLeverageDrawdownFactor(context.getCurrentDrawdownPercent());
-        
+
         // Reduce during high heat
         allocatedLeverage *= getLeverageHeatFactor(portfolioHeat);
-        
+
         // Floor at 1x (no leverage)
         allocatedLeverage = Math.max(1.0, allocatedLeverage);
-        
+
         log.info("Allocated leverage: {}x (from requested {}x)", allocatedLeverage, requestedLeverage);
         return allocatedLeverage;
     }
-    
+
     /**
      * Determine if we should reject a trade entirely.
      */
@@ -79,37 +81,37 @@ public class CapitalAllocator {
             @NotNull PortfolioContext context,
             double portfolioHeatAfter,
             double concentrationScore) {
-        
+
         // Reject if margin insufficient
         if (context.getAvailableCash() <= 0) {
             log.warn("Rejecting trade: insufficient cash");
             return true;
         }
-        
+
         // Reject if adding trade would exceed heat limit
         PortfolioRiskState.RiskStatus riskStatus = getRiskStatusFromHeat(portfolioHeatAfter);
         if (riskStatus == PortfolioRiskState.RiskStatus.STOP_TRADING) {
             log.warn("Rejecting trade: heat limit exceeded");
             return true;
         }
-        
+
         // Reject if concentration risk too high
         if (concentrationScore > 90 && portfolioHeatAfter > 8) {
             log.warn("Rejecting trade: concentration risk too high ({})", concentrationScore);
             return true;
         }
-        
+
         // Conservative profile rejects more trades
         if (context.isConservativeProfile() && portfolioHeatAfter > 5) {
             log.warn("Rejecting trade: conservative profile, heat too high");
             return true;
         }
-        
+
         return false;
     }
-    
+
     // Helper methods
-    
+
     private double getDrawdownReductionFactor(double drawdownPercent) {
         if (drawdownPercent > 15.0) {
             return 0.3; // Only 30% of capital allocated
@@ -121,7 +123,7 @@ public class CapitalAllocator {
             return 1.0; // Full allocation
         }
     }
-    
+
     private double getHeatReductionFactor(double portfolioHeat) {
         if (portfolioHeat > 8.0) {
             return 0.2; // Only 20% allocation
@@ -133,7 +135,7 @@ public class CapitalAllocator {
             return 1.0; // Full
         }
     }
-    
+
     private double getConcentrationReductionFactor(double concentrationScore) {
         if (concentrationScore > 90) {
             return 0.0; // Reject
@@ -147,7 +149,7 @@ public class CapitalAllocator {
             return 1.0;
         }
     }
-    
+
     private double getRiskProfileFactor(@NotNull String riskProfile) {
         return switch (riskProfile) {
             case "CONSERVATIVE" -> 0.5; // Half allocation for conservative
@@ -155,7 +157,7 @@ public class CapitalAllocator {
             default -> 1.0; // Balanced
         };
     }
-    
+
     private double getVolatilityReductionFactor(double volatilityLevel) {
         // 0-30: low, 30-60: normal, 60-100: high
         if (volatilityLevel > 75) {
@@ -168,7 +170,7 @@ public class CapitalAllocator {
             return 1.0;
         }
     }
-    
+
     private double getLeverageDrawdownFactor(double drawdownPercent) {
         if (drawdownPercent > 10.0) {
             return 0.5; // Max 0.5x leverage
@@ -178,7 +180,7 @@ public class CapitalAllocator {
             return 1.0; // Full leverage allowed
         }
     }
-    
+
     private double getLeverageHeatFactor(double portfolioHeat) {
         if (portfolioHeat > 8.0) {
             return 0.2; // Minimal leverage
@@ -188,7 +190,7 @@ public class CapitalAllocator {
             return 1.0;
         }
     }
-    
+
     private double getMaxLeverageForProfile(@NotNull String riskProfile) {
         return switch (riskProfile) {
             case "CONSERVATIVE" -> 1.0; // No leverage
@@ -197,7 +199,7 @@ public class CapitalAllocator {
             default -> 2.0;
         };
     }
-    
+
     private PortfolioRiskState.RiskStatus getRiskStatusFromHeat(double heat) {
         if (heat > 20.0) {
             return PortfolioRiskState.RiskStatus.STOP_TRADING;

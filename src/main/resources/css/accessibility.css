@@ -1,0 +1,116 @@
+/*******************************************************************************
+ * ACCESSIBILITY & FOCUS STATES
+ * Enhanced keyboard navigation and focus indicators for better accessibility
+ ******************************************************************************/
+
+/* ============================================================================
+   FOCUS INDICATOR STANDARDS
+   ============================================================================ */
+
+.button:focused,
+.combo-box:focused,
+.text-field:focused,
+.text-area:focused,
+.tab:focused {
+    -fx-border-color: #60a5fa;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.4), 6, 0, 0, 2);
+}
+
+/* ============================================================================
+   KEYBOARD NAVIGATION STATES
+   ============================================================================ */
+
+.button:armed {
+    -fx-background-color: #1d4ed8;
+    -fx-translate-y: 1;
+}
+
+.combo-box:showing .arrow-button {
+    -fx-background-color: #334155;
+}
+
+/* ============================================================================
+   HIGH CONTRAST MODE SUPPORT
+   ============================================================================ */
+
+.root.high-contrast {
+    -dark-bg: #000000;
+    -text-primary: #ffffff;
+    -border-strong: #ffffff;
+}
+
+.root.high-contrast .button {
+    -fx-border-width: 2;
+    -fx-border-color: #ffffff;
+}
+
+/* ============================================================================
+   DISABLED STATE OPTIMIZATION
+   ============================================================================ */
+
+.button:disabled,
+.combo-box:disabled,
+.text-field:disabled {
+    -fx-opacity: 0.5;
+    -fx-cursor: not-allowed;
+}
+
+.button:disabled:hover {
+    -fx-border-color: -border-strong;
+    -fx-effect: null;
+}
+
+/* ============================================================================
+   FOCUS RECTANGLE FOR COMPLEX COMPONENTS
+   ============================================================================ */
+
+.focus-indicator {
+    -fx-border-color: #60a5fa;
+    -fx-border-style: solid;
+    -fx-border-width: 2;
+    -fx-border-radius: 3;
+}
+
+/* ============================================================================
+   ENHANCED TOOLTIP STYLING
+   ============================================================================ */
+
+.tooltip {
+    -fx-background-color: #0f172a;
+    -fx-text-fill: #f8fafc;
+    -fx-border-color: #60a5fa;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-font-size: 12;
+    -fx-padding: 6 8 6 8;
+}
+
+/* ============================================================================
+   CONTEXT MENU FOCUS STATES
+   ============================================================================ */
+
+.context-menu .menu-item:focused {
+    -fx-background-color: #2563eb;
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: white;
+}
+
+/* ============================================================================
+   SCROLL BAR FOCUS IMPROVEMENT
+   ============================================================================ */
+
+.scroll-bar .thumb {
+    -fx-background-color: #475569;
+    -fx-background-radius: 5;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #64748b;
+}
+
+.scroll-bar:focused .thumb {
+    -fx-background-color: #60a5fa;
+}

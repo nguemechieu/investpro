@@ -46,6 +46,7 @@ public class StrategyMetadata {
     @Builder.Default
     private final boolean enabled = true;
 
+    @Getter
     public enum RiskLevel {
         LOW("Low Risk", "Conservative strategy, low volatility expected"),
         MEDIUM("Medium Risk", "Balanced strategy"),
@@ -60,13 +61,6 @@ public class StrategyMetadata {
             this.description = description;
         }
 
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getDescription() {
-            return description;
-        }
     }
 
     public boolean supportsAssetClass(AssetClass assetClass) {

@@ -3,6 +3,7 @@ package org.investpro.backtesting;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.indicators.StochasticIndicator;
 import java.util.*;
@@ -10,9 +11,11 @@ import java.util.*;
 /**
  * Example trading strategy implementation using Stochastic indicator
  */
+@Slf4j
 @Setter(AccessLevel.PRIVATE)
 @Getter
 public class StochasticBacktestStrategy extends BacktestStrategy {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StochasticBacktestStrategy.class);
     private final StochasticIndicator stochasticIndicator;
     private double kUpperBand;
     private double kLowerBand;

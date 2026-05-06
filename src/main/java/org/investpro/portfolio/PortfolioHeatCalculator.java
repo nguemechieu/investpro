@@ -12,17 +12,18 @@ import java.util.List;
  */
 @Slf4j
 public class PortfolioHeatCalculator {
-    
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PortfolioHeatCalculator.class);
+
     // Risk limits by portfolio state
     private static final double NORMAL_HEAT_LIMIT = 10.0; // 10% max heat in normal conditions
     private static final double WATCH_HEAT_LIMIT = 7.0;
     private static final double DEFENSIVE_HEAT_LIMIT = 3.0;
     private static final double DANGER_HEAT_LIMIT = 1.0;
     private static final double CRITICAL_STOP_HEAT_LIMIT = 0.5;
-    
+
     // Risk estimate for positions without stop loss
     private static final double DEFAULT_RISK_PERCENT = 2.0; // Assume 2% risk if stop loss missing
-    
+
     /**
      * Calculate total portfolio heat from open positions.
      */
@@ -30,22 +31,22 @@ public class PortfolioHeatCalculator {
         if (accountEquity <= 0 || positions.isEmpty()) {
             return 0.0;
         }
-        
+
         double totalRisk = 0.0;
-        
+
         for (Position position : positions) {
             double positionRisk = calculatePositionRisk(position);
             totalRisk += positionRisk;
             log.debug("Position {}: risk={}", position, positionRisk);
         }
-        
+
         double portfolioHeat = (totalRisk / accountEquity) * 100;
-        log.debug("Portfolio heat: {} positions, total risk: {}, equity: {}, heat: {}%", 
-                  positions.size(), totalRisk, accountEquity, portfolioHeat);
-        
+        log.debug("Portfolio heat: {} positions, total risk: {}, equity: {}, heat: {}%",
+                positions.size(), totalRisk, accountEquity, portfolioHeat);
+
         return Math.min(100.0, portfolioHeat); // Cap at 100%
     }
-    
+
     /**
      * Calculate risk for a single position.
      * If stop loss available: |entryPrice - stopLoss| * quantity
@@ -55,35 +56,35 @@ public class PortfolioHeatCalculator {
         double entryPrice = position.getEntryPrice();
         double currentPrice = position.getCurrentPrice();
         double quantity = Math.abs(position.getQuantity());
-        
+
         // If stop loss is set, use it for risk calculation
         if (hasStopLoss(position)) {
             double stopLoss = position.getStopLoss();
             double riskPerUnit = Math.abs(entryPrice - stopLoss);
             double positionRisk = riskPerUnit * quantity;
-            
+
             // Adjust for leverage/margin if applicable
             if (position.getLeverage() > 1) {
                 positionRisk *= position.getLeverage();
             }
-            
+
             return positionRisk;
         }
-        
+
         // No stop loss: use conservative estimate
         // Assume risk is DEFAULT_RISK_PERCENT of entry price per unit
         double conservativeRisk = (entryPrice * quantity * DEFAULT_RISK_PERCENT / 100.0);
-        
+
         if (position.getLeverage() > 1) {
             conservativeRisk *= position.getLeverage();
         }
-        
-        log.warn("Position {} has no stop loss - using conservative risk estimate: {}", 
-                 position, conservativeRisk);
-        
+
+        log.warn("Position {} has no stop loss - using conservative risk estimate: {}",
+                position, conservativeRisk);
+
         return conservativeRisk;
     }
-    
+
     /**
      * Determine risk status based on portfolio heat.
      */
@@ -91,7 +92,7 @@ public class PortfolioHeatCalculator {
     public PortfolioRiskState.RiskStatus determineRiskStatus(double portfolioHeat, double currentDrawdown) {
         // Adjust limits based on drawdown
         double effectiveHeatLimit = NORMAL_HEAT_LIMIT;
-        
+
         if (currentDrawdown > 15) {
             effectiveHeatLimit = DANGER_HEAT_LIMIT;
         } else if (currentDrawdown > 10) {
@@ -99,7 +100,7 @@ public class PortfolioHeatCalculator {
         } else if (currentDrawdown > 5) {
             effectiveHeatLimit = WATCH_HEAT_LIMIT;
         }
-        
+
         if (portfolioHeat >= effectiveHeatLimit * 2) {
             return PortfolioRiskState.RiskStatus.STOP_TRADING;
         } else if (portfolioHeat >= effectiveHeatLimit * 1.5) {
@@ -112,7 +113,7 @@ public class PortfolioHeatCalculator {
             return PortfolioRiskState.RiskStatus.NORMAL;
         }
     }
-    
+
     /**
      * Calculate portfolio heat after adding a candidate trade.
      */
@@ -123,9 +124,9 @@ public class PortfolioHeatCalculator {
             double candidateStopLoss,
             double candidateQuantity,
             double candidateLeverage) {
-        
+
         double currentHeat = calculatePortfolioHeat(currentPositions, accountEquity);
-        
+
         double candidateRisk;
         if (candidateStopLoss > 0 && Math.abs(candidateEntryPrice - candidateStopLoss) > 0.00001) {
             candidateRisk = Math.abs(candidateEntryPrice - candidateStopLoss) * candidateQuantity;
@@ -133,15 +134,15 @@ public class PortfolioHeatCalculator {
             candidateRisk = (candidateEntryPrice * candidateQuantity * DEFAULT_RISK_PERCENT / 100.0);
             log.warn("Candidate trade has no stop loss - using conservative estimate");
         }
-        
+
         if (candidateLeverage > 1) {
             candidateRisk *= candidateLeverage;
         }
-        
+
         double additionalHeat = (candidateRisk / accountEquity) * 100;
         return currentHeat + additionalHeat;
     }
-    
+
     /**
      * Get the heat limit for a given risk status.
      */
@@ -154,7 +155,7 @@ public class PortfolioHeatCalculator {
             case STOP_TRADING -> CRITICAL_STOP_HEAT_LIMIT;
         };
     }
-    
+
     private boolean hasStopLoss(@NotNull Position position) {
         return position.hasStopLoss() && position.getStopLoss() > 0;
     }

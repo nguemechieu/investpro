@@ -7,11 +7,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Allocates capital to strategies based on performance, risk, and drift metrics.
+ * Allocates capital to strategies based on performance, risk, and drift
+ * metrics.
  */
 @Slf4j
 public class StrategyCapitalAllocator {
-    
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyCapitalAllocator.class);
+
     /**
      * Allocate capital across strategies based on their scores and performance.
      */
@@ -19,58 +21,61 @@ public class StrategyCapitalAllocator {
     public Map<String, Double> allocateCapitalToStrategies(
             @NotNull PortfolioContext context,
             double totalCapitalToAllocate) {
-        
+
         Map<String, Double> allocations = new HashMap<>();
-        
+
         if (totalCapitalToAllocate <= 0) {
             return allocations;
         }
-        
+
         // For now, we'll use strategy exposure as the basis
-        // In production, this would integrate with StrategyScore from the strategy framework
+        // In production, this would integrate with StrategyScore from the strategy
+        // framework
         Map<String, Double> strategyExposures = context.getStrategyExposure();
-        
+
         if (strategyExposures.isEmpty()) {
             // If no strategies yet, allocate to the candidate strategy
             allocations.put(context.getCandidateStrategyId(), totalCapitalToAllocate);
             return allocations;
         }
-        
+
         // Get total existing exposure to normalize
         double totalExposure = strategyExposures.values().stream().mapToDouble(d -> d).sum();
-        if (totalExposure <= 0) totalExposure = 1.0;
-        
+        if (totalExposure <= 0)
+            totalExposure = 1.0;
+
         // Allocate proportionally but apply drift penalty
         for (Map.Entry<String, Double> entry : strategyExposures.entrySet()) {
             String strategyId = entry.getKey();
             double currentExposure = entry.getValue();
-            
+
             // Start with proportional allocation
             double allocation = (currentExposure / totalExposure) * totalCapitalToAllocate;
-            
+
             // Apply drift penalty if strategy is showing drift
             allocation *= getStrategyDriftFactor(strategyId, context);
-            
+
             // Apply performance score factor
             allocation *= getStrategyPerformanceFactor(strategyId, context);
-            
+
             allocations.put(strategyId, Math.max(0, allocation));
-            
+
             log.debug("Strategy {} allocated: {}", strategyId, allocation);
         }
-        
-        // Ensure allocations sum to total available (may be less due to drift/performance penalties)
+
+        // Ensure allocations sum to total available (may be less due to
+        // drift/performance penalties)
         double totalAllocated = allocations.values().stream().mapToDouble(d -> d).sum();
-        
+
         if (totalAllocated < totalCapitalToAllocate * 0.5) {
             // Allocate remainder to best performing strategies
             double remainder = totalCapitalToAllocate - totalAllocated;
             allocateBestPerformers(allocations, strategyExposures, remainder);
         }
-        
+
         return allocations;
     }
-    
+
     /**
      * Get drift factor for a strategy (penalties for drift).
      */
@@ -82,10 +87,10 @@ public class StrategyCapitalAllocator {
         // - If drawdown worse: reduce to 0.5-0.8
         // - If win rate dropped: reduce to 0.6-0.9
         // - If volatility increased: reduce to 0.7-0.95
-        
+
         return 1.0; // No drift penalty by default
     }
-    
+
     /**
      * Get performance factor for a strategy.
      */
@@ -97,33 +102,34 @@ public class StrategyCapitalAllocator {
         // - Medium score (60-80): 1.0 (maintain)
         // - Low score (<60): 0.5 (reduce)
         // - Recent losses: 0.7-0.8
-        
+
         return 1.0;
     }
-    
+
     private void allocateBestPerformers(
             @NotNull Map<String, Double> allocations,
             @NotNull Map<String, Double> strategyExposures,
             double remainderCapital) {
-        
+
         if (strategyExposures.isEmpty() || remainderCapital <= 0) {
             return;
         }
-        
+
         // Find strategy with highest exposure
         String bestStrategy = strategyExposures.entrySet().stream()
                 .max((a, b) -> Double.compare(a.getValue(), b.getValue()))
                 .map(Map.Entry::getKey)
                 .orElse(null);
-        
+
         if (bestStrategy != null) {
             allocations.merge(bestStrategy, remainderCapital, Double::sum);
             log.debug("Allocated remainder to best strategy: {} (+{})", bestStrategy, remainderCapital);
         }
     }
-    
+
     /**
-     * Determine if a strategy should be temporarily disabled due to poor performance or drift.
+     * Determine if a strategy should be temporarily disabled due to poor
+     * performance or drift.
      */
     public boolean shouldDisableStrategy(@NotNull String strategyId, @NotNull PortfolioContext context) {
         // In production, this would check:
@@ -132,11 +138,11 @@ public class StrategyCapitalAllocator {
         // - Volatility increase
         // - Data quality issues
         // - Overfitting indicators
-        
+
         // For now, always allow
         return false;
     }
-    
+
     /**
      * Reduce capital allocation for a specific strategy due to risk conditions.
      */
@@ -144,32 +150,32 @@ public class StrategyCapitalAllocator {
             @NotNull String strategyId,
             double currentAllocation,
             @NotNull PortfolioContext context) {
-        
+
         double reducedAllocation = currentAllocation;
-        
+
         // Reduce during high drawdown
         if (context.isHighDrawdown()) {
             reducedAllocation *= 0.8; // 20% reduction
         }
-        
+
         if (context.isCriticalDrawdown()) {
             reducedAllocation *= 0.5; // 50% reduction
         }
-        
+
         // Reduce if strategy dominates portfolio (concentration risk)
         double strategyExposure = context.getStrategyExposure().getOrDefault(strategyId, 0.0);
         if (strategyExposure > 40) { // Strategy already has >40% exposure
             reducedAllocation *= 0.7; // Reduce by 30%
         }
-        
+
         // Reduce in conservative profile
         if (context.isConservativeProfile()) {
             reducedAllocation *= 0.9;
         }
-        
+
         return Math.max(0, reducedAllocation);
     }
-    
+
     /**
      * Calculate total strategy allocation from portfolio allocation plan.
      */
@@ -177,7 +183,7 @@ public class StrategyCapitalAllocator {
         return plan.getStrategyAllocation().values().stream()
                 .mapToDouble(d -> d).sum();
     }
-    
+
     /**
      * Get recommended allocation ratio for a strategy based on score.
      */

@@ -2,17 +2,18 @@ package org.investpro.models.trading;
 
 import javafx.util.Pair;
 
-
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import  org.investpro.models.currency.CryptoCurrency;
-import  org.investpro.models.currency.Currency;
-import  org.investpro.models.currency.CurrencyNotFoundException;
-import  org.investpro.models.currency.CurrencyType;
-import  org.investpro.models.currency.FiatCurrency;
+import org.investpro.market.AssetClass;
+import org.investpro.market.ContractType;
+import org.investpro.models.currency.CryptoCurrency;
+import org.investpro.models.currency.Currency;
+import org.investpro.models.currency.CurrencyNotFoundException;
+import org.investpro.models.currency.CurrencyType;
+import org.investpro.models.currency.FiatCurrency;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -34,7 +35,6 @@ import java.util.regex.Pattern;
  * <p>
  * Exchange adapters should update bid/ask/last/volume/change fields.
  */
-
 
 @EqualsAndHashCode(callSuper = true)
 @Getter
@@ -66,12 +66,10 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public TradePair(
             @NotNull Currency baseCurrency,
-            @NotNull Currency counterCurrency
-    ) throws SQLException, ClassNotFoundException {
+            @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {
         super(
                 Objects.requireNonNull(baseCurrency, "baseCurrency must not be null"),
-                Objects.requireNonNull(counterCurrency, "counterCurrency must not be null")
-        );
+                Objects.requireNonNull(counterCurrency, "counterCurrency must not be null"));
 
         validateCurrencies(baseCurrency, counterCurrency);
 
@@ -84,34 +82,29 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public TradePair(
             @NotNull String baseCurrency,
-            @NotNull String counterCurrency
-    ) throws SQLException, ClassNotFoundException {
+            @NotNull String counterCurrency) throws SQLException, ClassNotFoundException {
         this(
                 Objects.requireNonNull(Currency.of(normalizeCode(baseCurrency))),
-                Objects.requireNonNull(Currency.of(normalizeCode(counterCurrency)))
-        );
+                Objects.requireNonNull(Currency.of(normalizeCode(counterCurrency))));
     }
 
     @Contract("_, _ -> new")
     public static @NotNull TradePair of(
             String baseCurrencyCode,
-            String counterCurrencyCode
-    ) throws SQLException, ClassNotFoundException {
+            String counterCurrencyCode) throws SQLException, ClassNotFoundException {
         return new TradePair(baseCurrencyCode, counterCurrencyCode);
     }
 
     @Contract("_, _ -> new")
     public static @NotNull TradePair of(
             @NotNull Currency baseCurrency,
-            @NotNull Currency counterCurrency
-    ) throws SQLException, ClassNotFoundException {
+            @NotNull Currency counterCurrency) throws SQLException, ClassNotFoundException {
         return new TradePair(baseCurrency, counterCurrency);
     }
 
     @Contract("_ -> new")
     public static @NotNull TradePair of(
-            @NotNull Pair<Currency, Currency> currencyPair
-    ) throws SQLException, ClassNotFoundException {
+            @NotNull Pair<Currency, Currency> currencyPair) throws SQLException, ClassNotFoundException {
         Objects.requireNonNull(currencyPair, "currencyPair must not be null");
         return new TradePair(currencyPair.getKey(), currencyPair.getValue());
     }
@@ -119,8 +112,7 @@ public class TradePair extends Pair<Currency, Currency> {
     public static <T extends Currency, V extends Currency> @NotNull TradePair parse(
             String symbol,
             @NotNull String separator,
-            Pair<Class<T>, Class<V>> pairType
-    ) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
+            Pair<Class<T>, Class<V>> pairType) throws CurrencyNotFoundException, SQLException, ClassNotFoundException {
         Objects.requireNonNull(symbol, "tradePair must not be null");
         Objects.requireNonNull(separator, "separator must not be null");
         Objects.requireNonNull(pairType, "pairType must not be null");
@@ -137,8 +129,7 @@ public class TradePair extends Pair<Currency, Currency> {
         if (parts.length != 2) {
             throw new IllegalArgumentException(
                     "Invalid trade pair '%s'. Expected format BASE%sQUOTE."
-                            .formatted(symbol, separator)
-            );
+                            .formatted(symbol, separator));
         }
 
         String baseCode = normalizeCode(parts[0]);
@@ -147,7 +138,6 @@ public class TradePair extends Pair<Currency, Currency> {
         Currency base = Currency.of(baseCode);
         Currency counter = Currency.of(counterCode);
 
-
         validateExpectedCurrencyType(base, baseCode, pairType.getKey(), true);
 
         if (pairType.getValue() != null) {
@@ -155,7 +145,6 @@ public class TradePair extends Pair<Currency, Currency> {
         } else {
             validateAnyKnownCurrency(counter, counterCode);
         }
-
 
         assert base != null;
         assert counter != null;
@@ -166,11 +155,10 @@ public class TradePair extends Pair<Currency, Currency> {
         if (separator.isEmpty()) {
             if (tradePair.length() < 6) {
                 throw new IllegalArgumentException(
-                        "Cannot parse compact trade pair shorter than 6 characters: %s".formatted(tradePair)
-                );
+                        "Cannot parse compact trade pair shorter than 6 characters: %s".formatted(tradePair));
             }
 
-            return new String[]{
+            return new String[] {
                     tradePair.substring(0, 3),
                     tradePair.substring(3)
             };
@@ -179,13 +167,11 @@ public class TradePair extends Pair<Currency, Currency> {
         return tradePair.split(Pattern.quote(separator));
     }
 
-
     private static void validateExpectedCurrencyType(
             Currency currency,
             String code,
             Class<? extends Currency> expectedType,
-            boolean base
-    ) {
+            boolean base) {
         if (expectedType == null) {
             try {
                 validateAnyKnownCurrency(currency, code);
@@ -223,14 +209,12 @@ public class TradePair extends Pair<Currency, Currency> {
 
         throw new IllegalArgumentException(
                 "%s currency type must be FiatCurrency.class, CryptoCurrency.class, or null, but was: %s"
-                        .formatted(base ? "Base" : "Counter", expectedType)
-        );
+                        .formatted(base ? "Base" : "Counter", expectedType));
     }
 
     private static void validateAnyKnownCurrency(
             Currency currency,
-            String code
-    ) throws CurrencyNotFoundException {
+            String code) throws CurrencyNotFoundException {
         if (currency == null
                 || currency == Currency.NULL_FIAT_CURRENCY
                 || currency == Currency.NULL_CRYPTO_CURRENCY) {
@@ -240,22 +224,19 @@ public class TradePair extends Pair<Currency, Currency> {
 
     private static void validateCurrencies(
             Currency baseCurrency,
-            Currency counterCurrency
-    ) {
+            Currency counterCurrency) {
         String baseCode = codeOf(baseCurrency);
         String counterCode = codeOf(counterCurrency);
 
         if (baseCode.isBlank() || counterCode.isBlank()) {
             throw new IllegalArgumentException(
                     "Currency codes must be non-empty, but were '%s' and '%s'"
-                            .formatted(baseCode, counterCode)
-            );
+                            .formatted(baseCode, counterCode));
         }
 
         if (baseCode.equalsIgnoreCase(counterCode)) {
             throw new IllegalArgumentException(
-                    "baseCurrency and counterCurrency must be different: %s".formatted(baseCode)
-            );
+                    "baseCurrency and counterCurrency must be different: %s".formatted(baseCode));
         }
     }
 
@@ -328,7 +309,8 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     /**
-     * Get the last traded price. Falls back to mid-price if last price is not available.
+     * Get the last traded price. Falls back to mid-price if last price is not
+     * available.
      */
     public double getLastPrice() {
         return last > 0 ? last : getMidPrice();
@@ -362,8 +344,7 @@ public class TradePair extends Pair<Currency, Currency> {
             double ask,
             double last,
             double volume,
-            double changePercent
-    ) {
+            double changePercent) {
         this.bid = sanitizeMarketValue(bid);
         this.ask = sanitizeMarketValue(ask);
         this.last = sanitizeMarketValue(last);
@@ -379,8 +360,7 @@ public class TradePair extends Pair<Currency, Currency> {
             double volume,
             double changePercent,
             double high24h,
-            double low24h
-    ) {
+            double low24h) {
         updateTicker(bid, ask, last, volume, changePercent);
         this.high24h = sanitizeMarketValue(high24h);
         this.low24h = sanitizeMarketValue(low24h);
@@ -478,5 +458,13 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public void setChange(double change) {
         this.changePercent = sanitizeFinite(change);
+    }
+
+    public AssetClass getAssetClass() {
+        return null;
+    }
+
+    public ContractType getContractType() {
+        return null;
     }
 }

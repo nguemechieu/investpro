@@ -3,7 +3,6 @@ package org.investpro.ui;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.web.WebView;
 import javafx.stage.Stage;
 
 public class CreateAccount extends Stage {
@@ -11,16 +10,14 @@ public class CreateAccount extends Stage {
         super();
         AnchorPane anc = new AnchorPane();
         anc.getChildren().add(
-                new Label("Create an account")
+                new Label("Create an account"));
 
-        );
-
-        WebView webView = new WebView();
-        webView.getEngine().load("https://www.google.com");
-        webView.setPrefSize(1000, 700);
-        webView.setLayoutX(0);
-        webView.setLayoutY(30);
-        anc.getChildren().add(webView);
+        Label infoLabel = new Label("Account creation interface\nPlease configure your trading account settings");
+        infoLabel.setPrefSize(1000, 700);
+        infoLabel.setLayoutX(0);
+        infoLabel.setLayoutY(30);
+        infoLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #64748b; -fx-padding: 20;");
+        anc.getChildren().add(infoLabel);
 
         Scene scene = new Scene(anc, 500, 500);
 

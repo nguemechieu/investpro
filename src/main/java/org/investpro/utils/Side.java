@@ -7,14 +7,16 @@ import java.util.Locale;
 
 public enum Side {
     BUY,
-    SELL,HOLD;
-
+    SELL,
+    HOLD;
 
     public static Side getSide(@NotNull String type) {
         if (type.equalsIgnoreCase("BUY")) {
             return BUY;
         } else if (type.equalsIgnoreCase("SELL")) {
             return SELL;
+        } else if (type.equalsIgnoreCase("HOLD")) {
+            return HOLD;
         } else {
             throw new IllegalArgumentException("unknown trade type: %s".formatted(type));
         }
@@ -25,12 +27,19 @@ public enum Side {
         return switch (side) {
             case BUY -> SELL;
             case SELL -> BUY;
-            default -> throw new IllegalArgumentException("unknown side: %s".formatted(side));
+            case HOLD -> HOLD;
         };
     }
 
     @Override
     public String toString() {
         return name().toLowerCase(Locale.US);
+    }
+
+    public boolean isSell() {
+        return this == SELL;
+    }
+    public boolean isBuy() {
+        return this == BUY;
     }
 }
