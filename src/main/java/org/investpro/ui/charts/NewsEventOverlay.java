@@ -20,8 +20,6 @@ import java.util.List;
  */
 @Slf4j
 public class NewsEventOverlay extends Canvas {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NewsEventOverlay.class);
-
     private final NewsDataProvider newsDataProvider;
     private List<NewsEvent> newsEvents = List.of();
 

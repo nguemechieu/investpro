@@ -1,11 +1,10 @@
 package org.investpro.models.currency;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.*;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -18,13 +17,12 @@ import java.util.List;
 /**
  * @author NOEL NGUEMECHIEU
  */
+@Slf4j
 public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
-    private static final Logger logger = LoggerFactory.getLogger(CryptoCurrencyDataProvider.class);
-
     public CryptoCurrencyDataProvider() {
         super();
 
-        logger.debug(
+        log.debug(
                 "CryptoCurrencyDataProvider constructor called"
         );
     }
@@ -86,7 +84,7 @@ public class CryptoCurrencyDataProvider extends CurrencyDataProvider {
                     throw new RuntimeException("Failed : HTTP error code : " + response1.statusCode());
                 }
                 InputStream inputStream = response1.body();
-                logger.info(jsonObject1.get("id").asText() + " " + inputStream);
+                log.info(jsonObject1.get("id").asText() + " " + inputStream);
 
                 //Save the image to the folder where the program is running (images/currency)
 

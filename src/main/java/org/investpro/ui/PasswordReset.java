@@ -1,23 +1,21 @@
 package org.investpro.ui;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.investpro.data.Db1;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Properties;
 
 /**
  * Password reset dialog for user account recovery.
  * Allows users to reset their password by verifying their username and email.
  */
+@Slf4j
 public class PasswordReset extends Stage {
-    private static final Logger logger = LoggerFactory.getLogger(PasswordReset.class);
-
     private TextField usernameField;
     private TextField emailField;
     private PasswordField newPasswordField;
@@ -172,7 +170,7 @@ public class PasswordReset extends Stage {
             boolean userExists = verifyUserExists(db, username, email);
 
             if (!userExists) {
-                logger.warn("Password reset attempt failed: username '{}' and email '{}' do not match", username,
+                log.warn("Password reset attempt failed: username '{}' and email '{}' do not match", username,
                         email);
                 return false;
             }
@@ -184,12 +182,12 @@ public class PasswordReset extends Stage {
             boolean updateSuccess = updateUserPassword(db, username, hashedPassword);
 
             if (!updateSuccess) {
-                logger.error("Failed to update password in database for username: {}", username);
+                log.error("Failed to update password in database for username: {}", username);
                 return false;
             }
 
             // Step 4: Log the successful password reset
-            logger.info("Password reset successful for username: {}", username);
+            log.info("Password reset successful for username: {}", username);
 
             // Step 5: Send confirmation (placeholder for email notification)
             sendPasswordResetConfirmation(email);
@@ -197,7 +195,7 @@ public class PasswordReset extends Stage {
             return true;
 
         } catch (Exception e) {
-            logger.error("Error during password reset for username: {}", username, e);
+            log.error("Error during password reset for username: {}", username, e);
             return false;
         }
     }
@@ -219,7 +217,7 @@ public class PasswordReset extends Stage {
             }
             return false;
         } catch (Exception e) {
-            logger.error("Error verifying user existence for username: {}", username, e);
+            log.error("Error verifying user existence for username: {}", username, e);
             return false;
         }
     }
@@ -237,7 +235,7 @@ public class PasswordReset extends Stage {
             int rowsAffected = stmt.executeUpdate();
             return rowsAffected > 0;
         } catch (Exception e) {
-            logger.error("Error updating password for username: {}", username, e);
+            log.error("Error updating password for username: {}", username, e);
             return false;
         }
     }
@@ -256,7 +254,7 @@ public class PasswordReset extends Stage {
             }
             return sb.toString();
         } catch (java.security.NoSuchAlgorithmException e) {
-            logger.error("Error hashing password", e);
+            log.error("Error hashing password", e);
             // Fallback: return the password as-is (not ideal, but prevents complete
             // failure)
             return password;
@@ -270,7 +268,7 @@ public class PasswordReset extends Stage {
         try {
             // Placeholder for email notification logic
             // In production, integrate with an email service like JavaMail or SendGrid
-            logger.info("Password reset confirmation would be sent to: {}", email);
+            log.info("Password reset confirmation would be sent to: {}", email);
 
             // Example using EmailNotifier if available:
             // org.investpro.core.EmailNotifier emailNotifier = new
@@ -280,7 +278,7 @@ public class PasswordReset extends Stage {
             // password.");
 
         } catch (Exception e) {
-            logger.warn("Could not send password reset confirmation email to: {}", email, e);
+            log.warn("Could not send password reset confirmation email to: {}", email, e);
             // Don't fail the password reset just because email couldn't be sent
         }
     }

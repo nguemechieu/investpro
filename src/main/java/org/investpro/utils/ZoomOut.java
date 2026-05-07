@@ -1,22 +1,19 @@
 package org.investpro.utils;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.animation.ScaleTransition;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.util.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Utility for zooming out JavaFX chart/workspace nodes.
  *
  * Designed for InvestPro chart tabs, chart containers, WebView panels,
  * and any JavaFX Node that supports scale transforms.
  */
+@Slf4j
 public final class ZoomOut {
-
-    private static final Logger logger = LoggerFactory.getLogger(ZoomOut.class);
-
     public static final double DEFAULT_STEP = 0.10;
     public static final double DEFAULT_MIN_SCALE = 0.50;
     public static final Duration DEFAULT_ANIMATION_DURATION = Duration.millis(140);
@@ -58,7 +55,7 @@ public final class ZoomOut {
             node.setScaleY(targetY);
         }
 
-        logger.debug("Zoomed out {} to scaleX={} scaleY={}",
+        log.debug("Zoomed out {} to scaleX={} scaleY={}",
                 node.getClass().getSimpleName(),
                 targetX,
                 targetY
@@ -98,7 +95,7 @@ public final class ZoomOut {
             node.setScaleY(1.0);
         }
 
-        logger.debug("Zoom reset for {}", node.getClass().getSimpleName());
+        log.debug("Zoom reset for {}", node.getClass().getSimpleName());
     }
 
     public static boolean canZoomOut(Node node) {

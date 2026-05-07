@@ -2,13 +2,13 @@ package org.investpro.ai;
 
 /**
  * Interface for AI reasoning services that review proposed trades.
- *
+ * <p>
  * Implementations are expected to:
  * - Review trades using structured request/response objects
  * - Never place trades directly
  * - Fail safely with ESCALATE_TO_MANUAL_REVIEW on errors
  * - Return within reasonable time (<5 seconds preferred)
- *
+ * <p>
  * Two implementations provided:
  * - LocalAiReasoningService: Deterministic fallback for offline/test mode
  * - OpenAiReasoningService: Real API integration with gpt-4-turbo

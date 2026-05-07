@@ -17,9 +17,6 @@ import org.investpro.models.currency.CurrencyType;
 import org.investpro.models.currency.FiatCurrency;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,9 +43,6 @@ import java.time.ZonedDateTime;
 @Slf4j
 @Data
 public class TradePair extends Pair<Currency, Currency> {
-
-    private static final Logger logger = LoggerFactory.getLogger(TradePair.class);
-
     static {
         Currency.registerCurrencies(new ArrayList<>(Currency.CURRENCIES.values()));
     }
@@ -81,7 +75,7 @@ public class TradePair extends Pair<Currency, Currency> {
         this.counterCurrency = counterCurrency;
         this.updatedAt = Instant.now();
 
-        logger.debug("TradePair created: {}", this);
+        log.debug("TradePair created: {}", this);
     }
 
     public TradePair(

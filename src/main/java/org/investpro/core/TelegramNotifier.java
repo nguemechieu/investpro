@@ -1,5 +1,7 @@
 package org.investpro.core;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -9,9 +11,6 @@ import lombok.Setter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.investpro.utils.ENUM_CHAT_ACTION;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -58,10 +57,8 @@ import java.util.function.BiConsumer;
  */
 @Getter
 @Setter
+@Slf4j
 public class TelegramNotifier {
-
-    private static final Logger logger = LoggerFactory.getLogger(TelegramNotifier.class);
-
     private static final String TELEGRAM_API_BASE = "https://api.telegram.org/bot";
     private static final String OPENAI_API_BASE = "https://api.openai.com/v1";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -77,6 +74,9 @@ public class TelegramNotifier {
     private volatile String openaiApiKey;
     private volatile boolean chatgptEnabled = false;
     private BiConsumer<String, String> orderCommentHandler;
+    private TelegramCommandHandler commandHandler;
+    private volatile boolean pollingEnabled = false;
+    private volatile Thread pollingThread;
 
     public TelegramNotifier(String botToken) {
         this(botToken, "");
@@ -112,7 +112,7 @@ public class TelegramNotifier {
         Set<String> detected = detectChatIds();
 
         if (detected.isEmpty()) {
-            logger.warn(
+            log.warn(
                     "Telegram chat detection found no chats. Send /start to the bot or add it to a group/channel first.");
             return Optional.empty();
         }
@@ -120,7 +120,7 @@ public class TelegramNotifier {
         String detectedChatId = detected.iterator().next();
         this.chatId = detectedChatId;
 
-        logger.info("Telegram target chat_id detected and selected: {}", detectedChatId);
+        log.info("Telegram target chat_id detected and selected: {}", detectedChatId);
         return Optional.of(detectedChatId);
     }
 
@@ -131,7 +131,7 @@ public class TelegramNotifier {
         Set<String> chatIds = new LinkedHashSet<>();
 
         if (!isEnabled()) {
-            logger.warn("Telegram bot token is empty. Cannot detect chat IDs.");
+            log.warn("Telegram bot token is empty. Cannot detect chat IDs.");
             return chatIds;
         }
 
@@ -151,14 +151,14 @@ public class TelegramNotifier {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() >= 400) {
-                logger.warn("Telegram getUpdates failed HTTP {}: {}", response.statusCode(), response.body());
+                log.warn("Telegram getUpdates failed HTTP {}: {}", response.statusCode(), response.body());
                 return chatIds;
             }
 
             JsonNode root = OBJECT_MAPPER.readTree(response.body());
 
             if (!root.path("ok").asBoolean(false)) {
-                logger.warn("Telegram getUpdates returned not ok: {}", response.body());
+                log.warn("Telegram getUpdates returned not ok: {}", response.body());
                 return chatIds;
             }
 
@@ -175,12 +175,12 @@ public class TelegramNotifier {
                 id.ifPresent(chatIds::add);
             }
         } catch (IOException exception) {
-            logger.warn("Telegram chat detection IO error", exception);
+            log.warn("Telegram chat detection IO error", exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            logger.warn("Telegram chat detection interrupted", exception);
+            log.warn("Telegram chat detection interrupted", exception);
         } catch (Exception exception) {
-            logger.warn("Telegram chat detection failed", exception);
+            log.warn("Telegram chat detection failed", exception);
         }
 
         return chatIds;
@@ -202,7 +202,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            logger.warn("Telegram message skipped because no chat_id/channel_id is available.");
+            log.warn("Telegram message skipped because no chat_id/channel_id is available.");
             return false;
         }
 
@@ -221,7 +221,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            logger.warn("Telegram markdown message skipped because no chat_id/channel_id is available.");
+            log.warn("Telegram markdown message skipped because no chat_id/channel_id is available.");
             return false;
         }
 
@@ -241,7 +241,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            logger.warn("Telegram HTML message skipped because no chat_id/channel_id is available.");
+            log.warn("Telegram HTML message skipped because no chat_id/channel_id is available.");
             return false;
         }
 
@@ -269,7 +269,7 @@ public class TelegramNotifier {
                     encode(actionValue));
             return postForm("sendChatAction", body);
         } catch (Exception e) {
-            logger.debug("Error sending chat action: {}", e.getMessage());
+            log.debug("Error sending chat action: {}", e.getMessage());
             return false;
         }
     }
@@ -280,15 +280,15 @@ public class TelegramNotifier {
     @SuppressWarnings("unused")
     public boolean sendPhoto(Path photoPath, String caption) {
         if (photoPath == null || !Files.exists(photoPath)) {
-            logger.warn("Telegram photo skipped because file does not exist: {}", photoPath);
+            log.warn("Telegram photo skipped because file does not exist: {}", photoPath);
             return false;
         }
 
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            if (logger.isWarnEnabled())
-                logger.warn("""
+            if (log.isWarnEnabled())
+                log.warn("""
                         Telegram photo skipped because no chat_id/channel_id is available.""");
             return false;
         }
@@ -301,7 +301,7 @@ public class TelegramNotifier {
                     photoPath,
                     caption);
         } catch (Exception exception) {
-            logger.warn("Telegram sendPhoto failed", exception);
+            log.warn("Telegram sendPhoto failed", exception);
             return false;
         }
     }
@@ -318,7 +318,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            logger.warn("Telegram photo skipped because no chat_id/channel_id is available.");
+            log.warn("Telegram photo skipped because no chat_id/channel_id is available.");
             return false;
         }
 
@@ -336,15 +336,15 @@ public class TelegramNotifier {
     @SuppressWarnings("unused")
     public boolean sendDocument(Path documentPath, String caption) {
         if (documentPath == null || !Files.exists(documentPath)) {
-            logger.warn("Telegram document skipped because file does not exist: {}", documentPath);
+            log.warn("Telegram document skipped because file does not exist: {}", documentPath);
             return false;
         }
 
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            if (logger.isWarnEnabled())
-                logger.warn("Telegram document skipped because no chat_id/channel_id is available.");
+            if (log.isWarnEnabled())
+                log.warn("Telegram document skipped because no chat_id/channel_id is available.");
             return false;
         }
 
@@ -356,7 +356,7 @@ public class TelegramNotifier {
                     documentPath,
                     caption);
         } catch (Exception exception) {
-            logger.warn("Telegram sendDocument failed", exception);
+            log.warn("Telegram sendDocument failed", exception);
             return false;
         }
     }
@@ -373,7 +373,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            logger.warn("Telegram document skipped because no chat_id/channel_id is available.");
+            log.warn("Telegram document skipped because no chat_id/channel_id is available.");
             return false;
         }
 
@@ -387,7 +387,7 @@ public class TelegramNotifier {
 
     private Optional<String> resolveTargetChatId() {
         if (!isEnabled()) {
-            logger.warn("Telegram bot token is empty.");
+            log.warn("Telegram bot token is empty.");
             return Optional.empty();
         }
 
@@ -544,7 +544,7 @@ public class TelegramNotifier {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() >= 400) {
-                logger.warn("Telegram {} failed HTTP {}: {}", method, response.statusCode(), response.body());
+                log.warn("Telegram {} failed HTTP {}: {}", method, response.statusCode(), response.body());
                 return false;
             }
 
@@ -552,19 +552,19 @@ public class TelegramNotifier {
             boolean ok = root.path("ok").asBoolean(false);
 
             if (!ok) {
-                logger.warn("Telegram {} returned not ok: {}", method, response.body());
+                log.warn("Telegram {} returned not ok: {}", method, response.body());
             }
 
             return ok;
         } catch (IOException exception) {
-            logger.warn("Telegram {} IO error", method, exception);
+            log.warn("Telegram {} IO error", method, exception);
             return false;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            logger.warn("Telegram {} interrupted", method, exception);
+            log.warn("Telegram {} interrupted", method, exception);
             return false;
         } catch (Exception exception) {
-            logger.warn("Telegram {} failed", method, exception);
+            log.warn("Telegram {} failed", method, exception);
             return false;
         }
     }
@@ -670,7 +670,7 @@ public class TelegramNotifier {
         if (apiKey != null && !apiKey.isBlank()) {
             this.openaiApiKey = apiKey.trim();
             this.chatgptEnabled = true;
-            logger.info("ChatGPT integration initialized for multi-user bot");
+            log.info("ChatGPT integration initialized for multi-user bot");
         }
     }
 
@@ -683,7 +683,7 @@ public class TelegramNotifier {
     @SuppressWarnings("unused")
     public void pollAndProcessUserMessages() {
         if (!isEnabled()) {
-            logger.warn("Cannot poll messages: bot token not configured");
+            log.warn("Cannot poll messages: bot token not configured");
             return;
         }
 
@@ -699,7 +699,7 @@ public class TelegramNotifier {
                 });
             }
         } catch (Exception e) {
-            logger.warn("Error processing user messages", e);
+            log.warn("Error processing user messages", e);
         }
     }
 
@@ -738,7 +738,7 @@ public class TelegramNotifier {
                 }
             }
         } catch (Exception e) {
-            logger.debug("Error getting user message from chat {}", chatId, e);
+            log.debug("Error getting user message from chat {}", chatId, e);
         }
 
         return Optional.empty();
@@ -748,15 +748,19 @@ public class TelegramNotifier {
      * Process a single user message and respond accordingly.
      */
     private void processUserMessage(UserContext context, UserMessage message) {
-        logger.info("Processing message from user {} ({}): {}", message.userId, message.userName, message.text);
+        log.info("Processing message from user {} ({}): {}", message.userId, message.userName, message.text);
 
         // Show typing indicator while processing
         sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
 
         String response;
 
+        // Check if it's a command (starts with /)
+        if (message.text.startsWith("/")) {
+            response = handleCommand(message);
+        }
         // Check if it's an order comment
-        if (message.text.startsWith("/comment")) {
+        else if (message.text.startsWith("#comment")) {
             response = handleOrderComment(message);
         }
         // Check for specific query types
@@ -787,6 +791,22 @@ public class TelegramNotifier {
         }
 
         context.lastProcessedUpdate = message.timestamp;
+    }
+
+    /**
+     * Handle a command message
+     */
+    private String handleCommand(UserMessage message) {
+        if (commandHandler == null) {
+            return "⚠️ Command handler not configured";
+        }
+
+        try {
+            return commandHandler.handleCommand(message.text, message.chatId);
+        } catch (Exception e) {
+            log.error("Error handling command: {}", message.text, e);
+            return "❌ Error executing command: " + e.getMessage();
+        }
     }
 
     /**
@@ -929,11 +949,11 @@ public class TelegramNotifier {
 
                 return content.isBlank() ? "No response from ChatGPT" : content;
             } else {
-                logger.warn("ChatGPT API error: HTTP {}", response.statusCode());
+                log.warn("ChatGPT API error: HTTP {}", response.statusCode());
                 return "⚠️ ChatGPT returned an error. Using default response.";
             }
         } catch (Exception e) {
-            logger.warn("Error querying ChatGPT", e);
+            log.warn("Error querying ChatGPT", e);
             return "⚠️ Could not reach ChatGPT. Please try again later.";
         }
     }
@@ -1000,6 +1020,77 @@ public class TelegramNotifier {
      */
     public void setOrderCommentHandler(BiConsumer<String, String> handler) {
         this.orderCommentHandler = handler;
+    }
+
+    /**
+     * Set the command handler for processing trading commands
+     */
+    public void setCommandHandler(TelegramCommandHandler handler) {
+        this.commandHandler = handler;
+    }
+
+    /**
+     * Start polling for messages in background thread
+     */
+    public void startPolling() {
+        if (pollingEnabled) {
+            log.warn("Telegram polling already enabled");
+            return;
+        }
+
+        if (!isEnabled()) {
+            log.warn("Cannot start polling: bot token not configured");
+            return;
+        }
+
+        pollingEnabled = true;
+        pollingThread = new Thread(() -> {
+            log.info("Telegram polling started");
+            while (pollingEnabled) {
+                try {
+                    pollAndProcessUserMessages();
+                    Thread.sleep(2000); // Poll every 2 seconds
+                } catch (InterruptedException e) {
+                    if (pollingEnabled) {
+                        log.debug("Telegram polling interrupted");
+                    }
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    log.warn("Error in Telegram polling loop", e);
+                }
+            }
+            log.info("Telegram polling stopped");
+        }, "TelegramPollingThread");
+
+        pollingThread.setDaemon(true);
+        pollingThread.start();
+    }
+
+    /**
+     * Stop polling for messages
+     */
+    public void stopPolling() {
+        if (!pollingEnabled) {
+            return;
+        }
+
+        pollingEnabled = false;
+
+        if (pollingThread != null && pollingThread.isAlive()) {
+            try {
+                pollingThread.join(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
+     * Check if polling is currently enabled
+     */
+    public boolean isPollingEnabled() {
+        return pollingEnabled;
     }
 
     /**

@@ -1,14 +1,13 @@
 package org.investpro.models.currency;
 
+import lombok.extern.slf4j.Slf4j;
+
 import lombok.Getter;
 import  org.investpro.data.Db1;
 
 import  org.investpro.utils.SymmetricPair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -20,9 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 @Getter
+@Slf4j
 public abstract class Currency {
-    private   static final Logger logger = LoggerFactory.getLogger(Currency.class);
-
     public static CryptoCurrency NULL_CRYPTO_CURRENCY;
     public static final FiatCurrency NULL_FIAT_CURRENCY;
 
@@ -113,7 +111,7 @@ public abstract class Currency {
         Objects.requireNonNull(currency, "currency must not be null");
 
         CURRENCIES.put(SymmetricPair.of(currency.code, currency.currencyType), currency);
-        logger.info("registered currency: " + currency);
+        log.info("registered currency: " + currency);
 
         for (Currency currency1 : CURRENCIES.values()) {
             db1.save(currency1);

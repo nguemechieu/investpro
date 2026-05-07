@@ -7,6 +7,7 @@ import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
 import org.investpro.core.agents.AgentRegistry;
 import org.investpro.core.agents.AgentRuntime;
+import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
@@ -42,11 +43,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 @Getter
 public class SmartBot {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SmartBot.class);
-
     private final AgentEventBus eventBus;
     private final AgentRuntime runtime;
     private final AgentRegistry agentRegistry;
+    private final SymbolAgentManager symbolAgentManager;
 
     private final AtomicBoolean started = new AtomicBoolean(false);
 
@@ -69,6 +69,7 @@ public class SmartBot {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
         this.agentRegistry = Objects.requireNonNull(agentRegistry, "agentRegistry must not be null");
+        this.symbolAgentManager = new SymbolAgentManager();
     }
 
     /**

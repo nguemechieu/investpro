@@ -12,8 +12,6 @@ import java.util.*;
  */
 @Slf4j
 public class CorrelationRiskAnalyzer {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(CorrelationRiskAnalyzer.class);
-
     // Default correlation assumptions when no matrix provided
     private static final double SAME_ASSET_CLASS_CORRELATION = 0.7;
     private static final double SAME_SECTOR_CORRELATION = 0.6;

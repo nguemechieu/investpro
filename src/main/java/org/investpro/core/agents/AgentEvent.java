@@ -39,6 +39,8 @@ public record AgentEvent(
 
     public static final String RISK_APPROVED = "RISK_APPROVED";
     public static final String RISK_REJECTED = "RISK_REJECTED";
+    public static final String RISK_REVIEWED = "RISK_REVIEWED";
+    public static final String RISK_ALERT = "RISK_ALERT";
 
     public static final String REASONING_APPROVED = "REASONING_APPROVED";
     public static final String REASONING_REJECTED = "REASONING_REJECTED";

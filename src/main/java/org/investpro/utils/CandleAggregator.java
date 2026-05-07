@@ -1,10 +1,9 @@
 package org.investpro.utils;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.Trade;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -16,9 +15,8 @@ import java.util.stream.Collectors;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Slf4j
 public class CandleAggregator {
-    private static final Logger logger = LoggerFactory.getLogger(CandleAggregator.class);
-
     // Standard trading timeframes in seconds
     public static final Map<String, Integer> TIMEFRAME_SECONDS = Collections
             .unmodifiableMap(new LinkedHashMap<String, Integer>() {

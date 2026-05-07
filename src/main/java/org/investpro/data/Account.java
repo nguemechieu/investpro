@@ -1,12 +1,11 @@
 package org.investpro.data;
 
+import lombok.extern.slf4j.Slf4j;
+
 import lombok.Data;
 import  org.investpro.exchange.Exchange;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -44,10 +43,8 @@ import java.util.concurrent.ExecutionException;
 //        “Is this trade worth taking probabilistically?”
 
 @Data
+@Slf4j
 public class Account {
-
-    private static final Logger logger = LoggerFactory.getLogger(Account.class);
-
     // ---------------------------------------------------------------------
     // Identity
     // ---------------------------------------------------------------------
@@ -163,7 +160,7 @@ private String destination = "";
 
         hydrateFromExchange(exchange, false);
 
-        logger.info(
+        log.info(
                 "Account created broker={} username={} accountId={}",
                 brokerName,
                 this.username,
@@ -288,17 +285,17 @@ private String destination = "";
 
             if (userDetails != null) {
                 copyFrom(userDetails);
-                logger.info("Account details populated from exchange for account={}", accountId);
+                log.info("Account details populated from exchange for account={}", accountId);
             } else {
-                logger.warn("No account details returned by exchange={}", brokerName);
+                log.warn("No account details returned by exchange={}", brokerName);
             }
         } catch (ExecutionException exception) {
-            logger.error("Failed to fetch account details from {}", brokerName, exception);
+            log.error("Failed to fetch account details from {}", brokerName, exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            logger.error("Interrupted while fetching account details from {}", brokerName, exception);
+            log.error("Interrupted while fetching account details from {}", brokerName, exception);
         } catch (Exception exception) {
-            logger.error("Unexpected account details error from {}", brokerName, exception);
+            log.error("Unexpected account details error from {}", brokerName, exception);
         }
     }
 

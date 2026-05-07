@@ -28,8 +28,6 @@ import java.util.concurrent.CompletableFuture;
  */
 @Slf4j
 public class ManualTradePanel extends VBox {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ManualTradePanel.class);
-
     private final Exchange exchange;
     private final TradePair tradePair;
     private final TradeExecutionCoordinator executionCoordinator;

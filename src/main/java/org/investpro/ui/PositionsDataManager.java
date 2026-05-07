@@ -1,14 +1,13 @@
 package org.investpro.ui;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import lombok.Getter;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.Position;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -18,10 +17,8 @@ import java.util.function.Consumer;
  * Manager for receiving and updating position data from exchanges.
  * Handles real-time position updates and periodic refreshes.
  */
+@Slf4j
 public class PositionsDataManager {
-
-    private static final Logger logger = LoggerFactory.getLogger(PositionsDataManager.class);
-
     /**
      * -- GETTER --
      *  Get the observable list of positions for binding to UI.
@@ -46,7 +43,7 @@ public class PositionsDataManager {
      */
     public void refreshPositions(Exchange exchange) {
         if (exchange == null) {
-            logger.warn("Cannot refresh positions: exchange is null");
+            log.warn("Cannot refresh positions: exchange is null");
             return;
         }
 
@@ -58,7 +55,7 @@ public class PositionsDataManager {
                         positions.setAll(positionList);
                         updatePositionMetrics();
                         notifyStatus("✅ Loaded %d positions".formatted(positionList.size()));
-                        logger.info("Positions refreshed: {} positions loaded", positionList.size());
+                        log.info("Positions refreshed: {} positions loaded", positionList.size());
                     } else {
                         positions.clear();
                         notifyStatus("ℹ️ No open positions");
@@ -66,7 +63,7 @@ public class PositionsDataManager {
                 }))
                 .exceptionally(exception -> {
                     notifyStatus("❌ Failed to load positions: %s".formatted(exception.getMessage()));
-                    logger.error("Position refresh failed", exception);
+                    log.error("Position refresh failed", exception);
                     return null;
                 });
     }
@@ -135,7 +132,7 @@ public class PositionsDataManager {
         }, intervalMs, intervalMs);
 
         notifyStatus("🔄 Auto-refresh enabled (%dms)".formatted(intervalMs));
-        logger.info("Position auto-refresh started: {} ms interval", intervalMs);
+        log.info("Position auto-refresh started: {} ms interval", intervalMs);
     }
 
     /**
@@ -146,7 +143,7 @@ public class PositionsDataManager {
             refreshTimer.cancel();
             refreshTimer = null;
             notifyStatus("⏸️ Auto-refresh disabled");
-            logger.info("Position auto-refresh stopped");
+            log.info("Position auto-refresh stopped");
         }
     }
 
@@ -239,7 +236,7 @@ public class PositionsDataManager {
             try {
                 statusCallback.accept(message);
             } catch (Exception e) {
-                logger.warn("Error in status callback", e);
+                log.warn("Error in status callback", e);
             }
         }
     }

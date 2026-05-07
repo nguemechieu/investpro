@@ -27,8 +27,6 @@ import java.util.List;
 @Setter
 @AllArgsConstructor
 public class AiPositionManagementResponse {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory
-            .getLogger(AiPositionManagementResponse.class);
 
     // =========================================================================
     // AI Decision

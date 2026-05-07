@@ -1,13 +1,12 @@
 package org.investpro.service;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.EmailNotifier;
 
 import org.investpro.core.NotificationMessage;
 import org.investpro.core.TelegramNotifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Objects;
 import java.util.Set;
 
@@ -22,10 +21,8 @@ import java.util.Set;
  * - Both
  * - None
  */
+@Slf4j
 public class NotificationService {
-
-    private static final Logger logger = LoggerFactory.getLogger(NotificationService.class);
-
     private final TelegramNotifier telegramNotifier;
     private final EmailNotifier emailNotifier;
 
@@ -82,7 +79,7 @@ public class NotificationService {
         }
 
         if (!isEnabled()) {
-            logger.debug("Notification skipped because no notifier is enabled. title={}", message.title());
+            log.debug("Notification skipped because no notifier is enabled. title={}", message.title());
             return;
         }
 
@@ -165,7 +162,7 @@ public class NotificationService {
 
     private void sendTelegram(NotificationMessage message) {
         if (!isTelegramEnabled()) {
-            logger.debug("Telegram notification skipped because TelegramNotifier is not enabled.");
+            log.debug("Telegram notification skipped because TelegramNotifier is not enabled.");
             return;
         }
 
@@ -173,16 +170,16 @@ public class NotificationService {
             boolean sent = telegramNotifier.sendMarkdown(message.toTelegramMarkdown());
 
             if (!sent) {
-                logger.warn("Telegram notification was not sent. title={}", message.title());
+                log.warn("Telegram notification was not sent. title={}", message.title());
             }
         } catch (Exception exception) {
-            logger.warn("Telegram notification failed: {}", exception.getMessage(), exception);
+            log.warn("Telegram notification failed: {}", exception.getMessage(), exception);
         }
     }
 
     private void sendEmail(NotificationMessage message) {
         if (!isEmailEnabled()) {
-            logger.debug("Email notification skipped because EmailNotifier is not enabled.");
+            log.debug("Email notification skipped because EmailNotifier is not enabled.");
             return;
         }
 
@@ -190,10 +187,10 @@ public class NotificationService {
             boolean sent = emailNotifier.send(message);
 
             if (!sent) {
-                logger.warn("Email notification was not sent. title={}", message.title());
+                log.warn("Email notification was not sent. title={}", message.title());
             }
         } catch (Exception exception) {
-            logger.warn("Email notification failed: {}", exception.getMessage(), exception);
+            log.warn("Email notification failed: {}", exception.getMessage(), exception);
         }
     }
 

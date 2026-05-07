@@ -1,5 +1,7 @@
 package org.investpro.core.agents.execution;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
@@ -7,22 +9,16 @@ import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.reasoning.ReasoningDecision;
 import org.investpro.core.agents.risk.RiskDecision;
 import org.investpro.core.agents.signal.Signal;
-import org.investpro.strategy.StrategySignal;
 import org.investpro.models.trading.Order;
 import org.investpro.utils.Side;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Final execution gate.
  * <p>
  * This is the only agent that is allowed to call exchange.createOrder(...).
  * Uses StrategySignal to determine the action instead of just side direction.
  */
+@Slf4j
 public class ExecutionAgent implements Agent {
-
-    private static final Logger logger = LoggerFactory.getLogger(ExecutionAgent.class);
-
     private AgentContext context;
     private boolean running;
 
@@ -102,10 +98,10 @@ public class ExecutionAgent implements Agent {
                         return null;
                     });
         } catch (JsonProcessingException exception) {
-            logger.error("Order serialization failed", exception);
+            log.error("Order serialization failed", exception);
             context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), exception));
         } catch (Exception exception) {
-            logger.error("Order execution failed", exception);
+            log.error("Order execution failed", exception);
             context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), exception));
         }
     }

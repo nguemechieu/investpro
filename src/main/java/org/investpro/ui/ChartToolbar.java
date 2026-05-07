@@ -163,20 +163,13 @@ public class ChartToolbar extends Region {
                 Tool.CLEAR_PRICE_LINES,
                 Tool.APPLY_SCALING,
                 Tool.PRINT,
-                Tool.AUTO_TRADE,
-                Tool.OPTIONS
+                Tool.AUTO_TRADE
         };
 
         toolbarNodes.add(functionOptionsSeparator);
 
         for (Tool tool : essentialTools) {
-            ToolbarButton toolbarButton;
-            if (tool == Tool.OPTIONS) {
-                toolbarButton = new ToolbarButton(Tool.OPTIONS);
-                attachOptionsButtonBehavior(toolbarButton);
-            } else {
-                toolbarButton = new ToolbarButton(tool);
-            }
+            ToolbarButton toolbarButton = new ToolbarButton(tool);
             toolbarNodes.add(toolbarButton);
         }
     }

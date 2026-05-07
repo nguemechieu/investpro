@@ -12,8 +12,6 @@ import java.util.List;
  */
 @Slf4j
 public class PortfolioHeatCalculator {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PortfolioHeatCalculator.class);
-
     // Risk limits by portfolio state
     private static final double NORMAL_HEAT_LIMIT = 10.0; // 10% max heat in normal conditions
     private static final double WATCH_HEAT_LIMIT = 7.0;

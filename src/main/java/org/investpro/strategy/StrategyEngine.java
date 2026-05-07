@@ -55,8 +55,7 @@ public class StrategyEngine {
     public StrategyEngine(@NotNull TradeExecutionCoordinator tradeExecutionCoordinator) {
         this.tradeExecutionCoordinator = Objects.requireNonNull(
                 tradeExecutionCoordinator,
-                "tradeExecutionCoordinator must not be null"
-        );
+                "tradeExecutionCoordinator must not be null");
         this.strategyRegistry = StrategyRegistry.getInstance();
         this.strategyRankingEngine = new StrategyRankingEngine();
     }
@@ -88,8 +87,7 @@ public class StrategyEngine {
                         "StrategyEngine: Error generating signal from strategy {}: {}",
                         safeStrategyId(strategy),
                         exception.getMessage(),
-                        exception
-                );
+                        exception);
             }
         }
 
@@ -101,8 +99,7 @@ public class StrategyEngine {
      */
     public @NotNull StrategySignal generateSignalFromStrategyId(
             @NotNull String strategyId,
-            @NotNull StrategyContext context
-    ) {
+            @NotNull StrategyContext context) {
         Objects.requireNonNull(strategyId, "strategyId must not be null");
         Objects.requireNonNull(context, "context must not be null");
 
@@ -121,8 +118,7 @@ public class StrategyEngine {
      */
     public @NotNull StrategySignal generateSignalFromStrategy(
             @NotNull TradingStrategy strategy,
-            @NotNull StrategyContext context
-    ) {
+            @NotNull StrategyContext context) {
         Objects.requireNonNull(strategy, "strategy must not be null");
         Objects.requireNonNull(context, "context must not be null");
 
@@ -152,8 +148,7 @@ public class StrategyEngine {
                     "StrategyEngine: Error executing strategy {}: {}",
                     strategyId,
                     exception.getMessage(),
-                    exception
-            );
+                    exception);
 
             return holdSignal(strategy, context, "Strategy execution error: " + exception.getMessage());
         }
@@ -177,8 +172,7 @@ public class StrategyEngine {
      */
     public boolean isStrategyCompatible(
             @NotNull TradingStrategy strategy,
-            @NotNull StrategyContext context
-    ) {
+            @NotNull StrategyContext context) {
         Objects.requireNonNull(strategy, "strategy must not be null");
         Objects.requireNonNull(context, "context must not be null");
 
@@ -236,8 +230,7 @@ public class StrategyEngine {
      */
     public @NotNull StrategySignal generateConsensusSignal(
             @NotNull StrategyContext context,
-            int minAgreements
-    ) {
+            int minAgreements) {
         Objects.requireNonNull(context, "context must not be null");
 
         if (minAgreements <= 0) {
@@ -266,8 +259,7 @@ public class StrategyEngine {
                 "StrategyEngine: No consensus. BUY={}, SELL={}, required={}",
                 buySignals.size(),
                 sellSignals.size(),
-                minAgreements
-        );
+                minAgreements);
 
         return holdSignal(null, context, "No strategy consensus");
     }
@@ -296,8 +288,7 @@ public class StrategyEngine {
      */
     public void onSignalGenerated(
             @NotNull StrategySignal signal,
-            @NotNull TradeRiskContext riskContext
-    ) {
+            @NotNull TradeRiskContext riskContext) {
         Objects.requireNonNull(signal, "signal must not be null");
         Objects.requireNonNull(riskContext, "riskContext must not be null");
 
@@ -311,8 +302,7 @@ public class StrategyEngine {
                 signal.getStrategyId(),
                 signal.getSymbol(),
                 signal.getSide(),
-                signal.getConfidence()
-        );
+                signal.getConfidence());
 
         // Do not execute directly here unless your TradeExecutionCoordinator already
         // performs risk approval internally.
@@ -328,8 +318,7 @@ public class StrategyEngine {
     public void cacheSignal(
             @NotNull String strategyId,
             @NotNull StrategyContext context,
-            @NotNull StrategySignal signal
-    ) {
+            @NotNull StrategySignal signal) {
         Objects.requireNonNull(strategyId, "strategyId must not be null");
         Objects.requireNonNull(context, "context must not be null");
         Objects.requireNonNull(signal, "signal must not be null");
@@ -348,8 +337,7 @@ public class StrategyEngine {
     public @Nullable StrategySignal getLastCachedSignal(
             @NotNull String strategyId,
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe
-    ) {
+            @NotNull Timeframe timeframe) {
         String cacheKey = buildCacheKey(strategyId, symbol, timeframe);
         return lastSignalCache.get(cacheKey);
     }
@@ -357,16 +345,14 @@ public class StrategyEngine {
     public @Nullable Long getLastSignalTimestamp(
             @NotNull String strategyId,
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe
-    ) {
+            @NotNull Timeframe timeframe) {
         String cacheKey = buildCacheKey(strategyId, symbol, timeframe);
         return lastSignalTimestampCache.get(cacheKey);
     }
 
     public @Nullable StrategyContext getCachedContext(
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe
-    ) {
+            @NotNull Timeframe timeframe) {
         String cacheKey = buildContextCacheKey(symbol, timeframe);
         return contextCache.get(cacheKey);
     }
@@ -406,12 +392,13 @@ public class StrategyEngine {
     private @NotNull StrategySignal holdSignal(
             @Nullable TradingStrategy strategy,
             @NotNull StrategyContext context,
-            @NotNull String reason
-    ) {
+            @NotNull String reason) {
         String strategyId = strategy == null ? "strategy-engine" : safeStrategyId(strategy);
+        String strategyName = strategy == null ? "StrategyEngine" : safeStrategyName(strategy);
 
         return StrategySignal.builder()
                 .strategyId(strategyId)
+                .strategyName(strategyName)
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(HOLD)
@@ -430,8 +417,7 @@ public class StrategyEngine {
     private @NotNull StrategySignal buildConsensusFromSignals(
             @NotNull StrategyContext context,
             @NotNull Side side,
-            @NotNull List<StrategySignal> agreeingSignals
-    ) {
+            @NotNull List<StrategySignal> agreeingSignals) {
         double avgConfidence = agreeingSignals.stream()
                 .mapToDouble(StrategySignal::getConfidence)
                 .average()
@@ -461,8 +447,15 @@ public class StrategyEngine {
                 .map(StrategySignal::getStrategyId)
                 .collect(Collectors.joining(","));
 
+        String strategyNames = agreeingSignals.stream()
+                .map(StrategySignal::getStrategyName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining(","));
+
         return StrategySignal.builder()
                 .strategyId("consensus:" + strategyIds)
+                .strategyName(strategyNames.isEmpty() ? "Consensus" : strategyNames)
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(side)
@@ -492,15 +485,13 @@ public class StrategyEngine {
     private String buildCacheKey(
             @NotNull String strategyId,
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe
-    ) {
+            @NotNull Timeframe timeframe) {
         return String.format("signal:%s:%s:%s", strategyId, symbol.getSymbol(), timeframe);
     }
 
     private String buildContextCacheKey(
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe
-    ) {
+            @NotNull Timeframe timeframe) {
         return String.format("context:%s:%s", symbol.getSymbol(), timeframe);
     }
 
@@ -510,6 +501,15 @@ public class StrategyEngine {
         }
 
         return strategy.getMetadata().getStrategyId();
+    }
+
+    private String safeStrategyName(@Nullable TradingStrategy strategy) {
+        if (strategy == null || strategy.getMetadata() == null) {
+            return "UNKNOWN";
+        }
+
+        String displayName = strategy.getMetadata().getDisplayName();
+        return displayName != null && !displayName.isBlank() ? displayName : "UNKNOWN";
     }
 
     private String signalReason(@NotNull StrategySignal signal) {

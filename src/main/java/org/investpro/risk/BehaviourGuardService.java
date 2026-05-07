@@ -1,11 +1,14 @@
 package org.investpro.risk;
 
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.prefs.Preferences;
 
 /**
  * Service for managing Behaviour Guard settings.
- * 
+ * <p>
  * Handles persistence, loading, and validation of guard configuration.
  * Uses Java Preferences API for system-independent storage.
  */
@@ -180,10 +183,9 @@ public class BehaviourGuardService {
     /**
      * Validation result wrapper
      */
-    @Slf4j
     public static class BehaviourGuardValidation {
-        private java.util.List<String> errors = new java.util.ArrayList<>();
-        private java.util.List<String> warnings = new java.util.ArrayList<>();
+        private final List<String> errors = new ArrayList<>();
+        private final List<String> warnings = new ArrayList<>();
 
         public void addError(String error) {
             errors.add(error);

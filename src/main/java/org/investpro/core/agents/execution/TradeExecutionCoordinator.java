@@ -46,7 +46,6 @@ import static org.investpro.utils.Side.HOLD;
  */
 @Slf4j
 public class TradeExecutionCoordinator {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TradeExecutionCoordinator.class);
 
     private final RiskManagementSystem riskManagementSystem;
     private final AiReasoningService aiReasoningService;
@@ -115,6 +114,16 @@ public class TradeExecutionCoordinator {
         Objects.requireNonNull(signal, "signal cannot be null");
         Objects.requireNonNull(riskContext, "riskContext cannot be null");
         return processSignalInternal(signal, signal.getSide(), riskContext);
+    }
+
+    public CompletableFuture<TradeExecutionResult> processReviewedSignal(
+            @NotNull StrategySignal signal,
+            @NotNull TradeRiskContext riskContext,
+            @Nullable Object tradeReview) {
+        log.debug("TradeExecutionCoordinator: received risk-reviewed signal. symbol={} review={}",
+                signal.getSymbol(),
+                tradeReview == null ? "none" : tradeReview.getClass().getSimpleName());
+        return processSignal(signal, riskContext);
     }
 
     private CompletableFuture<TradeExecutionResult> processSignalInternal(
@@ -229,7 +238,8 @@ public class TradeExecutionCoordinator {
 
         return guardedExecution.whenComplete((ignored, throwable) -> {
             symbolTradeLockManager.unlock(exchangeName, symbolText);
-            log.info("TradeExecutionCoordinator: symbol lock released. exchange={} symbol={}", exchangeName, symbolText);
+            log.info("TradeExecutionCoordinator: symbol lock released. exchange={} symbol={}", exchangeName,
+                    symbolText);
         });
     }
 
@@ -353,7 +363,8 @@ public class TradeExecutionCoordinator {
                     return TradeExecutionResult.executed(
                             orderId,
                             "Closed existing position only for " + symbolText,
-                            "Opposite signal produced " + intent + "; opening the opposite side is deferred to a later strategy cycle.");
+                            "Opposite signal produced " + intent
+                                    + "; opening the opposite side is deferred to a later strategy cycle.");
                 })
                 .exceptionally(exception -> TradeExecutionResult.failed(rootMessage(exception)));
     }
@@ -437,7 +448,8 @@ public class TradeExecutionCoordinator {
                 return riskContext;
             }
 
-            double balance = firstPositive(account.getTotalBalance(), account.getAvailableBalance(), account.getEquity());
+            double balance = firstPositive(account.getTotalBalance(), account.getAvailableBalance(),
+                    account.getEquity());
             double equity = riskContext.getAccountEquity() > 0.0
                     ? riskContext.getAccountEquity()
                     : firstPositive(account.getEquity(), account.getTotalBalance(), account.getAvailableBalance());

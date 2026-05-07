@@ -1,22 +1,19 @@
 package org.investpro.core.agents.market;
 
+import lombok.extern.slf4j.Slf4j;
+
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Normalizes market/account stream events for downstream agents.
  */
 @Getter
 @Setter
+@Slf4j
 public class MarketDataAgent implements Agent {
-
-    private static final Logger logger = LoggerFactory.getLogger(MarketDataAgent.class);
-
     private AgentContext context;
     private boolean running;
 
@@ -29,20 +26,20 @@ public class MarketDataAgent implements Agent {
     public void start(AgentContext context) {
         this.context = context;
         this.running = true;
-        logger.info("MarketDataAgent started");
+        log.info("MarketDataAgent started");
     }
 
     @Override
     public void stop() {
         running = false;
 
-        logger.info("MarketDataAgent stopped");
+        log.info("MarketDataAgent stopped");
     }
 
     @Override
     public void onEvent(AgentEvent event) {
         if (!running || event == null) {
-            logger.info("MarketDataAgent onEvent() called before stopping");
+            log.info("MarketDataAgent onEvent() called before stopping");
             return;
         }
 
@@ -54,7 +51,7 @@ public class MarketDataAgent implements Agent {
                  AgentEvent.ACCOUNT_UPDATE,
                  AgentEvent.POSITION_UPDATE,
                  AgentEvent.ORDER_UPDATE,
-                 AgentEvent.FILL_UPDATE -> logger.debug("{} received {}", name(), event.type());
+                 AgentEvent.FILL_UPDATE -> log.debug("{} received {}", name(), event.type());
             default -> {
             }
         }

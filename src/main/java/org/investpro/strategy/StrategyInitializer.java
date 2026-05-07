@@ -6,18 +6,29 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.impl.BreakoutStrategy;
 import org.investpro.strategy.impl.MeanReversionStrategy;
 import org.investpro.strategy.impl.TrendFollowingStrategy;
+import org.investpro.strategy.impl.UnifiedStrategy;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Initializes and registers all available trading strategies.
- * Should be called during application startup.
+ *
+ * Startup responsibility:
+ * - register legacy concrete strategies
+ * - register catalog-driven strategy definitions
+ * - avoid instantiating every catalog variant
+ *
+ * The StrategyRegistry should lazily instantiate UnifiedStrategy variants
+ * when a specific strategy name is requested.
  */
 @Slf4j
 @Getter
 @Setter
-public class StrategyInitializer {
+public final class StrategyInitializer {
 
     private static boolean initialized = false;
+
+    private StrategyInitializer() {
+    }
 
     public static synchronized void initializeStrategies() {
         if (initialized) {
@@ -27,46 +38,105 @@ public class StrategyInitializer {
 
         StrategyRegistry registry = StrategyRegistry.getInstance();
 
-        // Register built-in strategies
-        registerTrendFollowingStrategy(registry);
-        registerMeanReversionStrategy(registry);
-        registerBreakoutStrategy(registry);
+        registerLegacyStrategies(registry);
+        registerCatalogDefinitions(registry);
+        registerDefaultUnifiedStrategy(registry);
 
         initialized = true;
-        log.info("Strategy initialization complete. Total strategies: {}", registry.getAllStrategies().size());
+
+        log.info(
+                "Strategy initialization complete. instantiatedStrategies={}, definitions={}",
+                registry.instantiatedCount(),
+                registry.definitionCount()
+        );
     }
 
-    private static void registerTrendFollowingStrategy(@NotNull StrategyRegistry registry) {
+    private static void registerLegacyStrategies(@NotNull StrategyRegistry registry) {
+        registerLegacyStrategy(registry, new TrendFollowingStrategy());
+        registerLegacyStrategy(registry, new MeanReversionStrategy());
+        registerLegacyStrategy(registry, new BreakoutStrategy());
+    }
+
+    private static void registerLegacyStrategy(
+            @NotNull StrategyRegistry registry,
+            @NotNull TradingStrategy strategy
+    ) {
         try {
-            TradingStrategy strategy = new TrendFollowingStrategy();
-            registry.register(strategy);
-            log.info("Registered TrendFollowingStrategy");
-        } catch (Exception e) {
-            log.error("Failed to register TrendFollowingStrategy", e);
+            strategy.validateConfiguration();
+            registry.register(strategy.getMetadata().getStrategyId(), strategy);
+
+            log.info(
+                    "Registered legacy strategy: id={}, name={}",
+                    strategy.getMetadata().getStrategyId(),
+                    strategy.getMetadata().getDisplayName()
+            );
+
+        } catch (Exception exception) {
+            log.error(
+                    "Failed to register legacy strategy: {}",
+                    strategy.getClass().getSimpleName(),
+                    exception
+            );
         }
     }
 
-    private static void registerMeanReversionStrategy(@NotNull StrategyRegistry registry) {
+    /**
+     * Register all catalog definitions without creating UnifiedStrategy instances.
+     *
+     * This mirrors the Python registry pattern:
+     * definitions are loaded first, then concrete strategy objects are created lazily.
+     */
+    private static void registerCatalogDefinitions(@NotNull StrategyRegistry registry) {
+        int registered = 0;
+
+        for (StrategyDefinition definition : StrategyCatalog.STRATEGY_DEFINITIONS.values()) {
+            if (definition == null || isBlank(definition.getName())) {
+                continue;
+            }
+
+            try {
+                registry.registerDefinition(definition);
+                registered++;
+            } catch (Exception exception) {
+                log.warn(
+                        "Failed to register strategy definition: {}",
+                        definition.getName(),
+                        exception
+                );
+            }
+        }
+
+        log.info("Registered {} catalog strategy definitions", registered);
+    }
+
+    /**
+     * Register one generic UnifiedStrategy instance.
+     *
+     * The rest of the variants should be created lazily by StrategyRegistry.
+     */
+    private static void registerDefaultUnifiedStrategy(@NotNull StrategyRegistry registry) {
         try {
-            TradingStrategy strategy = new MeanReversionStrategy();
-            registry.register(strategy);
-            log.info("Registered MeanReversionStrategy");
-        } catch (Exception e) {
-            log.error("Failed to register MeanReversionStrategy", e);
+            UnifiedStrategy unifiedStrategy = new UnifiedStrategy("Trend Following");
+
+            registry.register("unified-strategy", unifiedStrategy);
+
+            log.info("Registered default UnifiedStrategy instance");
+
+        } catch (Exception exception) {
+            log.error("Failed to register default UnifiedStrategy", exception);
         }
     }
 
-    private static void registerBreakoutStrategy(@NotNull StrategyRegistry registry) {
-        try {
-            TradingStrategy strategy = new BreakoutStrategy();
-            registry.register(strategy);
-            log.info("Registered BreakoutStrategy");
-        } catch (Exception e) {
-            log.error("Failed to register BreakoutStrategy", e);
-        }
+    public static synchronized boolean isInitialized() {
+        return initialized;
     }
 
-    public static void reset() {
+    public static synchronized void reset() {
         initialized = false;
+        log.info("StrategyInitializer reset");
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

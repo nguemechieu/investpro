@@ -26,6 +26,8 @@ import java.security.Security;
 import java.security.interfaces.ECPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -223,7 +225,21 @@ public final class CoinbaseJwtSigner {
          * Environment variables often store private keys with escaped newlines.
          * Coinbase examples show replacing "\\n" with real newlines before parsing.
          */
-        value = value.replace("\\n", "\n").trim();
+        value = stripWrappingQuotes(value);
+        value = value
+                .replace("\\r\\n", "\n")
+                .replace("\\n", "\n")
+                .replace("\\r", "\n")
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .trim();
+
+        /*
+         * Some UI/password fields and .env editors collapse PEMs into a single line:
+         * -----BEGIN ...----- base64 -----END ...-----
+         * PEMParser needs canonical line boundaries, so rebuild the block.
+         */
+        value = canonicalizePemBlock(value);
 
         if (!value.contains("BEGIN") || !value.contains("PRIVATE KEY")) {
             throw new IllegalArgumentException(
@@ -231,6 +247,69 @@ public final class CoinbaseJwtSigner {
         }
 
         return value;
+    }
+
+    private static String stripWrappingQuotes(String value) {
+        String normalized = value == null ? "" : value.trim();
+        boolean changed = true;
+
+        while (changed && normalized.length() >= 2) {
+            changed = false;
+            char first = normalized.charAt(0);
+            char last = normalized.charAt(normalized.length() - 1);
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                normalized = normalized.substring(1, normalized.length() - 1).trim();
+                changed = true;
+            }
+        }
+
+        return normalized;
+    }
+
+    private static String canonicalizePemBlock(String pem) {
+        String value = pem == null ? "" : pem.trim();
+        String beginPrefix = "-----BEGIN ";
+        String endPrefix = "-----END ";
+
+        int beginStart = value.indexOf(beginPrefix);
+        if (beginStart < 0) {
+            return value;
+        }
+
+        int beginEnd = value.indexOf("-----", beginStart + beginPrefix.length());
+        if (beginEnd < 0) {
+            return value;
+        }
+        beginEnd += "-----".length();
+
+        int endStart = value.indexOf(endPrefix, beginEnd);
+        if (endStart < 0) {
+            return value;
+        }
+
+        int endEnd = value.indexOf("-----", endStart + endPrefix.length());
+        if (endEnd < 0) {
+            return value;
+        }
+        endEnd += "-----".length();
+
+        String header = value.substring(beginStart, beginEnd).trim();
+        String footer = value.substring(endStart, endEnd).trim();
+        String body = value.substring(beginEnd, endStart)
+                .replaceAll("\\s+", "")
+                .trim();
+
+        if (body.isBlank()) {
+            return value;
+        }
+
+        List<String> lines = new ArrayList<>();
+        lines.add(header);
+        for (int index = 0; index < body.length(); index += 64) {
+            lines.add(body.substring(index, Math.min(index + 64, body.length())));
+        }
+        lines.add(footer);
+        return String.join("\n", lines);
     }
 
     private static String normalizeMethod(String method) {

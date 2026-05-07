@@ -26,8 +26,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @Slf4j
 public class AgentRegistry {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AgentRegistry.class);
-
     private final Map<String, Agent> agents = new HashMap<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -152,6 +150,9 @@ public class AgentRegistry {
         try {
             for (Agent agent : agents.values()) {
                 try {
+                    if (context.getEventBus() != null) {
+                        context.getEventBus().subscribeAll(agent::onEvent);
+                    }
                     agent.start(context);
                     log.debug("Agent started: id={}", agent.name());
 

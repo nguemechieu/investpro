@@ -1,11 +1,8 @@
 package org.investpro.risk;
 
-import org.investpro.enums.*;
-import org.investpro.models.trading.TradePair;
-import org.investpro.exchange.Exchange;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
+import org.investpro.enums.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -22,10 +19,9 @@ import java.util.Objects;
  * This is the PRIMARY GATEKEEPER for all trade decisions.
  * Integrates all risk dimensions into a cohesive framework.
  */
+@Slf4j
 
 public record RiskManagementSystem(double defaultMaxRiskPerTrade, double defaultMaxCumulativeRisk) {
-
-    private static final Logger log = LoggerFactory.getLogger(RiskManagementSystem.class);
 
     public RiskManagementSystem() {
         // 2% max per trade
@@ -194,8 +190,6 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         double finalPositionSize = SmallAccountSizingPolicy.apply(
                 context.getBroker(),
                 accountBalance,
-                context.getSymbol(),
-                null,
                 calculatedPositionSize);
         boolean smallAccountModeActive = isOanda(context.getBroker())
                 && accountBalance > 0.0
@@ -449,60 +443,4 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         return sb.toString();
     }
 
-    /**
-     * Assess risk for bot trading across multiple symbols.
-     *
-     * @param exchange Exchange being used for bot trading
-     * @param symbols  Trading pairs for bot to trade
-     * @return RiskDecision for bot trading approval
-     */
-    public RiskDecision assessBotTradingRisk(Exchange exchange, List<TradePair> symbols) {
-        List<String> blockers = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-
-        // Bot trading is inherently riskier - require stricter checks
-        if (symbols == null || symbols.isEmpty()) {
-            blockers.add("No symbols provided for bot trading");
-        } else if (symbols.size() > 5) {
-            warnings.add("Bot trading more than 5 symbols - consider reducing to improve monitoring");
-        }
-
-        if (exchange == null || !exchange.isConnected()) {
-            blockers.add("Exchange not connected for bot trading");
-        }
-
-        boolean approved = blockers.isEmpty();
-        String reason = approved ? "Bot trading approved"
-                : "Bot trading blocked: %s".formatted(String.join("; ", blockers));
-
-        return RiskDecision.builder()
-                .approved(approved)
-                .approvalReason(reason)
-                .blockers(blockers)
-                .warnings(warnings)
-                .recommendations(List.of("Monitor bot trades closely", "Set daily loss limit"))
-                .build();
-    }
-
-    public RiskDecision assessCancelAllRisk(Exchange exchange) {
-        List<String> blockers = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-
-        // Cancel-all is a high-risk operation requiring strict conditions
-        if (exchange == null || !exchange.isConnected()) {
-            blockers.add("Exchange not connected for cancel-all operation");
-        }
-
-        boolean approved = blockers.isEmpty();
-        String reason = approved ? "Cancel-all operation approved"
-                : "Cancel-all operation blocked: %s".formatted(String.join("; ", blockers));
-
-        return RiskDecision.builder()
-                .approved(approved)
-                .approvalReason(reason)
-                .blockers(blockers)
-                .warnings(warnings)
-                .recommendations(List.of("Verify all positions before cancel-all"))
-                .build();
-    }
 }

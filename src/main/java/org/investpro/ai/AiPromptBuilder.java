@@ -1,5 +1,6 @@
 package org.investpro.ai;
 
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -19,6 +20,7 @@ import java.util.StringJoiner;
  * This class only builds prompts. It does not validate AI output.
  * Always validate AI output using AiDecisionValidator / PositionActionValidator / FinalRiskGate.
  */
+@Slf4j
 public final class AiPromptBuilder {
 
     private AiPromptBuilder() {

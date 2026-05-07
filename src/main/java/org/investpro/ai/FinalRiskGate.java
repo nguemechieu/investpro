@@ -1,12 +1,10 @@
 package org.investpro.ai;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.risk.RiskDecision;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -22,9 +20,9 @@ import java.util.List;
  * AI can reduce risk, wait, reject, or escalate.
  * AI cannot increase position size, leverage, or risk beyond RiskDecision limits.
  */
+@Slf4j
 public final class FinalRiskGate {
 
-    private static final Logger logger = LoggerFactory.getLogger(FinalRiskGate.class);
 
     private FinalRiskGate() {
     }
@@ -65,7 +63,7 @@ public final class FinalRiskGate {
 
         // Rule 1: deterministic risk blockers always win.
         if (riskBlockers != null && !riskBlockers.isEmpty()) {
-            logger.warn("RiskManagementSystem has hard blockers. Order rejected.");
+            log.warn("RiskManagementSystem has hard blockers. Order rejected.");
             return OrderApprovalDecision.rejected(
                     "Hard blockers from RiskManagementSystem",
                     "Risk blockers: %s".formatted(String.join("; ", riskBlockers))
@@ -75,7 +73,7 @@ public final class FinalRiskGate {
         AiDecision aiDecision = aiResponse.getDecision();
 
         if (aiDecision == null) {
-            logger.warn("AI decision was null. Escalating to manual review.");
+            log.warn("AI decision was null. Escalating to manual review.");
             return OrderApprovalDecision.escalate(
                     "Invalid AI decision",
                     "AI response did not include a valid decision."
@@ -84,7 +82,7 @@ public final class FinalRiskGate {
 
         // Rule 2: if deterministic risk says cannot proceed, reject.
         if (!riskDecision.canProceed()) {
-            logger.warn("RiskDecision indicated trade cannot proceed. Order rejected.");
+            log.warn("RiskDecision indicated trade cannot proceed. Order rejected.");
             return OrderApprovalDecision.rejected(
                     "RiskDecision cannot proceed",
                     "Risk assessment indicated the trade should not proceed."
@@ -93,7 +91,7 @@ public final class FinalRiskGate {
 
         // Rule 3: AI can reject.
         if (aiDecision == AiDecision.REJECT) {
-            logger.info("AI rejected trade. Order rejected.");
+            log.info("AI rejected trade. Order rejected.");
             return OrderApprovalDecision.rejected(
                     "AI reasoning rejected the trade",
                     safeExplanation(aiResponse)
@@ -102,7 +100,7 @@ public final class FinalRiskGate {
 
         // Rule 4: AI can wait.
         if (aiDecision == AiDecision.WAIT) {
-            logger.info("AI recommends waiting. Order not sent.");
+            log.info("AI recommends waiting. Order not sent.");
             return OrderApprovalDecision.wait(
                     "Market conditions not optimal",
                     safeExplanation(aiResponse)
@@ -111,7 +109,7 @@ public final class FinalRiskGate {
 
         // Rule 5: AI can escalate.
         if (aiDecision == AiDecision.ESCALATE_TO_MANUAL_REVIEW) {
-            logger.info("AI escalated trade to manual review. Order not sent.");
+            log.info("AI escalated trade to manual review. Order not sent.");
             return OrderApprovalDecision.escalate(
                     "AI requires manual review",
                     safeExplanation(aiResponse)
@@ -141,10 +139,10 @@ public final class FinalRiskGate {
 
             if (aiDecision == AiDecision.APPROVE_WITH_REDUCED_SIZE
                     && approvedPositionSize >= riskDecision.getFinalPositionSize()) {
-                logger.warn("AI selected APPROVE_WITH_REDUCED_SIZE but did not reduce size. Clamped to risk-approved size.");
+                log.warn("AI selected APPROVE_WITH_REDUCED_SIZE but did not reduce size. Clamped to risk-approved size.");
             }
 
-            logger.info("FinalRiskGate approved order. positionSize={}, riskMultiplier={}, executionStrategy={}",
+            log.info("FinalRiskGate approved order. positionSize={}, riskMultiplier={}, executionStrategy={}",
                     approvedPositionSize, approvedRiskMultiplier, executionStrategy);
 
             return OrderApprovalDecision.approved(
@@ -156,7 +154,7 @@ public final class FinalRiskGate {
             );
         }
 
-        logger.warn("Unexpected gate state: riskCanProceed={}, aiDecision={}",
+        log.warn("Unexpected gate state: riskCanProceed={}, aiDecision={}",
                 riskDecision.canProceed(), aiDecision);
 
         return OrderApprovalDecision.escalate(

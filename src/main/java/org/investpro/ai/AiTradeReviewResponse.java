@@ -6,7 +6,6 @@ import lombok.Setter;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
-import org.investpro.ai.AiDecision;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,7 +14,7 @@ import java.util.List;
  * Immutable response object returned by AiReasoningService after reviewing a
  * trade.
  * Contains the AI's decision, confidence level, and detailed reasoning.
- *
+ * <p>
  * The AI NEVER places trades directly. This response feeds into FinalRiskGate
  * for final authority.
  */
@@ -25,7 +24,6 @@ import java.util.List;
 @Getter
 @Setter
 public class AiTradeReviewResponse {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AiTradeReviewResponse.class);
     // =========================================================================
     // Decision
     // =========================================================================

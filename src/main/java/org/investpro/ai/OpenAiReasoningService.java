@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * OpenAI-based AI reasoning service.
  * Uses GPT-4 Turbo to review trades with real AI reasoning.
- *
+ * <p>
  * Features:
  * - Reads API key from OPENAI_API_KEY environment variable
  * - Fails safely if API key is not configured
@@ -25,8 +25,6 @@ import java.util.Map;
  */
 @Slf4j
 public class OpenAiReasoningService implements AiReasoningService {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(OpenAiReasoningService.class);
-
     private static final String SERVICE_NAME = "OpenAI GPT-4 Turbo";
     private static final String API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private static final String MODEL = "gpt-4-turbo";
@@ -52,10 +50,10 @@ public class OpenAiReasoningService implements AiReasoningService {
         this.fallback = new LocalAiReasoningService();
 
         if (this.apiKey == null || this.apiKey.isBlank()) {
-            logger.info(
+            log.info(
                     "OpenAI API key not configured. Using local fallback service. Set OPENAI_API_KEY environment variable to enable.");
         } else {
-            logger.info("OpenAI API service initialized successfully");
+            log.info("OpenAI API service initialized successfully");
         }
     }
 
@@ -63,7 +61,7 @@ public class OpenAiReasoningService implements AiReasoningService {
     public AiTradeReviewResponse reviewTrade(AiTradeReviewRequest request) {
         // If no API key, use fallback
         if (!isAvailable()) {
-            logger.debug("OpenAI API not configured, using local fallback");
+            log.debug("OpenAI API not configured, using local fallback");
             return fallback.reviewTrade(request);
         }
 
@@ -89,7 +87,7 @@ public class OpenAiReasoningService implements AiReasoningService {
             long processingTime = System.currentTimeMillis() - startTime;
 
             if (response.statusCode() != 200) {
-                logger.warn("OpenAI API returned status {}: {}", response.statusCode(), response.body());
+                log.warn("OpenAI API returned status {}: {}", response.statusCode(), response.body());
                 return fallback.reviewTrade(request);
             }
 
@@ -97,7 +95,7 @@ public class OpenAiReasoningService implements AiReasoningService {
             return parseOpenAiResponse(response.body(), processingTime);
 
         } catch (Exception e) {
-            logger.error("Error calling OpenAI API, falling back to local service: {}", e.getMessage());
+            log.error("Error calling OpenAI API, falling back to local service: {}", e.getMessage());
             return fallback.reviewTrade(request);
         }
     }
@@ -135,10 +133,10 @@ public class OpenAiReasoningService implements AiReasoningService {
     /**
      * Parse OpenAI API response and extract AI decision.
      */
-    @SuppressWarnings("unchecked")
+
     private AiTradeReviewResponse parseOpenAiResponse(String responseBody, long processingTime) {
         try {
-            Map<String, Object> response = objectMapper.readValue(responseBody, Map.class);
+            Map response = objectMapper.readValue(responseBody, Map.class);
 
             // Extract content from response
             List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
@@ -169,7 +167,7 @@ public class OpenAiReasoningService implements AiReasoningService {
 
             // Validate AI response (ensure it doesn't violate guardrails)
             if (!isValidAiResponse(decision, suggestedRiskMultiplier, suggestedPositionSize)) {
-                logger.warn("AI response violated guardrails, escalating to manual review");
+                log.warn("AI response violated guardrails, escalating to manual review");
                 return AiTradeReviewResponse.builder()
                         .decision(AiDecision.ESCALATE_TO_MANUAL_REVIEW)
                         .confidence(0.0)
@@ -205,7 +203,7 @@ public class OpenAiReasoningService implements AiReasoningService {
                     .build();
 
         } catch (Exception e) {
-            logger.error("Error parsing OpenAI response: {}", e.getMessage());
+            log.error("Error parsing OpenAI response: {}", e.getMessage());
             return AiTradeReviewResponse.failedResponse("Failed to parse AI response: %s".formatted(e.getMessage()),
                     SERVICE_NAME);
         }

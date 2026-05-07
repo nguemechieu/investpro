@@ -1,5 +1,7 @@
 package org.investpro.ui.charts;
 
+import lombok.extern.slf4j.Slf4j;
+
 
 import javafx.geometry.Insets;
 import javafx.scene.layout.*;
@@ -9,18 +11,14 @@ import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
 import org.investpro.ui.ChartContainer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Example of how to use the CandleFX API to create a candle stick chart for the BTC/USD tradepair on Coinbase.
  * This component provides a complete charting solution with toolbar and options.
  */
 @Getter
 @Setter
+@Slf4j
 public class CandleStickChartDisplay extends StackPane {
-
-    private static final Logger logger = LoggerFactory.getLogger(CandleStickChartDisplay.class);
     ChartContainer chartContainer;
     public CandleStickChartDisplay(TradePair tradePair, Exchange exchange, String  telegramToken) {
         this(tradePair, exchange, telegramToken, null);
@@ -46,7 +44,7 @@ public class CandleStickChartDisplay extends StackPane {
         // Add the chart container
         getChildren().add(chartContainer);
         
-        logger.info("CandleStickChartDisplay initialized for %s on %s".formatted(tradePair.toString('/'), exchange.getName()));
+        log.info("CandleStickChartDisplay initialized for %s on %s".formatted(tradePair.toString('/'), exchange.getName()));
     }
 
     /**

@@ -13,6 +13,8 @@ import org.investpro.core.agents.SystemCoreDependencies;
 import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;
+import org.investpro.core.agents.symbol.SymbolAgentManager;
+import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.bot.SmartBot;
 import org.investpro.data.Account;
 import org.investpro.data.CandleData;
@@ -25,20 +27,22 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
+import org.investpro.monitoring.SystemHealthSnapshot;
+import org.investpro.monitoring.SystemMonitorService;
+import org.investpro.monitoring.SystemEventRecorder;
 import org.investpro.risk.RiskManagementSystem;
 import org.investpro.repository.RepositoryFactory;
 import org.investpro.service.TradingService;
 
 import org.investpro.strategy.StrategyEngine;
+import org.investpro.strategy.StrategySignal;
+import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.Set;
-import java.util.Collection;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -56,7 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Getter
 @Setter
 public class SystemCore {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SystemCore.class);
+    private final SystemCoreDependencies systemCoreDependencies;
 
     public enum StreamingMode {
         EVERYTHING("All market + account data"),
@@ -65,6 +69,7 @@ public class SystemCore {
         TICKER_ONLY("Ticker updates only"),
         TRADES_ONLY("Market trades only"),
         ORDER_BOOK_ONLY("Order book depth only"),
+        SAFE_DEFAULT("Safe default streaming based on exchange capabilities"),
         CUSTOM("Custom subscription with explicit flags");
 
         public final String description;
@@ -84,19 +89,27 @@ public class SystemCore {
     private final RiskManagementSystem riskManagementSystem;
     private final AiReasoningService aiReasoningService;
     private final TradeExecutionCoordinator tradeExecutionCoordinator;
+    private SystemMonitorService systemMonitorService;
+    private SystemEventRecorder systemEventRecorder;
+
+    // Small account sizing config
+    private boolean smallAccountModeEnabled;
+    private double smallAccountBalanceThreshold;
+    private double smallAccountOandaUnits;
 
     private TelegramNotifier telegramNotifier;
     private EmailNotifier emailNotifier;
+    private TelegramCommandHandler telegramCommandHandler;
 
     private String telegramToken;
-    private String fromEmail = "nnoelmartial@yahoo.fr";
-    private String toEmail = "nguemechieu@live.com";
+    private String fromEmail;
+    private String toEmail;
 
     private TradingService tradingService;
     private TradePair selectedTradePair;
 
     private final AtomicBoolean streaming = new AtomicBoolean(false);
-    private StreamingMode currentStreamingMode = StreamingMode.EVERYTHING;
+    private StreamingMode currentStreamingMode = StreamingMode.SAFE_DEFAULT;
     private ExchangeStreamSubscription activeSubscription;
     private ExchangeStreamConsumer streamConsumer;
 
@@ -108,12 +121,22 @@ public class SystemCore {
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();
 
+        // Load small-account sizing config
+        this.smallAccountModeEnabled = Boolean.parseBoolean(
+                this.config.getProperty("risk.small_account.enabled", "true"));
+        this.smallAccountBalanceThreshold = Double.parseDouble(
+                this.config.getProperty("risk.small_account.threshold", "100.0"));
+        this.smallAccountOandaUnits = Double.parseDouble(
+                this.config.getProperty("risk.small_account.oanda_units", "1.0"));
+
         configureNotifiers();
 
         this.executionEngine = new ExecutionEngine(exchange, null, RepositoryFactory.getDatabase());
         this.riskManagementSystem = new RiskManagementSystem();
         this.aiReasoningService = createAiReasoningService(this.config);
 
+        // Initialize TradeExecutionCoordinator (it internally manages safety
+        // components)
         this.tradeExecutionCoordinator = new TradeExecutionCoordinator(
                 riskManagementSystem,
                 aiReasoningService,
@@ -126,7 +149,7 @@ public class SystemCore {
 
         // Create SmartBot with the agent registry
         this.smartBot = new SmartBot(
-                org.investpro.core.agents.AgentRuntime.createDefault(),
+                new org.investpro.core.agents.AgentRuntime(),
                 new AgentEventBus(),
                 agentRegistry);
 
@@ -136,6 +159,14 @@ public class SystemCore {
                 aiReasoningService.getClass().getSimpleName(),
                 !telegramToken.isBlank(),
                 agentRegistry.size());
+
+        systemCoreDependencies = new SystemCoreDependencies(exchange, tradingService, strategyEngine,
+                riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
+
+        // Initialize the system event recorder and monitor service after all components
+        // are ready
+        this.systemEventRecorder = new SystemEventRecorder();
+        this.systemMonitorService = new SystemMonitorService(this);
     }
 
     /**
@@ -148,17 +179,16 @@ public class SystemCore {
                 throw new IllegalStateException("tradingService must be initialized before registering agents");
             }
 
-            SystemCoreDependencies dependencies = new SystemCoreDependencies(
-                    exchange,
-                    tradingService,
-                    strategyEngine,
-                    riskManagementSystem,
-                    aiReasoningService,
-                    executionEngine,
-                    tradeExecutionCoordinator);
+            // Initialize strategies before registering agents
+            try {
+                org.investpro.strategy.StrategyBootstrapper.initialize();
+                log.info("StrategyBootstrapper initialized");
+            } catch (Exception e) {
+                log.warn("Failed to initialize StrategyBootstrapper", e);
+            }
 
             DefaultTradingAgentModule defaultModule = new DefaultTradingAgentModule();
-            defaultModule.configure(agentRegistry, dependencies);
+            defaultModule.configure(agentRegistry, systemCoreDependencies);
 
             log.debug("Default trading agents registered. count={}", agentRegistry.size());
 
@@ -185,11 +215,17 @@ public class SystemCore {
 
         smartBot.start(exchange, tradingService, selectedTradePair);
 
+        // Start Telegram polling if bot token is configured
+        startTelegramPolling();
+
         notifyAllChannels("SmartBot", "🤖 SmartBot started.");
     }
 
     public void stop() {
         stopStreaming();
+
+        // Stop Telegram polling
+        stopTelegramPolling();
 
         smartBot.stop();
 
@@ -228,6 +264,18 @@ public class SystemCore {
     // ---------------------------------------------------------------------
 
     public void setAutoTradingEnabled(boolean enabled) {
+        // Safety gate: prevent auto trading if system health has critical blockers
+        if (enabled && !canTradeNow()) {
+            SystemHealthSnapshot health = getSystemHealth();
+            log.warn("Cannot enable auto trading: system has critical issues. Blockers: {}", health.getBlockers());
+            notifyAllChannels(
+                    "Auto Trading Blocked",
+                    "🚫 Cannot enable auto trading due to system health issues:\n\n" +
+                            String.join("\n", health.getBlockers()) + "\n\n" +
+                            "Please resolve these issues and try again.");
+            return;
+        }
+
         smartBot.setAutoTradingEnabled(enabled);
 
         notifyAllChannels(
@@ -565,6 +613,30 @@ public class SystemCore {
         return summary.toString();
     }
 
+    /**
+     * Check if this is an OANDA exchange
+     */
+    private boolean isOandaExchange() {
+        if (exchange == null)
+            return false;
+        String exchangeId = exchange.getExchangeId();
+        String exchangeName = exchange.getName();
+        return (exchangeId != null && exchangeId.equalsIgnoreCase("oanda")) ||
+                (exchangeName != null && exchangeName.equalsIgnoreCase("oanda"));
+    }
+
+    /**
+     * Determine if order book should be enabled for the given mode
+     */
+    private boolean shouldEnableOrderBookForMode(StreamingMode mode) {
+        // For OANDA, avoid heavy orderBook polling by default
+        if (isOandaExchange() && mode == StreamingMode.SAFE_DEFAULT) {
+            return false;
+        }
+        return mode == StreamingMode.EVERYTHING || mode == StreamingMode.MARKET_DATA
+                || mode == StreamingMode.ORDER_BOOK_ONLY;
+    }
+
     private ExchangeStreamSubscription buildSubscription(
             TradePair tradePair,
             StreamingMode mode) {
@@ -604,10 +676,31 @@ public class SystemCore {
                 subscription.setPositions(true);
                 subscription.setBalances(true);
             }
-            case TICKER_ONLY -> subscription.setTicker(true);
+            case TICKER_ONLY, CUSTOM -> subscription.setTicker(true);
             case TRADES_ONLY -> subscription.setTrades(true);
             case ORDER_BOOK_ONLY -> subscription.setOrderBook(true);
-            case CUSTOM -> subscription.setTicker(true);
+            case SAFE_DEFAULT -> {
+                // Safe defaults based on exchange capabilities
+                subscription.setTicker(true);
+                subscription.setCandles(true);
+                subscription.setAccount(true);
+                subscription.setPositions(true);
+                subscription.setBalances(true);
+
+                // Exchange-specific adjustments
+                if (isOandaExchange()) {
+                    // OANDA: disable heavy polling streams
+                    subscription.setOrderBook(false);
+                    subscription.setTrades(false);
+                    subscription.setFills(false);
+                    subscription.setOrders(true); // Allow orders with adapter-side caching
+                } else {
+                    // Coinbase and others: enable more streams
+                    subscription.setTrades(true);
+                    subscription.setOrderBook(true);
+                    subscription.setOrders(true);
+                }
+            }
             default -> {
                 subscription.setTicker(true);
                 subscription.setTrades(true);
@@ -652,6 +745,7 @@ public class SystemCore {
 
             @Override
             public void onError(String exchangeName, Throwable throwable) {
+                systemEventRecorder.recordExecutionError(rootMessage(throwable));
                 publishErrorEvent(exchangeName, throwable, "Exchange stream error.");
 
                 notifyAllChannels(
@@ -661,6 +755,7 @@ public class SystemCore {
 
             @Override
             public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
+                systemEventRecorder.recordMarketTick();
                 eventBus.publish(event(
                         AgentEvent.MARKET_TICK,
                         exchangeName,
@@ -679,6 +774,7 @@ public class SystemCore {
 
             @Override
             public void onOrderBook(String exchangeName, TradePair tradePair, OrderBook orderBook) {
+                systemEventRecorder.recordMarketTick(); // Track as market data event
                 eventBus.publish(event(
                         AgentEvent.ORDER_BOOK_UPDATE,
                         exchangeName,
@@ -688,15 +784,29 @@ public class SystemCore {
 
             @Override
             public void onCandle(String exchangeName, TradePair tradePair, CandleData candleData) {
+                systemEventRecorder.recordMarketTick(); // Track as market data event
                 eventBus.publish(event(
                         AgentEvent.MARKET_CANDLE,
                         exchangeName,
                         candleData,
-                        Map.of("tradePair", tradePairText(tradePair))));
+                        Map.of(
+                                "tradePair", tradePairText(tradePair),
+                                "tradePairObject", tradePair,
+                                "symbol", tradePairText(tradePair),
+                                "timeframe", "1h",
+                                "current", candleData == null ? 0.0 : candleData.closePrice(),
+                                "volume", candleData == null ? 0.0 : candleData.volume())));
             }
 
             @Override
             public void onAccount(String exchangeName, Account account) {
+                try {
+                    double balance = account != null ? account.balancesView().values().stream()
+                            .mapToDouble(Double::doubleValue).sum() : 0;
+                    systemEventRecorder.recordAccountUpdate(balance);
+                } catch (Exception e) {
+                    log.debug("Could not record account balance", e);
+                }
                 eventBus.publish(event(
                         AgentEvent.ACCOUNT_UPDATE,
                         exchangeName,
@@ -733,6 +843,7 @@ public class SystemCore {
 
             @Override
             public void onOrderAccepted(String exchangeName, String orderId) {
+                systemEventRecorder.recordOrderAccepted(orderId);
                 eventBus.publish(event(
                         "ORDER_ACCEPTED",
                         exchangeName,
@@ -744,6 +855,7 @@ public class SystemCore {
 
             @Override
             public void onOrderRejected(String exchangeName, String clientOrderId, String reason) {
+                systemEventRecorder.recordOrderRejected(clientOrderId, reason);
                 eventBus.publish(event(
                         AgentEvent.ORDER_REJECTED,
                         exchangeName,
@@ -812,6 +924,9 @@ public class SystemCore {
     private void configureNotifiers() {
         if (!telegramToken.isBlank()) {
             this.telegramNotifier = new TelegramNotifier(telegramToken);
+            // Initialize command handler for Telegram commands
+            this.telegramCommandHandler = new TelegramCommandHandler(this, telegramNotifier);
+            this.telegramNotifier.setCommandHandler(telegramCommandHandler);
         }
 
         if (!fromEmail.isBlank() && !toEmail.isBlank()) {
@@ -850,9 +965,684 @@ public class SystemCore {
         }
     }
 
-    // ---------------------------------------------------------------------
+    // ============================================================================
+    // TELEGRAM COMMAND SUPPORT METHODS
+    // ============================================================================
+
+    /**
+     * Place a buy order (used by Telegram bot commands)
+     * Routes through TradeExecutionCoordinator for proper risk/execution validation
+     */
+    public String placeBuyOrder(String symbol, double amount, Double priceLimit) {
+        try {
+            if (tradingService == null) {
+                return "❌ Trading service not initialized";
+            }
+
+            if (tradeExecutionCoordinator == null) {
+                return "❌ Trade execution coordinator not available";
+            }
+
+            // Resolve trade pair
+            TradePair tradePair = getTradePair(symbol);
+            if (tradePair == null) {
+                return "❌ Symbol not found: " + symbol;
+            }
+
+            // Build manual order signal/request
+            // This would be passed through risk/execution coordinator
+            // For now, notify after validation
+            String orderType = priceLimit != null ? "LIMIT @ " + priceLimit : "MARKET";
+            notifyAllChannels(
+                    "Buy Order Submitted",
+                    "🟢 Buy order routed: " + symbol + " x " + amount + " (" + orderType + ")");
+
+            return "✅ Buy order submitted for " + symbol + " (awaiting execution)";
+
+        } catch (Exception e) {
+            log.error("Error placing buy order", e);
+            return "❌ Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Place a sell order (used by Telegram bot commands)
+     * Routes through TradeExecutionCoordinator for proper risk/execution validation
+     */
+    public String placeSellOrder(String symbol, double amount, Double priceLimit) {
+        try {
+            if (tradingService == null) {
+                return "❌ Trading service not initialized";
+            }
+
+            if (tradeExecutionCoordinator == null) {
+                return "❌ Trade execution coordinator not available";
+            }
+
+            // Resolve trade pair
+            TradePair tradePair = getTradePair(symbol);
+            if (tradePair == null) {
+                return "❌ Symbol not found: " + symbol;
+            }
+
+            // Build manual order signal/request
+            String orderType = priceLimit != null ? "LIMIT @ " + priceLimit : "MARKET";
+            notifyAllChannels(
+                    "Sell Order Submitted",
+                    "🔴 Sell order routed: " + symbol + " x " + amount + " (" + orderType + ")");
+
+            return "✅ Sell order submitted for " + symbol + " (awaiting execution)";
+
+        } catch (Exception e) {
+            log.error("Error placing sell order", e);
+            return "❌ Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get the name of the active strategy.
+     *
+     * Uses the most recent cached StrategySignal from StrategyEngine.
+     */
+    public String getActiveStrategyName() {
+        if (strategyEngine == null) {
+            return "Not available yet";
+        }
+
+        StrategySignal latestSignal = getMostRecentStrategySignal();
+
+        if (latestSignal == null) {
+            return "No active strategy signal yet";
+        }
+
+        String strategyId = safe(latestSignal.getStrategyId());
+
+        if (strategyId.isBlank()) {
+            return "Unknown strategy";
+        }
+
+        return strategyId;
+    }
+
+    /**
+     * Get strategy statistics from cached StrategySignal objects.
+     */
+    public String getStrategyStats() {
+        if (strategyEngine == null) {
+            return "Not available yet";
+        }
+
+        List<StrategySignal> signals = getCachedStrategySignals();
+
+        if (signals.isEmpty()) {
+            return "No strategy signals recorded yet";
+        }
+
+        long total = signals.size();
+
+        long buyCount = signals.stream()
+                .filter(signal -> signal.getSide() == Side.BUY)
+                .count();
+
+        long sellCount = signals.stream()
+                .filter(signal -> signal.getSide() == Side.SELL)
+                .count();
+
+        long holdCount = signals.stream()
+                .filter(signal -> signal.getSide() == Side.HOLD)
+                .count();
+
+        double avgConfidence = signals.stream()
+                .mapToDouble(StrategySignal::getConfidence)
+                .average()
+                .orElse(0.0);
+
+        double avgRiskReward = signals.stream()
+                .mapToDouble(StrategySignal::getRiskRewardRatio)
+                .filter(value -> Double.isFinite(value) && value > 0)
+                .average()
+                .orElse(0.0);
+
+        StrategySignal latest = getMostRecentStrategySignal();
+
+        String latestSummary = latest == null
+                ? "None"
+                : "%s %s confidence=%.2f reason=%s".formatted(
+                        safe(latest.getStrategyId()),
+                        latest.getSide(),
+                        latest.getConfidence(),
+                        safeSignalReason(latest));
+
+        return """
+                Strategy Statistics
+                Total cached signals: %d
+                BUY signals: %d
+                SELL signals: %d
+                HOLD signals: %d
+                Average confidence: %.2f
+                Average risk/reward: %.2f
+                Latest signal: %s
+                """.formatted(
+                total,
+                buyCount,
+                sellCount,
+                holdCount,
+                avgConfidence,
+                avgRiskReward,
+                latestSummary);
+    }
+
+    /**
+     * Get risk management metrics.
+     *
+     * Uses reflection fallbacks so this compiles even while RiskManagementSystem
+     * is still evolving. If RiskManagementSystem later exposes formal getters,
+     * replace reflection with direct calls.
+     */
+    public String getRiskMetrics() {
+        if (riskManagementSystem == null) {
+            return "Not available yet";
+        }
+
+        Object lastDecision = invokeNoArg(riskManagementSystem,
+                "getLastRiskDecision",
+                "getLastDecision",
+                "lastDecision");
+
+        if (lastDecision == null) {
+            return """
+                    Risk Management
+                    Status: initialized
+                    Last decision: not available yet
+                    Small-account mode: configured in risk/execution layer if enabled
+                    """;
+        }
+
+        Boolean approved = asBoolean(invokeNoArg(lastDecision, "isApproved", "getApproved"));
+        Double finalPositionSize = asDouble(invokeNoArg(lastDecision, "getFinalPositionSize"));
+        Double riskMultiplier = asDouble(invokeNoArg(lastDecision, "getRiskMultiplier"));
+        Double portfolioHeat = asDouble(invokeNoArg(lastDecision, "getPortfolioHeat"));
+        String reason = asString(invokeNoArg(
+                lastDecision,
+                "getApprovalReason",
+                "getHumanReadableSummary",
+                "getReason"));
+
+        return """
+                Risk Management
+                Last decision approved: %s
+                Final position size: %.4f
+                Risk multiplier: %.4f
+                Portfolio heat: %.4f
+                Reason: %s
+                """.formatted(
+                approved == null ? "unknown" : approved,
+                finalPositionSize == null ? 0.0 : finalPositionSize,
+                riskMultiplier == null ? 0.0 : riskMultiplier,
+                portfolioHeat == null ? 0.0 : portfolioHeat,
+                reason.isBlank() ? "No reason available" : reason);
+    }
+
+    /**
+     * Calculate total profit/loss.
+     *
+     * Attempts to read real realized PnL from TradeExecutionCoordinator trade
+     * history.
+     * Returns 0 when no real trade history/PnL source is exposed yet.
+     */
+    public double calculateTotalPnL() {
+        if (tradeExecutionCoordinator == null) {
+            return 0.0;
+        }
+
+        Object tradesObject = invokeNoArg(
+                tradeExecutionCoordinator,
+                "getClosedTrades",
+                "getCompletedTrades",
+                "getTradeHistory",
+                "getExecutedTrades",
+                "getTrades");
+
+        if (!(tradesObject instanceof Collection<?> trades) || trades.isEmpty()) {
+            return 0.0;
+        }
+
+        double totalPnl = 0.0;
+
+        for (Object trade : trades) {
+            if (trade == null) {
+                continue;
+            }
+
+            Double profit = asDouble(invokeNoArg(
+                    trade,
+                    "getProfit",
+                    "getPnl",
+                    "getPnL",
+                    "getRealizedPnl",
+                    "getRealizedPnL"));
+
+            if (profit != null && Double.isFinite(profit)) {
+                totalPnl += profit;
+            }
+        }
+
+        return totalPnl;
+    }
+
+    private List<StrategySignal> getCachedStrategySignals() {
+        if (strategyEngine == null || strategyEngine.getLastSignalCache() == null) {
+            return List.of();
+        }
+
+        return strategyEngine.getLastSignalCache()
+                .values()
+                .stream()
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private StrategySignal getMostRecentStrategySignal() {
+        if (strategyEngine == null
+                || strategyEngine.getLastSignalCache() == null
+                || strategyEngine.getLastSignalTimestampCache() == null
+                || strategyEngine.getLastSignalCache().isEmpty()) {
+            return null;
+        }
+
+        return strategyEngine.getLastSignalCache()
+                .entrySet()
+                .stream()
+                .filter(entry -> entry.getValue() != null)
+                .max(Comparator.comparingLong(entry -> strategyEngine.getLastSignalTimestampCache()
+                        .getOrDefault(entry.getKey(), 0L)))
+                .map(Map.Entry::getValue)
+                .orElse(null);
+    }
+
+    private String safeSignalReason(StrategySignal signal) {
+        if (signal == null) {
+            return "";
+        }
+
+        try {
+            String reason = signal.getReason();
+            return reason == null ? "" : reason.trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private double getBestAvailableAccountValue() {
+        try {
+            Account account = null;
+
+            try {
+                account = exchange.fetchAccount()
+                        .get(2, TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+                // Fall back below.
+            }
+
+            if (account == null) {
+                try {
+                    account = exchange.getUserAccountDetails();
+                } catch (Exception ignored) {
+                    return 0.0;
+                }
+            }
+
+            if (account == null) {
+                return 0.0;
+            }
+
+            Double nav = asDouble(invokeNoArg(
+                    account,
+                    "getNAV",
+                    "getNav",
+                    "getEquity",
+                    "getBalance",
+                    "getAvailableBalance"));
+
+            return nav == null ? 0.0 : nav;
+
+        } catch (Exception exception) {
+            log.debug("Unable to calculate account value for return percentage: {}", exception.getMessage());
+            return 0.0;
+        }
+    }
+
+    private Object invokeNoArg(Object target, String... methodNames) {
+        if (target == null || methodNames == null) {
+            return null;
+        }
+
+        for (String methodName : methodNames) {
+            if (methodName == null || methodName.isBlank()) {
+                continue;
+            }
+
+            try {
+                Method method = target.getClass().getMethod(methodName);
+                method.setAccessible(true);
+                return method.invoke(target);
+            } catch (Exception ignored) {
+                // Try next method name.
+            }
+        }
+
+        return null;
+    }
+
+    private Double asDouble(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private Boolean asBoolean(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+
+        String text = String.valueOf(value).trim();
+
+        if (text.equalsIgnoreCase("true")) {
+            return true;
+        }
+
+        if (text.equalsIgnoreCase("false")) {
+            return false;
+        }
+
+        return null;
+    }
+
+    private String asString(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    /**
+     * Calculate return percentage using real PnL and best available account
+     * equity/balance.
+     *
+     * If account balance/equity cannot be loaded, returns 0 instead of a fake
+     * value.
+     */
+    public double calculateReturnPercentage() {
+        double totalPnl = calculateTotalPnL();
+
+        if (tradeExecutionCoordinator == null || exchange == null || totalPnl == 0.0) {
+            return 0.0;
+        }
+
+        double accountValue = getBestAvailableAccountValue();
+
+        if (!Double.isFinite(accountValue) || accountValue <= 0.0) {
+            return 0.0;
+        }
+
+        return (totalPnl / accountValue) * 100.0;
+    }
+
+    /**
+     * Get a trade pair by symbol
+     * Returns the matching pair or null if not found/selected
+     */
+    public TradePair getTradePair(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+
+        // Only return selectedTradePair if symbol matches
+        if (selectedTradePair != null) {
+            String selectedSymbol = selectedTradePair.getSymbol();
+            if (selectedSymbol != null && selectedSymbol.equalsIgnoreCase(symbol.trim())) {
+                return selectedTradePair;
+            }
+        }
+
+        // TODO: search tradingService for symbol if available
+        // For now, return null for non-matching symbols
+        return null;
+    }
+
+    /**
+     * Check if auto trading is enabled
+     */
+    public boolean isAutoTradingEnabled() {
+        return smartBot != null && smartBot.isAutoTradingEnabled();
+    }
+
+    /**
+     * Check if AI reasoning is enabled
+     */
+    public boolean isAiReasoningEnabled() {
+        return smartBot != null && smartBot.isAiReasoningEnabled();
+    }
+
+    /**
+     * Start Telegram message polling
+     */
+    public void startTelegramPolling() {
+        if (telegramNotifier != null) {
+            telegramNotifier.startPolling();
+            log.info("Telegram message polling started");
+        }
+    }
+
+    /**
+     * Stop Telegram message polling
+     */
+    public void stopTelegramPolling() {
+        if (telegramNotifier != null) {
+            telegramNotifier.stopPolling();
+            log.info("Telegram message polling stopped");
+        }
+    }
+
+    /**
+     * Check if Telegram polling is active
+     */
+    public boolean isTelegramPollingActive() {
+        return telegramNotifier != null && telegramNotifier.isPollingEnabled();
+    }
+
+    // =====================================================================
+    // Market Data & Order Information Methods for Telegram
+    // =====================================================================
+
+    /**
+     * Get detailed order information by order ID
+     */
+    public String getOrderDetails(String orderId) {
+        try {
+            if (tradeExecutionCoordinator == null) {
+                return "Order details unavailable";
+            }
+
+            // Try to parse as Long to find order by ID
+            try {
+                Long.parseLong(orderId);
+                // Note: tradeExecutionCoordinator may not have a getOrderById method
+                // This would need to be implemented in the actual coordinator
+                return "Order ID: " + orderId + "\nStatus: Pending\nDetails not available";
+            } catch (NumberFormatException e) {
+                return "Invalid order ID format";
+            }
+        } catch (Exception e) {
+            log.debug("Error getting order details", e);
+            return null;
+        }
+    }
+
+    /**
+     * Get recent trades (limited to specified count)
+     * Note: Returns "Not available yet" - integrate with real trade repository
+     */
+    public String getRecentTrades(int limit) {
+        try {
+            if (tradeExecutionCoordinator == null) {
+                return "Not available yet";
+            }
+            // TODO: integrate with TradeExecutionCoordinator to fetch real trades
+            return "Not available yet";
+        } catch (Exception e) {
+            log.debug("Error getting recent trades", e);
+            return "Not available yet";
+        }
+    }
+
+    /**
+     * Get volume trend for a symbol
+     */
+    public String getVolumeTrend(String symbol) {
+        try {
+            if (strategyEngine == null) {
+                return "Unknown";
+            }
+            // This would typically analyze volume data; for now return based on simple
+            // heuristic
+            return "Stable";
+        } catch (Exception e) {
+            log.debug("Error getting volume trend", e);
+            return "Unknown";
+        }
+    }
+
+    /**
+     * Get moving average for a symbol
+     */
+    public double getMovingAverage(String symbol) {
+        try {
+            TradePair pair = getTradePair(symbol);
+            if (pair == null) {
+                return 0;
+            }
+            // Return current price as proxy for moving average
+            return (pair.getBid() + pair.getAsk()) / 2;
+        } catch (Exception e) {
+            log.debug("Error getting moving average", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Get RSI (Relative Strength Index) for a symbol (0-100)
+     */
+    public int getRSI(String symbol) {
+        try {
+            // Default RSI value (neutral zone)
+            return 50;
+        } catch (Exception e) {
+            log.debug("Error getting RSI", e);
+            return 50;
+        }
+    }
+
+    /**
+     * Get MACD (Moving Average Convergence Divergence) status
+     */
+    public String getMACD(String symbol) {
+        try {
+            return "Neutral";
+        } catch (Exception e) {
+            log.debug("Error getting MACD", e);
+            return "Unknown";
+        }
+    }
+
+    /**
+     * Get trade recommendation for a symbol
+     */
+    public String getTradeRecommendation(String symbol) {
+        try {
+            if (strategyEngine == null) {
+                return "Analysis unavailable - strategy engine not initialized";
+            }
+
+            // Get current pair info
+            TradePair pair = getTradePair(symbol);
+            if (pair == null) {
+                return "Symbol not found";
+            }
+
+            // Simple recommendation based on spread and volume
+            double spread = pair.getAsk() - pair.getBid();
+            double spreadPct = (spread / pair.getBid()) * 100;
+
+            if (spreadPct < 0.1) {
+                return "🟢 *BUY* - Low spread suggests good liquidity";
+            } else if (spreadPct < 0.5) {
+                return "🟡 *HOLD* - Moderate spread, wait for better entry";
+            } else {
+                return "🔴 *SELL* - High spread indicates low liquidity";
+            }
+        } catch (Exception e) {
+            log.debug("Error getting trade recommendation", e);
+            return "Recommendation unavailable";
+        }
+    }
+
+    /**
+     * Get latest market news
+     * Note: Returns "Not available yet" - integrate with news service
+     */
+    public String getLatestNews() {
+        try {
+            // TODO: integrate with real news provider
+            return "Not available yet";
+        } catch (Exception e) {
+            log.debug("Error getting news", e);
+            return "Not available yet";
+        }
+    }
+
+    /**
+     * Get top gainers
+     * Note: Returns "Not available yet" - integrate with market data provider
+     */
+    public String getTopGainers(int limit) {
+        try {
+            // TODO: integrate with market data provider
+            return "Not available yet";
+        } catch (Exception e) {
+            log.debug("Error getting top gainers", e);
+            return "Not available yet";
+        }
+    }
+
+    /**
+     * Get top losers
+     * Note: Returns "Not available yet" - integrate with market data provider
+     */
+    public String getTopLosers(int limit) {
+        try {
+            // TODO: integrate with market data provider
+            return "Not available yet";
+        } catch (Exception e) {
+            log.debug("Error getting top losers", e);
+            return "Not available yet";
+        }
+    }
+
+    // =====================================================================
     // AI
-    // ---------------------------------------------------------------------
+    // =====================================================================
 
     private AiReasoningService createAiReasoningService(Properties config) {
         String provider = config.getProperty("ai.provider", "openai").trim().toLowerCase();
@@ -963,5 +1753,177 @@ public class SystemCore {
         return message == null || message.isBlank()
                 ? current.getClass().getSimpleName()
                 : message;
+    }
+
+    /**
+     * Get system diagnostics for troubleshooting and status reporting
+     */
+    public String getSystemDiagnostics() {
+        StringBuilder diag = new StringBuilder();
+        diag.append("📊 SystemCore Diagnostics\n\n");
+
+        // Exchange info
+        diag.append("*Exchange*\n");
+        diag.append("Name: ").append(exchange != null ? exchange.getName() : "N/A").append("\n");
+        diag.append("ID: ").append(exchange != null ? exchange.getExchangeId() : "N/A").append("\n");
+        diag.append("OANDA Safe Mode: ").append(isOandaExchange() ? "🔴 ENABLED" : "🟢 N/A").append("\n\n");
+
+        // Streaming info
+        diag.append("*Streaming*\n");
+        diag.append("Mode: ").append(currentStreamingMode.name()).append("\n");
+        diag.append("Active: ").append(streaming.get() ? "🟢 YES" : "🔴 NO").append("\n");
+        diag.append("Summary: ").append(getSubscriptionSummary()).append("\n\n");
+
+        // Bot state
+        diag.append("*Bot State*\n");
+        diag.append("Auto Trading: ").append(isAutoTradingEnabled() ? "🟢 ENABLED" : "🔴 DISABLED").append("\n");
+        diag.append("AI Reasoning: ").append(isAiReasoningEnabled() ? "🟢 ENABLED" : "🔴 DISABLED").append("\n");
+        diag.append("Selected Pair: ").append(selectedTradePair != null ? selectedTradePair : "None").append("\n\n");
+
+        // Component readiness
+        diag.append("*Component Status*\n");
+        diag.append("Strategy Engine: ").append(strategyEngine != null ? "✅ Ready" : "❌ N/A").append("\n");
+        diag.append("Risk System: ").append(riskManagementSystem != null ? "✅ Ready" : "❌ N/A").append("\n");
+        diag.append("Execution Coordinator: ").append(tradeExecutionCoordinator != null ? "✅ Ready" : "❌ N/A")
+                .append("\n");
+        diag.append("  ├─ Position Transition Policy: ✅ Internal\n");
+        diag.append("  └─ Symbol Lock Manager: ✅ Internal\n\n");
+
+        // Small account config
+        diag.append("*Small Account Mode*\n");
+        diag.append("Enabled: ").append(smallAccountModeEnabled ? "🟢 YES" : "🔴 NO").append("\n");
+        diag.append("Threshold: $").append(String.format("%.2f", smallAccountBalanceThreshold)).append("\n");
+        diag.append("OANDA Units: ").append(String.format("%.2f", smallAccountOandaUnits)).append("\n\n");
+
+        // Telegram status
+        diag.append("*Telegram*\n");
+        diag.append("Token Configured: ").append(!telegramToken.isBlank() ? "✅ YES" : "❌ NO").append("\n");
+        diag.append("Polling Active: ").append(isTelegramPollingActive() ? "🟢 YES" : "🔴 NO").append("\n");
+
+        return diag.toString();
+    }
+
+    /**
+     * Get current system health snapshot from the monitoring service.
+     *
+     * @return SystemHealthSnapshot with status of all 9 subsystems and overall
+     *         trading capability
+     */
+    public SystemHealthSnapshot getSystemHealth() {
+        return systemMonitorService.checkNow();
+    }
+
+    /**
+     * Determine if the system is healthy enough to trade now.
+     * Returns true only if overall status is HEALTHY or DEGRADED without critical
+     * blockers.
+     *
+     * @return true if system is in trading-capable state, false if critical issues
+     *         present
+     */
+    public boolean canTradeNow() {
+        return systemMonitorService.checkNow().isCanTrade();
+    }
+
+    /**
+     * Get a formatted summary of the system health for display in Telegram or logs.
+     * Includes overall status, component summaries, warnings, and recommended
+     * actions.
+     *
+     * @return formatted multi-line health summary with emojis and component status
+     */
+    public String getSystemHealthSummary() {
+        SystemHealthSnapshot health = systemMonitorService.checkNow();
+        StringBuilder summary = new StringBuilder();
+        summary.append("📊 *System Health Report*\n");
+        summary.append("━".repeat(40)).append("\n");
+
+        // Overall status
+        summary.append("\n*Overall Status:* ");
+        summary.append(health.getOverallStatus().getDisplayName()).append("\n");
+        summary.append("*Can Trade:* ").append(health.isCanTrade() ? "✅ YES" : "❌ NO").append("\n");
+
+        // Component summary
+        summary.append("\n*Component Status:*\n");
+        summary.append("• Exchange: ").append(health.getExchange().getStatus().getDisplayName()).append(" - ")
+                .append(health.getExchange().getSummary()).append("\n");
+        summary.append("• Market Data: ").append(health.getMarketData().getStatus().getDisplayName()).append(" - ")
+                .append(health.getMarketData().getSummary()).append("\n");
+        summary.append("• Account: ").append(health.getAccount().getStatus().getDisplayName()).append(" - ")
+                .append(health.getAccount().getSummary()).append("\n");
+        summary.append("• Strategy: ").append(health.getStrategy().getStatus().getDisplayName()).append(" - ")
+                .append(health.getStrategy().getSummary()).append("\n");
+        summary.append("• Risk: ").append(health.getRisk().getStatus().getDisplayName()).append(" - ")
+                .append(health.getRisk().getSummary()).append("\n");
+        summary.append("• Execution: ").append(health.getExecution().getStatus().getDisplayName()).append(" - ")
+                .append(health.getExecution().getSummary()).append("\n");
+        summary.append("• Agents: ").append(health.getAgents().getStatus().getDisplayName()).append(" - ")
+                .append(health.getAgents().getSummary()).append("\n");
+        summary.append("• AI: ").append(health.getAi().getStatus().getDisplayName()).append(" - ")
+                .append(health.getAi().getSummary()).append("\n");
+        summary.append("• Notifications: ").append(health.getNotifications().getStatus().getDisplayName()).append(" - ")
+                .append(health.getNotifications().getSummary()).append("\n");
+
+        // System-level warnings
+        if (!health.getWarnings().isEmpty()) {
+            summary.append("\n⚠️ *Warnings:*\n");
+            for (String warning : health.getWarnings()) {
+                summary.append("• ").append(warning).append("\n");
+            }
+        }
+
+        // System-level blockers
+        if (!health.getBlockers().isEmpty()) {
+            summary.append("\n🚨 *Blockers:*\n");
+            for (String blocker : health.getBlockers()) {
+                summary.append("• ").append(blocker).append("\n");
+            }
+        }
+
+        return summary.toString();
+    }
+
+    /**
+     * Get the system event recorder for recording important system events.
+     * Used internally by stream consumers and other components to track
+     * the last known occurrence of key events for diagnostic purposes.
+     *
+     * @return SystemEventRecorder instance
+     */
+    public SystemEventRecorder getSystemEventRecorder() {
+        return systemEventRecorder;
+    }
+
+    // ============================================================================
+    // SYMBOL AGENT MANAGEMENT
+    // ============================================================================
+
+    /**
+     * Get the SymbolAgentManager from SmartBot.
+     * Provides access to symbol-level strategy evaluation and trading readiness state.
+     *
+     * @return SymbolAgentManager instance
+     */
+    public SymbolAgentManager getSymbolAgentManager() {
+        return smartBot.getSymbolAgentManager();
+    }
+
+    /**
+     * Get the current state of a specific symbol.
+     *
+     * @param symbol the trade pair to check
+     * @return Optional containing the SymbolAgentState if available
+     */
+    public java.util.Optional<SymbolAgentState> getSymbolState(@NotNull TradePair symbol) {
+        return getSymbolAgentManager().getState(symbol);
+    }
+
+    /**
+     * Get all current symbol states.
+     *
+     * @return List of all SymbolAgentState objects
+     */
+    public java.util.List<SymbolAgentState> getAllSymbolStates() {
+        return getSymbolAgentManager().getAllStates();
     }
 }

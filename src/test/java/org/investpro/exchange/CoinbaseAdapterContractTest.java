@@ -4,6 +4,10 @@ import org.investpro.exchange.models.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.GZIPOutputStream;
+
 import static org.assertj.core.api.Assertions.*;
 
 /**
@@ -20,6 +24,19 @@ import static org.assertj.core.api.Assertions.*;
  */
 @DisplayName("Coinbase Exchange Adapter Contract Tests")
 class CoinbaseAdapterContractTest {
+
+    @Test
+    @DisplayName("Coinbase decodes gzip JSON responses before parsing")
+    void testCoinbaseDecodesGzipResponseBodies() throws Exception {
+        String json = "{\"accounts\":[]}";
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+            gzip.write(json.getBytes(StandardCharsets.UTF_8));
+        }
+
+        assertThat(Coinbase.decodeBody(output.toByteArray(), "gzip")).isEqualTo(json);
+        assertThat(Coinbase.decodeBody(output.toByteArray(), "")).isEqualTo(json);
+    }
 
     @Test
     @DisplayName("Coinbase capability declares FULL_ORDER_BOOK support")

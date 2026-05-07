@@ -4,6 +4,7 @@ import org.investpro.enums.ExecutionStrategy;
 import org.investpro.models.trading.Position;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -11,14 +12,13 @@ import java.time.LocalDateTime;
  * Final gate for open-position actions.
  */
 @Slf4j
-@SuppressWarnings("unused")
 public class PositionActionFinalGate {
 
     /**
      * Make final decision on position action.
      */
-    @SuppressWarnings("unused")
-    public static PositionActionIntent makeDecision(
+
+    public static @Nullable PositionActionIntent makeDecision(
             Position position,
             AiPositionManagementResponse aiRecommendation) {
 
@@ -38,9 +38,9 @@ public class PositionActionFinalGate {
             return approveAction(
                     position,
                     AiPositionAction.HOLD,
-                    null,
-                    null,
-                    null,
+                    0.0,
+                    0.0,
+                    0.0,
                     aiRecommendation.getExplanation(),
                     aiRecommendation.getConfidence());
         }

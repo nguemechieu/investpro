@@ -18,8 +18,6 @@ import java.util.List;
  */
 @Slf4j
 public class NewsCalendarPanel extends VBox {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NewsCalendarPanel.class);
-
     private final NewsDataProvider newsDataProvider;
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm");
 

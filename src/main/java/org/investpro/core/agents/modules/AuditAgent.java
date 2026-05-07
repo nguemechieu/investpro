@@ -18,8 +18,6 @@ import org.investpro.core.agents.AgentEvent;
  */
 @Slf4j
 public class AuditAgent implements org.investpro.core.agents.Agent {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AuditAgent.class);
-
     private volatile boolean running = false;
     private AgentContext context;
 

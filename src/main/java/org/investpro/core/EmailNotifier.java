@@ -1,5 +1,7 @@
 package org.investpro.core;
 
+import lombok.extern.slf4j.Slf4j;
+
 import jakarta.mail.Authenticator;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
@@ -10,9 +12,6 @@ import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Properties;
 
 /**
@@ -33,6 +32,7 @@ import java.util.Properties;
  * - INVESTPRO_SMTP_PASSWORD
  * - INVESTPRO_SMTP_STARTTLS
  */
+@Slf4j
 public record EmailNotifier(
         String fromEmail,
         String toEmail,
@@ -42,9 +42,6 @@ public record EmailNotifier(
         String password,
         boolean startTls
 ) {
-
-    private static final Logger logger = LoggerFactory.getLogger(EmailNotifier.class);
-
     private static final int DEFAULT_SMTP_PORT = 587;
 
     public EmailNotifier(String fromEmail, String toEmail) {
@@ -104,7 +101,7 @@ public record EmailNotifier(
 
     public boolean sendPlainText(String subject, String body) {
         if (!isEnabled()) {
-            logger.debug("Email notification skipped because EmailNotifier is not configured.");
+            log.debug("Email notification skipped because EmailNotifier is not configured.");
             return false;
         }
 
@@ -114,17 +111,17 @@ public record EmailNotifier(
 
             Transport.send(email);
 
-            logger.info("EMAIL notification sent to={} from={} subject={}", toEmail, fromEmail, subject);
+            log.info("EMAIL notification sent to={} from={} subject={}", toEmail, fromEmail, subject);
             return true;
         } catch (Exception exception) {
-            logger.warn("Email notification failed: {}", exception.getMessage(), exception);
+            log.warn("Email notification failed: {}", exception.getMessage(), exception);
             return false;
         }
     }
 
     public boolean sendHtml(String subject, String htmlBody) {
         if (!isEnabled()) {
-            logger.debug("HTML email notification skipped because EmailNotifier is not configured.");
+            log.debug("HTML email notification skipped because EmailNotifier is not configured.");
             return false;
         }
 
@@ -134,10 +131,10 @@ public record EmailNotifier(
 
             Transport.send(email);
 
-            logger.info("HTML EMAIL notification sent to={} from={} subject={}", toEmail, fromEmail, subject);
+            log.info("HTML EMAIL notification sent to={} from={} subject={}", toEmail, fromEmail, subject);
             return true;
         } catch (Exception exception) {
-            logger.warn("HTML email notification failed: {}", exception.getMessage(), exception);
+            log.warn("HTML email notification failed: {}", exception.getMessage(), exception);
             return false;
         }
     }

@@ -12,7 +12,7 @@ import org.investpro.models.trading.TradePair;
 /**
  * Request object sent to AI position manager for review of an open position.
  * Contains all relevant position state, market data, risk metrics, and context.
- *
+ * <p>
  * AI must use this context to recommend position actions (hold, reduce, close,
  * etc.)
  * but cannot directly execute orders—recommendations feed through
@@ -24,7 +24,6 @@ import org.investpro.models.trading.TradePair;
 @Setter
 @AllArgsConstructor
 public class AiPositionManagementRequest {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AiPositionManagementRequest.class);
 
     // =========================================================================
     // Position Identity

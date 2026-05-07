@@ -21,8 +21,6 @@ import java.util.Set;
  */
 @Slf4j
 public class SymbolExecutionFilter {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SymbolExecutionFilter.class);
-
     private final Set<String> enabledSymbols = new HashSet<>();
     private final Set<String> disabledSymbols = new HashSet<>();
     private boolean allowAllByDefault = true;

@@ -1,13 +1,14 @@
 package org.investpro.utils;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.LoggerFactory;
-
+@Slf4j
 public class LogOnExceptionThreadFactory implements ThreadFactory {
     private final AtomicInteger threadIndex = new AtomicInteger(1);
     private final String threadNamePrefix;
@@ -39,7 +40,7 @@ public class LogOnExceptionThreadFactory implements ThreadFactory {
             thread.setPriority(threadPriority);
         }
 
-        thread.setUncaughtExceptionHandler((t, e) -> LoggerFactory.getLogger(t.getName()).error(e.getMessage(), e));
+        thread.setUncaughtExceptionHandler((t, e) -> log.error("Uncaught exception on {}", t.getName(), e));
 
         return thread;
     }

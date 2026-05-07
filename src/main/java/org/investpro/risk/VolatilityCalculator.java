@@ -27,7 +27,7 @@ public class VolatilityCalculator {
             return 2.0;
         }
 
-        double lastClose = candles.get(candles.size() - 1).closePrice();
+        double lastClose = candles.getLast().closePrice();
         if (lastClose <= 0) {
             return 2.0;
         }

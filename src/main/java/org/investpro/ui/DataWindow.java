@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -13,9 +15,6 @@ import javafx.scene.layout.VBox;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.models.trading.TradePair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -34,10 +33,8 @@ import java.util.Objects;
  */
 @Getter
 @Setter
+@Slf4j
 public class DataWindow extends VBox {
-
-    private static final Logger logger = LoggerFactory.getLogger(DataWindow.class);
-
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.systemDefault());
 
@@ -216,7 +213,7 @@ public class DataWindow extends VBox {
         try {
             return tradePair.toString('/');
         } catch (Exception exception) {
-            logger.debug("Unable to format trade pair", exception);
+            log.debug("Unable to format trade pair", exception);
             return String.valueOf(tradePair);
         }
     }
@@ -238,24 +235,24 @@ public class DataWindow extends VBox {
     }
 
     private String stringify(Object value) {
-        if (value == null) {
-            return "-";
-        }
-        if (value instanceof Double) {
-            Double number = (Double) value;
-            return formatPrice(number);
-        }
-        if (value instanceof Float) {
-            Float number = (Float) value;
-            return formatPrice(number.doubleValue());
-        }
-        if (value instanceof Number) {
-            Number number = (Number) value;
-            return String.valueOf(number);
-        }
-        if (value instanceof Instant) {
-            Instant instant = (Instant) value;
-            return TIME_FORMATTER.format(instant);
+        switch (value) {
+            case null -> {
+                return "-";
+            }
+            case Double number -> {
+                return formatPrice(number);
+            }
+            case Float number -> {
+                return formatPrice(number.doubleValue());
+            }
+            case Number number -> {
+                return String.valueOf(number);
+            }
+            case Instant instant -> {
+                return TIME_FORMATTER.format(instant);
+            }
+            default -> {
+            }
         }
 
         String text = String.valueOf(value).trim();

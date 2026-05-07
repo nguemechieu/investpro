@@ -21,7 +21,6 @@ import java.time.LocalDateTime;
 @Value
 @Builder
 public class AiTradeReviewRequest {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AiTradeReviewRequest.class);
     // =========================================================================
     // Market & Signal Context
     // =========================================================================

@@ -1,13 +1,13 @@
-package org.investpro.strategy;
+package org.investpro.repository;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.strategy.StrategyAssignment;
 import org.investpro.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Repository for managing strategy assignments.
@@ -44,7 +44,7 @@ public final class StrategyAssignmentRepository {
 
     /**
      * Saves an assignment.
-     *
+     * <p>
      * If an assignment with the same ID already exists, the old version is removed
      * from the symbol/timeframe index before the new one is inserted.
      */
@@ -149,7 +149,7 @@ public final class StrategyAssignmentRepository {
         synchronized (assignments) {
             return assignments.stream()
                     .filter(Objects::nonNull)
-                    .collect(Collectors.toUnmodifiableList());
+                    .toList();
         }
     }
 
@@ -168,7 +168,7 @@ public final class StrategyAssignmentRepository {
                 })
                 .filter(Objects::nonNull)
                 .filter(assignment -> assignment.getSymbol().equalsIgnoreCase(symbol))
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
     }
 
     /**
@@ -188,7 +188,7 @@ public final class StrategyAssignmentRepository {
                 .filter(Objects::nonNull)
                 .filter(StrategyAssignment::isValid)
                 .filter(assignment -> !assignment.isExpired())
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
     }
 
     /**

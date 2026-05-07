@@ -3,7 +3,7 @@ package org.investpro.service;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.research.StrategyBacktestResult;
 import org.investpro.strategy.StrategyAssignment;
-import org.investpro.strategy.StrategyAssignmentRepository;
+import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.timeframe.Timeframe;
@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 public class StrategySelectionService {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategySelectionService.class);
     private static StrategySelectionService instance;
     private final StrategyRegistry registry;
     private final StrategyAssignmentRepository assignmentRepository;

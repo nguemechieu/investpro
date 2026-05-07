@@ -21,8 +21,7 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class AiAuditRecord {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AiAuditRecord.class);
-    // =========================================================================
+ // =========================================================================
     // Identifiers
     // =========================================================================
 

@@ -184,7 +184,7 @@ public class IndicatorPanel extends VBox {
         
         stdDevSpinner.valueProperty().addListener((obs, old, newVal) -> {
             IndicatorType type = indicatorSelector.getValue();
-            if (type != null && type == IndicatorType.BOLLINGER) {
+            if (type == IndicatorType.BOLLINGER) {
                 IndicatorSettings settings = indicatorManager.getSettings(type);
                 if (settings != null) {
                     settings.setStdDeviation(newVal);

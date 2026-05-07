@@ -1,10 +1,13 @@
 package org.investpro.execution;
 
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-
+@Slf4j
 public class SymbolTradeLockManager {
 
     public static final Duration DEFAULT_TTL = Duration.ofSeconds(30);
@@ -68,17 +71,17 @@ public class SymbolTradeLockManager {
         return entry.reason();
     }
 
-    private static String key(String exchangeName, String symbol) {
+    private static @NotNull String key(String exchangeName, String symbol) {
         return normalize(exchangeName) + "::" + normalize(symbol);
     }
 
-    private static String normalize(String value) {
+    private static @NotNull String normalize(String value) {
         return Objects.toString(value, "")
                 .trim()
                 .toUpperCase(Locale.ROOT);
     }
 
-    private static String safeReason(String reason) {
+    private static @NotNull String safeReason(String reason) {
         return reason == null || reason.isBlank() ? "Order transition in progress" : reason.trim();
     }
 

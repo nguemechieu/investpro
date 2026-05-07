@@ -56,6 +56,28 @@ class CoinbaseJwtSignerTest {
     }
 
     @Test
+    void acceptsEscapedNewlinePrivateKeyPem() throws Exception {
+        KeyPair keyPair = generateEcKeyPair();
+        String escapedPem = toPem(keyPair).replace("\n", "\\n");
+
+        CoinbaseJwtSigner signer = new CoinbaseJwtSigner(TEST_KEY_NAME, escapedPem, 120);
+        SignedJWT jwt = SignedJWT.parse(signer.buildRestJwt("GET", "/api/v3/brokerage/accounts"));
+
+        assertTrue(jwt.verify(new ECDSAVerifier((ECPublicKey) keyPair.getPublic())));
+    }
+
+    @Test
+    void acceptsQuotedOneLinePrivateKeyPem() throws Exception {
+        KeyPair keyPair = generateEcKeyPair();
+        String oneLinePem = "\"" + toPem(keyPair).replace("\n", " ").trim() + "\"";
+
+        CoinbaseJwtSigner signer = new CoinbaseJwtSigner(TEST_KEY_NAME, oneLinePem, 120);
+        SignedJWT jwt = SignedJWT.parse(signer.buildRestJwt("GET", "/api/v3/brokerage/accounts"));
+
+        assertTrue(jwt.verify(new ECDSAVerifier((ECPublicKey) keyPair.getPublic())));
+    }
+
+    @Test
     void liveCredentialsCanCallAccountsEndpointWhenExplicitlyEnabled() throws Exception {
         Assumptions.assumeTrue(Boolean.getBoolean("coinbase.liveAuth"), "live auth test disabled");
 

@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.application.Platform;
 import org.investpro.data.Account;
 
@@ -11,9 +13,6 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Objects;
 
 /**
@@ -26,10 +25,8 @@ import java.util.Objects;
  *
  * SystemCore can own the main streaming lifecycle.
  */
+@Slf4j
 public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
-
-    private static final Logger logger = LoggerFactory.getLogger(DesktopExchangeStreamBridge.class);
-
     private final TradingWindow window;
 
     public DesktopExchangeStreamBridge(TradingWindow window) {
@@ -59,7 +56,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     public void onError(String exchangeName, Throwable throwable) {
         String message = rootMessage(throwable);
 
-        logger.warn("Stream error from {}: {}", exchangeName, message, throwable);
+        log.warn("Stream error from {}: {}", exchangeName, message, throwable);
 
         runOnUiThread(() -> {
             window.updateStreamingStatus("Stream error");
@@ -85,7 +82,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
             return;
         }
 
-        runOnUiThread(() -> window.updateTradeFromStream(tradePair, trade));
+        runOnUiThread(() -> window.updateTradeFromStream(trade));
     }
 
     @Override
@@ -179,7 +176,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
             );
 
             if (fill != null && fill.getTradePair() != null) {
-                window.updateTradeFromStream(fill.getTradePair(), fill);
+                window.updateTradeFromStream(fill);
             }
 
             window.refreshAccountWorkspace();
@@ -199,7 +196,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void onRawMessage(String exchangeName, String channel, String rawJson) {
-        logger.debug(
+        log.debug(
                 "Raw stream message exchange={} channel={} payload={}",
                 exchangeName,
                 channel,

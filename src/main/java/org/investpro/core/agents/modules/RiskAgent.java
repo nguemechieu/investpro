@@ -20,8 +20,6 @@ import org.investpro.core.agents.AgentEvent;
  */
 @Slf4j
 public class RiskAgent implements org.investpro.core.agents.Agent {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RiskAgent.class);
-
     private volatile boolean running = false;
     private AgentContext context;
 

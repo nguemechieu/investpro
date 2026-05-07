@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class StrategyRankingEngine {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyRankingEngine.class);
 
     /**
      * Scores a single backtest result into a StrategyScore.

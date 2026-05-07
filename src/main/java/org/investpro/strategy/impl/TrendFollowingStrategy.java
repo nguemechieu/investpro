@@ -50,20 +50,17 @@ public class TrendFollowingStrategy extends BaseStrategy {
         Set<AssetClass> assets = EnumSet.of(
                 AssetClass.CRYPTO_ASSET,
                 AssetClass.FIAT_CURRENCY,
-                AssetClass.EQUITY
-        );
+                AssetClass.EQUITY);
 
         Set<ContractType> contracts = EnumSet.of(
                 ContractType.SPOT,
-                ContractType.PERPETUAL
-        );
+                ContractType.PERPETUAL);
 
         Set<Timeframe> timeframes = EnumSet.of(
                 Timeframe.H1,
                 Timeframe.H4,
                 Timeframe.D1,
-                Timeframe.W1
-        );
+                Timeframe.W1);
 
         return StrategyMetadata.builder()
                 .strategyId(STRATEGY_ID)
@@ -118,16 +115,14 @@ public class TrendFollowingStrategy extends BaseStrategy {
                         "Bullish trend confirmed: price > SMA20 > SMA50. " +
                                 "Entry=" + currentPrice +
                                 ", SL=" + stopLoss +
-                                ", TP=" + takeProfit
-                );
+                                ", TP=" + takeProfit);
 
                 log.debug(
                         "Trend-following BUY signal: symbol={}, price={}, sma20={}, sma50={}",
                         context.getSymbol(),
                         currentPrice,
                         sma20,
-                        sma50
-                );
+                        sma50);
 
                 return buildBuySignal(context, currentPrice, stopLoss, takeProfit, sma20, sma50);
             }
@@ -140,31 +135,27 @@ public class TrendFollowingStrategy extends BaseStrategy {
                         "Bearish trend confirmed: price < SMA20 < SMA50. " +
                                 "Entry=" + currentPrice +
                                 ", SL=" + stopLoss +
-                                ", TP=" + takeProfit
-                );
+                                ", TP=" + takeProfit);
 
                 log.debug(
                         "Trend-following SELL signal: symbol={}, price={}, sma20={}, sma50={}",
                         context.getSymbol(),
                         currentPrice,
                         sma20,
-                        sma50
-                );
+                        sma50);
 
                 return buildSellSignal(context, currentPrice, stopLoss, takeProfit, sma20, sma50);
             }
 
             return noSignal(
                     context,
-                    "No clear trend: price=" + currentPrice + ", SMA20=" + sma20 + ", SMA50=" + sma50
-            );
+                    "No clear trend: price=" + currentPrice + ", SMA20=" + sma20 + ", SMA50=" + sma50);
 
         } catch (Exception exception) {
             log.error(
                     "Error generating trend-following signal for symbol={}",
                     context.getSymbol(),
-                    exception
-            );
+                    exception);
 
             return noSignal(context, "Trend-following analysis error: " + exception.getMessage());
         }
@@ -186,7 +177,7 @@ public class TrendFollowingStrategy extends BaseStrategy {
 
     @Override
     public Object getId() {
-        return STRATEGY_ID ;
+        return STRATEGY_ID;
     }
 
     @Override
@@ -231,8 +222,7 @@ public class TrendFollowingStrategy extends BaseStrategy {
             double stopLoss,
             double takeProfit,
             double sma20,
-            double sma50
-    ) {
+            double sma50) {
         double riskRewardRatio = calculateRiskRewardRatio(entry, stopLoss, takeProfit);
         double confidence = calculateConfidence(riskRewardRatio, entry, sma20, sma50);
 
@@ -242,11 +232,11 @@ public class TrendFollowingStrategy extends BaseStrategy {
                 entry,
                 stopLoss,
                 takeProfit,
-                riskRewardRatio
-        );
+                riskRewardRatio);
 
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
+                .strategyName(metadata.getDisplayName())
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(BUY)
@@ -268,8 +258,7 @@ public class TrendFollowingStrategy extends BaseStrategy {
             double stopLoss,
             double takeProfit,
             double sma20,
-            double sma50
-    ) {
+            double sma50) {
         double riskRewardRatio = calculateRiskRewardRatio(entry, stopLoss, takeProfit);
         double confidence = calculateConfidence(riskRewardRatio, entry, sma20, sma50);
 
@@ -279,11 +268,11 @@ public class TrendFollowingStrategy extends BaseStrategy {
                 entry,
                 stopLoss,
                 takeProfit,
-                riskRewardRatio
-        );
+                riskRewardRatio);
 
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
+                .strategyName(metadata.getDisplayName())
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(SELL)

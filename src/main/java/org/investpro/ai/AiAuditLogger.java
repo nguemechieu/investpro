@@ -25,7 +25,6 @@ import java.util.UUID;
 @Slf4j
 @Getter
 public class AiAuditLogger {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AiAuditLogger.class);
 
     private final String logFilePath;
     private final ObjectMapper objectMapper;
@@ -45,7 +44,7 @@ public class AiAuditLogger {
         try {
             Files.createDirectories(Paths.get(logFilePath).getParent());
         } catch (IOException e) {
-            logger.warn("Failed to create audit log directory: {}", e.getMessage());
+            log.warn("Failed to create audit log directory: {}", e.getMessage());
         }
     }
 
@@ -65,12 +64,12 @@ public class AiAuditLogger {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND);
 
-            logger.debug("AI trade review logged: {}", record.getAuditId());
+            log.debug("AI trade review logged: {}", record.getAuditId());
 
         } catch (IOException e) {
-            logger.error("Failed to write AI audit log: {}", e.getMessage());
+            log.error("Failed to write AI audit log: {}", e.getMessage());
         } catch (Exception e) {
-            logger.error("Error building audit record: {}", e.getMessage());
+            log.error("Error building audit record: {}", e.getMessage());
         }
     }
 
@@ -141,7 +140,7 @@ public class AiAuditLogger {
             PositionActionIntent actionIntent) {
 
         // Log position review to audit trail
-        logger.info("Position review: {} - {} - Action: {}", positionId, symbol,
+        log.info("Position review: {} - {} - Action: {}", positionId, symbol,
                 aiResponse != null ? aiResponse.getAction() : "UNKNOWN");
     }
 
@@ -156,7 +155,7 @@ public class AiAuditLogger {
             String executionDetails) {
 
         // Log position action to audit trail
-        logger.info("Position action: {} - {} - Success: {}", positionId, symbol, executionSuccess);
+        log.info("Position action: {} - {} - Success: {}", positionId, symbol, executionSuccess);
     }
 
     /**
@@ -164,9 +163,9 @@ public class AiAuditLogger {
      */
     public void recordDecision(AiAuditRecord record) {
         if (record == null) {
-            logger.warn("Cannot record null audit record");
+            log.warn("Cannot record null audit record");
             return;
         }
-        logger.info("Decision recorded: {}", record.getAuditId());
+        log.info("Decision recorded: {}", record.getAuditId());
     }
 }

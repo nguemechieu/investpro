@@ -27,13 +27,18 @@ public record TradingProfile(
         ProbabilityLevel probabilityLevel,
         CapitalProtection capitalProtection,
         SystemDesign systemDesign,
-        String description) {
+        String description,
+        // OpenAI Configuration
+        boolean enableOpenaiIntegration,
+        String openaiApiKey,
+        String openaiModel,
+        double openaiTemperature) {
 
     private static final Preferences PREFS = Preferences.userNodeForPackage(TradingProfile.class);
 
     public static TradingProfile defaults() {
         return new TradingProfile(
-                "",
+                System.getProperty("user.name", "Trader"),
                 RiskProfile.MODERATE,
                 "Swing Trading",
                 1000.0,
@@ -48,28 +53,44 @@ public record TradingProfile(
                 ProbabilityLevel.HIGH,
                 CapitalProtection.STRICT_STOPS,
                 SystemDesign.HYBRID_SYSTEM,
-                "");
+                "",
+                false,
+                "",
+                "gpt-3.5-turbo",
+                0.7);
     }
 
     public static TradingProfile load() {
         TradingProfile defaults = defaults();
         return new TradingProfile(
                 PREFS.get("traderName", defaults.traderName()),
-                enumValue(RiskProfile.class, PREFS.get("riskProfile", defaults.riskProfile().name()), defaults.riskProfile()),
+                enumValue(RiskProfile.class, PREFS.get("riskProfile", defaults.riskProfile().name()),
+                        defaults.riskProfile()),
                 PREFS.get("tradingStyle", defaults.tradingStyle()),
                 PREFS.getDouble("dailyLossLimit", defaults.dailyLossLimit()),
                 PREFS.getDouble("maxPositionSize", defaults.maxPositionSize()),
                 PREFS.getInt("maxOpenPositions", defaults.maxOpenPositions()),
                 PREFS.getBoolean("autoTradingEnabled", defaults.autoTradingEnabled()),
                 PREFS.getBoolean("advancedOrdersEnabled", defaults.advancedOrdersEnabled()),
-                enumValue(MarketBehavior.class, PREFS.get("marketBehavior", defaults.marketBehavior().name()), defaults.marketBehavior()),
-                enumValue(ExecutionStrategy.class, PREFS.get("executionStrategy", defaults.executionStrategy().name()), defaults.executionStrategy()),
-                enumValue(LiquidityProfile.class, PREFS.get("liquidityProfile", defaults.liquidityProfile().name()), defaults.liquidityProfile()),
-                enumValue(PsychologyProfile.class, PREFS.get("psychologyProfile", defaults.psychologyProfile().name()), defaults.psychologyProfile()),
-                enumValue(ProbabilityLevel.class, PREFS.get("probabilityLevel", defaults.probabilityLevel().name()), defaults.probabilityLevel()),
-                enumValue(CapitalProtection.class, PREFS.get("capitalProtection", defaults.capitalProtection().name()), defaults.capitalProtection()),
-                enumValue(SystemDesign.class, PREFS.get("systemDesign", defaults.systemDesign().name()), defaults.systemDesign()),
-                PREFS.get("description", defaults.description()));
+                enumValue(MarketBehavior.class, PREFS.get("marketBehavior", defaults.marketBehavior().name()),
+                        defaults.marketBehavior()),
+                enumValue(ExecutionStrategy.class, PREFS.get("executionStrategy", defaults.executionStrategy().name()),
+                        defaults.executionStrategy()),
+                enumValue(LiquidityProfile.class, PREFS.get("liquidityProfile", defaults.liquidityProfile().name()),
+                        defaults.liquidityProfile()),
+                enumValue(PsychologyProfile.class, PREFS.get("psychologyProfile", defaults.psychologyProfile().name()),
+                        defaults.psychologyProfile()),
+                enumValue(ProbabilityLevel.class, PREFS.get("probabilityLevel", defaults.probabilityLevel().name()),
+                        defaults.probabilityLevel()),
+                enumValue(CapitalProtection.class, PREFS.get("capitalProtection", defaults.capitalProtection().name()),
+                        defaults.capitalProtection()),
+                enumValue(SystemDesign.class, PREFS.get("systemDesign", defaults.systemDesign().name()),
+                        defaults.systemDesign()),
+                PREFS.get("description", defaults.description()),
+                PREFS.getBoolean("enableOpenaiIntegration", defaults.enableOpenaiIntegration()),
+                PREFS.get("openaiApiKey", defaults.openaiApiKey()),
+                PREFS.get("openaiModel", defaults.openaiModel()),
+                PREFS.getDouble("openaiTemperature", defaults.openaiTemperature()));
     }
 
     public void save() {
@@ -89,6 +110,11 @@ public record TradingProfile(
         PREFS.put("capitalProtection", capitalProtection.name());
         PREFS.put("systemDesign", systemDesign.name());
         PREFS.put("description", safe(description));
+        // Save OpenAI configuration
+        PREFS.putBoolean("enableOpenaiIntegration", enableOpenaiIntegration);
+        PREFS.put("openaiApiKey", safe(openaiApiKey));
+        PREFS.put("openaiModel", safe(openaiModel));
+        PREFS.putDouble("openaiTemperature", Math.max(0.0, Math.min(2.0, openaiTemperature)));
     }
 
     public static void reset() {

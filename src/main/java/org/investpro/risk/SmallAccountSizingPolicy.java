@@ -1,7 +1,5 @@
 package org.investpro.risk;
 
-import org.investpro.models.trading.TradePair;
-import org.investpro.utils.Side;
 
 public final class SmallAccountSizingPolicy {
 
@@ -14,8 +12,7 @@ public final class SmallAccountSizingPolicy {
     public static double apply(
             String exchangeName,
             double accountBalance,
-            TradePair pair,
-            Side side,
+
             double requestedUnits) {
         if (isOanda(exchangeName)
                 && accountBalance > 0.0

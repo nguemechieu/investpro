@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.currency.Money;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -33,6 +34,7 @@ public class Trade {
     private double takeProfit;
     private double swap;
     private double profit;
+    private double closePrice; // Exit price for closed trades
 
     public Trade() {
         super();
@@ -55,7 +57,7 @@ public class Trade {
      */
 
     // 1315922016,5.800000000000,1.000000000000
-    public Trade(TradePair tradePair, int timestamp, Money price, double amount, Side transactionType,
+    public Trade(TradePair tradePair, int timestamp, @NotNull Money price, double amount, Side transactionType,
             long localTradeId, double fee) {
         this.tradePair = tradePair;
         this.timestamp = Instant.ofEpochSecond(timestamp);

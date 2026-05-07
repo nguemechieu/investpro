@@ -1,5 +1,7 @@
 package org.investpro.data;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyType;
@@ -8,16 +10,12 @@ import org.investpro.models.trading.Order;
 
 import org.investpro.utils.SymmetricPair;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.PrintWriter;
 import java.sql.*;
 import java.util.Properties;
+@Slf4j
 
 public class Db1 implements Db {
-    private static final Logger logger = LoggerFactory.getLogger(Db1.class);
-
     Connection conn;
     // = DriverManager.getConnection("jdbc:sqlite:cryptoinvestor");
 
@@ -30,7 +28,7 @@ public class Db1 implements Db {
             String databaseFile = conf.getProperty("sqlite_db_file", "investpro_db.sql");
             this.conn = DriverManager.getConnection("jdbc:sqlite:%s".formatted(databaseFile));
         } catch (SQLException e) {
-            logger.error("Error connecting to the database\n%s".formatted(e.getMessage()));
+            log.error("Error connecting to the database\n%s".formatted(e.getMessage()));
 
         }
     }
@@ -51,7 +49,7 @@ public class Db1 implements Db {
             this.conn.createStatement().executeUpdate(sql);
             ensureCurrencyColumns();
         } catch (SQLException e) {
-            logger.error("Error creating the database tables\n%s".formatted(e.getMessage()));
+            log.error("Error creating the database tables\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -59,7 +57,7 @@ public class Db1 implements Db {
     @Override
     public void dropTables() {
         if (conn == null) {
-            logger.warn("Database connection is null, cannot drop tables");
+            log.warn("Database connection is null, cannot drop tables");
             return;
         }
         try {
@@ -68,16 +66,16 @@ public class Db1 implements Db {
             stmt.execute("DROP TABLE IF EXISTS trades");
             stmt.execute("DROP TABLE IF EXISTS orders");
             stmt.execute("DROP TABLE IF EXISTS account_balances");
-            logger.info("All tables dropped successfully");
+            log.info("All tables dropped successfully");
         } catch (SQLException e) {
-            logger.error("Error dropping tables: {}", e.getMessage(), e);
+            log.error("Error dropping tables: {}", e.getMessage(), e);
         }
     }
 
     @Override
     public void truncateTables() {
         if (conn == null) {
-            logger.warn("Database connection is null, cannot truncate tables");
+            log.warn("Database connection is null, cannot truncate tables");
             return;
         }
         try {
@@ -86,31 +84,31 @@ public class Db1 implements Db {
             stmt.execute("DELETE FROM trades");
             stmt.execute("DELETE FROM orders");
             stmt.execute("DELETE FROM account_balances");
-            logger.info("All tables truncated successfully");
+            log.info("All tables truncated successfully");
         } catch (SQLException e) {
-            logger.error("Error truncating tables: {}", e.getMessage(), e);
+            log.error("Error truncating tables: {}", e.getMessage(), e);
         }
     }
 
     @Override
     public void insertData() {
-        logger.debug("insertData() called - use insert(table, column, value) method instead");
+        log.debug("insertData() called - use insert(table, column, value) method instead");
     }
 
     @Override
     public void updateData() {
-        logger.debug("updateData() called - use update(table, column, value) method instead");
+        log.debug("updateData() called - use update(table, column, value) method instead");
     }
 
     @Override
     public void deleteData() {
-        logger.debug("deleteData() called - use truncateTables() to clear all data");
+        log.debug("deleteData() called - use truncateTables() to clear all data");
     }
 
     @Override
     public void createIndexes() {
         if (conn == null) {
-            logger.warn("Database connection is null, cannot create indexes");
+            log.warn("Database connection is null, cannot create indexes");
             return;
         }
         try {
@@ -118,16 +116,16 @@ public class Db1 implements Db {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_currency_code ON currencies(code)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_symbol ON orders(symbol)");
-            logger.info("Indexes created successfully");
+            log.info("Indexes created successfully");
         } catch (SQLException e) {
-            logger.error("Error creating indexes: {}", e.getMessage(), e);
+            log.error("Error creating indexes: {}", e.getMessage(), e);
         }
     }
 
     @Override
     public void dropIndexes() {
         if (conn == null) {
-            logger.warn("Database connection is null, cannot drop indexes");
+            log.warn("Database connection is null, cannot drop indexes");
             return;
         }
         try {
@@ -135,9 +133,9 @@ public class Db1 implements Db {
             stmt.execute("DROP INDEX IF EXISTS idx_currency_code");
             stmt.execute("DROP INDEX IF EXISTS idx_trades_timestamp");
             stmt.execute("DROP INDEX IF EXISTS idx_orders_symbol");
-            logger.info("Indexes dropped successfully");
+            log.info("Indexes dropped successfully");
         } catch (SQLException e) {
-            logger.error("Error dropping indexes: {}", e.getMessage(), e);
+            log.error("Error dropping indexes: {}", e.getMessage(), e);
         }
     }
 
@@ -145,20 +143,20 @@ public class Db1 implements Db {
     public void truncateIndexes() {
         // SQLite doesn't require explicit truncate for indexes - they're automatically
         // updated
-        logger.debug("truncateIndexes() - SQLite indexes are automatically managed");
+        log.debug("truncateIndexes() - SQLite indexes are automatically managed");
     }
 
     @Override
     public void createConstraints() {
         // SQLite constraints are created with table definitions
-        logger.debug("createConstraints() - constraints are defined at table creation");
+        log.debug("createConstraints() - constraints are defined at table creation");
     }
 
     @Override
     public void dropConstraints() {
         // SQLite doesn't support dropping individual constraints
         // Would require table recreation
-        logger.debug("dropConstraints() - cannot drop constraints in SQLite without recreating tables");
+        log.debug("dropConstraints() - cannot drop constraints in SQLite without recreating tables");
     }
 
     @Override
@@ -166,9 +164,9 @@ public class Db1 implements Db {
         if (conn != null) {
             try {
                 conn.close();
-                logger.info("Database connection closed");
+                log.info("Database connection closed");
             } catch (SQLException e) {
-                logger.error("Error closing database connection: {}", e.getMessage(), e);
+                log.error("Error closing database connection: {}", e.getMessage(), e);
             }
         }
     }
@@ -225,7 +223,7 @@ public class Db1 implements Db {
             da = conn.createStatement()
                     .executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error finding the data\n%s".formatted(e.getMessage()));
+            log.error("Error finding the data\n%s".formatted(e.getMessage()));
 
         }
 
@@ -237,7 +235,7 @@ public class Db1 implements Db {
         try {
             conn.createStatement().executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error finding all the data\n%s".formatted(e.getMessage()));
+            log.error("Error finding all the data\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -247,7 +245,7 @@ public class Db1 implements Db {
         try {
             conn.createStatement().executeUpdate("UPDATE %s SET %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error updating the database\n%s".formatted(e.getMessage()));
+            log.error("Error updating the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -258,7 +256,7 @@ public class Db1 implements Db {
             conn.createStatement().executeUpdate("INSERT INTO %s (%s) VALUES ('%s')".formatted(table, column, value));
         } catch (SQLException e) {
 
-            logger.error("Error inserting the database\n%s".formatted(e.getMessage()));
+            log.error("Error inserting the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -268,7 +266,7 @@ public class Db1 implements Db {
         try {
             conn.createStatement().executeUpdate("DELETE FROM %s WHERE %s = '%s'".formatted(table, column, value));
         } catch (SQLException e) {
-            logger.error("Error deleting the database\n%s".formatted(e.getMessage()));
+            log.error("Error deleting the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -279,7 +277,7 @@ public class Db1 implements Db {
             conn.createStatement()
                     .executeUpdate("CREATE TABLE IF NOT EXISTS %s (%s VARCHAR(255))".formatted(table, column));
         } catch (SQLException e) {
-            logger.error("Error creating the database table\n%s".formatted(e.getMessage()));
+            log.error("Error creating the database table\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -291,11 +289,11 @@ public class Db1 implements Db {
             ResultSet rs = conn.createStatement()
                     .executeQuery("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
             while (rs.next()) {
-                logger.info(rs.getString(column));
+                log.info(rs.getString(column));
             }
 
         } catch (SQLException e) {
-            logger.error("Error finding the database\n%s".formatted(e.getMessage()));
+            log.error("Error finding the database\n%s".formatted(e.getMessage()));
         }
 
     }
@@ -365,7 +363,7 @@ public class Db1 implements Db {
             existing.setString(2, currency.getCurrencyType().name());
 
             if (existing.executeQuery().next()) {
-                logger.info("Currency already exists with code: %s".formatted(currency.getCode()));
+                log.info("Currency already exists with code: %s".formatted(currency.getCode()));
             } else {
                 PreparedStatement insert = conn.prepareStatement(
                         "INSERT INTO currencies (currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image) "
@@ -384,7 +382,7 @@ public class Db1 implements Db {
 
                 Currency.CURRENCIES.put(new SymmetricPair<>(currency.getCode(), type), currency);
 
-                logger.info(
+                log.info(
                         "New Currency with code: %swas added  to the  database".formatted(currency.getCode()));
 
             }
@@ -403,7 +401,7 @@ public class Db1 implements Db {
         statement.setString(1, code);
         ResultSet check = statement.executeQuery();
         if (!check.next()) {
-            logger.info("Currency not found with code: %s".formatted(code));
+            log.info("Currency not found with code: %s".formatted(code));
 
             try {
 
@@ -424,7 +422,7 @@ public class Db1 implements Db {
             String symbol = check.getString("symbol");
             String image = check.getString("image");
             String currencyType = check.getString("currency_type");
-            logger.info("Currency found with code: %s ".formatted(code));
+            log.info("Currency found with code: %s ".formatted(code));
             String format = String.format(
                     "Currency with code: %s, full_display_name: %s,  short_display_name: %s, fractional_digits: %s, symbol: %s, image: %s, currency_type: %s",
                     code,
@@ -434,9 +432,9 @@ public class Db1 implements Db {
                     symbol,
                     image,
                     currencyType);
-            logger.info(format);
+            log.info(format);
             CurrencyType type = CurrencyType.valueOf(currencyType);
-            logger.info("Currency Type: %s".formatted(type));
+            log.info("Currency Type: %s".formatted(type));
             newCurrency = new Currency(
                     type,
                     fullDisplayName,
@@ -447,7 +445,7 @@ public class Db1 implements Db {
                     image) {
 
             };
-            logger.info("New Currency: %s".formatted(newCurrency));
+            log.info("New Currency: %s".formatted(newCurrency));
         }
         return newCurrency;
     }
@@ -469,7 +467,7 @@ public class Db1 implements Db {
 
         conn.createStatement()
                 .executeUpdate("ALTER TABLE currencies ADD COLUMN %s %s".formatted(columnName, columnType));
-        logger.info("Added missing currencies.%s column".formatted(columnName));
+        log.info("Added missing currencies.%s column".formatted(columnName));
     }
 
     private boolean currencyColumnExists(String columnName) throws SQLException {
@@ -524,9 +522,9 @@ public class Db1 implements Db {
             pstmt.setDouble(9, order.getProfit());
             pstmt.setString(10, order.getStatus() != null ? order.getStatus() : "PENDING");
             pstmt.executeUpdate();
-            logger.info("Order saved: symbol=%s, type=%s".formatted(order.getSymbol(), order.getType()));
+            log.info("Order saved: symbol=%s, type=%s".formatted(order.getSymbol(), order.getType()));
         } catch (SQLException e) {
-            logger.error("Error saving order: %s".formatted(e.getMessage()), e);
+            log.error("Error saving order: %s".formatted(e.getMessage()), e);
             throw e;
         }
     }
@@ -549,7 +547,7 @@ public class Db1 implements Db {
                 return mapResultSetToOrder(rs);
             }
         } catch (SQLException e) {
-            logger.error("Error retrieving order: %s".formatted(e.getMessage()), e);
+            log.error("Error retrieving order: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return null;
@@ -573,9 +571,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found %d orders for symbol: %s".formatted(orders.size(), symbol));
+            log.info("Found %d orders for symbol: %s".formatted(orders.size(), symbol));
         } catch (SQLException e) {
-            logger.error("Error retrieving orders by symbol: %s".formatted(e.getMessage()), e);
+            log.error("Error retrieving orders by symbol: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -599,9 +597,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found %d orders with status: %s".formatted(orders.size(), status));
+            log.info("Found %d orders with status: %s".formatted(orders.size(), status));
         } catch (SQLException e) {
-            logger.error("Error retrieving orders by status: %s".formatted(e.getMessage()), e);
+            log.error("Error retrieving orders by status: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -628,9 +626,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found %d orders in time range".formatted(orders.size()));
+            log.info("Found %d orders in time range".formatted(orders.size()));
         } catch (SQLException e) {
-            logger.error("Error retrieving orders by time range: %s".formatted(e.getMessage()), e);
+            log.error("Error retrieving orders by time range: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -651,9 +649,9 @@ public class Db1 implements Db {
             while (rs.next()) {
                 orders.add(mapResultSetToOrder(rs));
             }
-            logger.info("Found %d open orders".formatted(orders.size()));
+            log.info("Found %d open orders".formatted(orders.size()));
         } catch (SQLException e) {
-            logger.error("Error retrieving open orders: %s".formatted(e.getMessage()), e);
+            log.error("Error retrieving open orders: %s".formatted(e.getMessage()), e);
             throw e;
         }
         return orders;
@@ -673,7 +671,7 @@ public class Db1 implements Db {
                 return rs.getLong(1);
             }
         } catch (SQLException e) {
-            logger.error("Error counting open orders: " + e.getMessage(), e);
+            log.error("Error counting open orders: " + e.getMessage(), e);
             throw e;
         }
         return 0;
@@ -693,7 +691,7 @@ public class Db1 implements Db {
                 return rs.getLong(1);
             }
         } catch (SQLException e) {
-            logger.error("Error counting orders: " + e.getMessage(), e);
+            log.error("Error counting orders: " + e.getMessage(), e);
             throw e;
         }
         return 0;
@@ -714,7 +712,7 @@ public class Db1 implements Db {
             int rowsAffected = pstmt.executeUpdate();
             return rowsAffected > 0;
         } catch (SQLException e) {
-            logger.error("Error deleting order: " + e.getMessage(), e);
+            log.error("Error deleting order: " + e.getMessage(), e);
             throw e;
         }
     }
@@ -733,9 +731,9 @@ public class Db1 implements Db {
             pstmt.setString(1, newStatus);
             pstmt.setString(2, orderId);
             pstmt.executeUpdate();
-            logger.info("Order %s status updated to: %s".formatted(orderId, newStatus));
+            log.info("Order %s status updated to: %s".formatted(orderId, newStatus));
         } catch (SQLException e) {
-            logger.error("Error updating order status: %s".formatted(e.getMessage()), e);
+            log.error("Error updating order status: %s".formatted(e.getMessage()), e);
             throw e;
         }
     }
@@ -781,7 +779,7 @@ public class Db1 implements Db {
         conn.createStatement().executeUpdate(sql);
         conn.createStatement().executeUpdate(
                 "CREATE INDEX IF NOT EXISTS idx_symbol_exchange ON trading_symbols(exchange)");
-        logger.info("Symbol config table created");
+        log.info("Symbol config table created");
     }
 
     /**
@@ -796,7 +794,7 @@ public class Db1 implements Db {
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
         conn.createStatement().executeUpdate(sql);
-        logger.info("Symbol selection table created");
+        log.info("Symbol selection table created");
     }
 
     // COMMENTED OUT - SymbolService class not found in codebase

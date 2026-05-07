@@ -20,8 +20,6 @@ import org.investpro.core.agents.AgentEvent;
  */
 @Slf4j
 public class PositionManagementAgent implements org.investpro.core.agents.Agent {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PositionManagementAgent.class);
-
     private volatile boolean running = false;
     private AgentContext context;
 

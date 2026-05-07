@@ -1,5 +1,7 @@
 package org.investpro.core.agents;
 
+import lombok.extern.slf4j.Slf4j;
+
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.core.agents.execution.ExecutionAgent;
@@ -7,13 +9,9 @@ import org.investpro.core.agents.learning.LearningAgent;
 import org.investpro.core.agents.market.MarketDataAgent;
 import org.investpro.core.agents.portfolio.PortfolioAgent;
 import org.investpro.core.agents.reasoning.ReasoningAgent;
-import org.investpro.core.agents.risk.RiskAgent;
-import org.investpro.core.agents.signal.SignalAgent;
+import org.investpro.core.agents.modules.SignalAgent;
 import org.investpro.core.agents.strategy.StrategyAgent;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -24,10 +22,8 @@ import java.util.Objects;
  */
 @Getter
 @Setter
+@Slf4j
 public class AgentRuntime {
-
-    private static final Logger logger = LoggerFactory.getLogger(AgentRuntime.class);
-
     private final List<Agent> agents = new ArrayList<>();
     private AgentContext context;
 
@@ -38,7 +34,6 @@ public class AgentRuntime {
         runtime.register(new MarketDataAgent());
         runtime.register(new SignalAgent());
         runtime.register(new StrategyAgent());
-        runtime.register(new RiskAgent());
         runtime.register(new ReasoningAgent());
         runtime.register(new ExecutionAgent());
         runtime.register(new PortfolioAgent());
@@ -66,9 +61,9 @@ public class AgentRuntime {
 
             try {
                 agent.start(context);
-                logger.info("Agent started: {}", agent.name());
+                log.info("Agent started: {}", agent.name());
             } catch (Exception exception) {
-                logger.error("Failed to start agent {}", agent.name(), exception);
+                log.error("Failed to start agent {}", agent.name(), exception);
             }
         }
         running = true;
@@ -79,7 +74,7 @@ public class AgentRuntime {
             try {
                 agent.stop();
             } catch (Exception exception) {
-                logger.warn("Failed to stop agent {}", agent.name(), exception);
+                log.warn("Failed to stop agent {}", agent.name(), exception);
             }
         }
         if (context != null && context.getEventBus() != null) {

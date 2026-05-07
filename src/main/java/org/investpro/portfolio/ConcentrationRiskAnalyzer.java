@@ -11,8 +11,6 @@ import java.util.Map;
  */
 @Slf4j
 public class ConcentrationRiskAnalyzer {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ConcentrationRiskAnalyzer.class);
-
     /**
      * Calculate concentration risk score.
      */

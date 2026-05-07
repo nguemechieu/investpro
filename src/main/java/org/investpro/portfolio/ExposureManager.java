@@ -12,8 +12,6 @@ import java.util.*;
  */
 @Slf4j
 public class ExposureManager {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ExposureManager.class);
-
     /**
      * Calculate exposure breakdown from open positions.
      */

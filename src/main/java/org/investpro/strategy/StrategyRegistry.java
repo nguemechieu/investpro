@@ -2,171 +2,302 @@ package org.investpro.strategy;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.enums.StrategyCategory;
-import org.investpro.enums.AssetClass;
-import org.investpro.enums.ContractType;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.strategy.impl.UnifiedStrategy;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
- * Central registry for all trading strategies.
- * Manages strategy registration, lookup, and filtering.
+ * Registry for catalog-driven trading strategies.
+ *
+ * This registry stores StrategyDefinition objects first and lazily creates
+ * UnifiedStrategy instances only when requested.
+ *
+ * This mirrors the Python strategy registry pattern:
+ * - register built-in definitions
+ * - lazy instantiate selected strategy
+ * - support aliases
+ * - track active strategy
+ * - configure parameters dynamically
  */
 @Slf4j
 @Getter
-public class StrategyRegistry {
-    private static StrategyRegistry instance;
-    private final Map<String, TradingStrategy> strategiesById = new ConcurrentHashMap<>();
+public final class StrategyRegistry {
+
+    private static volatile StrategyRegistry instance;
+
+    /**
+     * Instantiated strategies, keyed by normalized strategy name.
+     */
+    private final Map<String, TradingStrategy> strategies = new LinkedHashMap<>();
+
+    /**
+     * Strategy catalog definitions, keyed by normalized strategy name.
+     */
+    private final Map<String, StrategyDefinition> definitions = new LinkedHashMap<>();
+
+    /**
+     * Current active strategy variant name.
+     */
+    private String activeName;
+
+    /**
+     * Fallback strategy if nothing else can be resolved.
+     */
+    private final UnifiedStrategy defaultStrategy = new UnifiedStrategy("Trend Following");
 
     private StrategyRegistry() {
+        registerBuiltInStrategies();
     }
 
-    /**
-     * Gets the singleton instance of StrategyRegistry.
-     */
-    public static synchronized StrategyRegistry getInstance() {
-        if (instance == null) {
-            instance = new StrategyRegistry();
+    public static StrategyRegistry getInstance() {
+        StrategyRegistry local = instance;
+
+        if (local == null) {
+            synchronized (StrategyRegistry.class) {
+                local = instance;
+
+                if (local == null) {
+                    local = new StrategyRegistry();
+                    instance = local;
+                }
+            }
         }
-        return instance;
+
+        return local;
+    }
+
+    private void registerBuiltInStrategies() {
+        for (StrategyDefinition definition : StrategyCatalog.STRATEGY_DEFINITIONS.values()) {
+            if (definition == null || isBlank(definition.getName())) {
+                continue;
+            }
+
+
+            String normalized = StrategyCatalog.normalizeStrategyName(definition.getName());
+
+            definitions.putIfAbsent(normalized, definition);
+
+            if (activeName == null) {
+                activeName = normalized;
+            }
+        }
+
+        log.info("StrategyRegistry initialized with {} strategy definitions", definitions.size());
     }
 
     /**
-     * Registers a trading strategy.
-     * Validates that metadata is complete and strategyId is unique.
+     * Registers a concrete strategy instance.
      *
-     * @param strategy the strategy to register
-     * @throws IllegalArgumentException if validation fails
+     * Useful for custom strategies that are not catalog-driven.
      */
-    public void register(@NotNull TradingStrategy strategy) {
+    public synchronized void register(@NotNull String name, @NotNull TradingStrategy strategy) {
         Objects.requireNonNull(strategy, "strategy must not be null");
 
-        StrategyMetadata metadata = strategy.getMetadata();
-        Objects.requireNonNull(metadata, "strategy metadata must not be null");
-        Objects.requireNonNull(metadata.getStrategyId(), "strategy ID must not be null");
+        String normalized = StrategyCatalog.normalizeStrategyName(name);
 
-        String strategyId = metadata.getStrategyId();
-        if (strategiesById.containsKey(strategyId)) {
-            throw new IllegalArgumentException("Strategy with ID already registered: " + strategyId);
+        StrategyDefinition definition = StrategyCatalog.definition(normalized);
+        definitions.put(normalized, definition);
+        strategies.put(normalized, strategy);
+
+        if (activeName == null) {
+            activeName = normalized;
         }
 
-        try {
-            strategy.validateConfiguration();
-        } catch (IllegalStateException e) {
-            log.error("Strategy {} failed validation: {}", strategyId, e.getMessage());
-            throw new IllegalArgumentException("Strategy validation failed: " + e.getMessage(), e);
+        log.info("Registered strategy instance: {}", normalized);
+    }
+
+    /**
+     * Registers a definition without instantiating the strategy yet.
+     */
+    public synchronized void registerDefinition(@NotNull StrategyDefinition definition) {
+        Objects.requireNonNull(definition, "definition must not be null");
+
+        String normalized = StrategyCatalog.normalizeStrategyName(definition.getName());
+
+        definitions.put(normalized, definition);
+
+        if (activeName == null) {
+            activeName = normalized;
         }
 
-        strategiesById.put(strategyId, strategy);
-        log.info("Registered strategy: {} ({})", metadata.getDisplayName(), strategyId);
+        log.info("Registered strategy definition: {}", normalized);
     }
 
     /**
-     * Unregisters a strategy by ID.
-     */
-    public void unregister(@NotNull String strategyId) {
-        TradingStrategy removed = strategiesById.remove(strategyId);
-        if (removed != null) {
-            log.info("Unregistered strategy: {}", strategyId);
-        }
-    }
-
-    /**
-     * Gets all registered strategies.
-     */
-    @NotNull
-    public List<TradingStrategy> getAllStrategies() {
-        return new ArrayList<>(strategiesById.values());
-    }
-
-    /**
-     * Gets all enabled strategies.
-     */
-    @NotNull
-    public List<TradingStrategy> getEnabledStrategies() {
-        return strategiesById.values().stream()
-                .filter(TradingStrategy::isEnabled)
-                .filter(s -> s.getMetadata().isEnabled())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Gets a strategy by ID.
+     * Gets a strategy by name or alias.
+     *
+     * If the strategy has not been instantiated yet, this lazily creates it.
      */
     @Nullable
-    public TradingStrategy getStrategy(@NotNull String strategyId) {
-        return strategiesById.get(strategyId);
+    public synchronized TradingStrategy getStrategy(@Nullable String name) {
+        String normalized = StrategyCatalog.normalizeStrategyName(name);
+
+        TradingStrategy existing = strategies.get(normalized);
+
+        if (existing != null) {
+            return existing;
+        }
+
+        return instantiateStrategy(normalized);
     }
 
     /**
-     * Gets strategies by category.
+     * Alias for compatibility with older code.
      */
-    @NotNull
-    public List<TradingStrategy> getStrategiesByCategory(@NotNull StrategyCategory category) {
-        return strategiesById.values().stream()
-                .filter(s -> s.getMetadata().getCategory() == category)
-                .collect(Collectors.toList());
+    @Nullable
+    public TradingStrategy get(@Nullable String name) {
+        return getStrategy(name);
     }
 
     /**
-     * Gets strategies supporting a specific asset class.
+     * Instantiates a catalog-driven UnifiedStrategy for the selected variant.
      */
-    @NotNull
-    public List<TradingStrategy> getStrategiesByAssetClass(@NotNull AssetClass assetClass) {
-        return strategiesById.values().stream()
-                .filter(s -> s.supportsAssetClass(assetClass))
-                .collect(Collectors.toList());
+    @Nullable
+    private TradingStrategy instantiateStrategy(@NotNull String name) {
+        StrategyDefinition definition = definitions.get(name);
+
+        if (definition == null) {
+            log.warn("Strategy definition not found: {}", name);
+            return null;
+        }
+
+        UnifiedStrategy strategy = new UnifiedStrategy(definition.getName());
+        strategy.applyParameters(definition.getParameters());
+
+        strategies.put(name, strategy);
+
+        log.debug(
+                "Instantiated strategy: name={}, baseName={}",
+                definition.getName(),
+                definition.getBaseName()
+        );
+
+        return strategy;
     }
 
     /**
-     * Gets strategies supporting a specific timeframe.
+     * Lists all available strategy names, including lazy definitions.
      */
-    @NotNull
-    public List<TradingStrategy> getStrategiesByTimeframe(@NotNull Timeframe timeframe) {
-        return strategiesById.values().stream()
-                .filter(s -> s.supportsTimeframe(timeframe))
-                .collect(Collectors.toList());
+    public List<String> list() {
+        return definitions.keySet().stream().toList();
     }
 
-    /**
-     * Gets strategies compatible with multiple criteria.
-     */
-    @NotNull
-    public List<TradingStrategy> getCompatibleStrategies(
-            @NotNull AssetClass assetClass,
-            @NotNull ContractType contractType,
-            @NotNull Timeframe timeframe) {
-        return strategiesById.values().stream()
-                .filter(s -> s.supportsAssetClass(assetClass))
-                .filter(s -> s.supportsContractType(contractType))
-                .filter(s -> s.supportsTimeframe(timeframe))
-                .collect(Collectors.toList());
+    public List<String> listStrategyNames() {
+        return list();
     }
 
-    /**
-     * Gets count of registered strategies.
-     */
-    public int getStrategyCount() {
-        return strategiesById.size();
+    public Collection<TradingStrategy> getEnabledStrategies() {
+        // Instantiate only the active strategy by default if nothing is loaded yet.
+        if (strategies.isEmpty() && activeName != null) {
+            getStrategy(activeName);
+        }
+
+        return strategies.values()
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(TradingStrategy::isEnabled)
+                .toList();
     }
 
-    /**
-     * Gets count of enabled strategies.
-     */
-    public int getEnabledStrategyCount() {
-        return getEnabledStrategies().size();
+    public synchronized void setActive(@Nullable String name) {
+        String normalized = StrategyCatalog.normalizeStrategyName(name);
+
+        if (definitions.containsKey(normalized) || strategies.containsKey(normalized)) {
+            activeName = normalized;
+            log.info("Active strategy set to {}", activeName);
+            return;
+        }
+
+        log.warn("Cannot set active strategy. Unknown strategy: {}", name);
     }
 
-    /**
-     * Clears all strategies (useful for testing).
-     */
-    public void clear() {
-        strategiesById.clear();
-        log.info("Cleared all registered strategies");
+    public synchronized TradingStrategy configure(@Nullable String strategyName, @Nullable StrategyParameters params) {
+        String targetName = StrategyCatalog.normalizeStrategyName(
+                strategyName == null || strategyName.isBlank() ? activeName : strategyName
+        );
+
+        setActive(targetName);
+
+        TradingStrategy target = resolveStrategy(targetName);
+
+        if (target instanceof UnifiedStrategy unifiedStrategy) {
+            unifiedStrategy.setStrategyName(targetName);
+
+            if (params != null) {
+                unifiedStrategy.applyParameters(params);
+            }
+        }
+
+        return target;
+    }
+
+    public TradingStrategy resolveStrategy(@Nullable String strategyName) {
+        String normalized = strategyName == null || strategyName.isBlank()
+                ? null
+                : StrategyCatalog.normalizeStrategyName(strategyName);
+
+        if (normalized != null) {
+            TradingStrategy selected = getStrategy(normalized);
+
+            if (selected != null) {
+                return selected;
+            }
+        }
+
+        if (activeName != null) {
+            TradingStrategy active = getStrategy(activeName);
+
+            if (active != null) {
+                return active;
+            }
+        }
+
+        if (!definitions.isEmpty()) {
+            String firstName = definitions.keySet().iterator().next();
+            TradingStrategy first = getStrategy(firstName);
+
+            if (first != null) {
+                return first;
+            }
+        }
+
+        return defaultStrategy;
+    }
+
+    public StrategySignal generateSignal(@NotNull StrategyContext context, @Nullable String strategyName) {
+        TradingStrategy strategy = resolveStrategy(strategyName);
+        return strategy.generateSignal(context);
+    }
+
+    public StrategySignal generateSignal(@NotNull StrategyContext context) {
+        return generateSignal(context, activeName);
+    }
+
+    public boolean contains(@Nullable String name) {
+        String normalized = StrategyCatalog.normalizeStrategyName(name);
+        return definitions.containsKey(normalized) || strategies.containsKey(normalized);
+    }
+
+    public int definitionCount() {
+        return definitions.size();
+    }
+
+    public int instantiatedCount() {
+        return strategies.size();
+    }
+
+    public void clearInstantiatedStrategies() {
+        strategies.clear();
+        log.info("Cleared instantiated strategies. Definitions remain loaded: {}", definitions.size());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

@@ -1,10 +1,9 @@
 package org.investpro.repository;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.investpro.data.Db1;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.Properties;
 
@@ -13,15 +12,15 @@ import java.util.Properties;
  * Manages the singleton Db1 instance and provides methods to create repository
  * implementations.
  */
+@Slf4j
 public class RepositoryFactory {
-    private static final Logger logger = LoggerFactory.getLogger(RepositoryFactory.class);
     private static final Db1 db1Instance;
 
     static {
         try {
             db1Instance = initializeDatabase();
         } catch (Exception e) {
-            logger.error("Failed to initialize database for repositories", e);
+            log.error("Failed to initialize database for repositories", e);
             throw new RuntimeException("Failed to initialize database", e);
         }
     }
@@ -40,10 +39,10 @@ public class RepositoryFactory {
             if (resourceStream != null) {
                 conf.load(resourceStream);
             } else {
-                logger.debug("conf.properties not found in classpath, using default database configuration");
+                log.debug("conf.properties not found in classpath, using default database configuration");
             }
         } catch (IOException e) {
-            logger.warn("Failed to load conf.properties, using default database configuration", e);
+            log.warn("Failed to load conf.properties, using default database configuration", e);
         }
 
         Db1 db1 = new Db1(conf);

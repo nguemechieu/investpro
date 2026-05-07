@@ -8,7 +8,7 @@ import lombok.Setter;
 /**
  * Configuration for Behaviour Guard - trading behavior protection and risk
  * limits.
- * 
+ * <p>
  * Encapsulates all guard settings including:
  * - Drawdown and equity protection
  * - Win/loss streak limits

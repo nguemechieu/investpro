@@ -57,6 +57,11 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
 
     @Override
     public boolean isPaperTrading() {
+        // If user explicitly selected trading mode during onboarding, respect that
+        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
+            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        }
+        // Otherwise, default to paper trading for Interactive Brokers
         return true;
     }
 

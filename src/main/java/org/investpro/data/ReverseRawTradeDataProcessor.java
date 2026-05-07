@@ -1,5 +1,7 @@
 package org.investpro.data;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.beans.property.SimpleIntegerProperty;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,9 +11,6 @@ import  org.investpro.models.trading.TradePair;
 import  org.investpro.utils.CandleDataSupplier;
 import  org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -29,9 +28,8 @@ import java.util.concurrent.Future;
 
 @Setter
 @Getter
+@Slf4j
 public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
-    private static final Logger logger = LoggerFactory.getLogger(ReverseRawTradeDataProcessor.class);
-
     private final Path rawTradeData;
     private final Exchange exchange;
     private int start;
@@ -41,7 +39,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
         this.rawTradeData = Objects.requireNonNull(rawTradeData, "rawTradeData must not be null");
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
 
-        logger.info("Reading raw trade data from {}", rawTradeData);
+        log.info("Reading raw trade data from {}", rawTradeData);
     }
 
     @Override
@@ -54,7 +52,7 @@ public class ReverseRawTradeDataProcessor extends CandleDataSupplier {
             while ((line = fileReader.readLine()) != null) {
                 String[] parts = line.split(",");
                 if (parts.length != 3) {
-                    logger.debug("Skipping malformed raw trade line: {}", line);
+                    log.debug("Skipping malformed raw trade line: {}", line);
                     continue;
                 }
 

@@ -233,6 +233,11 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
+        // If user explicitly selected trading mode during onboarding, respect that
+        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
+            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        }
+        // Otherwise, check if sandbox
         return isSandbox();
     }
 

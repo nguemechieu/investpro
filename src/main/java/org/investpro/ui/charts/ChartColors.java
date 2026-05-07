@@ -12,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public final class ChartColors {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ChartColors.class);
     // Bullish Candle Colors (Green - Price went UP)
     public static final Paint BULL_CANDLE_FILL_COLOR = Color.rgb(8, 153, 129, 0.96);
     public static final Paint BULL_CANDLE_BORDER_COLOR = Color.rgb(8, 153, 129);

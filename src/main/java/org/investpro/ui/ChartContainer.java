@@ -22,6 +22,7 @@ import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.data.CandleData;
 import org.investpro.data.ReverseRawTradeDataProcessor;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
@@ -46,11 +47,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * Professional chart container for displaying candlestick charts with interactive controls.
+ * Professional chart container for displaying candlestick charts with
+ * interactive controls.
  * <p>
  * Responsibilities:
  * - Hosts a CandleStickChart with proper lifecycle management.
@@ -63,9 +63,6 @@ import java.util.logging.Logger;
 @Setter
 @Slf4j
 public class ChartContainer extends Region {
-
-    private static final Logger LOGGER = Logger.getLogger(ChartContainer.class.getName());
-
     private static final int DEFAULT_SECONDS_PER_CANDLE = 3600;
     private static final String DEFAULT_TIMEFRAME = "1h";
 
@@ -125,8 +122,7 @@ public class ChartContainer extends Region {
     private final HBox toolbarContainer = new HBox(TOOLBAR_SPACING);
     private final VBox candleChartContainer = new VBox();
     private final ComboBox<String> timeframeSelector = new ComboBox<>(
-            FXCollections.observableArrayList(CandleAggregator.getSupportedTimeframes())
-    );
+            FXCollections.observableArrayList(CandleAggregator.getSupportedTimeframes()));
 
     private ChartToolbar toolbar;
     private CandleStickChart candleStickChart;
@@ -145,8 +141,7 @@ public class ChartContainer extends Region {
             Exchange exchange,
             TradePair tradePair,
             boolean liveSyncing,
-            String telegramToken
-    ) {
+            String telegramToken) {
         this(exchange, tradePair, liveSyncing, telegramToken, null);
     }
 
@@ -155,8 +150,7 @@ public class ChartContainer extends Region {
             TradePair tradePair,
             boolean liveSyncing,
             String telegramToken,
-            TradingService tradingService
-    ) {
+            TradingService tradingService) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
         this.tradePair = Objects.requireNonNull(tradePair, "tradePair must not be null");
         this.liveSyncing = liveSyncing;
@@ -180,7 +174,7 @@ public class ChartContainer extends Region {
         try {
             createInitialChart();
             registerTimeframeListener();
-            LOGGER.log(Level.INFO, "ChartContainer initialized successfully for {0}", tradePair);
+            log.info("ChartContainer initialized successfully for {}", tradePair);
         } catch (Exception exception) {
             handleChartError("Failed to initialize chart container: " + rootMessage(exception));
         }
@@ -210,8 +204,7 @@ public class ChartContainer extends Region {
                 TOOLBAR_PADDING,
                 TOOLBAR_PADDING_HORIZONTAL,
                 TOOLBAR_PADDING,
-                TOOLBAR_PADDING_HORIZONTAL
-        ));
+                TOOLBAR_PADDING_HORIZONTAL));
         toolbarContainer.setMinHeight(TOOLBAR_HEIGHT);
         toolbarContainer.setPrefHeight(TOOLBAR_HEIGHT);
         toolbarContainer.setMaxHeight(TOOLBAR_HEIGHT);
@@ -230,8 +223,7 @@ public class ChartContainer extends Region {
                     candleChartContainer.widthProperty(),
                     candleChartContainer.heightProperty(),
                     optionsPopOver,
-                    functionOptionsSeparator
-            );
+                    functionOptionsSeparator);
 
             HBox.setHgrow(toolbar, Priority.ALWAYS);
             toolbar.setMaxWidth(Double.MAX_VALUE);
@@ -241,16 +233,14 @@ public class ChartContainer extends Region {
                     configuredTimeframeSelector(),
                     new Separator(Orientation.VERTICAL),
                     toolbar,
-                    spacer()
-            );
+                    spacer());
 
         } catch (Exception exception) {
-            LOGGER.log(Level.WARNING, "Failed to configure full toolbar, using fallback", exception);
+            log.warn("Failed to configure full toolbar, using fallback", exception);
             toolbarContainer.getChildren().setAll(
                     timeframeLabel(),
                     configuredTimeframeSelector(),
-                    spacer()
-            );
+                    spacer());
         }
     }
 
@@ -304,7 +294,7 @@ public class ChartContainer extends Region {
         try {
             CandleStickChart chart = buildChart(secondsPerCandle.get());
             installChart(chart, false);
-            LOGGER.log(Level.FINE, "Initial chart created successfully");
+            log.debug("Initial chart created successfully");
         } catch (SQLException | ClassNotFoundException exception) {
             handleChartError("Failed to create initial chart: " + exception.getMessage());
             throw new RuntimeException("Failed to create initial candle chart", exception);
@@ -331,7 +321,7 @@ public class ChartContainer extends Region {
         }
 
         if (!CandleAggregator.isValidTimeframe(timeframe)) {
-            LOGGER.log(Level.WARNING, "Invalid timeframe selected: {0}", timeframe);
+            log.warn("Invalid timeframe selected: {}", timeframe);
             return;
         }
 
@@ -354,7 +344,7 @@ public class ChartContainer extends Region {
         }
 
         try {
-            LOGGER.log(Level.FINE, "Recreating chart for timeframe: {0}s", durationSeconds);
+            log.debug("Recreating chart for timeframe: {}s", durationSeconds);
             CandleStickChart newChart = buildChart(durationSeconds);
             installChart(newChart, true);
         } catch (SQLException | ClassNotFoundException exception) {
@@ -379,8 +369,7 @@ public class ChartContainer extends Region {
                 telegramToken,
                 tradingService,
                 candleChartContainer.widthProperty(),
-                candleChartContainer.heightProperty()
-        );
+                candleChartContainer.heightProperty());
     }
 
     private CandleDataSupplier buildCandleDataSupplier(int durationSeconds) {
@@ -388,14 +377,13 @@ public class ChartContainer extends Region {
 
         if (rawTradeDataPath != null) {
             try {
-                LOGGER.log(Level.INFO, "Using ReverseRawTradeDataProcessor for {0}", rawTradeDataPath);
+                log.info("Using ReverseRawTradeDataProcessor for {}", rawTradeDataPath);
                 return new ReverseRawTradeDataProcessor(rawTradeDataPath, durationSeconds, tradePair, exchange);
             } catch (IOException exception) {
-                LOGGER.log(
-                        Level.WARNING,
-                        "Unable to use raw trade data processor; falling back to exchange supplier: " + exception.getMessage(),
-                        exception
-                );
+                log.warn(
+                        "Unable to use raw trade data processor; falling back to exchange supplier: {}",
+                        exception.getMessage(),
+                        exception);
             }
         }
 
@@ -520,11 +508,10 @@ public class ChartContainer extends Region {
             }
 
             File selectedDirectory = directoryChooser.showDialog(
-                    candleStickChart.getScene() == null ? null : candleStickChart.getScene().getWindow()
-            );
+                    candleStickChart.getScene() == null ? null : candleStickChart.getScene().getWindow());
 
             if (selectedDirectory == null) {
-                LOGGER.log(Level.INFO, "Screenshot save cancelled by user");
+                log.info("Screenshot save cancelled by user");
                 return;
             }
 
@@ -532,17 +519,16 @@ public class ChartContainer extends Region {
 
             String filename = "InvestPro-%s-%s.png".formatted(
                     tradePair.toString('-'),
-                    SNAPSHOT_FORMAT.format(LocalDateTime.now())
-            );
+                    SNAPSHOT_FORMAT.format(LocalDateTime.now()));
 
             File output = new File(selectedDirectory, filename);
             WritableImage image = candleStickChart.snapshot(null, null);
             ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", output);
 
-            LOGGER.log(Level.INFO, "Chart screenshot saved to {0}", output.getAbsolutePath());
+            log.info("Chart screenshot saved to {}", output.getAbsolutePath());
         } catch (IOException exception) {
             handleChartError("Failed to save chart screenshot: " + exception.getMessage());
-            LOGGER.log(Level.SEVERE, "Screenshot save error", exception);
+            log.error("Screenshot save error", exception);
         }
     }
 
@@ -561,7 +547,7 @@ public class ChartContainer extends Region {
         boolean printed = job.printPage(candleStickChart);
         if (printed) {
             job.endJob();
-            LOGGER.log(Level.INFO, "Chart sent to printer.");
+            log.info("Chart sent to printer.");
         } else {
             handleChartError("Chart print was cancelled or failed.");
         }
@@ -577,9 +563,9 @@ public class ChartContainer extends Region {
             chart.prefHeightProperty().unbind();
             chart.dispose();
             executeOnChartDisposed();
-            LOGGER.log(Level.FINE, "Chart disposed successfully");
+            log.debug("Chart disposed successfully");
         } catch (Exception exception) {
-            LOGGER.log(Level.WARNING, "Exception during chart disposal: " + exception.getMessage(), exception);
+            log.warn("Exception during chart disposal: {}", exception.getMessage(), exception);
         }
     }
 
@@ -588,13 +574,13 @@ public class ChartContainer extends Region {
                 ? "Unknown chart error"
                 : errorMessage;
 
-        LOGGER.log(Level.SEVERE, message);
+        log.error(message);
 
         if (onChartError != null) {
             try {
                 onChartError.accept(message);
             } catch (Exception exception) {
-                LOGGER.log(Level.WARNING, "Exception in onChartError callback", exception);
+                log.warn("Exception in onChartError callback", exception);
             }
         }
     }
@@ -604,7 +590,7 @@ public class ChartContainer extends Region {
             try {
                 onChartCreated.run();
             } catch (Exception exception) {
-                LOGGER.log(Level.WARNING, "Exception in onChartCreated callback: " + exception.getMessage(), exception);
+                log.warn("Exception in onChartCreated callback: {}", exception.getMessage(), exception);
             }
         }
     }
@@ -614,7 +600,7 @@ public class ChartContainer extends Region {
             try {
                 onChartDisposed.run();
             } catch (Exception exception) {
-                LOGGER.log(Level.WARNING, "Exception in onChartDisposed callback: " + exception.getMessage(), exception);
+                log.warn("Exception in onChartDisposed callback: {}", exception.getMessage(), exception);
             }
         }
     }
@@ -707,7 +693,18 @@ public class ChartContainer extends Region {
         candleStickChart = null;
         candleChartContainer.getChildren().clear();
         toolbarContainer.getChildren().clear();
-        LOGGER.log(Level.INFO, "ChartContainer disposed");
+        log.info("ChartContainer disposed");
+    }
+
+    /**
+     * Sets the callback to be invoked when a candlestick is clicked.
+     *
+     * @param callback the callback to handle candle selection
+     */
+    public void setCandleSelectionCallback(Consumer<CandleData> callback) {
+        if (candleStickChart != null) {
+            candleStickChart.setCandleSelectionCallback(callback);
+        }
     }
 
     public void setOnAutoTradeAction(Runnable callback) {

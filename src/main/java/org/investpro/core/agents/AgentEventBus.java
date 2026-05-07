@@ -1,7 +1,6 @@
 package org.investpro.core.agents;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Map;
@@ -15,11 +14,9 @@ import java.util.function.Consumer;
 /**
  * Lightweight event bus for InvestPro agents.
  */
+@Slf4j
 
 public class AgentEventBus {
-
-    private static final Logger logger = LoggerFactory.getLogger(AgentEventBus.class);
-
     private final Map<String, List<Consumer<AgentEvent>>> subscribers = new ConcurrentHashMap<>();
     private final List<Consumer<AgentEvent>> allSubscribers = new CopyOnWriteArrayList<>();
     private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
@@ -82,7 +79,7 @@ public class AgentEventBus {
         try {
             handler.accept(event);
         } catch (Exception exception) {
-            logger.error("Agent event handler failed for {}", event, exception);
+            log.error("Agent event handler failed for {}", event, exception);
         }
     }
 }

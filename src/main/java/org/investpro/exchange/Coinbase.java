@@ -35,6 +35,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -48,6 +49,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.zip.GZIPInputStream;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
@@ -98,7 +100,8 @@ public class Coinbase extends Exchange {
         if (!this.apiKey.isEmpty() && !this.apiSecret.isEmpty()) {
             log.info("Coinbase: Using credentials from provided parameters");
         } else {
-            // Fallback to environment variables only when no explicit credentials were supplied.
+            // Fallback to environment variables only when no explicit credentials were
+            // supplied.
             String envKeyName = CoinbaseCredentialProvider.getKeyName();
             String envPrivateKey = CoinbaseCredentialProvider.getPrivateKey();
 
@@ -147,6 +150,26 @@ public class Coinbase extends Exchange {
                 websocketJwt);
     }
 
+    public static @NotNull String decodeBody(byte[] byteArray, String encoding) {
+        if (byteArray == null || byteArray.length == 0) {
+            return "";
+        }
+
+        try {
+            if (encoding != null && encoding.toLowerCase(Locale.ROOT).contains("gzip")) {
+                try (GZIPInputStream gzipInputStream =
+                             new GZIPInputStream(new ByteArrayInputStream(byteArray))) {
+                    return new String(gzipInputStream.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+
+            return new String(byteArray, StandardCharsets.UTF_8);
+
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Failed to decode HTTP response body", exception);
+        }
+    }
+
     @Override
     public String getName() {
         return "Coinbase";
@@ -174,6 +197,11 @@ public class Coinbase extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
+        // If user explicitly selected trading mode during onboarding, respect that
+        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
+            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        }
+        // Otherwise, always live trading for Coinbase by default
         return false;
     }
 
@@ -1593,7 +1621,7 @@ public class Coinbase extends Exchange {
                         return Optional.empty();
                     }
 
-                    return Optional.ofNullable(positions.get(0));
+                    return Optional.ofNullable(positions.getFirst());
                 });
     }
 

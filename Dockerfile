@@ -28,8 +28,9 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the built JAR from build stage
+# Copy the built JAR and dependencies from build stage
 COPY --from=build /investpro/target/investpro-1.0.0-SNAPSHOT.jar ./investpro.jar
+COPY --from=build /investpro/target/lib ./lib
 
 # PostgreSQL JDBC driver will be loaded at runtime
 # Ensure PostgreSQL driver is available in the classpath

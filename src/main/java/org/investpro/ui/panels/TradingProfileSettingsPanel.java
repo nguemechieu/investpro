@@ -23,7 +23,7 @@ import org.investpro.enums.SystemDesign;
 @Slf4j
 public class TradingProfileSettingsPanel extends VBox {
 
-    private TextField traderNameField;
+    private Label traderNameLabel;
     private ComboBox<RiskProfile> riskLevelCombo;
     private ComboBox<String> tradingStyleCombo;
     private Spinner<Double> dailyLossLimitSpinner;
@@ -108,14 +108,13 @@ public class TradingProfileSettingsPanel extends VBox {
         grid.setStyle(
                 "-fx-background-color: #16213e; -fx-border-color: #374151; -fx-border-width: 1; -fx-border-radius: 4;");
 
-        traderNameField = new TextField();
-        traderNameField.setPromptText("Enter your trader name");
-        traderNameField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff; -fx-padding: 6;");
+        traderNameLabel = new Label(System.getProperty("user.name", "Trader"));
+        traderNameLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 12; -fx-padding: 6;");
 
         Label nameLabel = new Label("Trader Name:");
         nameLabel.setStyle("-fx-text-fill: #a0aec0;");
 
-        grid.addRow(0, nameLabel, traderNameField);
+        grid.addRow(0, nameLabel, traderNameLabel);
 
         return new VBox(8, sectionTitle, grid);
     }
@@ -429,9 +428,9 @@ public class TradingProfileSettingsPanel extends VBox {
     }
 
     private void saveProfile() {
-        String traderName = traderNameField.getText();
+        String traderName = System.getProperty("user.name", "Trader");
         TradingProfile profile = new TradingProfile(
-                traderNameField.getText(),
+                traderName,
                 riskLevelCombo.getValue(),
                 tradingStyleCombo.getValue(),
                 dailyLossLimitSpinner.getValue(),
@@ -446,21 +445,69 @@ public class TradingProfileSettingsPanel extends VBox {
                 probabilityLevelCombo.getValue(),
                 capitalProtectionCombo.getValue(),
                 systemDesignCombo.getValue(),
-                profileDescriptionArea.getText());
+                profileDescriptionArea.getText(),
+                enableOpenaiIntegrationCheckbox.isSelected(),
+                openaiApiKeyField.getText(),
+                openaiModelCombo.getValue(),
+                openaiTemperatureSpinner.getValue());
         profile.save();
 
+        // Configure OpenAI if enabled
+        if (enableOpenaiIntegrationCheckbox.isSelected() && !openaiApiKeyField.getText().trim().isEmpty()) {
+            configureOpenAI(openaiApiKeyField.getText(), openaiModelCombo.getValue(),
+                    openaiTemperatureSpinner.getValue());
+        }
+
         log.info(
-                "Trading Profile Saved: trader={}, risk={}, style={}, dailyLoss={}, maxPos={}, maxOpen={}, autoTrade={}, advanced={}",
+                "Trading Profile Saved: trader={}, risk={}, style={}, dailyLoss={}, maxPos={}, maxOpen={}, autoTrade={}, advanced={}, openaiEnabled={}, openaiModel={}",
                 profile.traderName(), profile.riskProfile(), profile.tradingStyle(), profile.dailyLossLimit(),
                 profile.maxPositionSize(), profile.maxOpenPositions(), profile.autoTradingEnabled(),
-                profile.advancedOrdersEnabled());
+                profile.advancedOrdersEnabled(), profile.enableOpenaiIntegration(), profile.openaiModel());
+
+        // Show success notification
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Profile Saved");
+        alert.setHeaderText("Trading Profile Saved Successfully");
+        alert.setContentText("Your trading profile and settings have been saved.");
+        alert.showAndWait();
+    }
+
+    private void configureOpenAI(String apiKey, String model, double temperature) {
+        try {
+            // Set system properties for OpenAI configuration
+            System.setProperty("openai.api.key", apiKey);
+            System.setProperty("openai.model", model);
+            System.setProperty("openai.temperature", String.valueOf(temperature));
+
+            log.info("OpenAI configured: model={}, temperature={}", model, temperature);
+        } catch (Exception e) {
+            log.error("Failed to configure OpenAI", e);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Configuration Error");
+            alert.setHeaderText("OpenAI Configuration Failed");
+            alert.setContentText("Error configuring OpenAI: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
 
     private void resetProfile() {
-        TradingProfile.reset();
-        applyProfile(TradingProfile.defaults());
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Reset Profile");
+        confirmAlert.setHeaderText("Reset to Defaults?");
+        confirmAlert.setContentText("This will reset all trading profile settings to their default values. Continue?");
 
-        log.info("Trading Profile reset to defaults");
+        if (confirmAlert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+            TradingProfile.reset();
+            applyProfile(TradingProfile.defaults());
+
+            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+            successAlert.setTitle("Profile Reset");
+            successAlert.setHeaderText("Profile Reset Successfully");
+            successAlert.setContentText("Your trading profile has been reset to default values.");
+            successAlert.showAndWait();
+
+            log.info("Trading Profile reset to defaults");
+        }
     }
 
     private void closeProfilePanel() {
@@ -484,7 +531,7 @@ public class TradingProfileSettingsPanel extends VBox {
     }
 
     private void applyProfile(TradingProfile profile) {
-        traderNameField.setText(profile.traderName());
+        traderNameLabel.setText(System.getProperty("user.name", "Trader"));
         riskLevelCombo.setValue(profile.riskProfile());
         tradingStyleCombo.setValue(profile.tradingStyle());
         dailyLossLimitSpinner.getValueFactory().setValue(profile.dailyLossLimit());
@@ -500,6 +547,14 @@ public class TradingProfileSettingsPanel extends VBox {
         capitalProtectionCombo.setValue(profile.capitalProtection());
         systemDesignCombo.setValue(profile.systemDesign());
         profileDescriptionArea.setText(profile.description());
+
+        // Apply OpenAI settings
+        enableOpenaiIntegrationCheckbox.setSelected(profile.enableOpenaiIntegration());
+        openaiApiKeyField.setText(profile.openaiApiKey() != null ? profile.openaiApiKey() : "");
+        if (profile.openaiModel() != null && openaiModelCombo.getItems().contains(profile.openaiModel())) {
+            openaiModelCombo.setValue(profile.openaiModel());
+        }
+        openaiTemperatureSpinner.getValueFactory().setValue(profile.openaiTemperature());
     }
 
     // Getter methods for streaming settings

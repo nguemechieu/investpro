@@ -69,6 +69,11 @@ public class Alpaca extends BrokerExchangeAdapter {
 
     @Override
     public boolean isPaperTrading() {
+        // If user explicitly selected trading mode during onboarding, respect that
+        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
+            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        }
+        // Otherwise, check credentials and environment variable
         return !hasCredentials() || Boolean.parseBoolean(System.getenv().getOrDefault("ALPACA_PAPER", "false"));
     }
 

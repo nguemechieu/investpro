@@ -30,8 +30,8 @@ import java.util.Objects;
  */
 public class InvestPro extends Application {
 
-    private static final double DEFAULT_WIDTH = 1540;
-    private static final double DEFAULT_HEIGHT = 860;
+    private static final double DEFAULT_WIDTH = 1530;
+    private static final double DEFAULT_HEIGHT = 840;
     private static final double MIN_WIDTH = 1200;
     private static final double MIN_HEIGHT = 720;
 
@@ -68,7 +68,7 @@ public class InvestPro extends Application {
 
         // Set window icon
         try {
-            Image icon = new Image(getClass().getResourceAsStream("/Invest.png"));
+            Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/Invest.png")));
             primaryStage.getIcons().add(icon);
         } catch (Exception e) {
             System.err.println("Failed to load window icon: " + e.getMessage());

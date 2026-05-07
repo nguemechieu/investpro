@@ -166,6 +166,7 @@ public class PositionHealthScore {
     /**
      * Check if position health is acceptable.
      */
+    @SuppressWarnings("unused")
     public boolean isHealthy() {
         return status == HealthStatus.HEALTHY && !deterministicExitRequired;
     }
@@ -173,6 +174,7 @@ public class PositionHealthScore {
     /**
      * Get recommended action based on health score.
      */
+    @SuppressWarnings("unused")
     public String getRecommendedAction() {
         if (deterministicExitRequired) {
             return "CLOSE_POSITION: " + deterministicExitReason;
@@ -191,6 +193,7 @@ public class PositionHealthScore {
     /**
      * Get a summary of position health.
      */
+    @SuppressWarnings("unused")
     public String getHealthSummary() {
         return String.format("Status: %s, Score: %.2f, Stop Distance: %.0f bps, Risk: %.2f%%, Portfolio Heat: %.2f%%",
                 status.getLabel(),

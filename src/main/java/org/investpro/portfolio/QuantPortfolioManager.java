@@ -19,7 +19,6 @@ import java.util.*;
 @Slf4j
 @Getter
 public class QuantPortfolioManager {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(QuantPortfolioManager.class);
     private static QuantPortfolioManager INSTANCE;
 
     private final PortfolioHeatCalculator heatCalculator;

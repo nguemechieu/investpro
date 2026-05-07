@@ -5,23 +5,30 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.TradePair;
+import org.investpro.repository.HistoricalDataRepository;
+import org.investpro.repository.HistoricalDataRepositoryImpl;
+
 import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Service for managing and executing backtesting operations
+ * Service for managing and executing backtesting operations.
+ * Manages historical data storage and backtesting execution with persistent
+ * data caching.
  */
 @Slf4j
 @Getter
 @Setter
 public class BacktestingService {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BacktestingService.class);
     private BackTesting backtestEngine;
     private Map<String, List<CandleData>> historicalDataCache;
+    private HistoricalDataRepository historicalDataRepository;
 
     public BacktestingService() {
         this.backtestEngine = new BackTesting();
         this.historicalDataCache = new HashMap<>();
+        this.historicalDataRepository = new HistoricalDataRepositoryImpl();
+        log.info("BacktestingService initialized with persistent historical data storage");
     }
 
     /**
@@ -65,6 +72,9 @@ public class BacktestingService {
      */
     public BacktestSuiteResult runStandardSuite(TradePair pair, LocalDateTime start, LocalDateTime end,
             double initialBalance, List<CandleData> historicalData) {
+        // Store historical data for future reference
+        storeHistoricalData(pair, start, end, "1h", historicalData);
+
         BacktestConfig config = createConfig(pair, start, end, initialBalance);
         BacktestSuiteResult suiteResult = new BacktestSuiteResult();
 
@@ -87,7 +97,66 @@ public class BacktestingService {
     }
 
     /**
-     * Cache historical data for multiple backtests
+     * Store historical data persistently for future backtests.
+     * Data is stored in JSON format and can be retrieved without fetching from
+     * exchange again.
+     * 
+     * @param pair      The trading pair
+     * @param startTime Start of the data range
+     * @param endTime   End of the data range
+     * @param timeframe The timeframe/granularity (e.g., "1m", "5m", "1h", "1d")
+     * @param data      The candle data to store
+     */
+    public void storeHistoricalData(TradePair pair, LocalDateTime startTime, LocalDateTime endTime,
+            String timeframe, List<CandleData> data) {
+        try {
+            historicalDataRepository.saveHistoricalData(pair, startTime, endTime, timeframe, data);
+            String cacheKey = pair.getSymbol() + "_" + timeframe;
+            historicalDataCache.put(cacheKey, new ArrayList<>(data));
+            log.info("Stored {} historical data points for {}/{}", data.size(), pair.getSymbol(), timeframe);
+        } catch (Exception e) {
+            log.error("Failed to store historical data for {}", pair.getSymbol(), e);
+        }
+    }
+
+    /**
+     * Retrieve stored historical data for backtesting.
+     * Checks persistent storage before attempting to fetch from exchange.
+     * 
+     * @param pair      The trading pair
+     * @param startTime Start of the data range
+     * @param endTime   End of the data range
+     * @param timeframe The timeframe/granularity
+     * @return Optional containing the historical data if available
+     */
+    public Optional<List<CandleData>> getStoredHistoricalData(TradePair pair, LocalDateTime startTime,
+            LocalDateTime endTime, String timeframe) {
+        try {
+            return historicalDataRepository.getHistoricalData(pair, startTime, endTime, timeframe);
+        } catch (java.sql.SQLException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Check if historical data is available for the given parameters.
+     * 
+     * @param pair      The trading pair
+     * @param startTime Start of the data range
+     * @param endTime   End of the data range
+     * @param timeframe The timeframe
+     * @return true if data is stored and available
+     */
+    public boolean hasStoredData(TradePair pair, LocalDateTime startTime, LocalDateTime endTime, String timeframe) {
+        try {
+            return historicalDataRepository.hasData(pair, startTime, endTime, timeframe);
+        } catch (java.sql.SQLException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Cache historical data for multiple backtests (in-memory)
      */
     public void cacheHistoricalData(String key, List<CandleData> data) {
         historicalDataCache.put(key, new ArrayList<>(data));
@@ -101,10 +170,17 @@ public class BacktestingService {
     }
 
     /**
-     * Clear cache
+     * Clear in-memory cache
      */
     public void clearCache() {
         historicalDataCache.clear();
+    }
+
+    /**
+     * Get total number of stored historical data points
+     */
+    public long getStoredDataPointCount() {
+        return historicalDataRepository.getDataPointCount();
     }
 
     /**

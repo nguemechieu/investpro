@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderPane;
@@ -9,9 +11,6 @@ import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.ui.charts.CandleStickChartDisplay;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Objects;
 
 /**
@@ -20,9 +19,8 @@ import java.util.Objects;
  * This keeps TradingWindow cleaner and avoids repeating chart-tab logic.
  */
 @Getter
+@Slf4j
 public final class CreateNewChart {
-
-    private static final Logger logger = LoggerFactory.getLogger(CreateNewChart.class);
      TabPane chartTabPane;
      Exchange exchange;
      TradePair tradePair;
@@ -66,12 +64,12 @@ public final class CreateNewChart {
         Tab chartTab = new Tab(tabTitle);
         chartTab.setContent(content);
         chartTab.setClosable(true);
-        chartTab.setOnClosed(event -> logger.info("Chart closed: {}", tabTitle));
+        chartTab.setOnClosed(event -> log.info("Chart closed: {}", tabTitle));
 
         chartTabPane.getTabs().add(chartTab);
         chartTabPane.getSelectionModel().select(chartTab);
 
-        logger.info("Chart opened: {}", tabTitle);
+        log.info("Chart opened: {}", tabTitle);
 
     }
 
@@ -116,7 +114,7 @@ public final class CreateNewChart {
         }
 
         chartTabPane.getTabs().clear();
-        logger.info("All chart tabs closed.");
+        log.info("All chart tabs closed.");
     }
 
     /**

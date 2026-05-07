@@ -3,24 +3,24 @@ package org.investpro.exchange;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.Getter;
 import lombok.Setter;
-import  org.investpro.data.Account;
-import  org.investpro.data.InProgressCandleData;
-import  org.investpro.models.trading.Order;
-import  org.investpro.models.trading.OrderBook;
-import  org.investpro.models.trading.OpenOrder;
-import  org.investpro.models.trading.Position;
-import  org.investpro.models.trading.Ticker;
-import  org.investpro.models.trading.Trade;
-import  org.investpro.models.trading.TradePair;
+import org.investpro.data.Account;
+import org.investpro.data.InProgressCandleData;
+import org.investpro.models.trading.Order;
+import org.investpro.models.trading.OrderBook;
+import org.investpro.models.trading.OpenOrder;
+import org.investpro.models.trading.Position;
+import org.investpro.models.trading.Ticker;
+import org.investpro.models.trading.Trade;
+import org.investpro.models.trading.TradePair;
 
-import  org.investpro.utils.CandleDataSupplier;
-import  org.investpro.utils.MARKET_TYPES;
-import  org.investpro.utils.Side;
-import  org.investpro.exchange.websocket.ExchangeWebSocketClient;
-import  org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
-import  org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
-import  org.investpro.exchange.infrastructure.OrderCommandConsumer;
-import  org.investpro.exchange.infrastructure.StreamTransport;
+import org.investpro.utils.CandleDataSupplier;
+import org.investpro.utils.MARKET_TYPES;
+import org.investpro.utils.Side;
+import org.investpro.exchange.websocket.ExchangeWebSocketClient;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.OrderCommandConsumer;
+import org.investpro.exchange.infrastructure.StreamTransport;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
@@ -58,10 +58,12 @@ public abstract class Exchange {
 
     private String telegramToken;
     private String emailNotification;
+    private String userSelectedTradingMode; // "PAPER" or "LIVE" - user's explicit choice during onboarding
 
     protected Exchange(String apiKey, String apiSecret) {
         this.apiKey = safe(apiKey);
         this.apiSecret = safe(apiSecret);
+        this.userSelectedTradingMode = "LIVE"; // Default to LIVE
     }
 
     // ---------------------------------------------------------------------
@@ -83,17 +85,20 @@ public abstract class Exchange {
     public abstract boolean supportsMarketType(MARKET_TYPES marketType);
 
     public abstract List<MARKET_TYPES> getSupportedMarketTypes();
-  public abstract CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity);
 
-    public abstract   CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice);
+    public abstract CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity);
 
-    public abstract  CompletableFuture<String> closePosition(TradePair symbol, String positionId);
+    public abstract CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity,
+            double limitPrice);
 
-    public abstract   CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId, double quantity);
+    public abstract CompletableFuture<String> closePosition(TradePair symbol, String positionId);
 
-    public abstract  CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss);
+    public abstract CompletableFuture<String> closePartialPosition(TradePair symbol, String positionId,
+            double quantity);
 
-    public abstract  CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit);
+    public abstract CompletableFuture<String> modifyStopLoss(TradePair symbol, String positionId, double stopLoss);
+
+    public abstract CompletableFuture<String> modifyTakeProfit(TradePair symbol, String positionId, double takeProfit);
     // ---------------------------------------------------------------------
     // Notification settings
     // ---------------------------------------------------------------------
@@ -175,23 +180,20 @@ public abstract class Exchange {
 
     public abstract CandleDataSupplier getCandleDataSupplier(
             int secondsPerCandle,
-            TradePair tradePair
-    );
+            TradePair tradePair);
 
     public abstract CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(
             TradePair tradePair,
             Instant currentCandleStartedAt,
             long secondsIntoCurrentCandle,
-            int secondsPerCandle
-    );
+            int secondsPerCandle);
 
     /**
      * Public market trades, not user/account fills.
      */
     public abstract CompletableFuture<List<Trade>> fetchRecentTradesUntil(
             TradePair tradePair,
-            Instant stopAt
-    );
+            Instant stopAt);
 
     /**
      * Raw or adapter-specific order book response.
@@ -248,28 +250,24 @@ public abstract class Exchange {
             Side side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    );
+            double slippage);
 
     public abstract CompletableFuture<String> createMarketOrder(
             TradePair tradePair,
             Side side,
-            double amount
-    );
+            double amount);
 
     public abstract CompletableFuture<String> createLimitOrder(
             TradePair tradePair,
             Side side,
             double amount,
-            double limitPrice
-    );
+            double limitPrice);
 
     public abstract CompletableFuture<String> createStopOrder(
             TradePair tradePair,
             Side side,
             double amount,
-            double stopPrice
-    );
+            double stopPrice);
 
     public abstract CompletableFuture<String> createBracketOrder(
             TradePair tradePair,
@@ -277,8 +275,7 @@ public abstract class Exchange {
             double amount,
             double entryPrice,
             double stopLoss,
-            double takeProfit
-    );
+            double takeProfit);
 
     public CompletableFuture<String> submitOrder(Order order) {
         try {
@@ -302,8 +299,7 @@ public abstract class Exchange {
 
     public abstract CompletableFuture<List<Order>> fetchOrderHistory(
             TradePair tradePair,
-            Instant since
-    );
+            Instant since);
 
     // ---------------------------------------------------------------------
     // Positions / portfolio
@@ -330,14 +326,12 @@ public abstract class Exchange {
 
     public abstract CompletableFuture<List<Trade>> fetchAccountTradesSince(
             TradePair tradePair,
-            Instant since
-    );
+            Instant since);
 
     public abstract CompletableFuture<List<Trade>> fetchAccountTradesBetween(
             TradePair tradePair,
             Instant from,
-            Instant to
-    );
+            Instant to);
 
     // ---------------------------------------------------------------------
     // Manual trading API used by UI buttons
@@ -350,8 +344,7 @@ public abstract class Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    );
+            double slippage);
 
     public abstract void sell(
             TradePair tradePair,
@@ -360,8 +353,7 @@ public abstract class Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    );
+            double slippage);
 
     public abstract void autoTrading(@NotNull Boolean auto, String signal);
 
@@ -377,8 +369,7 @@ public abstract class Exchange {
             MARKET_TYPES marketType,
             double size,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         buy(tradePair, marketType, size, 0.0, stopLoss, takeProfit, 0.0);
     }
 
@@ -390,8 +381,7 @@ public abstract class Exchange {
             MARKET_TYPES marketType,
             double size,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         sell(tradePair, marketType, size, 0.0, stopLoss, takeProfit, 0.0);
     }
 
@@ -415,8 +405,7 @@ public abstract class Exchange {
             Side side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         Instant timestamp = now() == null ? Instant.now() : now();
 
         return new Order(
@@ -429,8 +418,7 @@ public abstract class Exchange {
                 price,
                 stopLoss,
                 takeProfit,
-                slippage
-        );
+                slippage);
     }
 
     // ---------------------------------------------------------------------
@@ -444,8 +432,7 @@ public abstract class Exchange {
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    );
+            double slippage);
 
     public abstract double normalizeAmount(TradePair tradePair, double amount);
 
@@ -461,8 +448,7 @@ public abstract class Exchange {
 
     public abstract CompletableFuture<String> setLeverage(
             TradePair tradePair,
-            double leverage
-    );
+            double leverage);
 
     // ---------------------------------------------------------------------
     // Capabilities
@@ -514,12 +500,10 @@ public abstract class Exchange {
 
     public abstract void stream(
             ExchangeStreamSubscription subscription,
-            ExchangeStreamConsumer consumer
-    );
+            ExchangeStreamConsumer consumer);
 
     public abstract void stopStreaming(
-            ExchangeStreamSubscription subscription
-    );
+            ExchangeStreamSubscription subscription);
 
     public CompletableFuture<List<Trade>> fetchTrades(TradePair tradePair) {
         return CompletableFuture.completedFuture(List.of());
@@ -548,24 +532,20 @@ public abstract class Exchange {
 
     public abstract void streamTicker(
             TradePair tradePair,
-            ExchangeStreamConsumer consumer
-    );
+            ExchangeStreamConsumer consumer);
 
     public abstract void streamTrades(
             TradePair tradePair,
-            ExchangeStreamConsumer consumer
-    );
+            ExchangeStreamConsumer consumer);
 
     public abstract void streamOrderBook(
             TradePair tradePair,
-            ExchangeStreamConsumer consumer
-    );
+            ExchangeStreamConsumer consumer);
 
     public abstract void streamCandles(
             TradePair tradePair,
             int secondsPerCandle,
-            ExchangeStreamConsumer consumer
-    );
+            ExchangeStreamConsumer consumer);
 
     public abstract void streamAccount(ExchangeStreamConsumer consumer);
 
@@ -619,8 +599,7 @@ public abstract class Exchange {
 
     public void createOrderAsync(
             Order order,
-            OrderCommandConsumer consumer
-    ) {
+            OrderCommandConsumer consumer) {
         try {
             createOrder(order)
                     .thenAccept(orderId -> {
@@ -646,14 +625,13 @@ public abstract class Exchange {
     // ---------------------------------------------------------------------
 
     public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size,
-                                                    double price) {
+            double price) {
         return CompletableFuture.completedFuture(
                 tradePair != null
                         && marketType != null
                         && supportsMarketType(marketType)
                         && size > 0
-                        && price >= 0
-        );
+                        && price >= 0);
     }
 
     public void logExchangeProperties() {
@@ -663,8 +641,7 @@ public abstract class Exchange {
                 getExchangeId(),
                 getDisplayName(),
                 isSandbox(),
-                isPaperTrading()
-        );
+                isPaperTrading());
     }
 
     protected String safe(String value) {
@@ -688,8 +665,7 @@ public abstract class Exchange {
 
     protected UnsupportedOperationException unsupported(String methodName) {
         return new UnsupportedOperationException(
-                "%s does not support %s".formatted(getName(), methodName)
-        );
+                "%s does not support %s".formatted(getName(), methodName));
     }
 
     protected static <T> CompletableFuture<T> failedFuture(Throwable throwable) {
@@ -716,8 +692,7 @@ public abstract class Exchange {
                 : message;
     }
 
-    public abstract CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) ;
-
-
+    public abstract CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId,
+            double trailingDistance);
 
 }

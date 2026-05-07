@@ -15,7 +15,6 @@ import java.util.*;
 @Setter(AccessLevel.PRIVATE)
 @Getter
 public class StochasticBacktestStrategy extends BacktestStrategy {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StochasticBacktestStrategy.class);
     private final StochasticIndicator stochasticIndicator;
     private double kUpperBand;
     private double kLowerBand;

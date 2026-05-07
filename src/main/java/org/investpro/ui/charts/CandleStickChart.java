@@ -59,9 +59,6 @@ import org.investpro.utils.LogOnExceptionThreadFactory;
 import org.investpro.utils.ZoomDirection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
@@ -112,9 +109,6 @@ import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
 @Setter
 @Slf4j
 public class CandleStickChart extends Region {
-
-    private static final Logger logger = LoggerFactory.getLogger(CandleStickChart.class);
-
     private static final DateTimeFormatter SCREENSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final DateTimeFormatter CROSSHAIR_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(java.time.ZoneId.systemDefault());
@@ -183,6 +177,9 @@ public class CandleStickChart extends Region {
 
     private final List<PriceLine> priceLines = new ArrayList<>();
     private final List<ChartIndicator> indicators = new ArrayList<>();
+
+    // Candle selection callback
+    private Consumer<CandleData> candleSelectionCallback;
 
     private Canvas canvas;
     private GraphicsContext graphicsContext;
@@ -442,7 +439,14 @@ public class CandleStickChart extends Region {
 
         canvas.setOnMouseClicked(event -> {
             canvas.requestFocus();
-            if (event.getButton() == MouseButton.SECONDARY) {
+            if (event.getButton() == MouseButton.PRIMARY) {
+                // Handle left-click for candle selection
+                CandleData selectedCandle = getCandleAtPosition(event.getX());
+                if (selectedCandle != null && candleSelectionCallback != null) {
+                    candleSelectionCallback.accept(selectedCandle);
+                }
+                event.consume();
+            } else if (event.getButton() == MouseButton.SECONDARY) {
                 toggleCrosshair();
                 event.consume();
             }
@@ -494,7 +498,7 @@ public class CandleStickChart extends Region {
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
             } catch (Exception exception) {
-                logger.warn("WebSocket live stream failed for {}; polling fallback will be used.", tradePair,
+                log.warn("WebSocket live stream failed for {}; polling fallback will be used.", tradePair,
                         exception);
             }
 
@@ -525,7 +529,7 @@ public class CandleStickChart extends Region {
                     if (disposed)
                         return;
                     if (throwable != null) {
-                        logger.error("Error loading chart data for {}", tradePair, throwable);
+                        log.error("Error loading chart data for {}", tradePair, throwable);
                         showErrorMessage("Failed to load chart data: %s".formatted(rootMessage(throwable)));
                     }
                 });
@@ -553,7 +557,7 @@ public class CandleStickChart extends Region {
                     }
                 });
             } catch (Exception exception) {
-                logger.debug("Polling task failed for {}", tradePair, exception);
+                log.debug("Polling task failed for {}", tradePair, exception);
             }
         }, 3, 3, SECONDS);
     }
@@ -1540,6 +1544,40 @@ public class CandleStickChart extends Region {
         return showCrosshair;
     }
 
+    /**
+     * Gets the candlestick data at the given X coordinate on the canvas.
+     *
+     * @param canvasX the X coordinate on the canvas
+     * @return the CandleData at that position, or null if no candle is at that
+     *         position
+     */
+    private CandleData getCandleAtPosition(double canvasX) {
+        if (data.isEmpty() || candleBodyWidth <= 0) {
+            return null;
+        }
+
+        // Calculate which candle index this X position corresponds to
+        // candleBodyWidth includes spacing, so we need to account for that
+        double pixelsPerCandle = candleBodyWidth + 2; // 2 pixels for spacing
+        int candleIndexOffset = (int) ((canvasX - 50) / pixelsPerCandle); // 50 is approximate left margin
+
+        int candleIndex = firstVisibleIndex + candleIndexOffset;
+
+        // Get the candle at this index
+        if (data.size() > candleIndex && candleIndex >= 0) {
+            int keyAtIndex = 0;
+            int currentIndex = 0;
+            for (int key : data.keySet()) {
+                if (currentIndex == candleIndex) {
+                    return data.get(key);
+                }
+                currentIndex++;
+            }
+        }
+
+        return null;
+    }
+
     public void toggleCrosshair() {
         setCrosshairVisible(!showCrosshair);
     }
@@ -1576,7 +1614,7 @@ public class CandleStickChart extends Region {
                 ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(image, null), "png", file);
                 showTransientNotice("Screenshot saved: %s".formatted(file.getName()));
             } catch (IOException exception) {
-                logger.error("Failed to save screenshot", exception);
+                log.error("Failed to save screenshot", exception);
                 showErrorMessage("Screenshot failed: %s".formatted(rootMessage(exception)));
             }
         });
@@ -1681,6 +1719,15 @@ public class CandleStickChart extends Region {
         return chartHeight;
     }
 
+    /**
+     * Sets the callback to be invoked when a candlestick is clicked.
+     *
+     * @param callback Consumer that receives the clicked CandleData
+     */
+    public void setCandleSelectionCallback(Consumer<CandleData> callback) {
+        this.candleSelectionCallback = callback;
+    }
+
     public void dispose() {
         if (disposed)
             return;
@@ -1696,7 +1743,7 @@ public class CandleStickChart extends Region {
             if (exchange.getWebsocketClient() != null)
                 exchange.getWebsocketClient().stopStreamLiveTrades(tradePair);
         } catch (Exception exception) {
-            logger.debug("Unable to stop live stream for {}", tradePair, exception);
+            log.debug("Unable to stop live stream for {}", tradePair, exception);
         }
         shutdownExecutor(updateInProgressCandleExecutor);
         shutdownExecutor(chartLoadingExecutor);
@@ -1849,12 +1896,12 @@ public class CandleStickChart extends Region {
 
         @Override
         public void remove(TradePair tradePair) {
-            logger.debug("Removing trade pair from chart consumer: {}", tradePair);
+            log.debug("Removing trade pair from chart consumer: {}", tradePair);
         }
 
         @Override
         public void put(TradePair tradePair) {
-            logger.debug("Registering trade pair for chart consumer: {}", tradePair);
+            log.debug("Registering trade pair for chart consumer: {}", tradePair);
         }
 
         @Override
@@ -1866,7 +1913,7 @@ public class CandleStickChart extends Region {
         public void accept(Trade trade) {
             if (trade != null)
                 liveTradesQueue.offer(trade);
-            logger.info(liveTradesQueue.toString());
+            log.info(liveTradesQueue.toString());
         }
 
         @Override

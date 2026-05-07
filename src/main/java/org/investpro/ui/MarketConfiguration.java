@@ -1,20 +1,20 @@
 package org.investpro.ui;
 
 public record MarketConfiguration(
-    String username,
-    String marketType,
-    String venue,
-    String exchange,
-    String apiKey,
-    String apiSecret,
-    String accountId,
-    String telegramToken,
-    String openaiApiKey,
-    String openaiModel,
-    String openaiOrgId
-) {
+        String username,
+        String marketType,
+        String venue,
+        String exchange,
+        String apiKey,
+        String apiSecret,
+        String accountId,
+        String telegramToken,
+        String openaiApiKey,
+        String openaiModel,
+        String openaiOrgId,
+        String tradingMode) {
     public String telegramToken() {
-        return  telegramToken;
+        return telegramToken;
 
     }
 
@@ -28,6 +28,14 @@ public record MarketConfiguration(
 
     public String openaiOrgId() {
         return openaiOrgId;
+    }
+
+    public String tradingMode() {
+        return tradingMode != null ? tradingMode : "LIVE";
+    }
+
+    public boolean isPaperTrading() {
+        return "PAPER".equalsIgnoreCase(tradingMode());
     }
 
     public boolean hasOpenAiConfiguration() {

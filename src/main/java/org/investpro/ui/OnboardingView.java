@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.investpro.exchange.*;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
@@ -19,8 +21,10 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -33,9 +37,6 @@ import org.investpro.service.UserAuthService;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -49,9 +50,8 @@ import java.util.prefs.Preferences;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Slf4j
 public class OnboardingView extends StackPane {
-    private static final Logger logger = LoggerFactory.getLogger(OnboardingView.class);
-
     private final Consumer<MarketConfiguration> onReady;
     private final TextField usernameField = new TextField();
     private final PasswordField passwordField = new PasswordField();
@@ -283,6 +283,21 @@ public class OnboardingView extends StackPane {
         // Load remembered credentials for this exchange if they exist
         loadRememberedExchangeCredentials(selectedExchange, apiKeyField, apiSecretField, accountIdField);
 
+        // Trading mode selection
+        ToggleGroup tradingModeGroup = new ToggleGroup();
+        RadioButton liveRadioButton = new RadioButton("Live Trading");
+        liveRadioButton.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 12;");
+        liveRadioButton.setToggleGroup(tradingModeGroup);
+        liveRadioButton.setSelected(true); // Default to Live Trading
+
+        RadioButton paperRadioButton = new RadioButton("Paper Trading");
+        paperRadioButton.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 12;");
+        paperRadioButton.setToggleGroup(tradingModeGroup);
+
+        HBox tradingModeBox = new HBox(20, liveRadioButton, paperRadioButton);
+        tradingModeBox.setAlignment(Pos.CENTER_LEFT);
+        tradingModeBox.setStyle("-fx-padding: 8 0 0 0;");
+
         GridPane credGrid = new GridPane();
         credGrid.setHgap(14);
         credGrid.setVgap(14);
@@ -300,6 +315,7 @@ public class OnboardingView extends StackPane {
         }
 
         credGrid.addRow(2, new Label("Telegram Token"), telegramToken);
+        credGrid.addRow(3, new Label("Trading Mode"), tradingModeBox);
 
         CheckBox rememberCredentialsCheckBox = new CheckBox("Remember these credentials");
         rememberCredentialsCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
@@ -320,6 +336,9 @@ public class OnboardingView extends StackPane {
         validation.setAlignment(Pos.CENTER);
 
         continueButton.setOnAction(event -> {
+            // Determine trading mode from radio button selection
+            String selectedTradingMode = paperRadioButton.isSelected() ? "PAPER" : "LIVE";
+
             // For OANDA, only token is required (Account ID is optional - can be
             // auto-detected)
             if (selectedExchange.equals("OANDA")) {
@@ -339,7 +358,8 @@ public class OnboardingView extends StackPane {
                         telegramToken.getText().trim(),
                         null, // openaiApiKey - optional
                         null, // openaiModel - optional
-                        null // openaiOrgId - optional
+                        null, // openaiOrgId - optional
+                        selectedTradingMode // Trading mode
                 );
             } else {
                 // For other exchanges, require both API Key and API Secret
@@ -358,7 +378,8 @@ public class OnboardingView extends StackPane {
                         telegramToken.getText().trim(),
                         null, // openaiApiKey - optional
                         null, // openaiModel - optional
-                        null // openaiOrgId - optional
+                        null, // openaiOrgId - optional
+                        selectedTradingMode // Trading mode
                 );
             }
 
@@ -687,13 +708,13 @@ public class OnboardingView extends StackPane {
             String errorMessage = e.getMessage() != null ? e.getMessage() : "Authentication failed";
 
             // Log the full error for debugging
-            logger.error("Authentication failed for {}: {}", exchangeName, errorMessage, e);
+            log.error("Authentication failed for {}: {}", exchangeName, errorMessage, e);
 
             // Extract and show exchange-specific error details
             String userMessage = parseExchangeError(exchangeName, errorMessage);
             return new AuthenticationResult(false, userMessage);
         } catch (Exception e) {
-            logger.error("Unexpected error during authentication for {}: {}", exchangeName, e.getMessage(), e);
+            log.error("Unexpected error during authentication for {}: {}", exchangeName, e.getMessage(), e);
             return new AuthenticationResult(false,
                     "Unexpected error during authentication: %s".formatted(e.getMessage()));
         }
@@ -706,12 +727,12 @@ public class OnboardingView extends StackPane {
     private @NotNull String parseExchangeError(String exchangeName, @NotNull String errorMessage) {
         // Check for HTTP status codes and common errors
         if (errorMessage.contains("401") || errorMessage.contains("Unauthorized")) {
-            logger.warn("Authentication failed - 401 Unauthorized for {}", exchangeName);
+            log.warn("Authentication failed - 401 Unauthorized for {}", exchangeName);
             return "Invalid credentials. Status: 401 Unauthorized. Check your API key and secret.";
         }
 
         if (errorMessage.contains("403") || errorMessage.contains("Forbidden")) {
-            logger.warn("Authentication failed - 403 Forbidden for {}", exchangeName);
+            log.warn("Authentication failed - 403 Forbidden for {}", exchangeName);
             return "Access forbidden. Status: 403. Your API key may not have the required permissions.";
         }
 
@@ -733,7 +754,7 @@ public class OnboardingView extends StackPane {
             int httpIndex = errorMessage.indexOf("HTTP");
             if (httpIndex >= 0) {
                 String httpPart = errorMessage.substring(httpIndex);
-                logger.debug("Extracted HTTP error details: {}", httpPart);
+                log.debug("Extracted HTTP error details: {}", httpPart);
 
                 // Check if there's a JSON error body
                 if (httpPart.contains("{")) {
@@ -742,7 +763,7 @@ public class OnboardingView extends StackPane {
                         int jsonEnd = httpPart.lastIndexOf("}");
                         if (jsonEnd > jsonStart) {
                             String jsonError = httpPart.substring(jsonStart, jsonEnd + 1);
-                            logger.debug("Extracted JSON error from response: {}", jsonError);
+                            log.debug("Extracted JSON error from response: {}", jsonError);
 
                             // Try to extract "message" field if it's JSON
                             if (jsonError.contains("\"message\"")) {
@@ -764,7 +785,7 @@ public class OnboardingView extends StackPane {
                             }
                         }
                     } catch (Exception e) {
-                        logger.debug("Could not parse JSON error response", e);
+                        log.debug("Could not parse JSON error response", e);
                     }
                 }
 
@@ -804,7 +825,7 @@ public class OnboardingView extends StackPane {
             return new AuthenticationResult(true, "Successfully authenticated with %s".formatted(exchangeName));
         } catch (RuntimeException e) {
             String errorMessage = e.getMessage() != null ? e.getMessage() : "Authentication failed";
-            logger.error("Exchange connection failed for {}: {}", exchangeName, errorMessage, e);
+            log.error("Exchange connection failed for {}: {}", exchangeName, errorMessage, e);
             String userMessage = parseExchangeError(exchangeName, errorMessage);
             return new AuthenticationResult(false, userMessage);
         }

@@ -53,19 +53,16 @@ public class MeanReversionStrategy extends BaseStrategy {
         Set<AssetClass> assets = EnumSet.of(
                 AssetClass.CRYPTO_ASSET,
                 AssetClass.FIAT_CURRENCY,
-                AssetClass.EQUITY
-        );
+                AssetClass.EQUITY);
 
         Set<ContractType> contracts = EnumSet.of(
-                ContractType.SPOT
-        );
+                ContractType.SPOT);
 
         Set<Timeframe> timeframes = EnumSet.of(
                 Timeframe.M15,
                 Timeframe.M30,
                 Timeframe.H1,
-                Timeframe.H4
-        );
+                Timeframe.H4);
 
         return StrategyMetadata.builder()
                 .strategyId(STRATEGY_ID)
@@ -132,8 +129,7 @@ public class MeanReversionStrategy extends BaseStrategy {
                                 "price=" + currentPrice +
                                 ", lowerBand=" + lowerBand +
                                 ", sma20=" + sma20 +
-                                ", rsi14=" + rsi14
-                );
+                                ", rsi14=" + rsi14);
 
                 return buildBuySignal(context, currentPrice, stopLoss, takeProfit);
             }
@@ -147,8 +143,7 @@ public class MeanReversionStrategy extends BaseStrategy {
                                 "price=" + currentPrice +
                                 ", upperBand=" + upperBand +
                                 ", sma20=" + sma20 +
-                                ", rsi14=" + rsi14
-                );
+                                ", rsi14=" + rsi14);
 
                 return buildSellSignal(context, currentPrice, stopLoss, takeProfit);
             }
@@ -158,15 +153,13 @@ public class MeanReversionStrategy extends BaseStrategy {
                     "No mean-reversion setup: price=" + currentPrice +
                             ", lowerBand=" + lowerBand +
                             ", upperBand=" + upperBand +
-                            ", rsi14=" + rsi14
-            );
+                            ", rsi14=" + rsi14);
 
         } catch (Exception exception) {
             log.error(
                     "Error generating mean-reversion signal for symbol={}",
                     context.getSymbol(),
-                    exception
-            );
+                    exception);
 
             return noSignal(context, "Mean-reversion analysis error: " + exception.getMessage());
         }
@@ -181,7 +174,7 @@ public class MeanReversionStrategy extends BaseStrategy {
 
     @Override
     public Object getId() {
-        return STRATEGY_ID ;
+        return STRATEGY_ID;
     }
 
     private double calculateSMA(@NotNull List<CandleData> candles, int period) {
@@ -276,12 +269,12 @@ public class MeanReversionStrategy extends BaseStrategy {
             @NotNull StrategyContext context,
             double entry,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         double confidence = calculateConfidence(entry, stopLoss, takeProfit);
 
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
+                .strategyName(metadata.getDisplayName())
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(BUY)
@@ -302,12 +295,12 @@ public class MeanReversionStrategy extends BaseStrategy {
             @NotNull StrategyContext context,
             double entry,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         double confidence = calculateConfidence(entry, stopLoss, takeProfit);
 
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
+                .strategyName(metadata.getDisplayName())
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(SELL)

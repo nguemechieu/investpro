@@ -12,8 +12,6 @@ import java.util.Map;
  */
 @Slf4j
 public class StrategyCapitalAllocator {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyCapitalAllocator.class);
-
     /**
      * Allocate capital across strategies based on their scores and performance.
      */

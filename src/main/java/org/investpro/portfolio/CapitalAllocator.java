@@ -9,8 +9,6 @@ import org.jetbrains.annotations.NotNull;
  */
 @Slf4j
 public class CapitalAllocator {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(CapitalAllocator.class);
-
     /**
      * Allocate capital for a candidate trade based on portfolio state.
      */

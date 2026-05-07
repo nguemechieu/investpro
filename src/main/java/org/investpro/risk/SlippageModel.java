@@ -63,10 +63,8 @@ public class SlippageModel {
      */
     public static ExecutionStrategy getRecommendedStrategy(LiquidityProfile liquidityProfile) {
         return switch (liquidityProfile) {
-            case DEEP -> ExecutionStrategy.LIMIT_ORDER;
-            case NORMAL -> ExecutionStrategy.LIMIT_ORDER;
-            case THIN-> ExecutionStrategy.SCALED_ENTRY;
-            case ILLIQUID -> ExecutionStrategy.SCALED_ENTRY;
+            case DEEP, NORMAL -> ExecutionStrategy.LIMIT_ORDER;
+            case THIN, ILLIQUID -> ExecutionStrategy.SCALED_ENTRY;
         };
     }
 

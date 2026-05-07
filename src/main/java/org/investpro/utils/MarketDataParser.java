@@ -1,5 +1,7 @@
 package org.investpro.utils;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
@@ -10,9 +12,6 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +23,8 @@ import java.util.List;
 @Data
 @Getter
 @Setter
+@Slf4j
 public class MarketDataParser {
-    private static final Logger logger = LoggerFactory.getLogger(MarketDataParser.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static List<Position> positions;
 
@@ -64,7 +63,7 @@ public class MarketDataParser {
 
             orderBook.setTimestamp(Instant.now());
         } catch (Exception e) {
-            logger.error("Failed to parse generic order book", e);
+            log.error("Failed to parse generic order book", e);
         }
         return orderBook;
     }

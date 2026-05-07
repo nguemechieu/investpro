@@ -11,7 +11,6 @@ import org.investpro.strategy.TradingStrategy;
 import org.investpro.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -142,13 +141,13 @@ public abstract class BaseStrategy implements TradingStrategy {
                 metadata.getStrategyId(),
                 context.getSymbol(),
                 context.getTimeframe(),
-                safeReason
-        );
+                safeReason);
 
         return StrategySignal.builder()
                 .strategyId(metadata.getStrategyId())
-                .symbol(context.getSymbol().toString('/'))
-                .timeframe(context.getTimeframe().toString())
+                .strategyName(metadata.getDisplayName())
+                .symbol(context.getSymbol() == null ? "" : context.getSymbol().toString('/'))
+                .timeframe(context.getTimeframe() == null ? "" : context.getTimeframe().getCode())
                 .side(HOLD)
                 .confidence(0.0)
                 .entryPrice(context.getCurrentPrice())

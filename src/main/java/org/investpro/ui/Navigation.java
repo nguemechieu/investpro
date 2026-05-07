@@ -1,5 +1,9 @@
 package org.investpro.ui;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -9,16 +13,14 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Navigation panel for switching between exchanges and managing exchange connections.
  * Provides UI controls for selecting different crypto exchanges and viewing exchange status.
  */
+@Slf4j
+@Getter
+@Setter
 public class Navigation extends Stage {
-    private static final Logger logger = LoggerFactory.getLogger(Navigation.class);
-
     private static final String[] AVAILABLE_EXCHANGES = {
             "COINBASE",
             "BINANCE US",
@@ -199,7 +201,7 @@ public class Navigation extends Stage {
     private void selectExchange(String exchangeName) {
         exchangeSelector.setValue(exchangeName);
         currentExchangeLabel.setText("Current: " + exchangeName);
-        logger.info("Exchange selected: {}", exchangeName);
+        log.info("Exchange selected: {}", exchangeName);
 
         // Call the callback if set
         if (onExchangeChanged != null) {
@@ -212,7 +214,7 @@ public class Navigation extends Stage {
      */
     private void connectToExchange() {
         String currentExchange = exchangeSelector.getValue();
-        logger.info("Connecting to exchange: {}", currentExchange);
+        log.info("Connecting to exchange: {}", currentExchange);
         connectionStatusLabel.setText("Status: Connecting...");
         connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #f59e0b;");
         // Connection logic would be handled by the trading window
@@ -223,7 +225,7 @@ public class Navigation extends Stage {
      */
     private void disconnectFromExchange() {
         String currentExchange = exchangeSelector.getValue();
-        logger.info("Disconnecting from exchange: {}", currentExchange);
+        log.info("Disconnecting from exchange: {}", currentExchange);
         connectionStatusLabel.setText("Status: Disconnected");
         connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #ef4444;");
     }

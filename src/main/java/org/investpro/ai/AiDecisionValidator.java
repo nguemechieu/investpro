@@ -21,8 +21,6 @@ import org.investpro.enums.ExecutionStrategy;
  */
 @Slf4j
 public class AiDecisionValidator {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AiDecisionValidator.class);
-
     /**
      * Validate an AI response against guardrails.
      * If any guardrail is violated, adjust the decision to be safer.
@@ -45,7 +43,7 @@ public class AiDecisionValidator {
         if (hasRiskBlockers(request)) {
             if (aiResponse.getDecision() == AiDecision.APPROVE ||
                     aiResponse.getDecision() == AiDecision.APPROVE_WITH_REDUCED_SIZE) {
-                logger.warn("AI attempted to approve trade with risk blockers. Escalating to manual review.");
+                log.warn("AI attempted to approve trade with risk blockers. Escalating to manual review.");
                 violations.append("Risk blockers exist. ");
                 validatedResponse = escalateToManualReview(aiResponse, "Risk blockers must be addressed");
             }
@@ -53,14 +51,14 @@ public class AiDecisionValidator {
 
         // 2. Check: AI cannot increase position size
         if (aiResponse.getSuggestedPositionSize() > request.getRiskDecision().getFinalPositionSize()) {
-            logger.warn("AI attempted to increase position size beyond limit. Capping to RiskDecision limit.");
+            log.warn("AI attempted to increase position size beyond limit. Capping to RiskDecision limit.");
             violations.append("Position size exceeded. ");
             validatedResponse = capPositionSize(validatedResponse, request.getRiskDecision().getFinalPositionSize());
         }
 
         // 3. Check: AI cannot increase leverage
         if (aiResponse.getSuggestedRiskMultiplier() > 1.0) {
-            logger.warn("AI suggested risk multiplier > 1.0. Capping to 1.0");
+            log.warn("AI suggested risk multiplier > 1.0. Capping to 1.0");
             violations.append("Risk multiplier exceeded. ");
             validatedResponse = capRiskMultiplier(validatedResponse, 1.0);
         }
@@ -68,7 +66,7 @@ public class AiDecisionValidator {
         // 4. Check: Cannot use MARKET order for illiquid assets
         if (isIlliquid(request) && ExecutionStrategy.MARKET_ORDER.name()
                 .equalsIgnoreCase(aiResponse.getRecommendedExecutionStrategy())) {
-            logger.warn("AI recommended MARKET order for illiquid asset. Forcing LIMIT order.");
+            log.warn("AI recommended MARKET order for illiquid asset. Forcing LIMIT order.");
             violations.append("Market order not viable for illiquid assets. ");
             validatedResponse = overrideExecutionStrategy(validatedResponse, ExecutionStrategy.LIMIT_ORDER.name());
         }
@@ -77,7 +75,7 @@ public class AiDecisionValidator {
         // IMPULSIVE/FEARFUL
         if (hasCapitalProtectionRisk(request)) {
             if (aiResponse.getDecision() == AiDecision.APPROVE) {
-                logger.warn("AI approved trade with capital protection risk. Escalating.");
+                log.warn("AI approved trade with capital protection risk. Escalating.");
                 violations.append("Capital protection risk detected. ");
                 validatedResponse = escalateToManualReview(aiResponse,
                         "Capital protection risk requires manual review");
@@ -86,14 +84,14 @@ public class AiDecisionValidator {
 
         // 6. Check: AI response validity (NaN, null values, etc.)
         if (!isResponseValid(validatedResponse)) {
-            logger.warn("AI response contains invalid values. Escalating to manual review.");
+            log.warn("AI response contains invalid values. Escalating to manual review.");
             violations.append("Invalid response data. ");
             validatedResponse = escalateToManualReview(aiResponse, "AI response contains invalid values");
         }
 
         // Log if any violations were found and corrected
         if (!violations.isEmpty()) {
-            logger.info("AI response guardrails enforced: {}", violations);
+            log.info("AI response guardrails enforced: {}", violations);
         }
 
         return validatedResponse;

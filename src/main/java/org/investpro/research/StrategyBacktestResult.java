@@ -12,7 +12,8 @@ import java.util.List;
 // Note: StrategyScore is in this same package, so no import needed but declared below
 
 /**
- * Results and metrics from backtesting a strategy on a specific symbol/timeframe.
+ * Results and metrics from backtesting a strategy on a specific
+ * symbol/timeframe.
  */
 @Getter
 @Builder
@@ -126,6 +127,7 @@ public class StrategyBacktestResult {
     @Override
     public String toString() {
         return String.format("BacktestResult{%s/%s: trades=%d, wr=%.1f%%, pf=%.2f, ret=%.2f%%, dd=%.2f%%, exp=%.2f}",
-                symbol, timeframe.getCode(), totalTrades, winRate * 100, profitFactor, totalReturnPercent, maxDrawdownPercent, expectancy);
+                symbol, timeframe.getCode(), totalTrades, winRate * 100, profitFactor, totalReturnPercent,
+                maxDrawdownPercent, expectancy);
     }
 }

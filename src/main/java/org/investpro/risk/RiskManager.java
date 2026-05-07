@@ -1,9 +1,11 @@
 package org.investpro.risk;
 
+import lombok.extern.slf4j.Slf4j;
+
 import lombok.Getter;
 import lombok.Setter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.investpro.models.trading.TradePair;
 import org.investpro.models.trading.Ticker;
 
@@ -13,10 +15,9 @@ import org.investpro.models.trading.Ticker;
  */
 @Getter
 @Setter
+@Slf4j
 
 public class RiskManager {
-    private static final Logger logger = LoggerFactory.getLogger(RiskManager.class);
-    
     // Risk parameters
     private double accountBalance;
     private double riskPercentage = 2.0;  // Risk 2% of account per trade
@@ -28,7 +29,7 @@ public class RiskManager {
 
     public RiskManager(double accountBalance) {
         this.accountBalance = Math.max(100, accountBalance);
-        logger.info("RiskManager initialized with account balance: ${}", accountBalance);
+        log.info("RiskManager initialized with account balance: ${}", accountBalance);
     }
     
     /**
@@ -41,7 +42,7 @@ public class RiskManager {
             boolean isBuySignal) {
         
         if (ticker == null || tradePair == null) {
-            logger.warn("Invalid inputs for risk calculation");
+            log.warn("Invalid inputs for risk calculation");
             return TradeRiskParameters.EMPTY;
         }
         
@@ -51,7 +52,7 @@ public class RiskManager {
         }
         
         // Calculate position size
-        double positionSize = calculatePositionSize(tradePair, currentPrice);
+        double positionSize = calculatePositionSize(currentPrice);
         
         // Calculate stop loss and take profit
         StopLossLevel stopLossLevel = calculateStopLoss(
@@ -69,7 +70,7 @@ public class RiskManager {
         // Calculate risk amount in USD
         double riskAmount = (accountBalance * riskPercentage) / 100.0;
         
-        logger.info("Risk Parameters for {}: size={}, entry={}, SL={} ({}%), TP={} ({}%), risk=${}",
+        log.info("Risk Parameters for {}: size={}, entry={}, SL={} ({}%), TP={} ({}%), risk=${}",
             tradePair, positionSize, currentPrice, stopLossPrice, stopLossPercent, 
             takeProfitPrice, takeProfitPercent, riskAmount);
         
@@ -88,7 +89,7 @@ public class RiskManager {
     /**
      * Calculate position size using fixed fractional position sizing
      */
-    private double calculatePositionSize(TradePair tradePair, double currentPrice) {
+    private double calculatePositionSize(double currentPrice) {
         // Risk amount = account balance * risk percentage
         double riskAmount = (accountBalance * riskPercentage) / 100.0;
         
@@ -107,7 +108,8 @@ public class RiskManager {
     /**
      * Calculate stop loss using volatility-based ATR (Average True Range)
      */
-    private StopLossLevel calculateStopLoss(double currentPrice, double volatility, boolean isBuy) {
+    @Contract("_, _, _ -> new")
+    private @NotNull StopLossLevel calculateStopLoss(double currentPrice, double volatility, boolean isBuy) {
         double atrValue = currentPrice * (volatility / 100.0);
         
         // Use 2x ATR for stop loss
@@ -148,7 +150,7 @@ public class RiskManager {
      */
     public void updateAccountBalance(double newBalance) {
         this.accountBalance = Math.max(100, newBalance);
-        logger.info("Account balance updated to: ${}", newBalance);
+        log.info("Account balance updated to: ${}", newBalance);
     }
     
     /**
@@ -156,7 +158,7 @@ public class RiskManager {
      */
     public void setRiskPercentage(double percentage) {
         this.riskPercentage = Math.max(0.1, Math.min(5.0, percentage));
-        logger.info("Risk percentage set to: {}%", this.riskPercentage);
+        log.info("Risk percentage set to: {}%", this.riskPercentage);
     }
     
     /**
@@ -164,24 +166,10 @@ public class RiskManager {
      */
     public void setRewardRiskRatio(double ratio) {
         this.rewardRiskRatio = Math.max(1.0, Math.min(5.0, ratio));
-        logger.info("Reward-Risk ratio set to: 1:{}", this.rewardRiskRatio);
+        log.info("Reward-Risk ratio set to: 1:{}", this.rewardRiskRatio);
     }
     
-    /**
-     * Set maximum position size
-     */
-    public void setMaxPositionSize(double maxSize) {
-        this.maxPositionSize = Math.max(0.001, maxSize);
-        logger.info("Max position size set to: {}", this.maxPositionSize);
-    }
-    
-    /**
-     * Enable/disable volatility-based stop loss
-     */
-    public void setUseVolatilityBased(boolean use) {
-        this.useVolatilityBased = use;
-        logger.info("Volatility-based stops: {}", use ? "ENABLED" : "DISABLED");
-    }
+
 
     @Override
     public String toString() {

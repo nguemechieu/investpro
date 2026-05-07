@@ -23,7 +23,8 @@ import static org.investpro.utils.Side.SELL;
 /**
  * Breakout Strategy.
  *
- * Trades breakouts above resistance or below support levels using Donchian channels.
+ * Trades breakouts above resistance or below support levels using Donchian
+ * channels.
  *
  * Best for:
  * - breakout markets
@@ -48,21 +49,18 @@ public class BreakoutStrategy extends BaseStrategy {
         Set<AssetClass> assets = EnumSet.of(
                 AssetClass.CRYPTO_ASSET,
                 AssetClass.FIAT_CURRENCY,
-                AssetClass.COMMODITY
-        );
+                AssetClass.COMMODITY);
 
         Set<ContractType> contracts = EnumSet.of(
                 ContractType.SPOT,
-                ContractType.PERPETUAL
-        );
+                ContractType.PERPETUAL);
 
         Set<Timeframe> timeframes = EnumSet.of(
                 Timeframe.M5,
                 Timeframe.M15,
                 Timeframe.H1,
                 Timeframe.H4,
-                Timeframe.D1
-        );
+                Timeframe.D1);
 
         return StrategyMetadata.builder()
                 .strategyId(STRATEGY_ID)
@@ -116,13 +114,11 @@ public class BreakoutStrategy extends BaseStrategy {
             double resistance = donchian.resistance();
             double support = donchian.support();
 
-            boolean bullishBreakout =
-                    latest.closePrice() > resistance
-                            && previous.closePrice() <= resistance;
+            boolean bullishBreakout = latest.closePrice() > resistance
+                    && previous.closePrice() <= resistance;
 
-            boolean bearishBreakout =
-                    latest.closePrice() < support
-                            && previous.closePrice() >= support;
+            boolean bearishBreakout = latest.closePrice() < support
+                    && previous.closePrice() >= support;
 
             if (bullishBreakout) {
                 double stopLoss = support;
@@ -132,16 +128,14 @@ public class BreakoutStrategy extends BaseStrategy {
                         "Bullish breakout confirmed: close above Donchian resistance. " +
                                 "price=" + currentPrice +
                                 ", resistance=" + resistance +
-                                ", support=" + support
-                );
+                                ", support=" + support);
 
                 log.debug(
                         "Breakout BUY signal: symbol={}, price={}, resistance={}, support={}",
                         context.getSymbol(),
                         currentPrice,
                         resistance,
-                        support
-                );
+                        support);
 
                 return buildBuySignal(context, currentPrice, stopLoss, takeProfit, resistance, support);
             }
@@ -154,16 +148,14 @@ public class BreakoutStrategy extends BaseStrategy {
                         "Bearish breakout confirmed: close below Donchian support. " +
                                 "price=" + currentPrice +
                                 ", resistance=" + resistance +
-                                ", support=" + support
-                );
+                                ", support=" + support);
 
                 log.debug(
                         "Breakout SELL signal: symbol={}, price={}, resistance={}, support={}",
                         context.getSymbol(),
                         currentPrice,
                         resistance,
-                        support
-                );
+                        support);
 
                 return buildSellSignal(context, currentPrice, stopLoss, takeProfit, resistance, support);
             }
@@ -172,15 +164,13 @@ public class BreakoutStrategy extends BaseStrategy {
                     context,
                     "No breakout detected: price=" + currentPrice +
                             ", resistance=" + resistance +
-                            ", support=" + support
-            );
+                            ", support=" + support);
 
         } catch (Exception exception) {
             log.error(
                     "Error generating breakout signal for symbol={}",
                     context.getSymbol(),
-                    exception
-            );
+                    exception);
 
             return noSignal(context, "Breakout analysis error: " + exception.getMessage());
         }
@@ -193,7 +183,7 @@ public class BreakoutStrategy extends BaseStrategy {
 
     @Override
     public Object getId() {
-        return STRATEGY_ID ;
+        return STRATEGY_ID;
     }
 
     @Override
@@ -207,8 +197,10 @@ public class BreakoutStrategy extends BaseStrategy {
     /**
      * Calculates the Donchian channel using candles before the latest candle.
      *
-     * This avoids look-ahead bias. If we include the latest candle in resistance/support,
-     * the breakout check can become unreliable because the breakout candle creates the level.
+     * This avoids look-ahead bias. If we include the latest candle in
+     * resistance/support,
+     * the breakout check can become unreliable because the breakout candle creates
+     * the level.
      */
     private DonchianChannel calculateDonchianExcludingLatest(@NotNull List<CandleData> candles, int period) {
         if (candles.size() < period + 1) {
@@ -255,13 +247,13 @@ public class BreakoutStrategy extends BaseStrategy {
             double stopLoss,
             double takeProfit,
             double resistance,
-            double support
-    ) {
+            double support) {
         double riskRewardRatio = calculateRiskRewardRatio(entry, stopLoss, takeProfit);
         double confidence = calculateConfidence(riskRewardRatio, entry, resistance, support);
 
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
+                .strategyName(metadata.getDisplayName())
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(BUY)
@@ -283,13 +275,13 @@ public class BreakoutStrategy extends BaseStrategy {
             double stopLoss,
             double takeProfit,
             double resistance,
-            double support
-    ) {
+            double support) {
         double riskRewardRatio = calculateRiskRewardRatio(entry, stopLoss, takeProfit);
         double confidence = calculateConfidence(riskRewardRatio, entry, resistance, support);
 
         return StrategySignal.builder()
                 .strategyId(STRATEGY_ID)
+                .strategyName(metadata.getDisplayName())
                 .symbol(context.getSymbol().toString('/'))
                 .timeframe(context.getTimeframe().toString())
                 .side(SELL)
@@ -320,8 +312,7 @@ public class BreakoutStrategy extends BaseStrategy {
             double riskRewardRatio,
             double entry,
             double resistance,
-            double support
-    ) {
+            double support) {
         double confidence = 0.62;
 
         if (riskRewardRatio >= 2.0) {

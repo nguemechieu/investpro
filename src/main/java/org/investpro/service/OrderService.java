@@ -5,7 +5,6 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.repository.OrderRepository;
 
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -145,32 +144,6 @@ public class OrderService implements CrudService<Order, String> {
         return findByStatus(ORDER_STATUS_CANCELLED);
     }
 
-    /**
-     * Find all rejected orders.
-     */
-    public List<Order> getRejectedOrders() throws SQLException {
-        return findByStatus(ORDER_STATUS_REJECTED);
-    }
-
-    /**
-     * Find orders within a time range.
-     *
-     * @param startTime the start instant
-     * @param endTime the end instant
-     * @return list of orders in the time range
-     * @throws SQLException if database operation fails
-     */
-    public List<Order> findByTimeRange(Instant startTime, Instant endTime) throws SQLException {
-        if (startTime == null || endTime == null) {
-            throw new IllegalArgumentException("time range must not be null");
-        }
-
-        if (startTime.isAfter(endTime)) {
-            throw new IllegalArgumentException("startTime must be before or equal to endTime");
-        }
-
-        return repository.findByTimeRange(startTime, endTime);
-    }
 
     /**
      * Find all open orders.
@@ -214,7 +187,7 @@ public class OrderService implements CrudService<Order, String> {
      * @return the updated order
      * @throws SQLException if database operation fails
      */
-    public Order cancelOrder(Order order) throws SQLException, ClassNotFoundException {
+    public Order cancelOrder(Order order) throws SQLException {
         requireOrder(order);
 
         if (isOrderFilled(order)) {
@@ -371,16 +344,6 @@ public class OrderService implements CrudService<Order, String> {
         return total;
     }
 
-    /**
-     * Calculate net P&L after commission and swap.
-     */
-    public double calculateNetProfit(Order order) {
-        if (order == null) {
-            return 0.0;
-        }
-
-        return order.getProfit() - order.getCommission() + order.getSwap();
-    }
 
     /**
      * Validate an order before saving.
