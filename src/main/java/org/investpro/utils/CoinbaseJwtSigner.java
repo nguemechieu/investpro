@@ -6,15 +6,16 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import io.github.cdimascio.dotenv.Dotenv;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.jetbrains.annotations.NotNull;
-import org.testcontainers.shaded.org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.testcontainers.shaded.org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.testcontainers.shaded.org.bouncycastle.openssl.PEMKeyPair;
-import org.testcontainers.shaded.org.bouncycastle.openssl.PEMParser;
-import org.testcontainers.shaded.org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
-
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -51,6 +52,7 @@ import java.util.UUID;
  */
 @Getter
 @Setter
+@Slf4j
 public final class CoinbaseJwtSigner {
     public static final String DEFAULT_REQUEST_HOST = "api.coinbase.com";
     public static final long DEFAULT_TTL_SECONDS = 120L;
@@ -112,7 +114,8 @@ public final class CoinbaseJwtSigner {
     /**
      * Build a REST JWT directly from a full URL
      * Example:
-     * buildRestJwtForUrl("GET", "<a href="https://api.coinbase.com/api/v3/brokerage/accounts">...</a>")
+     * buildRestJwtForUrl("GET",
+     * "<a href="https://api.coinbase.com/api/v3/brokerage/accounts">...</a>")
      */
     public String buildRestJwtForUrl(String method, String fullUrl) {
         Objects.requireNonNull(fullUrl, "fullUrl must not be null");
@@ -152,7 +155,6 @@ public final class CoinbaseJwtSigner {
         return "Bearer %s".formatted(buildRestJwtForUrl(method, fullUrl));
     }
 
-
     private String signJwt(String uriClaim) {
         long now = Instant.now().getEpochSecond();
 
@@ -183,14 +185,28 @@ public final class CoinbaseJwtSigner {
             throw new IllegalStateException("Unable to sign Coinbase JWT.", exception);
         }
     }
+    private static final Dotenv DOTENV = Dotenv.configure()
+            .directory(System.getProperty("user.dir"))
+            .filename(".env")
+            .ignoreIfMalformed()
+            .ignoreIfMissing()
+            .load();
 
+    private static String env(String key) {
+        String value = System.getenv(key);
+
+        if (value == null || value.isBlank()) {
+            value = DOTENV.get(key);
+        }
+
+        return value;
+    }
     private static String normalizeKeyName(String keyName) {
         String value = keyName == null ? "" : keyName.trim();
 
         if (value.isBlank()) {
             throw new IllegalArgumentException(
-                    "Coinbase API key name is required. Expected format: organizations/{org_id}/apiKeys/{key_id}"
-            );
+                    "Coinbase API key name is required. Expected format: organizations/{org_id}/apiKeys/{key_id}");
         }
 
         return value;
@@ -211,8 +227,7 @@ public final class CoinbaseJwtSigner {
 
         if (!value.contains("BEGIN") || !value.contains("PRIVATE KEY")) {
             throw new IllegalArgumentException(
-                    "Invalid Coinbase private key PEM. Expected -----BEGIN EC PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----."
-            );
+                    "Invalid Coinbase private key PEM. Expected -----BEGIN EC PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----.");
         }
 
         return value;
@@ -283,14 +298,17 @@ public final class CoinbaseJwtSigner {
             JcaPEMKeyConverter converter = new JcaPEMKeyConverter()
                     .setProvider(BOUNCY_CASTLE_PROVIDER);
 
-            PrivateKey privateKey = switch (parsed) {
-                case PEMKeyPair pemKeyPair -> converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
-                case PrivateKeyInfo privateKeyInfo -> converter.getPrivateKey(privateKeyInfo);
-                case PrivateKey parsedPrivateKey -> parsedPrivateKey;
-                default -> throw new IllegalArgumentException(
-                        "Unsupported Coinbase private key format: " + parsed.getClass().getName()
-                );
-            };
+            PrivateKey privateKey;
+            if (parsed instanceof PEMKeyPair pemKeyPair) {
+                privateKey = converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
+            } else if (parsed instanceof PrivateKeyInfo privateKeyInfo) {
+                privateKey = converter.getPrivateKey(privateKeyInfo);
+            } else if (parsed instanceof PrivateKey) {
+                privateKey = (PrivateKey) parsed;
+            } else {
+                throw new IllegalArgumentException(
+                        "Unsupported Coinbase private key format: " + parsed.getClass().getName());
+            }
 
             KeyFactory keyFactory = KeyFactory.getInstance("EC");
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKey.getEncoded());
@@ -313,14 +331,15 @@ public final class CoinbaseJwtSigner {
      *
      * Environment variables:
      * COINBASE_KEY_NAME="organizations/{org_id}/apiKeys/{key_id}"
-     * COINBASE_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----"
+     * COINBASE_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC
+     * PRIVATE KEY-----"
      *
      * Example:
      * java org.investpro.exchange.CoinbaseJwtSigner GET /api/v3/brokerage/accounts
      */
     static void main(String @NotNull [] args) {
-        String keyName = "organizations/a8dd6d6f-375a-4f4b-b0b0-75f829b998eb/apiKeys/efd80950-544c-4051-9911-b41b8d32bc67";//System.getenv("COINBASE_KEY_NAME");
-        String privateKey = "-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEIOtcCOGlCU6sv8fQsUkxliRPkmtZIzjKq7VETXKpukW5oAoGCCqGSM49\\nAwEHoUQDQgAEpIxDQbb9Raa2N0MFzUBho/sEuU6C1GwA0qP58/5t9G24iu31q+K9\\n4VF+Hq1v4opkoJROToqMqyu9UIZHsYl8pg==\\n-----END EC PRIVATE KEY-----\\n";//System.getenv("COINBASE_PRIVATE_KEY");
+        String keyName = env("COINBASE_KEY_NAME");
+        String privateKey = env("COINBASE_PRIVATE_KEY");
 
         String method = args.length > 0 ? args[0] : "GET";
         String path = args.length > 1 ? args[1] : "/api/v3/brokerage/accounts";

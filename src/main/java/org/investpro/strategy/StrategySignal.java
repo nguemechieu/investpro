@@ -3,7 +3,8 @@ package org.investpro.strategy;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
-import org.investpro.risk.MarketBehavior;
+import org.investpro.enums.MarketBehavior;
+import org.investpro.enums.TradingSessionStatus;
 import org.investpro.utils.Side;
 
 import java.time.LocalDateTime;
@@ -13,10 +14,15 @@ import java.util.Map;
 /**
  * Normalized strategy signal returned by every TradingStrategy.
  *
- * This object represents a complete trade idea, not just BUY/SELL/HOLD.
+ * This is the PRIMARY signal class that should be used throughout the system.
+ * StrategySignal provides complete trade context beyond just side direction:
+ * - Entry/exit prices and stop loss/take profit levels
+ * - Risk/reward ratios
+ * - Confidence and expected value metrics
+ * - Win/loss probabilities
  *
- * Side = direction only.
- * StrategySignal = full signal context.
+ * Side = direction only (use strategy signal instead).
+ * StrategySignal = full signal context with all trading parameters.
  */
 @Value
 @Builder(toBuilder = true)
@@ -108,6 +114,16 @@ public class StrategySignal {
      * Current market behavior/regime.
      */
     MarketBehavior marketBehavior;
+
+    /**
+     * Trading session status for the symbol when this signal was created.
+     */
+    TradingSessionStatus sessionStatus;
+
+    /**
+     * Human-readable notes about the symbol's trading session.
+     */
+    String sessionNotes;
 
     /**
      * Whether this signal is valid until a specific time.
@@ -275,8 +291,7 @@ public class StrategySignal {
             double entryPrice,
             double stopLossPrice,
             double takeProfitPrice,
-            String reason
-    ) {
+            String reason) {
         return StrategySignal.builder()
                 .symbol(symbol)
                 .timeframe(timeframe)
@@ -300,8 +315,7 @@ public class StrategySignal {
             double entryPrice,
             double stopLossPrice,
             double takeProfitPrice,
-            String reason
-    ) {
+            String reason) {
         return StrategySignal.builder()
                 .symbol(symbol)
                 .timeframe(timeframe)
@@ -338,5 +352,9 @@ public class StrategySignal {
         }
 
         return Math.max(min, Math.min(max, value));
+    }
+
+    public String getReason() {
+        return reasons.stream().reduce("", (s1, s2) -> s1 + s2);
     }
 }

@@ -16,7 +16,6 @@ import org.jetbrains.annotations.NotNull;
 @Getter
 @Setter
 public class StrategyInitializer {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyInitializer.class);
 
     private static boolean initialized = false;
 

@@ -1,6 +1,5 @@
 package org.investpro.ui;
 
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.IntegerProperty;
@@ -42,11 +41,13 @@ import java.util.Optional;
 
 import static org.investpro.utils.FXUtils.computeTextDimensions;
 
-
 /**
- * A resizable toolbar, placed at the top of a {@code CandleStickChart} and contained
- * inside a {@code CandleStickChartContainer}, that contains a series of labelled
- * buttons that allow for controlling the chart paired with this toolbar. Some of the
+ * A resizable toolbar, placed at the top of a {@code CandleStickChart} and
+ * contained
+ * inside a {@code CandleStickChartContainer}, that contains a series of
+ * labelled
+ * buttons that allow for controlling the chart paired with this toolbar. Some
+ * of the
  * functions of the buttons are:
  *
  * <ul>
@@ -58,11 +59,15 @@ import static org.investpro.utils.FXUtils.computeTextDimensions;
  * <li>Enable/disable auto trading</li>
  * </ul>
  * <p>
- * The toolbar buttons are labelled with either text (which is used for the duration buttons,
- * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom in/out).
+ * The toolbar buttons are labelled with either text (which is used for the
+ * duration buttons,
+ * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom
+ * in/out).
  * <p>
- * The toolbar is responsive and adjusts button sizes and fonts based on container width.
- * It manages a PopOver for chart options and handles mouse interactions elegantly.
+ * The toolbar is responsive and adjusts button sizes and fonts based on
+ * container width.
+ * It manages a PopOver for chart options and handles mouse interactions
+ * elegantly.
  */
 @Getter
 @Setter
@@ -99,8 +104,9 @@ public class ChartToolbar extends Region {
     private Runnable onScreenshotAction;
     private Runnable onAutoTradeAction;
     private Runnable onPrintAction;
+
     public ChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
-                        PopOver optionsPopOver, Separator functionOptionsSeparator) {
+            PopOver optionsPopOver, Separator functionOptionsSeparator) {
         this.optionsPopOver = optionsPopOver;
         this.functionOptionsSeparator = functionOptionsSeparator;
         Objects.requireNonNull(containerWidth, "containerWidth must not be null");
@@ -115,11 +121,10 @@ public class ChartToolbar extends Region {
      */
     private @NotNull List<Node> buildToolbarNodes() {
         List<Node> toolbarNodes = new ArrayList<>();
-          addActionButtons(toolbarNodes);
+        addActionButtons(toolbarNodes);
         addFunctionButtons(toolbarNodes);
         return toolbarNodes;
     }
-
 
     /**
      * Adds action buttons (screenshot, auto-trade).
@@ -143,23 +148,23 @@ public class ChartToolbar extends Region {
         }
 
         Tool[] essentialTools = {
-            Tool.ZOOM_IN,
-            Tool.ZOOM_OUT,
-            Tool.JUMP_TO_LATEST,
-            Tool.FIT_CHART,
-            Tool.REFRESH_CHART,
-            Tool.TOGGLE_CROSSHAIR,
-            Tool.TOGGLE_PRICE_LINES,
-            Tool.ADD_SUPPORT_LINE,
-            Tool.ADD_RESISTANCE_LINE,
-            Tool.ADD_ENTRY_LINE,
-            Tool.ADD_STOP_LOSS_LINE,
-            Tool.ADD_TAKE_PROFIT_LINE,
-            Tool.CLEAR_PRICE_LINES,
-            Tool.APPLY_SCALING,
-            Tool.PRINT,
-            Tool.AUTO_TRADE,
-            Tool.OPTIONS
+                Tool.ZOOM_IN,
+                Tool.ZOOM_OUT,
+                Tool.JUMP_TO_LATEST,
+                Tool.FIT_CHART,
+                Tool.REFRESH_CHART,
+                Tool.TOGGLE_CROSSHAIR,
+                Tool.TOGGLE_PRICE_LINES,
+                Tool.ADD_SUPPORT_LINE,
+                Tool.ADD_RESISTANCE_LINE,
+                Tool.ADD_ENTRY_LINE,
+                Tool.ADD_STOP_LOSS_LINE,
+                Tool.ADD_TAKE_PROFIT_LINE,
+                Tool.CLEAR_PRICE_LINES,
+                Tool.APPLY_SCALING,
+                Tool.PRINT,
+                Tool.AUTO_TRADE,
+                Tool.OPTIONS
         };
 
         toolbarNodes.add(functionOptionsSeparator);
@@ -180,12 +185,12 @@ public class ChartToolbar extends Region {
      * Attaches hover behavior to the options button.
      */
     private void attachOptionsButtonBehavior(@NotNull ToolbarButton toolbarButton) {
-        toolbarButton.setOnAction(_ -> showOptionsPopOver(toolbarButton));
-        toolbarButton.setOnMouseEntered(_ -> {
+        toolbarButton.setOnAction(event -> showOptionsPopOver(toolbarButton));
+        toolbarButton.setOnMouseEntered(event -> {
             mouseInsideOptionsButton = true;
             showOptionsPopOver(toolbarButton);
         });
-        toolbarButton.setOnMouseExited(_ -> {
+        toolbarButton.setOnMouseExited(event -> {
             mouseInsideOptionsButton = false;
             if (getScene() != null && getScene().getWindow() != null && mouseExitedPopOverFilter == null) {
                 mouseExitedPopOverFilter = new MouseExitedPopOverFilter(getScene());
@@ -195,7 +200,8 @@ public class ChartToolbar extends Region {
     }
 
     private void showOptionsPopOver(Node owner) {
-        if (optionsPopOver == null || owner == null || owner.getScene() == null || owner.getScene().getWindow() == null) {
+        if (optionsPopOver == null || owner == null || owner.getScene() == null
+                || owner.getScene().getWindow() == null) {
             return;
         }
         optionsPopOver.show(owner);
@@ -214,7 +220,7 @@ public class ChartToolbar extends Region {
      * Configures the toolbar container and sets up dynamic resizing.
      */
     private void configureToolbar(List<Node> toolbarNodes, ObservableNumberValue containerWidth,
-                                   ObservableNumberValue containerHeight) {
+            ObservableNumberValue containerHeight) {
         toolbar.getChildren().addAll(toolbarNodes);
         toolbar.getStyleClass().add("candle-chart-toolbar");
         toolbar.setFillHeight(true);
@@ -278,7 +284,8 @@ public class ChartToolbar extends Region {
 
     /**
      * Registers event handlers for all toolbar buttons with the chart.
-     * Connects granularity buttons to timeframe changes and tool buttons to their actions.
+     * Connects granularity buttons to timeframe changes and tool buttons to their
+     * actions.
      *
      * @param candleStickChart the chart to control
      * @param secondsPerCandle the property tracking the current candle duration
@@ -293,49 +300,57 @@ public class ChartToolbar extends Region {
         registerActionHandlers();
     }
 
-
     /**
      * Registers handlers for tool buttons (zoom, print, options).
      */
     private void registerToolHandlers(CandleStickChart candleStickChart) {
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
+                if (tool.tool == null) {
+                    continue;
+                }
+
                 switch (tool.tool) {
                     // Zoom functions
-                    case ZOOM_IN, ZOOM_OUT -> tool.setOnAction(_ -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
+                    case ZOOM_IN, ZOOM_OUT ->
+                        tool.setOnAction(event -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
                     // Chart navigation
-                    case JUMP_TO_LATEST -> tool.setOnAction(_ -> candleStickChart.jumpToLatestCandle());
-                    case FIT_CHART -> tool.setOnAction(_ -> candleStickChart.fitChart());
-                    case REFRESH_CHART -> tool.setOnAction(_ -> candleStickChart.refreshChart());
-                    case AUTO_TRADE  -> tool.setOnAction(_ -> candleStickChart.autoTrade());
-                    case SCREEN_SHOT -> tool.setOnAction(_ -> candleStickChart.screenshot());
+                    case JUMP_TO_LATEST -> tool.setOnAction(event -> candleStickChart.jumpToLatestCandle());
+                    case FIT_CHART -> tool.setOnAction(event -> candleStickChart.fitChart());
+                    case REFRESH_CHART -> tool.setOnAction(event -> candleStickChart.refreshChart());
+                    case AUTO_TRADE -> tool.setOnAction(event -> candleStickChart.autoTrade());
+                    case SCREEN_SHOT -> tool.setOnAction(event -> candleStickChart.screenshot());
 
                     // Crosshair controls
-                    case TOGGLE_CROSSHAIR -> tool.setOnAction(_ -> candleStickChart.toggleCrosshair());
+                    case TOGGLE_CROSSHAIR -> tool.setOnAction(event -> candleStickChart.toggleCrosshair());
 
                     // Price line controls
-                    case TOGGLE_PRICE_LINES -> tool.setOnAction(_ -> candleStickChart.togglePriceLines());
-                    case ADD_SUPPORT_LINE -> tool.setOnAction(_ -> addPromptedPriceLine(candleStickChart, PriceLineKind.SUPPORT));
-                    case ADD_RESISTANCE_LINE -> tool.setOnAction(_ -> addPromptedPriceLine(candleStickChart, PriceLineKind.RESISTANCE));
-                    case ADD_ENTRY_LINE -> tool.setOnAction(_ -> addPromptedPriceLine(candleStickChart, PriceLineKind.ENTRY));
-                    case ADD_STOP_LOSS_LINE -> tool.setOnAction(_ -> addPromptedPriceLine(candleStickChart, PriceLineKind.STOP_LOSS));
-                    case ADD_TAKE_PROFIT_LINE -> tool.setOnAction(_ -> addPromptedPriceLine(candleStickChart, PriceLineKind.TAKE_PROFIT));
-                    case CLEAR_PRICE_LINES -> tool.setOnAction(_ -> candleStickChart.clearPriceLines());
+                    case TOGGLE_PRICE_LINES -> tool.setOnAction(event -> candleStickChart.togglePriceLines());
+                    case ADD_SUPPORT_LINE ->
+                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.SUPPORT));
+                    case ADD_RESISTANCE_LINE ->
+                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.RESISTANCE));
+                    case ADD_ENTRY_LINE ->
+                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.ENTRY));
+                    case ADD_STOP_LOSS_LINE ->
+                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.STOP_LOSS));
+                    case ADD_TAKE_PROFIT_LINE ->
+                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.TAKE_PROFIT));
+                    case CLEAR_PRICE_LINES -> tool.setOnAction(event -> candleStickChart.clearPriceLines());
 
                     // Adaptive scaling
-                    case APPLY_SCALING -> tool.setOnAction(_ -> candleStickChart.applyAdaptiveScaling());
+                    case APPLY_SCALING -> tool.setOnAction(event -> candleStickChart.applyAdaptiveScaling());
 
                     // Other functions
-                    case PRINT -> tool.setOnAction(_ -> executePrintAction());
-                    
-                    // OPTIONS button already has handlers from attachOptionsButtonBehavior - skip override
+                    case PRINT -> tool.setOnAction(event -> executePrintAction());
+
+                    // OPTIONS button already has handlers from attachOptionsButtonBehavior - skip
+                    // override
                     case OPTIONS -> {
-                        // No action needed - OPTIONS button was already configured in attachOptionsButtonBehavior
+                        // No action needed - OPTIONS button was already configured in
+                        // attachOptionsButtonBehavior
                     }
-                    
-                    case null -> {
-                        // No action for null tool (shouldn't happen)
-                    }
+
                 }
             }
         }
@@ -381,7 +396,7 @@ public class ChartToolbar extends Region {
      * Registers handlers for action buttons (screenshot, auto-trade).
      */
     private void registerActionHandlers() {
-        screenshotButton.setOnAction(_ -> executeScreenshotAction());
+        screenshotButton.setOnAction(event -> executeScreenshotAction());
     }
 
     /**
@@ -401,18 +416,6 @@ public class ChartToolbar extends Region {
      */
     private CandleStickChart candleStickChart;
 
-
-
-
-
-
-
-
-
-
-
-
-
     /**
      * Executes the screenshot action if a callback is set.
      */
@@ -424,8 +427,6 @@ public class ChartToolbar extends Region {
         }
     }
 
-
-
     private void executePrintAction() {
         if (onPrintAction != null) {
             onPrintAction.run();
@@ -436,7 +437,8 @@ public class ChartToolbar extends Region {
 
     /**
      * Enumeration of toolbar tools (non-granularity buttons).
-     * Includes zoom controls, navigation, crosshair toggle, and price line management.
+     * Includes zoom controls, navigation, crosshair toggle, and price line
+     * management.
      */
     enum Tool {
         // Zoom controls
@@ -464,9 +466,8 @@ public class ChartToolbar extends Region {
         // Chart options
         PRINT("/img/print-solid.png", "Print Chart"),
         OPTIONS("/img/cog-solid.png", "Chart Options"),
-        SCREEN_SHOT("/img/screenshot.png","Chart Screen Shot" ),
+        SCREEN_SHOT("/img/screenshot.png", "Chart Screen Shot"),
         AUTO_TRADE("/img/auto-trade-solid.png", "Auto Trade");
-
 
         private final String imgPath;
         private final String tooltip;
@@ -528,7 +529,8 @@ public class ChartToolbar extends Region {
          */
         ZoomDirection getZoomDirection() {
             if (!isZoomFunction()) {
-                throw new IllegalArgumentException("cannot call getZoomDirection() on non-zoom function: %s".formatted(name()));
+                throw new IllegalArgumentException(
+                        "cannot call getZoomDirection() on non-zoom function: %s".formatted(name()));
             }
             return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;
         }
@@ -553,7 +555,8 @@ public class ChartToolbar extends Region {
     }
 
     /**
-     * A specialized Button for the toolbar that can be either a text-labeled granularity button
+     * A specialized Button for the toolbar that can be either a text-labeled
+     * granularity button
      * or a glyph-labeled tool button.
      */
     private static class ToolbarButton extends Button {
@@ -593,9 +596,9 @@ public class ChartToolbar extends Region {
          * Internal constructor for all button types.
          *
          * @param textLabel the text label or null
-         * @param tool the tool type or null
-         * @param imgPath the image path or null
-         * @param duration the duration in seconds or -1
+         * @param tool      the tool type or null
+         * @param imgPath   the image path or null
+         * @param duration  the duration in seconds or -1
          */
         private ToolbarButton(String textLabel, Tool tool, String imgPath, int duration) {
             if (textLabel == null && imgPath == null) {
@@ -645,16 +648,16 @@ public class ChartToolbar extends Region {
             this.active.set(active);
         }
 
-
     }
 
     /**
-     * Listener that adjusts toolbar button sizes and fonts based on container dimensions.
+     * Listener that adjusts toolbar button sizes and fonts based on container
+     * dimensions.
      * Uses delayed sizing to debounce rapid resize events.
      */
     private class SizeChangeListener extends DelayedSizeChangeListener {
         SizeChangeListener(BooleanProperty gotFirstSize, ObservableValue<Number> containerWidth,
-                           ObservableValue<Number> containerHeight) {
+                ObservableValue<Number> containerHeight) {
             super(SIZE_ADJUSTMENT_DELAY_PRIMARY, SIZE_ADJUSTMENT_DELAY_SECONDARY, gotFirstSize,
                     containerWidth, containerHeight);
         }
@@ -739,15 +742,14 @@ public class ChartToolbar extends Region {
          * Applies calculated sizes and padding to all toolbar buttons.
          */
         private void applyButtonSizes(Font textFont, Insets textPadding, Font glyphFont,
-                                      Insets glyphPadding, double width) {
+                Insets glyphPadding, double width) {
             long buttonCount = toolbar.getChildren()
                     .stream()
                     .filter(node -> node instanceof Button)
                     .count();
             double compactWidth = Math.max(
                     24.0,
-                    Math.min(48.0, (Math.max(280.0, width) - 12.0) / Math.max(1.0, buttonCount))
-            );
+                    Math.min(48.0, (Math.max(280.0, width) - 12.0) / Math.max(1.0, buttonCount)));
             for (Node toolbarNode : toolbar.getChildren()) {
                 if (toolbarNode instanceof Button button && !(toolbarNode instanceof ToolbarButton)) {
                     button.setFont(glyphFont);
@@ -787,9 +789,9 @@ public class ChartToolbar extends Region {
          */
         private void updateSeparatorPadding(boolean isLargeScreen, double width) {
             if (isLargeScreen) {
-                functionOptionsSeparator.setPadding(new Insets( width+2,0, 0, 0));
+                functionOptionsSeparator.setPadding(new Insets(width + 2, 0, 0, 0));
             } else {
-                functionOptionsSeparator.setPadding(new Insets(width+1, 2, 0, 0));
+                functionOptionsSeparator.setPadding(new Insets(width + 1, 2, 0, 0));
             }
         }
     }
@@ -828,7 +830,7 @@ public class ChartToolbar extends Region {
             double maxY = optionsPopOver.getY() + optionsPopOver.getHeight() + bufferZone;
 
             return event.getScreenX() >= minX && event.getScreenX() <= maxX &&
-                   event.getScreenY() >= minY && event.getScreenY() <= maxY;
+                    event.getScreenY() >= minY && event.getScreenY() <= maxY;
         }
     }
 }

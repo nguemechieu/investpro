@@ -6,11 +6,15 @@ import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
+import org.investpro.strategy.StrategySignal;
 
 import static org.investpro.utils.Side.HOLD;
 
 /**
- * Filters and approves/rejects signals before risk review.
+ * Filters and approves/rejects strategy signals before risk review.
+ * 
+ * Evaluates StrategySignal confidence and direction to determine if
+ * the signal is actionable or should be filtered out.
  */
 @Getter
 @Setter

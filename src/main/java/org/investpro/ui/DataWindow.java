@@ -38,9 +38,8 @@ public class DataWindow extends VBox {
 
     private static final Logger logger = LoggerFactory.getLogger(DataWindow.class);
 
-    private static final DateTimeFormatter TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    .withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            .withZone(ZoneId.systemDefault());
 
     private final Label titleLabel = new Label("Data Window");
     private final Label symbolLabel = new Label("Symbol: -");
@@ -73,8 +72,7 @@ public class DataWindow extends VBox {
                 titleLabel,
                 symbolLabel,
                 timeframeLabel,
-                tableView
-        );
+                tableView);
 
         VBox.setVgrow(tableView, Priority.ALWAYS);
     }
@@ -84,15 +82,13 @@ public class DataWindow extends VBox {
         tableView.setFocusTraversable(false);
 
         TableColumn<DataRow, String> nameColumn = new TableColumn<>("Field");
-        nameColumn.setCellValueFactory(cell ->
-                new ReadOnlyStringWrapper(cell.getValue() == null ? "" : cell.getValue().name())
-        );
+        nameColumn.setCellValueFactory(
+                cell -> new ReadOnlyStringWrapper(cell.getValue() == null ? "" : cell.getValue().name()));
         nameColumn.setPrefWidth(120);
 
         TableColumn<DataRow, String> valueColumn = new TableColumn<>("Value");
-        valueColumn.setCellValueFactory(cell ->
-                new ReadOnlyStringWrapper(cell.getValue() == null ? "" : cell.getValue().value())
-        );
+        valueColumn.setCellValueFactory(
+                cell -> new ReadOnlyStringWrapper(cell.getValue() == null ? "" : cell.getValue().value()));
         valueColumn.setPrefWidth(140);
 
         tableView.getColumns().setAll(nameColumn, valueColumn);
@@ -120,8 +116,7 @@ public class DataWindow extends VBox {
             double high,
             double low,
             double close,
-            double volume
-    ) {
+            double volume) {
         runOnFx(() -> {
             this.currentTradePair = tradePair;
             this.currentTimeframe = safe(timeframe);
@@ -146,8 +141,7 @@ public class DataWindow extends VBox {
             double bid,
             double ask,
             double last,
-            Instant timestamp
-    ) {
+            Instant timestamp) {
         runOnFx(() -> {
             this.currentTradePair = tradePair;
             symbolLabel.setText("Symbol: " + symbolText(tradePair));
@@ -199,8 +193,6 @@ public class DataWindow extends VBox {
         });
     }
 
-
-
     private void setRows(Map<String, ?> values) {
         rows.clear();
 
@@ -212,8 +204,7 @@ public class DataWindow extends VBox {
         for (Map.Entry<String, ?> entry : values.entrySet()) {
             rows.add(new DataRow(
                     safe(entry.getKey()),
-                    stringify(entry.getValue())
-            ));
+                    stringify(entry.getValue())));
         }
     }
 
@@ -247,24 +238,24 @@ public class DataWindow extends VBox {
     }
 
     private String stringify(Object value) {
-        switch (value) {
-            case null -> {
-                return "-";
-            }
-            case Double number -> {
-                return formatPrice(number);
-            }
-            case Float number -> {
-                return formatPrice(number.doubleValue());
-            }
-            case Number number -> {
-                return String.valueOf(number);
-            }
-            case Instant instant -> {
-                return TIME_FORMATTER.format(instant);
-            }
-            default -> {
-            }
+        if (value == null) {
+            return "-";
+        }
+        if (value instanceof Double) {
+            Double number = (Double) value;
+            return formatPrice(number);
+        }
+        if (value instanceof Float) {
+            Float number = (Float) value;
+            return formatPrice(number.doubleValue());
+        }
+        if (value instanceof Number) {
+            Number number = (Number) value;
+            return String.valueOf(number);
+        }
+        if (value instanceof Instant) {
+            Instant instant = (Instant) value;
+            return TIME_FORMATTER.format(instant);
         }
 
         String text = String.valueOf(value).trim();

@@ -4,6 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.enums.CapitalProtection;
+import org.investpro.enums.LiquidityProfile;
+import org.investpro.enums.MarketBehavior;
+import org.investpro.enums.RiskProfile;
 import org.investpro.models.trading.Position;
 
 import java.time.LocalDateTime;

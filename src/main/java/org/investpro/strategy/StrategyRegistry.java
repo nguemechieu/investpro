@@ -2,8 +2,9 @@ package org.investpro.strategy;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.market.AssetClass;
-import org.investpro.market.ContractType;
+import org.investpro.enums.StrategyCategory;
+import org.investpro.enums.AssetClass;
+import org.investpro.enums.ContractType;
 import org.investpro.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -19,7 +20,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 public class StrategyRegistry {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyRegistry.class);
     private static StrategyRegistry instance;
     private final Map<String, TradingStrategy> strategiesById = new ConcurrentHashMap<>();
 

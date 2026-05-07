@@ -1,6 +1,5 @@
 package org.investpro.core.agents;
 
-import org.investpro.core.SystemCoreDependencies;
 import org.jetbrains.annotations.NotNull;
 
 /**

@@ -34,7 +34,8 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
     @Override
     public Set<Integer> getSupportedGranularities() {
         // Binance supported intervals: 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d 3d 1w 1M
-        return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400, 21600, 28800, 43200, 86400, 259200, 604800, 2592000));
+        return new TreeSet<>(Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400, 21600, 28800, 43200, 86400, 259200,
+                604800, 2592000));
     }
 
     @Override
@@ -48,7 +49,8 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
     }
 
     @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
+            Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
@@ -67,7 +69,8 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
         long startTimeMs = endTimeMs - (long) numCandles * secondsPerCandle * 1000;
 
         String interval = getIntervalString(secondsPerCandle);
-        String url = "%s/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d".formatted(API_BASE, symbol, interval, startTimeMs, endTimeMs, numCandles);
+        String url = "%s/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d".formatted(API_BASE, symbol,
+                interval, startTimeMs, endTimeMs, numCandles);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -115,14 +118,15 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
                         double closePrice = Double.parseDouble(candle.get(4).asText());
                         double volume = Double.parseDouble(candle.get(7).asText());
 
-                        CandleData data = new CandleData(openPrice, closePrice, highPrice, lowPrice, (int) openTime, volume);
+                        CandleData data = new CandleData(openPrice, closePrice, highPrice, lowPrice, (int) openTime,
+                                volume);
                         candleData.add(data);
                     }
                 }
                 if (candleData.isEmpty()) {
                     endTime.set(-1); // Signal that there's no more data
                 } else {
-                    endTime.set(candleData.getLast().openTime());
+                    endTime.set(candleData.get(candleData.size() - 1).openTime());
                 }
             }
         } catch (Exception e) {

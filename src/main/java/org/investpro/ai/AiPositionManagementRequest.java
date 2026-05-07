@@ -5,12 +5,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.enums.*;
 import org.investpro.models.trading.TradePair;
-import org.investpro.risk.CapitalProtection;
-import org.investpro.risk.LiquidityProfile;
-import org.investpro.risk.MarketBehavior;
-import org.investpro.risk.PsychologyProfile;
-import org.investpro.risk.RiskProfile;
+
 
 /**
  * Request object sent to AI position manager for review of an open position.

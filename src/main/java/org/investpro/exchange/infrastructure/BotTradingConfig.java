@@ -109,6 +109,11 @@ public class BotTradingConfig {
     private double profitTakingPercent = 50.0; // Take % of profit at defined levels
     private long trailingStopUpdateInterval = 5000; // Update trailing stop every N ms
     private boolean enablePartialProfitTaking = true;
+
+    // Small-account execution safety
+    private boolean smallAccountModeEnabled = true;
+    private double smallAccountBalanceThreshold = 100.0;
+    private double smallAccountOandaUnits = 1.0;
     
     public BotTradingConfig() {
         this.enabled = false;
@@ -400,6 +405,30 @@ public class BotTradingConfig {
     public void setEnablePartialProfitTaking(boolean enable) {
         this.enablePartialProfitTaking = enable;
     }
+
+    public boolean isSmallAccountModeEnabled() {
+        return smallAccountModeEnabled;
+    }
+
+    public void setSmallAccountModeEnabled(boolean smallAccountModeEnabled) {
+        this.smallAccountModeEnabled = smallAccountModeEnabled;
+    }
+
+    public double getSmallAccountBalanceThreshold() {
+        return smallAccountBalanceThreshold;
+    }
+
+    public void setSmallAccountBalanceThreshold(double smallAccountBalanceThreshold) {
+        this.smallAccountBalanceThreshold = Math.max(0.0, smallAccountBalanceThreshold);
+    }
+
+    public double getSmallAccountOandaUnits() {
+        return smallAccountOandaUnits;
+    }
+
+    public void setSmallAccountOandaUnits(double smallAccountOandaUnits) {
+        this.smallAccountOandaUnits = Math.max(0.0, smallAccountOandaUnits);
+    }
     
     public StreamingMode getStreamingMode() {
         return streamingMode;
@@ -426,6 +455,8 @@ public class BotTradingConfig {
         this.minProfitPercent = prefs.getDouble("bot_min_profit", 0.5);
         this.maxPortfolioRiskPercent = prefs.getDouble("bot_max_risk", 2.0);
         this.minTimeBetweenTrades = prefs.getLong("bot_min_time_between", 5000);
+        this.allowedSignals = parseAllowedSignals(prefs.get("bot_allowed_signals", ""));
+        this.tradingSymbols = parseTradingSymbols(prefs.get("bot_trading_symbols", ""));
         
         // Leverage and margin
         this.leverage = prefs.getDouble("bot_leverage", 1.0);
@@ -479,6 +510,9 @@ public class BotTradingConfig {
         this.profitTakingPercent = prefs.getDouble("bot_profit_taking", 50.0);
         this.trailingStopUpdateInterval = prefs.getLong("bot_trailing_stop_interval", 5000);
         this.enablePartialProfitTaking = prefs.getBoolean("bot_partial_profit", true);
+        this.smallAccountModeEnabled = prefs.getBoolean("bot_small_account_mode", true);
+        this.smallAccountBalanceThreshold = prefs.getDouble("bot_small_account_threshold", 100.0);
+        this.smallAccountOandaUnits = prefs.getDouble("bot_small_account_oanda_units", 1.0);
         
         // Symbol trading mode
         String symbolModeStr = prefs.get("bot_symbol_mode", "SELECTED_SYMBOLS");
@@ -504,6 +538,8 @@ public class BotTradingConfig {
         prefs.putDouble("bot_min_profit", minProfitPercent);
         prefs.putDouble("bot_max_risk", maxPortfolioRiskPercent);
         prefs.putLong("bot_min_time_between", minTimeBetweenTrades);
+        prefs.put("bot_allowed_signals", String.join(",", allowedSignals));
+        prefs.put("bot_trading_symbols", formatTradingSymbols());
         
         // Leverage and margin
         prefs.putDouble("bot_leverage", leverage);
@@ -535,6 +571,9 @@ public class BotTradingConfig {
         prefs.putDouble("bot_profit_taking", profitTakingPercent);
         prefs.putLong("bot_trailing_stop_interval", trailingStopUpdateInterval);
         prefs.putBoolean("bot_partial_profit", enablePartialProfitTaking);
+        prefs.putBoolean("bot_small_account_mode", smallAccountModeEnabled);
+        prefs.putDouble("bot_small_account_threshold", smallAccountBalanceThreshold);
+        prefs.putDouble("bot_small_account_oanda_units", smallAccountOandaUnits);
         
         // Symbol trading mode
         prefs.put("bot_symbol_mode", symbolTradingMode.name());
@@ -596,10 +635,65 @@ public class BotTradingConfig {
         this.profitTakingPercent = 50.0;
         this.trailingStopUpdateInterval = 5000;
         this.enablePartialProfitTaking = true;
+        this.smallAccountModeEnabled = true;
+        this.smallAccountBalanceThreshold = 100.0;
+        this.smallAccountOandaUnits = 1.0;
     }
     
     @Override
     public String toString() {
         return "BotTradingConfig{enabled=%s, symbols=%d, tradeSize=%s, stopLoss=%s, takeProfit=%s, leverage=%s, marginMode=%s, streaming=%s, maxOpenPositions=%d, positionSizingStrategy=%s, allowedSignals=%s}".formatted(enabled, tradingSymbols.size(), tradeSize, stopLoss, takeProfit, leverage, marginMode, streamingEnabled, maxOpenPositions, positionSizingStrategy, allowedSignals);
+    }
+
+    private Set<String> parseAllowedSignals(String rawSignals) {
+        Set<String> parsedSignals = new HashSet<>();
+        if (rawSignals == null || rawSignals.isBlank()) {
+            return parsedSignals;
+        }
+
+        for (String signal : rawSignals.split(",")) {
+            if (signal != null && !signal.isBlank()) {
+                parsedSignals.add(signal.trim().toUpperCase(Locale.ROOT));
+            }
+        }
+        return parsedSignals;
+    }
+
+    private List<TradePair> parseTradingSymbols(String rawSymbols) {
+        List<TradePair> parsedSymbols = new ArrayList<>();
+        if (rawSymbols == null || rawSymbols.isBlank()) {
+            return parsedSymbols;
+        }
+
+        for (String symbol : rawSymbols.split(",")) {
+            String normalized = symbol == null ? "" : symbol.trim();
+            if (normalized.isBlank()) {
+                continue;
+            }
+
+            String[] parts = normalized.contains("/")
+                    ? normalized.split("/")
+                    : normalized.split("-");
+            if (parts.length != 2) {
+                continue;
+            }
+
+            try {
+                parsedSymbols.add(new TradePair(parts[0], parts[1]));
+            } catch (Exception ignored) {
+                // Ignore symbols that are no longer known to the local currency registry.
+            }
+        }
+        return parsedSymbols;
+    }
+
+    private String formatTradingSymbols() {
+        List<String> symbols = new ArrayList<>();
+        for (TradePair pair : tradingSymbols) {
+            if (pair != null) {
+                symbols.add(pair.toSlashSymbol());
+            }
+        }
+        return String.join(",", symbols);
     }
 }

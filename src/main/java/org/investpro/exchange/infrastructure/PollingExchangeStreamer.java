@@ -19,7 +19,9 @@ public class PollingExchangeStreamer {
 
     @Override
     public String toString() {
-        return "PollingExchangeStreamer{exchange=%s, tickerTasks=%d, orderBookTasks=%d, accountTaskActive=%s, ordersTaskActive=%s, positionsTaskActive=%s}".formatted(exchange.getName(), tickerTasks.size(), orderBookTasks.size(), accountTask != null, ordersTask != null, positionsTask != null);
+        return "PollingExchangeStreamer{exchange=%s, tickerTasks=%d, orderBookTasks=%d, accountTaskActive=%s, ordersTaskActive=%s, positionsTaskActive=%s}"
+                .formatted(exchange.getName(), tickerTasks.size(), orderBookTasks.size(), accountTask != null,
+                        ordersTask != null, positionsTask != null);
     }
 
     private final Map<TradePair, ScheduledFuture<?>> orderBookTasks = new ConcurrentHashMap<>();
@@ -69,7 +71,7 @@ public class PollingExchangeStreamer {
         accountTask = scheduleAtFixedRate(() -> {
             try {
                 exchange.fetchAccount()
-                        .exceptionally(_ -> {
+                        .exceptionally(ex -> {
                             try {
                                 return exchange.getUserAccountDetails();
                             } catch (Exception exception) {
@@ -166,7 +168,8 @@ public class PollingExchangeStreamer {
             try {
                 runnable.run();
             } catch (Throwable ignored) {
-                // Individual tasks report errors to their consumer; keep scheduler threads alive.
+                // Individual tasks report errors to their consumer; keep scheduler threads
+                // alive.
             }
         }, 0, periodSeconds, TimeUnit.SECONDS);
     }

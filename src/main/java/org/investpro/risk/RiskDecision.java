@@ -1,6 +1,7 @@
 package org.investpro.risk;
 
 import lombok.*;
+import org.investpro.enums.ExecutionStrategy;
 
 import java.util.ArrayList;
 import java.util.Collections;

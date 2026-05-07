@@ -7,6 +7,7 @@ import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.utils.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.investpro.utils.Side.*;
 
 /**
- * Creates simple deterministic signals from live market events.
+ * Creates simple deterministic strategy signals from live market events.
+ * 
+ * Prefer converting output to StrategySignal format for richer context
+ * including entry/exit prices, risk/reward ratios, and confidence metrics.
  */
 @Getter
 @Setter
@@ -42,6 +46,7 @@ public class SignalAgent implements Agent {
     }
 
     Signal signal;
+
     @Override
     public void stop() {
         running = false;
@@ -69,10 +74,9 @@ public class SignalAgent implements Agent {
         }
 
         double previous = lastPrices.put(pair, price);
-        if ( previous <= 0) {
+        if (previous <= 0) {
             return;
         }
-
 
         double change = (price - previous) / previous;
         double min = Math.min(0.95, 0.55 + Math.abs(change * 100));

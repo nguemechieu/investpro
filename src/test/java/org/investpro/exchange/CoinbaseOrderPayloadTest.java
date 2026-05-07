@@ -7,9 +7,7 @@ import org.investpro.models.trading.Order;
 import org.investpro.utils.Side;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class CoinbaseOrderPayloadTest {
 
@@ -45,7 +43,7 @@ class CoinbaseOrderPayloadTest {
         assertEquals("SELL", payload.path("side").asText());
         assertEquals("1.25", limit.path("base_size").asText());
         assertEquals("2400.5", limit.path("limit_price").asText());
-        assertEquals(false, limit.path("post_only").asBoolean());
+        assertFalse(limit.path("post_only").asBoolean());
     }
 
     @Test

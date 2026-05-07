@@ -1,8 +1,10 @@
 package org.investpro.risk;
 
+import org.investpro.enums.*;
 import org.investpro.models.trading.TradePair;
 import org.investpro.exchange.Exchange;
-import org.investpro.trading.MarketBehavior;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,6 +25,8 @@ import java.util.Objects;
 
 public record RiskManagementSystem(double defaultMaxRiskPerTrade, double defaultMaxCumulativeRisk) {
 
+    private static final Logger log = LoggerFactory.getLogger(RiskManagementSystem.class);
+
     public RiskManagementSystem() {
         // 2% max per trade
         this(2.0, 10.0); // 10% max cumulative
@@ -41,6 +45,17 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         List<String> recommendations = new ArrayList<>();
 
         // ===== CRITICAL BLOCKERS (prevent trade) =====
+
+        // 0. Block trades outside the instrument trading session.
+        TradingSessionStatus sessionStatus = context.getTradingSessionStatus();
+        if (sessionStatus == null) {
+            sessionStatus = context.getSymbol() != null && context.getSymbol().getTradingSession() != null
+                    ? context.getSymbol().getTradingSessionStatus()
+                    : null;
+        }
+        if (sessionStatus != null && !sessionStatus.isTradable()) {
+            blockers.add("Trading session is not open: " + sessionStatus);
+        }
 
         // 1. Block low probability setups
         if (context.getProbabilityLevel() == ProbabilityLevel.VERY_LOW) {
@@ -110,7 +125,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         }
 
         // Thin liquidity
-        if (context.getLiquidityProfile() == LiquidityProfile.THIN_LIQUIDITY) {
+        if (context.getLiquidityProfile() == LiquidityProfile.THIN) {
             warnings.add("THIN_LIQUIDITY. Use SCALED_ENTRY or LIMIT orders. Slippage will be elevated.");
         }
 
@@ -172,7 +187,32 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
 
         // Calculate final position sizing
         double riskMultiplier = calculateRiskMultiplier(context);
-        double finalPositionSize = calculateFinalPositionSize(context, riskMultiplier);
+        double calculatedPositionSize = calculateFinalPositionSize(context, riskMultiplier);
+        double accountBalance = context.getAccountBalance() > 0.0
+                ? context.getAccountBalance()
+                : context.getAccountEquity();
+        double finalPositionSize = SmallAccountSizingPolicy.apply(
+                context.getBroker(),
+                accountBalance,
+                context.getSymbol(),
+                null,
+                calculatedPositionSize);
+        boolean smallAccountModeActive = isOanda(context.getBroker())
+                && accountBalance > 0.0
+                && accountBalance < SmallAccountSizingPolicy.SMALL_ACCOUNT_BALANCE_THRESHOLD;
+        if (smallAccountModeActive) {
+            String message = "Small account mode enabled: OANDA balance below $100, order size forced to 1 unit.";
+            warnings.add(message);
+            recommendations.add(message);
+        }
+        log.info(
+                "RiskManagementSystem: sizing broker={} symbol={} accountBalance={} smallAccountMode={} requestedUnits={} finalUnits={}",
+                context.getBroker(),
+                context.getSymbol(),
+                accountBalance,
+                smallAccountModeActive ? "active" : "inactive",
+                calculatedPositionSize,
+                finalPositionSize);
         double finalLeverage = calculateFinalLeverage(context, finalPositionSize);
 
         // Calculate other metrics
@@ -270,6 +310,10 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         double maxPositionUnits = maxPositionAmount / context.getEntryPrice();
 
         return Math.min(adjusted, maxPositionUnits);
+    }
+
+    private static boolean isOanda(String exchangeName) {
+        return exchangeName != null && exchangeName.trim().equalsIgnoreCase("OANDA");
     }
 
     /**

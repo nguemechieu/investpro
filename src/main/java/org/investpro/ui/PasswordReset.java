@@ -31,7 +31,7 @@ public class PasswordReset extends Stage {
         setResizable(false);
 
         GridPane gridPane = createFormLayout();
-        
+
         Scene scene = new Scene(gridPane);
         scene.getStylesheets().add("/app.css");
         setScene(scene);
@@ -91,11 +91,11 @@ public class PasswordReset extends Stage {
         // Buttons
         Button resetButton = new Button("Reset Password");
         resetButton.setStyle("-fx-font-size: 12px; -fx-padding: 8 20;");
-        resetButton.setOnAction(_ -> handlePasswordReset());
+        resetButton.setOnAction(event -> handlePasswordReset());
 
         Button cancelButton = new Button("Cancel");
         cancelButton.setStyle("-fx-font-size: 12px; -fx-padding: 8 20;");
-        cancelButton.setOnAction(_ -> close());
+        cancelButton.setOnAction(event -> close());
 
         gridPane.add(resetButton, 0, 6);
         gridPane.add(cancelButton, 1, 6);
@@ -152,8 +152,7 @@ public class PasswordReset extends Stage {
                             javafx.application.Platform.runLater(PasswordReset.this::close);
                         }
                     },
-                    2000
-            );
+                    2000);
         } else {
             showError("Password reset failed. Please check your username and email.");
         }
@@ -168,40 +167,41 @@ public class PasswordReset extends Stage {
             // Get database connection from Db1
             Properties dbConfig = new Properties();
             Db1 db = new Db1(dbConfig);
-            
+
             // Step 1: Verify that the username and email match in the database
             boolean userExists = verifyUserExists(db, username, email);
-            
+
             if (!userExists) {
-                logger.warn("Password reset attempt failed: username '{}' and email '{}' do not match", username, email);
+                logger.warn("Password reset attempt failed: username '{}' and email '{}' do not match", username,
+                        email);
                 return false;
             }
-            
+
             // Step 2: Hash the new password for security
             String hashedPassword = hashPassword(newPassword);
-            
+
             // Step 3: Update the password in the database
             boolean updateSuccess = updateUserPassword(db, username, hashedPassword);
-            
+
             if (!updateSuccess) {
                 logger.error("Failed to update password in database for username: {}", username);
                 return false;
             }
-            
+
             // Step 4: Log the successful password reset
             logger.info("Password reset successful for username: {}", username);
-            
+
             // Step 5: Send confirmation (placeholder for email notification)
             sendPasswordResetConfirmation(email);
-            
+
             return true;
-            
+
         } catch (Exception e) {
             logger.error("Error during password reset for username: {}", username, e);
             return false;
         }
     }
-    
+
     /**
      * Verify that the username and email match a record in the database.
      */
@@ -211,7 +211,7 @@ public class PasswordReset extends Stage {
             java.sql.PreparedStatement stmt = db.getConnection().prepareStatement(query);
             stmt.setString(1, username);
             stmt.setString(2, email);
-            
+
             java.sql.ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 int count = rs.getInt("count");
@@ -223,7 +223,7 @@ public class PasswordReset extends Stage {
             return false;
         }
     }
-    
+
     /**
      * Update the user's password in the database.
      */
@@ -233,7 +233,7 @@ public class PasswordReset extends Stage {
             java.sql.PreparedStatement stmt = db.getConnection().prepareStatement(query);
             stmt.setString(1, hashedPassword);
             stmt.setString(2, username);
-            
+
             int rowsAffected = stmt.executeUpdate();
             return rowsAffected > 0;
         } catch (Exception e) {
@@ -241,7 +241,7 @@ public class PasswordReset extends Stage {
             return false;
         }
     }
-    
+
     /**
      * Hash a password using a simple mechanism.
      * Note: In production, use bcrypt, scrypt, or PBKDF2 instead.
@@ -257,11 +257,12 @@ public class PasswordReset extends Stage {
             return sb.toString();
         } catch (java.security.NoSuchAlgorithmException e) {
             logger.error("Error hashing password", e);
-            // Fallback: return the password as-is (not ideal, but prevents complete failure)
+            // Fallback: return the password as-is (not ideal, but prevents complete
+            // failure)
             return password;
         }
     }
-    
+
     /**
      * Send password reset confirmation email (placeholder).
      */
@@ -270,12 +271,14 @@ public class PasswordReset extends Stage {
             // Placeholder for email notification logic
             // In production, integrate with an email service like JavaMail or SendGrid
             logger.info("Password reset confirmation would be sent to: {}", email);
-            
+
             // Example using EmailNotifier if available:
-            // org.investpro.core.EmailNotifier emailNotifier = new org.investpro.core.EmailNotifier();
-            // emailNotifier.sendEmail(email, "Password Reset Successful", 
-            //     "Your password has been successfully reset. You can now log in with your new password.");
-            
+            // org.investpro.core.EmailNotifier emailNotifier = new
+            // org.investpro.core.EmailNotifier();
+            // emailNotifier.sendEmail(email, "Password Reset Successful",
+            // "Your password has been successfully reset. You can now log in with your new
+            // password.");
+
         } catch (Exception e) {
             logger.warn("Could not send password reset confirmation email to: {}", email, e);
             // Don't fail the password reset just because email couldn't be sent

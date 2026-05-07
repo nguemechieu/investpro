@@ -1,7 +1,8 @@
 package org.investpro.ai;
 
+import org.investpro.enums.RiskProfile;
 import org.investpro.risk.PositionSizingEngine;
-import org.investpro.risk.RiskProfile;
+
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

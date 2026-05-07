@@ -54,3 +54,5 @@ venv/
 ### Mac OS ###
 .DS_Store
 >>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
+
+.fake

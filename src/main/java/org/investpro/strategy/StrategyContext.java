@@ -3,7 +3,9 @@ package org.investpro.strategy;
 import lombok.Builder;
 import lombok.Getter;
 import org.investpro.data.CandleData;
-import org.investpro.trading.MarketBehavior;
+import org.investpro.enums.MarketBehavior;
+import org.investpro.enums.TradingSessionStatus;
+import org.investpro.market.InstrumentTradingSession;
 import org.investpro.models.trading.TradePair;
 import org.investpro.timeframe.Timeframe;
 
@@ -31,6 +33,8 @@ public class StrategyContext {
     private final MarketBehavior marketBehavior;
     private final double volatility; // Recent volatility measure
     private final double averageVolume;
+    private final InstrumentTradingSession tradingSession;
+    private final TradingSessionStatus tradingSessionStatus;
     
     // Timing
     @Builder.Default
@@ -43,7 +47,7 @@ public class StrategyContext {
         if (candles == null || candles.isEmpty()) {
             return null;
         }
-        return candles.getLast();
+        return candles.get(candles.size() - 1);
     }
 
     public CandleData getPreviousCandle(int barsBack) {

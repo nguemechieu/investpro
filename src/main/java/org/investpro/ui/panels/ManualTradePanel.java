@@ -6,8 +6,11 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.NotificationMessage;
+import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.TradePair;
+import org.investpro.risk.TradeRiskContext;
 import org.investpro.service.NotificationService;
 import org.investpro.utils.Side;
 
@@ -16,6 +19,12 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Manual Trade Panel for users to place orders directly.
  * Supports market, limit, stop, and bracket orders with full control.
+ * 
+ * INTEGRATED WITH EXECUTION PIPELINE:
+ * - Orders are submitted through TradeExecutionCoordinator
+ * - All orders pass through RiskManagementSystem -> AI Review -> FinalRiskGate
+ * -> ExecutionEngine
+ * - Direct exchange calls are bypassed in favor of the protected pipeline
  */
 @Slf4j
 public class ManualTradePanel extends VBox {
@@ -23,14 +32,20 @@ public class ManualTradePanel extends VBox {
 
     private final Exchange exchange;
     private final TradePair tradePair;
+    private final TradeExecutionCoordinator executionCoordinator;
     private final Runnable onTradeSubmitted;
     private final NotificationService notificationService;
+
+    // Price display
+    private final Label currentPriceLabel = new Label("Current Price: --");
+    private double currentPrice = 0.0;
 
     // Order Type Selection
     private final ComboBox<String> orderTypeCombo = new ComboBox<>();
 
     // Common Fields
     private final Spinner<Double> quantitySpinner;
+    private final Label lotSizeLabel = new Label("Lot Size: --");
     private final TextArea noteArea = new TextArea();
 
     // Market Order Fields
@@ -56,10 +71,11 @@ public class ManualTradePanel extends VBox {
     private final Button sellButton = new Button("SELL");
     private final Button resetButton = new Button("RESET");
 
-    public ManualTradePanel(Exchange exchange, TradePair tradePair, Runnable onTradeSubmitted,
-            NotificationService notificationService) {
+    public ManualTradePanel(Exchange exchange, TradePair tradePair, TradeExecutionCoordinator executionCoordinator,
+            Runnable onTradeSubmitted, NotificationService notificationService) {
         this.exchange = exchange;
         this.tradePair = tradePair;
+        this.executionCoordinator = executionCoordinator;
         this.onTradeSubmitted = onTradeSubmitted;
         this.notificationService = notificationService != null ? notificationService : NotificationService.disabled();
 
@@ -71,7 +87,42 @@ public class ManualTradePanel extends VBox {
         this.stopLossSpinner = new Spinner<>(0.0, 100000.0, 0.0, 0.01);
         this.takeProfitSpinner = new Spinner<>(0.0, 100000.0, 0.0, 0.01);
 
+        // Fetch current price asynchronously
+        fetchCurrentPrice();
+
         setupUI();
+    }
+
+    /**
+     * Backward compatibility constructor for existing code.
+     * Uses null ExecutionCoordinator - will fall back to direct exchange calls.
+     */
+    public ManualTradePanel(Exchange exchange, TradePair tradePair, Runnable onTradeSubmitted,
+            NotificationService notificationService) {
+        this(exchange, tradePair, null, onTradeSubmitted, notificationService);
+    }
+
+    private void fetchCurrentPrice() {
+        if (exchange == null) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                Object result = (Object) exchange.getOrderBook(tradePair).get();
+                if (result instanceof OrderBook) {
+                    OrderBook orderBook = (OrderBook) result;
+                    if (orderBook != null && !orderBook.getBids().isEmpty()) {
+                        double bid = orderBook.getBids().get(0).getPrice();
+                        double ask = !orderBook.getAsks().isEmpty() ? orderBook.getAsks().get(0).getPrice() : bid;
+                        currentPrice = (bid + ask) / 2.0;
+                        currentPriceLabel.setText(String.format("Current Price: $%.2f", currentPrice));
+                        updateEstimates();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch current price for {}", tradePair.getSymbol(), e);
+            }
+        });
     }
 
     private void setupUI() {
@@ -86,8 +137,15 @@ public class ManualTradePanel extends VBox {
         Label pairLabel = new Label("Pair: " + tradePair.getSymbol());
         pairLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #888;");
 
+        // Current price and lot size
+        currentPriceLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #ffaa00;");
+        lotSizeLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #88ddff;");
+
+        // Get lot size from TradePair
+        updateLotSizeLabel();
+
         VBox titleBox = new VBox(5);
-        titleBox.getChildren().addAll(titleLabel, pairLabel);
+        titleBox.getChildren().addAll(titleLabel, pairLabel, currentPriceLabel, lotSizeLabel);
         getChildren().add(titleBox);
 
         getChildren().add(new Separator());
@@ -122,6 +180,12 @@ public class ManualTradePanel extends VBox {
 
         // Event Handlers
         setupEventHandlers();
+    }
+
+    private void updateLotSizeLabel() {
+        if (tradePair != null) {
+            lotSizeLabel.setText("Lot Size: " + tradePair.getSymbol());
+        }
     }
 
     private VBox createOrderTypeSection() {
@@ -298,6 +362,13 @@ public class ManualTradePanel extends VBox {
         }
 
         try {
+            TradingProfile profile = TradingProfile.load();
+            if (!profile.advancedOrdersEnabled() && ("STOP".equals(orderType) || "BRACKET".equals(orderType))) {
+                showAlert("Advanced Orders Disabled",
+                        "Enable advanced orders in Trading Profile settings before submitting " + orderType + " orders.");
+                return;
+            }
+
             switch (orderType) {
                 case "MARKET" -> submitMarketOrder(side, quantity);
                 case "LIMIT" -> submitLimitOrder(side, quantity);
@@ -310,27 +381,55 @@ public class ManualTradePanel extends VBox {
         }
     }
 
+    /**
+     * Submit market order through the execution pipeline if available,
+     * otherwise use direct exchange call.
+     */
     private void submitMarketOrder(Side side, double quantity) {
-        CompletableFuture<String> future = exchange.createMarketOrder(tradePair, side, quantity);
-        future.thenAccept(orderId -> {
-            log.info("Market order placed: {} {} {} - Order ID: {}", side, quantity, tradePair.getSymbol(), orderId);
-            showAlert("Success", "Market order placed successfully\nOrder ID: " + orderId);
+        if (executionCoordinator != null) {
+            double referencePrice = currentPrice > 0 ? currentPrice : 0.0;
+            TradeRiskContext context = profileRiskContext(quantity, referencePrice)
+                    .currentPrice(currentPrice > 0 ? currentPrice : 0.0)
+                    .entryPrice(currentPrice > 0 ? currentPrice : 0.0)
+                    .build();
+
+            executionCoordinator.handleSignal(side, context);
+
+            showAlert("Success", "Market order submitted for approval\nOrder will execute if approved by risk gates");
             notificationService.notify(NotificationMessage.trade(
-                    "Market Order Placed",
-                    "Market order placed for " + quantity + " " + tradePair.getSymbol() + " at " + side + "\nOrder ID: "
-                            + orderId));
+                    "Market Order Submitted",
+                    "Market order for " + quantity + " " + tradePair.getSymbol() + " submitted for approval"));
             onTradeSubmitted.run();
             resetForm();
-        }).exceptionally(ex -> {
-            log.error("Market order failed", ex);
-            showAlert("Error", "Failed to place market order: " + ex.getMessage());
-            notificationService.notify(NotificationMessage.warning(
-                    "Market Order Failed",
-                    "Failed to place market order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
-            return null;
-        });
+        } else {
+            // Fallback to direct exchange call (for backward compatibility)
+            CompletableFuture<String> future = exchange.createMarketOrder(tradePair, side, quantity);
+            future.thenAccept(orderId -> {
+                log.info("Market order placed: {} {} {} - Order ID: {}", side, quantity, tradePair.getSymbol(),
+                        orderId);
+                showAlert("Success", "Market order placed successfully\nOrder ID: " + orderId);
+                notificationService.notify(NotificationMessage.trade(
+                        "Market Order Placed",
+                        "Market order placed for " + quantity + " " + tradePair.getSymbol() + " at " + side
+                                + "\nOrder ID: "
+                                + orderId));
+                onTradeSubmitted.run();
+                resetForm();
+            }).exceptionally(ex -> {
+                log.error("Market order failed", ex);
+                showAlert("Error", "Failed to place market order: " + ex.getMessage());
+                notificationService.notify(NotificationMessage.warning(
+                        "Market Order Failed",
+                        "Failed to place market order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
+                return null;
+            });
+        }
     }
 
+    /**
+     * Submit limit order through the execution pipeline if available,
+     * otherwise use direct exchange call.
+     */
     private void submitLimitOrder(Side side, double quantity) {
         double limitPrice = limitPriceSpinner.getValue();
         if (limitPrice <= 0) {
@@ -338,26 +437,49 @@ public class ManualTradePanel extends VBox {
             return;
         }
 
-        CompletableFuture<String> future = exchange.createLimitOrder(tradePair, side, quantity, limitPrice);
-        future.thenAccept(orderId -> {
-            log.info("Limit order placed: {} {} @ {} - Order ID: {}", side, quantity, limitPrice, orderId);
-            showAlert("Success", "Limit order placed successfully\nOrder ID: " + orderId);
+        if (executionCoordinator != null) {
+            TradeRiskContext context = profileRiskContext(quantity, limitPrice)
+                    .entryPrice(limitPrice)
+                    .currentPrice(currentPrice > 0 ? currentPrice : 0.0)
+                    .build();
+
+            executionCoordinator.handleSignal(side, context);
+
+            showAlert("Success", "Limit order submitted for approval\nOrder will execute if approved by risk gates");
             notificationService.notify(NotificationMessage.trade(
-                    "Limit Order Placed",
-                    "Limit order placed for " + quantity + " " + tradePair.getSymbol() + " @ " + limitPrice + " " + side
-                            + "\nOrder ID: " + orderId));
+                    "Limit Order Submitted",
+                    "Limit order for " + quantity + " " + tradePair.getSymbol() + " @ " + limitPrice
+                            + " submitted for approval"));
             onTradeSubmitted.run();
             resetForm();
-        }).exceptionally(ex -> {
-            log.error("Limit order failed", ex);
-            showAlert("Error", "Failed to place limit order: " + ex.getMessage());
-            notificationService.notify(NotificationMessage.warning(
-                    "Limit Order Failed",
-                    "Failed to place limit order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
-            return null;
-        });
+        } else {
+            // Fallback to direct exchange call
+            CompletableFuture<String> future = exchange.createLimitOrder(tradePair, side, quantity, limitPrice);
+            future.thenAccept(orderId -> {
+                log.info("Limit order placed: {} {} @ {} - Order ID: {}", side, quantity, limitPrice, orderId);
+                showAlert("Success", "Limit order placed successfully\nOrder ID: " + orderId);
+                notificationService.notify(NotificationMessage.trade(
+                        "Limit Order Placed",
+                        "Limit order placed for " + quantity + " " + tradePair.getSymbol() + " @ " + limitPrice + " "
+                                + side
+                                + "\nOrder ID: " + orderId));
+                onTradeSubmitted.run();
+                resetForm();
+            }).exceptionally(ex -> {
+                log.error("Limit order failed", ex);
+                showAlert("Error", "Failed to place limit order: " + ex.getMessage());
+                notificationService.notify(NotificationMessage.warning(
+                        "Limit Order Failed",
+                        "Failed to place limit order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
+                return null;
+            });
+        }
     }
 
+    /**
+     * Submit stop order through the execution pipeline if available,
+     * otherwise use direct exchange call.
+     */
     private void submitStopOrder(Side side, double quantity) {
         double stopPrice = stopPriceSpinner.getValue();
         if (stopPrice <= 0) {
@@ -365,26 +487,51 @@ public class ManualTradePanel extends VBox {
             return;
         }
 
-        CompletableFuture<String> future = exchange.createStopOrder(tradePair, side, quantity, stopPrice);
-        future.thenAccept(orderId -> {
-            log.info("Stop order placed: {} {} @ {} - Order ID: {}", side, quantity, stopPrice, orderId);
-            showAlert("Success", "Stop order placed successfully\nOrder ID: " + orderId);
+        if (executionCoordinator != null) {
+            double referencePrice = currentPrice > 0 ? currentPrice : stopPrice;
+            TradeRiskContext context = profileRiskContext(quantity, referencePrice)
+                    .entryPrice(currentPrice > 0 ? currentPrice : stopPrice)
+                    .stopLossPrice(stopPrice)
+                    .currentPrice(currentPrice > 0 ? currentPrice : 0.0)
+                    .build();
+
+            executionCoordinator.handleSignal(side, context);
+
+            showAlert("Success", "Stop order submitted for approval\nOrder will trigger if approved by risk gates");
             notificationService.notify(NotificationMessage.trade(
-                    "Stop Order Placed",
-                    "Stop order placed for " + quantity + " " + tradePair.getSymbol() + " @ " + stopPrice + " " + side
-                            + "\nOrder ID: " + orderId));
+                    "Stop Order Submitted",
+                    "Stop order for " + quantity + " " + tradePair.getSymbol() + " @ " + stopPrice
+                            + " submitted for approval"));
             onTradeSubmitted.run();
             resetForm();
-        }).exceptionally(ex -> {
-            log.error("Stop order failed", ex);
-            showAlert("Error", "Failed to place stop order: " + ex.getMessage());
-            notificationService.notify(NotificationMessage.warning(
-                    "Stop Order Failed",
-                    "Failed to place stop order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
-            return null;
-        });
+        } else {
+            // Fallback to direct exchange call
+            CompletableFuture<String> future = exchange.createStopOrder(tradePair, side, quantity, stopPrice);
+            future.thenAccept(orderId -> {
+                log.info("Stop order placed: {} {} @ {} - Order ID: {}", side, quantity, stopPrice, orderId);
+                showAlert("Success", "Stop order placed successfully\nOrder ID: " + orderId);
+                notificationService.notify(NotificationMessage.trade(
+                        "Stop Order Placed",
+                        "Stop order placed for " + quantity + " " + tradePair.getSymbol() + " @ " + stopPrice + " "
+                                + side
+                                + "\nOrder ID: " + orderId));
+                onTradeSubmitted.run();
+                resetForm();
+            }).exceptionally(ex -> {
+                log.error("Stop order failed", ex);
+                showAlert("Error", "Failed to place stop order: " + ex.getMessage());
+                notificationService.notify(NotificationMessage.warning(
+                        "Stop Order Failed",
+                        "Failed to place stop order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
+                return null;
+            });
+        }
     }
 
+    /**
+     * Submit bracket order through the execution pipeline if available,
+     * otherwise use direct exchange call.
+     */
     private void submitBracketOrder(Side side, double quantity) {
         double entryPrice = entryPriceSpinner.getValue();
         double stopLoss = stopLossSpinner.getValue();
@@ -405,29 +552,93 @@ public class ManualTradePanel extends VBox {
             return;
         }
 
-        CompletableFuture<String> future = exchange.createBracketOrder(
-                tradePair, side, quantity, entryPrice, stopLoss, takeProfit);
+        if (executionCoordinator != null) {
+            TradeRiskContext context = profileRiskContext(quantity, entryPrice)
+                    .entryPrice(entryPrice)
+                    .stopLossPrice(stopLoss)
+                    .takeProfitPrice(takeProfit)
+                    .currentPrice(currentPrice > 0 ? currentPrice : 0.0)
+                    .build();
 
-        future.thenAccept(orderId -> {
-            log.info("Bracket order placed: {} {} @ {} SL:{} TP:{} - Order ID: {}",
-                    side, quantity, entryPrice, stopLoss, takeProfit, orderId);
-            showAlert("Success", "Bracket order placed successfully\nOrder ID: " + orderId);
+            executionCoordinator.handleSignal(side, context);
+
+            showAlert("Success", "Bracket order submitted for approval\nOrder will execute if approved by risk gates");
             notificationService.notify(NotificationMessage.trade(
-                    "Bracket Order Placed",
-                    "Bracket order placed for " + quantity + " " + tradePair.getSymbol() + " @ " + entryPrice + " "
-                            + side
-                            + "\nStop Loss: " + stopLoss + " | Take Profit: " + takeProfit
-                            + "\nOrder ID: " + orderId));
+                    "Bracket Order Submitted",
+                    "Bracket order for " + quantity + " " + tradePair.getSymbol() + " @ " + entryPrice
+                            + " submitted for approval\nSL: " + stopLoss + " | TP: " + takeProfit));
             onTradeSubmitted.run();
             resetForm();
-        }).exceptionally(ex -> {
-            log.error("Bracket order failed", ex);
-            showAlert("Error", "Failed to place bracket order: " + ex.getMessage());
-            notificationService.notify(NotificationMessage.warning(
-                    "Bracket Order Failed",
-                    "Failed to place bracket order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
-            return null;
-        });
+        } else {
+            // Fallback to direct exchange call
+            CompletableFuture<String> future = exchange.createBracketOrder(
+                    tradePair, side, quantity, entryPrice, stopLoss, takeProfit);
+
+            future.thenAccept(orderId -> {
+                log.info("Bracket order placed: {} {} @ {} SL:{} TP:{} - Order ID: {}",
+                        side, quantity, entryPrice, stopLoss, takeProfit, orderId);
+                showAlert("Success", "Bracket order placed successfully\nOrder ID: " + orderId);
+                notificationService.notify(NotificationMessage.trade(
+                        "Bracket Order Placed",
+                        "Bracket order placed for " + quantity + " " + tradePair.getSymbol() + " @ " + entryPrice + " "
+                                + side
+                                + "\nStop Loss: " + stopLoss + " | Take Profit: " + takeProfit
+                                + "\nOrder ID: " + orderId));
+                onTradeSubmitted.run();
+                resetForm();
+            }).exceptionally(ex -> {
+                log.error("Bracket order failed", ex);
+                showAlert("Error", "Failed to place bracket order: " + ex.getMessage());
+                notificationService.notify(NotificationMessage.warning(
+                        "Bracket Order Failed",
+                        "Failed to place bracket order for " + tradePair.getSymbol() + ": " + ex.getMessage()));
+                return null;
+            });
+        }
+    }
+
+    private TradeRiskContext.TradeRiskContextBuilder profileRiskContext(double quantity, double referencePrice) {
+        TradingProfile profile = TradingProfile.load();
+        double positionFraction = Math.max(profile.riskProfile().getMaxPositionSize(), 0.01);
+        double accountEquity = Math.max(profile.maxPositionSize() / positionFraction, profile.maxPositionSize());
+        double requestedSize = capQuantityByNotional(quantity, referencePrice, profile.maxPositionSize());
+
+        return TradeRiskContext.builder()
+                .symbol(tradePair)
+                .assetClass("CRYPTO")
+                .contractType("SPOT")
+                .broker(exchange == null ? "" : exchange.getName())
+                .accountEquity(accountEquity)
+                .availableCash(accountEquity)
+                .requestedPositionSize(requestedSize)
+                .requestedLeverage(profile.riskProfile().capLeverage(1.0))
+                .expectedWinRate(profile.probabilityLevel().getExpectedWinRate())
+                .expectedRewardRiskRatio(2.0)
+                .riskProfile(profile.riskProfile())
+                .marketBehavior(profile.marketBehavior())
+                .executionStrategy(profile.executionStrategy())
+                .liquidityProfile(profile.liquidityProfile())
+                .psychologyProfile(profile.psychologyProfile())
+                .probabilityLevel(profile.probabilityLevel())
+                .capitalProtection(profile.capitalProtection())
+                .systemDesign(profile.systemDesign())
+                .tradingSessionStatus(tradePair == null ? null : tradePair.getTradingSessionStatus())
+                .tradingSessionNotes(tradePair == null || tradePair.getTradingSession() == null
+                        ? ""
+                        : tradePair.getTradingSession().getNotes())
+                .maxRiskPerTrade(profile.maxRiskPerTradePercent())
+                .maxCumulativeRisk(profile.maxCumulativeRiskPercent())
+                .maxAllowedLeverage(profile.riskProfile().getMaxLeverage())
+                .maxAllowedDrawdownPercent(profile.maxDrawdownPercent())
+                .estimatedSlippagePercent(profile.executionStrategy().getEstimatedSlippage());
+    }
+
+    private double capQuantityByNotional(double quantity, double referencePrice, double maxNotional) {
+        if (quantity <= 0.0 || referencePrice <= 0.0 || maxNotional <= 0.0) {
+            return quantity;
+        }
+
+        return Math.min(quantity, maxNotional / referencePrice);
     }
 
     private void updateEstimates() {

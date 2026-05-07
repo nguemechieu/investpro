@@ -9,6 +9,7 @@ import org.investpro.ai.OpenAiReasoningService;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
 import org.investpro.core.agents.AgentRegistry;
+import org.investpro.core.agents.SystemCoreDependencies;
 import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;

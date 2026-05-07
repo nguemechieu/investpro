@@ -49,7 +49,8 @@ public class BitfinexCandleDataSupplier extends CandleDataSupplier {
     }
 
     @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
+            Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
@@ -68,7 +69,8 @@ public class BitfinexCandleDataSupplier extends CandleDataSupplier {
         long startTimeMs = endTimeMs - (long) numCandles * secondsPerCandle * 1000;
 
         String timeframe = getTimeframeString(secondsPerCandle);
-        String url = API_BASE + "/candles/trade:" + timeframe + ":" + pair + "/hist?start=" + startTimeMs + "&end=" + endTimeMs + "&limit=" + numCandles;
+        String url = API_BASE + "/candles/trade:" + timeframe + ":" + pair + "/hist?start=" + startTimeMs + "&end="
+                + endTimeMs + "&limit=" + numCandles;
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -112,14 +114,15 @@ public class BitfinexCandleDataSupplier extends CandleDataSupplier {
                         double lowPrice = candle.get(4).asDouble();
                         double volume = candle.get(5).asDouble();
 
-                        CandleData data = new CandleData(openPrice, closePrice, highPrice, lowPrice, (int) openTime, volume);
+                        CandleData data = new CandleData(openPrice, closePrice, highPrice, lowPrice, (int) openTime,
+                                volume);
                         candleData.add(data);
                     }
                 }
                 if (candleData.isEmpty()) {
                     endTime.set(-1); // Signal that there's no more data
                 } else {
-                    endTime.set(candleData.getLast().openTime());
+                    endTime.set(candleData.get(candleData.size() - 1).openTime());
                 }
             }
         } catch (Exception e) {

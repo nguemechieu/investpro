@@ -146,7 +146,7 @@ public class OpenAiReasoningService implements AiReasoningService {
                 return AiTradeReviewResponse.failedResponse("Empty response from OpenAI API", SERVICE_NAME);
             }
 
-            Map<String, Object> choice = choices.getFirst();
+            Map<String, Object> choice = choices.get(0);
             Map<String, Object> message = (Map<String, Object>) choice.get("message");
             String content = (String) message.get("content");
 

@@ -1,5 +1,8 @@
 package org.investpro.risk;
 
+import org.investpro.enums.ExecutionStrategy;
+import org.investpro.enums.LiquidityProfile;
+
 /**
  * Models slippage impact on trade execution.
  * Combines execution strategy, liquidity, and volatility factors.
@@ -25,7 +28,7 @@ public class SlippageModel {
         }
 
         double baseSlippage = executionStrategy.getEstimatedSlippage();
-        double spreadImpact = liquidityProfile.getAvgSpreadPercent();
+        double spreadImpact = liquidityProfile.getAvgSpread();
         double volatilityImpact = volatility * 0.5;  // Volatility can add up to 0.5%
 
         return baseSlippage + (spreadImpact * 0.1) + volatilityImpact;
@@ -49,7 +52,7 @@ public class SlippageModel {
         }
 
         // Market orders risky in thin liquidity
-        return executionStrategy != ExecutionStrategy.MARKET_ORDER || liquidityProfile != LiquidityProfile.THIN_LIQUIDITY;  // Still return false - not recommended
+        return executionStrategy != ExecutionStrategy.MARKET_ORDER || liquidityProfile != LiquidityProfile.THIN;  // Still return false - not recommended
     }
 
     /**
@@ -60,9 +63,9 @@ public class SlippageModel {
      */
     public static ExecutionStrategy getRecommendedStrategy(LiquidityProfile liquidityProfile) {
         return switch (liquidityProfile) {
-            case DEEP_LIQUIDITY -> ExecutionStrategy.LIMIT_ORDER;
-            case NORMAL_LIQUIDITY -> ExecutionStrategy.LIMIT_ORDER;
-            case THIN_LIQUIDITY -> ExecutionStrategy.SCALED_ENTRY;
+            case DEEP -> ExecutionStrategy.LIMIT_ORDER;
+            case NORMAL -> ExecutionStrategy.LIMIT_ORDER;
+            case THIN-> ExecutionStrategy.SCALED_ENTRY;
             case ILLIQUID -> ExecutionStrategy.SCALED_ENTRY;
         };
     }

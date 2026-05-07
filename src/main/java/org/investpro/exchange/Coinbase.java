@@ -92,31 +92,28 @@ public class Coinbase extends Exchange {
     public Coinbase(String apiKey, String apiSecret) {
         super(apiKey, apiSecret);
 
-        // Try to load credentials from environment variables first (most secure)
-        // COINBASE_KEY_NAME: organizations/{org_id}/apiKeys/{key_id}
-        // COINBASE_PRIVATE_KEY: EC private key in PEM format
-        String envKeyName = CoinbaseCredentialProvider.getKeyName();
-        String envPrivateKey = CoinbaseCredentialProvider.getPrivateKey();
+        this.apiKey = apiKey == null ? "" : apiKey.trim();
+        this.apiSecret = apiSecret == null ? "" : apiSecret.trim();
 
-        if (envKeyName != null && !envKeyName.isBlank() && envPrivateKey != null && !envPrivateKey.isBlank()) {
-            // Use environment variable credentials (preferred)
-            this.apiKey = envKeyName.trim();
-            this.apiSecret = envPrivateKey.trim();
-            log.info(
-                    "Coinbase: Using credentials from environment variables (COINBASE_KEY_NAME, COINBASE_PRIVATE_KEY)");
+        if (!this.apiKey.isEmpty() && !this.apiSecret.isEmpty()) {
+            log.info("Coinbase: Using credentials from provided parameters");
         } else {
-            // Fall back to provided parameters (UI input or programmatic)
-            this.apiKey = apiKey == null ? "" : apiKey.trim();
-            this.apiSecret = apiSecret == null ? "" : apiSecret.trim();
-            if (!this.apiKey.isEmpty() && !this.apiSecret.isEmpty()) {
-                log.info("Coinbase: Using credentials from provided parameters");
+            // Fallback to environment variables only when no explicit credentials were supplied.
+            String envKeyName = CoinbaseCredentialProvider.getKeyName();
+            String envPrivateKey = CoinbaseCredentialProvider.getPrivateKey();
+
+            if (envKeyName != null && !envKeyName.isBlank() && envPrivateKey != null && !envPrivateKey.isBlank()) {
+                this.apiKey = envKeyName.trim();
+                this.apiSecret = envPrivateKey.trim();
+                log.info(
+                        "Coinbase: Using credentials from environment variables (COINBASE_KEY_NAME, COINBASE_PRIVATE_KEY)");
             } else {
                 log.warn(
                         "Coinbase: No credentials provided. Set COINBASE_KEY_NAME and COINBASE_PRIVATE_KEY environment variables, or provide apiKey/apiSecret parameters.");
             }
         }
 
-        this.jwtSigner = new CoinbaseJwtSigner(apiKey, apiSecret);
+        this.jwtSigner = createJwtSigner(this.apiKey, this.apiSecret);
 
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(20))
@@ -126,6 +123,7 @@ public class Coinbase extends Exchange {
 
         // Initialize bot trading components
         this.botConfig = new BotTradingConfig();
+        this.botConfig.loadFromPreferences();
         // Try to get account balance for risk management, default to $10k if
         // unavailable
         double accountBalance = 500.0;
@@ -140,12 +138,13 @@ public class Coinbase extends Exchange {
 
         this.signalProcessor = new SignalProcessor(this, this.botConfig, accountBalance);
 
-        log.info("Coinbase WebSocket JWT created: {} characters, null={}", jwtSigner.buildWebSocketJwt().length(),
-                jwtSigner.buildWebSocketJwt().isEmpty());
+        String websocketJwt = websocketJwt();
+        log.info("Coinbase WebSocket JWT created: {} characters, empty={}", websocketJwt.length(),
+                websocketJwt.isEmpty());
         this.websocketClient = new CoinbaseExchangeWebSocketClient(
                 URI.create(MARKET_DATA_WS_URL),
                 new Draft_6455(),
-                jwtSigner.buildWebSocketJwt());
+                websocketJwt);
     }
 
     @Override
@@ -371,6 +370,14 @@ public class Coinbase extends Exchange {
                     value != null && value.contains("PRIVATE KEY"));
         }
         return result;
+    }
+
+    private CoinbaseJwtSigner createJwtSigner(String keyName, String privateKey) {
+        if (keyName == null || keyName.isBlank() || !looksLikePrivateKey(privateKey)) {
+            return null;
+        }
+
+        return new CoinbaseJwtSigner(keyName, privateKey);
     }
 
     private String websocketJwt() {
@@ -1586,7 +1593,7 @@ public class Coinbase extends Exchange {
                         return Optional.empty();
                     }
 
-                    return Optional.ofNullable(positions.getFirst());
+                    return Optional.ofNullable(positions.get(0));
                 });
     }
 

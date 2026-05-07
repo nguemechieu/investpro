@@ -11,7 +11,8 @@ import java.util.stream.Collectors;
 
 /**
  * Aggregates individual trades into candlestick data for various timeframes.
- * Supports standard trading intervals: 1m, 5m, 15m, 1h, 4h, 1d.
+ * Supports standard trading intervals: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1w,
+ * 1M.
  *
  * @author NOEL NGUEMECHIEU
  */
@@ -19,19 +20,26 @@ public class CandleAggregator {
     private static final Logger logger = LoggerFactory.getLogger(CandleAggregator.class);
 
     // Standard trading timeframes in seconds
-    public static final Map<String, Integer> TIMEFRAME_SECONDS = Collections.unmodifiableMap(new LinkedHashMap<String, Integer>() {{
-        put("1m", 60);
-        put("5m", 300);
-        put("15m", 900);
-        put("1h", 3600);
-        put("4h", 14400);
-        put("1d", 86400);
-    }});
+    public static final Map<String, Integer> TIMEFRAME_SECONDS = Collections
+            .unmodifiableMap(new LinkedHashMap<String, Integer>() {
+                {
+                    put("1m", 60);
+                    put("5m", 300);
+                    put("15m", 900);
+                    put("30m", 1800);
+                    put("1h", 3600);
+                    put("2h", 7200);
+                    put("4h", 14400);
+                    put("1d", 86400);
+                    put("1w", 604800);
+                    put("1M", 2592000); // 30 days
+                }
+            });
 
     /**
      * Aggregates trades into candlestick data for the specified timeframe.
      *
-     * @param trades the list of trades to aggregate
+     * @param trades    the list of trades to aggregate
      * @param timeframe the timeframe key (e.g., "1h", "1d")
      * @return a list of aggregated CandleData sorted by open time
      * @throws IllegalArgumentException if the timeframe is not supported
@@ -43,7 +51,7 @@ public class CandleAggregator {
 
         Integer secondsPerCandle = TIMEFRAME_SECONDS.get(timeframe);
         if (secondsPerCandle == null) {
-            throw new IllegalArgumentException("Unsupported timeframe: " + timeframe + 
+            throw new IllegalArgumentException("Unsupported timeframe: " + timeframe +
                     ". Supported: " + String.join(", ", TIMEFRAME_SECONDS.keySet()));
         }
 
@@ -51,9 +59,10 @@ public class CandleAggregator {
     }
 
     /**
-     * Aggregates trades into candlestick data for the specified time interval in seconds.
+     * Aggregates trades into candlestick data for the specified time interval in
+     * seconds.
      *
-     * @param trades the list of trades to aggregate
+     * @param trades           the list of trades to aggregate
      * @param secondsPerCandle the duration of each candle in seconds
      * @return a list of aggregated CandleData sorted by open time
      */
@@ -64,7 +73,7 @@ public class CandleAggregator {
 
         // Group trades by candle time bucket
         Map<Long, List<Trade>> candleBuckets = new TreeMap<>();
-        
+
         for (Trade trade : trades) {
             long bucketTime = getBucketTime(trade.getTimestamp(), secondsPerCandle);
             candleBuckets.computeIfAbsent(bucketTime, k -> new ArrayList<>()).add(trade);
@@ -75,7 +84,7 @@ public class CandleAggregator {
         for (Map.Entry<Long, List<Trade>> entry : candleBuckets.entrySet()) {
             long bucketTime = entry.getKey();
             List<Trade> bucketTrades = entry.getValue();
-            
+
             CandleData candle = createCandleFromTrades(bucketTrades, (int) bucketTime);
             candles.add(candle);
         }
@@ -84,22 +93,24 @@ public class CandleAggregator {
     }
 
     /**
-     * Aggregates trades into candlestick data, automatically selecting the optimal timeframe
+     * Aggregates trades into candlestick data, automatically selecting the optimal
+     * timeframe
      * based on the number of trades and desired visible candles.
      *
-     * @param trades the list of trades to aggregate
-     * @param desiredVisibleCandles target number of visible candles (typically 40-100)
+     * @param trades                the list of trades to aggregate
+     * @param desiredVisibleCandles target number of visible candles (typically
+     *                              40-100)
      * @return a map of timeframe -> aggregated CandleData list
      */
     public static Map<String, List<CandleData>> aggregateCandlesAllTimeframes(
             List<Trade> trades, int desiredVisibleCandles) {
-        
+
         Map<String, List<CandleData>> result = new LinkedHashMap<>();
-        
+
         for (String timeframe : TIMEFRAME_SECONDS.keySet()) {
             result.put(timeframe, aggregateCandles(trades, timeframe));
         }
-        
+
         return result;
     }
 
@@ -124,33 +135,34 @@ public class CandleAggregator {
                 .map(t -> t.getTimestamp().getEpochSecond())
                 .max(Long::compareTo)
                 .orElse(0L);
-        
+
         long timeSpanSeconds = Math.max(1, maxTime - minTime);
-        
+
         // Find the timeframe that results in 40-100 candles
         String optimalTimeframe = "1h";
         int closestDiff = Integer.MAX_VALUE;
-        
+
         for (String timeframe : TIMEFRAME_SECONDS.keySet()) {
             int secondsPerCandle = TIMEFRAME_SECONDS.get(timeframe);
             long numCandles = Math.max(1, timeSpanSeconds / secondsPerCandle);
-            
+
             int targetCount = 60; // Aim for roughly 60 candles
-            int diff = Math.abs((int)numCandles - targetCount);
-            
+            int diff = Math.abs((int) numCandles - targetCount);
+
             if (diff < closestDiff) {
                 closestDiff = diff;
                 optimalTimeframe = timeframe;
             }
         }
-        
+
         return optimalTimeframe;
     }
 
     /**
-     * Creates a single CandleData from a list of trades within the same time bucket.
+     * Creates a single CandleData from a list of trades within the same time
+     * bucket.
      *
-     * @param trades trades within the same candle period
+     * @param trades   trades within the same candle period
      * @param openTime the opening time of the candle in epoch seconds
      * @return aggregated CandleData
      */
@@ -166,12 +178,12 @@ public class CandleAggregator {
 
         double open = sortedTrades.get(0).getPrice();
         double close = sortedTrades.get(sortedTrades.size() - 1).getPrice();
-        
+
         double high = sortedTrades.stream()
                 .mapToDouble(t -> t.getPrice())
                 .max()
                 .orElse(open);
-        
+
         double low = sortedTrades.stream()
                 .mapToDouble(t -> t.getPrice())
                 .min()
@@ -193,7 +205,7 @@ public class CandleAggregator {
     /**
      * Calculates the bucket time (start of the time period) for a given timestamp.
      *
-     * @param timestamp the trade timestamp
+     * @param timestamp        the trade timestamp
      * @param secondsPerCandle the candle duration in seconds
      * @return the bucket time in epoch seconds
      */

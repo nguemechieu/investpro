@@ -98,10 +98,13 @@ public class MarketInfoPanel extends ScrollPane {
         String symbol = pair.getBaseCurrency().getSymbol();
         if ("BTC".equals(symbol)) {
             educationText.setText(
-                "Bitcoin (BTC) is the world's first decentralized digital currency.\n\n" +
-                "Key Unit: Each Satoshi is worth 0.00000001 BTC (1 BTC = 100,000,000 Satoshis)\n\n" +
-                "Bitcoin transactions are secured by the Proof-of-Work consensus mechanism " +
-                "and recorded on a distributed ledger called the blockchain."
+                    """
+                            Bitcoin (BTC) is the world's first decentralized digital currency.
+                            
+                            Key Unit: Each Satoshi is worth 0.00000001 BTC (1 BTC = 100,000,000 Satoshis)
+                            
+                            Bitcoin transactions are secured by the Proof-of-Work consensus mechanism \
+                            and recorded on a distributed ledger called the blockchain."""
             );
         } else if ("ETH".equals(symbol)) {
             educationText.setText(

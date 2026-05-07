@@ -36,6 +36,7 @@ public class NewsCalendarPanel extends VBox {
 
     public NewsCalendarPanel(NewsDataProvider newsDataProvider) {
         this.newsDataProvider = newsDataProvider;
+        this.newsDataProvider.loadSampleCalendarIfEmpty();
         setupUI();
         setupTable();
         setupEventHandlers();
@@ -271,20 +272,21 @@ public class NewsCalendarPanel extends VBox {
     private void updateStatus() {
         int blackoutCount = newsDataProvider.getActiveBlackoutCount();
         boolean blackoutActive = newsDataProvider.isNewsBlackoutActive();
+        int upcomingSoon = newsDataProvider.getImmediateUpcomingEvents().size();
+        int visibleEvents = newsTable.getItems().size();
 
         if (blackoutActive) {
-            statusLabel.setText(String.format("⚠️ NEWS BLACKOUT ACTIVE - %d event(s) blocking trades", blackoutCount));
+            statusLabel.setText(String.format("NEWS BLACKOUT ACTIVE - %d event(s) blocking trades", blackoutCount));
             statusLabel.setStyle("-fx-text-fill: #ff0000; -fx-font-weight: bold;");
-        } else if (newsDataProvider.getImmediateUpcomingEvents().size() > 0) {
-            statusLabel.setText(String.format("⏰ %d upcoming event(s) in next 60 minutes",
-                    newsDataProvider.getImmediateUpcomingEvents().size()));
+        } else if (upcomingSoon > 0) {
+            statusLabel.setText(String.format("%d event(s) in next 60 minutes, %d visible this week",
+                    upcomingSoon, visibleEvents));
             statusLabel.setStyle("-fx-text-fill: #ffaa00; -fx-font-weight: bold;");
         } else {
-            statusLabel.setText("✓ No active blackouts - Trading enabled");
+            statusLabel.setText(String.format("No active blackouts - %d event(s) visible this week", visibleEvents));
             statusLabel.setStyle("-fx-text-fill: #00ff00; -fx-font-weight: bold;");
         }
     }
-
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);

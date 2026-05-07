@@ -1,7 +1,8 @@
 package org.investpro.ai;
 
+import org.investpro.enums.ExecutionStrategy;
 import org.investpro.models.trading.Position;
-import org.investpro.risk.ExecutionStrategy;
+
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;

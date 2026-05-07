@@ -2,6 +2,7 @@ package org.investpro.ai;
 
 import org.jetbrains.annotations.NotNull;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.enums.ExecutionStrategy;
 
 /**
  * Enforces guardrails on AI decisions.
@@ -65,10 +66,11 @@ public class AiDecisionValidator {
         }
 
         // 4. Check: Cannot use MARKET order for illiquid assets
-        if (isIlliquid(request) && "MARKET_ORDER".equalsIgnoreCase(aiResponse.getRecommendedExecutionStrategy())) {
+        if (isIlliquid(request) && ExecutionStrategy.MARKET_ORDER.name()
+                .equalsIgnoreCase(aiResponse.getRecommendedExecutionStrategy())) {
             logger.warn("AI recommended MARKET order for illiquid asset. Forcing LIMIT order.");
             violations.append("Market order not viable for illiquid assets. ");
-            validatedResponse = overrideExecutionStrategy(validatedResponse, "LIMIT_ORDER");
+            validatedResponse = overrideExecutionStrategy(validatedResponse, ExecutionStrategy.LIMIT_ORDER.name());
         }
 
         // 5. Check: Cannot approve if capital protection is NONE and psychology is

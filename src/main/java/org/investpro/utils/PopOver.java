@@ -94,7 +94,7 @@ public class PopOver extends PopupControl {
         }
 
         setAnchorLocation(AnchorLocation.WINDOW_TOP_LEFT);
-        setOnHiding(_ -> setDetached(false));
+        setOnHiding(event -> setDetached(false));
 
         /*
          * Create some initial content.
@@ -104,7 +104,7 @@ public class PopOver extends PopupControl {
         label.setPadding(new Insets(4));
         setContentNode(label);
 
-        InvalidationListener repositionListener = _ -> {
+        InvalidationListener repositionListener = observable -> {
             if (isShowing() && !isDetached()) {
                 show(getOwnerNode(), targetX, targetY);
                 adjustWindowLocation();
@@ -120,7 +120,7 @@ public class PopOver extends PopupControl {
         /*
          * A detached popover should of course not automatically hide itself.
          */
-        detached.addListener(_ -> setAutoHide(!isDetached()));
+        detached.addListener(observable -> setAutoHide(!isDetached()));
 
         setAutoHide(true);
     }
@@ -202,7 +202,7 @@ public class PopOver extends PopupControl {
         contentNodeProperty().set(content);
     }
 
-    private final InvalidationListener hideListener = _ -> {
+    private final InvalidationListener hideListener = observable -> {
         if (!isDetached()) {
             hide(Duration.ZERO);
         }

@@ -4,8 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import org.investpro.enums.ExecutionStrategy;
 import org.investpro.models.trading.TradePair;
-import org.investpro.risk.ExecutionStrategy;
+
 
 /**
  * Intent to perform an action on an open position.

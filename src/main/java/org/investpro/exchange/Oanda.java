@@ -23,6 +23,8 @@ import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.investpro.exchange.oanda.OandaCandleDataSupplier;
+import org.investpro.exchange.oanda.OandaTradingSessionFactory;
+import org.investpro.exchange.oanda.OandaRateLimiter;
 import org.investpro.exchange.websocket.OandaWebSocketClient;
 import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.exchange.infrastructure.PollingExchangeStreamer;
@@ -54,6 +56,14 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Random;
+import org.investpro.exchange.oanda.OandaRateLimiter;
 
 @EqualsAndHashCode(callSuper = true)
 
@@ -83,6 +93,57 @@ public class Oanda extends Exchange {
     private String apiSecret;
     private String accountId;
     private boolean websocketAvailable;
+
+    // Rate limiting and concurrency
+    private final OandaRateLimiter rateLimiter = new OandaRateLimiter(1, Duration.ofMillis(250));
+    private final ExecutorService oandaExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+        private final AtomicInteger count = new AtomicInteger(0);
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "oanda-http-worker-" + count.incrementAndGet());
+            t.setDaemon(false);
+            return t;
+        }
+    });
+
+    // Caching with TTL
+    private static class CacheEntry<T> {
+        T value;
+        long expiresAt;
+
+        CacheEntry(T value, long ttlMs) {
+            this.value = value;
+            this.expiresAt = System.currentTimeMillis() + ttlMs;
+        }
+
+        boolean isExpired() {
+            return System.currentTimeMillis() > expiresAt;
+        }
+    }
+
+    private final ConcurrentHashMap<String, CacheEntry<Map<String, Ticker>>> pricingCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry<Account>> accountCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry<List<Position>>> positionsCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry<List<OpenOrder>>> openOrdersCache = new ConcurrentHashMap<>();
+
+    // Request coalescing - reuse in-flight requests
+    private CompletableFuture<Account> inflightAccountRequest = null;
+    private CompletableFuture<List<Position>> inflightPositionsRequest = null;
+    private CompletableFuture<List<OpenOrder>> inflightOpenOrdersRequest = null;
+
+    // Diagnostics
+    private final AtomicLong totalOandaRequests = new AtomicLong(0);
+    private final AtomicLong oanda429Count = new AtomicLong(0);
+    private final AtomicLong oandaRetryCount = new AtomicLong(0);
+    private final AtomicLong cachePricingHits = new AtomicLong(0);
+    private final AtomicLong cachePricingMisses = new AtomicLong(0);
+    private final AtomicLong cacheAccountHits = new AtomicLong(0);
+    private final AtomicLong cacheAccountMisses = new AtomicLong(0);
+    private long last429TimeMs = 0L;
+    private String last429Endpoint = "";
+
+    private static final Random jitterRandom = new Random();
 
     @Override
     public String toString() {
@@ -290,6 +351,7 @@ public class Oanda extends Exchange {
         Currency quote = new FiatCurrency("USD", "USD", "USD", 2, "USD", "USD");
 
         tradePair = new TradePair(base, quote);
+        tradePair.setTradingSession(OandaTradingSessionFactory.forInstrument("EUR_USD"));
         return tradePair;
     }
 
@@ -344,7 +406,9 @@ public class Oanda extends Exchange {
                 try {
                     Currency base = new FiatCurrency(parts[0], parts[0], parts[0], 2, parts[0], parts[0]);
                     Currency quote = new FiatCurrency(parts[1], parts[1], parts[1], 2, parts[1], parts[1]);
-                    pairs.add(new TradePair(base, quote));
+                    TradePair pair = new TradePair(base, quote);
+                    pair.setTradingSession(OandaTradingSessionFactory.forInstrument(name));
+                    pairs.add(pair);
                 } catch (SQLException | ClassNotFoundException exception) {
                     logger.debug("Skipping OANDA instrument {}", name, exception);
                 }
@@ -497,7 +561,47 @@ public class Oanda extends Exchange {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
 
-        String url = "%s/v3/instruments/%s/orderbook".formatted(OANDA_API_URL, tradePair.toString('_'));
+        // Attempt 1: Try orderBook endpoint
+        String orderBookUrl = "%s/v3/instruments/%s/orderBook".formatted(OANDA_API_URL, tradePair.toString('_'));
+        HttpRequest orderBookRequest = requestBuilder(orderBookUrl).GET().build();
+
+        return httpClient.sendAsync(orderBookRequest, HttpResponse.BodyHandlers.ofString())
+                .thenCompose(response -> {
+                    if (isSuccess(response)) {
+                        logger.debug("OANDA orderBook endpoint succeeded for {}", tradePair);
+                        return CompletableFuture.completedFuture(parseOandaOrderBook(response.body(), tradePair));
+                    }
+
+                    logger.debug("OANDA orderBook HTTP {}, attempting positionBook fallback", response.statusCode());
+
+                    // Attempt 2: Try positionBook endpoint
+                    String positionBookUrl = "%s/v3/instruments/%s/positionBook".formatted(OANDA_API_URL,
+                            tradePair.toString('_'));
+                    HttpRequest positionBookRequest = requestBuilder(positionBookUrl).GET().build();
+
+                    return httpClient.sendAsync(positionBookRequest, HttpResponse.BodyHandlers.ofString())
+                            .thenCompose(posResponse -> {
+                                if (isSuccess(posResponse)) {
+                                    logger.debug("OANDA positionBook endpoint succeeded for {}", tradePair);
+                                    return CompletableFuture
+                                            .completedFuture(parseOandaPositionBook(posResponse.body(), tradePair));
+                                }
+
+                                logger.debug("OANDA positionBook HTTP {}, attempting pricing fallback",
+                                        posResponse.statusCode());
+
+                                // Attempt 3: Fallback to pricing endpoint
+                                return fetchSyntheticOrderBookFromPricing(tradePair);
+                            });
+                });
+    }
+
+    public CompletableFuture<String> fetchPositionBook(TradePair tradePair) {
+        if (tradePair == null) {
+            return failedFuture(new IllegalArgumentException("tradePair must not be null"));
+        }
+
+        String url = "%s/v3/instruments/%s/positionBook".formatted(OANDA_API_URL, tradePair.toString('_'));
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -506,21 +610,128 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.warn("OANDA orderbook failed HTTP {}: {}", response.statusCode(), response.body());
-                        return new OrderBook(tradePair);
+                        throw new RuntimeException(
+                                "OANDA positionBook failed HTTP %d: %s".formatted(response.statusCode(),
+                                        response.body()));
                     }
-                    return parseOandaOrderBook(response.body(), tradePair);
+                    return response.body();
                 });
     }
 
+    /**
+     * Parse OANDA distribution order book response.
+     *
+     * <p>
+     * OANDA's orderBook endpoint returns a distribution of orders by price level.
+     */
     @Contract("_, _ -> new")
     private @NotNull OrderBook parseOandaOrderBook(String body, TradePair tradePair) {
-        /*
-         * Keep this safe until your OrderBook model exposes bid/ask mutators.
-         * Returning a typed empty OrderBook is better than null and keeps UI stable.
-         */
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(body);
+            JsonNode bids = root.path("orderBook").path("buckets");
+            JsonNode asks = root.path("orderBook").path("buckets");
 
-        return new OrderBook(tradePair);
+            OrderBook orderBook = new OrderBook(tradePair);
+
+            // For now, return typed empty book until full parser is ready
+            // This keeps the structure safe and prevents NPEs
+            logger.debug("Parsed OANDA orderBook for {}", tradePair);
+
+            return orderBook;
+        } catch (Exception e) {
+            logger.warn("Failed to parse OANDA orderBook response: {}", e.getMessage());
+            return new OrderBook(tradePair);
+        }
+    }
+
+    /**
+     * Parse OANDA position book (distribution) response.
+     *
+     * <p>
+     * OANDA's positionBook endpoint returns distribution of open positions by
+     * price.
+     */
+    @Contract("_, _ -> new")
+    private @NotNull OrderBook parseOandaPositionBook(String body, TradePair tradePair) {
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(body);
+            JsonNode positionBook = root.path("positionBook");
+
+            OrderBook orderBook = new OrderBook(tradePair);
+
+            // For now, return typed empty book until full parser is ready
+            logger.debug("Parsed OANDA positionBook for {}", tradePair);
+
+            return orderBook;
+        } catch (Exception e) {
+            logger.warn("Failed to parse OANDA positionBook response: {}", e.getMessage());
+            return new OrderBook(tradePair);
+        }
+    }
+
+    /**
+     * Create a synthetic top-of-book order book from OANDA pricing endpoint.
+     *
+     * <p>
+     * OANDA does not provide full depth order books like Binance/Coinbase.
+     * This fallback uses the pricing endpoint to create a synthetic top-of-book
+     * snapshot.
+     *
+     * @return Synthetic OrderBook with only best bid/ask
+     */
+    private CompletableFuture<OrderBook> fetchSyntheticOrderBookFromPricing(TradePair tradePair) {
+        String account = resolveAccountId();
+
+        if (account.isBlank()) {
+            logger.debug("No account ID for OANDA pricing fallback");
+            return CompletableFuture.completedFuture(new OrderBook(tradePair));
+        }
+
+        String url = "%s/v3/accounts/%s/pricing?instruments=%s".formatted(OANDA_API_URL, account,
+                toInstrument(tradePair));
+
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return sendWithExponentialBackoff(request)
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.debug("OANDA pricing fallback failed HTTP {}", response.statusCode());
+                        return new OrderBook(tradePair);
+                    }
+
+                    try {
+                        JsonNode prices = OBJECT_MAPPER.readTree(response.body()).path("prices");
+
+                        if (!prices.isArray() || prices.isEmpty()) {
+                            logger.debug("OANDA pricing response empty");
+                            return new OrderBook(tradePair);
+                        }
+
+                        JsonNode price = prices.get(0);
+
+                        double bid = firstPrice(price.path("bids"));
+                        double ask = firstPrice(price.path("asks"));
+
+                        if (bid <= 0 || ask <= 0) {
+                            logger.debug("OANDA pricing fallback: no valid bid/ask");
+                            return new OrderBook(tradePair);
+                        }
+
+                        // Create synthetic top-of-book with single price level
+                        OrderBook orderBook = new OrderBook(tradePair);
+                        orderBook.getBids().add(new OrderBook.PriceLevel(bid, 0));
+                        orderBook.getAsks().add(new OrderBook.PriceLevel(ask, 0));
+                        orderBook.setTimestamp(Instant.now());
+
+                        logger.info("OANDA pricing fallback succeeded for {}: bid={}, ask={}", tradePair, bid, ask);
+
+                        return orderBook;
+
+                    } catch (Exception e) {
+                        logger.warn("Failed to parse OANDA pricing for fallback: {}", e.getMessage());
+                        return new OrderBook(tradePair);
+                    }
+                });
     }
 
     @Override
@@ -557,52 +768,9 @@ public class Oanda extends Exchange {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
 
-        String account = resolveAccountId();
-
-        if (account.isBlank()) {
-            return CompletableFuture.completedFuture(emptyTicker());
-        }
-
-        String url = "%s/v3/accounts/%s/pricing?instruments=%s"
-                .formatted(OANDA_API_URL, account, toInstrument(tradePair));
-
-        HttpRequest request = requestBuilder(url)
-                .GET()
-                .build();
-
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (!isSuccess(response)) {
-                        logger.warn("OANDA pricing failed HTTP {}: {}", response.statusCode(), response.body());
-                        return emptyTicker();
-                    }
-
-                    try {
-                        JsonNode prices = OBJECT_MAPPER.readTree(response.body()).path("prices");
-
-                        if (!prices.isArray() || prices.isEmpty()) {
-                            return emptyTicker();
-                        }
-
-                        JsonNode price = prices.get(0);
-
-                        double bid = firstPrice(price.path("bids"));
-                        double ask = firstPrice(price.path("asks"));
-                        long timestamp = Instant.parse(price.path("time").asText(Instant.now().toString()))
-                                .toEpochMilli();
-
-                        Ticker ticker = new Ticker();
-                        ticker.setBidPrice(bid);
-                        ticker.setAskPrice(ask);
-                        ticker.setTimestamp(timestamp);
-                        ticker.setVolume(0);
-
-                        return ticker;
-
-                    } catch (Exception exception) {
-                        throw new RuntimeException(exception);
-                    }
-                });
+        // Use batch pricing which includes caching
+        return getLatestPrices(List.of(tradePair))
+                .thenApply(priceMap -> priceMap.getOrDefault(toInstrument(tradePair), emptyTicker()));
     }
 
     @Override
@@ -611,14 +779,14 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        List<CompletableFuture<Ticker>> futures = tradePairs.stream()
-                .filter(Objects::nonNull)
-                .map(this::fetchTicker)
-                .toList();
-
-        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(ignored -> futures.stream()
-                        .map(CompletableFuture::join)
+        // Use batch pricing instead of individual requests
+        return getLatestPrices(tradePairs)
+                .thenApply(priceMap -> tradePairs.stream()
+                        .filter(Objects::nonNull)
+                        .map(pair -> {
+                            String instrument = toInstrument(pair);
+                            return priceMap.getOrDefault(instrument, emptyTicker());
+                        })
                         .toList());
     }
 
@@ -639,6 +807,13 @@ public class Oanda extends Exchange {
             return null;
         }
 
+        // Check cache first
+        String cacheKey = "account_" + account;
+        Account cached = getAccountCached(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         String url = "%s/v3/accounts/%s/summary".formatted(OANDA_API_URL, account);
 
         HttpRequest request = requestBuilder(url)
@@ -646,7 +821,7 @@ public class Oanda extends Exchange {
                 .build();
 
         try {
-            HttpResponse<String> response = send(request);
+            HttpResponse<String> response = sendCritical(request);
 
             if (!isSuccess(response)) {
                 logger.warn("OANDA account summary failed HTTP {}: {}", response.statusCode(), response.body());
@@ -657,7 +832,54 @@ public class Oanda extends Exchange {
 
             Account userAccount = new Account(this, accountNode.path("alias").asText("OANDA Account"), "");
             userAccount.setEmail(accountNode.path("id").asText(account));
+            userAccount.setUsername(accountNode.path("id").asText(account));
+            userAccount.setAccountId(accountNode.path("id").asText(account));
+            userAccount.setBrokerName("OANDA");
+            userAccount.setExchangeId("oanda");
 
+            // Parse financial metrics
+            userAccount.setBaseCurrency(accountNode.path("currency").asText("USD"));
+            userAccount.setTotalBalance(accountNode.path("balance").asDouble(0.0));
+            userAccount.setAvailableBalance(accountNode.path("availableMarginClosingOnly").asDouble(0.0));
+            userAccount.setEquity(accountNode.path("NAV").asDouble(0.0));
+            userAccount.setNav(accountNode.path("NAV").asDouble(0.0));
+            userAccount.setMarginUsed(accountNode.path("marginUsed").asDouble(0.0));
+            userAccount.setFreeMargin(accountNode.path("marginAvailable").asDouble(0.0));
+            userAccount.setMarginAvailable(accountNode.path("marginAvailable").asDouble(0.0));
+            userAccount.setUnrealizedPnl(accountNode.path("unrealizedPL").asDouble(0.0));
+            userAccount.setRealizedPnl(accountNode.path("realizedPL").asDouble(0.0));
+            userAccount.setOpenPositionCount(accountNode.path("openPositionCount").asInt(0));
+            userAccount.setOpenOrderCount(accountNode.path("openTradeCount").asInt(0));
+
+            // Parse metadata
+            if (accountNode.has("hedgingEnabled")) {
+                userAccount.getMetadata().put("hedgingEnabled", accountNode.path("hedgingEnabled").asBoolean());
+            }
+            if (accountNode.has("marginRate")) {
+                userAccount.getMetadata().put("marginRate", accountNode.path("marginRate").asText());
+            }
+            if (accountNode.has("positionAggregationMode")) {
+                userAccount.getMetadata().put("positionAggregationMode",
+                        accountNode.path("positionAggregationMode").asText());
+            }
+
+            // Parse timestamps
+            String createdByUserAtStr = accountNode.path("createdByUserID").asText("");
+            String lastTransactionIDStr = accountNode.path("lastTransactionID").asText("");
+            if (!lastTransactionIDStr.isEmpty()) {
+                userAccount.getMetadata().put("lastTransactionID", lastTransactionIDStr);
+            }
+
+            userAccount.setUpdatedAt(Instant.now());
+            userAccount.setConnected(true);
+            userAccount.setSandbox(accountNode.path("id").asText("").startsWith("101-")); // OANDA sandbox accounts
+                                                                                          // start with 101-
+            userAccount.setPaperTrading(userAccount.isSandbox());
+
+            // Cache the account
+            setAccountCached(cacheKey, userAccount);
+
+            logger.debug("OANDA account loaded: {} ({})", userAccount.getUsername(), userAccount.getAccountId());
             return userAccount;
 
         } catch (Exception exception) {
@@ -668,62 +890,42 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        return CompletableFuture.supplyAsync(this::getUserAccountDetails);
+        return CompletableFuture.supplyAsync(this::getUserAccountDetails, oandaExecutor);
     }
 
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
-        return fetchAccountSummaryDouble("NAV");
+        // Fetch from cached account summary instead of making separate call
+        return fetchAccount().thenApply(account -> account != null ? account.getMarginAvailable() : 0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
-        return fetchAccountSummaryDouble("balance");
+        // Fetch from cached account summary instead of making separate call
+        return fetchAccount().thenApply(account -> account != null ? account.getTotalBalance() : 0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchEquity() {
-        return fetchAccountSummaryDouble("NAV");
+        // Fetch from cached account summary instead of making separate call
+        return fetchAccount().thenApply(account -> account != null ? account.getEquity() : 0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchMarginUsed() {
-        return fetchAccountSummaryDouble("marginUsed");
+        // Fetch from cached account summary instead of making separate call
+        return fetchAccount().thenApply(account -> account != null ? account.getMarginUsed() : 0.0);
     }
 
     @Override
     public CompletableFuture<Double> fetchFreeMargin() {
-        return fetchAccountSummaryDouble("marginAvailable");
+        // Fetch from cached account summary instead of making separate call
+        return fetchAccount().thenApply(account -> account != null ? account.getFreeMargin() : 0.0);
     }
 
     private CompletableFuture<Double> fetchAccountSummaryDouble(String fieldName) {
-        String account = resolveAccountId();
-
-        if (account.isBlank()) {
-            return CompletableFuture.completedFuture(0.0);
-        }
-
-        String url = "%s/v3/accounts/%s/summary".formatted(OANDA_API_URL, account);
-
-        HttpRequest request = requestBuilder(url)
-                .GET()
-                .build();
-
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (!isSuccess(response)) {
-                        logger.warn("OANDA account field {} failed HTTP {}", fieldName, response.statusCode());
-                        return 0.0;
-                    }
-
-                    try {
-                        return OBJECT_MAPPER.readTree(response.body())
-                                .path("account")
-                                .path(fieldName)
-                                .asDouble(0.0);
-                    } catch (Exception exception) {
-                        throw new RuntimeException(exception);
-                    }
-                });
+        // DEPRECATED: Use fetchAccount() instead to reuse cached data
+        return fetchAccount()
+                .thenApply(account -> account != null ? account.getTotalBalance() : 0.0);
     }
 
     // ---------------------------------------------------------------------
@@ -805,7 +1007,7 @@ public class Oanda extends Exchange {
                 logger.error("Failed to create OANDA order", exception);
                 return "";
             }
-        });
+        }, oandaExecutor);
     }
 
     @Override
@@ -1163,7 +1365,7 @@ public class Oanda extends Exchange {
         return fetchPositions(tradePair)
                 .thenApply(positions -> positions == null || positions.isEmpty()
                         ? Optional.empty()
-                        : Optional.ofNullable(positions.getFirst()));
+                        : Optional.ofNullable(positions.get(0)));
     }
 
     @Override
@@ -1202,7 +1404,7 @@ public class Oanda extends Exchange {
     @Override
     public CompletableFuture<String> closeAllPositions() {
         return fetchAllPositions()
-                .thenApply(_ -> "Close-all positions requires Position -> TradePair mapping.");
+                .thenApply(positions -> "Close-all positions requires Position -> TradePair mapping.");
     }
 
     @Override
@@ -1797,6 +1999,798 @@ public class Oanda extends Exchange {
         return true;
     }
 
+    // =====================================================================
+    // ADDITIONAL OANDA API ENDPOINTS (v3)
+    // =====================================================================
+
+    // --------- ORDER ENDPOINTS ---------
+
+    /**
+     * GET /v3/accounts/{accountID}/orders - List all orders
+     */
+    public CompletableFuture<List<Order>> fetchAllOrders() {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String url = "%s/v3/accounts/%s/orders".formatted(OANDA_API_URL, account);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA fetch all orders failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    try {
+                        JsonNode orders = OBJECT_MAPPER.readTree(response.body()).path("orders");
+                        return orders.isArray()
+                                ? parseOrderList(orders)
+                                : Collections.emptyList();
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA orders", e);
+                        return Collections.emptyList();
+                    }
+                });
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/pendingOrders - List pending orders
+     */
+    public CompletableFuture<List<Order>> fetchPendingOrders() {
+        return fetchAllOrders()
+                .thenApply(orders -> orders.stream()
+                        .filter(o -> o.getStatus() != null && o.getStatus().equals("PENDING"))
+                        .toList());
+    }
+
+    /**
+     * PUT /v3/accounts/{accountID}/orders/{orderSpecifier} - Replace an order
+     */
+    public CompletableFuture<String> replaceOrder(String orderId, Order newOrder) {
+        Objects.requireNonNull(newOrder, "newOrder must not be null");
+        if (safe(orderId).isBlank()) {
+            return failedFuture(new IllegalArgumentException("orderId must not be blank"));
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture("");
+        }
+
+        try {
+            String url = "%s/v3/accounts/%s/orders/%s".formatted(OANDA_API_URL, account, orderId.trim());
+            Map<String, Object> payload = buildOrderPayload(newOrder);
+
+            HttpRequest request = requestBuilder(url)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
+                    .build();
+
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> isSuccess(response) ? orderId : "");
+        } catch (Exception e) {
+            return failedFuture(e);
+        }
+    }
+
+    /**
+     * PUT /v3/accounts/{accountID}/orders/{orderSpecifier}/clientExtensions -
+     * Update order client extensions
+     */
+    public CompletableFuture<String> updateOrderClientExtensions(String orderId, Map<String, String> extensions) {
+        if (safe(orderId).isBlank() || extensions == null) {
+            return failedFuture(new IllegalArgumentException("orderId and extensions must not be null/blank"));
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture("");
+        }
+
+        try {
+            String url = "%s/v3/accounts/%s/orders/%s/clientExtensions"
+                    .formatted(OANDA_API_URL, account, orderId.trim());
+            Map<String, Object> payload = Map.of("clientExtensions", extensions);
+
+            HttpRequest request = requestBuilder(url)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
+                    .build();
+
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> isSuccess(response) ? orderId : "");
+        } catch (Exception e) {
+            return failedFuture(e);
+        }
+    }
+
+    // --------- ACCOUNT ENDPOINTS ---------
+
+    /**
+     * GET /v3/accounts - List all accounts accessible to the API token
+     */
+    public CompletableFuture<List<Account>> listAccounts() {
+        String url = "%s/v3/accounts".formatted(OANDA_API_URL);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA list accounts failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    try {
+                        JsonNode accounts = OBJECT_MAPPER.readTree(response.body()).path("accounts");
+                        List<Account> result = new ArrayList<>();
+                        if (accounts.isArray()) {
+                            for (JsonNode acc : accounts) {
+                                Account account = parseAccountNode(acc);
+                                if (account != null)
+                                    result.add(account);
+                            }
+                        }
+                        return result;
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA accounts list", e);
+                        return Collections.emptyList();
+                    }
+                });
+    }
+
+    /**
+     * GET /v3/accounts/{accountID} - Get full account details (not summary)
+     */
+    public CompletableFuture<Account> getAccountDetails(String accountID) {
+        if (safe(accountID).isBlank()) {
+            accountID = resolveAccountId();
+        }
+
+        String finalAccountId = accountID;
+        if (finalAccountId.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        String url = "%s/v3/accounts/%s".formatted(OANDA_API_URL, finalAccountId);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get account details failed HTTP {}", response.statusCode());
+                        return null;
+                    }
+                    try {
+                        JsonNode accountNode = OBJECT_MAPPER.readTree(response.body()).path("account");
+                        return parseAccountNode(accountNode);
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA account details", e);
+                        return null;
+                    }
+                });
+    }
+
+    /**
+     * PATCH /v3/accounts/{accountID}/configuration - Configure account settings
+     */
+    public CompletableFuture<String> configureAccount(String accountID, Map<String, Object> config) {
+        if (safe(accountID).isBlank() || config == null) {
+            return failedFuture(new IllegalArgumentException("accountID and config must not be null/blank"));
+        }
+
+        try {
+            String url = "%s/v3/accounts/%s/configuration".formatted(OANDA_API_URL, accountID);
+            HttpRequest request = requestBuilder(url)
+                    .header("Content-Type", "application/json")
+                    .method("PATCH", HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(config)))
+                    .build();
+
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> isSuccess(response) ? "Configuration updated" : "");
+        } catch (Exception e) {
+            return failedFuture(e);
+        }
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/changes - Get account changes since a
+     * transaction ID
+     */
+    public CompletableFuture<JsonNode> getAccountChanges(String accountID, String sinceTransactionID) {
+        if (safe(accountID).isBlank()) {
+            accountID = resolveAccountId();
+        }
+
+        String finalAccountId = accountID;
+        if (finalAccountId.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        String url = "%s/v3/accounts/%s/changes".formatted(OANDA_API_URL, finalAccountId);
+        if (!safe(sinceTransactionID).isBlank()) {
+            url += "?sinceTransactionID=" + sinceTransactionID;
+        }
+
+        String finalUrl = url;
+        HttpRequest request = requestBuilder(finalUrl).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get account changes failed HTTP {}", response.statusCode());
+                        return null;
+                    }
+                    try {
+                        return OBJECT_MAPPER.readTree(response.body());
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA account changes", e);
+                        return null;
+                    }
+                });
+    }
+
+    // --------- TRADE ENDPOINTS ---------
+
+    /**
+     * GET /v3/accounts/{accountID}/trades - Get all trades
+     */
+    public CompletableFuture<List<Trade>> getAllTrades() {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String url = "%s/v3/accounts/%s/trades".formatted(OANDA_API_URL, account);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get all trades failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    try {
+                        JsonNode trades = OBJECT_MAPPER.readTree(response.body()).path("trades");
+                        return parseTradeList(trades);
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA trades", e);
+                        return Collections.emptyList();
+                    }
+                });
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/trades/{tradeSpecifier} - Get trade details
+     */
+    public CompletableFuture<Optional<Trade>> getTrade(String tradeID) {
+        if (safe(tradeID).isBlank()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        String url = "%s/v3/accounts/%s/trades/%s".formatted(OANDA_API_URL, account, tradeID.trim());
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        return Optional.empty();
+                    }
+                    try {
+                        JsonNode tradeNode = OBJECT_MAPPER.readTree(response.body()).path("trade");
+                        return tradeNode.isMissingNode() ? Optional.empty() : Optional.of(parseTradeNode(tradeNode));
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA trade", e);
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    /**
+     * PUT /v3/accounts/{accountID}/trades/{tradeSpecifier}/close - Close a trade
+     */
+    public CompletableFuture<String> closeTrade(String tradeID, double units) {
+        if (safe(tradeID).isBlank()) {
+            return failedFuture(new IllegalArgumentException("tradeID must not be blank"));
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture("");
+        }
+
+        try {
+            String url = "%s/v3/accounts/%s/trades/%s/close"
+                    .formatted(OANDA_API_URL, account, tradeID.trim());
+            Map<String, Object> payload = Map.of(
+                    "units", units == 0 ? "ALL" : String.valueOf((long) units));
+
+            HttpRequest request = requestBuilder(url)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
+                    .build();
+
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> isSuccess(response) ? tradeID : "");
+        } catch (Exception e) {
+            return failedFuture(e);
+        }
+    }
+
+    /**
+     * PUT /v3/accounts/{accountID}/trades/{tradeSpecifier}/clientExtensions -
+     * Update trade client extensions
+     */
+    public CompletableFuture<String> updateTradeClientExtensions(String tradeID, Map<String, String> extensions) {
+        if (safe(tradeID).isBlank() || extensions == null) {
+            return failedFuture(new IllegalArgumentException("tradeID and extensions must not be null/blank"));
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture("");
+        }
+
+        try {
+            String url = "%s/v3/accounts/%s/trades/%s/clientExtensions"
+                    .formatted(OANDA_API_URL, account, tradeID.trim());
+            Map<String, Object> payload = Map.of("clientExtensions", extensions);
+
+            HttpRequest request = requestBuilder(url)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(payload)))
+                    .build();
+
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> isSuccess(response) ? tradeID : "");
+        } catch (Exception e) {
+            return failedFuture(e);
+        }
+    }
+
+    /**
+     * PUT /v3/accounts/{accountID}/trades/{tradeSpecifier}/orders - Set dependent
+     * orders on trade
+     */
+    public CompletableFuture<String> manageTradeOrders(String tradeID, double stopLoss, double takeProfit) {
+        if (safe(tradeID).isBlank()) {
+            return failedFuture(new IllegalArgumentException("tradeID must not be blank"));
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture("");
+        }
+
+        try {
+            String url = "%s/v3/accounts/%s/trades/%s/orders"
+                    .formatted(OANDA_API_URL, account, tradeID.trim());
+            Map<String, Object> orders = new LinkedHashMap<>();
+
+            if (stopLoss > 0) {
+                orders.put("stopLossOnFill", Map.of("price", String.valueOf(stopLoss)));
+            }
+            if (takeProfit > 0) {
+                orders.put("takeProfitOnFill", Map.of("price", String.valueOf(takeProfit)));
+            }
+
+            HttpRequest request = requestBuilder(url)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(orders)))
+                    .build();
+
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> isSuccess(response) ? tradeID : "");
+        } catch (Exception e) {
+            return failedFuture(e);
+        }
+    }
+
+    // --------- POSITION ENDPOINTS ---------
+
+    /**
+     * GET /v3/accounts/{accountID}/positions - Get all positions (not just open)
+     */
+    public CompletableFuture<List<Position>> getAllPositions() {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String url = "%s/v3/accounts/%s/positions".formatted(OANDA_API_URL, account);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get all positions failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    return parseOandaAllPositions(response.body());
+                });
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/positions/{instrument} - Get position details
+     * for instrument
+     */
+    public CompletableFuture<Optional<Position>> getPositionDetails(String instrument) {
+        if (safe(instrument).isBlank()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        String url = "%s/v3/accounts/%s/positions/%s"
+                .formatted(OANDA_API_URL, account, instrument.trim().toUpperCase());
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        return Optional.empty();
+                    }
+                    try {
+                        JsonNode posNode = OBJECT_MAPPER.readTree(response.body()).path("position");
+                        if (posNode.isMissingNode()) {
+                            return Optional.empty();
+                        }
+                        List<Position> positions = new ArrayList<>();
+                        String inst = posNode.path("instrument").asText("");
+                        addPositionLeg(positions, instrumentToTradePair(inst), inst, posNode.path("long"), Side.BUY);
+                        addPositionLeg(positions, instrumentToTradePair(inst), inst, posNode.path("short"), Side.SELL);
+                        return positions.isEmpty() ? Optional.empty() : Optional.of(positions.get(0));
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA position details", e);
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    // --------- TRANSACTION ENDPOINTS ---------
+
+    /**
+     * GET /v3/accounts/{accountID}/transactions - Get transaction history
+     */
+    public CompletableFuture<List<JsonNode>> getTransactions(int maxCount, String sinceTransactionID) {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String url = "%s/v3/accounts/%s/transactions?count=%d"
+                .formatted(OANDA_API_URL, account, Math.min(maxCount, 1000));
+        if (!safe(sinceTransactionID).isBlank()) {
+            url += "&sinceTransactionID=" + sinceTransactionID;
+        }
+
+        String finalUrl = url;
+        HttpRequest request = requestBuilder(finalUrl).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get transactions failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    try {
+                        JsonNode transactions = OBJECT_MAPPER.readTree(response.body()).path("transactions");
+                        if (!transactions.isArray()) {
+                            return Collections.emptyList();
+                        }
+                        List<JsonNode> result = new ArrayList<>();
+                        for (JsonNode tx : transactions) {
+                            result.add(tx);
+                        }
+                        return result;
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA transactions", e);
+                        return Collections.emptyList();
+                    }
+                });
+    }
+
+    // --------- PRICING ENDPOINTS ---------
+
+    /**
+     * GET /v3/accounts/{accountID}/candles/latest - Get latest candles for multiple
+     * instruments
+     */
+    public CompletableFuture<Map<String, JsonNode>> getLatestCandles(List<String> instruments) {
+        if (instruments == null || instruments.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyMap());
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyMap());
+        }
+
+        String instrumentsParam = String.join(",", instruments);
+        String url = "%s/v3/accounts/%s/candles/latest?instruments=%s"
+                .formatted(OANDA_API_URL, account, instrumentsParam);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get latest candles failed HTTP {}", response.statusCode());
+                        return Collections.emptyMap();
+                    }
+                    try {
+                        JsonNode candles = OBJECT_MAPPER.readTree(response.body()).path("candles");
+                        Map<String, JsonNode> result = new LinkedHashMap<>();
+                        if (candles.isArray()) {
+                            for (JsonNode candle : candles) {
+                                String inst = candle.path("instrument").asText("");
+                                if (!inst.isBlank()) {
+                                    result.put(inst, candle);
+                                }
+                            }
+                        }
+                        return result;
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA latest candles", e);
+                        return Collections.emptyMap();
+                    }
+                });
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/instruments/{instrument}/candles - Get candles
+     * for an instrument
+     */
+    public CompletableFuture<List<JsonNode>> getInstrumentCandles(String instrument, String granularity,
+            String from, String to, int count) {
+        if (safe(instrument).isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String url = "%s/v3/accounts/%s/instruments/%s/candles?price=MBA"
+                .formatted(OANDA_API_URL, account, instrument.trim().toUpperCase());
+
+        if (!safe(granularity).isBlank()) {
+            url += "&granularity=" + granularity;
+        }
+        if (!safe(from).isBlank()) {
+            url += "&from=" + from;
+        }
+        if (!safe(to).isBlank()) {
+            url += "&to=" + to;
+        }
+        if (count > 0) {
+            url += "&count=" + Math.min(count, 5000);
+        }
+
+        String finalUrl = url;
+        HttpRequest request = requestBuilder(finalUrl).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA get instrument candles failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    try {
+                        JsonNode candles = OBJECT_MAPPER.readTree(response.body()).path("candles");
+                        if (!candles.isArray()) {
+                            return Collections.emptyList();
+                        }
+                        List<JsonNode> result = new ArrayList<>();
+                        for (JsonNode candle : candles) {
+                            result.add(candle);
+                        }
+                        return result;
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA instrument candles", e);
+                        return Collections.emptyList();
+                    }
+                });
+    }
+
+    // --------- HELPER METHODS FOR PARSING ---------
+
+    private List<Order> parseOrderList(JsonNode ordersNode) {
+        List<Order> result = new ArrayList<>();
+        if (!ordersNode.isArray()) {
+            return result;
+        }
+        for (JsonNode node : ordersNode) {
+            Order order = parseOrderNode(node);
+            if (order != null) {
+                result.add(order);
+            }
+        }
+        return result;
+    }
+
+    private Order parseOrderNode(JsonNode node) {
+        if (node == null || node.isMissingNode()) {
+            return null;
+        }
+        double signedUnits = node.path("units").asDouble(0.0);
+        Order order = new Order();
+        order.setId(parseLong(node.path("id").asText("0")));
+        order.setSymbol(node.path("instrument").asText(""));
+        order.setQuantity(Math.abs(signedUnits));
+        order.setPrice(node.path("price").asDouble(0.0));
+        order.setType(node.path("type").asText(""));
+        order.setSide(signedUnits < 0 ? Side.SELL : Side.BUY);
+        order.setStatus(node.path("state").asText(""));
+        order.setDate(java.util.Date.from(parseInstant(node.path("createTime").asText(""))));
+        return order;
+    }
+
+    private List<Trade> parseTradeList(JsonNode tradesNode) {
+        List<Trade> result = new ArrayList<>();
+        if (!tradesNode.isArray()) {
+            return result;
+        }
+        for (JsonNode node : tradesNode) {
+            Trade trade = parseTradeNode(node);
+            if (trade != null) {
+                result.add(trade);
+            }
+        }
+        return result;
+    }
+
+    private Trade parseTradeNode(JsonNode node) {
+        if (node == null || node.isMissingNode()) {
+            return null;
+        }
+        double units = node.path("currentUnits").asDouble(node.path("initialUnits").asDouble(0.0));
+        TradePair pair = instrumentToTradePair(node.path("instrument").asText(""));
+        Trade trade = new Trade(
+                pair,
+                node.path("price").asDouble(0.0),
+                Math.abs(units),
+                units < 0 ? Side.SELL : Side.BUY,
+                parseLong(node.path("id").asText("0")),
+                parseInstant(node.path("openTime").asText("")));
+        trade.setFee(node.path("financing").asDouble(0.0));
+        return trade;
+    }
+
+    private Account parseAccountNode(JsonNode accountNode) {
+        if (accountNode == null || accountNode.isMissingNode()) {
+            return null;
+        }
+        String accountId = accountNode.path("id").asText("");
+        Account account = new Account(this, accountNode.path("alias").asText("OANDA Account"), "");
+        account.setEmail(accountNode.path("id").asText(accountId));
+        account.setUsername(accountNode.path("id").asText(accountId));
+        account.setAccountId(accountId);
+        account.setBrokerName("OANDA");
+        account.setExchangeId("oanda");
+        account.setBaseCurrency(accountNode.path("currency").asText("USD"));
+        account.setTotalBalance(accountNode.path("balance").asDouble(0.0));
+        account.setEquity(accountNode.path("NAV").asDouble(0.0));
+        account.setNav(accountNode.path("NAV").asDouble(0.0));
+        account.setMarginUsed(accountNode.path("marginUsed").asDouble(0.0));
+        account.setFreeMargin(accountNode.path("marginAvailable").asDouble(0.0));
+        account.setUpdatedAt(Instant.now());
+        account.setConnected(true);
+        account.setSandbox(accountId.startsWith("101-"));
+        account.setPaperTrading(account.isSandbox());
+        return account;
+    }
+
+    private Map<String, Object> buildOrderPayload(Order order) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        Map<String, Object> orderNode = new LinkedHashMap<>();
+
+        orderNode.put("type", safe(order.getType()).isBlank() ? "MARKET" : order.getType());
+        String instrument = safe(order.getSymbol()).replace("/", "_").toUpperCase();
+        orderNode.put("instrument", instrument.isBlank() ? "EUR_USD" : instrument);
+
+        double units = normalizeAmount(null, order.getQuantity());
+        orderNode.put("units", String.valueOf((long) (order.getSide() == Side.SELL ? -units : units)));
+
+        if (order.getPrice() > 0) {
+            orderNode.put("price", String.valueOf(order.getPrice()));
+        }
+
+        payload.put("order", orderNode);
+        return payload;
+    }
+
+    // =====================================================================
+    // END ADDITIONAL OANDA API ENDPOINTS
+    // =====================================================================
+
+    // =====================================================================
+    // CACHING AND DIAGNOSTICS
+    // =====================================================================
+
+    private <T> T getCached(String key, ConcurrentHashMap<String, CacheEntry<T>> cache) {
+        CacheEntry<T> entry = cache.get(key);
+        if (entry != null && !entry.isExpired()) {
+            return entry.value;
+        }
+        cache.remove(key);
+        return null;
+    }
+
+    private <T> void setCached(String key, T value, long ttlMs, ConcurrentHashMap<String, CacheEntry<T>> cache) {
+        cache.put(key, new CacheEntry<>(value, ttlMs));
+    }
+
+    public Map<String, Ticker> getPricingCached(String cacheKey) {
+        Map<String, Ticker> cached = getCached(cacheKey, pricingCache);
+        if (cached != null) {
+            cachePricingHits.incrementAndGet();
+        } else {
+            cachePricingMisses.incrementAndGet();
+        }
+        return cached;
+    }
+
+    public void setPricingCached(String cacheKey, Map<String, Ticker> prices) {
+        setCached(cacheKey, prices, 500, pricingCache); // 500ms TTL
+    }
+
+    public Account getAccountCached(String cacheKey) {
+        Account cached = getCached(cacheKey, accountCache);
+        if (cached != null) {
+            cacheAccountHits.incrementAndGet();
+        } else {
+            cacheAccountMisses.incrementAndGet();
+        }
+        return cached;
+    }
+
+    public void setAccountCached(String cacheKey, Account account) {
+        setCached(cacheKey, account, 3000, accountCache); // 3s TTL
+    }
+
+    public List<Position> getPositionsCached(String cacheKey) {
+        return getCached(cacheKey, positionsCache);
+    }
+
+    public void setPositionsCached(String cacheKey, List<Position> positions) {
+        setCached(cacheKey, positions, 3000, positionsCache); // 3s TTL
+    }
+
+    public List<OpenOrder> getOpenOrdersCached(String cacheKey) {
+        return getCached(cacheKey, openOrdersCache);
+    }
+
+    public void setOpenOrdersCached(String cacheKey, List<OpenOrder> orders) {
+        setCached(cacheKey, orders, 3000, openOrdersCache); // 3s TTL
+    }
+
+    public void logDiagnostics() {
+        logger.info(
+                "OANDA Diagnostics: totalRequests={}, http429Count={}, retryCount={}, pricingCacheHits={}, pricingCacheMisses={}, accountCacheHits={}, accountCacheMisses={}, last429Endpoint={}ms ago: {}",
+                totalOandaRequests.get(),
+                oanda429Count.get(),
+                oandaRetryCount.get(),
+                cachePricingHits.get(),
+                cachePricingMisses.get(),
+                cacheAccountHits.get(),
+                cacheAccountMisses.get(),
+                System.currentTimeMillis() - last429TimeMs,
+                last429Endpoint.isEmpty() ? "none" : last429Endpoint);
+    }
+
+    // =====================================================================
+    // END CACHING AND DIAGNOSTICS
+    // =====================================================================
+
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
@@ -1849,7 +2843,128 @@ public class Oanda extends Exchange {
     }
 
     private HttpResponse<String> send(HttpRequest request) throws IOException, InterruptedException {
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        totalOandaRequests.incrementAndGet();
+        try {
+            return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3, 1000L, 30000L));
+        } catch (Exception e) {
+            if (e instanceof IOException || e instanceof InterruptedException) {
+                throw (IOException) (e instanceof IOException ? e : new IOException(e));
+            }
+            throw new IOException(e);
+        }
+    }
+
+    private HttpResponse<String> sendCritical(HttpRequest request) throws IOException, InterruptedException {
+        totalOandaRequests.incrementAndGet();
+        try {
+            return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 5, 1000L, 30000L));
+        } catch (Exception e) {
+            if (e instanceof IOException || e instanceof InterruptedException) {
+                throw (IOException) (e instanceof IOException ? e : new IOException(e));
+            }
+            throw new IOException(e);
+        }
+    }
+
+    /**
+     * Send HTTP request with exponential backoff retry logic (synchronized
+     * version).
+     * Uses rate limiter for concurrency control.
+     * 
+     * Backoff strategy:
+     * - Starts at 1000ms (not 200ms to respect API limits)
+     * - Adds jitter ±250-750ms to prevent thundering herd
+     * - Respects Retry-After header if present
+     * - Logs 429 at WARN once per cooldown window
+     * 
+     * @param request        The HTTP request to send
+     * @param maxRetries     Maximum retries (3 for polling, 5 for critical)
+     * @param initialDelayMs Base delay (1000ms)
+     * @param maxDelayMs     Max delay cap (30000ms)
+     * @return The HTTP response
+     */
+    private HttpResponse<String> sendWithExponentialBackoffSync(
+            HttpRequest request,
+            int maxRetries,
+            long initialDelayMs,
+            long maxDelayMs) throws IOException, InterruptedException {
+
+        int attemptCount = 0;
+        long lastLogTime = 0;
+
+        while (true) {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            // If successful or not a rate limit error, return immediately
+            if (response.statusCode() != 429) {
+                return response;
+            }
+
+            // If we've exhausted retries, return the 429 response
+            if (attemptCount >= maxRetries) {
+                long now = System.currentTimeMillis();
+                if (now - lastLogTime > 60000) { // Log once per minute to avoid spam
+                    logger.warn("OANDA 429: Max retries ({}) exhausted. Endpoint: {}",
+                            maxRetries, extractEndpoint(request.uri().toString()));
+                    lastLogTime = now;
+                    last429TimeMs = now;
+                    last429Endpoint = extractEndpoint(request.uri().toString());
+                }
+                oanda429Count.incrementAndGet();
+                return response;
+            }
+
+            oandaRetryCount.incrementAndGet();
+
+            // Check for Retry-After header
+            long delayMs = parseRetryAfterHeader(response);
+            if (delayMs <= 0) {
+                // Calculate exponential backoff: 1000 * 2^attempt
+                delayMs = Math.min(initialDelayMs * (long) Math.pow(2, attemptCount), maxDelayMs);
+            }
+
+            // Add jitter to prevent thundering herd: ±250-750ms
+            long jitter = 250 + jitterRandom.nextLong(501);
+            delayMs = Math.min(delayMs + jitter, maxDelayMs);
+
+            long now = System.currentTimeMillis();
+            if (now - lastLogTime > 60000) { // Log once per minute
+                logger.warn("OANDA 429: Retrying after {}ms with jitter (attempt {}/{}). Endpoint: {}",
+                        delayMs, attemptCount + 1, maxRetries, extractEndpoint(request.uri().toString()));
+                lastLogTime = now;
+                last429TimeMs = now;
+                last429Endpoint = extractEndpoint(request.uri().toString());
+            }
+
+            Thread.sleep(delayMs);
+            attemptCount++;
+        }
+    }
+
+    private long parseRetryAfterHeader(HttpResponse<?> response) {
+        if (response == null)
+            return 0;
+        return response.headers()
+                .firstValue("Retry-After")
+                .map(s -> {
+                    try {
+                        return Long.parseLong(s) * 1000L; // Convert seconds to ms
+                    } catch (NumberFormatException e) {
+                        return 0L;
+                    }
+                })
+                .orElse(0L);
+    }
+
+    private String extractEndpoint(String url) {
+        try {
+            String path = new java.net.URI(url).getPath();
+            // Extract meaningful part: /v3/accounts/123/summary -> summary
+            String[] parts = path.split("/");
+            return parts.length > 0 ? parts[parts.length - 1] : url;
+        } catch (Exception e) {
+            return "unknown";
+        }
     }
 
     private boolean isSuccess(HttpResponse<?> response) {
@@ -1877,10 +2992,14 @@ public class Oanda extends Exchange {
         try {
             Currency base = new FiatCurrency(parts[0], parts[0], parts[0], 2, parts[0], parts[0]);
             Currency quote = new FiatCurrency(parts[1], parts[1], parts[1], 2, parts[1], parts[1]);
-            return new TradePair(base, quote);
+            TradePair pair = new TradePair(base, quote);
+            pair.setTradingSession(OandaTradingSessionFactory.forInstrument(normalized));
+            return pair;
         } catch (Exception exception) {
             try {
-                return new TradePair("EUR", "USD");
+                TradePair fallback = new TradePair("EUR", "USD");
+                fallback.setTradingSession(OandaTradingSessionFactory.forInstrument("EUR_USD"));
+                return fallback;
             } catch (Exception fallbackException) {
                 throw new IllegalStateException("Unable to create OANDA trade pair for %s".formatted(instrument),
                         fallbackException);
@@ -1983,6 +3102,87 @@ public class Oanda extends Exchange {
         return array.get(0).path("price").asDouble(0.0);
     }
 
+    // =====================================================================
+    // BATCH PRICING AND ASYNC HELPERS
+    // =====================================================================
+
+    /**
+     * Fetch latest prices for multiple instruments in a single batch request.
+     * Results are cached with 500ms TTL.
+     */
+    public CompletableFuture<Map<String, Ticker>> getLatestPrices(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(new LinkedHashMap<>());
+        }
+
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(new LinkedHashMap<>());
+        }
+
+        // Check cache for all pairs
+        String cacheKey = "prices_" + pairs.hashCode();
+        Map<String, Ticker> cached = getPricingCached(cacheKey);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached);
+        }
+
+        // Batch instruments: EUR_USD,USD_JPY,...
+        String instruments = pairs.stream()
+                .filter(Objects::nonNull)
+                .map(this::toInstrument)
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(","));
+
+        if (instruments.isBlank()) {
+            return CompletableFuture.completedFuture(new LinkedHashMap<>());
+        }
+
+        String url = "%s/v3/accounts/%s/pricing?instruments=%s"
+                .formatted(OANDA_API_URL, account, instruments);
+
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return sendWithExponentialBackoff(request)
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA batch pricing failed HTTP {}", response.statusCode());
+                        return new LinkedHashMap<>();
+                    }
+
+                    try {
+                        Map<String, Ticker> result = new LinkedHashMap<>();
+                        JsonNode pricesArray = OBJECT_MAPPER.readTree(response.body()).path("prices");
+
+                        if (pricesArray.isArray()) {
+                            for (JsonNode price : pricesArray) {
+                                String instrument = price.path("instrument").asText("");
+                                double bid = firstPrice(price.path("bids"));
+                                double ask = firstPrice(price.path("asks"));
+                                long timestamp = Instant.parse(price.path("time").asText(Instant.now().toString()))
+                                        .toEpochMilli();
+
+                                Ticker ticker = new Ticker();
+                                ticker.setBidPrice(bid);
+                                ticker.setAskPrice(ask);
+                                ticker.setTimestamp(timestamp);
+                                ticker.setVolume(0);
+
+                                result.put(instrument, ticker);
+                            }
+                        }
+
+                        // Cache the result
+                        setPricingCached(cacheKey, result);
+                        return result;
+
+                    } catch (Exception e) {
+                        logger.error("Failed to parse batch pricing response", e);
+                        return new LinkedHashMap<>();
+                    }
+                });
+    }
+
     private Ticker emptyTicker() {
         Ticker ticker = new Ticker();
         ticker.setBidPrice(0.0);
@@ -2010,5 +3210,36 @@ public class Oanda extends Exchange {
         CompletableFuture<T> future = new CompletableFuture<>();
         future.completeExceptionally(throwable);
         return future;
+    }
+
+    /**
+     * Convenience method with default backoff parameters.
+     * Initial delay: 1000ms, Max delay: 30 seconds, Max retries: 3 (polling)
+     */
+    private CompletableFuture<HttpResponse<String>> sendWithExponentialBackoff(HttpRequest request) {
+        totalOandaRequests.incrementAndGet();
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3, 1000L, 30000L));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }, oandaExecutor);
+    }
+
+    /**
+     * Critical request version with higher retry count.
+     * Initial delay: 1000ms, Max delay: 30 seconds, Max retries: 5 (critical
+     * operations)
+     */
+    private CompletableFuture<HttpResponse<String>> sendWithExponentialBackoffCritical(HttpRequest request) {
+        totalOandaRequests.incrementAndGet();
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 5, 1000L, 30000L));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }, oandaExecutor);
     }
 }

@@ -7,8 +7,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.market.AssetClass;
-import org.investpro.market.ContractType;
+import org.investpro.enums.LiquidityProfile;
+import org.investpro.enums.AssetClass;
+import org.investpro.enums.ContractType;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyNotFoundException;
@@ -25,7 +26,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.investpro.market.InstrumentTradingSession;
+import org.investpro.enums.TradingSessionStatus;
 
+import java.time.ZonedDateTime;
 /**
  * Represents a tradable market pair such as:
  * BTC/USD, EUR/USD, ETH/USDT.
@@ -466,5 +470,32 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public ContractType getContractType() {
         return null;
+    }
+
+    private LiquidityProfile liquidityProfile = LiquidityProfile.NORMAL;
+
+    public boolean isTradableByLiquidity() {
+        return liquidityProfile != null && liquidityProfile.isTradable();
+    }
+
+    public double liquidityAdjustedSize(double requestedSize) {
+        return requestedSize * Objects.requireNonNullElse(liquidityProfile, LiquidityProfile.NORMAL).getSizeMultiplier();
+
+    }
+
+    private InstrumentTradingSession tradingSession;
+
+
+
+    public TradingSessionStatus getTradingSessionStatus() {
+        if (tradingSession == null) {
+            return TradingSessionStatus.UNKNOWN;
+        }
+
+        return tradingSession.getStatus(ZonedDateTime.now());
+    }
+
+    public boolean isTradableNow() {
+        return tradingSession != null && tradingSession.isTradableNow(ZonedDateTime.now());
     }
 }

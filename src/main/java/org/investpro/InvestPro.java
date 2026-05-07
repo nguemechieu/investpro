@@ -4,8 +4,10 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
+import org.investpro.strategy.StrategyBootstrapper;
 import org.investpro.ui.MarketConfiguration;
 import org.investpro.ui.OnboardingView;
 import org.investpro.ui.TradingWindow;
@@ -38,7 +40,7 @@ public class InvestPro extends Application {
 
     private TradingWindow tradingWindow;
 
-   public static void main(String[] args) {
+    public static void main(String[] args) {
         launch(args);
     }
 
@@ -50,6 +52,9 @@ public class InvestPro extends Application {
     public void start(@NotNull Stage primaryStage) {
         this.primaryStage = Objects.requireNonNull(primaryStage, "primaryStage must not be null");
 
+        // Initialize strategy framework early
+        StrategyBootstrapper.initialize();
+
         configurePrimaryStage();
         configureRootScene();
 
@@ -60,21 +65,29 @@ public class InvestPro extends Application {
 
     private void configurePrimaryStage() {
         primaryStage.setTitle(buildWindowTitle());
+
+        // Set window icon
+        try {
+            Image icon = new Image(getClass().getResourceAsStream("/Invest.png"));
+            primaryStage.getIcons().add(icon);
+        } catch (Exception e) {
+            System.err.println("Failed to load window icon: " + e.getMessage());
+        }
+
         primaryStage.setMinWidth(MIN_WIDTH);
         primaryStage.setMinHeight(MIN_HEIGHT);
         primaryStage.setWidth(DEFAULT_WIDTH);
         primaryStage.setHeight(DEFAULT_HEIGHT);
         primaryStage.setResizable(true);
 
-        primaryStage.setOnCloseRequest(_ -> {
+        primaryStage.setOnCloseRequest(event -> {
             shutdownTradingTerminal();
             Platform.exit();
         });
     }
 
     private void configureRootScene() {
-//        root.setStyle("-fx-background-color: #0f172a;");
-
+        // root.setStyle("-fx-background-color: #0f172a;");
 
         root.getChildren().clear();
         root.getStyleClass().add("root");
@@ -105,14 +118,12 @@ public class InvestPro extends Application {
             showErrorAlert(
                     "Terminal Error",
                     "Failed to open the trading terminal.",
-                    exception
-            );
+                    exception);
         } catch (Exception exception) {
             showErrorAlert(
                     "Terminal Error",
                     "Failed to open the trading terminal.",
-                    exception
-            );
+                    exception);
         }
     }
 
@@ -131,8 +142,7 @@ public class InvestPro extends Application {
         try {
             String cssResource = Objects.requireNonNull(
                     InvestPro.class.getResource("..\\..\\app.css"),
-                    "Missing /app.css resource"
-            ).toExternalForm();
+                    "Missing /app.css resource").toExternalForm();
 
             scene.getStylesheets().setAll(cssResource);
         } catch (Exception exception) {
@@ -180,7 +190,8 @@ public class InvestPro extends Application {
 
     private void showErrorAlert(String title, String message, Throwable throwable) {
         // Defer dialog display to allow JavaFX to finish animation/layout processing
-        // This prevents "showAndWait is not allowed during animation or layout processing" error
+        // This prevents "showAndWait is not allowed during animation or layout
+        // processing" error
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle(title);
@@ -188,8 +199,7 @@ public class InvestPro extends Application {
             alert.setContentText(
                     throwable == null || throwable.getMessage() == null
                             ? "Unknown error"
-                            : throwable.getMessage()
-            );
+                            : throwable.getMessage());
             alert.showAndWait();
         });
     }

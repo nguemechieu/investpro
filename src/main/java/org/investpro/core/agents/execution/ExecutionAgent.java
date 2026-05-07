@@ -7,6 +7,7 @@ import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.reasoning.ReasoningDecision;
 import org.investpro.core.agents.risk.RiskDecision;
 import org.investpro.core.agents.signal.Signal;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.models.trading.Order;
 import org.investpro.utils.Side;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
  * Final execution gate.
  * <p>
  * This is the only agent that is allowed to call exchange.createOrder(...).
+ * Uses StrategySignal to determine the action instead of just side direction.
  */
 public class ExecutionAgent implements Agent {
 
@@ -47,12 +49,14 @@ public class ExecutionAgent implements Agent {
         }
 
         if (!context.isAutoTradingEnabled()) {
-            context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Auto trading disabled."));
+            context.getEventBus()
+                    .publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Auto trading disabled."));
             return;
         }
 
         if (context.getExchange() == null || !Boolean.TRUE.equals(context.getExchange().isConnected())) {
-            context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Exchange is not connected."));
+            context.getEventBus().publishAsync(
+                    AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Exchange is not connected."));
             return;
         }
 
@@ -69,28 +73,32 @@ public class ExecutionAgent implements Agent {
         Signal signal = riskDecision != null && riskDecision.getSourcePayload() instanceof Signal s ? s : null;
 
         if (riskDecision == null || signal == null || signal.getTradePair() == null) {
-            context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Missing signal/risk payload."));
+            context.getEventBus().publishAsync(
+                    AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), "Missing signal/risk payload."));
             return;
         }
 
         try {
-            Side side = "SELL".equalsIgnoreCase(riskDecision.getAction()) ? Side.SELL : Side.BUY;
+            // Extract strategy signal direction instead of converting action string
+            Side strategyDirection = signal.getSide() != null ? signal.getSide() : Side.HOLD;
+
             Order order = context.getExchange().createOrder(
                     0,
                     signal.getTradePair(),
                     "MARKET",
                     0.0,
                     riskDecision.getApprovedSize(),
-                    side,
+                    strategyDirection,
                     0.0,
                     0.0,
-                    0.0
-            );
+                    0.0);
 
             context.getExchange().createOrder(order)
-                    .thenAccept(response -> context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_SUBMITTED, name(), response)))
+                    .thenAccept(response -> context.getEventBus()
+                            .publishAsync(AgentEvent.execution(AgentEvent.ORDER_SUBMITTED, name(), response)))
                     .exceptionally(exception -> {
-                        context.getEventBus().publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), exception));
+                        context.getEventBus()
+                                .publishAsync(AgentEvent.execution(AgentEvent.ORDER_REJECTED, name(), exception));
                         return null;
                     });
         } catch (JsonProcessingException exception) {

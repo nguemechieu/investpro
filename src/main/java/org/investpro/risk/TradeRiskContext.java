@@ -2,6 +2,15 @@ package org.investpro.risk;
 
 import lombok.Builder;
 import lombok.Value;
+import org.investpro.enums.RiskProfile;
+import org.investpro.enums.MarketBehavior;
+import org.investpro.enums.ExecutionStrategy;
+import org.investpro.enums.LiquidityProfile;
+import org.investpro.enums.PsychologyProfile;
+import org.investpro.enums.ProbabilityLevel;
+import org.investpro.enums.CapitalProtection;
+import org.investpro.enums.SystemDesign;
+import org.investpro.enums.TradingSessionStatus;
 import org.investpro.models.trading.TradePair;
 
 /**
@@ -13,7 +22,8 @@ import org.investpro.models.trading.TradePair;
  * - TradeExecutionCoordinator.processSignal(...)
  * - ExecutionEngine.executeApprovedOrder(...)
  *
- * It is intentionally immutable and server-capable so it can later be sent to an
+ * It is intentionally immutable and server-capable so it can later be sent to
+ * an
  * authoritative backend decision service.
  */
 @Value
@@ -122,6 +132,13 @@ public class TradeRiskContext {
     CapitalProtection capitalProtection;
     SystemDesign systemDesign;
 
+    /** Current trading session status for the symbol. */
+    TradingSessionStatus tradingSessionStatus;
+
+    /** Human-readable notes for the symbol trading session. */
+    @Builder.Default
+    String tradingSessionNotes = "";
+
     // =========================================================================
     // Derived / calculated fields and risk limits
     // =========================================================================
@@ -130,11 +147,15 @@ public class TradeRiskContext {
     @Builder.Default
     double volatility = 0.0;
 
-    /** User/system max risk per trade as percent of equity, for example 1.0 = 1%. */
+    /**
+     * User/system max risk per trade as percent of equity, for example 1.0 = 1%.
+     */
     @Builder.Default
-    double maxRiskPerTrade = 1.0;
+    double maxRiskPerTrade = 2.0;
 
-    /** User/system max cumulative risk as percent of equity, for example 5.0 = 5%. */
+    /**
+     * User/system max cumulative risk as percent of equity, for example 5.0 = 5%.
+     */
     @Builder.Default
     double maxCumulativeRisk = 5.0;
 
@@ -454,7 +475,8 @@ public class TradeRiskContext {
     }
 
     /**
-     * Returns true if the context has the minimum inputs needed for risk evaluation.
+     * Returns true if the context has the minimum inputs needed for risk
+     * evaluation.
      */
     public boolean isValidForRiskEvaluation() {
         return hasValidSymbol()
@@ -464,7 +486,8 @@ public class TradeRiskContext {
     }
 
     /**
-     * Returns true if this context has enough information for bracket-style risk evaluation.
+     * Returns true if this context has enough information for bracket-style risk
+     * evaluation.
      */
     public boolean hasBracketRiskPlan() {
         return hasValidEntryPrice() && hasStopLoss() && hasTakeProfit();
@@ -482,7 +505,8 @@ public class TradeRiskContext {
                 .freeMargin(safePositive(freeMargin))
                 .accountBalance(safePositive(accountBalance))
                 .requestedPositionSize(safePositive(requestedPositionSize))
-                .requestedLeverage(requestedLeverage <= 0.0 || !Double.isFinite(requestedLeverage) ? 1.0 : requestedLeverage)
+                .requestedLeverage(
+                        requestedLeverage <= 0.0 || !Double.isFinite(requestedLeverage) ? 1.0 : requestedLeverage)
                 .entryPrice(safePositive(entryPrice))
                 .stopLossPrice(safePositive(stopLossPrice))
                 .takeProfitPrice(safePositive(takeProfitPrice))
@@ -499,6 +523,8 @@ public class TradeRiskContext {
                 .maxAllowedDrawdownPercent(safePositive(maxAllowedDrawdownPercent))
                 .estimatedSlippagePercent(safePositive(estimatedSlippagePercent))
                 .estimatedFee(safePositive(estimatedFee))
+                .tradingSessionStatus(tradingSessionStatus)
+                .tradingSessionNotes(tradingSessionNotes == null ? "" : tradingSessionNotes)
                 .build();
     }
 

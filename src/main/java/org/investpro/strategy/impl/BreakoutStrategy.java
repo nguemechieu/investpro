@@ -1,18 +1,19 @@
 package org.investpro.strategy.impl;
 
-import org.investpro.strategy.StrategyCategory;
-import org.investpro.strategy.StrategyContext;
-import org.investpro.strategy.StrategyMetadata;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
-import org.investpro.market.AssetClass;
-import org.investpro.market.ContractType;
+import org.investpro.enums.MarketBehavior;
+import org.investpro.enums.StrategyCategory;
+import org.investpro.enums.AssetClass;
+import org.investpro.enums.ContractType;
+import org.investpro.strategy.StrategyContext;
+import org.investpro.strategy.StrategyMetadata;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.timeframe.Timeframe;
-import org.investpro.trading.MarketBehavior;
-import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -20,44 +21,58 @@ import static org.investpro.utils.Side.BUY;
 import static org.investpro.utils.Side.SELL;
 
 /**
- * Breakout Strategy
- * Trades breakouts above resistance or below support levels.
- * Uses Donchian channels for dynamic levels.
+ * Breakout Strategy.
+ *
+ * Trades breakouts above resistance or below support levels using Donchian channels.
+ *
+ * Best for:
+ * - breakout markets
+ * - high-volatility markets
+ * - expanding trend conditions
  */
 @Slf4j
 public class BreakoutStrategy extends BaseStrategy {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BreakoutStrategy.class);
+
+    public static final String STRATEGY_ID = "breakout";
+
+    private static final int DONCHIAN_PERIOD = 20;
+    private static final int MINIMUM_BARS_REQUIRED = 60;
+
+    private static final double TAKE_PROFIT_BUFFER = 0.02;
 
     public BreakoutStrategy() {
         super(buildMetadata());
     }
 
     private static StrategyMetadata buildMetadata() {
-        Set<AssetClass> assets = new HashSet<>();
-        assets.add(AssetClass.CRYPTO_ASSET);
-        assets.add(AssetClass.FIAT_CURRENCY);
-        assets.add(AssetClass.COMMODITY);
+        Set<AssetClass> assets = EnumSet.of(
+                AssetClass.CRYPTO_ASSET,
+                AssetClass.FIAT_CURRENCY,
+                AssetClass.COMMODITY
+        );
 
-        Set<ContractType> contracts = new HashSet<>();
-        contracts.add(ContractType.SPOT);
-        contracts.add(ContractType.PERPETUAL);
+        Set<ContractType> contracts = EnumSet.of(
+                ContractType.SPOT,
+                ContractType.PERPETUAL
+        );
 
-        Set<Timeframe> timeframes = new HashSet<>();
-        timeframes.add(Timeframe.M5);
-        timeframes.add(Timeframe.M15);
-        timeframes.add(Timeframe.H1);
-        timeframes.add(Timeframe.H4);
-        timeframes.add(Timeframe.D1);
+        Set<Timeframe> timeframes = EnumSet.of(
+                Timeframe.M5,
+                Timeframe.M15,
+                Timeframe.H1,
+                Timeframe.H4,
+                Timeframe.D1
+        );
 
         return StrategyMetadata.builder()
-                .strategyId("breakout-v1")
+                .strategyId(STRATEGY_ID)
                 .displayName("Breakout Strategy")
-                .description("Trades breakouts using Donchian channels and volume confirmation")
+                .description("Trades breakouts using Donchian channels and optional volume confirmation.")
                 .category(StrategyCategory.BREAKOUT)
                 .supportedAssetClasses(assets)
                 .supportedContractTypes(contracts)
                 .supportedTimeframes(timeframes)
-                .minimumBarsRequired(60)
+                .minimumBarsRequired(MINIMUM_BARS_REQUIRED)
                 .expectedHoldingPeriod("hours-days")
                 .riskLevel(StrategyMetadata.RiskLevel.MEDIUM)
                 .version("1.0.0")
@@ -67,44 +82,108 @@ public class BreakoutStrategy extends BaseStrategy {
     }
 
     @Override
-    public @NotNull Side generateSignal(@NotNull StrategyContext context) {
+    public StrategySignal generateSignal(@NotNull StrategyContext context) {
         if (hasEnoughBars(context)) {
-            return noSignal(context, "Insufficient bars");
+            return noSignal(context, "Insufficient bars for breakout analysis");
+        }
+
+        if (context.getCandles() == null || context.getCandles().size() < DONCHIAN_PERIOD + 1) {
+            return noSignal(context, "Not enough candle data for Donchian breakout");
         }
 
         try {
             List<CandleData> candles = context.getCandles();
+
             CandleData latest = candles.get(candles.size() - 1);
             CandleData previous = candles.get(candles.size() - 2);
-            double currentPrice = context.getCurrentPrice();
 
-            // Calculate Donchian channels (20-period)
-            double[] donchian = calculateDonchian(candles, 20);
-            double resistance = donchian[0];
-            double support = donchian[1];
-
-            // Check for breakout above resistance
-            if (latest.closePrice() > resistance && previous.closePrice() <= resistance) {
-                updateSignalDescription("Breakout above resistance level");
-                return buildBuySignal(context, currentPrice, support, resistance * 1.02);
+            if (latest == null || previous == null) {
+                return noSignal(context, "Latest or previous candle is missing");
             }
 
-            // Check for breakout below support
-            if (latest.closePrice() < support && previous.closePrice() >= support) {
-                updateSignalDescription("Breakout below support level");
-                return buildSellSignal(context, currentPrice, resistance, support * 0.98);
+            double currentPrice = resolveCurrentPrice(context, latest);
+
+            if (currentPrice <= 0) {
+                return noSignal(context, "Invalid current price");
             }
 
-            return noSignal(context, "No breakout detected");
-        } catch (Exception e) {
-            log.error("Error in breakout signal", e);
-            return noSignal(context, "Analysis error");
+            DonchianChannel donchian = calculateDonchianExcludingLatest(candles, DONCHIAN_PERIOD);
+
+            if (!donchian.isValid()) {
+                return noSignal(context, "Invalid Donchian channel values");
+            }
+
+            double resistance = donchian.resistance();
+            double support = donchian.support();
+
+            boolean bullishBreakout =
+                    latest.closePrice() > resistance
+                            && previous.closePrice() <= resistance;
+
+            boolean bearishBreakout =
+                    latest.closePrice() < support
+                            && previous.closePrice() >= support;
+
+            if (bullishBreakout) {
+                double stopLoss = support;
+                double takeProfit = currentPrice * (1.0 + TAKE_PROFIT_BUFFER);
+
+                updateSignalDescription(
+                        "Bullish breakout confirmed: close above Donchian resistance. " +
+                                "price=" + currentPrice +
+                                ", resistance=" + resistance +
+                                ", support=" + support
+                );
+
+                log.debug(
+                        "Breakout BUY signal: symbol={}, price={}, resistance={}, support={}",
+                        context.getSymbol(),
+                        currentPrice,
+                        resistance,
+                        support
+                );
+
+                return buildBuySignal(context, currentPrice, stopLoss, takeProfit, resistance, support);
+            }
+
+            if (bearishBreakout) {
+                double stopLoss = resistance;
+                double takeProfit = currentPrice * (1.0 - TAKE_PROFIT_BUFFER);
+
+                updateSignalDescription(
+                        "Bearish breakout confirmed: close below Donchian support. " +
+                                "price=" + currentPrice +
+                                ", resistance=" + resistance +
+                                ", support=" + support
+                );
+
+                log.debug(
+                        "Breakout SELL signal: symbol={}, price={}, resistance={}, support={}",
+                        context.getSymbol(),
+                        currentPrice,
+                        resistance,
+                        support
+                );
+
+                return buildSellSignal(context, currentPrice, stopLoss, takeProfit, resistance, support);
+            }
+
+            return noSignal(
+                    context,
+                    "No breakout detected: price=" + currentPrice +
+                            ", resistance=" + resistance +
+                            ", support=" + support
+            );
+
+        } catch (Exception exception) {
+            log.error(
+                    "Error generating breakout signal for symbol={}",
+                    context.getSymbol(),
+                    exception
+            );
+
+            return noSignal(context, "Breakout analysis error: " + exception.getMessage());
         }
-    }
-
-    @Override
-    public boolean supportsMarketBehavior(org.investpro.risk.MarketBehavior marketBehavior) {
-        return true;
     }
 
     @Override
@@ -113,29 +192,163 @@ public class BreakoutStrategy extends BaseStrategy {
     }
 
     @Override
-    public boolean supportsMarketBehavior(@NotNull MarketBehavior marketBehavior) {
-        // Breakout works in trending and volatile markets
-        return true;
+    public Object getId() {
+        return STRATEGY_ID ;
     }
 
-    private double[] calculateDonchian(List<CandleData> candles, int period) {
-        int start = Math.max(0, candles.size() - period);
-        double highest = Double.MIN_VALUE;
-        double lowest = Double.MAX_VALUE;
+    @Override
+    public boolean supportsMarketBehavior(@NotNull MarketBehavior marketBehavior) {
+        return marketBehavior == MarketBehavior.BREAKOUT
+                || marketBehavior == MarketBehavior.HIGH_VOLATILITY
+                || marketBehavior == MarketBehavior.TRENDING_UP
+                || marketBehavior == MarketBehavior.TRENDING_DOWN;
+    }
 
-        for (int i = start; i < candles.size(); i++) {
-            highest = Math.max(highest, candles.get(i).highPrice());
-            lowest = Math.min(lowest, candles.get(i).lowPrice());
+    /**
+     * Calculates the Donchian channel using candles before the latest candle.
+     *
+     * This avoids look-ahead bias. If we include the latest candle in resistance/support,
+     * the breakout check can become unreliable because the breakout candle creates the level.
+     */
+    private DonchianChannel calculateDonchianExcludingLatest(@NotNull List<CandleData> candles, int period) {
+        if (candles.size() < period + 1) {
+            return DonchianChannel.invalid();
         }
 
-        return new double[] { highest, lowest };
+        int endExclusive = candles.size() - 1;
+        int start = endExclusive - period;
+
+        double highest = Double.NEGATIVE_INFINITY;
+        double lowest = Double.POSITIVE_INFINITY;
+
+        for (int i = start; i < endExclusive; i++) {
+            CandleData candle = candles.get(i);
+
+            if (candle == null || candle.highPrice() <= 0 || candle.lowPrice() <= 0) {
+                return DonchianChannel.invalid();
+            }
+
+            highest = Math.max(highest, candle.highPrice());
+            lowest = Math.min(lowest, candle.lowPrice());
+        }
+
+        if (highest == Double.NEGATIVE_INFINITY || lowest == Double.POSITIVE_INFINITY) {
+            return DonchianChannel.invalid();
+        }
+
+        return new DonchianChannel(highest, lowest);
     }
 
-    private Side buildBuySignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        return BUY;
+    private double resolveCurrentPrice(@NotNull StrategyContext context, @NotNull CandleData latest) {
+        double currentPrice = context.getCurrentPrice();
+
+        if (currentPrice > 0) {
+            return currentPrice;
+        }
+
+        return latest.closePrice();
     }
 
-    private Side buildSellSignal(StrategyContext context, double entry, double stopLoss, double takeProfit) {
-        return SELL;
+    private StrategySignal buildBuySignal(
+            @NotNull StrategyContext context,
+            double entry,
+            double stopLoss,
+            double takeProfit,
+            double resistance,
+            double support
+    ) {
+        double riskRewardRatio = calculateRiskRewardRatio(entry, stopLoss, takeProfit);
+        double confidence = calculateConfidence(riskRewardRatio, entry, resistance, support);
+
+        return StrategySignal.builder()
+                .strategyId(STRATEGY_ID)
+                .symbol(context.getSymbol().toString('/'))
+                .timeframe(context.getTimeframe().toString())
+                .side(BUY)
+                .confidence(confidence)
+                .entryPrice(entry)
+                .stopLossPrice(stopLoss)
+                .takeProfitPrice(takeProfit)
+                .riskRewardRatio(riskRewardRatio)
+                .sessionStatus(context.getTradingSessionStatus())
+                .sessionNotes(context.getTradingSession() == null ? null : context.getTradingSession().getNotes())
+                .reason("Bullish breakout setup: price closed above Donchian resistance")
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private StrategySignal buildSellSignal(
+            @NotNull StrategyContext context,
+            double entry,
+            double stopLoss,
+            double takeProfit,
+            double resistance,
+            double support
+    ) {
+        double riskRewardRatio = calculateRiskRewardRatio(entry, stopLoss, takeProfit);
+        double confidence = calculateConfidence(riskRewardRatio, entry, resistance, support);
+
+        return StrategySignal.builder()
+                .strategyId(STRATEGY_ID)
+                .symbol(context.getSymbol().toString('/'))
+                .timeframe(context.getTimeframe().toString())
+                .side(SELL)
+                .confidence(confidence)
+                .entryPrice(entry)
+                .stopLossPrice(stopLoss)
+                .takeProfitPrice(takeProfit)
+                .riskRewardRatio(riskRewardRatio)
+                .sessionStatus(context.getTradingSessionStatus())
+                .sessionNotes(context.getTradingSession() == null ? null : context.getTradingSession().getNotes())
+                .reason("Bearish breakout setup: price closed below Donchian support")
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private double calculateRiskRewardRatio(double entry, double stopLoss, double takeProfit) {
+        double risk = Math.abs(entry - stopLoss);
+        double reward = Math.abs(takeProfit - entry);
+
+        if (risk <= 0) {
+            return 0.0;
+        }
+
+        return reward / risk;
+    }
+
+    private double calculateConfidence(
+            double riskRewardRatio,
+            double entry,
+            double resistance,
+            double support
+    ) {
+        double confidence = 0.62;
+
+        if (riskRewardRatio >= 2.0) {
+            confidence += 0.10;
+        } else if (riskRewardRatio >= 1.5) {
+            confidence += 0.05;
+        }
+
+        double channelWidth = Math.abs(resistance - support) / entry;
+
+        if (channelWidth >= 0.03) {
+            confidence += 0.08;
+        } else if (channelWidth >= 0.015) {
+            confidence += 0.04;
+        }
+
+        return Math.min(confidence, 0.85);
+    }
+
+    private record DonchianChannel(double resistance, double support) {
+
+        private static DonchianChannel invalid() {
+            return new DonchianChannel(0.0, 0.0);
+        }
+
+        private boolean isValid() {
+            return resistance > 0 && support > 0 && resistance > support;
+        }
     }
 }

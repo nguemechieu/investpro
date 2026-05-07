@@ -1,17 +1,15 @@
 package org.investpro.strategy;
 
-import org.investpro.market.AssetClass;
-import org.investpro.market.ContractType;
-import org.investpro.risk.MarketBehavior;
+import org.investpro.enums.AssetClass;
+import org.investpro.enums.ContractType;
+import org.investpro.enums.MarketBehavior;
 import org.investpro.timeframe.Timeframe;
-import org.investpro.utils.Side;
-import org.jetbrains.annotations.NotNull;
 
 public interface TradingStrategy {
 
     StrategyMetadata getMetadata();
 
-    @NotNull Side generateSignal(StrategyContext context);
+    StrategySignal generateSignal(StrategyContext context);
 
     boolean supportsAssetClass(AssetClass assetClass);
 
@@ -20,8 +18,6 @@ public interface TradingStrategy {
     boolean supportsTimeframe(Timeframe timeframe);
 
     boolean supportsMarketBehavior(MarketBehavior marketBehavior);
-
-    boolean supportsMarketBehavior(@NotNull org.investpro.trading.MarketBehavior marketBehavior);
 
     int requiredWarmupBars();
 
@@ -32,4 +28,8 @@ public interface TradingStrategy {
     void validateConfiguration();
 
     String getLastSignalDescription();
+
+    Object getName();
+
+    Object getId();
 }

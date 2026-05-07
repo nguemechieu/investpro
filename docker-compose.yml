@@ -1,0 +1,70 @@
+services:
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: investpro-postgres
+    environment:
+      POSTGRES_DB: investpro
+      POSTGRES_USER: investpro
+      POSTGRES_PASSWORD: investpro123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U investpro -d investpro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - investpro-network
+
+  # InvestPro Application with GUI and PostgreSQL
+  investpro-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: investpro-app
+    environment:
+      # Database Configuration (PostgreSQL)
+      DB_URL: jdbc:postgresql://postgres:5432/investpro
+      DB_USER: investpro
+      DB_PASSWORD: investpro123
+      DB_DRIVER: org.postgresql.Driver
+      
+      # Display and VNC settings
+      DISPLAY: ":0"
+      VNC_PASSWORD: investpro
+      GEOMETRY: "1280x1024"
+      DEPTH: "24"
+      
+      # Application settings
+      JAVA_OPTS: "-Xmx2g -Xms512m -Djava.awt.headless=false"
+    
+    ports:
+      - "8080:8080"      # Application API port
+      - "5900:5900"      # VNC port for direct VNC clients
+      - "6080:6080"      # noVNC web port (if using built-in server)
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    volumes:
+      - ./logs:/app/logs
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    
+    networks:
+      - investpro-network
+    
+    # Restart policy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  investpro-network:
+    driver: bridge

@@ -1,10 +1,10 @@
 package org.investpro.core.agents.modules;
 
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.core.SystemCoreDependencies;
 import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentModule;
 import org.investpro.core.agents.AgentRegistry;
+import org.investpro.core.agents.SystemCoreDependencies;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;

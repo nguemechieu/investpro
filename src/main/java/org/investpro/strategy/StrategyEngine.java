@@ -1,17 +1,23 @@
 package org.investpro.strategy;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
-import org.investpro.market.AssetClass;
-import org.investpro.market.ContractType;
+import org.investpro.enums.AssetClass;
+import org.investpro.enums.ContractType;
+import org.investpro.enums.TradingSessionStatus;
 import org.investpro.models.trading.TradePair;
+import org.investpro.research.StrategyRankingEngine;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,31 +29,36 @@ import static org.investpro.utils.Side.HOLD;
 import static org.investpro.utils.Side.SELL;
 
 /**
- * StrategyEngine coordinates multi-strategy signal generation and execution.
+ * StrategyEngine coordinates multi-strategy signal generation.
  *
  * Responsibilities:
  * - find compatible strategies
- * - generate normalized Side signals (BUY, SELL, HOLD)
- * - build consensus signals
- * - cache last signals
- * - forward executable signals to TradeExecutionCoordinator
+ * - generate normalized StrategySignal objects
+ * - build consensus StrategySignal
+ * - cache last strategy signals
+ * - forward executable signals to the execution/risk pipeline
  */
 @Slf4j
+@Getter
+@Setter
 public class StrategyEngine {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StrategyEngine.class);
 
     private final TradeExecutionCoordinator tradeExecutionCoordinator;
     private final StrategyRegistry strategyRegistry;
 
     private final Map<String, StrategyContext> contextCache = new ConcurrentHashMap<>();
-    private final Map<String, Side> lastSignalCache = new ConcurrentHashMap<>();
+    private final Map<String, StrategySignal> lastSignalCache = new ConcurrentHashMap<>();
     private final Map<String, Long> lastSignalTimestampCache = new ConcurrentHashMap<>();
+
+    private StrategyRankingEngine strategyRankingEngine;
 
     public StrategyEngine(@NotNull TradeExecutionCoordinator tradeExecutionCoordinator) {
         this.tradeExecutionCoordinator = Objects.requireNonNull(
                 tradeExecutionCoordinator,
-                "tradeExecutionCoordinator must not be null");
+                "tradeExecutionCoordinator must not be null"
+        );
         this.strategyRegistry = StrategyRegistry.getInstance();
+        this.strategyRankingEngine = new StrategyRankingEngine();
     }
 
     // ============================================================================
@@ -55,21 +66,19 @@ public class StrategyEngine {
     // ============================================================================
 
     /**
-     * Generate signals from all compatible strategies for the given context.
-     *
-     * @param context market context with current data
-     * @return generated Side enum values (BUY, SELL, HOLD)
+     * Generates StrategySignal objects from all compatible strategies.
      */
-    public @NotNull List<Side> generateSignalsForContext(@NotNull StrategyContext context) {
+    public @NotNull List<StrategySignal> generateSignalsForContext(@NotNull StrategyContext context) {
         Objects.requireNonNull(context, "context must not be null");
 
+        cacheContext(context);
+
         List<TradingStrategy> compatibleStrategies = getCompatibleStrategies(context);
-        List<Side> signals = new ArrayList<>();
+        List<StrategySignal> signals = new ArrayList<>();
 
         for (TradingStrategy strategy : compatibleStrategies) {
             try {
-                @NotNull
-                Side signal = generateSignalFromStrategy(strategy, context);
+                StrategySignal signal = generateSignalFromStrategy(strategy, context);
 
                 signals.add(signal);
                 cacheSignal(strategy.getMetadata().getStrategyId(), context, signal);
@@ -79,7 +88,8 @@ public class StrategyEngine {
                         "StrategyEngine: Error generating signal from strategy {}: {}",
                         safeStrategyId(strategy),
                         exception.getMessage(),
-                        exception);
+                        exception
+                );
             }
         }
 
@@ -87,11 +97,12 @@ public class StrategyEngine {
     }
 
     /**
-     * Generate a signal from a specific strategy ID.
+     * Generates a StrategySignal from a specific strategy ID.
      */
-    public @Nullable Side generateSignalFromStrategyId(
+    public @NotNull StrategySignal generateSignalFromStrategyId(
             @NotNull String strategyId,
-            @NotNull StrategyContext context) {
+            @NotNull StrategyContext context
+    ) {
         Objects.requireNonNull(strategyId, "strategyId must not be null");
         Objects.requireNonNull(context, "context must not be null");
 
@@ -99,18 +110,19 @@ public class StrategyEngine {
 
         if (strategy == null) {
             log.warn("StrategyEngine: Strategy not found: {}", strategyId);
-            return null;
+            return holdSignal(null, context, "Strategy not found: " + strategyId);
         }
 
         return generateSignalFromStrategy(strategy, context);
     }
 
     /**
-     * Generate a signal from a strategy object.
+     * Generates a StrategySignal from a strategy object.
      */
-    public @NotNull Side generateSignalFromStrategy(
+    public @NotNull StrategySignal generateSignalFromStrategy(
             @NotNull TradingStrategy strategy,
-            @NotNull StrategyContext context) {
+            @NotNull StrategyContext context
+    ) {
         Objects.requireNonNull(strategy, "strategy must not be null");
         Objects.requireNonNull(context, "context must not be null");
 
@@ -118,17 +130,20 @@ public class StrategyEngine {
 
         if (!isStrategyCompatible(strategy, context)) {
             log.debug("StrategyEngine: Strategy {} not compatible with context", strategyId);
-            return HOLD;
+            return holdSignal(strategy, context, "Strategy is not compatible with this context");
         }
 
         if (!strategy.isEnabled()) {
             log.debug("StrategyEngine: Strategy {} is disabled", strategyId);
-            return HOLD;
+            return holdSignal(strategy, context, "Strategy is disabled");
         }
 
         try {
-            @NotNull
-            Side signal = strategy.generateSignal(context);
+            StrategySignal signal = strategy.generateSignal(context);
+
+            if (signal == null) {
+                return holdSignal(strategy, context, "Strategy returned null signal");
+            }
 
             return signal;
 
@@ -137,13 +152,15 @@ public class StrategyEngine {
                     "StrategyEngine: Error executing strategy {}: {}",
                     strategyId,
                     exception.getMessage(),
-                    exception);
-            return HOLD;
+                    exception
+            );
+
+            return holdSignal(strategy, context, "Strategy execution error: " + exception.getMessage());
         }
     }
 
     /**
-     * Get all enabled strategies compatible with the context.
+     * Gets all enabled strategies compatible with the context.
      */
     public @NotNull List<TradingStrategy> getCompatibleStrategies(@NotNull StrategyContext context) {
         Objects.requireNonNull(context, "context must not be null");
@@ -155,11 +172,13 @@ public class StrategyEngine {
     }
 
     /**
-     * Check if a strategy is compatible with the context.
+     * Checks whether a strategy supports the current symbol, timeframe, asset type,
+     * contract type, warmup bars, and market behavior.
      */
     public boolean isStrategyCompatible(
             @NotNull TradingStrategy strategy,
-            @NotNull StrategyContext context) {
+            @NotNull StrategyContext context
+    ) {
         Objects.requireNonNull(strategy, "strategy must not be null");
         Objects.requireNonNull(context, "context must not be null");
 
@@ -168,6 +187,19 @@ public class StrategyEngine {
         }
 
         if (context.getTimeframe() == null) {
+            return false;
+        }
+
+        TradingSessionStatus sessionStatus = context.getTradingSessionStatus();
+        if (sessionStatus == null && context.getSymbol().getTradingSession() != null) {
+            sessionStatus = context.getSymbol().getTradingSessionStatus();
+        }
+        if (sessionStatus != null && !sessionStatus.isTradable()) {
+            log.debug(
+                    "StrategyEngine: Strategy {} incompatible for {} because trading session is {}",
+                    safeStrategyId(strategy),
+                    context.getSymbol(),
+                    sessionStatus);
             return false;
         }
 
@@ -189,12 +221,8 @@ public class StrategyEngine {
             return false;
         }
 
-        if (context.getMarketBehavior() != null
-                && !strategy.supportsMarketBehavior(context.getMarketBehavior())) {
-            return false;
-        }
-
-        return true;
+        return context.getMarketBehavior() == null
+                || strategy.supportsMarketBehavior(context.getMarketBehavior());
     }
 
     // ============================================================================
@@ -202,63 +230,95 @@ public class StrategyEngine {
     // ============================================================================
 
     /**
-     * Generate a consensus Side requiring multiple strategies to agree.
+     * Generates a consensus StrategySignal requiring multiple strategies to agree.
      *
-     * @param context       market context
-     * @param minAgreements minimum strategies that must agree on same side
-     * @return consensus side (BUY, SELL, or HOLD)
+     * If no consensus exists, returns a HOLD StrategySignal.
      */
-    public @NotNull Side generateConsensusSignal(
+    public @NotNull StrategySignal generateConsensusSignal(
             @NotNull StrategyContext context,
-            int minAgreements) {
+            int minAgreements
+    ) {
         Objects.requireNonNull(context, "context must not be null");
 
         if (minAgreements <= 0) {
             minAgreements = 1;
         }
 
-        List<Side> signals = generateSignalsForContext(context);
+        List<StrategySignal> signals = generateSignalsForContext(context);
 
-        long buySignals = signals.stream()
-                .filter(signal -> signal == BUY)
-                .count();
+        List<StrategySignal> buySignals = signals.stream()
+                .filter(signal -> signal.getSide() == BUY)
+                .toList();
 
-        long sellSignals = signals.stream()
-                .filter(signal -> signal == SELL)
-                .count();
+        List<StrategySignal> sellSignals = signals.stream()
+                .filter(signal -> signal.getSide() == SELL)
+                .toList();
 
-        if (buySignals >= minAgreements) {
-            return BUY;
+        if (buySignals.size() >= minAgreements) {
+            return buildConsensusFromSignals(context, BUY, buySignals);
         }
 
-        if (sellSignals >= minAgreements) {
-            return SELL;
+        if (sellSignals.size() >= minAgreements) {
+            return buildConsensusFromSignals(context, SELL, sellSignals);
         }
 
         log.info(
                 "StrategyEngine: No consensus. BUY={}, SELL={}, required={}",
-                buySignals,
-                sellSignals,
-                minAgreements);
+                buySignals.size(),
+                sellSignals.size(),
+                minAgreements
+        );
 
-        return HOLD;
+        return holdSignal(null, context, "No strategy consensus");
     }
 
     /**
-     * Process a generated signal through the execution pipeline.
+     * Selects the best actionable signal from all compatible strategies.
+     *
+     * Useful when you do not require consensus but want the highest-confidence
+     * valid BUY/SELL signal.
+     */
+    public @NotNull StrategySignal generateBestSignal(@NotNull StrategyContext context) {
+        Objects.requireNonNull(context, "context must not be null");
+
+        return generateSignalsForContext(context)
+                .stream()
+                .filter(signal -> signal.getSide() == BUY || signal.getSide() == SELL)
+                .max(Comparator.comparingDouble(StrategySignal::getConfidence))
+                .orElseGet(() -> holdSignal(null, context, "No actionable strategy signal"));
+    }
+
+    /**
+     * Process a generated StrategySignal through the execution pipeline.
+     *
+     * Important:
+     * This should still go through risk management before real execution.
      */
     public void onSignalGenerated(
-            @NotNull Side signal,
-            @NotNull TradeRiskContext riskContext) {
+            @NotNull StrategySignal signal,
+            @NotNull TradeRiskContext riskContext
+    ) {
         Objects.requireNonNull(signal, "signal must not be null");
         Objects.requireNonNull(riskContext, "riskContext must not be null");
 
-        if (signal == HOLD) {
-            log.debug("StrategyEngine: Signal is HOLD, skipping execution.");
+        if (signal.getSide() == HOLD) {
+            log.debug("StrategyEngine: Signal is HOLD, skipping execution. reason={}", signalReason(signal));
             return;
         }
 
-        log.info("StrategyEngine: Signal generated: {}. Processing through execution coordinator.", signal);
+        log.info(
+                "StrategyEngine: StrategySignal generated: strategyId={}, symbol={}, side={}, confidence={}",
+                signal.getStrategyId(),
+                signal.getSymbol(),
+                signal.getSide(),
+                signal.getConfidence()
+        );
+
+        // Do not execute directly here unless your TradeExecutionCoordinator already
+        // performs risk approval internally.
+        //
+        // Preferred architecture:
+        // StrategySignal -> RiskEngine.evaluateSignal(...) -> ExecutionCoordinator
     }
 
     // ============================================================================
@@ -268,17 +328,28 @@ public class StrategyEngine {
     public void cacheSignal(
             @NotNull String strategyId,
             @NotNull StrategyContext context,
-            @NotNull Side signal) {
+            @NotNull StrategySignal signal
+    ) {
+        Objects.requireNonNull(strategyId, "strategyId must not be null");
+        Objects.requireNonNull(context, "context must not be null");
+        Objects.requireNonNull(signal, "signal must not be null");
+
+        if (context.getSymbol() == null || context.getTimeframe() == null) {
+            log.warn("StrategyEngine: Cannot cache signal with missing symbol/timeframe.");
+            return;
+        }
+
         String cacheKey = buildCacheKey(strategyId, context.getSymbol(), context.getTimeframe());
 
         lastSignalCache.put(cacheKey, signal);
         lastSignalTimestampCache.put(cacheKey, System.currentTimeMillis());
     }
 
-    public @Nullable Side getLastCachedSignal(
+    public @Nullable StrategySignal getLastCachedSignal(
             @NotNull String strategyId,
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe) {
+            @NotNull Timeframe timeframe
+    ) {
         String cacheKey = buildCacheKey(strategyId, symbol, timeframe);
         return lastSignalCache.get(cacheKey);
     }
@@ -286,14 +357,16 @@ public class StrategyEngine {
     public @Nullable Long getLastSignalTimestamp(
             @NotNull String strategyId,
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe) {
+            @NotNull Timeframe timeframe
+    ) {
         String cacheKey = buildCacheKey(strategyId, symbol, timeframe);
         return lastSignalTimestampCache.get(cacheKey);
     }
 
     public @Nullable StrategyContext getCachedContext(
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe) {
+            @NotNull Timeframe timeframe
+    ) {
         String cacheKey = buildContextCacheKey(symbol, timeframe);
         return contextCache.get(cacheKey);
     }
@@ -330,23 +403,104 @@ public class StrategyEngine {
     // Utility Methods
     // ============================================================================
 
-    private @NotNull Side holdSignal(
+    private @NotNull StrategySignal holdSignal(
             @Nullable TradingStrategy strategy,
             @NotNull StrategyContext context,
-            @NotNull String reason) {
-        return HOLD;
+            @NotNull String reason
+    ) {
+        String strategyId = strategy == null ? "strategy-engine" : safeStrategyId(strategy);
+
+        return StrategySignal.builder()
+                .strategyId(strategyId)
+                .symbol(context.getSymbol().toString('/'))
+                .timeframe(context.getTimeframe().toString())
+                .side(HOLD)
+                .confidence(0.0)
+                .entryPrice(context.getCurrentPrice())
+                .stopLossPrice(0.0)
+                .takeProfitPrice(0.0)
+                .riskRewardRatio(0.0)
+                .sessionStatus(context.getTradingSessionStatus())
+                .sessionNotes(context.getTradingSession() == null ? null : context.getTradingSession().getNotes())
+                .reason(reason)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private @NotNull StrategySignal buildConsensusFromSignals(
+            @NotNull StrategyContext context,
+            @NotNull Side side,
+            @NotNull List<StrategySignal> agreeingSignals
+    ) {
+        double avgConfidence = agreeingSignals.stream()
+                .mapToDouble(StrategySignal::getConfidence)
+                .average()
+                .orElse(0.0);
+
+        double avgEntry = agreeingSignals.stream()
+                .mapToDouble(StrategySignal::getEntryPrice)
+                .filter(value -> value > 0)
+                .average()
+                .orElse(context.getCurrentPrice());
+
+        double avgStopLoss = agreeingSignals.stream()
+                .mapToDouble(StrategySignal::getStopLossPrice)
+                .filter(value -> value > 0)
+                .average()
+                .orElse(0.0);
+
+        double avgTakeProfit = agreeingSignals.stream()
+                .mapToDouble(StrategySignal::getTakeProfitPrice)
+                .filter(value -> value > 0)
+                .average()
+                .orElse(0.0);
+
+        double riskRewardRatio = calculateRiskRewardRatio(avgEntry, avgStopLoss, avgTakeProfit);
+
+        String strategyIds = agreeingSignals.stream()
+                .map(StrategySignal::getStrategyId)
+                .collect(Collectors.joining(","));
+
+        return StrategySignal.builder()
+                .strategyId("consensus:" + strategyIds)
+                .symbol(context.getSymbol().toString('/'))
+                .timeframe(context.getTimeframe().toString())
+                .side(side)
+                .confidence(avgConfidence)
+                .entryPrice(avgEntry)
+                .stopLossPrice(avgStopLoss)
+                .takeProfitPrice(avgTakeProfit)
+                .riskRewardRatio(riskRewardRatio)
+                .sessionStatus(context.getTradingSessionStatus())
+                .sessionNotes(context.getTradingSession() == null ? null : context.getTradingSession().getNotes())
+                .reason("Consensus signal from strategies: " + strategyIds)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private double calculateRiskRewardRatio(double entry, double stopLoss, double takeProfit) {
+        double risk = Math.abs(entry - stopLoss);
+        double reward = Math.abs(takeProfit - entry);
+
+        if (risk <= 0) {
+            return 0.0;
+        }
+
+        return reward / risk;
     }
 
     private String buildCacheKey(
             @NotNull String strategyId,
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe) {
+            @NotNull Timeframe timeframe
+    ) {
         return String.format("signal:%s:%s:%s", strategyId, symbol.getSymbol(), timeframe);
     }
 
     private String buildContextCacheKey(
             @NotNull TradePair symbol,
-            @NotNull Timeframe timeframe) {
+            @NotNull Timeframe timeframe
+    ) {
         return String.format("context:%s:%s", symbol.getSymbol(), timeframe);
     }
 
@@ -356,5 +510,18 @@ public class StrategyEngine {
         }
 
         return strategy.getMetadata().getStrategyId();
+    }
+
+    private String signalReason(@NotNull StrategySignal signal) {
+        try {
+            if (signal.getReason() != null) {
+                return signal.getReason();
+            }
+        } catch (Exception ignored) {
+            // Some StrategySignal versions may use reasons instead of reason.
+            log.error(ignored.getMessage(), ignored);
+        }
+
+        return "";
     }
 }

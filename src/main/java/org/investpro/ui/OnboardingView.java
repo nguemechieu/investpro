@@ -101,7 +101,7 @@ public class OnboardingView extends StackPane {
 
         Button forgetButton = new Button("Forget");
         forgetButton.setStyle("-fx-padding: 4 12; -fx-background-color: #1e40af; -fx-text-fill: white;");
-        forgetButton.setOnAction(_ -> forgetCredentials());
+        forgetButton.setOnAction(event -> forgetCredentials());
 
         Button forgotPasswordButton = new Button("Forgot Password");
         forgotPasswordButton.setStyle(
@@ -124,9 +124,9 @@ public class OnboardingView extends StackPane {
         Label validation = new Label();
         validation.setStyle("-fx-text-fill: #ef4444;");
         validation.setAlignment(Pos.CENTER);
-        forgotPasswordButton.setOnAction(_ -> showForgotPasswordDialog(validation));
+        forgotPasswordButton.setOnAction(event -> showForgotPasswordDialog(validation));
 
-        createButton.setOnAction(_ -> {
+        createButton.setOnAction(event -> {
             if (!emailField.isVisible()) {
                 emailField.setVisible(true);
                 emailField.setManaged(true);
@@ -151,7 +151,7 @@ public class OnboardingView extends StackPane {
             }
         });
 
-        loginButton.setOnAction(_ -> {
+        loginButton.setOnAction(event -> {
             char[] password = passwordField.getText().toCharArray();
             UserAuthService.AuthResult result = authService.signIn(usernameField.getText(), password);
             Arrays.fill(password, '\0');
@@ -196,7 +196,7 @@ public class OnboardingView extends StackPane {
         exchangeBox.getSelectionModel().select("COINBASE");
 
         // Autoload credentials when exchange changes
-        exchangeBox.setOnAction(_ -> {
+        exchangeBox.setOnAction(event -> {
             if (marketTypeBox.getValue() != null && venueBox.getValue() != null && exchangeBox.getValue() != null) {
                 showExchangeCredentialsStep();
             }
@@ -220,7 +220,7 @@ public class OnboardingView extends StackPane {
         Label validation = new Label();
         validation.setStyle("-fx-text-fill: #ef4444;");
         validation.setAlignment(Pos.CENTER);
-        loadMarketButton.setOnAction(_ -> {
+        loadMarketButton.setOnAction(event -> {
             if (marketTypeBox.getValue() == null || venueBox.getValue() == null || exchangeBox.getValue() == null) {
                 validation.setText("Select a market type, venue, and exchange.");
                 return;
@@ -319,7 +319,7 @@ public class OnboardingView extends StackPane {
         validation.setStyle("-fx-text-fill: #ef4444;");
         validation.setAlignment(Pos.CENTER);
 
-        continueButton.setOnAction(_ -> {
+        continueButton.setOnAction(event -> {
             // For OANDA, only token is required (Account ID is optional - can be
             // auto-detected)
             if (selectedExchange.equals("OANDA")) {
@@ -396,7 +396,7 @@ public class OnboardingView extends StackPane {
             showLoadingOverlay();
         });
 
-        backButton.setOnAction(_ -> showConfigurationStep());
+        backButton.setOnAction(event -> showConfigurationStep());
 
         Label title = new Label("Exchange Credentials");
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
@@ -450,7 +450,7 @@ public class OnboardingView extends StackPane {
 
         info.setText(infoText);
 
-        helpButton.setOnAction(_ -> {
+        helpButton.setOnAction(event -> {
             Alert helpDialog = new Alert(Alert.AlertType.INFORMATION);
             helpDialog.setTitle("Credential Format Help - " + selectedExchange);
             helpDialog.setHeaderText("How to find your " + selectedExchange + " credentials");
@@ -499,9 +499,9 @@ public class OnboardingView extends StackPane {
                 frame(0.65, "Loading exchange instruments..."),
                 frame(0.84, "Preparing trading terminal..."),
                 frame(1.0, "Market data is ready."));
-        timeline.setOnFinished(_ -> {
+        timeline.setOnFinished(event -> {
             PauseTransition pause = new PauseTransition(Duration.millis(450));
-            pause.setOnFinished(_ -> onReady.accept(configuration));
+            pause.setOnFinished(pauseEvent -> onReady.accept(configuration));
             pause.play();
         });
         timeline.play();
@@ -510,7 +510,7 @@ public class OnboardingView extends StackPane {
     @Contract("_, _ -> new")
     private @NotNull KeyFrame frame(double progress, String message) {
         return new KeyFrame(Duration.millis(2600 * progress),
-                _ -> statusLabel.setText(message),
+                event -> statusLabel.setText(message),
                 new KeyValue(progressBar.progressProperty(), progress));
     }
 
@@ -565,7 +565,7 @@ public class OnboardingView extends StackPane {
         Platform.runLater(newPasswordField::requestFocus);
         dialog.showAndWait()
                 .filter(button -> button == resetButtonType)
-                .ifPresent(_ -> {
+                .ifPresent(savedValue -> {
                     if (!newPasswordField.getText().equals(confirmPasswordField.getText())) {
                         validation.setStyle("-fx-text-fill: #ef4444;");
                         validation.setText("New password and confirmation do not match.");
@@ -602,7 +602,7 @@ public class OnboardingView extends StackPane {
         FadeTransition fadeOut = new FadeTransition(Duration.millis(180), this);
         fadeOut.setFromValue(1);
         fadeOut.setToValue(0);
-        fadeOut.setOnFinished(_ -> {
+        fadeOut.setOnFinished(event -> {
             getChildren().setAll(next);
             FadeTransition fadeIn = new FadeTransition(Duration.millis(220), this);
             fadeIn.setFromValue(0);
@@ -611,8 +611,6 @@ public class OnboardingView extends StackPane {
         });
         fadeOut.play();
     }
-
-
 
     private void loadRememberedCredentials() {
         rememberMeCheckBox.setSelected(authService.isRememberMeEnabled());
@@ -637,7 +635,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId,
-                                                   String token) {
+            String token) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         preferences.put("exchange_api_key_%s".formatted(exchange), apiKey);
         preferences.put("exchange_api_secret_%s".formatted(exchange), apiSecret);
@@ -646,7 +644,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void loadRememberedExchangeCredentials(String exchange, TextField apiKeyField, PasswordField apiSecretField,
-                                                   TextField accountIdField) {
+            TextField accountIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         String savedApiKey = preferences.get("exchange_api_key_%s".formatted(exchange), "");
         String savedApiSecret = preferences.get("exchange_api_secret_%s".formatted(exchange), "");
@@ -678,7 +676,6 @@ public class OnboardingView extends StackPane {
      */
     private AuthenticationResult authenticateWithBroker(String exchangeName, String apiKey, String apiSecret) {
         try {
-
 
             // Create exchange instance with provided credentials
             Exchange exchange = createExchange(exchangeName, apiKey, apiSecret);
@@ -788,6 +785,11 @@ public class OnboardingView extends StackPane {
      */
     private AuthenticationResult attemptExchangeAuthentication(String exchangeName, Exchange exchange) {
         try {
+            if (exchange instanceof Coinbase coinbase) {
+                coinbase.getUserAccountDetails();
+                return new AuthenticationResult(true, "Successfully authenticated with %s".formatted(exchangeName));
+            }
+
             exchange.connect();
 
             // Check if connection was successful
@@ -811,8 +813,7 @@ public class OnboardingView extends StackPane {
     /**
      * Creates an exchange instance based on the exchange name and credentials.
      */
-    private @Nullable Exchange createExchange(String exchangeName, String apiKey, String apiSecret)
-    {
+    private @Nullable Exchange createExchange(String exchangeName, String apiKey, String apiSecret) {
         String name = safe(exchangeName).toUpperCase();
         return switch (name) {
             case "BINANCE US" -> new BinanceUs(apiKey, apiSecret);
@@ -839,46 +840,46 @@ public class OnboardingView extends StackPane {
     private record AuthenticationResult(boolean success, String message) {
     }
 
-
-//    /**
-//     * Get available venues for a broker.
-//     */
-//    public java.util.List<String> getAvailableVenues(String brokerName) {
-//        return switch (brokerName.toUpperCase()) {
-//            case "COINBASE" -> java.util.Arrays.asList("Spot", "US Futures", "International Perpetuals");
-//            case "OANDA" -> List.of("FX/CFD");
-//            case "BINANCE" -> java.util.Arrays.asList("Spot", "Futures");
-//            case "BINANCE US" -> List.of("Spot");
-//            case "BITFINEX" -> java.util.Arrays.asList("Spot", "Derivatives");
-//            case "ALPACA" -> java.util.Arrays.asList("Stocks", "Crypto");
-//            case "INTERACTIVE BROKERS", "IBKR" -> Arrays.asList("Stocks", "Forex");
-//            default -> List.of("Default");
-//        };
-//    }
-//
-//    /**
-//     * Parse venue name string to BrokerVenue enum.
-//     */
-//    private BrokerVenue parseVenue(String brokerName, String venueName) {
-//        String broker = brokerName.toUpperCase();
-//        String venue = venueName.toUpperCase();
-//
-//        return switch (broker) {
-//            case "COINBASE" -> switch (venue) {
-//                case "SPOT" -> BrokerVenue.COINBASE_SPOT;
-//                case "US FUTURES", "FUTURES" -> BrokerVenue.COINBASE_US_FUTURES;
-//                case "INTERNATIONAL PERPETUALS", "PERPETUALS" ->
-//                        BrokerVenue.COINBASE_INTERNATIONAL_PERPETUALS;
-//                default -> BrokerVenue.UNKNOWN;
-//            };
-//            case "OANDA" -> BrokerVenue.OANDA_FX_CFD;
-//            case "BINANCE" -> switch (venue) {
-//                case "SPOT" -> BrokerVenue.BINANCE_SPOT;
-//                case "FUTURES" -> BrokerVenue.BINANCE_FUTURES;
-//                default -> BrokerVenue.UNKNOWN;
-//            };
-//            default -> BrokerVenue.UNKNOWN;
-//        };
-//
-//    }
+    // /**
+    // * Get available venues for a broker.
+    // */
+    // public java.util.List<String> getAvailableVenues(String brokerName) {
+    // return switch (brokerName.toUpperCase()) {
+    // case "COINBASE" -> java.util.Arrays.asList("Spot", "US Futures",
+    // "International Perpetuals");
+    // case "OANDA" -> List.of("FX/CFD");
+    // case "BINANCE" -> java.util.Arrays.asList("Spot", "Futures");
+    // case "BINANCE US" -> List.of("Spot");
+    // case "BITFINEX" -> java.util.Arrays.asList("Spot", "Derivatives");
+    // case "ALPACA" -> java.util.Arrays.asList("Stocks", "Crypto");
+    // case "INTERACTIVE BROKERS", "IBKR" -> Arrays.asList("Stocks", "Forex");
+    // default -> List.of("Default");
+    // };
+    // }
+    //
+    // /**
+    // * Parse venue name string to BrokerVenue enum.
+    // */
+    // private BrokerVenue parseVenue(String brokerName, String venueName) {
+    // String broker = brokerName.toUpperCase();
+    // String venue = venueName.toUpperCase();
+    //
+    // return switch (broker) {
+    // case "COINBASE" -> switch (venue) {
+    // case "SPOT" -> BrokerVenue.COINBASE_SPOT;
+    // case "US FUTURES", "FUTURES" -> BrokerVenue.COINBASE_US_FUTURES;
+    // case "INTERNATIONAL PERPETUALS", "PERPETUALS" ->
+    // BrokerVenue.COINBASE_INTERNATIONAL_PERPETUALS;
+    // default -> BrokerVenue.UNKNOWN;
+    // };
+    // case "OANDA" -> BrokerVenue.OANDA_FX_CFD;
+    // case "BINANCE" -> switch (venue) {
+    // case "SPOT" -> BrokerVenue.BINANCE_SPOT;
+    // case "FUTURES" -> BrokerVenue.BINANCE_FUTURES;
+    // default -> BrokerVenue.UNKNOWN;
+    // };
+    // default -> BrokerVenue.UNKNOWN;
+    // };
+    //
+    // }
 }

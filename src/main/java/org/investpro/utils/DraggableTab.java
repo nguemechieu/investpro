@@ -37,7 +37,8 @@ import java.util.Set;
  *
  * Notes:
  * - Works best when all tabs in the target pane are DraggableTab instances.
- * - Non-DraggableTab tabs are handled defensively and ignored for insertion geometry.
+ * - Non-DraggableTab tabs are handled defensively and ignored for insertion
+ * geometry.
  */
 @Getter
 @Setter
@@ -110,7 +111,7 @@ public class DraggableTab extends Tab {
 
         Scene scene = dragStage.getScene();
         if (scene != null && scene.getRoot() instanceof StackPane root && !root.getChildren().isEmpty()) {
-            Node node = root.getChildren().getFirst();
+            Node node = root.getChildren().get(0);
             if (node instanceof Text text) {
                 text.setText(safeTitle);
             }
@@ -225,8 +226,7 @@ public class DraggableTab extends Tab {
     private void moveToPane(
             @NotNull TabPane oldTabPane,
             int oldIndex,
-            @NotNull InsertData insertData
-    ) {
+            @NotNull InsertData insertData) {
         TabPane targetPane = insertData.insertPane();
 
         if (targetPane == null) {
@@ -261,7 +261,7 @@ public class DraggableTab extends Tab {
         detachedPane.getTabs().add(this);
         detachedPane.getSelectionModel().select(this);
 
-        detachedPane.getTabs().addListener((ListChangeListener<Tab>) _ -> {
+        detachedPane.getTabs().addListener((ListChangeListener<Tab>) change -> {
             if (detachedPane.getTabs().isEmpty()) {
                 unregisterTabPane(detachedPane);
                 newStage.hide();
@@ -273,7 +273,7 @@ public class DraggableTab extends Tab {
         newStage.setX(event.getScreenX());
         newStage.setY(event.getScreenY());
 
-        newStage.setOnHiding(_ -> unregisterTabPane(detachedPane));
+        newStage.setOnHiding(hidingEvent -> unregisterTabPane(detachedPane));
 
         newStage.show();
         detachedPane.requestLayout();
@@ -298,7 +298,7 @@ public class DraggableTab extends Tab {
                 continue;
             }
 
-            Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().getFirst());
+            Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().get(0));
 
             if (firstTabRect == null) {
                 continue;
@@ -323,7 +323,7 @@ public class DraggableTab extends Tab {
             return 0;
         }
 
-        Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().getFirst());
+        Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().get(0));
         Rectangle2D lastTabRect = getAbsoluteRect(tabPane.getTabs().get(tabCount - 1));
 
         if (firstTabRect == null || lastTabRect == null) {
@@ -362,15 +362,13 @@ public class DraggableTab extends Tab {
 
         Point2D localToScene = node.localToScene(
                 node.getLayoutBounds().getMinX(),
-                node.getLayoutBounds().getMinY()
-        );
+                node.getLayoutBounds().getMinY());
 
         return new Rectangle2D(
                 localToScene.getX() + node.getScene().getWindow().getX(),
                 localToScene.getY() + node.getScene().getWindow().getY(),
                 node.getWidth(),
-                node.getHeight()
-        );
+                node.getHeight());
     }
 
     private @Nullable Rectangle2D getAbsoluteRect(Tab tab) {
@@ -420,8 +418,7 @@ public class DraggableTab extends Tab {
                         + "-fx-background-radius: 6;"
                         + "-fx-border-color: #60a5fa;"
                         + "-fx-border-radius: 6;"
-                        + "-fx-padding: 6 10;"
-        );
+                        + "-fx-padding: 6 10;");
 
         Scene scene = new Scene(dragStagePane);
         scene.setFill(Color.TRANSPARENT);

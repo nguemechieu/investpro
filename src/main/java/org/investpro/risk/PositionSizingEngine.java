@@ -1,5 +1,9 @@
 package org.investpro.risk;
 
+import org.investpro.enums.LiquidityProfile;
+import org.investpro.enums.PsychologyProfile;
+import org.investpro.enums.RiskProfile;
+
 /**
  * Calculates appropriate position size based on risk parameters.
  * Implements Kelly Criterion and fixed fraction position sizing.

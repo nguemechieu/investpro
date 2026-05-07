@@ -143,7 +143,7 @@ public class PopOverSkin implements Skin<PopOver> {
         getPopupWindow().yProperty().addListener(updatePathListener);
         popOver.arrowLocationProperty().addListener(updatePathListener);
         popOver.contentNodeProperty().addListener(
-                (_, _, newContent) -> content
+                (observable, oldContent, newContent) -> content
                         .setCenter(newContent));
         popOver.detachedProperty()
                 .addListener((value, oldDetached, newDetached) -> {

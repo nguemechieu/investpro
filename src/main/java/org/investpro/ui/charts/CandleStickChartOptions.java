@@ -70,7 +70,7 @@ public class CandleStickChartOptions {
         );
         themeSelector.setValue(ChartColorPresets.DEFAULT);
         themeSelector.setStyle("-fx-padding: 5; -fx-min-width: 200;");
-        themeSelector.setOnAction(_ ->
+        themeSelector.setOnAction(event ->
             colorTheme.set(ChartColorPresets.getPreset(themeSelector.getValue()))
         );
         
