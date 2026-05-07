@@ -11,10 +11,6 @@
 **/*.dbmdl
 **/*.jfm
 **/bin
-<<<<<<< HEAD
-=======
-**/charts
->>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
 **/docker-compose*
 **/compose*
 **/Dockerfile*
@@ -23,5 +19,15 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
+**/pytest-cache-files-*
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+*.egg-info
+node_modules
+.maven
+target
+.m2
 LICENSE
 README.md

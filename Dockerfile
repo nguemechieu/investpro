@@ -44,11 +44,6 @@ ENV GEOMETRY=1280x1024
 ENV DEPTH=24
 ENV VNC_PASSWORD=investpro
 
-# Create VNC password file
-RUN mkdir -p /root/.vnc && \
-    echo "investpro" | vncpasswd -f > /root/.vnc/passwd && \
-    chmod 600 /root/.vnc/passwd
-
 # Supervisor configuration directory
 RUN mkdir -p /etc/supervisor/conf.d
 
