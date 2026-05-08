@@ -174,31 +174,6 @@ public class ChartToolbar extends Region {
         }
     }
 
-    /**
-     * Attaches hover behavior to the options button.
-     */
-    private void attachOptionsButtonBehavior(@NotNull ToolbarButton toolbarButton) {
-        toolbarButton.setOnAction(event -> showOptionsPopOver(toolbarButton));
-        toolbarButton.setOnMouseEntered(event -> {
-            mouseInsideOptionsButton = true;
-            showOptionsPopOver(toolbarButton);
-        });
-        toolbarButton.setOnMouseExited(event -> {
-            mouseInsideOptionsButton = false;
-            if (getScene() != null && getScene().getWindow() != null && mouseExitedPopOverFilter == null) {
-                mouseExitedPopOverFilter = new MouseExitedPopOverFilter(getScene());
-                getScene().getWindow().addEventFilter(MouseEvent.MOUSE_MOVED, mouseExitedPopOverFilter);
-            }
-        });
-    }
-
-    private void showOptionsPopOver(Node owner) {
-        if (optionsPopOver == null || owner == null || owner.getScene() == null
-                || owner.getScene().getWindow() == null) {
-            return;
-        }
-        optionsPopOver.show(owner);
-    }
 
     /**
      * Creates an invisible separator for visual grouping.

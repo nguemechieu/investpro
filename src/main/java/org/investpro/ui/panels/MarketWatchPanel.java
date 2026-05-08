@@ -1,4 +1,4 @@
-package org.investpro.ui;
+package org.investpro.ui.panels;
 
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -318,7 +318,7 @@ public class MarketWatchPanel extends BorderPane {
 
                 // Update or create rows
                 for (SymbolAgentState state : allStates) {
-                    if (state != null && state.getSymbol() != null) {
+                    if (state != null) {
                         TradePair symbol = state.getSymbol();
                         MarketWatchRow row = rowCache.computeIfAbsent(
                                 symbol,

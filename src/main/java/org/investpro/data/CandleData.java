@@ -3,6 +3,8 @@ package org.investpro.data;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Instant;
+
 /**
  * @author NOEL NGUEMECHIEU
  */
@@ -48,5 +50,12 @@ public record CandleData(double openPrice, double closePrice, double highPrice, 
 
     public long getOpenTime() {
         return openTime;
+    }
+
+
+
+    public Instant timestamp() {
+
+        return  Instant.now();
     }
 }

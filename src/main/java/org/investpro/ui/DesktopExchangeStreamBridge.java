@@ -13,16 +13,19 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Objects;
 
 /**
  * Bridges exchange streaming events into the JavaFX TradingWindow.
- *
+ * <p>
  * This class should stay UI-focused:
  * - receive exchange stream callbacks
  * - switch safely to JavaFX thread
  * - update TradingWindow UI state
- *
+ * <p>
  * SystemCore can own the main streaming lifecycle.
  */
 @Slf4j
@@ -70,6 +73,9 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
         if (tradePair == null || ticker == null) {
+            log.error(
+                    "Trading pair is null or Ticker is null"
+            );
             return;
         }
 
@@ -79,6 +85,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onTrade(String exchangeName, TradePair tradePair, Trade trade) {
         if (tradePair == null || trade == null) {
+            log.error("trade pair is null or Trade is null");
             return;
         }
 
@@ -88,6 +95,9 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onOrderBook(String exchangeName, TradePair tradePair, OrderBook orderBook) {
         if (tradePair == null || orderBook == null) {
+            log.error(
+                    "Trading pair is null or OrderBook is null"
+            );
             return;
         }
 
@@ -216,11 +226,12 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         }
     }
 
-    private static String safe(String value) {
+    @Contract(pure = true)
+    private static @NotNull String safe(String value) {
         return value == null ? "" : value.trim();
     }
 
-    private static String rootMessage(Throwable throwable) {
+    private static @NotNull String rootMessage(Throwable throwable) {
         if (throwable == null) {
             return "Unknown stream error";
         }

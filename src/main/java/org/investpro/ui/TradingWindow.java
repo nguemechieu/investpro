@@ -50,10 +50,7 @@ import org.investpro.ui.panels.MarketInfoPanel;
 import org.investpro.ui.panels.NewsCalendarPanel;
 import org.investpro.ui.panels.StrategyBuilderPanel;
 import org.investpro.ui.panels.BacktestingPanel;
-import org.investpro.ui.MarketWatchPanel;
-import org.investpro.ui.Navigation;
-import org.investpro.ui.DataWindow;
-import org.investpro.ui.MonitoringDashboard;
+import org.investpro.ui.panels.MarketWatchPanel;
 import org.investpro.ui.panels.AnalysisPanel;
 import org.investpro.ui.panels.OrderPanel;
 import org.investpro.ui.panels.StrategyAssignmentPanel;
@@ -4524,7 +4521,7 @@ public class TradingWindow extends BorderPane {
     }
 
     private void openBacktesting() {
-        BacktestingPanel backtestingPanel = new BacktestingPanel();
+        BacktestingPanel backtestingPanel = new BacktestingPanel(systemCore);
         createIndependentWindow("Backtesting", backtestingPanel, 1000, 700);
         journal("Backtesting panel opened");
         log.info("Backtesting panel opened");

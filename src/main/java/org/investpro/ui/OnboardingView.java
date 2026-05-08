@@ -69,7 +69,8 @@ public class OnboardingView extends StackPane {
     public OnboardingView(Consumer<MarketConfiguration> onReady) {
         this.onReady = Objects.requireNonNull(onReady);
         setPrefSize(1540, 780);
-        setStyle("-fx-background-color: #0f172a;");
+        OnboardingStyles.paneStyle("-fx-background-color: #0f172a;");
+      OnboardingStyles.labelStyle(11,"#cbd5e1;","16");
         loadRememberedCredentials();
         getChildren().setAll(createLoginStep());
     }
@@ -500,7 +501,7 @@ public class OnboardingView extends StackPane {
         progressBar.setProgress(0);
         progressBar.setPrefWidth(420);
 
-        Label title = new Label("Loading Market");
+        Label title = new Label("Loading Market ...");
         title.setStyle("-fx-text-fill: #3b82f6; -fx-font-size: 16px; -fx-font-weight: bold;");
 
         VBox overlay = new VBox(18, title, statusLabel, progressBar);
