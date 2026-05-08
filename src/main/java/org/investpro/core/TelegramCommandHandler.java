@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import javafx.scene.Scene;
 import javafx.scene.image.WritableImage;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
@@ -278,7 +280,16 @@ public class TelegramCommandHandler {
 
                 📸 *Screenshots & Monitoring*
                 /screenshot - Capture and send UI screenshot
-                
+                """;
+    }
+
+    private String getStatusReport() {
+        try {
+            StringBuilder report = new StringBuilder("*Account Status*\\n\\n");
+
+            Account account = systemCore.getExchange().getAccount();
+
+            if (account != null) {
                 report.append("💰 Balance: $").append(formatPrice(account.getBalance())).append("\\n");
                 report.append("📈 Equity: $").append(formatPrice(account.getEquity())).append("\\n");
                 report.append("📊 Margin Used: $").append(formatPrice(account.getMarginUsed())).append("\\n");
@@ -554,15 +565,21 @@ public class TelegramCommandHandler {
                 return "❌ Failed to capture screenshot";
             }
 
-            // Convert to BufferedImage
+            // Convert to BufferedImage using SwingFXUtils
             BufferedImage bufferedImage = new BufferedImage(
                     (int) snapshot.getWidth(),
                     (int) snapshot.getHeight(),
                     BufferedImage.TYPE_INT_RGB);
 
-            for (int y = 0; y < snapshot.getHeight(); y++) {
-                for (int x = 0; x < snapshot.getWidth(); x++) {
-                    int argb = snapshot.getArgb(x, y);
+            PixelReader pixelReader = snapshot.getPixelReader();
+            PixelWriter pixelWriter = new WritableImage(
+                    (int) snapshot.getWidth(),
+                    (int) snapshot.getHeight()).getPixelWriter();
+
+            // Copy pixels from snapshot to buffered image
+            for (int y = 0; y < (int) snapshot.getHeight(); y++) {
+                for (int x = 0; x < (int) snapshot.getWidth(); x++) {
+                    int argb = pixelReader.getArgb(x, y);
                     bufferedImage.setRGB(x, y, argb);
                 }
             }
