@@ -1053,6 +1053,12 @@ public class SystemCore {
                 return "❌ Trade execution coordinator not available";
             }
 
+            // Check if trading is allowed
+            if (!canSubmitOrders()) {
+                return "❌ Trading is not allowed on " + getExchange().getName() + 
+                       ". Check connection and trading mode.";
+            }
+
             // Resolve trade pair
             TradePair tradePair = getTradePair(symbol);
             if (tradePair == null) {
@@ -1087,6 +1093,12 @@ public class SystemCore {
 
             if (tradeExecutionCoordinator == null) {
                 return "❌ Trade execution coordinator not available";
+            }
+
+            // Check if trading is allowed
+            if (!canSubmitOrders()) {
+                return "❌ Trading is not allowed on " + getExchange().getName() + 
+                       ". Check connection and trading mode.";
             }
 
             // Resolve trade pair
@@ -1496,6 +1508,14 @@ public class SystemCore {
      */
     public boolean isAutoTradingEnabled() {
         return smartBot != null && smartBot.isAutoTradingEnabled();
+    }
+
+    /**
+     * Check if trading is allowed on the connected exchange.
+     * Returns true only if the exchange is connected and supports either live or paper trading.
+     */
+    public boolean canSubmitOrders() {
+        return exchange != null && exchange.canSubmitOrders();
     }
 
     /**

@@ -280,10 +280,35 @@ public abstract class Exchange {
 
     public CompletableFuture<String> submitOrder(Order order) {
         try {
+            // Validate that trading is allowed before submitting any order
+            if (!canSubmitOrders()) {
+                String reason = buildTradingDisabledReason();
+                return failedFuture(new IllegalStateException(
+                        "Trading is not allowed on " + getName() + ". " + reason));
+            }
+
             return createOrder(order);
         } catch (Exception exception) {
             return failedFuture(exception);
         }
+    }
+
+    /**
+     * Build a human-readable reason why trading is disabled.
+     */
+    private String buildTradingDisabledReason() {
+        if (!isConnected()) {
+            return "Exchange connection is not available.";
+        }
+        if (!canSubmitLiveOrders()) {
+            if (!supportsPaperTradingMode()) {
+                return "Exchange does not support live or paper trading.";
+            }
+            if (!isPaperTrading()) {
+                return "Live trading is not available. Paper trading mode is not enabled.";
+            }
+        }
+        return "Trading conditions are not met.";
     }
 
     public abstract CompletableFuture<String> cancelOrder(String orderId);

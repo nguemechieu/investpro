@@ -1340,7 +1340,6 @@ public class TradingWindow extends BorderPane {
         saveAppState();
     }
 
-
     private DraggableTab createDetachableTerminalTab(TabName tabName, Node content) {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
         tab.setClosable(true);
@@ -2002,9 +2001,9 @@ public class TradingWindow extends BorderPane {
 
         List<String> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
                 ? exchange.getSupportedTimeframes()
-                .stream()
-                .map(String::valueOf)
-                .toList()
+                        .stream()
+                        .map(String::valueOf)
+                        .toList()
                 : List.of("1m", "5m", "15m", "30m", "1h", "4h", "1d");
 
         timeframeSelector.getItems().setAll(supportedTimeframes);
@@ -2014,10 +2013,10 @@ public class TradingWindow extends BorderPane {
         String selectedTimeframe = supportedTimeframes.contains(savedTimeframe)
                 ? savedTimeframe
                 : supportedTimeframes.contains("1h")
-                ? "1h"
-                : supportedTimeframes.isEmpty()
-                ? null
-                : supportedTimeframes.getFirst();
+                        ? "1h"
+                        : supportedTimeframes.isEmpty()
+                                ? null
+                                : supportedTimeframes.getFirst();
 
         if (selectedTimeframe != null) {
             timeframeSelector.getSelectionModel().select(selectedTimeframe);
@@ -2253,7 +2252,8 @@ public class TradingWindow extends BorderPane {
     }
 
     /**
-     * Setup email notifications for OANDA exchange similar to MetaTrader-style alerts.
+     * Setup email notifications for OANDA exchange similar to MetaTrader-style
+     * alerts.
      *
      * This does not mean OANDA itself sends the emails.
      * TradeAdviser sends emails when OANDA-related events happen:
@@ -2292,8 +2292,7 @@ public class TradingWindow extends BorderPane {
         log.info(
                 "OANDA email notifications configured. accountId={}, email={}",
                 accountId,
-                maskEmail(emailAddress)
-        );
+                maskEmail(emailAddress));
 
         registerOandaEmailNotificationRules(accountId, emailAddress);
     }
@@ -2317,6 +2316,7 @@ public class TradingWindow extends BorderPane {
 
         log.info("Registered OANDA email notification rules for accountId={}", accountId);
     }
+
     private boolean isValidEmail(String email) {
         if (email == null || email.isBlank()) {
             return false;
@@ -2324,7 +2324,6 @@ public class TradingWindow extends BorderPane {
 
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     }
-
 
     private String maskEmail(String email) {
         if (email == null || email.isBlank() || !email.contains("@")) {
@@ -2341,6 +2340,7 @@ public class TradingWindow extends BorderPane {
 
         return name.charAt(0) + "***" + name.charAt(name.length() - 1) + "@" + domain;
     }
+
     private void rejectConnectionValidation(Throwable throwable) {
         brokerAccessGranted = false;
         brokerSessions.remove(safe(exchangeSelector.getValue()));
@@ -3098,8 +3098,6 @@ public class TradingWindow extends BorderPane {
         }
     }
 
-
-
     private void openSelectedFromMarketWatch() {
         TradePair selected = marketWatchTable.getSelectionModel().getSelectedItem();
         if (selected != null) {
@@ -3604,7 +3602,6 @@ public class TradingWindow extends BorderPane {
 
         SettingsPanel profilePanel = new SettingsPanel(systemCore);
 
-
         ScrollPane scrollPane = new ScrollPane(profilePanel);
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-control-inner-background: #1a1a2e;");
@@ -3615,9 +3612,6 @@ public class TradingWindow extends BorderPane {
         dialog.setHeight(700);
         dialog.showAndWait();
     }
-
-
-
 
     private void showStrategyAssignmentPanel() {
         Dialog<Void> dialog = new Dialog<>();
@@ -4827,7 +4821,6 @@ public class TradingWindow extends BorderPane {
         log.info("Order panel opened for symbol: {}", selectedSymbol != null ? selectedSymbol.getSymbol() : "N/A");
         journal("Order panel opened");
     }
-
 
     // ============================================================================
     // EXCHANGE VENUE LABEL & DATA PROVIDER METHODS
