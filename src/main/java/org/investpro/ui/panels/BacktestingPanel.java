@@ -439,15 +439,22 @@ public class BacktestingPanel extends VBox {
 
         if (manager != null) {
             try {
-                List<TradePair> realSymbols = manager.getAllStates()
+                List<TradePair> allSymbols = manager.getAllStates()
                         .stream()
                         .map(SymbolAgentState::getSymbol)
                         .distinct()
                         .toList();
 
-                if (!realSymbols.isEmpty()) {
-                    symbols.addAll(realSymbols);
-                    log.info("Loaded {} symbols from live market", symbols.size());
+                // Filter symbols that have market data (bid and ask prices populated)
+                symbols = allSymbols.stream()
+                        .filter(pair -> pair.getBid() > 0 && pair.getAsk() > 0)
+                        .toList();
+
+                if (!symbols.isEmpty()) {
+                    log.info("Loaded {} symbols from live market with data (out of {} total symbols)", 
+                            symbols.size(), allSymbols.size());
+                } else {
+                    log.warn("Loaded {} symbols from live market but none have market data", allSymbols.size());
                 }
             } catch (Exception exception) {
                 log.warn("Failed to load symbols from SymbolAgentManager: {}", exception.getMessage());
