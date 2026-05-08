@@ -70,13 +70,14 @@ public class OnboardingView extends StackPane {
         this.onReady = Objects.requireNonNull(onReady);
         setPrefSize(1540, 780);
         OnboardingStyles.paneStyle("-fx-background-color: #0f172a;");
-      OnboardingStyles.labelStyle(11,"#cbd5e1;","16");
+        OnboardingStyles.labelStyle(11,"#cbd5e1;","16");
+
         loadRememberedCredentials();
         getChildren().setAll(createLoginStep());
     }
 
     private @NotNull BorderPane createLoginStep() {
-        Label appName = new Label("InvestPro");
+        Label appName = new Label("InvestPro -Login");
         appName.setStyle("-fx-font-size: 44px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
 
         Label prompt = new Label("Log in to your account or create one to start trading.");

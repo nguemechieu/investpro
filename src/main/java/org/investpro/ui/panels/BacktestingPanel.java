@@ -32,6 +32,7 @@ import org.investpro.strategy.impl.UnifiedStrategy;
 import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDate;
@@ -83,6 +84,9 @@ public class BacktestingPanel extends VBox {
 
     private AreaChart<Number, Number> equityCurveChart;
 
+    private Button compareBtn;
+    private Button exportBtn;
+
     private final SymbolAgentManager symbolAgentManager;
     private final HistoricalDataRepository historicalDataRepository;
     private final SystemCore systemCore;
@@ -96,23 +100,21 @@ public class BacktestingPanel extends VBox {
         this(null, null, null);
     }
 
-    public BacktestingPanel(
-            SymbolAgentManager symbolAgentManager,
-            HistoricalDataRepository historicalDataRepository) {
-        this(symbolAgentManager, historicalDataRepository, null);
-    }
-
     public BacktestingPanel(SystemCore systemCore) {
         this(
-                systemCore != null ? systemCore.getSmartBot().getSymbolAgentManager() : null,
+                systemCore != null && systemCore.getSmartBot() != null
+                        ? systemCore.getSmartBot().getSymbolAgentManager()
+                        : null,
                 HistoricalDataRepositoryImpl.getInstance(),
-                systemCore);
+                systemCore
+        );
     }
 
     public BacktestingPanel(
             SymbolAgentManager symbolAgentManager,
             HistoricalDataRepository historicalDataRepository,
-            SystemCore systemCore) {
+            SystemCore systemCore
+    ) {
         this.symbolAgentManager = symbolAgentManager;
         this.historicalDataRepository = historicalDataRepository != null
                 ? historicalDataRepository
@@ -123,6 +125,8 @@ public class BacktestingPanel extends VBox {
         setSpacing(12);
         setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
         getStyleClass().add("backtest-panel");
+
+        this.symbolCombo = new ComboBox<>();
 
         setupUI();
     }
@@ -146,7 +150,7 @@ public class BacktestingPanel extends VBox {
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
     }
 
-    private VBox createConfigurationSection() {
+    private @NotNull VBox createConfigurationSection() {
         VBox section = new VBox(10);
         section.setPadding(new Insets(12));
         section.setStyle(
@@ -162,11 +166,11 @@ public class BacktestingPanel extends VBox {
         strategyCombo = new ComboBox<>();
         List<String> strategies = loadStrategyNames();
         strategyCombo.setItems(FXCollections.observableArrayList(strategies));
-        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.getFirst());
+        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.get(0));
+
         strategyCombo.setPrefHeight(35);
         HBox strategyBox = createLabeledInput("Strategy:", strategyCombo);
 
-        symbolCombo = new ComboBox<>();
         loadSymbols();
         symbolCombo.setPrefHeight(35);
         HBox symbolBox = createLabeledInput("Symbol:", symbolCombo);
@@ -178,7 +182,7 @@ public class BacktestingPanel extends VBox {
         HBox timeframeBox = createLabeledInput("Timeframe:", timeframeCombo);
 
         orderTypeCombo = new ComboBox<>();
-        orderTypeCombo.setItems(FXCollections.observableArrayList("MARKET", "LIMIT", "STOP", "STOP_LIMIT"));
+        orderTypeCombo.setItems(FXCollections.observableArrayList("MARKET", "LIMIT", "STOP_LIMIT"));
         orderTypeCombo.setValue("MARKET");
         orderTypeCombo.setPrefHeight(35);
         HBox orderTypeBox = createLabeledInput("Order Type:", orderTypeCombo);
@@ -210,6 +214,8 @@ public class BacktestingPanel extends VBox {
                         "-fx-background-radius: 6; " +
                         "-fx-cursor: hand;");
         compareBtn.setDisable(true);
+        compareBtn.setOnAction(event -> compareResults());
+        this.compareBtn = compareBtn;
 
         Button cancelBtn = getButton();
 
@@ -285,6 +291,7 @@ public class BacktestingPanel extends VBox {
                         "-fx-background-radius: 6; " +
                         "-fx-cursor: hand;");
         exportBtn.setOnAction(event -> exportResults());
+        this.exportBtn = exportBtn;
 
         Label equityLabel = new Label("Equity Curve");
         equityLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
@@ -414,7 +421,7 @@ public class BacktestingPanel extends VBox {
         return table;
     }
 
-    private List<String> loadStrategyNames() {
+    private @NotNull List<String> loadStrategyNames() {
         try {
             List<String> strategies = new ArrayList<>(StrategyCatalog.availableStrategyNames());
 
@@ -428,70 +435,65 @@ public class BacktestingPanel extends VBox {
         return new ArrayList<>(StrategyCatalog.CORE_STRATEGY_NAMES);
     }
 
+
+
     private void loadSymbols() {
         List<TradePair> symbols = new ArrayList<>();
 
-        // Try to get symbols from SymbolAgentManager
         SymbolAgentManager manager = symbolAgentManager;
+
         if (manager == null && systemCore != null) {
-            manager = systemCore.getSmartBot().getSymbolAgentManager();
+            try {
+                if (systemCore.getSmartBot() != null) {
+                    manager = systemCore.getSmartBot().getSymbolAgentManager();
+                }
+            } catch (Exception exception) {
+                log.debug("Unable to read SymbolAgentManager from SystemCore: {}", exception.getMessage());
+            }
         }
 
         if (manager != null) {
             try {
-                List<TradePair> allSymbols = manager.getAllStates()
-                        .stream()
-                        .map(SymbolAgentState::getSymbol)
-                        .distinct()
-                        .toList();
-
-                // Filter symbols that have market data (bid and ask prices populated)
-                symbols = allSymbols.stream()
-                        .filter(pair -> pair.getBid() > 0 && pair.getAsk() > 0)
-                        .toList();
-
-                if (!symbols.isEmpty()) {
-                    log.info("Loaded {} symbols from live market with data (out of {} total symbols)", 
-                            symbols.size(), allSymbols.size());
-                } else {
-                    log.warn("Loaded {} symbols from live market but none have market data", allSymbols.size());
-                }
+                symbols.addAll(
+                        manager.getAllStates()
+                                .stream()
+                                .map(SymbolAgentState::getSymbol)
+                                .distinct()
+                                .toList()
+                );
             } catch (Exception exception) {
                 log.warn("Failed to load symbols from SymbolAgentManager: {}", exception.getMessage());
             }
         }
 
-        // Fallback to default symbols if none loaded from live market
-        if (symbols.isEmpty()) {
-            log.info("No symbols from live market, using default symbols");
+        if (symbols.isEmpty() && systemCore != null) {
             try {
-                symbols = Arrays.asList(
+                if (systemCore.getExchange() != null && systemCore.getExchange().getTradablePairs() != null) {
+                    symbols.addAll(systemCore.getExchange().getTradablePairs());
+                }
+            } catch (Exception exception) {
+                log.warn("Failed to load symbols from exchange: {}", exception.getMessage());
+            }
+        }
+
+        if (symbols.isEmpty()) {
+            try {
+                symbols.addAll(List.of(
                         TradePair.of("BTC", "USD"),
                         TradePair.of("ETH", "USD"),
-                        TradePair.of("AAPL", "USD"),
-                        TradePair.of("MSFT", "USD"),
-                        TradePair.of("GOOGL", "USD"),
-                        TradePair.of("AMZN", "USD"),
                         TradePair.of("EUR", "USD"),
                         TradePair.of("GBP", "USD"),
-                        TradePair.of("JPY", "USD"),
-                        TradePair.of("SPY", "USD"),
-                        TradePair.of("QQQ", "USD"),
-                        TradePair.of("IWM", "USD"),
-                        TradePair.of("GLD", "USD"),
-                        TradePair.of("TLT", "USD"),
-                        TradePair.of("DBC", "USD"));
-            } catch (Exception e) {
-                log.warn("Failed to create default symbol list: {}", e.getMessage());
-                // If we can't even create defaults, use an empty list
-                symbols = new ArrayList<>();
+                        TradePair.of("USD", "JPY")
+                ));
+            } catch (Exception exception) {
+                log.warn("Failed to create fallback TradePair list: {}", exception.getMessage());
             }
         }
 
         symbolCombo.setItems(FXCollections.observableArrayList(symbols));
 
         if (!symbols.isEmpty()) {
-            symbolCombo.setValue(symbols.getFirst());
+            symbolCombo.setValue(symbols.get(0));
         }
 
         symbolCombo.setCellFactory(comboBox -> new ListCell<>() {
@@ -605,6 +607,14 @@ public class BacktestingPanel extends VBox {
                 tradesTable.setItems(FXCollections.observableArrayList(trades));
                 updateEquityChart(trades);
                 updateMetrics(metrics);
+
+                // Enable export and compare buttons when backtest completes
+                if (exportBtn != null) {
+                    exportBtn.setDisable(false);
+                }
+                if (compareBtn != null) {
+                    compareBtn.setDisable(false);
+                }
 
                 statusLabel.setText(
                         "Backtest complete for "
@@ -865,9 +875,10 @@ public class BacktestingPanel extends VBox {
         return Optional.of(candle.closePrice());
     }
 
-    private ExitDecision shouldExitPosition(
+    @Contract("_, _, _, _, _, _, _ -> new")
+    private @NotNull ExitDecision shouldExitPosition(
             Side positionSide,
-            CandleData current,
+            @NotNull CandleData current,
             StrategySignal latestSignal,
             double stopLoss,
             double takeProfit,
@@ -909,7 +920,7 @@ public class BacktestingPanel extends VBox {
             return new ExitDecision(true, close, "Max bars held");
         }
 
-        return new ExitDecision(false, close, "");
+        return new ExitDecision(false, close, "Market Oversold");
     }
 
     private double calculateProfit(Side side, double entryPrice, double exitPrice, double quantity) {
@@ -959,7 +970,8 @@ public class BacktestingPanel extends VBox {
         Platform.runLater(() -> progressBar.setProgress(progress));
     }
 
-    private LocalDate candleDate() {
+    @Contract(" -> new")
+    private @NotNull LocalDate candleDate() {
         return LocalDate.now();
     }
 
@@ -977,7 +989,7 @@ public class BacktestingPanel extends VBox {
 
     private @NotNull List<CandleData> generateSampleData(int count, double startPrice) {
         List<CandleData> candles = new ArrayList<>();
-        double price = startPrice / 2;
+        double price = startPrice ;
         long timestamp = System.currentTimeMillis();
 
         for (int i = 0; i < count; i++) {
@@ -1090,7 +1102,125 @@ public class BacktestingPanel extends VBox {
     }
 
     private void exportResults() {
-        statusLabel.setText("Export feature coming soon...");
+        try {
+            // Check if we have any trades to export
+            if (tradesTable.getItems().isEmpty()) {
+                showAlert("No Results", "No trades to export. Please run a backtest first.", Alert.AlertType.WARNING);
+                return;
+            }
+
+            // Create CSV content
+            StringBuilder csvContent = new StringBuilder();
+            csvContent.append("Date,Side,Order Type,Entry Price,Exit Price,Quantity,Profit,Return %,Reason\n");
+
+            for (BacktestTrade trade : tradesTable.getItems()) {
+                csvContent.append(String.format(
+                        "%s,%s,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%s\n",
+                        trade.getDate(),
+                        trade.getSide(),
+                        trade.getOrderType(),
+                        trade.getPrice(),
+                        trade.getExitPrice(),
+                        trade.getQuantity(),
+                        trade.getProfit(),
+                        trade.getReturnPercent(),
+                        trade.getReason()
+                ));
+            }
+
+            // Add metrics summary
+            csvContent.append("\n\nMetrics Summary\n");
+            csvContent.append(String.format("Total Return,%s\n", totalReturnLabel.getText()));
+            csvContent.append(String.format("Win Rate,%s\n", winRateLabel.getText()));
+            csvContent.append(String.format("Max Drawdown,%s\n", maxDrawdownLabel.getText()));
+            csvContent.append(String.format("Sharpe Ratio,%s\n", sharpeLabel.getText()));
+            csvContent.append(String.format("Profit Factor,%s\n", profitFactorLabel.getText()));
+
+            // Get the symbol and strategy for filename
+            TradePair symbol = symbolCombo.getValue();
+            String strategy = strategyCombo.getValue();
+            String timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename = String.format("backtest_%s_%s_%s.csv", symbol != null ? symbol.toString().replace("/", "") : "unknown", strategy, timestamp);
+
+            // Show file chooser to select save location
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Export Backtest Results");
+            fileChooser.setInitialFileName(filename);
+            fileChooser.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
+                    new FileChooser.ExtensionFilter("All Files", "*.*")
+            );
+
+            File file = fileChooser.showSaveDialog(this.getScene().getWindow());
+            if (file != null) {
+                java.nio.file.Files.write(file.toPath(), csvContent.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                statusLabel.setText("✓ Results exported to: " + file.getName());
+                showAlert("Export Successful", "Backtest results exported to:\n" + file.getAbsolutePath(), Alert.AlertType.INFORMATION);
+                log.info("Backtest results exported to: {}", file.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            log.error("Failed to export results", e);
+            showAlert("Export Error", "Failed to export results: " + e.getMessage(), Alert.AlertType.ERROR);
+        }
+    }
+
+    private void compareResults() {
+        try {
+            // Check if we have trades to compare
+            if (tradesTable.getItems().isEmpty()) {
+                showAlert("No Results", "No backtest results to compare. Please run a backtest first.", Alert.AlertType.WARNING);
+                return;
+            }
+
+            // Create a new window to display comparison metrics
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Backtest Comparison");
+            alert.setHeaderText("Results Summary");
+
+            // Build comparison text
+            StringBuilder comparison = new StringBuilder();
+            comparison.append("Symbol: ").append(symbolCombo.getValue()).append("\n");
+            comparison.append("Strategy: ").append(strategyCombo.getValue()).append("\n");
+            comparison.append("Timeframe: ").append(timeframeCombo.getValue()).append("\n");
+            comparison.append("\n--- Performance Metrics ---\n");
+            comparison.append("Total Return: ").append(totalReturnLabel.getText()).append("\n");
+            comparison.append("Win Rate: ").append(winRateLabel.getText()).append("\n");
+            comparison.append("Max Drawdown: ").append(maxDrawdownLabel.getText()).append("\n");
+            comparison.append("Sharpe Ratio: ").append(sharpeLabel.getText()).append("\n");
+            comparison.append("Profit Factor: ").append(profitFactorLabel.getText()).append("\n");
+            comparison.append("\n--- Trade Summary ---\n");
+            comparison.append("Total Trades: ").append(tradesTable.getItems().size()).append("\n");
+
+            // Calculate winning trades
+            long winningTrades = tradesTable.getItems().stream()
+                    .filter(trade -> trade.getProfit() > 0)
+                    .count();
+            comparison.append("Winning Trades: ").append(winningTrades).append("\n");
+            comparison.append("Losing Trades: ").append(tradesTable.getItems().size() - winningTrades).append("\n");
+
+            // Calculate average profit
+            double avgProfit = tradesTable.getItems().stream()
+                    .mapToDouble(BacktestTrade::getProfit)
+                    .average()
+                    .orElse(0.0);
+            comparison.append(String.format("Average Profit: %.2f\n", avgProfit));
+
+            alert.setContentText(comparison.toString());
+            alert.showAndWait();
+
+            log.info("Backtest comparison displayed for: {}", symbolCombo.getValue());
+        } catch (Exception e) {
+            log.error("Failed to display comparison", e);
+            showAlert("Comparison Error", "Failed to display comparison: " + e.getMessage(), Alert.AlertType.ERROR);
+        }
+    }
+
+    private void showAlert(String title, String message, Alert.AlertType type) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
     private @NotNull HBox createLabeledInput(String label, @NotNull Node input) {
