@@ -8,11 +8,13 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.stage.Stage;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
+import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
@@ -26,6 +28,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -55,6 +58,7 @@ import java.util.*;
  * /strategy - Strategy performance metrics
  * /health - System health snapshot
  */
+@Getter
 @Slf4j
 public class TelegramCommandHandler {
     private static final String TELEGRAM_API_BASE = "https://api.telegram.org/bot";
@@ -62,30 +66,21 @@ public class TelegramCommandHandler {
 
     private final TelegramNotifier telegramNotifier;
     private final SystemCore systemCore;
-    private final String botToken;
+
     private final HttpClient httpClient;
-    private volatile Stage primaryStage;
+    private final Stage primaryStage= new Stage();
 
     private volatile long lastUpdateId = -1L;
     private volatile boolean polling = false;
     private volatile Thread pollingThread;
 
-    public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier,
-            String botToken) {
+    public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier) {
         this.systemCore = systemCore;
         this.telegramNotifier = telegramNotifier;
-        this.botToken = botToken;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
-    }
-
-    /**
-     * Set the primary stage for screenshot capture.
-     * Call this from JavaFX main stage to enable /screenshot command.
-     */
-    public void setPrimaryStage(@NotNull Stage stage) {
-        this.primaryStage = stage;
+        startPolling();
     }
 
     /**
@@ -169,7 +164,7 @@ public class TelegramCommandHandler {
         }
 
         try {
-            String url = "%s%s/getUpdates".formatted(TELEGRAM_API_BASE, botToken);
+            String url = "%s%s/getUpdates".formatted(TELEGRAM_API_BASE, telegramNotifier.getBotToken());
 
             if (lastUpdateId >= 0) {
                 url += "?offset=%d&timeout=30".formatted(lastUpdateId + 1);
@@ -235,23 +230,28 @@ public class TelegramCommandHandler {
      * Process a Telegram command and return response text
      */
     public String handleCommand(@NotNull String command, String chatId) {
-        if (command == null || command.isBlank()) {
+        if (command.isBlank()) {
             return "❌ No command provided";
         }
 
         String[] parts = command.trim().split("\\s+");
-        String cmd = parts[0].toLowerCase().replace("/", "");
+        String cmd = parts[0].toLowerCase();
+        TradePair pair;
+        try {
+            pair = new TradePair(parts[0].split("/")[0],parts[0].split("/")[1]);
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
 
         try {
             return switch (cmd) {
-                case "start" -> getHelpText();
-                case "help" -> getHelpText();
+                case "start", "help" -> getHelpText();
                 case "status" -> getStatusReport();
                 case "balance" -> getBalanceReport();
                 case "positions" -> getPositionsReport();
                 case "orders" -> getOrdersReport();
                 case "screenshot" -> captureAndSendScreenshot(chatId);
-                case "market" -> getMarketReport(parts.length > 1 ? parts[1] : null);
+                case "market" -> getMarketReport(parts.length > 1 ? pair: null);
                 case "risk" -> getRiskReport();
                 case "strategy" -> getStrategyReport();
                 case "health" -> getHealthReport();
@@ -290,13 +290,13 @@ public class TelegramCommandHandler {
             Account account = systemCore.getExchange().getAccount();
 
             if (account != null) {
-                report.append("💰 Balance: $").append(formatPrice(account.getBalance())).append("\\n");
+                report.append("💰 Balance: $").append(formatPrice(account.getAvailableBalance())).append("\\n");
                 report.append("📈 Equity: $").append(formatPrice(account.getEquity())).append("\\n");
                 report.append("📊 Margin Used: $").append(formatPrice(account.getMarginUsed())).append("\\n");
                 report.append("🔐 Margin Available: $").append(formatPrice(account.getMarginAvailable())).append("\\n");
                 report.append("📉 Unrealized P&L: $").append(formatPrice(account.getUnrealizedPnl())).append("\\n");
 
-                double marginLevel = account.getMarginLevel();
+                double marginLevel = account.getLeverage();
                 String marginStatus = marginLevel > 2.0 ? "✅" : marginLevel > 1.5 ? "⚠️" : "🔴";
                 report.append(marginStatus).append(" Margin Level: ").append(String.format("%.2f%%", marginLevel * 100))
                         .append("\\n");
@@ -320,12 +320,12 @@ public class TelegramCommandHandler {
             Account account = systemCore.getExchange().getAccount();
 
             if (account != null) {
-                report.append("💵 Cash Balance: $").append(formatPrice(account.getBalance())).append("\\n");
+                report.append("💵 Cash Balance: $").append(formatPrice(account.getTotalBalance())).append("\\n");
                 report.append("📊 Equity: $").append(formatPrice(account.getEquity())).append("\\n");
                 report.append("💳 Used Margin: $").append(formatPrice(account.getMarginUsed())).append("\\n");
                 report.append("🆓 Free Margin: $").append(formatPrice(account.getMarginAvailable())).append("\\n");
 
-                double marginLevel = account.getMarginLevel();
+                double marginLevel = account.getLeverage();
                 report.append("📈 Margin Level: ").append(String.format("%.2f%%", marginLevel * 100)).append("\\n");
 
                 double usagePercent = (account.getMarginUsed() / account.getMarginAvailable()) * 100;
@@ -345,7 +345,7 @@ public class TelegramCommandHandler {
 
     private String getPositionsReport() {
         try {
-            List<Position> positions = systemCore.getExchange().getPositions();
+            List<Position> positions = systemCore.getExchange().fetchPositions().get();
 
             if (positions == null || positions.isEmpty()) {
                 return "📭 No open positions";
@@ -355,18 +355,18 @@ public class TelegramCommandHandler {
 
             for (Position pos : positions) {
                 report.append("🏷️ *").append(pos.getSymbol()).append("*\\n");
-                report.append("   Size: ").append(pos.getSize()).append(" units\\n");
+                report.append("   Size: ").append(pos.getQuantity()).append(" units\\n");
                 report.append("   Entry: $").append(formatPrice(pos.getEntryPrice())).append("\\n");
                 report.append("   Current: $").append(formatPrice(pos.getCurrentPrice())).append("\\n");
 
-                double pnl = pos.getUnrealizedPnL();
-                double pnlPercent = (pnl / (pos.getSize() * pos.getEntryPrice())) * 100;
+                double pnl = pos.getUnrealizedPnl();
+                double pnlPercent = (pnl / (pos.getQuantity() * pos.getEntryPrice())) * 100;
                 String pnlStatus = pnl >= 0 ? "✅" : "❌";
 
                 report.append(pnlStatus).append(" P&L: $").append(formatPrice(pnl))
                         .append(" (").append(String.format("%.2f%%", pnlPercent)).append(")\\n");
 
-                report.append("   Margin: $").append(formatPrice(pos.getMarginRequired())).append("\\n");
+                report.append("   Margin: $").append(formatPrice(pos.getMarginUsed())).append("\\n");
                 report.append("\\n");
             }
 
@@ -380,7 +380,7 @@ public class TelegramCommandHandler {
 
     private String getOrdersReport() {
         try {
-            List<OpenOrder> orders = systemCore.getExchange().getOpenOrders();
+            List<OpenOrder> orders = systemCore.getExchange().fetchAllOpenOrders().get();
 
             if (orders == null || orders.isEmpty()) {
                 return "📭 No pending orders";
@@ -389,9 +389,9 @@ public class TelegramCommandHandler {
             StringBuilder report = new StringBuilder("*Open Orders (" + orders.size() + ")*\\n\\n");
 
             for (OpenOrder order : orders) {
-                report.append("🔔 *").append(order.getSymbol()).append(" - ").append(order.getType()).append("*\\n");
+                report.append("🔔 *").append(order.getTradePair().toString()).append(" / ").append(order.getSide()).append("*\\n");
                 report.append("   Side: ").append(order.getSide()).append("\\n");
-                report.append("   Amount: ").append(order.getAmount()).append(" units\\n");
+                report.append("   Amount: ").append(order.getSize()).append(" units\\n");
                 report.append("   Price: $").append(formatPrice(order.getPrice())).append("\\n");
                 report.append("   Status: ").append(order.getStatus()).append("\\n");
                 report.append("   Time: ").append(order.getTimestamp()).append("\\n");
@@ -406,14 +406,14 @@ public class TelegramCommandHandler {
         }
     }
 
-    private String getMarketReport(String symbol) {
+    private String getMarketReport(TradePair symbol) {
         try {
-            if (symbol == null || symbol.isBlank()) {
-                symbol = systemCore.getSelectedTradePair() != null ? systemCore.getSelectedTradePair().getSymbol()
-                        : "BTC/USD";
+            if (symbol == null ) {
+                symbol = systemCore.getSelectedTradePair() != null ? systemCore.getSelectedTradePair()
+                        : null;
             }
 
-            Ticker ticker = systemCore.getExchange().getTicker(symbol);
+            Ticker ticker = systemCore.getExchange().fetchTicker(symbol).get();
 
             if (ticker == null) {
                 return "❌ Unable to fetch market data for " + symbol;
@@ -421,16 +421,18 @@ public class TelegramCommandHandler {
 
             StringBuilder report = new StringBuilder("*Market Info - ").append(symbol).append("*\\n\\n");
 
-            report.append("📊 Bid: $").append(formatPrice(ticker.getBid())).append("\\n");
-            report.append("🎯 Ask: $").append(formatPrice(ticker.getAsk())).append("\\n");
 
-            double spread = ticker.getAsk() - ticker.getBid();
-            double spreadPercent = (spread / ticker.getBid()) * 100;
+
+            report.append("📊 Bid: $").append(formatPrice(ticker.getBidPrice())).append("\\n");
+            report.append("🎯 Ask: $").append(formatPrice(ticker.getAskPrice())).append("\\n");
+
+            double spread = ticker.getAskPrice() - ticker.getBidPrice();
+            double spreadPercent = (spread / ticker.getBidPrice()) * 100;
             report.append("📈 Spread: $").append(formatPrice(spread))
                     .append(" (").append(String.format("%.4f%%", spreadPercent)).append(")\\n");
 
-            report.append("🔺 High (24h): $").append(formatPrice(ticker.getHigh())).append("\\n");
-            report.append("🔻 Low (24h): $").append(formatPrice(ticker.getLow())).append("\\n");
+            report.append("🔺 High (24h): $").append(formatPrice(ticker.getHighPrice())).append("\\n");
+            report.append("🔻 Low (24h): $").append(formatPrice(ticker.getLowPrice())).append("\\n");
 
             if (ticker.getVolume() > 0) {
                 report.append("📦 Volume: ").append(String.format("%.2f", ticker.getVolume())).append("\\n");
@@ -452,7 +454,7 @@ public class TelegramCommandHandler {
             Account account = systemCore.getExchange().getAccount();
 
             if (account != null) {
-                double marginLevel = account.getMarginLevel();
+                double marginLevel = account.getLeverage();
                 String riskStatus = marginLevel > 2.0 ? "✅ LOW" : marginLevel > 1.5 ? "⚠️ MEDIUM" : "🔴 HIGH";
 
                 report.append("⚠️ Risk Level: ").append(riskStatus).append("\\n");
@@ -477,18 +479,15 @@ public class TelegramCommandHandler {
 
     private String getStrategyReport() {
         try {
-            StringBuilder report = new StringBuilder("*Strategy Status*\\n\\n");
 
-            report.append("📊 Active Strategies: Monitoring\\n");
-            report.append("🎯 Auto Trading: ");
-            report.append(systemCore.isAutoTradingEnabled() ? "✅ Enabled\\n" : "❌ Disabled\\n");
-            report.append("🔄 Streaming: ");
-            report.append(systemCore.isStreaming() ? "🔴 Active\\n" : "⚪ Inactive\\n");
-            report.append("🤖 AI Reasoning: ");
-            report.append(systemCore.isAiReasoningEnabled() ? "✅ Enabled\\n" : "❌ Disabled\\n");
-
-            report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
-            return report.toString();
+            return "*Strategy Status*\\n\\n" + "📊 Active Strategies: Monitoring\\n" +
+                    "🎯 Auto Trading: " +
+                    (systemCore.isAutoTradingEnabled() ? "✅ Enabled\\n" : "❌ Disabled\\n") +
+                    "🔄 Streaming: " +
+                    (systemCore.isStreaming() ? "🔴 Active\\n" : "⚪ Inactive\\n") +
+                    "🤖 AI Reasoning: " +
+                    (systemCore.isAiReasoningEnabled() ? "✅ Enabled\\n" : "❌ Disabled\\n") +
+                    "\\n_Updated: " + getCurrentTime() + "_";
         } catch (Exception e) {
             log.error("Error generating strategy report", e);
             return "❌ Error fetching strategy data: " + e.getMessage();
@@ -497,17 +496,14 @@ public class TelegramCommandHandler {
 
     private String getHealthReport() {
         try {
-            StringBuilder report = new StringBuilder("*System Health*\\n\\n");
 
-            report.append("✅ Exchange Connected: Yes\\n");
-            report.append("📡 API Status: Online\\n");
-            report.append("🔋 System Status: Operational\\n");
-            report.append("🔄 Last Update: ").append(getCurrentTime()).append("\\n");
-            report.append("📊 Active Streams: ");
-            report.append(systemCore.isStreaming() ? "Yes\\n" : "No\\n");
-
-            report.append("\\n_System Status: ✅ OPERATIONAL_");
-            return report.toString();
+            return "*System Health*\\n\\n" + "✅ Exchange Connected: Yes\\n" +
+                    "📡 API Status: Online\\n" +
+                    "🔋 System Status: Operational\\n" +
+                    "🔄 Last Update: " + getCurrentTime() + "\\n" +
+                    "📊 Active Streams: " +
+                    (systemCore.isStreaming() ? "Yes\\n" : "No\\n") +
+                    "\\n_System Status: ✅ OPERATIONAL_";
         } catch (Exception e) {
             log.error("Error generating health report", e);
             return "❌ Error fetching health status: " + e.getMessage();
@@ -520,7 +516,7 @@ public class TelegramCommandHandler {
         }
 
         try {
-            String url = "%s%s/sendMessage".formatted(TELEGRAM_API_BASE, botToken);
+            String url = "%s%s/sendMessage".formatted(TELEGRAM_API_BASE,telegramNotifier.getBotToken());
 
             String body = "chat_id=" + URLEncoder.encode(chatId, StandardCharsets.UTF_8) +
                     "&text=" + URLEncoder.encode(message, StandardCharsets.UTF_8) +
@@ -566,23 +562,7 @@ public class TelegramCommandHandler {
             }
 
             // Convert to BufferedImage using SwingFXUtils
-            BufferedImage bufferedImage = new BufferedImage(
-                    (int) snapshot.getWidth(),
-                    (int) snapshot.getHeight(),
-                    BufferedImage.TYPE_INT_RGB);
-
-            PixelReader pixelReader = snapshot.getPixelReader();
-            PixelWriter pixelWriter = new WritableImage(
-                    (int) snapshot.getWidth(),
-                    (int) snapshot.getHeight()).getPixelWriter();
-
-            // Copy pixels from snapshot to buffered image
-            for (int y = 0; y < (int) snapshot.getHeight(); y++) {
-                for (int x = 0; x < (int) snapshot.getWidth(); x++) {
-                    int argb = pixelReader.getArgb(x, y);
-                    bufferedImage.setRGB(x, y, argb);
-                }
-            }
+            BufferedImage bufferedImage = getBufferedImage(snapshot);
 
             // Save to temporary file
             Path tempFile = Files.createTempFile("investpro_screenshot_", ".png");
@@ -614,5 +594,26 @@ public class TelegramCommandHandler {
             log.error("Error capturing/sending screenshot", e);
             return "❌ Screenshot error: " + e.getMessage();
         }
+    }
+
+    private static @NotNull BufferedImage getBufferedImage(WritableImage snapshot) {
+        BufferedImage bufferedImage = new BufferedImage(
+                (int) snapshot.getWidth(),
+                (int) snapshot.getHeight(),
+                BufferedImage.TYPE_INT_RGB);
+
+        PixelReader pixelReader = snapshot.getPixelReader();
+        PixelWriter pixelWriter = new WritableImage(
+                (int) snapshot.getWidth(),
+                (int) snapshot.getHeight()).getPixelWriter();
+
+        // Copy pixels from snapshot to buffered image
+        for (int y = 0; y < (int) snapshot.getHeight(); y++) {
+            for (int x = 0; x < (int) snapshot.getWidth(); x++) {
+                int argb = pixelReader.getArgb(x, y);
+                bufferedImage.setRGB(x, y, argb);
+            }
+        }
+        return bufferedImage;
     }
 }

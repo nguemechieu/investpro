@@ -830,5 +830,6 @@ private String destination = "";
         return cleaned;
     }
 
+    private double leverage;
 
 }

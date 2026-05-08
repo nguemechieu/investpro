@@ -183,7 +183,7 @@ public class BacktestingPanel extends VBox {
         strategyCombo = new ComboBox<>();
         List<String> strategies = loadStrategyNames();
         strategyCombo.setItems(FXCollections.observableArrayList(strategies));
-        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.get(0));
+        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.getFirst());
         strategyCombo.setPrefHeight(35);
         HBox strategyBox = createLabeledInput("Strategy:", strategyCombo);
 
@@ -199,7 +199,7 @@ public class BacktestingPanel extends VBox {
                         ? Timeframe.H1
                         : timeframeCombo.getItems().isEmpty()
                         ? null
-                        : timeframeCombo.getItems().get(0)
+                        : timeframeCombo.getItems().getFirst()
         );
         timeframeCombo.setPrefHeight(35);
         timeframeCombo.setCellFactory(comboBox -> new ListCell<>() {

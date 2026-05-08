@@ -23,13 +23,12 @@ public class OpenOrder {
     private Instant updatedAt;
     private OrderStatus status;
     private String clientOrderId;
-    private double timeInForce;  // GTC, IOC, FOK, GTD
+    private String timeInForce;  // GTC, IOC, FOK, GTD
     private double avgFillPrice;
     private double commission;
     private String exchange;
 
-
-
+    public Instant Timestamp;
 
     public enum OrderStatus {
         PENDING,

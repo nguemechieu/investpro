@@ -40,7 +40,7 @@ import java.util.*;
 public class MarketWatchPanel extends BorderPane {
 
     private final SystemCore systemCore;
-    private final SymbolAgentManager symbolAgentManager;
+    private  SymbolAgentManager symbolAgentManager;
     private final TableView<MarketWatchRow> table = new TableView<>();
     private final Map<TradePair, MarketWatchRow> rowCache = new LinkedHashMap<>();
 
@@ -53,21 +53,15 @@ public class MarketWatchPanel extends BorderPane {
 
         // Safely get SymbolAgentManager with error logging
         try {
-            if (systemCore == null) {
-                log.error("SystemCore is null in MarketWatchPanel constructor");
-                this.symbolAgentManager = null;
-            } else if (systemCore.getSmartBot() == null) {
-                log.error("SmartBot is null in SystemCore");
-                this.symbolAgentManager = null;
-            } else {
-                this.symbolAgentManager = systemCore.getSmartBot().getSymbolAgentManager();
+
+                this.symbolAgentManager = systemCore.getSymbolAgentManager();
                 if (this.symbolAgentManager == null) {
                     log.error("SymbolAgentManager is null from SmartBot");
                 }
-            }
+
         } catch (Exception e) {
             log.error("Error initializing SymbolAgentManager in MarketWatchPanel", e);
-            this.symbolAgentManager = null;
+
         }
 
         initializeUI();

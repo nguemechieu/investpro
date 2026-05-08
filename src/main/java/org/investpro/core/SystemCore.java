@@ -6,15 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.LocalAiReasoningService;
 import org.investpro.ai.OpenAiReasoningService;
-import org.investpro.core.agents.AgentEvent;
-import org.investpro.core.agents.AgentEventBus;
-import org.investpro.core.agents.AgentRegistry;
-import org.investpro.core.agents.SystemCoreDependencies;
+import org.investpro.core.agents.*;
 import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
-import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.bot.SmartBot;
 import org.investpro.data.Account;
 import org.investpro.data.CandleData;
@@ -98,7 +94,6 @@ public class SystemCore {
      * Used internally by stream consumers and other components to track
      * the last known occurrence of key events for diagnostic purposes.
      *
-     * @return SystemEventRecorder instance
      */
     private SystemEventRecorder systemEventRecorder;
 
@@ -126,6 +121,7 @@ public class SystemCore {
     public SystemCore(@NotNull Exchange exchange, Properties config) {
         this.exchange = Objects.requireNonNull(exchange, "exchange cannot be null");
         this.config = config == null ? new Properties() : config;
+
 
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
         this.fromEmail = this.config.getProperty("from_email", "").trim();
@@ -159,7 +155,7 @@ public class SystemCore {
 
         // Create SmartBot with the agent registry
         this.smartBot = new SmartBot(
-                new org.investpro.core.agents.AgentRuntime(),
+                new AgentRuntime(),
                 new AgentEventBus(),
                 agentRegistry);
 
@@ -177,6 +173,7 @@ public class SystemCore {
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();
         this.systemMonitorService = new SystemMonitorService(this);
+
     }
 
     /**

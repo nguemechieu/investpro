@@ -877,7 +877,12 @@ public class TradingWindow extends BorderPane {
                     double maxSize = orderBookBids.stream().mapToDouble(OrderBook.PriceLevel::getSize).max()
                             .orElse(1.0);
                     double depthPercent = Math.min((bid.getSize() / maxSize) * 100, 100);
-                    String depthColor = String.format("rgba(16, 185, 129, %.2f)", depthPercent / 200);
+                    // Handle NaN values and cap alpha to valid CSS range (0-1)
+                    if (Double.isNaN(depthPercent) || Double.isInfinite(depthPercent)) {
+                        depthPercent = 0;
+                    }
+                    double alphaValue = Math.min(depthPercent / 200.0, 1.0);
+                    String depthColor = String.format("rgba(16, 185, 129, %.2f)", alphaValue);
 
                     Label priceLabel = new Label(price(bid.getPrice()));
                     priceLabel.setStyle(
@@ -924,7 +929,12 @@ public class TradingWindow extends BorderPane {
                     double maxSize = orderBookAsks.stream().mapToDouble(OrderBook.PriceLevel::getSize).max()
                             .orElse(1.0);
                     double depthPercent = Math.min((ask.getSize() / maxSize) * 100, 100);
-                    String depthColor = String.format("rgba(239, 68, 68, %.2f)", depthPercent / 200);
+                    // Handle NaN values and cap alpha to valid CSS range (0-1)
+                    if (Double.isNaN(depthPercent) || Double.isInfinite(depthPercent)) {
+                        depthPercent = 0;
+                    }
+                    double alphaValue = Math.min(depthPercent / 200.0, 1.0);
+                    String depthColor = String.format("rgba(239, 68, 68, %.2f)", alphaValue);
 
                     Label totalLabel = new Label(compactMarketNumber(ask.getPrice() * ask.getSize()));
                     totalLabel.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11; -fx-min-width: 80;");
