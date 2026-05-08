@@ -4,9 +4,16 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.core.SystemCore;
 import org.investpro.enums.StrategyCategory;
+import org.investpro.indicators.INDICATORS;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.timeframe.Timeframe;
+
+import java.util.Arrays;
 
 /**
  * Strategy Builder Panel - Allows users to build and configure custom trading
@@ -14,6 +21,8 @@ import org.investpro.timeframe.Timeframe;
  * Provides a UI to select indicators, set parameters, define entry/exit rules.
  */
 @Slf4j
+@Getter
+@Setter
 public class StrategyBuilderPanel extends VBox {
 
     private TextField strategyNameField;
@@ -22,13 +31,13 @@ public class StrategyBuilderPanel extends VBox {
     private ComboBox<String> indicatorCombo;
     private TextArea strategyDescriptionArea;
     private TableView<StrategyParameter> parametersTable;
-
-    public StrategyBuilderPanel() {
+    private SystemCore systemCore;
+    public StrategyBuilderPanel(SystemCore systemCore) {
         setPadding(new Insets(16));
         setSpacing(12);
         setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
         getStyleClass().add("strategy-builder-panel");
-
+        this.systemCore = systemCore;
         setupUI();
     }
 
@@ -102,9 +111,10 @@ public class StrategyBuilderPanel extends VBox {
 
         // Indicator Selection
         indicatorCombo = new ComboBox<>();
-        indicatorCombo.getItems().addAll("SMA (Moving Average)", "RSI (Relative Strength Index)",
-                "MACD (Moving Avg Convergence)", "Bollinger Bands",
-                "Stochastic Oscillator", "ATR (Average True Range)");
+        indicatorCombo.getItems().addAll(
+                Arrays.toString(INDICATORS.values())
+
+        );
         indicatorCombo.setPrefHeight(35);
         HBox indicatorBox = createLabeledInput("Add Indicator:", indicatorCombo);
 
@@ -181,17 +191,17 @@ public class StrategyBuilderPanel extends VBox {
 
         TableColumn<StrategyParameter, String> nameCol = new TableColumn<>("Indicator");
         nameCol.setCellValueFactory(
-                param -> new javafx.beans.property.SimpleStringProperty(param.getValue().getName()));
+                param -> new javafx.beans.property.SimpleStringProperty(param.getValue().name()));
         nameCol.setPrefWidth(150);
 
         TableColumn<StrategyParameter, String> paramCol = new TableColumn<>("Parameter");
         paramCol.setCellValueFactory(
-                param -> new javafx.beans.property.SimpleStringProperty(param.getValue().getParameter()));
+                param -> new javafx.beans.property.SimpleStringProperty(param.getValue().parameter()));
         paramCol.setPrefWidth(150);
 
         TableColumn<StrategyParameter, String> valueCol = new TableColumn<>("Value");
         valueCol.setCellValueFactory(
-                param -> new javafx.beans.property.SimpleStringProperty(param.getValue().getValue()));
+                param -> new javafx.beans.property.SimpleStringProperty(param.getValue().value()));
         valueCol.setPrefWidth(100);
 
         TableColumn<StrategyParameter, String> actionCol = new TableColumn<>("Action");
@@ -266,29 +276,9 @@ public class StrategyBuilderPanel extends VBox {
     }
 
     /**
-     * Inner class for strategy parameters
-     */
-    public static class StrategyParameter {
-        private final String name;
-        private final String parameter;
-        private final String value;
+         * Inner class for strategy parameters
+         */
+        public record StrategyParameter(String name, String parameter, String value) {
 
-        public StrategyParameter(String name, String parameter, String value) {
-            this.name = name;
-            this.parameter = parameter;
-            this.value = value;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getParameter() {
-            return parameter;
-        }
-
-        public String getValue() {
-            return value;
-        }
     }
 }

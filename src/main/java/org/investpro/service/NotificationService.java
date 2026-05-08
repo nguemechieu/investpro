@@ -214,4 +214,10 @@ public class NotificationService {
 
         return text;
     }
+
+    public void registerEmailRecipient(String oanda, String emailAddress) {
+    }
+
+    public void subscribeEmail(String oanda, String orderRejected) {
+    }
 }

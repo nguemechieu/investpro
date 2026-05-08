@@ -5,6 +5,7 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.chart.AreaChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -12,6 +13,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -1050,10 +1052,11 @@ public class BacktestingPanel extends VBox {
         double maxDrawdownPercent = 0.0;
 
         for (BacktestTrade trade : trades) {
-            if (trade == null) continue;
-            
+            if (trade == null)
+                continue;
+
             double profit = trade.getProfit();
-            
+
             // Skip invalid profit values
             if (Double.isNaN(profit) || Double.isInfinite(profit)) {
                 continue;
@@ -1082,15 +1085,15 @@ public class BacktestingPanel extends VBox {
         double totalTrades = winCount + lossCount;
         double winRate = totalTrades > 0.0 ? (winCount / totalTrades) * 100.0 : 0.0;
         double returnPercent = (totalProfit / INITIAL_EQUITY) * 100.0;
-        
+
         // Handle division by zero and edge cases for profit factor
         double profitFactor = 0.0;
         if (grossLoss > 0.0 && !Double.isInfinite(grossProfit / grossLoss)) {
             profitFactor = grossProfit / grossLoss;
         } else if (grossProfit > 0.0 && grossLoss == 0.0) {
-            profitFactor = 10.0;  // Cap at 10 for perfect trades
+            profitFactor = 10.0; // Cap at 10 for perfect trades
         }
-        
+
         // Handle division by zero for Sharpe ratio
         double sharpeApproximation = 0.0;
         if (maxDrawdownPercent > 0.0) {
@@ -1100,15 +1103,20 @@ public class BacktestingPanel extends VBox {
                 sharpeApproximation = 10.0;
             }
         } else if (returnPercent > 0.0) {
-            sharpeApproximation = returnPercent > 0 ? 10.0 : 0.0;
+            sharpeApproximation = 10.0;
         }
-        
+
         // Validate all values
-        if (Double.isNaN(returnPercent)) returnPercent = 0.0;
-        if (Double.isNaN(winRate)) winRate = 0.0;
-        if (Double.isNaN(maxDrawdownPercent)) maxDrawdownPercent = 0.0;
-        if (Double.isNaN(sharpeApproximation)) sharpeApproximation = 0.0;
-        if (Double.isNaN(profitFactor)) profitFactor = 0.0;
+        if (Double.isNaN(returnPercent))
+            returnPercent = 0.0;
+        if (Double.isNaN(winRate))
+            winRate = 0.0;
+        if (Double.isNaN(maxDrawdownPercent))
+            maxDrawdownPercent = 0.0;
+        if (Double.isNaN(sharpeApproximation))
+            sharpeApproximation = 0.0;
+        if (Double.isNaN(profitFactor))
+            profitFactor = 0.0;
 
         metrics.put("totalReturn", returnPercent);
         metrics.put("winRate", winRate);
@@ -1126,15 +1134,15 @@ public class BacktestingPanel extends VBox {
         sharpeLabel.setText(formatMetricValue(metrics.get("sharpeRatio"), false, false));
         profitFactorLabel.setText(formatMetricValue(metrics.get("profitFactor"), false, false));
     }
-    
+
     private String formatMetricValue(Object value, boolean isPercent, boolean isNegative) {
         double numValue = asDouble(value);
-        
+
         // Validate the value
         if (Double.isNaN(numValue) || Double.isInfinite(numValue)) {
             return isPercent ? "0.00%" : "0.00";
         }
-        
+
         if (isPercent) {
             if (isNegative && numValue > 0) {
                 return String.format("-%.2f%%", numValue);
@@ -1334,7 +1342,7 @@ public class BacktestingPanel extends VBox {
 
         addParameterRow(grid, 0, "Symbol:", symbolCombo.getValue() != null ? symbolCombo.getValue().toString() : "N/A");
         addParameterRow(grid, 1, "Strategy:", strategyCombo.getValue());
-        addParameterRow(grid, 2, "Timeframe:", timeframeCombo.getValue());
+        addParameterRow(grid, 2, "Timeframe:", timeframeCombo.getValue().getDisplayName());
         addParameterRow(grid, 3, "Number of Bars:", String.valueOf(barCountSpinner.getValue()));
 
         section.getChildren().addAll(sectionTitle, grid);
@@ -1399,8 +1407,12 @@ public class BacktestingPanel extends VBox {
         }
     }
 
-    private VBox createTradeSummarySection() {\n        VBox section = new VBox(10);\n        section.setPadding(new Insets(12));\n        section.setStyle(\n                \"-fx-background-color: #1e293b; \" +\n                        \"-fx-border-color: #f59e0b; \" +\n                        \"-fx-border-width: 1; \" +\n                        \"-fx-border-radius: 6; \" +\n                        \"-fx-background-radius: 6;\");\n\n        Label sectionTitle = new Label(\"Trade Summary\");\n        sectionTitle.setStyle(\"-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #f59e0b;\");\n\n        GridPane grid = new GridPane();\n        grid.setHgap(30);\n        grid.setVgap(12);\n\n        int totalTrades = tradesTable.getItems().size();\n        \n        if (totalTrades == 0) {\n            // Handle empty trades case\n            addMetricRow(grid, 0, \"Total Trades:\", \"0\", \"#ffffff\");\n            addMetricRow(grid, 1, \"Winning Trades:\", \"0\", \"#10b981\");\n            addMetricRow(grid, 2, \"Losing Trades:\", \"0\", \"#ef4444\");\n            addMetricRow(grid, 3, \"Average Profit:\", \"0.00\", \"#3b82f6\");\n            addMetricRow(grid, 4, \"Best Trade:\", \"0.00\", \"#10b981\");\n            addMetricRow(grid, 5, \"Worst Trade:\", \"0.00\", \"#ef4444\");\n        } else {\n            long winningTrades = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null && trade.getProfit() > 0)\n                    .count();\n            long losingTrades = totalTrades - winningTrades;\n\n            double avgProfit = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null)\n                    .mapToDouble(BacktestTrade::getProfit)\n                    .average()\n                    .orElse(0.0);\n\n            double maxProfit = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null)\n                    .mapToDouble(BacktestTrade::getProfit)\n                    .max()\n                    .orElse(0.0);\n\n            double minProfit = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null)\n                    .mapToDouble(BacktestTrade::getProfit)\n                    .min()\n                    .orElse(0.0);\n\n            // Validate calculated values\n            if (Double.isNaN(avgProfit)) avgProfit = 0.0;\n            if (Double.isNaN(maxProfit)) maxProfit = 0.0;\n            if (Double.isNaN(minProfit)) minProfit = 0.0;\n            if (Double.isInfinite(avgProfit)) avgProfit = 0.0;\n            if (Double.isInfinite(maxProfit)) maxProfit = 0.0;\n            if (Double.isInfinite(minProfit)) minProfit = 0.0;\n            \n            addMetricRow(grid, 0, \"Total Trades:\", String.valueOf(totalTrades), \"#ffffff\");\n            addMetricRow(grid, 1, \"Winning Trades:\", String.valueOf(winningTrades), \"#10b981\");\n            addMetricRow(grid, 2, \"Losing Trades:\", String.valueOf(losingTrades), \"#ef4444\");\n            addMetricRow(grid, 3, \"Average Profit:\", String.format(\"%.2f\", avgProfit), \"#3b82f6\");\n            addMetricRow(grid, 4, \"Best Trade:\", String.format(\"%.2f\", maxProfit), \"#10b981\");\n            addMetricRow(grid, 5, \"Worst Trade:\", String.format(\"%.2f\", minProfit), \"#ef4444\");\n        }\n\n        section.getChildren().addAll(sectionTitle, grid);\n        return section;\n    }
-
+    private VBox createTradeSummarySection() {
+        VBox section = new VBox(10);
+        section.setPadding(new Insets(12));
+        section.setStyle("-fx-background-color: #1e293b; \" +\n                        \"-fx-border-color: #f59e0b; \" +\n                        \"-fx-border-width: 1; \" +\n                        \"-fx-border-radius: 6; \" +\n                        \"-fx-background-radius: 6;\");\n\n        Label sectionTitle = new Label(\"Trade Summary\");\n        sectionTitle.setStyle(\"-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #f59e0b;\");\n\n        GridPane grid = new GridPane();\n        grid.setHgap(30);\n        grid.setVgap(12);\n\n        int totalTrades = tradesTable.getItems().size();\n        \n        if (totalTrades == 0) {\n            // Handle empty trades case\n            addMetricRow(grid, 0, \"Total Trades:\", \"0\", \"#ffffff\");\n            addMetricRow(grid, 1, \"Winning Trades:\", \"0\", \"#10b981\");\n            addMetricRow(grid, 2, \"Losing Trades:\", \"0\", \"#ef4444\");\n            addMetricRow(grid, 3, \"Average Profit:\", \"0.00\", \"#3b82f6\");\n            addMetricRow(grid, 4, \"Best Trade:\", \"0.00\", \"#10b981\");\n            addMetricRow(grid, 5, \"Worst Trade:\", \"0.00\", \"#ef4444\");\n        } else {\n            long winningTrades = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null && trade.getProfit() > 0)\n                    .count();\n            long losingTrades = totalTrades - winningTrades;\n\n            double avgProfit = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null)\n                    .mapToDouble(BacktestTrade::getProfit)\n                    .average()\n                    .orElse(0.0);\n\n            double maxProfit = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null)\n                    .mapToDouble(BacktestTrade::getProfit)\n                    .max()\n                    .orElse(0.0);\n\n            double minProfit = tradesTable.getItems().stream()\n                    .filter(trade -> trade != null)\n                    .mapToDouble(BacktestTrade::getProfit)\n                    .min()\n                    .orElse(0.0);\n\n            // Validate calculated values\n            if (Double.isNaN(avgProfit)) avgProfit = 0.0;\n            if (Double.isNaN(maxProfit)) maxProfit = 0.0;\n            if (Double.isNaN(minProfit)) minProfit = 0.0;\n            if (Double.isInfinite(avgProfit)) avgProfit = 0.0;\n            if (Double.isInfinite(maxProfit)) maxProfit = 0.0;\n            if (Double.isInfinite(minProfit)) minProfit = 0.0;\n            \n            addMetricRow(grid, 0, \"Total Trades:\", String.valueOf(totalTrades), \"#ffffff\");\n            addMetricRow(grid, 1, \"Winning Trades:\", String.valueOf(winningTrades), \"#10b981\");\n            addMetricRow(grid, 2, \"Losing Trades:\", String.valueOf(losingTrades), \"#ef4444\");\n            addMetricRow(grid, 3, \"Average Profit:\", String.format(\"%.2f\", avgProfit), \"#3b82f6\");\n            addMetricRow(grid, 4, \"Best Trade:\", String.format(\"%.2f\", maxProfit), \"#10b981\");\n            addMetricRow(grid, 5, \"Worst Trade:\", String.format(\"%.2f\", minProfit), \"#ef4444\");\n        }\n\n        section.getChildren().addAll(sectionTitle, grid);\n        return section;\n    }");
+    return  section;
+    }
     private void addParameterRow(GridPane grid, int row, String label, String value) {
         Label labelNode = new Label(label);
         labelNode.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11px; -fx-font-weight: bold;");

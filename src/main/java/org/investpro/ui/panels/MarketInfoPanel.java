@@ -6,6 +6,8 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.market.MarketStats;
@@ -19,6 +21,8 @@ import org.investpro.service.NewsDataProvider;
  * description.
  */
 @Slf4j
+@Getter
+@Setter
 public class MarketInfoPanel extends ScrollPane {
 
     private final VBox mainContent = new VBox(16);
@@ -44,10 +48,6 @@ public class MarketInfoPanel extends ScrollPane {
         setContent(mainContent);
 
         setupUI();
-    }
-
-    public void setExchange(Exchange exchange) {
-        this.exchange = exchange;
     }
 
     private void setupUI() {

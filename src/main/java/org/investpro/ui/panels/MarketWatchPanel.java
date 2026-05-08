@@ -78,6 +78,9 @@ public class MarketWatchPanel extends BorderPane {
 
         this.setCenter(content);
         this.setPadding(new Insets(4));
+
+        TradePair sym = systemCore.getSelectedTradePair();
+        updateSymbol(sym,symbolAgentManager.getState(sym).orElse(null));
     }
 
     private void setupTableColumns() {

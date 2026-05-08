@@ -5,6 +5,8 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.OpenOrder;
@@ -25,6 +27,8 @@ import java.util.Optional;
  * and expiration control.
  */
 @Slf4j
+@Getter
+@Setter
 public class OrderPanel extends BorderPane {
 
     private ComboBox<String> symbolCombo;

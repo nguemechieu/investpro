@@ -46,14 +46,7 @@ import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.DepthChart;
 import org.investpro.ui.charts.NewsEventOverlay;
-import org.investpro.ui.panels.MarketInfoPanel;
-import org.investpro.ui.panels.NewsCalendarPanel;
-import org.investpro.ui.panels.StrategyBuilderPanel;
-import org.investpro.ui.panels.BacktestingPanel;
-import org.investpro.ui.panels.MarketWatchPanel;
-import org.investpro.ui.panels.AnalysisPanel;
-import org.investpro.ui.panels.OrderPanel;
-import org.investpro.ui.panels.StrategyAssignmentPanel;
+import org.investpro.ui.panels.*;
 import org.investpro.utils.DraggableTab;
 import org.investpro.utils.ZoomDirection;
 
@@ -87,7 +80,7 @@ import static org.investpro.utils.Side.SELL;
 
 /**
  * Main InvestPro / TradeAdviser trading terminal window.
- *
+ * <p>
  * This version is wired to SystemCore:
  * - TradingWindow owns the UI.
  * - SystemCore owns SmartBot, streaming, strategy engine, risk, AI, execution,
@@ -478,7 +471,7 @@ public class TradingWindow extends BorderPane {
                 menuItem("Exchange Credentials", null, this::showSettingsDialog),
                 new SeparatorMenuItem(),
                 menuItem("Trading Profile", null, this::showTradingProfileSettings),
-                menuItem("Behaviour Guard", null, this::showBehaviourGuardSettings),
+
                 new SeparatorMenuItem(),
                 menuItem("Reset Password", null, this::openPasswordReset));
 
@@ -802,8 +795,8 @@ public class TradingWindow extends BorderPane {
         }
 
         // Get best bid and ask
-        double bestBid = orderBookBids.get(0).getPrice();
-        double bestAsk = orderBookAsks.get(0).getPrice();
+        double bestBid = orderBookBids.getFirst().getPrice();
+        double bestAsk = orderBookAsks.getFirst().getPrice();
         double midPrice = (bestBid + bestAsk) / 2.0;
         double spread = bestAsk - bestBid;
         double spreadPercent = (spread / midPrice) * 100;
@@ -1003,9 +996,6 @@ public class TradingWindow extends BorderPane {
     private @NotNull TabPane createNavigatorTabs() {
         TabPane navigatorTabs = new TabPane();
         navigatorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-
-        ListView<String> navigationView = new ListView<>(FXCollections.observableArrayList(
-                "Market Info", "Balance", "Equity", "Margin", "Free Margin"));
 
         Node overviewView = createOverviewPane();
 
@@ -1271,7 +1261,7 @@ public class TradingWindow extends BorderPane {
             marketWatchVisible = false;
         } else {
             if (!horizontalWorkbench.getItems().contains(marketWatchWrapper)) {
-                horizontalWorkbench.getItems().add(0, marketWatchWrapper);
+                horizontalWorkbench.getItems().addFirst(marketWatchWrapper);
             }
             horizontalWorkbench.setDividerPositions(0.22, 0.78);
             marketWatchVisible = true;
@@ -1340,12 +1330,6 @@ public class TradingWindow extends BorderPane {
         saveAppState();
     }
 
-    private DraggableTab createDetachableTerminalTab(String title, Node content) {
-        DraggableTab tab = new DraggableTab(title, content);
-        tab.setClosable(true);
-        terminalTabPane.getTabs().add(tab);
-        return tab;
-    }
 
     private DraggableTab createDetachableTerminalTab(TabName tabName, Node content) {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
@@ -1930,8 +1914,8 @@ public class TradingWindow extends BorderPane {
         return !safe(configuredApiKey).isBlank() && !safe(configuredApiSecret).isBlank();
     }
 
-    private boolean canUseAutoRefreshExecutor() {
-        return !autoRefreshExecutor.isShutdown() && !autoRefreshExecutor.isTerminated();
+    boolean canUseAutoRefreshExecutor() {
+        return autoRefreshExecutor.isShutdown() || autoRefreshExecutor.isTerminated();
     }
 
     private void configureSelectors(MarketConfiguration configuration) {
@@ -2023,7 +2007,7 @@ public class TradingWindow extends BorderPane {
                 ? "1h"
                 : supportedTimeframes.isEmpty()
                 ? null
-                : supportedTimeframes.get(0);
+                : supportedTimeframes.getFirst();
 
         if (selectedTimeframe != null) {
             timeframeSelector.getSelectionModel().select(selectedTimeframe);
@@ -2085,7 +2069,7 @@ public class TradingWindow extends BorderPane {
                 configuration == null ? configuredApiSecret : safe(configuration.apiSecret()));
 
         // Set trading mode from configuration
-        if (configuration != null && exchange != null) {
+        if (configuration != null) {
             exchange.setUserSelectedTradingMode(configuration.tradingMode());
         }
 
@@ -2259,32 +2243,94 @@ public class TradingWindow extends BorderPane {
     }
 
     /**
-     * Setup email notifications for OANDA exchange like MetaTrader
+     * Setup email notifications for OANDA exchange similar to MetaTrader-style alerts.
+     *
+     * This does not mean OANDA itself sends the emails.
+     * TradeAdviser sends emails when OANDA-related events happen:
+     * - ORDER_FILLED
+     * - ORDER_REJECTED
+     * - STREAM_DISCONNECTED
+     * - ERROR
+     * - BALANCE_UPDATE
+     * - RISK_REJECTED
      */
     private void setupOandaEmailNotifications(Account account) {
-        String exchangeName = exchange.getClass().getSimpleName().toLowerCase();
-        if (!"oanda".equalsIgnoreCase(exchangeName)) {
+        if (exchange == null) {
+            log.debug("Cannot configure OANDA email notifications: exchange is null");
             return;
         }
 
-        String emailAddr = exchange.getEmailNotification();
-        if (emailAddr == null || emailAddr.isBlank()) {
-            log.debug("OANDA email notifications not configured");
+        String exchangeName = exchange.getClass().getSimpleName();
+
+        if (!"Oanda".equalsIgnoreCase(exchangeName)) {
+            log.debug("Skipping OANDA email notifications because active exchange is {}", exchangeName);
             return;
         }
 
-        journal("✉ Email notifications enabled for OANDA at: " + emailAddr);
-        log.info("OANDA email notifications configured for: {}", emailAddr);
+        String emailAddress = safe(exchange.getEmailNotification());
 
-        // Email notifications will be sent for:
-        // - Trade executions (ORDER_FILLED)
-        // - Trade rejections (ORDER_REJECTED)
-        // - Connection issues (STREAM_DISCONNECTED, ERROR)
-        // - Balance updates (BALANCE_UPDATE)
-        // - Risk alerts (RISK_REJECTED)
-        // These are handled by the NotificationService integration with the exchange
+        if (!isValidEmail(emailAddress)) {
+            log.debug("OANDA email notifications not configured or invalid email: {}", maskEmail(emailAddress));
+            return;
+        }
+
+        String accountId = account != null && account.getAccountId() != null
+                ? account.getAccountId()
+                : "UNKNOWN";
+
+        journal("✉ OANDA email notifications enabled: " + maskEmail(emailAddress));
+        log.info(
+                "OANDA email notifications configured. accountId={}, email={}",
+                accountId,
+                maskEmail(emailAddress)
+        );
+
+        registerOandaEmailNotificationRules(accountId, emailAddress);
     }
 
+    private void registerOandaEmailNotificationRules(String accountId, String emailAddress) {
+        if (notificationService == null) {
+            log.warn("NotificationService is not available. OANDA email rules were not registered.");
+            return;
+        }
+
+        notificationService.registerEmailRecipient("OANDA", emailAddress);
+
+        notificationService.subscribeEmail("OANDA", "ORDER_FILLED");
+        notificationService.subscribeEmail("OANDA", "ORDER_REJECTED");
+        notificationService.subscribeEmail("OANDA", "STREAM_DISCONNECTED");
+        notificationService.subscribeEmail("OANDA", "ERROR");
+        notificationService.subscribeEmail("OANDA", "BALANCE_UPDATE");
+        notificationService.subscribeEmail("OANDA", "RISK_REJECTED");
+        notificationService.subscribeEmail("OANDA", "MARGIN_WARNING");
+        notificationService.subscribeEmail("OANDA", "POSITION_CLOSED");
+
+        log.info("Registered OANDA email notification rules for accountId={}", accountId);
+    }
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+    }
+
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            return "";
+        }
+
+        String[] parts = email.split("@", 2);
+        String name = parts[0];
+        String domain = parts[1];
+
+        if (name.length() <= 2) {
+            return "**@" + domain;
+        }
+
+        return name.charAt(0) + "***" + name.charAt(name.length() - 1) + "@" + domain;
+    }
     private void rejectConnectionValidation(Throwable throwable) {
         brokerAccessGranted = false;
         brokerSessions.remove(safe(exchangeSelector.getValue()));
@@ -2659,14 +2705,14 @@ public class TradingWindow extends BorderPane {
                 "System Announcements",
                 "Trading system updates and messages",
                 "#f59e0b",
-                () -> showSystemAnnouncements());
+                this::showSystemAnnouncements);
 
         container.getChildren().addAll(upcomingEventsBox, economicCalendarBox, announcementsBox);
         VBox.setVgrow(container, Priority.ALWAYS);
         return container;
     }
 
-    private VBox createOverviewMetric(String label, String value, String color) {
+    private @NotNull VBox createOverviewMetric(String label, String value, String color) {
         VBox box = new VBox(4);
         box.setPadding(new Insets(10));
         box.setMinWidth(150);
@@ -3042,12 +3088,7 @@ public class TradingWindow extends BorderPane {
         }
     }
 
-    private void openInitialChartIfAvailable() {
-        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            openSelectedSymbolChart();
-        }
-    }
+
 
     private void openSelectedFromMarketWatch() {
         TradePair selected = marketWatchTable.getSelectionModel().getSelectedItem();
@@ -3478,7 +3519,7 @@ public class TradingWindow extends BorderPane {
     }
 
     private void enablePositionAutoRefresh() {
-        if (!canUseAutoRefreshExecutor()) {
+        if (canUseAutoRefreshExecutor()) {
             return;
         }
         autoRefreshExecutor.scheduleAtFixedRate(() -> {
@@ -3494,7 +3535,7 @@ public class TradingWindow extends BorderPane {
     }
 
     private void startAutoRefreshTasks() {
-        if (!canUseAutoRefreshExecutor()) {
+        if (canUseAutoRefreshExecutor()) {
             return;
         }
         autoRefreshExecutor.scheduleAtFixedRate(() -> runOnFx(this::updateConnectionStatus), 2, 5, TimeUnit.SECONDS);
@@ -3551,8 +3592,8 @@ public class TradingWindow extends BorderPane {
         dialog.setHeaderText("Configure your trading profile and risk parameters");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
-        org.investpro.ui.panels.TradingProfileSettingsPanel profilePanel = new org.investpro.ui.panels.TradingProfileSettingsPanel();
-        profilePanel.loadProfile();
+        SettingsPanel profilePanel = new SettingsPanel(systemCore);
+
 
         ScrollPane scrollPane = new ScrollPane(profilePanel);
         scrollPane.setFitToWidth(true);
@@ -3565,25 +3606,8 @@ public class TradingWindow extends BorderPane {
         dialog.showAndWait();
     }
 
-    private void showBehaviourGuardSettings() {
-        Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("Behaviour Guard Settings");
-        dialog.setHeaderText("Configure trading guards and risk protection");
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
-        org.investpro.ui.panels.BehaviourGuardSettingsPanel guardPanel = new org.investpro.ui.panels.BehaviourGuardSettingsPanel();
-        guardPanel.loadGuardSettings();
 
-        ScrollPane scrollPane = new ScrollPane(guardPanel);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-control-inner-background: #1a1a2e;");
-
-        dialog.getDialogPane().setContent(scrollPane);
-        dialog.getDialogPane().setStyle("-fx-control-inner-background: #1a1a2e;");
-        dialog.setWidth(800);
-        dialog.setHeight(700);
-        dialog.showAndWait();
-    }
 
     private void showStrategyAssignmentPanel() {
         Dialog<Void> dialog = new Dialog<>();
@@ -3591,7 +3615,7 @@ public class TradingWindow extends BorderPane {
         dialog.setHeaderText("Assign and configure trading strategies for symbols");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
-        StrategyAssignmentPanel assignmentPanel = new StrategyAssignmentPanel();
+        StrategyAssignmentPanel assignmentPanel = new StrategyAssignmentPanel(systemCore);
 
         ScrollPane scrollPane = new ScrollPane(assignmentPanel);
         scrollPane.setFitToWidth(true);
@@ -4091,15 +4115,6 @@ public class TradingWindow extends BorderPane {
         return String.format("%.3f%%", spreadPercent);
     }
 
-    private String formatRangePercent(TradePair pair) {
-        if (pair == null || pair.getLow24h() <= 0) {
-            return "-";
-        }
-        double range = pair.getHigh24h() - pair.getLow24h();
-        double rangePercent = (range / pair.getLow24h()) * 100.0;
-        return String.format("%.2f%%", rangePercent);
-    }
-
     private String compactMarketNumber(double value) {
         if (!Double.isFinite(value))
             return "-";
@@ -4285,10 +4300,10 @@ public class TradingWindow extends BorderPane {
             return;
         }
 
-        accountPositionItems.add(0, position);
+        accountPositionItems.addFirst(position);
 
         while (accountPositionItems.size() > 500) {
-            accountPositionItems.remove(accountPositionItems.size() - 1);
+            accountPositionItems.removeLast();
         }
     }
 
@@ -4538,7 +4553,7 @@ public class TradingWindow extends BorderPane {
     // ============================================================================
 
     private void openStrategyBuilder() {
-        StrategyBuilderPanel strategyBuilder = new StrategyBuilderPanel();
+        StrategyBuilderPanel strategyBuilder = new StrategyBuilderPanel(systemCore);
         createIndependentWindow("Strategy Builder", strategyBuilder, 1000, 700);
         journal("Strategy Builder opened");
         log.info("Strategy Builder panel opened");
@@ -4552,7 +4567,7 @@ public class TradingWindow extends BorderPane {
     }
 
     private void openAnalysis() {
-        AnalysisPanel analysisPanel = new AnalysisPanel();
+        AnalysisPanel analysisPanel = new AnalysisPanel(systemCore);
         createIndependentWindow("Analysis", analysisPanel, 1000, 700);
         journal("Analysis panel opened");
         log.info("Analysis panel opened");
@@ -4803,9 +4818,6 @@ public class TradingWindow extends BorderPane {
         journal("Order panel opened");
     }
 
-    private OrderBook firstOrderBook(List<OrderBook> orderBooks) {
-        return orderBooks == null || orderBooks.isEmpty() ? null : orderBooks.get(0);
-    }
 
     // ============================================================================
     // EXCHANGE VENUE LABEL & DATA PROVIDER METHODS

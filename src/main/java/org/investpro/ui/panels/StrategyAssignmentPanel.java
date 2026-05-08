@@ -3,21 +3,29 @@ package org.investpro.ui.panels;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.core.SystemCore;
+import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.timeframe.Timeframe;
+
+import java.util.ArrayList;
 
 /**
  * Strategy Assignment Panel - Assign trading strategies to symbols and manage
  * parameters
  */
 @Slf4j
+@Getter
+@Setter
 public class StrategyAssignmentPanel extends VBox {
 
-        private ComboBox<String> symbolCombo;
+        private ComboBox<TradePair> symbolCombo;
         private ComboBox<String> strategyCombo;
-        private ComboBox<String> timeframeCombo;
+        private ComboBox<Timeframe> timeframeCombo;
         private CheckBox enableStrategyCheckbox;
         private CheckBox useRiskManagementCheckbox;
 
@@ -34,10 +42,12 @@ public class StrategyAssignmentPanel extends VBox {
         private Spinner<Double> takeProfitPercentSpinner;
 
         private TextArea strategyNotesArea;
+        private SystemCore systemCore;
 
-        public StrategyAssignmentPanel() {
+        public StrategyAssignmentPanel(SystemCore systemCore) {
                 this.setStyle("-fx-background-color: #1a1a2e; -fx-padding: 16;");
                 this.setSpacing(12);
+                this.systemCore=systemCore;
 
                 // Title
                 Label titleLabel = new Label("Strategy Assignment");
@@ -98,9 +108,7 @@ public class StrategyAssignmentPanel extends VBox {
                 Label symbolLabel = new Label("Trading Symbol:");
                 symbolLabel.setStyle("-fx-text-fill: #a0aec0;");
                 symbolCombo = new ComboBox<>();
-                symbolCombo.getItems().addAll(
-                                "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD",
-                                "DOGE/USD", "LINK/USD", "MATIC/USD", "AVAX/USD", "ATOM/USD");
+                symbolCombo.getItems().addAll(systemCore.getExchange().getTradePairSymbol());
                 symbolCombo.setPrefWidth(250);
                 symbolCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
                 grid.add(symbolLabel, 0, 0);
@@ -122,8 +130,7 @@ public class StrategyAssignmentPanel extends VBox {
                 Label timeframeLabel = new Label("Timeframe:");
                 timeframeLabel.setStyle("-fx-text-fill: #a0aec0;");
                 timeframeCombo = new ComboBox<>();
-                timeframeCombo.getItems().addAll(
-                                "1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1w", "1M");
+                timeframeCombo.getItems().addAll(systemCore.getExchange().getSupportedTimeframes());
                 timeframeCombo.setPrefWidth(250);
                 timeframeCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
                 grid.add(timeframeLabel, 0, 2);
@@ -330,9 +337,9 @@ public class StrategyAssignmentPanel extends VBox {
         }
 
         private void assignStrategy() {
-                String symbol = symbolCombo.getValue();
+                String symbol = symbolCombo.getValue().toString('/');
                 String strategy = strategyCombo.getValue();
-                String timeframeCode = timeframeCombo.getValue();
+                String timeframeCode = timeframeCombo.getValue().getCode();
                 Double confidence = confidenceThresholdSpinner.getValue();
                 Integer signalStrength = minSignalStrengthSpinner.getValue();
                 Double positionSize = positionSizePercentSpinner.getValue();
@@ -341,7 +348,7 @@ public class StrategyAssignmentPanel extends VBox {
                 String exitSignal = exitSignalCombo.getValue();
                 Double stopLoss = stopLossPercentSpinner.getValue();
                 Double takeProfit = takeProfitPercentSpinner.getValue();
-                Boolean enabled = enableStrategyCheckbox.isSelected();
+                boolean enabled = enableStrategyCheckbox.isSelected();
                 Boolean useRisk = useRiskManagementCheckbox.isSelected();
 
                 // Validate inputs
@@ -400,7 +407,7 @@ public class StrategyAssignmentPanel extends VBox {
         }
 
         private void testStrategy() {
-                String symbol = symbolCombo.getValue();
+                String symbol = symbolCombo.getValue().toString('/');
                 String strategy = strategyCombo.getValue();
                 log.info("Testing strategy: {} for symbol: {}", strategy, symbol);
                 showInfo("Test", "Testing " + strategy + " strategy on " + symbol + "...");

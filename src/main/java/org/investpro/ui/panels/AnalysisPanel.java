@@ -6,7 +6,12 @@ import javafx.scene.chart.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.core.SystemCore;
+import org.investpro.strategy.StrategyCatalog;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Strategy Analysis Panel - Analyzes strategy performance and characteristics.
@@ -14,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
  * risk metrics.
  */
 @Slf4j
+@Getter
+@Setter
 public class AnalysisPanel extends VBox {
 
     private ComboBox<String> strategyCombo;
@@ -21,12 +28,15 @@ public class AnalysisPanel extends VBox {
     private Label performanceScoreLabel;
     private BarChart<String, Number> performanceChart;
     private LineChart<Number, Number> drawdownChart;
-
-    public AnalysisPanel() {
+private SystemCore systemCore;
+    public AnalysisPanel(SystemCore systemCore) {
         setPadding(new Insets(16));
         setSpacing(12);
         setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
         getStyleClass().add("analysis-panel");
+        this.systemCore = systemCore;
+
+
 
         setupUI();
     }
@@ -63,7 +73,7 @@ public class AnalysisPanel extends VBox {
 
         // Strategy Selection
         strategyCombo = new ComboBox<>();
-        strategyCombo.getItems().addAll("Mean Reversion", "Trend Following", "Breakout", "My Custom Strategy");
+        strategyCombo.getItems().addAll(StrategyCatalog.availableStrategyNames());
         strategyCombo.setPrefWidth(200);
         strategyCombo.setOnAction(e -> updateAnalysis());
 
@@ -92,7 +102,7 @@ public class AnalysisPanel extends VBox {
         return configBox;
     }
 
-    private TabPane createAnalysisTabs() {
+    private @NotNull TabPane createAnalysisTabs() {
         TabPane tabPane = new TabPane();
         tabPane.setStyle("-fx-control-inner-background: #0f3460;");
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);

@@ -2,6 +2,7 @@ package org.investpro.ui.models;
 
 import javafx.beans.property.*;
 import javafx.beans.value.ObservableValue;
+import javafx.scene.control.TableRow;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.symbol.SymbolAgentState;
@@ -19,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * - Live readiness (liveReady, issue)
  */
 @Slf4j
-public class MarketWatchRow {
+public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
     // Basic market data
     private final ObjectProperty<TradePair> symbol = new SimpleObjectProperty<>();
@@ -56,6 +57,7 @@ public class MarketWatchRow {
         this.spreadPercent.set(spreadPercent);
         this.session.set(session);
         this.lastUpdated = System.currentTimeMillis();
+
     }
 
     // ===== Getters for properties =====
@@ -226,6 +228,7 @@ public class MarketWatchRow {
         }
 
         lastUpdated = System.currentTimeMillis();
+
     }
 
     /**

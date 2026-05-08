@@ -36,6 +36,8 @@ import org.investpro.service.TradingService;
 
 import org.investpro.strategy.StrategyEngine;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.ui.panels.SettingsPanel;
+
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
@@ -90,6 +92,14 @@ public class SystemCore {
     private final AiReasoningService aiReasoningService;
     private final TradeExecutionCoordinator tradeExecutionCoordinator;
     private SystemMonitorService systemMonitorService;
+    /**
+     * -- GETTER --
+     * Get the system event recorder for recording important system events.
+     * Used internally by stream consumers and other components to track
+     * the last known occurrence of key events for diagnostic purposes.
+     *
+     * @return SystemEventRecorder instance
+     */
     private SystemEventRecorder systemEventRecorder;
 
     // Small account sizing config
@@ -198,6 +208,68 @@ public class SystemCore {
         }
     }
 
+
+    public void applySystemSettings(SettingsPanel.SystemSafetySettings settings) {
+        if (settings == null) {
+            return;
+        }
+
+        System.setProperty(
+                "tradeadviser.strategy.requireBacktestBeforeLive",
+                String.valueOf(settings.requireBacktestBeforeLive())
+        );
+        System.setProperty(
+                "tradeadviser.strategy.requirePaperTradingBeforeLive",
+                String.valueOf(settings.requirePaperTradingBeforeLive())
+        );
+        System.setProperty(
+                "tradeadviser.strategy.autoAssignBest",
+                String.valueOf(settings.autoAssignBestStrategy())
+        );
+        System.setProperty(
+                "tradeadviser.strategy.minScore",
+                String.valueOf(settings.minStrategyScore())
+        );
+        System.setProperty(
+                "tradeadviser.strategy.topCandidates",
+                String.valueOf(settings.topStrategiesToPaperTrade())
+        );
+
+        System.setProperty(
+                "tradeadviser.execution.smallAccountMode",
+                String.valueOf(settings.smallAccountModeEnabled())
+        );
+        System.setProperty(
+                "tradeadviser.execution.smallAccountThreshold",
+                String.valueOf(settings.smallAccountThreshold())
+        );
+        System.setProperty(
+                "tradeadviser.execution.smallAccountTradeUnits",
+                String.valueOf(settings.smallAccountUnits())
+        );
+        System.setProperty(
+                "tradeadviser.execution.preventOpenCloseSameCycle",
+                String.valueOf(settings.preventOpenCloseSameCycle())
+        );
+        System.setProperty(
+                "tradeadviser.execution.preventInstantReverse",
+                String.valueOf(settings.preventInstantReverse())
+        );
+        System.setProperty(
+                "tradeadviser.execution.symbolCooldownSeconds",
+                String.valueOf(settings.symbolCooldownSeconds())
+        );
+
+        log.info(
+                "Applied system safety settings: requireBacktest={}, requirePaper={}, autoAssignBest={}, minScore={}, smallAccountMode={}, preventReverse={}",
+                settings.requireBacktestBeforeLive(),
+                settings.requirePaperTradingBeforeLive(),
+                settings.autoAssignBestStrategy(),
+                settings.minStrategyScore(),
+                settings.smallAccountModeEnabled(),
+                settings.preventInstantReverse()
+        );
+    }
     // ---------------------------------------------------------------------
     // Lifecycle
     // ---------------------------------------------------------------------
@@ -440,6 +512,7 @@ public class SystemCore {
             activeSubscription = null;
             streamConsumer = null;
             streaming.set(false);
+
         }
     }
 
@@ -1041,7 +1114,7 @@ public class SystemCore {
 
     /**
      * Get the name of the active strategy.
-     *
+     * <p>
      * Uses the most recent cached StrategySignal from StrategyEngine.
      */
     public String getActiveStrategyName() {
@@ -1108,10 +1181,10 @@ public class SystemCore {
         String latestSummary = latest == null
                 ? "None"
                 : "%s %s confidence=%.2f reason=%s".formatted(
-                        safe(latest.getStrategyId()),
-                        latest.getSide(),
-                        latest.getConfidence(),
-                        safeSignalReason(latest));
+                safe(latest.getStrategyId()),
+                latest.getSide(),
+                latest.getConfidence(),
+                safeSignalReason(latest));
 
         return """
                 Strategy Statistics
@@ -1134,7 +1207,7 @@ public class SystemCore {
 
     /**
      * Get risk management metrics.
-     *
+     * <p>
      * Uses reflection fallbacks so this compiles even while RiskManagementSystem
      * is still evolving. If RiskManagementSystem later exposes formal getters,
      * replace reflection with direct calls.
@@ -1185,7 +1258,7 @@ public class SystemCore {
 
     /**
      * Calculate total profit/loss.
-     *
+     * <p>
      * Attempts to read real realized PnL from TradeExecutionCoordinator trade
      * history.
      * Returns 0 when no real trade history/PnL source is exposed yet.
@@ -1379,7 +1452,7 @@ public class SystemCore {
     /**
      * Calculate return percentage using real PnL and best available account
      * equity/balance.
-     *
+     * <p>
      * If account balance/equity cannot be loaded, returns 0 instead of a fake
      * value.
      */
@@ -1807,7 +1880,7 @@ public class SystemCore {
      * Get current system health snapshot from the monitoring service.
      *
      * @return SystemHealthSnapshot with status of all 9 subsystems and overall
-     *         trading capability
+     * trading capability
      */
     public SystemHealthSnapshot getSystemHealth() {
         return systemMonitorService.checkNow();
@@ -1819,7 +1892,7 @@ public class SystemCore {
      * blockers.
      *
      * @return true if system is in trading-capable state, false if critical issues
-     *         present
+     * present
      */
     public boolean canTradeNow() {
         return systemMonitorService.checkNow().isCanTrade();
@@ -1883,17 +1956,6 @@ public class SystemCore {
         return summary.toString();
     }
 
-    /**
-     * Get the system event recorder for recording important system events.
-     * Used internally by stream consumers and other components to track
-     * the last known occurrence of key events for diagnostic purposes.
-     *
-     * @return SystemEventRecorder instance
-     */
-    public SystemEventRecorder getSystemEventRecorder() {
-        return systemEventRecorder;
-    }
-
     // ============================================================================
     // SYMBOL AGENT MANAGEMENT
     // ============================================================================
@@ -1908,22 +1970,4 @@ public class SystemCore {
         return smartBot.getSymbolAgentManager();
     }
 
-    /**
-     * Get the current state of a specific symbol.
-     *
-     * @param symbol the trade pair to check
-     * @return Optional containing the SymbolAgentState if available
-     */
-    public java.util.Optional<SymbolAgentState> getSymbolState(@NotNull TradePair symbol) {
-        return getSymbolAgentManager().getState(symbol);
-    }
-
-    /**
-     * Get all current symbol states.
-     *
-     * @return List of all SymbolAgentState objects
-     */
-    public java.util.List<SymbolAgentState> getAllSymbolStates() {
-        return getSymbolAgentManager().getAllStates();
-    }
 }
