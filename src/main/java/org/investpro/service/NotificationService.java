@@ -1,17 +1,20 @@
 package org.investpro.service;
 
 import lombok.extern.slf4j.Slf4j;
-
-import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.EmailNotifier;
-
 import org.investpro.core.NotificationMessage;
 import org.investpro.core.TelegramNotifier;
+import org.investpro.core.agents.AgentEvent;
+
+import java.util.Collections;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Central notification service for InvestPro.
+ * Central notification service for InvestPro / TradeAdviser.
  *
  * Converts important agent/runtime events into user-facing notifications.
  *
@@ -20,12 +23,22 @@ import java.util.Set;
  * - Email
  * - Both
  * - None
+ *
+ * Also supports channel-specific email subscriptions, for example:
+ * - OANDA ORDER_FILLED
+ * - OANDA ORDER_REJECTED
+ * - OANDA STREAM_DISCONNECTED
+ * - OANDA RISK_REJECTED
  */
 @Slf4j
 public class NotificationService {
+
     private final TelegramNotifier telegramNotifier;
     private final EmailNotifier emailNotifier;
 
+    /**
+     * Default globally important events.
+     */
     private final Set<String> importantEvents = Set.of(
             AgentEvent.SMART_BOT_STARTED,
             AgentEvent.SMART_BOT_STREAMING_STARTED,
@@ -51,6 +64,22 @@ public class NotificationService {
             AgentEvent.STREAM_DISCONNECTED,
             AgentEvent.ERROR
     );
+
+    /**
+     * Channel/exchange -> email recipient.
+     *
+     * Example:
+     * OANDA -> trader@example.com
+     */
+    private final Map<String, String> emailRecipientsByChannel = new ConcurrentHashMap<>();
+
+    /**
+     * Channel/exchange -> subscribed event types.
+     *
+     * Example:
+     * OANDA -> ORDER_FILLED, ORDER_REJECTED, RISK_REJECTED
+     */
+    private final Map<String, Set<String>> emailSubscriptionsByChannel = new ConcurrentHashMap<>();
 
     public NotificationService(TelegramNotifier telegramNotifier, EmailNotifier emailNotifier) {
         this.telegramNotifier = telegramNotifier;
@@ -105,13 +134,40 @@ public class NotificationService {
         notify(NotificationMessage.info(title, body).toBoth());
     }
 
+    /**
+     * Notify from an agent event.
+     *
+     * This supports:
+     * - default important events
+     * - channel-specific email subscriptions such as OANDA events
+     */
     @SuppressWarnings("unused")
     public void notifyAgentEvent(AgentEvent event) {
-        if (event == null || !importantEvents.contains(event.type())) {
+        if (event == null || event.type() == null) {
+            return;
+        }
+
+        boolean globallyImportant = importantEvents.contains(event.type());
+        boolean channelSubscribed = isSubscribedEmailEvent(event);
+
+        if (!globallyImportant && !channelSubscribed) {
             return;
         }
 
         NotificationMessage message = toNotificationMessage(event);
+
+        if (channelSubscribed) {
+            String channel = extractChannel(event);
+            String recipient = emailRecipientsByChannel.get(normalize(channel));
+
+            if (recipient != null && !recipient.isBlank()) {
+                message = message
+                        .toEmailOnly()
+                        .withMetadata("notificationChannel", channel)
+                        .withMetadata("emailRecipient", maskEmail(recipient));
+            }
+        }
+
         notify(message);
     }
 
@@ -215,9 +271,194 @@ public class NotificationService {
         return text;
     }
 
-    public void registerEmailRecipient(String oanda, String emailAddress) {
+    /**
+     * Register an email recipient for a notification channel/exchange.
+     *
+     * Example:
+     * registerEmailRecipient("OANDA", "trader@example.com");
+     */
+    public void registerEmailRecipient(String channel, String emailAddress) {
+        String normalizedChannel = normalize(channel);
+        String email = safe(emailAddress);
+
+        if (normalizedChannel.isBlank()) {
+            log.warn("Cannot register email recipient: channel is blank");
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            log.warn(
+                    "Cannot register email recipient for channel {}: invalid email={}",
+                    normalizedChannel,
+                    maskEmail(email)
+            );
+            return;
+        }
+
+        emailRecipientsByChannel.put(normalizedChannel, email);
+
+        log.info(
+                "Registered email recipient for channel {}: {}",
+                normalizedChannel,
+                maskEmail(email)
+        );
     }
 
-    public void subscribeEmail(String oanda, String orderRejected) {
+    /**
+     * Subscribe a channel/exchange to receive email notifications for an event.
+     *
+     * Example:
+     * subscribeEmail("OANDA", AgentEvent.ORDER_FILLED);
+     */
+    public void subscribeEmail(String channel, String eventType) {
+        String normalizedChannel = normalize(channel);
+        String normalizedEventType = safe(eventType);
+
+        if (normalizedChannel.isBlank()) {
+            log.warn("Cannot subscribe email event: channel is blank");
+            return;
+        }
+
+        if (normalizedEventType.isBlank()) {
+            log.warn("Cannot subscribe email event for channel {}: event type is blank", normalizedChannel);
+            return;
+        }
+
+        emailSubscriptionsByChannel
+                .computeIfAbsent(normalizedChannel, ignored -> ConcurrentHashMap.newKeySet())
+                .add(normalizedEventType);
+
+        log.info(
+                "Subscribed channel {} to email event {}",
+                normalizedChannel,
+                normalizedEventType
+        );
+    }
+
+    public void unsubscribeEmail(String channel, String eventType) {
+        String normalizedChannel = normalize(channel);
+        String normalizedEventType = safe(eventType);
+
+        Set<String> events = emailSubscriptionsByChannel.get(normalizedChannel);
+
+        if (events == null) {
+            return;
+        }
+
+        events.remove(normalizedEventType);
+
+        if (events.isEmpty()) {
+            emailSubscriptionsByChannel.remove(normalizedChannel);
+        }
+
+        log.info(
+                "Unsubscribed channel {} from email event {}",
+                normalizedChannel,
+                normalizedEventType
+        );
+    }
+
+    public boolean isEmailSubscribed(String channel, String eventType) {
+        String normalizedChannel = normalize(channel);
+        String normalizedEventType = safe(eventType);
+
+        return emailSubscriptionsByChannel
+                .getOrDefault(normalizedChannel, Collections.emptySet())
+                .contains(normalizedEventType);
+    }
+
+    public Set<String> getEmailSubscriptions(String channel) {
+        String normalizedChannel = normalize(channel);
+
+        return Set.copyOf(
+                emailSubscriptionsByChannel.getOrDefault(normalizedChannel, Collections.emptySet())
+        );
+    }
+
+    public String getEmailRecipient(String channel) {
+        return emailRecipientsByChannel.get(normalize(channel));
+    }
+
+    private boolean isSubscribedEmailEvent(AgentEvent event) {
+        String channel = extractChannel(event);
+
+        if (channel.isBlank()) {
+            return false;
+        }
+
+        return isEmailSubscribed(channel, event.type());
+    }
+
+    /**
+     * Extract channel/exchange from event metadata.
+     *
+     * Supports metadata keys:
+     * - exchange
+     * - broker
+     * - channel
+     *
+     * Falls back to source when source contains OANDA.
+     */
+    private String extractChannel(AgentEvent event) {
+        if (event == null) {
+            return "";
+        }
+
+        if (event.metadata() != null) {
+            Object exchange = event.metadata().get("exchange");
+            if (exchange != null && !String.valueOf(exchange).isBlank()) {
+                return String.valueOf(exchange);
+            }
+
+            Object broker = event.metadata().get("broker");
+            if (broker != null && !String.valueOf(broker).isBlank()) {
+                return String.valueOf(broker);
+            }
+
+            Object channel = event.metadata().get("channel");
+            if (channel != null && !String.valueOf(channel).isBlank()) {
+                return String.valueOf(channel);
+            }
+        }
+
+        String source = safe(event.source());
+
+        if (source.toLowerCase(Locale.ROOT).contains("oanda")) {
+            return "OANDA";
+        }
+
+        return "";
+    }
+
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+    }
+
+    private String normalize(String value) {
+        return safe(value).toUpperCase(Locale.ROOT);
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            return "";
+        }
+
+        String[] parts = email.split("@", 2);
+        String name = parts[0];
+        String domain = parts[1];
+
+        if (name.length() <= 2) {
+            return "**@" + domain;
+        }
+
+        return name.charAt(0) + "***" + name.charAt(name.length() - 1) + "@" + domain;
     }
 }

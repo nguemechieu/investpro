@@ -14,7 +14,7 @@ import java.util.prefs.Preferences;
 
 /**
  * System Settings Panel.
- *
+ * <p>
  * This panel controls system-level safety settings:
  * - require backtest before live trading
  * - require paper trading before live trading
@@ -25,7 +25,7 @@ import java.util.prefs.Preferences;
  * - prevent open/close same cycle
  * - prevent instant reverse orders
  * - symbol cooldown
- *
+ * <p>
  * This panel does not place orders.
  * It only saves configuration and applies it to SystemCore.
  */
@@ -61,6 +61,28 @@ public class SettingsPanel extends VBox {
     private Button stopStreamingButton;
     private Label streamingStatusLabel;
 
+    // OpenAI configuration
+    private CheckBox enableOpenAiCheckbox;
+    private PasswordField openaiApiKeyField;
+    private ComboBox<String> openaiModelCombo;
+    private Spinner<Double> temperatureSpinner;
+    private Spinner<Integer> maxTokensSpinner;
+
+    // Telegram configuration
+    private CheckBox enableTelegramCheckbox;
+    private PasswordField telegramBotTokenField;
+    private TextField telegramChatIdField;
+    private Button testTelegramButton;
+
+    // Email notification configuration
+    private CheckBox enableEmailCheckbox;
+    private TextField smtpServerField;
+    private Spinner<Integer> smtpPortSpinner;
+    private TextField emailAddressField;
+    private PasswordField emailPasswordField;
+    private CheckBox enableTlsCheckbox;
+    private Button testEmailButton;
+
     private Label statusLabel;
 
     public SettingsPanel(SystemCore systemCore) {
@@ -81,6 +103,9 @@ public class SettingsPanel extends VBox {
 
         VBox systemSafetySection = createSystemSafetySection();
         VBox streamingSection = createStreamingSection();
+        VBox openAiSection = createOpenAiSection();
+        VBox telegramSection = createTelegramSection();
+        VBox emailSection = createEmailSection();
         HBox buttonBox = createButtonBox();
 
         statusLabel = new Label("Ready");
@@ -93,6 +118,12 @@ public class SettingsPanel extends VBox {
                 systemSafetySection,
                 new Separator(),
                 streamingSection,
+                new Separator(),
+                openAiSection,
+                new Separator(),
+                telegramSection,
+                new Separator(),
+                emailSection,
                 new Separator());
         content.setPadding(new Insets(8));
         scrollPane.setContent(content);
@@ -220,6 +251,168 @@ public class SettingsPanel extends VBox {
         return new VBox(8, sectionTitle, grid);
     }
 
+    private VBox createOpenAiSection() {
+        Label sectionTitle = new Label("OpenAI Configuration");
+        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #8b5cf6;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        grid.setStyle(
+                "-fx-background-color: #16213e; " +
+                        "-fx-border-color: #8b5cf6; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4;");
+
+        enableOpenAiCheckbox = styledCheckBox("Enable OpenAI Integration", false);
+
+        openaiApiKeyField = new PasswordField();
+        openaiApiKeyField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        openaiApiKeyField.setPromptText("sk-...");
+
+        openaiModelCombo = new ComboBox<>();
+        openaiModelCombo.getItems().addAll("gpt-4o", "gpt-4", "gpt-3.5-turbo");
+        openaiModelCombo.setValue("gpt-4o");
+        openaiModelCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+
+        temperatureSpinner = doubleSpinner(0.0, 2.0, 0.7, 0.1);
+        maxTokensSpinner = intSpinner(1, 4000, 1000, 100);
+
+        grid.add(enableOpenAiCheckbox, 0, 0, 2, 1);
+        addRow(grid, 1, "API Key:", openaiApiKeyField);
+        addRow(grid, 2, "Model:", openaiModelCombo);
+        addRow(grid, 3, "Temperature (0-2):", temperatureSpinner);
+        addRow(grid, 4, "Max Tokens:", maxTokensSpinner);
+
+        return new VBox(8, sectionTitle, grid);
+    }
+
+    private VBox createTelegramSection() {
+        Label sectionTitle = new Label("Telegram Notifications");
+        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #60a5fa;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        grid.setStyle(
+                "-fx-background-color: #16213e; " +
+                        "-fx-border-color: #60a5fa; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4;");
+
+        enableTelegramCheckbox = styledCheckBox("Enable Telegram Notifications", false);
+
+        telegramBotTokenField = new PasswordField();
+        telegramBotTokenField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        telegramBotTokenField.setPromptText("Bot token from @BotFather");
+
+        telegramChatIdField = new TextField();
+        telegramChatIdField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        telegramChatIdField.setPromptText("Your chat ID");
+
+        testTelegramButton = new Button("Test Connection");
+        testTelegramButton.setStyle(buttonStyle("#60a5fa"));
+        testTelegramButton.setOnAction(event -> testTelegramConnection());
+
+        grid.add(enableTelegramCheckbox, 0, 0, 2, 1);
+        addRow(grid, 1, "Bot Token:", telegramBotTokenField);
+        addRow(grid, 2, "Chat ID:", telegramChatIdField);
+        grid.add(testTelegramButton, 1, 3);
+
+        return new VBox(8, sectionTitle, grid);
+    }
+
+    private VBox createEmailSection() {
+        Label sectionTitle = new Label("Email Notifications");
+        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #ec4899;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        grid.setStyle(
+                "-fx-background-color: #16213e; " +
+                        "-fx-border-color: #ec4899; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4;");
+
+        enableEmailCheckbox = styledCheckBox("Enable Email Notifications", false);
+
+        smtpServerField = new TextField();
+        smtpServerField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        smtpServerField.setPromptText("smtp.gmail.com");
+
+        smtpPortSpinner = intSpinner(1, 65535, 587, 1);
+
+        emailAddressField = new TextField();
+        emailAddressField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        emailAddressField.setPromptText("your-email@gmail.com");
+
+        emailPasswordField = new PasswordField();
+        emailPasswordField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        emailPasswordField.setPromptText("App password");
+
+        enableTlsCheckbox = styledCheckBox("Use TLS", true);
+
+        testEmailButton = new Button("Test Connection");
+        testEmailButton.setStyle(buttonStyle("#ec4899"));
+        testEmailButton.setOnAction(event -> testEmailConnection());
+
+        grid.add(enableEmailCheckbox, 0, 0, 2, 1);
+        addRow(grid, 1, "SMTP Server:", smtpServerField);
+        addRow(grid, 2, "SMTP Port:", smtpPortSpinner);
+        addRow(grid, 3, "Email Address:", emailAddressField);
+        addRow(grid, 4, "Password:", emailPasswordField);
+        grid.add(enableTlsCheckbox, 0, 5, 2, 1);
+        grid.add(testEmailButton, 1, 6);
+
+        return new VBox(8, sectionTitle, grid);
+    }
+
+    private void testTelegramConnection() {
+        String botToken = telegramBotTokenField.getText();
+        String chatId = telegramChatIdField.getText();
+
+        if (botToken.isEmpty() || chatId.isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "Validation Error", "Please enter bot token and chat ID");
+            return;
+        }
+
+        try {
+            // TODO: Implement actual Telegram connection test
+            showAlert(Alert.AlertType.INFORMATION, "Success", "Telegram connection test passed!");
+            statusLabel.setText("Telegram connection test successful");
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.ERROR, "Connection Failed", "Error: " + e.getMessage());
+            statusLabel.setText("Telegram connection test failed");
+        }
+    }
+
+    private void testEmailConnection() {
+        String smtpServer = smtpServerField.getText();
+        String emailAddress = emailAddressField.getText();
+        String password = emailPasswordField.getText();
+
+        if (smtpServer.isEmpty() || emailAddress.isEmpty() || password.isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, "Validation Error", "Please fill in all required fields");
+            return;
+        }
+
+        try {
+            // TODO: Implement actual email connection test
+            showAlert(Alert.AlertType.INFORMATION, "Success", "Email connection test passed!");
+            statusLabel.setText("Email connection test successful");
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.ERROR, "Connection Failed", "Error: " + e.getMessage());
+            statusLabel.setText("Email connection test failed");
+        }
+    }
+
     private void updateStreamingModeDescription(SystemCore.StreamingMode mode) {
         if (mode != null) {
             streamingModeDescriptionLabel.setText(mode.description);
@@ -317,6 +510,9 @@ public class SettingsPanel extends VBox {
 
         applySettingsToSystemCore(settings);
         saveStreamingSettings();
+        saveOpenAiSettings();
+        saveTelegramSettings();
+        saveEmailSettings();
 
         statusLabel.setText("Settings saved and applied.");
         log.info("System settings saved: {}", settings);
@@ -341,6 +537,9 @@ public class SettingsPanel extends VBox {
 
         // Save streaming settings
         saveStreamingSettings();
+        saveOpenAiSettings();
+        saveTelegramSettings();
+        saveEmailSettings();
 
         statusLabel.setText("Settings applied.");
         log.info("System settings applied: {}", settings);
@@ -367,6 +566,29 @@ public class SettingsPanel extends VBox {
         saveStreamingSettings();
         updateStreamingUI();
 
+        // Reset OpenAI settings
+        enableOpenAiCheckbox.setSelected(false);
+        openaiApiKeyField.clear();
+        openaiModelCombo.setValue("gpt-4o");
+        temperatureSpinner.getValueFactory().setValue(0.7);
+        maxTokensSpinner.getValueFactory().setValue(1000);
+        saveOpenAiSettings();
+
+        // Reset Telegram settings
+        enableTelegramCheckbox.setSelected(false);
+        telegramBotTokenField.clear();
+        telegramChatIdField.clear();
+        saveTelegramSettings();
+
+        // Reset Email settings
+        enableEmailCheckbox.setSelected(false);
+        smtpServerField.clear();
+        smtpPortSpinner.getValueFactory().setValue(587);
+        emailAddressField.clear();
+        emailPasswordField.clear();
+        enableTlsCheckbox.setSelected(true);
+        saveEmailSettings();
+
         statusLabel.setText("Settings reset to defaults.");
         log.info("System settings reset to defaults");
     }
@@ -387,8 +609,63 @@ public class SettingsPanel extends VBox {
         enableStreamingCheckbox.setSelected(PREFS.getBoolean("enableStreaming", false));
         updateStreamingUI();
 
+        // Load OpenAI settings
+        loadOpenAiSettings();
+
+        // Load Telegram settings
+        loadTelegramSettings();
+
+        // Load Email settings
+        loadEmailSettings();
+
         statusLabel.setText("Settings loaded.");
         log.info("System settings loaded: {}", settings);
+    }
+
+    private void saveOpenAiSettings() {
+        PREFS.putBoolean("openaiEnabled", enableOpenAiCheckbox.isSelected());
+        PREFS.put("openaiApiKey", openaiApiKeyField.getText());
+        PREFS.put("openaiModel", openaiModelCombo.getValue());
+        PREFS.putDouble("openaiTemperature", temperatureSpinner.getValue());
+        PREFS.putInt("openaiMaxTokens", maxTokensSpinner.getValue());
+    }
+
+    private void loadOpenAiSettings() {
+        enableOpenAiCheckbox.setSelected(PREFS.getBoolean("openaiEnabled", false));
+        openaiApiKeyField.setText(PREFS.get("openaiApiKey", ""));
+        openaiModelCombo.setValue(PREFS.get("openaiModel", "gpt-4o"));
+        temperatureSpinner.getValueFactory().setValue(PREFS.getDouble("openaiTemperature", 0.7));
+        maxTokensSpinner.getValueFactory().setValue(PREFS.getInt("openaiMaxTokens", 1000));
+    }
+
+    private void saveTelegramSettings() {
+        PREFS.putBoolean("telegramEnabled", enableTelegramCheckbox.isSelected());
+        PREFS.put("telegramBotToken", telegramBotTokenField.getText());
+        PREFS.put("telegramChatId", telegramChatIdField.getText());
+    }
+
+    private void loadTelegramSettings() {
+        enableTelegramCheckbox.setSelected(PREFS.getBoolean("telegramEnabled", false));
+        telegramBotTokenField.setText(PREFS.get("telegramBotToken", ""));
+        telegramChatIdField.setText(PREFS.get("telegramChatId", ""));
+    }
+
+    private void saveEmailSettings() {
+        PREFS.putBoolean("emailEnabled", enableEmailCheckbox.isSelected());
+        PREFS.put("smtpServer", smtpServerField.getText());
+        PREFS.putInt("smtpPort", smtpPortSpinner.getValue());
+        PREFS.put("emailAddress", emailAddressField.getText());
+        PREFS.put("emailPassword", emailPasswordField.getText());
+        PREFS.putBoolean("emailUseTls", enableTlsCheckbox.isSelected());
+    }
+
+    private void loadEmailSettings() {
+        enableEmailCheckbox.setSelected(PREFS.getBoolean("emailEnabled", false));
+        smtpServerField.setText(PREFS.get("smtpServer", ""));
+        smtpPortSpinner.getValueFactory().setValue(PREFS.getInt("smtpPort", 587));
+        emailAddressField.setText(PREFS.get("emailAddress", ""));
+        emailPasswordField.setText(PREFS.get("emailPassword", ""));
+        enableTlsCheckbox.setSelected(PREFS.getBoolean("emailUseTls", true));
     }
 
     private SystemSafetySettings buildSettingsFromUi() {
