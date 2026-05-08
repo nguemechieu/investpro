@@ -13,6 +13,7 @@ import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 
+import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -695,4 +696,5 @@ public abstract class Exchange {
     public abstract CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId,
             double trailingDistance);
 
+    public  abstract List<Timeframe> getSupportedTimeframes() ;
 }

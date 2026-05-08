@@ -2359,6 +2359,19 @@ public class Coinbase extends Exchange {
     }
 
     @Override
+    public List<Timeframe> getSupportedTimeframes() {
+        return List.of(
+                Timeframe.M1,
+                Timeframe.M5,
+                Timeframe.M15,
+                Timeframe.M30,
+                Timeframe.H1,
+                Timeframe.H4,
+                Timeframe.D1
+        );
+    }
+
+    @Override
     public double getSize() {
         return 0;
     }

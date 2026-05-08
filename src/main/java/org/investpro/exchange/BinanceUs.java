@@ -544,6 +544,18 @@ public class BinanceUs extends Exchange {
     }
 
     @Override
+    public List<Timeframe> getSupportedTimeframes() {
+        return List.of(
+                Timeframe.M5,
+                Timeframe.M15,
+                Timeframe.H1,
+                Timeframe.H4,
+                Timeframe.D1,
+                Timeframe.W1
+        );
+    }
+
+    @Override
     public double getSize() {
         return 0;
     }

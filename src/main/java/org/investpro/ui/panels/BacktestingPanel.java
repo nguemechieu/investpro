@@ -11,6 +11,7 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -35,6 +36,7 @@ import org.investpro.utils.Side;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -106,15 +108,13 @@ public class BacktestingPanel extends VBox {
                         ? systemCore.getSmartBot().getSymbolAgentManager()
                         : null,
                 HistoricalDataRepositoryImpl.getInstance(),
-                systemCore
-        );
+                systemCore);
     }
 
     public BacktestingPanel(
             SymbolAgentManager symbolAgentManager,
             HistoricalDataRepository historicalDataRepository,
-            SystemCore systemCore
-    ) {
+            SystemCore systemCore) {
         this.symbolAgentManager = symbolAgentManager;
         this.historicalDataRepository = historicalDataRepository != null
                 ? historicalDataRepository
@@ -176,7 +176,7 @@ public class BacktestingPanel extends VBox {
         HBox symbolBox = createLabeledInput("Symbol:", symbolCombo);
 
         timeframeCombo = new ComboBox<>();
-        timeframeCombo.setItems(FXCollections.observableArrayList("1m", "5m", "15m", "30m", "1h", "4h", "1d"));
+        timeframeCombo.setItems(FXCollections.observableArrayList(systemCore.getExchange().getSupportedTimeframes()));
         timeframeCombo.setValue("1h");
         timeframeCombo.setPrefHeight(35);
         HBox timeframeBox = createLabeledInput("Timeframe:", timeframeCombo);
@@ -435,8 +435,6 @@ public class BacktestingPanel extends VBox {
         return new ArrayList<>(StrategyCatalog.CORE_STRATEGY_NAMES);
     }
 
-
-
     private void loadSymbols() {
         List<TradePair> symbols = new ArrayList<>();
 
@@ -459,8 +457,7 @@ public class BacktestingPanel extends VBox {
                                 .stream()
                                 .map(SymbolAgentState::getSymbol)
                                 .distinct()
-                                .toList()
-                );
+                                .toList());
             } catch (Exception exception) {
                 log.warn("Failed to load symbols from SymbolAgentManager: {}", exception.getMessage());
             }
@@ -483,8 +480,7 @@ public class BacktestingPanel extends VBox {
                         TradePair.of("ETH", "USD"),
                         TradePair.of("EUR", "USD"),
                         TradePair.of("GBP", "USD"),
-                        TradePair.of("USD", "JPY")
-                ));
+                        TradePair.of("USD", "JPY")));
             } catch (Exception exception) {
                 log.warn("Failed to create fallback TradePair list: {}", exception.getMessage());
             }
@@ -989,7 +985,7 @@ public class BacktestingPanel extends VBox {
 
     private @NotNull List<CandleData> generateSampleData(int count, double startPrice) {
         List<CandleData> candles = new ArrayList<>();
-        double price = startPrice ;
+        double price = startPrice;
         long timestamp = System.currentTimeMillis();
 
         for (int i = 0; i < count; i++) {
@@ -1124,8 +1120,7 @@ public class BacktestingPanel extends VBox {
                         trade.getQuantity(),
                         trade.getProfit(),
                         trade.getReturnPercent(),
-                        trade.getReason()
-                ));
+                        trade.getReason()));
             }
 
             // Add metrics summary
@@ -1139,8 +1134,10 @@ public class BacktestingPanel extends VBox {
             // Get the symbol and strategy for filename
             TradePair symbol = symbolCombo.getValue();
             String strategy = strategyCombo.getValue();
-            String timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String filename = String.format("backtest_%s_%s_%s.csv", symbol != null ? symbol.toString().replace("/", "") : "unknown", strategy, timestamp);
+            String timestamp = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename = String.format("backtest_%s_%s_%s.csv",
+                    symbol != null ? symbol.toString().replace("/", "") : "unknown", strategy, timestamp);
 
             // Show file chooser to select save location
             FileChooser fileChooser = new FileChooser();
@@ -1148,14 +1145,15 @@ public class BacktestingPanel extends VBox {
             fileChooser.setInitialFileName(filename);
             fileChooser.getExtensionFilters().addAll(
                     new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
-                    new FileChooser.ExtensionFilter("All Files", "*.*")
-            );
+                    new FileChooser.ExtensionFilter("All Files", "*.*"));
 
             File file = fileChooser.showSaveDialog(this.getScene().getWindow());
             if (file != null) {
-                java.nio.file.Files.write(file.toPath(), csvContent.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                java.nio.file.Files.write(file.toPath(),
+                        csvContent.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 statusLabel.setText("✓ Results exported to: " + file.getName());
-                showAlert("Export Successful", "Backtest results exported to:\n" + file.getAbsolutePath(), Alert.AlertType.INFORMATION);
+                showAlert("Export Successful", "Backtest results exported to:\n" + file.getAbsolutePath(),
+                        Alert.AlertType.INFORMATION);
                 log.info("Backtest results exported to: {}", file.getAbsolutePath());
             }
         } catch (Exception e) {
@@ -1168,7 +1166,8 @@ public class BacktestingPanel extends VBox {
         try {
             // Check if we have trades to compare
             if (tradesTable.getItems().isEmpty()) {
-                showAlert("No Results", "No backtest results to compare. Please run a backtest first.", Alert.AlertType.WARNING);
+                showAlert("No Results", "No backtest results to compare. Please run a backtest first.",
+                        Alert.AlertType.WARNING);
                 return;
             }
 
