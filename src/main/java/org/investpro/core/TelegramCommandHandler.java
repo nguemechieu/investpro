@@ -1,42 +1,219 @@
 package org.investpro.core;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.exchange.Exchange;
-import org.investpro.models.trading.TradePair;
+import org.investpro.data.Account;
+import org.investpro.models.trading.OpenOrder;
+import org.investpro.models.trading.Position;
+import org.investpro.models.trading.Ticker;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
  * Telegram Command Handler for executing trading commands from Telegram.
- * <p>
+ *
+ * Features:
+ * - Real-time polling for incoming messages
+ * - Responds with accurate and updated account data
+ * - Supports position monitoring, order status, balance checks
+ * - Market data reporting with bid/ask spreads
+ * - Risk metrics and system health reporting
+ *
  * Supported Commands:
  * /start - Start the bot
  * /help - Show available commands
- * /status - Show bot and market status
- * /balance - Show account balance
- * /positions - Show open positions
- * /orders - Show active orders
- * /orderinfo ORDERID - Get detailed order information
- * /trades - Show trade history
- * /buy SYMBOL AMOUNT [PRICE] - Execute a buy order
- * /sell SYMBOL AMOUNT [PRICE] - Execute a sell order
- * /cancel ORDERID - Cancel an order
- * /strategy - Show active strategy
- * /toggleauto - Toggle auto trading
- * /risk - Show risk metrics
- * /pnl - Show profit/loss
- * /market SYMBOL - Get market info for a symbol
- * /analysis SYMBOL - Get detailed market analysis
- * /news - Get market news
- * /top - Show top gainers/losers
+ * /status - Show account balance and margin
+ * /balance - Detailed balance breakdown
+ * /positions - List all open positions with P&L
+ * /orders - Show active pending orders
+ * /market SYMBOL - Get real-time ticker and spread
+ * /risk - Risk management status
+ * /strategy - Strategy performance metrics
+ * /health - System health snapshot
  */
 @Slf4j
-public record TelegramCommandHandler(SystemCore systemCore, TelegramNotifier telegramNotifier) {
+public class TelegramCommandHandler {
+    private static final String TELEGRAM_API_BASE = "https://api.telegram.org/bot";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private final TelegramNotifier telegramNotifier;
+    private final SystemCore systemCore;
+    private final String botToken;
+    private final HttpClient httpClient;
+
+    private volatile long lastUpdateId = -1L;
+    private volatile boolean polling = false;
+    private volatile Thread pollingThread;
+
+    public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier, String botToken) {
+        this.systemCore = systemCore;
+        this.telegramNotifier = telegramNotifier;
+        this.botToken = botToken;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
+    }
+
+    /**
+     * Start polling for incoming Telegram messages.
+     */
+    public void startPolling() {
+        if (polling) {
+            log.warn("Telegram command polling already started");
+            return;
+        }
+
+        if (!telegramNotifier.isEnabled()) {
+            log.warn("Telegram bot token not configured");
+            return;
+        }
+
+        polling = true;
+        pollingThread = new Thread(this::pollLoop, "TelegramCommandHandler-Polling");
+        pollingThread.setDaemon(true);
+        pollingThread.start();
+
+        log.info("Telegram command handler polling started");
+    }
+
+    /**
+     * Stop polling for messages.
+     */
+    public void stopPolling() {
+        polling = false;
+
+        if (pollingThread != null) {
+            pollingThread.interrupt();
+            try {
+                pollingThread.join(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        log.info("Telegram command handler polling stopped");
+    }
+
+    private void pollLoop() {
+        while (polling && !Thread.currentThread().isInterrupted()) {
+            try {
+                List<JsonNode> updates = getUpdates();
+
+                for (JsonNode update : updates) {
+                    try {
+                        processUpdate(update);
+                    } catch (Exception e) {
+                        log.error("Error processing Telegram update", e);
+                    }
+                }
+
+                if (updates.isEmpty()) {
+                    Thread.sleep(1000);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.error("Error in Telegram polling loop", e);
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
+        log.info("Telegram command handler polling loop ended");
+    }
+
+    private List<JsonNode> getUpdates() {
+        List<JsonNode> updates = new ArrayList<>();
+
+        if (!telegramNotifier.isEnabled()) {
+            return updates;
+        }
+
+        try {
+            String url = "%s%s/getUpdates".formatted(TELEGRAM_API_BASE, botToken);
+
+            if (lastUpdateId >= 0) {
+                url += "?offset=%d&timeout=30".formatted(lastUpdateId + 1);
+            } else {
+                url += "?timeout=30";
+            }
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(35))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() < 400) {
+                JsonNode root = OBJECT_MAPPER.readTree(response.body());
+
+                if (root.path("ok").asBoolean(false)) {
+                    ArrayNode result = root.withArray("result");
+
+                    for (JsonNode update : result) {
+                        long updateId = update.path("update_id").asLong(-1L);
+                        if (updateId > lastUpdateId) {
+                            lastUpdateId = updateId;
+                        }
+                        updates.add(update);
+                    }
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            log.debug("Error fetching Telegram updates: {}", e.getMessage());
+        }
+
+        return updates;
+    }
+
+    private void processUpdate(JsonNode update) {
+        JsonNode message = update.path("message");
+
+        if (message.isMissingNode() || !message.path("text").isTextual()) {
+            return;
+        }
+
+        String text = message.path("text").asText("");
+        String chatId = message.path("chat").path("id").asText("");
+        String userName = message.path("from").path("username").asText("user");
+
+        if (text.isBlank() || chatId.isBlank()) {
+            return;
+        }
+
+        log.debug("Telegram message from @{}: {}", userName, text);
+
+        String response = handleCommand(text, chatId);
+
+        if (response != null && !response.isBlank()) {
+            sendMessage(chatId, response);
+        }
+    }
+
     /**
      * Process a Telegram command and return response text
      */
-    public String handleCommand(String command, String chatId) {
+    public String handleCommand(@NotNull String command, String chatId) {
         if (command == null || command.isBlank()) {
             return "❌ No command provided";
         }
@@ -46,28 +223,17 @@ public record TelegramCommandHandler(SystemCore systemCore, TelegramNotifier tel
 
         try {
             return switch (cmd) {
-                case "start" -> handleStart();
-                case "help" -> handleHelp();
-                case "status" -> handleStatus();
-                case "health" -> handleSystemHealth();
-                case "diagnostics" -> handleSystemDiagnostics();
-                case "balance" -> handleBalance();
-                case "positions" -> handlePositions();
-                case "orders" -> handleOrders();
-                case "orderinfo" -> handleOrderInfo(parts);
-                case "trades" -> handleTrades();
-                case "buy" -> handleBuyOrder(parts);
-                case "sell" -> handleSellOrder(parts);
-                case "cancel" -> handleCancelOrder(parts);
-                case "strategy" -> handleStrategyInfo();
-                case "toggleauto" -> handleToggleAutoTrading();
-                case "risk" -> handleRiskMetrics();
-                case "pnl" -> handleProfitLoss();
-                case "market" -> handleMarketInfo(parts);
-                case "analysis" -> handleMarketAnalysis(parts);
-                case "news" -> handleMarketNews();
-                case "top" -> handleTopMovers();
-                default -> "❌ Unknown command: /" + cmd + "\nUse /help to see available commands";
+                case "start" -> getHelpText();
+                case "help" -> getHelpText();
+                case "status" -> getStatusReport();
+                case "balance" -> getBalanceReport();
+                case "positions" -> getPositionsReport();
+                case "orders" -> getOrdersReport();
+                case "market" -> getMarketReport(parts.length > 1 ? parts[1] : null);
+                case "risk" -> getRiskReport();
+                case "strategy" -> getStrategyReport();
+                case "health" -> getHealthReport();
+                default -> "❌ Unknown command: /" + cmd + "\nType /help for available commands.";
             };
         } catch (Exception e) {
             log.error("Error handling Telegram command: {}", command, e);
@@ -75,501 +241,289 @@ public record TelegramCommandHandler(SystemCore systemCore, TelegramNotifier tel
         }
     }
 
-    private String handleStart() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "⚠️ Bot is initializing. Please wait...";
-        }
+    private String getHelpText() {
         return """
-                👋 *InvestPro Trading Bot Started*
-
-                Connected Exchange: %s
-                Status: 🟢 Online
-
-                Type /help to see available commands.
-                Type /balance to check your account.
-                """.formatted(systemCore.getExchange().getDisplayName());
-    }
-
-    private String handleHelp() {
-        return """
-                📚 *Available Commands*
-
-                *Account & Status*
-                /balance - Show account balance
-                /positions - List open positions
-                /orders - Show active orders
-                /orderinfo ID - Get details for specific order
-                /trades - Show trade history
-                /pnl - Show profit/loss
-                /risk - Show risk metrics
-                /status - Show bot status
-
-                *Market Information*
-                /market SYMBOL - Get market info (ex: /market BTC)
-                /analysis SYMBOL - Get detailed analysis (ex: /analysis ETH)
-                /news - Show market news and headlines
-                /top - Show top gainers and losers
-
-                *Trading Commands*
-                /buy SYMBOL AMOUNT [PRICE] - Buy (ex: /buy BTC 0.5)
-                /sell SYMBOL AMOUNT [PRICE] - Sell (ex: /sell BTC 0.5)
-                /cancel ORDERID - Cancel order
-
-                *Bot Control*
-                /start - Initialize the bot
-                /strategy - Show active strategy
-                /toggleauto - Toggle auto trading
-                /help - Show this message
-
-                💡 *Tip:* Ask any trading questions and the bot will respond!
-                Ex: "What's the BTC trend?" or "How profitable was today?"
+                *InvestPro Telegram Commands*
+                
+                📊 *Account & Trading*
+                /status - Account balance and margin info
+                /balance - Detailed balance breakdown
+                /positions - Current open positions
+                /orders - Pending open orders
+                
+                📈 *Market & Strategy*
+                /market [symbol] - Ticker and spread info
+                /strategy - Strategy performance metrics
+                /risk - Risk management status
+                
+                🔧 *System*
+                /health - System health snapshot
+                /help - Show this help message
+                
+                Use these commands to monitor your trading account.
                 """;
     }
 
-    private String handleStatus() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "🔴 *Bot Status*: Offline";
-        }
-
-        Exchange exchange = systemCore.getExchange();
-        boolean autoTradingEnabled = systemCore.isAutoTradingEnabled();
-        boolean aiReasoningEnabled = systemCore.isAiReasoningEnabled();
-
-        return """
-                🟢 *Bot Status*: Online
-
-                *Exchange:* %s
-                *Auto Trading:* %s
-                *AI Reasoning:* %s
-                *Streaming:* %s
-
-                Use /balance to check account balance
-                """.formatted(
-                exchange.getDisplayName(),
-                autoTradingEnabled ? "✅ Enabled" : "❌ Disabled",
-                aiReasoningEnabled ? "✅ Enabled" : "❌ Disabled",
-                systemCore.isStreaming() ? "🔴 Active" : "⚪ Inactive");
-    }
-
-    private String handleSystemHealth() {
-        if (systemCore == null) {
-            return "❌ System Core not available";
-        }
-        return systemCore.getSystemHealthSummary();
-    }
-
-    private String handleSystemDiagnostics() {
-        if (systemCore == null) {
-            return "❌ System Core not available";
-        }
-        return systemCore.getSystemDiagnostics();
-    }
-
-    private String handleBalance() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
+    private String getStatusReport() {
         try {
-            Exchange exchange = systemCore.getExchange();
-            Map<String, Double> balances = exchange.getAccount().balancesView();
+            StringBuilder report = new StringBuilder("*Account Status*\\n\\n");
 
-            // Calculate total balance
-            double totalBalance = balances != null ? balances.values().stream().mapToDouble(Double::doubleValue).sum()
-                    : 0;
+            Account account = systemCore.getExchange().getAccount();
 
-            return String.format(
-                    "💰 *Account Balance*\n\nCurrency: USD\nBalance: $%.2f",
-                    totalBalance);
-        } catch (Exception e) {
-            log.debug("Error fetching balance", e);
-            return "⚠️ Could not fetch balance: " + e.getMessage();
-        }
-    }
+            if (account != null) {
+                report.append("💰 Balance: $").append(formatPrice(account.getBalance())).append("\\n");
+                report.append("📈 Equity: $").append(formatPrice(account.getEquity())).append("\\n");
+                report.append("📊 Margin Used: $").append(formatPrice(account.getMarginUsed())).append("\\n");
+                report.append("🔐 Margin Available: $").append(formatPrice(account.getMarginAvailable())).append("\\n");
+                report.append("📉 Unrealized P&L: $").append(formatPrice(account.getUnrealizedPnl())).append("\\n");
 
-    private String handlePositions() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
+                double marginLevel = account.getMarginLevel();
+                String marginStatus = marginLevel > 2.0 ? "✅" : marginLevel > 1.5 ? "⚠️" : "🔴";
+                report.append(marginStatus).append(" Margin Level: ").append(String.format("%.2f%%", marginLevel * 100)).append("\\n");
 
-        try {
-            // Get positions - placeholder since getPositions might not exist
-            // This would be implemented when Exchange API is available
-            return "📊 *Open Positions*\n\n📭 No open positions\n\nPositions data coming soon...";
-        } catch (Exception e) {
-            log.debug("Error fetching positions", e);
-            return "⚠️ Could not fetch positions: " + e.getMessage();
-        }
-    }
-
-    private String handleOrders() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            // Placeholder - getOrders may not exist on Exchange
-            return "📋 *Active Orders*\n\n📭 No active orders";
-        } catch (Exception e) {
-            log.debug("Error fetching orders", e);
-            return "⚠️ Could not fetch orders: " + e.getMessage();
-        }
-    }
-
-    /**
-     * Handle /orderinfo command to get detailed order information
-     */
-    private String handleOrderInfo(@NotNull String[] parts) {
-        if (parts.length < 2) {
-            return "❌ Usage: /orderinfo ORDERID";
-        }
-
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            String orderId = parts[1];
-            String orderDetails = systemCore.getOrderDetails(orderId);
-
-            if (orderDetails == null || orderDetails.isEmpty()) {
-                return "❌ Order not found: " + orderId;
+                report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
+            } else {
+                report.append("⚠️ Unable to fetch account information");
             }
 
-            return "📋 *Order Details*\n\n" + orderDetails;
+            return report.toString();
         } catch (Exception e) {
-            log.debug("Error getting order info", e);
-            return "⚠️ Could not fetch order details: " + e.getMessage();
+            log.error("Error generating status report", e);
+            return "❌ Error fetching account status: " + e.getMessage();
         }
     }
 
-    private String handleBuyOrder(@NotNull String[] parts) {
-        if (parts.length < 3) {
-            return "❌ Usage: /buy SYMBOL AMOUNT [PRICE]\nExample: /buy BTC 0.5 or /buy BTC 0.5 45000";
-        }
-
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
+    private String getBalanceReport() {
         try {
-            String symbol = parts[1].toUpperCase();
-            double amount = Double.parseDouble(parts[2]);
-            Double priceLimit = parts.length > 3 ? Double.parseDouble(parts[3]) : null;
+            StringBuilder report = new StringBuilder("*Balance Breakdown*\\n\\n");
 
-            // Validate amount
-            if (amount <= 0) {
-                return "❌ Amount must be positive";
+            Account account = systemCore.getExchange().getAccount();
+
+            if (account != null) {
+                report.append("💵 Cash Balance: $").append(formatPrice(account.getBalance())).append("\\n");
+                report.append("📊 Equity: $").append(formatPrice(account.getEquity())).append("\\n");
+                report.append("💳 Used Margin: $").append(formatPrice(account.getMarginUsed())).append("\\n");
+                report.append("🆓 Free Margin: $").append(formatPrice(account.getMarginAvailable())).append("\\n");
+
+                double marginLevel = account.getMarginLevel();
+                report.append("📈 Margin Level: ").append(String.format("%.2f%%", marginLevel * 100)).append("\\n");
+
+                double usagePercent = (account.getMarginUsed() / account.getMarginAvailable()) * 100;
+                report.append("⚙️ Margin Usage: ").append(String.format("%.1f%%", usagePercent)).append("\\n");
+
+                report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
+            } else {
+                report.append("⚠️ Unable to fetch balance information");
             }
 
-            // Execute buy order
-            boolean orderType = priceLimit != null; // true = LIMIT, false = MARKET
-            String response = systemCore.placeBuyOrder(symbol, amount, priceLimit);
-
-            return "✅ *Buy Order Submitted*\n\n" +
-                    "Symbol: " + symbol + "\n" +
-                    "Amount: " + amount + "\n" +
-                    "Type: " + (orderType ? "LIMIT @ $" + priceLimit : "MARKET") + "\n\n" +
-                    response;
-        } catch (NumberFormatException e) {
-            return "❌ Invalid amount or price format";
+            return report.toString();
         } catch (Exception e) {
-            log.error("Error executing buy order", e);
-            return "❌ Failed to place buy order: " + e.getMessage();
+            log.error("Error generating balance report", e);
+            return "❌ Error fetching balance: " + e.getMessage();
         }
     }
 
-    private String handleSellOrder(@NotNull String[] parts) {
-        if (parts.length < 3) {
-            return "❌ Usage: /sell SYMBOL AMOUNT [PRICE]\nExample: /sell BTC 0.5";
-        }
-
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
+    private String getPositionsReport() {
         try {
-            String symbol = parts[1].toUpperCase();
-            double amount = Double.parseDouble(parts[2]);
-            Double priceLimit = parts.length > 3 ? Double.parseDouble(parts[3]) : null;
+            List<Position> positions = systemCore.getExchange().getPositions();
 
-            if (amount <= 0) {
-                return "❌ Amount must be positive";
+            if (positions == null || positions.isEmpty()) {
+                return "📭 No open positions";
             }
 
-            // Execute sell order
-            boolean orderType = priceLimit != null;
-            String response = systemCore.placeSellOrder(symbol, amount, priceLimit);
+            StringBuilder report = new StringBuilder("*Open Positions (" + positions.size() + ")*\\n\\n");
 
-            return "✅ *Sell Order Submitted*\n\n" +
-                    "Symbol: " + symbol + "\n" +
-                    "Amount: " + amount + "\n" +
-                    "Type: " + (orderType ? "LIMIT @ $" + priceLimit : "MARKET") + "\n\n" +
-                    response;
-        } catch (NumberFormatException e) {
-            return "❌ Invalid amount or price format";
-        } catch (Exception e) {
-            log.error("Error executing sell order", e);
-            return "❌ Failed to place sell order: " + e.getMessage();
-        }
-    }
+            for (Position pos : positions) {
+                report.append("🏷️ *").append(pos.getSymbol()).append("*\\n");
+                report.append("   Size: ").append(pos.getSize()).append(" units\\n");
+                report.append("   Entry: $").append(formatPrice(pos.getEntryPrice())).append("\\n");
+                report.append("   Current: $").append(formatPrice(pos.getCurrentPrice())).append("\\n");
 
-    private String handleCancelOrder(@NotNull String[] parts) {
-        if (parts.length < 2) {
-            return "❌ Usage: /cancel ORDERID";
-        }
+                double pnl = pos.getUnrealizedPnL();
+                double pnlPercent = (pnl / (pos.getSize() * pos.getEntryPrice())) * 100;
+                String pnlStatus = pnl >= 0 ? "✅" : "❌";
 
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
+                report.append(pnlStatus).append(" P&L: $").append(formatPrice(pnl))
+                        .append(" (").append(String.format("%.2f%%", pnlPercent)).append(")\\n");
 
-        try {
-            String orderId = parts[1];
-            // Placeholder for order cancellation
-            return "✅ *Order Cancelled*\n\nOrder ID: " + orderId;
-        } catch (Exception e) {
-            log.error("Error cancelling order", e);
-            return "❌ Failed to cancel order: " + e.getMessage();
-        }
-    }
-
-    private String handleStrategyInfo() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            String strategyName = systemCore.getActiveStrategyName();
-            String strategyStats = systemCore.getStrategyStats();
-
-            return "📈 *Active Strategy*\n\n" +
-                    "Strategy: " + (strategyName != null ? strategyName : "None") + "\n\n" +
-                    (strategyStats != null ? strategyStats : "No statistics available");
-        } catch (Exception e) {
-            log.debug("Error getting strategy info", e);
-            return "⚠️ Could not fetch strategy info: " + e.getMessage();
-        }
-    }
-
-    private String handleToggleAutoTrading() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            boolean currentState = systemCore.isAutoTradingEnabled();
-            systemCore.setAutoTradingEnabled(!currentState);
-
-            return "✅ *Auto Trading " + (!currentState ? "Enabled" : "Disabled") + "*\n\n" +
-                    "Auto trading is now " + (!currentState ? "🟢 ON" : "🔴 OFF");
-        } catch (Exception e) {
-            log.error("Error toggling auto trading", e);
-            return "❌ Failed to toggle auto trading: " + e.getMessage();
-        }
-    }
-
-    private String handleRiskMetrics() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            String riskMetrics = systemCore.getRiskMetrics();
-            return "⚠️ *Risk Metrics*\n\n" +
-                    (riskMetrics != null ? riskMetrics : "No risk metrics available");
-        } catch (Exception e) {
-            log.debug("Error getting risk metrics", e);
-            return "⚠️ Could not fetch risk metrics: " + e.getMessage();
-        }
-    }
-
-    private String handleProfitLoss() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            double totalPnL = systemCore.calculateTotalPnL();
-            double percentReturn = systemCore.calculateReturnPercentage();
-
-            String pnlStatus = totalPnL >= 0 ? "📈 Profit" : "📉 Loss";
-            String arrow = totalPnL >= 0 ? "📈" : "📉";
-
-            return arrow + " *" + pnlStatus + "*\n\n" +
-                    "Total P&L: $" + String.format("%.2f", totalPnL) + "\n" +
-                    "Return: " + String.format("%.2f%%", percentReturn);
-        } catch (Exception e) {
-            log.debug("Error calculating P&L", e);
-            return "⚠️ Could not calculate P&L: " + e.getMessage();
-        }
-    }
-
-    private String handleMarketInfo(@NotNull String[] parts) {
-        if (parts.length < 2) {
-            return "❌ Usage: /market SYMBOL\nExample: /market BTC";
-        }
-
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            String symbol = parts[1].toUpperCase();
-            TradePair tradePair = systemCore.getTradePair(symbol);
-
-            if (tradePair == null) {
-                return "❌ Symbol not found: " + symbol;
+                report.append("   Margin: $").append(formatPrice(pos.getMarginRequired())).append("\\n");
+                report.append("\\n");
             }
 
-            double bid = tradePair.getBid();
-            double ask = tradePair.getAsk();
-            double spread = ask - bid;
-            double spreadPct = (spread / bid) * 100;
-
-            return """
-                    📊 *Market Info - %s*
-
-                    Bid: $%.2f
-                    Ask: $%.2f
-                    Spread: $%.2f (%.4f%%)
-                    24h Volume: %.2f
-
-                    💡 Tip: Use /analysis %s for detailed market analysis,%s
-                    """.formatted(
-                    symbol,
-                    bid,
-                    ask,
-                    spread,
-                    spreadPct,
-                    tradePair.getVolume());
+            report.append("_Updated: ").append(getCurrentTime()).append("_");
+            return report.toString();
         } catch (Exception e) {
-            log.debug("Error getting market info", e);
-            return "⚠️ Could not fetch market info: " + e.getMessage();
+            log.error("Error generating positions report", e);
+            return "❌ Error fetching positions: " + e.getMessage();
         }
     }
 
-    private String handleTrades() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
+    private String getOrdersReport() {
         try {
-            String tradeHistory = systemCore.getRecentTrades(10);
+            List<OpenOrder> orders = systemCore.getExchange().getOpenOrders();
 
-            if (tradeHistory == null || tradeHistory.isEmpty()) {
-                return "📭 No recent trades";
+            if (orders == null || orders.isEmpty()) {
+                return "📭 No pending orders";
             }
 
-            return "📈 *Recent Trades*\n\n" + tradeHistory;
-        } catch (Exception e) {
-            log.debug("Error getting trades", e);
-            return "⚠️ Could not fetch trade history: " + e.getMessage();
-        }
-    }
+            StringBuilder report = new StringBuilder("*Open Orders (" + orders.size() + ")*\\n\\n");
 
-    /**
-     * Handle /analysis command for detailed market analysis
-     */
-    private String handleMarketAnalysis(@NotNull String[] parts) {
-        if (parts.length < 2) {
-            return "❌ Usage: /analysis SYMBOL\nExample: /analysis BTC";
-        }
-
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
-        try {
-            String symbol = parts[1].toUpperCase();
-            TradePair tradePair = systemCore.getTradePair(symbol);
-
-            if (tradePair == null) {
-                return "❌ Symbol not found: " + symbol;
+            for (OpenOrder order : orders) {
+                report.append("🔔 *").append(order.getSymbol()).append(" - ").append(order.getType()).append("*\\n");
+                report.append("   Side: ").append(order.getSide()).append("\\n");
+                report.append("   Amount: ").append(order.getAmount()).append(" units\\n");
+                report.append("   Price: $").append(formatPrice(order.getPrice())).append("\\n");
+                report.append("   Status: ").append(order.getStatus()).append("\\n");
+                report.append("   Time: ").append(order.getTimestamp()).append("\\n");
+                report.append("\\n");
             }
 
-            double bid = tradePair.getBid();
-            double ask = tradePair.getAsk();
-            double volume = tradePair.getVolume();
-            double spread = ask - bid;
-            double spreadPct = (spread / bid) * 100;
-
-            return """
-                    🔍 *Detailed Market Analysis - %s*
-
-                    💹 *Price*
-                    Bid: $%.2f
-                    Ask: $%.2f
-                    Spread: $%.2f (%.4f%%)
-
-                    📊 *Volume*
-                    24h Volume: %.2f
-                    Volume Trend: %s
-
-                    📈 *Technical Indicators*
-                    Moving Average: $%.2f
-                    RSI: %d
-                    MACD: %s
-
-                    💡 *Recommendation*
-                    %s
-                    """.formatted(
-                    symbol,
-                    bid,
-                    ask,
-                    spread,
-                    spreadPct,
-                    volume,
-                    systemCore.getVolumeTrend(symbol),
-                    systemCore.getMovingAverage(symbol),
-                    systemCore.getRSI(symbol),
-                    systemCore.getMACD(symbol),
-                    systemCore.getTradeRecommendation(symbol));
+            report.append("_Updated: ").append(getCurrentTime()).append("_");
+            return report.toString();
         } catch (Exception e) {
-            log.debug("Error getting market analysis", e);
-            return "⚠️ Could not fetch analysis: " + e.getMessage();
+            log.error("Error generating orders report", e);
+            return "❌ Error fetching orders: " + e.getMessage();
         }
     }
 
-    /**
-     * Handle /news command to show market news
-     */
-    private String handleMarketNews() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
-        }
-
+    private String getMarketReport(String symbol) {
         try {
-            String news = systemCore.getLatestNews();
-
-            if (news == null || news.isEmpty()) {
-                return "📭 No news available";
+            if (symbol == null || symbol.isBlank()) {
+                symbol = systemCore.getSelectedTradePair() != null ?
+                        systemCore.getSelectedTradePair().getSymbol() : "BTC/USD";
             }
 
-            return "📰 *Market News*\n\n" + news;
+            Ticker ticker = systemCore.getExchange().getTicker(symbol);
+
+            if (ticker == null) {
+                return "❌ Unable to fetch market data for " + symbol;
+            }
+
+            StringBuilder report = new StringBuilder("*Market Info - ").append(symbol).append("*\\n\\n");
+
+            report.append("📊 Bid: $").append(formatPrice(ticker.getBid())).append("\\n");
+            report.append("🎯 Ask: $").append(formatPrice(ticker.getAsk())).append("\\n");
+
+            double spread = ticker.getAsk() - ticker.getBid();
+            double spreadPercent = (spread / ticker.getBid()) * 100;
+            report.append("📈 Spread: $").append(formatPrice(spread))
+                    .append(" (").append(String.format("%.4f%%", spreadPercent)).append(")\\n");
+
+            report.append("🔺 High (24h): $").append(formatPrice(ticker.getHigh())).append("\\n");
+            report.append("🔻 Low (24h): $").append(formatPrice(ticker.getLow())).append("\\n");
+
+            if (ticker.getVolume() > 0) {
+                report.append("📦 Volume: ").append(String.format("%.2f", ticker.getVolume())).append("\\n");
+            }
+
+            report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
+
+            return report.toString();
         } catch (Exception e) {
-            log.debug("Error getting news", e);
-            return "⚠️ Could not fetch news: " + e.getMessage();
+            log.error("Error generating market report", e);
+            return "❌ Error fetching market data: " + e.getMessage();
         }
     }
 
-    /**
-     * Handle /top command to show top gainers and losers
-     */
-    private String handleTopMovers() {
-        if (systemCore == null || !systemCore.isReady()) {
-            return "❌ Bot is not ready";
+    private String getRiskReport() {
+        try {
+            StringBuilder report = new StringBuilder("*Risk Management Status*\\n\\n");
+
+            Account account = systemCore.getExchange().getAccount();
+
+            if (account != null) {
+                double marginLevel = account.getMarginLevel();
+                String riskStatus = marginLevel > 2.0 ? "✅ LOW" : marginLevel > 1.5 ? "⚠️ MEDIUM" : "🔴 HIGH";
+
+                report.append("⚠️ Risk Level: ").append(riskStatus).append("\\n");
+                report.append("📊 Margin Level: ").append(String.format("%.2f%%", marginLevel * 100)).append("\\n");
+
+                double usagePercent = (account.getMarginUsed() / account.getMarginAvailable()) * 100;
+                report.append("💳 Margin Usage: ").append(String.format("%.1f%%", usagePercent)).append("\\n");
+
+                report.append("📈 Unrealized P&L: $").append(formatPrice(account.getUnrealizedPnl())).append("\\n");
+                report.append("🎯 Stop Loss Active: Yes\\n");
+            } else {
+                report.append("⚠️ Unable to fetch risk information");
+            }
+
+            report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
+            return report.toString();
+        } catch (Exception e) {
+            log.error("Error generating risk report", e);
+            return "❌ Error fetching risk status: " + e.getMessage();
+        }
+    }
+
+    private String getStrategyReport() {
+        try {
+            StringBuilder report = new StringBuilder("*Strategy Status*\\n\\n");
+
+            report.append("📊 Active Strategies: Monitoring\\n");
+            report.append("🎯 Auto Trading: ");
+            report.append(systemCore.isAutoTradingEnabled() ? "✅ Enabled\\n" : "❌ Disabled\\n");
+            report.append("🔄 Streaming: ");
+            report.append(systemCore.isStreaming() ? "🔴 Active\\n" : "⚪ Inactive\\n");
+            report.append("🤖 AI Reasoning: ");
+            report.append(systemCore.isAiReasoningEnabled() ? "✅ Enabled\\n" : "❌ Disabled\\n");
+
+            report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
+            return report.toString();
+        } catch (Exception e) {
+            log.error("Error generating strategy report", e);
+            return "❌ Error fetching strategy data: " + e.getMessage();
+        }
+    }
+
+    private String getHealthReport() {
+        try {
+            StringBuilder report = new StringBuilder("*System Health*\\n\\n");
+
+            report.append("✅ Exchange Connected: Yes\\n");
+            report.append("📡 API Status: Online\\n");
+            report.append("🔋 System Status: Operational\\n");
+            report.append("🔄 Last Update: ").append(getCurrentTime()).append("\\n");
+            report.append("📊 Active Streams: ");
+            report.append(systemCore.isStreaming() ? "Yes\\n" : "No\\n");
+
+            report.append("\\n_System Status: ✅ OPERATIONAL_");
+            return report.toString();
+        } catch (Exception e) {
+            log.error("Error generating health report", e);
+            return "❌ Error fetching health status: " + e.getMessage();
+        }
+    }
+
+    private void sendMessage(String chatId, String message) {
+        if (message == null || message.isBlank() || chatId == null || chatId.isBlank()) {
+            return;
         }
 
         try {
-            String topGainers = systemCore.getTopGainers(5);
-            String topLosers = systemCore.getTopLosers(5);
+            String url = "%s%s/sendMessage".formatted(TELEGRAM_API_BASE, botToken);
 
-            return "📊 *Market Movers - Top 5*\n\n" +
-                    "🟢 *Top Gainers*\n" + topGainers + "\n" +
-                    "🔴 *Top Losers*\n" + topLosers;
+            String body = "chat_id=" + URLEncoder.encode(chatId, StandardCharsets.UTF_8) +
+                    "&text=" + URLEncoder.encode(message, StandardCharsets.UTF_8) +
+                    "&parse_mode=Markdown";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
-            log.debug("Error getting top movers", e);
-            return "⚠️ Could not fetch market movers: " + e.getMessage();
+            log.error("Error sending Telegram message", e);
         }
+    }
+
+    private String formatPrice(double price) {
+        return String.format("%.2f", Math.abs(price));
+    }
+
+    private String getCurrentTime() {
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 }

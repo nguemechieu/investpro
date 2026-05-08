@@ -12,8 +12,6 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.timeframe.Timeframe;
 
-import java.util.ArrayList;
-
 /**
  * Strategy Assignment Panel - Assign trading strategies to symbols and manage
  * parameters
