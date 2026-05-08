@@ -3,6 +3,9 @@ package org.investpro.core;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import javafx.scene.Scene;
+import javafx.scene.image.WritableImage;
+import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
 import org.investpro.models.trading.OpenOrder;
@@ -10,6 +13,8 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.jetbrains.annotations.NotNull;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -17,6 +22,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -31,6 +38,7 @@ import java.util.*;
  * - Supports position monitoring, order status, balance checks
  * - Market data reporting with bid/ask spreads
  * - Risk metrics and system health reporting
+ * - Screenshot capture and sending via Telegram
  *
  * Supported Commands:
  * /start - Start the bot
@@ -40,6 +48,7 @@ import java.util.*;
  * /positions - List all open positions with P&L
  * /orders - Show active pending orders
  * /market SYMBOL - Get real-time ticker and spread
+ * /screenshot - Capture and send current UI screenshot
  * /risk - Risk management status
  * /strategy - Strategy performance metrics
  * /health - System health snapshot
@@ -53,18 +62,28 @@ public class TelegramCommandHandler {
     private final SystemCore systemCore;
     private final String botToken;
     private final HttpClient httpClient;
+    private volatile Stage primaryStage;
 
     private volatile long lastUpdateId = -1L;
     private volatile boolean polling = false;
     private volatile Thread pollingThread;
 
-    public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier, String botToken) {
+    public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier,
+            String botToken) {
         this.systemCore = systemCore;
         this.telegramNotifier = telegramNotifier;
         this.botToken = botToken;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
+    }
+
+    /**
+     * Set the primary stage for screenshot capture.
+     * Call this from JavaFX main stage to enable /screenshot command.
+     */
+    public void setPrimaryStage(@NotNull Stage stage) {
+        this.primaryStage = stage;
     }
 
     /**
@@ -229,6 +248,7 @@ public class TelegramCommandHandler {
                 case "balance" -> getBalanceReport();
                 case "positions" -> getPositionsReport();
                 case "orders" -> getOrdersReport();
+                case "screenshot" -> captureAndSendScreenshot(chatId);
                 case "market" -> getMarketReport(parts.length > 1 ? parts[1] : null);
                 case "risk" -> getRiskReport();
                 case "strategy" -> getStrategyReport();
@@ -244,33 +264,21 @@ public class TelegramCommandHandler {
     private String getHelpText() {
         return """
                 *InvestPro Telegram Commands*
-                
+
                 📊 *Account & Trading*
                 /status - Account balance and margin info
                 /balance - Detailed balance breakdown
                 /positions - Current open positions
                 /orders - Pending open orders
-                
+
                 📈 *Market & Strategy*
                 /market [symbol] - Ticker and spread info
                 /strategy - Strategy performance metrics
                 /risk - Risk management status
+
+                📸 *Screenshots & Monitoring*
+                /screenshot - Capture and send UI screenshot
                 
-                🔧 *System*
-                /health - System health snapshot
-                /help - Show this help message
-                
-                Use these commands to monitor your trading account.
-                """;
-    }
-
-    private String getStatusReport() {
-        try {
-            StringBuilder report = new StringBuilder("*Account Status*\\n\\n");
-
-            Account account = systemCore.getExchange().getAccount();
-
-            if (account != null) {
                 report.append("💰 Balance: $").append(formatPrice(account.getBalance())).append("\\n");
                 report.append("📈 Equity: $").append(formatPrice(account.getEquity())).append("\\n");
                 report.append("📊 Margin Used: $").append(formatPrice(account.getMarginUsed())).append("\\n");
@@ -279,7 +287,8 @@ public class TelegramCommandHandler {
 
                 double marginLevel = account.getMarginLevel();
                 String marginStatus = marginLevel > 2.0 ? "✅" : marginLevel > 1.5 ? "⚠️" : "🔴";
-                report.append(marginStatus).append(" Margin Level: ").append(String.format("%.2f%%", marginLevel * 100)).append("\\n");
+                report.append(marginStatus).append(" Margin Level: ").append(String.format("%.2f%%", marginLevel * 100))
+                        .append("\\n");
 
                 report.append("\\n_Updated: ").append(getCurrentTime()).append("_");
             } else {
@@ -389,8 +398,8 @@ public class TelegramCommandHandler {
     private String getMarketReport(String symbol) {
         try {
             if (symbol == null || symbol.isBlank()) {
-                symbol = systemCore.getSelectedTradePair() != null ?
-                        systemCore.getSelectedTradePair().getSymbol() : "BTC/USD";
+                symbol = systemCore.getSelectedTradePair() != null ? systemCore.getSelectedTradePair().getSymbol()
+                        : "BTC/USD";
             }
 
             Ticker ticker = systemCore.getExchange().getTicker(symbol);
@@ -525,5 +534,68 @@ public class TelegramCommandHandler {
 
     private String getCurrentTime() {
         return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+
+    /**
+     * Capture the current JavaFX scene and send as screenshot to Telegram.
+     * Returns message text to be sent to user.
+     */
+    private String captureAndSendScreenshot(String chatId) {
+        if (primaryStage == null || primaryStage.getScene() == null) {
+            return "❌ No UI stage available for screenshot. Please initialize the application first.";
+        }
+
+        try {
+            // Capture the JavaFX scene
+            Scene scene = primaryStage.getScene();
+            WritableImage snapshot = scene.snapshot(null);
+
+            if (snapshot == null) {
+                return "❌ Failed to capture screenshot";
+            }
+
+            // Convert to BufferedImage
+            BufferedImage bufferedImage = new BufferedImage(
+                    (int) snapshot.getWidth(),
+                    (int) snapshot.getHeight(),
+                    BufferedImage.TYPE_INT_RGB);
+
+            for (int y = 0; y < snapshot.getHeight(); y++) {
+                for (int x = 0; x < snapshot.getWidth(); x++) {
+                    int argb = snapshot.getArgb(x, y);
+                    bufferedImage.setRGB(x, y, argb);
+                }
+            }
+
+            // Save to temporary file
+            Path tempFile = Files.createTempFile("investpro_screenshot_", ".png");
+            ImageIO.write(bufferedImage, "png", tempFile.toFile());
+
+            log.info("Screenshot captured: {}", tempFile.getFileName());
+
+            // Send to Telegram
+            String caption = "📸 *InvestPro UI Screenshot*\\n\\n" +
+                    "Captured: " + getCurrentTime() + "\\n" +
+                    "Resolution: " + (int) snapshot.getWidth() + "x" + (int) snapshot.getHeight();
+
+            boolean sent = telegramNotifier.sendPhoto(tempFile, caption);
+
+            // Clean up temp file
+            try {
+                Files.delete(tempFile);
+            } catch (IOException e) {
+                log.debug("Could not delete temp screenshot file: {}", tempFile);
+            }
+
+            if (sent) {
+                return "✅ Screenshot sent successfully!";
+            } else {
+                return "⚠️ Screenshot captured but failed to send to Telegram";
+            }
+
+        } catch (Exception e) {
+            log.error("Error capturing/sending screenshot", e);
+            return "❌ Screenshot error: " + e.getMessage();
+        }
     }
 }
