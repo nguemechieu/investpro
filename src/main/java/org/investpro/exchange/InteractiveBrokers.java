@@ -9,6 +9,7 @@ import org.investpro.models.trading.Order;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Trade;
+import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import lombok.extern.slf4j.Slf4j;
@@ -347,18 +348,13 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
     }
 
     @Override
-    public boolean supportsTradeStreaming() {
-        return false;
-    }
-
-    @Override
     public boolean supportsCandleStreaming() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean supportsOrderBookStreaming() {
-        return false;
+        return true;
     }
 
     // --------- Order Creation Methods ---------
@@ -679,4 +675,16 @@ public class InteractiveBrokers extends BrokerExchangeAdapter {
     public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
         return failedFuture(unsupported("enableTrailingStop"));
     }
+    @Override
+    public List<Timeframe> getSupportedTimeframes() {
+        return List.of(
+                Timeframe.M1,
+                Timeframe.M5,
+                Timeframe.M15,
+                Timeframe.M30,
+                Timeframe.H1,
+                Timeframe.H4,
+                Timeframe.D1);
+    }
+
 }

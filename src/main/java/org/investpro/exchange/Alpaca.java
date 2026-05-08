@@ -12,6 +12,7 @@ import org.investpro.models.trading.Order;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Trade;
+import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
@@ -678,6 +679,19 @@ public class Alpaca extends BrokerExchangeAdapter {
     public CompletableFuture<String> enableTrailingStop(TradePair symbol, String positionId, double trailingDistance) {
         return failedFuture(unsupported("enableTrailingStop"));
     }
+
+    @Override
+    public List<Timeframe> getSupportedTimeframes() {
+        return List.of(
+                Timeframe.M1,
+                Timeframe.M5,
+                Timeframe.M15,
+                Timeframe.M30,
+                Timeframe.H1,
+                Timeframe.H4,
+                Timeframe.D1);
+    }
+
 
     @Override
     public CompletableFuture<Account> fetchAccount() {

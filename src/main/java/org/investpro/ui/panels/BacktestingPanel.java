@@ -67,7 +67,7 @@ public class BacktestingPanel extends VBox {
 
     private ComboBox<String> strategyCombo;
     private ComboBox<TradePair> symbolCombo;
-    private ComboBox<String> timeframeCombo;
+    private ComboBox<Timeframe> timeframeCombo;
     private ComboBox<String> orderTypeCombo;
 
     private DatePicker startDatePicker;
@@ -178,8 +178,8 @@ public class BacktestingPanel extends VBox {
         HBox symbolBox = createLabeledInput("Symbol:", symbolCombo);
 
         timeframeCombo = new ComboBox<>();
-        timeframeCombo.setItems(FXCollections.observableArrayList(systemCore.getExchange().getSupportedTimeframes()));
-        timeframeCombo.setValue("1h");
+        timeframeCombo.getItems().addAll(systemCore.getExchange().getSupportedTimeframes());
+        timeframeCombo.setValue(Timeframe.H1);
         timeframeCombo.setPrefHeight(35);
         HBox timeframeBox = createLabeledInput("Timeframe:", timeframeCombo);
 
@@ -550,7 +550,7 @@ public class BacktestingPanel extends VBox {
         try {
             String strategyName = strategyCombo.getValue();
             TradePair selectedPair = symbolCombo.getValue();
-            String timeframeCode = timeframeCombo.getValue();
+            String timeframeCode = timeframeCombo.getValue().getCode();
             MARKET_TYPES orderType = resolveOrderType(orderTypeCombo.getValue());
 
             LocalDate startDate = startDatePicker.getValue();
@@ -1123,30 +1123,7 @@ public class BacktestingPanel extends VBox {
             }
 
             // Create CSV content
-            StringBuilder csvContent = new StringBuilder();
-            csvContent.append("Date,Side,Order Type,Entry Price,Exit Price,Quantity,Profit,Return %,Reason\n");
-
-            for (BacktestTrade trade : tradesTable.getItems()) {
-                csvContent.append(String.format(
-                        "%s,%s,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%s\n",
-                        trade.getDate(),
-                        trade.getSide(),
-                        trade.getOrderType(),
-                        trade.getPrice(),
-                        trade.getExitPrice(),
-                        trade.getQuantity(),
-                        trade.getProfit(),
-                        trade.getReturnPercent(),
-                        trade.getReason()));
-            }
-
-            // Add metrics summary
-            csvContent.append("\n\nMetrics Summary\n");
-            csvContent.append(String.format("Total Return,%s\n", totalReturnLabel.getText()));
-            csvContent.append(String.format("Win Rate,%s\n", winRateLabel.getText()));
-            csvContent.append(String.format("Max Drawdown,%s\n", maxDrawdownLabel.getText()));
-            csvContent.append(String.format("Sharpe Ratio,%s\n", sharpeLabel.getText()));
-            csvContent.append(String.format("Profit Factor,%s\n", profitFactorLabel.getText()));
+            StringBuilder csvContent = getStringBuilder();
 
             // Get the symbol and strategy for filename
             TradePair symbol = symbolCombo.getValue();
@@ -1166,8 +1143,8 @@ public class BacktestingPanel extends VBox {
 
             File file = fileChooser.showSaveDialog(this.getScene().getWindow());
             if (file != null) {
-                java.nio.file.Files.write(file.toPath(),
-                        csvContent.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                java.nio.file.Files.writeString(file.toPath(),
+                        csvContent.toString());
                 statusLabel.setText("✓ Results exported to: " + file.getName());
                 showAlert("Export Successful", "Backtest results exported to:\n" + file.getAbsolutePath(),
                         Alert.AlertType.INFORMATION);
@@ -1179,6 +1156,34 @@ public class BacktestingPanel extends VBox {
         }
     }
 
+    private @NotNull StringBuilder getStringBuilder() {
+        StringBuilder csvContent = new StringBuilder();
+        csvContent.append("Date,Side,Order Type,Entry Price,Exit Price,Quantity,Profit,Return %,Reason\n");
+
+        for (BacktestTrade trade : tradesTable.getItems()) {
+            csvContent.append(String.format(
+                    "%s,%s,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%s\n",
+                    trade.getDate(),
+                    trade.getSide(),
+                    trade.getOrderType(),
+                    trade.getPrice(),
+                    trade.getExitPrice(),
+                    trade.getQuantity(),
+                    trade.getProfit(),
+                    trade.getReturnPercent(),
+                    trade.getReason()));
+        }
+
+        // Add metrics summary
+        csvContent.append("\n\nMetrics Summary\n");
+        csvContent.append(String.format("Total Return,%s\n", totalReturnLabel.getText()));
+        csvContent.append(String.format("Win Rate,%s\n", winRateLabel.getText()));
+        csvContent.append(String.format("Max Drawdown,%s\n", maxDrawdownLabel.getText()));
+        csvContent.append(String.format("Sharpe Ratio,%s\n", sharpeLabel.getText()));
+        csvContent.append(String.format("Profit Factor,%s\n", profitFactorLabel.getText()));
+        return csvContent;
+    }
+
     private void compareResults() {
         try {
             // Check if we have trades to compare
@@ -1188,47 +1193,196 @@ public class BacktestingPanel extends VBox {
                 return;
             }
 
-            // Create a new window to display comparison metrics
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Backtest Comparison");
-            alert.setHeaderText("Results Summary");
+            // Create a modernized dialog window
+            Stage comparisonStage = new Stage();
+            comparisonStage.setTitle("Backtest Comparison Results");
+            comparisonStage.setWidth(700);
+            comparisonStage.setHeight(900);
+            comparisonStage.initStyle(javafx.stage.StageStyle.DECORATED);
 
-            // Build comparison text
-            StringBuilder comparison = new StringBuilder();
-            comparison.append("Symbol: ").append(symbolCombo.getValue()).append("\n");
-            comparison.append("Strategy: ").append(strategyCombo.getValue()).append("\n");
-            comparison.append("Timeframe: ").append(timeframeCombo.getValue()).append("\n");
-            comparison.append("\n--- Performance Metrics ---\n");
-            comparison.append("Total Return: ").append(totalReturnLabel.getText()).append("\n");
-            comparison.append("Win Rate: ").append(winRateLabel.getText()).append("\n");
-            comparison.append("Max Drawdown: ").append(maxDrawdownLabel.getText()).append("\n");
-            comparison.append("Sharpe Ratio: ").append(sharpeLabel.getText()).append("\n");
-            comparison.append("Profit Factor: ").append(profitFactorLabel.getText()).append("\n");
-            comparison.append("\n--- Trade Summary ---\n");
-            comparison.append("Total Trades: ").append(tradesTable.getItems().size()).append("\n");
+            VBox mainBox = new VBox(15);
+            mainBox.setPadding(new Insets(20));
+            mainBox.setStyle("-fx-background-color: #0f172a;");
 
-            // Calculate winning trades
-            long winningTrades = tradesTable.getItems().stream()
-                    .filter(trade -> trade.getProfit() > 0)
-                    .count();
-            comparison.append("Winning Trades: ").append(winningTrades).append("\n");
-            comparison.append("Losing Trades: ").append(tradesTable.getItems().size() - winningTrades).append("\n");
+            // Title
+            Label titleLabel = new Label("Backtest Performance Analysis");
+            titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
-            // Calculate average profit
-            double avgProfit = tradesTable.getItems().stream()
-                    .mapToDouble(BacktestTrade::getProfit)
-                    .average()
-                    .orElse(0.0);
-            comparison.append(String.format("Average Profit: %.2f\n", avgProfit));
+            // Test Parameters Section
+            VBox paramBox = createParametersSection();
 
-            alert.setContentText(comparison.toString());
-            alert.showAndWait();
+            // Performance Metrics Section
+            VBox metricsBox = createMetricsSection();
+
+            // Trade Summary Section
+            VBox tradeBox = createTradeSummarySection();
+
+            // Close Button
+            Button closeBtn = new Button("✕ Close");
+            closeBtn.setStyle(
+                    "-fx-padding: 10px 30px; " +
+                            "-fx-font-size: 13px; " +
+                            "-fx-background-color: #ef4444; " +
+                            "-fx-text-fill: white; " +
+                            "-fx-background-radius: 6; " +
+                            "-fx-cursor: hand;");
+            closeBtn.setOnAction(e -> comparisonStage.close());
+
+            HBox buttonBox = new HBox(10);
+            buttonBox.setAlignment(Pos.CENTER);
+            buttonBox.getChildren().add(closeBtn);
+
+            ScrollPane scrollPane = new ScrollPane();
+            scrollPane.setContent(new VBox(15, paramBox, metricsBox, tradeBox));
+            scrollPane.setFitToWidth(true);
+            scrollPane.setStyle("-fx-background-color: #0f172a; -fx-control-inner-background: #0f172a;");
+
+            mainBox.getChildren().addAll(
+                    titleLabel,
+                    new Separator(),
+                    scrollPane,
+                    new Separator(),
+                    buttonBox);
+
+            VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+            Scene scene = new Scene(mainBox);
+            comparisonStage.setScene(scene);
+            comparisonStage.show();
 
             log.info("Backtest comparison displayed for: {}", symbolCombo.getValue());
         } catch (Exception e) {
             log.error("Failed to display comparison", e);
             showAlert("Comparison Error", "Failed to display comparison: " + e.getMessage(), Alert.AlertType.ERROR);
         }
+    }
+
+    private VBox createParametersSection() {
+        VBox section = new VBox(10);
+        section.setPadding(new Insets(12));
+        section.setStyle(
+                "-fx-background-color: #1e293b; " +
+                        "-fx-border-color: #3b82f6; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 6; " +
+                        "-fx-background-radius: 6;");
+
+        Label sectionTitle = new Label("Test Parameters");
+        sectionTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #60a5fa;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(20);
+        grid.setVgap(10);
+
+        addParameterRow(grid, 0, "Symbol:", symbolCombo.getValue() != null ? symbolCombo.getValue().toString() : "N/A");
+        addParameterRow(grid, 1, "Strategy:", strategyCombo.getValue());
+        addParameterRow(grid, 2, "Timeframe:", timeframeCombo.getValue());
+        addParameterRow(grid, 3, "Number of Bars:", String.valueOf(barCountSpinner.getValue()));
+
+        section.getChildren().addAll(sectionTitle, grid);
+        return section;
+    }
+
+    private VBox createMetricsSection() {
+        VBox section = new VBox(10);
+        section.setPadding(new Insets(12));
+        section.setStyle(
+                "-fx-background-color: #1e293b; " +
+                        "-fx-border-color: #10b981; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 6; " +
+                        "-fx-background-radius: 6;");
+
+        Label sectionTitle = new Label("Performance Metrics");
+        sectionTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #10b981;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(30);
+        grid.setVgap(12);
+
+        // Parse metrics with colors
+        addMetricRow(grid, 0, "Total Return:", totalReturnLabel.getText(), "#10b981");
+        addMetricRow(grid, 1, "Win Rate:", winRateLabel.getText(), "#3b82f6");
+        addMetricRow(grid, 2, "Max Drawdown:", maxDrawdownLabel.getText(), "#f59e0b");
+        addMetricRow(grid, 3, "Sharpe Ratio:", sharpeLabel.getText(), "#8b5cf6");
+        addMetricRow(grid, 4, "Profit Factor:", profitFactorLabel.getText(), "#ec4899");
+
+        section.getChildren().addAll(sectionTitle, grid);
+        return section;
+    }
+
+    private VBox createTradeSummarySection() {
+        VBox section = new VBox(10);
+        section.setPadding(new Insets(12));
+        section.setStyle(
+                "-fx-background-color: #1e293b; " +
+                        "-fx-border-color: #f59e0b; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 6; " +
+                        "-fx-background-radius: 6;");
+
+        Label sectionTitle = new Label("Trade Summary");
+        sectionTitle.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #f59e0b;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(30);
+        grid.setVgap(12);
+
+        int totalTrades = tradesTable.getItems().size();
+        long winningTrades = tradesTable.getItems().stream()
+                .filter(trade -> trade.getProfit() > 0)
+                .count();
+        long losingTrades = totalTrades - winningTrades;
+
+        double avgProfit = tradesTable.getItems().stream()
+                .mapToDouble(BacktestTrade::getProfit)
+                .average()
+                .orElse(0.0);
+
+        double maxProfit = tradesTable.getItems().stream()
+                .mapToDouble(BacktestTrade::getProfit)
+                .max()
+                .orElse(0.0);
+
+        double minProfit = tradesTable.getItems().stream()
+                .mapToDouble(BacktestTrade::getProfit)
+                .min()
+                .orElse(0.0);
+
+        addMetricRow(grid, 0, "Total Trades:", String.valueOf(totalTrades), "#ffffff");
+        addMetricRow(grid, 1, "Winning Trades:", String.valueOf(winningTrades), "#10b981");
+        addMetricRow(grid, 2, "Losing Trades:", String.valueOf(losingTrades), "#ef4444");
+        addMetricRow(grid, 3, "Average Profit:", String.format("%.2f", avgProfit), "#3b82f6");
+        addMetricRow(grid, 4, "Best Trade:", String.format("%.2f", maxProfit), "#10b981");
+        addMetricRow(grid, 5, "Worst Trade:", String.format("%.2f", minProfit), "#ef4444");
+
+        section.getChildren().addAll(sectionTitle, grid);
+        return section;
+    }
+
+    private void addParameterRow(GridPane grid, int row, String label, String value) {
+        Label labelNode = new Label(label);
+        labelNode.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11px; -fx-font-weight: bold;");
+
+        Label valueNode = new Label(value);
+        valueNode.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 11px;");
+
+        grid.add(labelNode, 0, row);
+        grid.add(valueNode, 1, row);
+    }
+
+    private void addMetricRow(GridPane grid, int row, String label, String value, String color) {
+        Label labelNode = new Label(label);
+        labelNode.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11px; -fx-font-weight: bold;");
+
+        Label valueNode = new Label(value);
+        valueNode.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 12px; -fx-font-weight: bold;");
+
+        HBox row_hbox = new HBox(10);
+        row_hbox.setAlignment(Pos.CENTER_LEFT);
+        row_hbox.getChildren().addAll(labelNode, valueNode);
+
+        grid.add(row_hbox, row % 2, row / 2);
     }
 
     private void showAlert(String title, String message, Alert.AlertType type) {

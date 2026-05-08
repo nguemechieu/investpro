@@ -19,6 +19,7 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
+import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -1984,7 +1985,9 @@ public class Oanda extends Exchange {
                 Timeframe.H1,
                 Timeframe.H4,
                 Timeframe.D1,
-                Timeframe.W1);
+                Timeframe.W1,
+                Timeframe.MN
+        );
     }
 
     @Override

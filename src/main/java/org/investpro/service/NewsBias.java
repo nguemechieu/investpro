@@ -20,13 +20,13 @@ public class NewsBias {
     private double score;
     private double confidence;
     private String reason;
-    private String headline = "";
-    private int eventCount = 0;
-    private int positiveCount = 0;
-    private int negativeCount = 0;
-    private int neutralCount = 0;
-    private double averageImpact = 0.0;
-    private String latestTimestamp = "";
+    private String headline ;
+    private int eventCount ;
+    private int positiveCount ;
+    private int negativeCount ;
+    private int neutralCount ;
+    private double averageImpact;
+    private String latestTimestamp ;
     Map<String, Object> metadata = new LinkedHashMap<>();
 
     public Map<String, Object> toMap() {

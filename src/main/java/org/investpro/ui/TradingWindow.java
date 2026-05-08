@@ -868,7 +868,7 @@ public class TradingWindow extends BorderPane {
     private @NotNull ListView<OrderBook.PriceLevel> createBidsListView() {
         ListView<OrderBook.PriceLevel> listView = new ListView<>(orderBookBids);
         listView.setStyle("-fx-control-inner-background: #0f3460; -fx-padding: 0; -fx-border-color: transparent;");
-        listView.setCellFactory(param -> new ListCell<OrderBook.PriceLevel>() {
+        listView.setCellFactory(param -> new ListCell<>() {
             @Override
             protected void updateItem(OrderBook.PriceLevel bid, boolean empty) {
                 super.updateItem(bid, empty);
@@ -915,7 +915,7 @@ public class TradingWindow extends BorderPane {
     private @NotNull ListView<OrderBook.PriceLevel> createAsksListView() {
         ListView<OrderBook.PriceLevel> listView = new ListView<>(orderBookAsks);
         listView.setStyle("-fx-control-inner-background: #0f3460; -fx-padding: 0; -fx-border-color: transparent;");
-        listView.setCellFactory(param -> new ListCell<OrderBook.PriceLevel>() {
+        listView.setCellFactory(param -> new ListCell<>() {
             @Override
             protected void updateItem(OrderBook.PriceLevel ask, boolean empty) {
                 super.updateItem(ask, empty);
@@ -2004,18 +2004,42 @@ public class TradingWindow extends BorderPane {
     }
 
     private void configureTimeframeSelector() {
-        timeframeSelector.getItems().setAll(exchange.getSupportedTimeframes().toString());
+        timeframeSelector.getItems().clear();
+
+        List<String> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
+                ? exchange.getSupportedTimeframes()
+                .stream()
+                .map(String::valueOf)
+                .toList()
+                : List.of("1m", "5m", "15m", "30m", "1h", "4h", "1d");
+
+        timeframeSelector.getItems().setAll(supportedTimeframes);
+
         String savedTimeframe = preferences.get("selected_timeframe", "1h");
-        timeframeSelector.getSelectionModel()
-                .select(timeframeSelector.getItems().contains(savedTimeframe) ? savedTimeframe : "1h");
+
+        String selectedTimeframe = supportedTimeframes.contains(savedTimeframe)
+                ? savedTimeframe
+                : supportedTimeframes.contains("1h")
+                ? "1h"
+                : supportedTimeframes.isEmpty()
+                ? null
+                : supportedTimeframes.get(0);
+
+        if (selectedTimeframe != null) {
+            timeframeSelector.getSelectionModel().select(selectedTimeframe);
+        }
+
         timeframeSelector.setOnAction(event -> {
             String selected = timeframeSelector.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                preferences.put("selected_timeframe", selected);
-                onTimeframeChanged(selected);
-                saveAppState();
-                journal("Timeframe changed to: " + selected);
+
+            if (selected == null || selected.isBlank()) {
+                return;
             }
+
+            preferences.put("selected_timeframe", selected);
+            onTimeframeChanged(selected);
+            saveAppState();
+            journal("Timeframe changed to: " + selected);
         });
     }
 
