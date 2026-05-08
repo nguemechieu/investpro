@@ -73,6 +73,8 @@ public class BacktestingPanel extends VBox {
     private DatePicker startDatePicker;
     private DatePicker endDatePicker;
 
+    private Spinner<Integer> barCountSpinner;
+
     private Label statusLabel;
     private ProgressBar progressBar;
 
@@ -195,6 +197,12 @@ public class BacktestingPanel extends VBox {
         endDatePicker.setPrefHeight(35);
         HBox endDateBox = createLabeledInput("End Date:", endDatePicker);
 
+        barCountSpinner = new Spinner<>(10, 10000, 500, 50);
+        barCountSpinner.setPrefHeight(35);
+        barCountSpinner.setEditable(true);
+        barCountSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+        HBox barCountBox = createLabeledInput("Number of Bars:", barCountSpinner);
+
         Button runBacktestBtn = new Button("▶ Run Backtest");
         runBacktestBtn.setStyle(
                 "-fx-padding: 10px 25px; " +
@@ -238,6 +246,7 @@ public class BacktestingPanel extends VBox {
                 orderTypeBox,
                 startDateBox,
                 endDateBox,
+                barCountBox,
                 buttonBox,
                 statusLabel,
                 progressBar);
@@ -577,6 +586,14 @@ public class BacktestingPanel extends VBox {
                 Platform.runLater(() -> statusLabel.setText(
                         "Using sample data for " + displayTradePair(selectedPair)
                                 + " because no historical data was found"));
+            }
+
+            // Limit candles to the specified number of bars
+            int barCount = barCountSpinner.getValue();
+            if (candles.size() > barCount) {
+                candles = new ArrayList<>(candles.subList(candles.size() - barCount, candles.size()));
+                Platform.runLater(() -> statusLabel.setText(
+                        statusLabel.getText() + " (using last " + barCount + " bars)"));
             }
 
             if (candles.isEmpty()) {

@@ -10,6 +10,7 @@ import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
+import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -1113,8 +1114,7 @@ public class Bitfinex extends Exchange {
                 Timeframe.H1,
                 Timeframe.H4,
                 Timeframe.D1,
-                Timeframe.W1
-        );
+                Timeframe.W1);
     }
 
     private CompletableFuture<String> submitBitfinexOrder(

@@ -15,6 +15,7 @@ import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.TradePair;
+import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.CoinbaseJwtSigner;
 import org.investpro.utils.MARKET_TYPES;
@@ -157,8 +158,7 @@ public class Coinbase extends Exchange {
 
         try {
             if (encoding != null && encoding.toLowerCase(Locale.ROOT).contains("gzip")) {
-                try (GZIPInputStream gzipInputStream =
-                             new GZIPInputStream(new ByteArrayInputStream(byteArray))) {
+                try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(byteArray))) {
                     return new String(gzipInputStream.readAllBytes(), StandardCharsets.UTF_8);
                 }
             }
@@ -2367,8 +2367,7 @@ public class Coinbase extends Exchange {
                 Timeframe.M30,
                 Timeframe.H1,
                 Timeframe.H4,
-                Timeframe.D1
-        );
+                Timeframe.D1);
     }
 
     @Override

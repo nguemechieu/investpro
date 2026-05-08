@@ -1984,8 +1984,7 @@ public class Oanda extends Exchange {
                 Timeframe.H1,
                 Timeframe.H4,
                 Timeframe.D1,
-                Timeframe.W1
-        );
+                Timeframe.W1);
     }
 
     @Override
