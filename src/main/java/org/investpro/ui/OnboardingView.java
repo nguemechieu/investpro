@@ -226,12 +226,15 @@ public class OnboardingView extends StackPane {
     private void showConfigurationStep() {
         marketTypeBox.getItems().setAll("Crypto", "Stocks", "Futures", "Forex", "Options", "ETFs", "Bonds");
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
-        exchangeBox.getItems().setAll(
-                "COINBASE", "BINANCE US", "BINANCE", "OANDA", "BITFINEX",
-                "ALPACA", "INTERACTIVE BROKERS", "SCHWAB", "BITMEX", "BITSTAMP", "BITTREX");
+        
+        // Dynamically populate exchanges from SupportedExchange enum
+        java.util.Arrays.stream(SupportedExchange.values())
+                .map(SupportedExchange::getDisplayName)
+                .forEach(exchangeBox.getItems()::add);
+        
         marketTypeBox.getSelectionModel().select("Crypto");
         venueBox.getSelectionModel().select("US");
-        exchangeBox.getSelectionModel().select("COINBASE");
+        exchangeBox.getSelectionModel().select(SupportedExchange.COINBASE.getDisplayName());
 
         // Autoload credentials when exchange changes
         exchangeBox.setOnAction(event -> {
@@ -285,13 +288,14 @@ public class OnboardingView extends StackPane {
     }
 
     private void showExchangeCredentialsStep() {
-        String selectedExchange = exchangeBox.getValue();
+        String selectedExchangeName = exchangeBox.getValue();
+        SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
         TextField apiKeyField = new TextField();
         apiKeyField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
-        if (selectedExchange.equals("OANDA")) {
+        if (selectedExchange == SupportedExchange.OANDA) {
             apiKeyField.setPromptText("OANDA Token (Bearer Token)");
         } else {
             apiKeyField.setPromptText("API Key");
@@ -303,15 +307,15 @@ public class OnboardingView extends StackPane {
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
         // For OANDA, API Secret field should be hidden
-        apiSecretField.setVisible(!selectedExchange.equals("OANDA"));
-        apiSecretField.setManaged(!selectedExchange.equals("OANDA"));
+        apiSecretField.setVisible(selectedExchange != SupportedExchange.OANDA);
+        apiSecretField.setManaged(selectedExchange != SupportedExchange.OANDA);
 
         TextField accountIdField = new TextField();
         accountIdField.setPromptText("Account ID (auto-detected if blank)");
         accountIdField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-        accountIdField.setVisible(selectedExchange.equals("OANDA"));
-        accountIdField.setManaged(selectedExchange.equals("OANDA"));
+        accountIdField.setVisible(selectedExchange == SupportedExchange.OANDA);
+        accountIdField.setManaged(selectedExchange == SupportedExchange.OANDA);
 
         // Telegram Token field (optional)
         telegramToken.setPromptText("Telegram Bot Token (optional)");
@@ -319,7 +323,7 @@ public class OnboardingView extends StackPane {
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
         // Load remembered credentials for this exchange if they exist
-        loadRememberedExchangeCredentials(selectedExchange, apiKeyField, apiSecretField, accountIdField);
+        loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
 
         // Trading mode selection
         ToggleGroup tradingModeGroup = new ToggleGroup();
@@ -341,14 +345,14 @@ public class OnboardingView extends StackPane {
         credGrid.setVgap(14);
         credGrid.setAlignment(Pos.CENTER);
 
-        Label apiKeyLabel = new Label(selectedExchange.equals("OANDA") ? "Token" : "API Key");
+        Label apiKeyLabel = new Label(selectedExchange == SupportedExchange.OANDA ? "Token" : "API Key");
         credGrid.addRow(0, apiKeyLabel, apiKeyField);
 
-        if (!selectedExchange.equals("OANDA")) {
+        if (selectedExchange != SupportedExchange.OANDA) {
             credGrid.addRow(1, new Label("API Secret"), apiSecretField);
         }
 
-        if (selectedExchange.equals("OANDA")) {
+        if (selectedExchange == SupportedExchange.OANDA) {
             credGrid.addRow(1, new Label("Account ID"), accountIdField);
         }
 
@@ -379,7 +383,7 @@ public class OnboardingView extends StackPane {
 
             // For OANDA, only token is required (Account ID is optional - can be
             // auto-detected)
-            if (selectedExchange.equals("OANDA")) {
+            if (selectedExchange == SupportedExchange.OANDA) {
                 if (apiKeyField.getText().isBlank()) {
                     validation.setText("OANDA Token is required.");
                     return;
@@ -389,7 +393,7 @@ public class OnboardingView extends StackPane {
                         usernameField.getText().trim(),
                         marketTypeBox.getValue(),
                         venueBox.getValue(),
-                        exchangeBox.getValue(),
+                        selectedExchange.getFactoryKey(),
                         apiKeyField.getText().trim(),
                         accountIdField.getText().trim(), // Use account ID as apiSecret
                         accountIdField.getText().trim(),
@@ -409,7 +413,7 @@ public class OnboardingView extends StackPane {
                         usernameField.getText().trim(),
                         marketTypeBox.getValue(),
                         venueBox.getValue(),
-                        exchangeBox.getValue(),
+                        selectedExchange.getFactoryKey(),
                         apiKeyField.getText().trim(),
                         apiSecretField.getText().trim(),
                         accountIdField.getText().trim(),
@@ -423,16 +427,16 @@ public class OnboardingView extends StackPane {
 
             // Authenticate with broker before proceeding
             validation.setStyle("-fx-text-fill: #fbbf24;");
-            validation.setText("Authenticating with %s...".formatted(selectedExchange));
+            validation.setText("Authenticating with %s...".formatted(selectedExchange.getDisplayName()));
 
             String apiKey;
             apiKey = apiKeyField.getText().trim();
-            String apiSecret = selectedExchange.equals("OANDA") ? accountIdField.getText().trim()
+            String apiSecret = selectedExchange == SupportedExchange.OANDA ? accountIdField.getText().trim()
                     : apiSecretField.getText().trim();
 
 
             AuthResult authResult = authenticateExchange(
-                    selectedExchange,
+                    selectedExchange.getFactoryKey(),
                     apiKey,
                     apiSecret,
                     accountIdField.getText(),
@@ -450,7 +454,7 @@ public class OnboardingView extends StackPane {
 
             // Save exchange credentials if checkbox is selected
             if (rememberCredentialsCheckBox.isSelected()) {
-                saveRememberedExchangeCredentials(selectedExchange,
+                saveRememberedExchangeCredentials(selectedExchangeName,
                         apiKeyField.getText().trim(),
                         apiSecretField.getText().trim(),
                         accountIdField.getText().trim(),
@@ -480,37 +484,37 @@ public class OnboardingView extends StackPane {
         helpButton.setCursor(Cursor.HAND);
 
         String infoText = switch (selectedExchange) {
-            case "COINBASE" -> """
+            case COINBASE -> """
                     Coinbase Advanced Trade API:
                     • API Key: Organization ID format (organizations/xxxxx/apiKeys/xxxxx)
                     • API Secret: EC Private Key in PEM format (-----BEGIN EC PRIVATE KEY-----)
                     Generate at: https://coinbase.com/settings/api""";
-            case "OANDA" -> """
+            case OANDA -> """
                     OANDA v3 API:
                     • Token: Bearer token from Account Settings
                     • Account ID: Optional (auto-detected if left blank)
                     Generate at: https://www.oanda.com/account/tpa/personal-token""";
-            case "BINANCE", "BINANCE US" -> """
+            case BINANCE, BINANCE_US -> """
                     Binance API:
                     • API Key: Public key from API Management
                     • API Secret: Secret key from API Management
                     Generate at: https://www.binance.com/en/user/settings/api-management""";
-            case "BITFINEX" -> """
+            case BITFINEX -> """
                     Bitfinex API:
                     • API Key: Public key from Settings → API
                     • API Secret: Secret key from Settings → API
                     Generate at: https://www.bitfinex.com/api""";
-            case "ALPACA" -> """
+            case ALPACA -> """
                     Alpaca Trading API:
                     • API Key: From Dashboard → API Keys
                     • API Secret: From Dashboard → API Keys
                     Generate at: https://app.alpaca.markets/""";
-            case "INTERACTIVE BROKERS" -> """
+            case INTERACTIVE_BROKERS -> """
                     Interactive Brokers:
                     • API Key: Your IB account username or API key
                     • API Secret: Your IB account password or secret
                     Setup: Enable API at Account Management""";
-            default -> "Enter your API Key and API Secret for " + selectedExchange;
+            default -> "Enter your API Key and API Secret for " + selectedExchange.getDisplayName();
         };
 
         info.setText(infoText);

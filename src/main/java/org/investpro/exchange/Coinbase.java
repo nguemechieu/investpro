@@ -151,7 +151,8 @@ public class Coinbase extends Exchange {
         return apiKey == null || apiSecret == null || apiKey.trim().isEmpty() || apiSecret.trim().isEmpty();
     }
 
-    private CoinbaseWebSocketClient createWebSocketClient() {
+    @Contract(" -> new")
+    private @NotNull CoinbaseWebSocketClient createWebSocketClient() {
         String websocketJwt = websocketJwt();
         log.info("Coinbase WebSocket JWT created: {} characters, empty={}", websocketJwt.length(),
                 websocketJwt.isEmpty());

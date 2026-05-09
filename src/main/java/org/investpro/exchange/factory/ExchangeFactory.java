@@ -36,16 +36,14 @@ public final class ExchangeFactory {
 
         return switch (normalized) {
             case "binanceus", "binance_us", "binance-us" -> new BinanceUs(credentials);
-
             case "coinbase", "coinbaseadvanced", "coinbase_advanced", "coinbase-advanced" ->
                     new Coinbase(credentials);
-
             case "oanda" -> new Oanda(credentials);
-
             case "alpaca" -> new Alpaca(credentials);
-            case  "binance" -> new Binance(credentials);
-            case "stellar-network"->new StellarNetwork(credentials);
-
+            case "binance" -> new Binance(credentials);
+            case "stellar_network", "stellar-network" -> new StellarNetwork(credentials);
+            case "bitfinex" -> new Bitfinex(credentials);
+            case "interactive_brokers", "interactive-brokers" -> new InteractiveBrokers(credentials);
             default -> throw new IllegalArgumentException("Unsupported exchange: " + exchangeId);
         };
     }
