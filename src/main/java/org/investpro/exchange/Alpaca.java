@@ -698,6 +698,111 @@ public class Alpaca extends Exchange {
         return failedFuture(unsupported("fetchOpenOrders"));
     }
 
+    /**
+     * Parses Alpaca open orders response into a list of OpenOrder objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
+        }
+
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
+    }
+
+    /**
+     * Parses a single Alpaca open order from JsonNode.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            if (node == null || !node.isObject()) {
+                return null;
+            }
+
+            OpenOrder order = new OpenOrder();
+
+            order.setOrderId(node.path("id").asText(""));
+
+            String symbol = node.path("symbol").asText();
+            if (!symbol.isEmpty()) {
+                order.setTradePair(new TradePair(symbol, "USD"));
+            }
+
+            String side = node.path("side").asText("buy");
+            order.setSide("sell".equalsIgnoreCase(side) ? Side.SELL : Side.BUY);
+
+            order.setPrice(parseDouble(node.path("limit_price").asText("0"), 0.0));
+            order.setSize(parseDouble(node.path("qty").asText("0"), 0.0));
+            order.setFilledSize(parseDouble(node.path("filled_qty").asText("0"), 0.0));
+            order.setRemainingSize(Math.max(0.0, order.getSize() - order.getFilledSize()));
+
+            String status = node.path("status").asText("PENDING");
+            try {
+                order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase()));
+            } catch (Exception e) {
+                order.setStatus(OpenOrder.OrderStatus.PENDING);
+            }
+
+            String type = node.path("order_type").asText("limit");
+            try {
+                order.setOrderType(OpenOrder.OrderType.valueOf(type.toUpperCase()));
+            } catch (Exception e) {
+                order.setOrderType(OpenOrder.OrderType.LIMIT);
+            }
+
+            String createdAt = node.path("created_at").asText("");
+            if (!createdAt.isEmpty()) {
+                try {
+                    order.setCreatedAt(Instant.parse(createdAt));
+                } catch (Exception e) {
+                    // Keep default
+                }
+            }
+
+            String updatedAt = node.path("updated_at").asText(createdAt);
+            if (!updatedAt.isEmpty()) {
+                try {
+                    order.setUpdatedAt(Instant.parse(updatedAt));
+                } catch (Exception e) {
+                    // Keep default
+                }
+            }
+
+            return order;
+        } catch (Exception exception) {
+            log.debug("Error parsing Alpaca open order", exception);
+            return null;
+        }
+    }
+
+    private double parseDouble(String value, double defaultValue) {
+        try {
+            return Double.parseDouble(value);
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         return failedFuture(unsupported("fetchAllOpenOrders"));

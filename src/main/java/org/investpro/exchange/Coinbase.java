@@ -82,7 +82,7 @@ public class Coinbase extends Exchange {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
+    protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
     private final HttpClient httpClient;
     private HttpRequest.Builder requestBuilder;
@@ -148,8 +148,9 @@ public class Coinbase extends Exchange {
 
     private boolean hasCredentials() {
 
-        return  apiKey==null||apiSecret==null|| apiKey.trim().isEmpty()|| apiSecret.trim().isEmpty();
+        return apiKey == null || apiSecret == null || apiKey.trim().isEmpty() || apiSecret.trim().isEmpty();
     }
+
     private CoinbaseWebSocketClient createWebSocketClient() {
         String websocketJwt = websocketJwt();
         log.info("Coinbase WebSocket JWT created: {} characters, empty={}", websocketJwt.length(),
@@ -541,7 +542,7 @@ public class Coinbase extends Exchange {
             log.debug("Private key validation failed: contains BEGIN={}, contains PRIVATE KEY={}",
                     value != null && value.contains("BEGIN"),
                     value != null && value.contains("PRIVATE KEY"));
-            logCredentialDiagnostics(apiKey,apiSecret,this.getDisplayName());
+            logCredentialDiagnostics(apiKey, apiSecret, this.getDisplayName());
         }
         return result;
     }
@@ -1945,8 +1946,6 @@ public class Coinbase extends Exchange {
         return AuthResult.success("Coinbase authentication validated");
     }
 
-
-
     @Override
     public CompletableFuture<Boolean> validateOrder(
             TradePair tradePair,
@@ -2317,7 +2316,6 @@ public class Coinbase extends Exchange {
 
         // Adapter to convert ExchangeStreamConsumer to LiveTradesConsumer
 
-
         try {
             websocketClient.streamLiveTrades(tradePair, liveTradeConsumers);
             log.info("Subscribed Coinbase trade stream: {}", tradePair);
@@ -2561,48 +2559,73 @@ public class Coinbase extends Exchange {
 
     private List<OpenOrder> parseOpenOrders(String jsonResponse, TradePair tradePair) {
         List<OpenOrder> orders = new ArrayList<>();
-
         try {
             JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
             JsonNode ordersNode = root.has("orders") ? root.get("orders") : root;
-
-            if (ordersNode != null && ordersNode.isArray()) {
-                for (JsonNode orderNode : ordersNode) {
-                    OpenOrder order = parseOpenOrderNode(orderNode, tradePair);
-
-                    if (order != null) {
-                        orders.add(order);
-                    }
-                }
-            }
+            return parseOpenOrders(ordersNode);
         } catch (Exception exception) {
             log.error("Failed to parse Coinbase open orders", exception);
+            return orders;
+        }
+    }
+
+    /**
+     * Parses Coinbase open orders response into a list of OpenOrder objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
         }
 
-        return orders;
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
     }
 
     private @NotNull List<OpenOrder> parseOpenOrdersAll(String jsonResponse) {
         List<OpenOrder> orders = new ArrayList<>();
-
         try {
             JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
             JsonNode ordersNode = root.has("orders") ? root.get("orders") : root;
-
-            if (ordersNode != null && ordersNode.isArray()) {
-                for (JsonNode orderNode : ordersNode) {
-                    OpenOrder order = parseOpenOrderNodeWithTradePair(orderNode);
-
-                    if (order != null) {
-                        orders.add(order);
-                    }
-                }
-            }
+            return parseOpenOrders(ordersNode);
         } catch (Exception exception) {
             log.error("Failed to parse all Coinbase open orders", exception);
+            return orders;
         }
+    }
 
-        return orders;
+    /**
+     * Parses a single Coinbase open order from JsonNode.
+     * Extracts TradePair from product_id field.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            String product = firstText(node, "product_id", "productId");
+            TradePair tradePair = parseTradePairFromProductId(product);
+            return parseOpenOrderNode(node, tradePair);
+        } catch (Exception exception) {
+            log.debug("Failed to parse Coinbase open order node: {}", node, exception);
+            return null;
+        }
     }
 
     private OpenOrder parseOpenOrderNode(JsonNode node, TradePair tradePair) {
@@ -2662,18 +2685,6 @@ public class Coinbase extends Exchange {
         } catch (Exception exception) {
             log.debug("Failed to parse Coinbase open order node: {}", node, exception);
             return null;
-        }
-    }
-
-    private OpenOrder parseOpenOrderNodeWithTradePair(JsonNode node) {
-        try {
-            String product = firstText(node, "product_id", "productId");
-            TradePair pair = parseTradePairFromProductId(product);
-            return parseOpenOrderNode(node, pair);
-        } catch (Exception exception) {
-            log.debug("Failed to parse Coinbase open order node with pair: {}", node, exception);
-            throw new RuntimeException("Failed to parse Coinbase open order node with pair: %s".formatted(node),
-                    exception);
         }
     }
 

@@ -536,7 +536,8 @@ public class StellarNetwork extends Exchange {
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
         return new TradePair("XLM", "USDC");
     }
-    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
+
+    protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
     @Override
     public List<TradePair> getTradePairSymbol() throws SQLException, ClassNotFoundException {
@@ -717,6 +718,89 @@ public class StellarNetwork extends Exchange {
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         return CompletableFuture.completedFuture(List.copyOf(orders.values()));
+    }
+
+    /**
+     * Parses Stellar open orders response into a list of OpenOrder objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
+        }
+
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
+    }
+
+    /**
+     * Parses a single Stellar open order from JsonNode.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            if (node == null || !node.isObject()) {
+                return null;
+            }
+
+            OpenOrder order = new OpenOrder();
+
+            order.setOrderId(node.path("id").asText(""));
+
+            // Parse trading pair from seller/buyer assets
+            String sellingAsset = node.path("selling").path("asset_code").asText();
+            String buyingAsset = node.path("buying").path("asset_code").asText();
+            if (!sellingAsset.isEmpty() && !buyingAsset.isEmpty()) {
+                order.setTradePair(new TradePair(buyingAsset, sellingAsset));
+            }
+
+            double price = node.path("price").asDouble(0.0);
+            order.setPrice(price);
+
+            // Get amount and priceg
+            double amount = node.path("amount").asDouble(0.0);
+            order.setSize(amount);
+
+            // Stellar doesn't have traditional filled/remaining in this context
+            order.setFilledSize(0.0);
+            order.setRemainingSize(amount);
+
+            // Parse side from selling asset
+            String side = node.path("side").asText("buy");
+            order.setSide("sell".equalsIgnoreCase(side) ? Side.SELL : Side.BUY);
+
+            order.setOrderType(OpenOrder.OrderType.LIMIT);
+            order.setStatus(OpenOrder.OrderStatus.PENDING);
+
+            long timestamp = node.path("timestamp").asLong(0);
+            if (timestamp > 0) {
+                order.setCreatedAt(Instant.ofEpochSecond(timestamp));
+                order.setUpdatedAt(Instant.ofEpochSecond(timestamp));
+            }
+
+            return order;
+        } catch (Exception exception) {
+            log.debug("Error parsing Stellar open order", exception);
+            return null;
+        }
     }
 
     @Override

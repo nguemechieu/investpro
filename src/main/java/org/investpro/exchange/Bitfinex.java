@@ -772,6 +772,86 @@ public class Bitfinex extends Exchange {
         return CompletableFuture.completedFuture(List.of());
     }
 
+    /**
+     * Parses Bitfinex open orders response into a list of OpenOrder objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
+        }
+
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
+    }
+
+    /**
+     * Parses a single Bitfinex open order from JsonNode.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            if (node == null || !node.isObject()) {
+                return null;
+            }
+
+            OpenOrder order = new OpenOrder();
+
+            // Bitfinex order fields mapping
+            order.setOrderId(node.path("id").asText(""));
+            order.setPrice(node.path("price").asDouble(0.0));
+            order.setSize(node.path("amount").asDouble(0.0));
+            order.setFilledSize(node.path("executedAmount").asDouble(0.0));
+            order.setRemainingSize(Math.max(0.0, order.getSize() - order.getFilledSize()));
+
+            String side = node.path("side").asText("buy");
+            order.setSide("sell".equalsIgnoreCase(side) ? Side.SELL : Side.BUY);
+
+            String type = node.path("type").asText("limit");
+            try {
+                order.setOrderType(OpenOrder.OrderType.valueOf(type.toUpperCase().replace("-", "_")));
+            } catch (Exception e) {
+                order.setOrderType(OpenOrder.OrderType.LIMIT);
+            }
+
+            String status = node.path("status").asText("PENDING");
+            try {
+                order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase().replace("-", "_")));
+            } catch (Exception e) {
+                order.setStatus(OpenOrder.OrderStatus.PENDING);
+            }
+
+            long timestamp = node.path("mtsCreate").asLong(0);
+            if (timestamp > 0) {
+                order.setCreatedAt(Instant.ofEpochMilli(timestamp));
+                order.setUpdatedAt(Instant.ofEpochMilli(timestamp));
+            }
+
+            return order;
+        } catch (Exception exception) {
+            log.debug("Error parsing Bitfinex open order", exception);
+            return null;
+        }
+    }
+
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
         return CompletableFuture.completedFuture(List.of());

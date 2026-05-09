@@ -104,16 +104,9 @@ public class Oanda extends Exchange {
 
     // Rate limiting and concurrency
     private final OandaRateLimiter rateLimiter = new OandaRateLimiter(1, Duration.ofMillis(250));
-    private final ExecutorService oandaExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
-        private final AtomicInteger count = new AtomicInteger(0);
+    private final ExecutorService oandaExecutor=Executors.newFixedThreadPool(2,new ThreadFactory(){private final AtomicInteger count=new AtomicInteger(0);
 
-        @Override
-        public Thread newThread(@NotNull Runnable r) {
-            Thread t = new Thread(r, "oanda-http-worker-" + count.incrementAndGet());
-            t.setDaemon(false);
-            return t;
-        }
-    });
+    @Override public Thread newThread(@NotNull Runnable r){Thread t=new Thread(r,"oanda-http-worker-"+count.incrementAndGet());t.setDaemon(false);return t;}});
 
     // Caching with TTL
     private static class CacheEntry<T> {
@@ -1355,44 +1348,90 @@ public class Oanda extends Exchange {
 
     private List<OpenOrder> parseOandaAllOpenOrders(String body) {
         try {
-            JsonNode orders = OBJECT_MAPPER.readTree(body).path("orders");
-
-            if (!orders.isArray() || orders.isEmpty()) {
-                return Collections.emptyList();
-            }
-
-            List<OpenOrder> result = new ArrayList<>();
-
-            for (JsonNode node : orders) {
-                String instrument = node.path("instrument").asText("");
-                double signedUnits = node.path("units").asDouble(0.0);
-                double filledUnits = Math.abs(node.path("filledUnits").asDouble(0.0));
-                double totalUnits = Math.abs(signedUnits);
-
-                OpenOrder order = new OpenOrder();
-                order.setOrderId(node.path("id").asText(""));
-                order.setTradePair(instrumentToTradePair(instrument));
-                order.setSide(signedUnits < 0 ? Side.SELL : Side.BUY);
-                order.setOrderType(toOpenOrderType(node.path("type").asText("LIMIT")));
-                order.setPrice(node.path("price").asDouble(0.0));
-                order.setSize(totalUnits);
-                order.setFilledSize(filledUnits);
-                order.setRemainingSize(Math.max(0.0, totalUnits - filledUnits));
-                order.setCreatedAt(parseInstant(node.path("createTime").asText("")));
-                order.setUpdatedAt(parseInstant(node.path("time").asText(node.path("createTime").asText(""))));
-                order.setStatus(toOpenOrderStatus(node.path("state").asText("PENDING")));
-                order.setClientOrderId(node.path("clientExtensions").path("id").asText(""));
-                order.setExchange("OANDA");
-
-                result.add(order);
-            }
-
-            return result;
-
-        } catch (Exception exception) {
-            logger.warn("Unable to parse OANDA open orders", exception);
+            JsonNode root = OBJECT_MAPPER.readTree(body);
+            JsonNode orders = root.path("orders");
+            return parseOpenOrders(orders);
+        } catch (Exception e) {
+            logger.warn("Failed to parse OANDA all open orders: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Parses OANDA open orders response into a list of OpenOrder objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
+        }
+
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
+    }
+
+    /**
+     * Parses a single OANDA open order from JsonNode.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            if (node == null || !node.isObject()) {
+                return null;
+            }
+
+            String instrument = node.path("instrument").asText("");
+            double signedUnits = node.path("units").asDouble(0.0);
+            double filledUnits = Math.abs(node.path("filledUnits").asDouble(0.0));
+            double totalUnits = Math.abs(signedUnits);
+
+            OpenOrder order = new OpenOrder();
+            order.setOrderId(node.path("id").asText(""));
+            order.setTradePair(instrumentToTradePair(instrument));
+            order.setSide(signedUnits < 0 ? Side.SELL : Side.BUY);
+            order.setOrderType(toOpenOrderType(node.path("type").asText("LIMIT")));
+            order.setPrice(node.path("price").asDouble(0.0));
+            order.setSize(totalUnits);
+            order.setFilledSize(filledUnits);
+            order.setRemainingSize(Math.max(0.0, totalUnits - filledUnits));
+            order.setCreatedAt(parseInstant(node.path("createTime").asText("")));
+            order.setUpdatedAt(parseInstant(node.path("time").asText(node.path("createTime").asText(""))));
+            order.setStatus(toOpenOrderStatus(node.path("state").asText("PENDING")));
+            order.setClientOrderId(node.path("clientExtensions").path("id").asText(""));
+            order.setExchange("OANDA");
+
+            return order;
+        } catch (Exception e) {
+            logger.debug("Failed to parse OANDA open order node: {}", node, e);
+            return null;
+        }
+    }
+
+    }catch(
+
+    Exception exception)
+    {
+        logger.warn("Unable to parse OANDA open orders", exception);
+        return Collections.emptyList();
+    }
     }
 
     @Override

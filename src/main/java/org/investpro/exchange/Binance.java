@@ -1153,6 +1153,86 @@ public class Binance extends Exchange {
         return failedFuture(unsupported("fetchOpenOrders"));
     }
 
+    /**
+     * Parses Binance open orders response into a list of OpenOrder objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
+        }
+
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
+    }
+
+    /**
+     * Parses a single Binance open order from JsonNode.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            if (node == null || !node.isObject()) {
+                return null;
+            }
+
+            OpenOrder order = new OpenOrder();
+
+            order.setOrderId(node.path("orderId").asText());
+
+            String symbol = node.path("symbol").asText();
+            TradePair tradePair = tradePairFromSymbol(symbol);
+            order.setTradePair(tradePair);
+
+            String side = node.path("side").asText();
+            order.setSide("SELL".equals(side) ? Side.SELL : Side.BUY);
+
+            order.setPrice(node.path("price").asDouble(0.0));
+            order.setSize(node.path("origQty").asDouble(0.0));
+            order.setFilledSize(node.path("executedQty").asDouble(0.0));
+            order.setRemainingSize(Math.max(0.0, order.getSize() - order.getFilledSize()));
+
+            try {
+                order.setStatus(OpenOrder.OrderStatus.valueOf(node.path("status").asText("UNKNOWN")));
+            } catch (Exception e) {
+                order.setStatus(OpenOrder.OrderStatus.UNKNOWN);
+            }
+
+            try {
+                order.setOrderType(OpenOrder.OrderType.valueOf(node.path("type").asText("MARKET")));
+            } catch (Exception e) {
+                order.setOrderType(OpenOrder.OrderType.MARKET);
+            }
+
+            order.setCreatedAt(Instant.ofEpochMilli(node.path("time").asLong()));
+            order.setUpdatedAt(Instant.ofEpochMilli(node.path("updateTime").asLong()));
+            order.setTimeInForce(node.path("timeInForce").asText());
+
+            return order;
+        } catch (Exception exception) {
+            log.debug("Error parsing Binance open order", exception);
+            return null;
+        }
+    }
+
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         return failedFuture(unsupported("fetchAllOpenOrders"));

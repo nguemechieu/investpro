@@ -2230,6 +2230,7 @@ public class BinanceUs extends Exchange {
             }
 
             OpenOrder order = new OpenOrder();
+
             order.setOrderId(orderNode.path("orderId").asText());
 
             String symbol = orderNode.path("symbol").asText();

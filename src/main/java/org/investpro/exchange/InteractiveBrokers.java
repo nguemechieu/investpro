@@ -558,6 +558,92 @@ public class InteractiveBrokers extends Exchange {
         return failedFuture(unsupported("fetchAllOpenOrders"));
     }
 
+    /**
+     * Parses Interactive Brokers open orders response into a list of OpenOrder
+     * objects.
+     * Handles both array format and single object format.
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+
+        if (rootNode == null || rootNode.isNull()) {
+            return openOrders;
+        }
+
+        if (rootNode.isArray()) {
+            for (JsonNode orderNode : rootNode) {
+                OpenOrder order = parseOpenOrder(orderNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            return openOrders;
+        }
+
+        // Optional fallback: some endpoints may return a single object
+        if (rootNode.isObject()) {
+            OpenOrder order = parseOpenOrder(rootNode);
+            if (order != null) {
+                openOrders.add(order);
+            }
+        }
+
+        return openOrders;
+    }
+
+    /**
+     * Parses a single Interactive Brokers open order from JsonNode.
+     */
+    private OpenOrder parseOpenOrder(JsonNode node) {
+        try {
+            if (node == null || !node.isObject()) {
+                return null;
+            }
+
+            OpenOrder order = new OpenOrder();
+
+            order.setOrderId(node.path("orderId").asText(""));
+
+            String symbol = node.path("contract").path("localSymbol").asText();
+            if (!symbol.isEmpty()) {
+                order.setTradePair(new TradePair(symbol, "USD"));
+            }
+
+            String action = node.path("action").asText("BUY");
+            order.setSide("SELL".equalsIgnoreCase(action) ? Side.SELL : Side.BUY);
+
+            order.setPrice(node.path("lmtPrice").asDouble(0.0));
+            order.setSize(node.path("totalQuantity").asDouble(0.0));
+            order.setFilledSize(node.path("filledQuantity").asDouble(0.0));
+            order.setRemainingSize(Math.max(0.0, order.getSize() - order.getFilledSize()));
+
+            String status = node.path("orderStatus").asText("PENDING");
+            try {
+                order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase()));
+            } catch (Exception e) {
+                order.setStatus(OpenOrder.OrderStatus.PENDING);
+            }
+
+            String orderType = node.path("orderType").asText("LMT");
+            try {
+                order.setOrderType(OpenOrder.OrderType.valueOf(orderType.replace("_", "")));
+            } catch (Exception e) {
+                order.setOrderType(OpenOrder.OrderType.LIMIT);
+            }
+
+            long timestamp = node.path("createTime").asLong(0);
+            if (timestamp > 0) {
+                order.setCreatedAt(Instant.ofEpochMilli(timestamp));
+                order.setUpdatedAt(Instant.ofEpochMilli(timestamp));
+            }
+
+            return order;
+        } catch (Exception exception) {
+            log.debug("Error parsing Interactive Brokers open order", exception);
+            return null;
+        }
+    }
+
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
         return failedFuture(unsupported("fetchOrderHistory"));
