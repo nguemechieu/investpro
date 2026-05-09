@@ -37,7 +37,7 @@ public final class ExchangeFactory {
         return switch (normalized) {
             case "binanceus", "binance_us", "binance-us" -> new BinanceUs(credentials);
             case "coinbase", "coinbaseadvanced", "coinbase_advanced", "coinbase-advanced" ->
-                    new Coinbase(credentials);
+                new Coinbase(credentials);
             case "oanda" -> new Oanda(credentials);
             case "alpaca" -> new Alpaca(credentials);
             case "binance" -> new Binance(credentials);

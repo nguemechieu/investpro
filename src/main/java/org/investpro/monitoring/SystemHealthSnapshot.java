@@ -98,6 +98,20 @@ public class SystemHealthSnapshot {
     private final ComponentHealth notifications = unavailableComponent("Notifications");
 
     /**
+     * License health (validity, expiration, feature access).
+     */
+    @NotNull
+    @Builder.Default
+    private final ComponentHealth license = unavailableComponent("License");
+
+    /**
+     * System resources health (memory, CPU, disk, threads).
+     */
+    @NotNull
+    @Builder.Default
+    private final ComponentHealth systemResources = unavailableComponent("System Resources");
+
+    /**
      * Critical blockers preventing trading.
      */
     @NotNull
@@ -177,6 +191,10 @@ public class SystemHealthSnapshot {
             count++;
         if (notifications.isCritical())
             count++;
+        if (license.isCritical())
+            count++;
+        if (systemResources.isCritical())
+            count++;
         return count;
     }
 
@@ -202,6 +220,10 @@ public class SystemHealthSnapshot {
         if (ai.hasIssue())
             count++;
         if (notifications.hasIssue())
+            count++;
+        if (license.hasIssue())
+            count++;
+        if (systemResources.hasIssue())
             count++;
         return count;
     }
@@ -231,6 +253,8 @@ public class SystemHealthSnapshot {
         report.append(agents.toFormattedString());
         report.append(ai.toFormattedString());
         report.append(notifications.toFormattedString());
+        report.append(license.toFormattedString());
+        report.append(systemResources.toFormattedString());
 
         if (!blockers.isEmpty()) {
             report.append("\n**BLOCKERS**\n");

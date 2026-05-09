@@ -2495,7 +2495,8 @@ public class Coinbase extends Exchange {
                 Timeframe.M30,
                 Timeframe.H1,
                 Timeframe.H4,
-                Timeframe.D1);
+                Timeframe.D1
+                );
     }
 
     @Override
@@ -2574,7 +2575,7 @@ public class Coinbase extends Exchange {
      * Parses Coinbase open orders response into a list of OpenOrder objects.
      * Handles both array format and single object format.
      */
-    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+    private @NotNull List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
         List<OpenOrder> openOrders = new ArrayList<>();
 
         if (rootNode == null || rootNode.isNull()) {
@@ -2652,6 +2653,7 @@ public class Coinbase extends Exchange {
                             OpenOrder.OrderType.valueOf(orderTypeText.toUpperCase(Locale.ROOT).replace("-", "_")));
                 } catch (Exception ignored) {
                     // Keep default if model has one.
+                    log.error(ignored.toString());
                 }
             }
 
@@ -2679,6 +2681,7 @@ public class Coinbase extends Exchange {
                     order.setStatus(OpenOrder.OrderStatus.valueOf(status.toUpperCase(Locale.ROOT)));
                 } catch (Exception ignored) {
                     // Keep default if model has one.
+                    log.error(ignored.toString());
                 }
             }
 
@@ -2689,7 +2692,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private List<Position> parsePositionsFromAccounts(String jsonResponse, TradePair tradePair) {
+    private @NotNull List<Position> parsePositionsFromAccounts(String jsonResponse, TradePair tradePair) {
         List<Position> positions = new ArrayList<>();
 
         try {
@@ -2857,7 +2860,8 @@ public class Coinbase extends Exchange {
             try {
                 trade.setFee(parseDouble(firstText(fillNode, "commission", "fee"), 0.0));
             } catch (Exception ignored) {
-                // Fee setter may not exist in every Trade version.
+                // Fee setter may not exist in every Trade version
+                log.warn(ignored.toString());
             }
 
             return trade;

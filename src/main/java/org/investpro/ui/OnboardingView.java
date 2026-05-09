@@ -226,12 +226,12 @@ public class OnboardingView extends StackPane {
     private void showConfigurationStep() {
         marketTypeBox.getItems().setAll("Crypto", "Stocks", "Futures", "Forex", "Options", "ETFs", "Bonds");
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
-        
+
         // Dynamically populate exchanges from SupportedExchange enum
         java.util.Arrays.stream(SupportedExchange.values())
                 .map(SupportedExchange::getDisplayName)
                 .forEach(exchangeBox.getItems()::add);
-        
+
         marketTypeBox.getSelectionModel().select("Crypto");
         venueBox.getSelectionModel().select("US");
         exchangeBox.getSelectionModel().select(SupportedExchange.COINBASE.getDisplayName());
@@ -433,7 +433,6 @@ public class OnboardingView extends StackPane {
             apiKey = apiKeyField.getText().trim();
             String apiSecret = selectedExchange == SupportedExchange.OANDA ? accountIdField.getText().trim()
                     : apiSecretField.getText().trim();
-
 
             AuthResult authResult = authenticateExchange(
                     selectedExchange.getFactoryKey(),
@@ -690,8 +689,8 @@ public class OnboardingView extends StackPane {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         authService.forgetRememberedUser();
         // Clear all exchange credentials
-        for (String exchange : new String[]{"COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA",
-                "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX"}) {
+        for (String exchange : new String[] { "COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA",
+                "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX" }) {
             preferences.remove("exchange_api_key_%s".formatted(exchange));
             preferences.remove("exchange_api_secret_%s".formatted(exchange));
             preferences.remove("exchange_account_id_%s".formatted(exchange));
@@ -704,7 +703,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId,
-                                                   String token) {
+            String token) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         preferences.put("exchange_api_key_%s".formatted(exchange), apiKey);
         preferences.put("exchange_api_secret_%s".formatted(exchange), apiSecret);
@@ -713,7 +712,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void loadRememberedExchangeCredentials(String exchange, TextField apiKeyField, PasswordField apiSecretField,
-                                                   TextField accountIdField) {
+            TextField accountIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         String savedApiKey = preferences.get("exchange_api_key_%s".formatted(exchange), "");
         String savedApiSecret = preferences.get("exchange_api_secret_%s".formatted(exchange), "");
@@ -739,8 +738,7 @@ public class OnboardingView extends StackPane {
             String apiKey,
             String apiSecret,
             String accountId,
-            String tradingMode
-    ) {
+            String tradingMode) {
         String exchangeId = normalizeExchangeId(selectedExchange);
 
         CredentialProvider credentialProvider = new UiCredentialProvider(
@@ -748,8 +746,7 @@ public class OnboardingView extends StackPane {
                 apiKey,
                 apiSecret,
                 accountId,
-                tradingMode
-        );
+                tradingMode);
 
         ExchangeFactory exchangeFactory = new ExchangeFactory(credentialProvider);
 
@@ -764,8 +761,7 @@ public class OnboardingView extends StackPane {
             String apiKey,
             String apiSecret,
             String accountId,
-            String tradingMode
-    ) {
+            String tradingMode) {
         try {
             Exchange exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, tradingMode);
             AuthResult authResult = exchange.AuthCheckResult(selectedExchange);
@@ -809,10 +805,11 @@ public class OnboardingView extends StackPane {
             case "binance", "binanceus", "binance_us", "binance_us_spot" -> "binanceus";
 
             case "coinbase",
-                 "coinbaseadvanced",
-                 "coinbase_advanced",
-                 "coinbaseadvancedtrade",
-                 "coinbase_advanced_trade" -> "coinbase";
+                    "coinbaseadvanced",
+                    "coinbase_advanced",
+                    "coinbaseadvancedtrade",
+                    "coinbase_advanced_trade" ->
+                "coinbase";
 
             case "oanda", "oanda_fx", "oanda_forex" -> "oanda";
 

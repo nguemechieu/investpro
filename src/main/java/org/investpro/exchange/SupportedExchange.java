@@ -26,6 +26,7 @@ public enum SupportedExchange {
 
     /**
      * Get the user-friendly display name for this exchange.
+     * 
      * @return display name suitable for UI labels
      */
     public String getDisplayName() {
@@ -34,6 +35,7 @@ public enum SupportedExchange {
 
     /**
      * Get the factory key used to instantiate this exchange.
+     * 
      * @return key for ExchangeFactory.create()
      */
     public String getFactoryKey() {
@@ -42,6 +44,7 @@ public enum SupportedExchange {
 
     /**
      * Get the enum value from a factory key.
+     * 
      * @param factoryKey the key used in ExchangeFactory
      * @return the matching SupportedExchange enum value
      * @throws IllegalArgumentException if no matching exchange found
@@ -57,6 +60,7 @@ public enum SupportedExchange {
 
     /**
      * Get the enum value from a display name.
+     * 
      * @param displayName the UI-friendly display name
      * @return the matching SupportedExchange enum value
      * @throws IllegalArgumentException if no matching exchange found
