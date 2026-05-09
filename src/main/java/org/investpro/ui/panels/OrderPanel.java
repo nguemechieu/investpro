@@ -437,6 +437,8 @@ private  SystemCore systemCore;
     private void updateUIForOrderType() {
         OpenOrder.OrderType selectedType = orderTypeCombo.getValue();
         boolean isMarket = selectedType == OpenOrder.OrderType.MARKET;
+        boolean isLimitOrStopLimit = selectedType == OpenOrder.OrderType.LIMIT || 
+                                     selectedType == OpenOrder.OrderType.STOP_LIMIT;
 
         priceField.setDisable(isMarket);
         expirationDatePicker.setDisable(isMarket);
@@ -448,6 +450,34 @@ private  SystemCore systemCore;
         } else {
             styleInput(priceField);
             styleInput(expirationDatePicker);
+        }
+
+        // For LIMIT and STOP_LIMIT orders, highlight stopLoss and takeProfit as required
+        if (isLimitOrStopLimit) {
+            // Highlight fields with red/green borders to show they are required
+            stopLossSpinner.setStyle(
+                    "-fx-font-size: 14px; " +
+                    "-fx-background-color: #0b1120; " +
+                    "-fx-control-inner-background: #0b1120; " +
+                    "-fx-text-fill: #ffffff; " +
+                    "-fx-background-radius: 8; " +
+                    "-fx-border-color: #ef4444; " +
+                    "-fx-border-width: 2; " +
+                    "-fx-border-radius: 8; " +
+                    "-fx-padding: 6;");
+            takeProfitSpinner.setStyle(
+                    "-fx-font-size: 14px; " +
+                    "-fx-background-color: #0b1120; " +
+                    "-fx-control-inner-background: #0b1120; " +
+                    "-fx-text-fill: #ffffff; " +
+                    "-fx-background-radius: 8; " +
+                    "-fx-border-color: #10b981; " +
+                    "-fx-border-width: 2; " +
+                    "-fx-border-radius: 8; " +
+                    "-fx-padding: 6;");
+        } else {
+            styleInput(stopLossSpinner);
+            styleInput(takeProfitSpinner);
         }
 
         placeOrderButton.setText(isMarket ? "PLACE MARKET" : "PLACE ORDER");
@@ -508,6 +538,18 @@ private  SystemCore systemCore;
             if (orderType != OpenOrder.OrderType.MARKET && price <= 0.0) {
                 showError(t("order.pricePositive"));
                 return;
+            }
+
+            // For LIMIT and STOP_LIMIT orders, always require stoploss and take profit prices
+            if (orderType == OpenOrder.OrderType.LIMIT || orderType == OpenOrder.OrderType.STOP_LIMIT) {
+                if (stopLoss <= 0.0) {
+                    showError("Stop Loss price is required for " + orderType + " orders");
+                    return;
+                }
+                if (takeProfit <= 0.0) {
+                    showError("Take Profit price is required for " + orderType + " orders");
+                    return;
+                }
             }
 
             LocalDate expirationDate = expirationDatePicker.getValue();

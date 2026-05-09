@@ -22,6 +22,9 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -42,7 +45,8 @@ public class BinanceWebSocketClient extends ExchangeWebSocketClient {
 
     private final java.util.Map<String, Consumer<String>> streamHandlers = new java.util.concurrent.ConcurrentHashMap<>();
     private long subscriptionId = 1;
-    private ExchangeStreamConsumer liveTradeConsumers;
+    protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
+            Collections.synchronizedMap(new HashMap<>());
 
     public BinanceWebSocketClient(URI uri, Draft draft) {
         super(uri, draft);
@@ -124,7 +128,7 @@ public class BinanceWebSocketClient extends ExchangeWebSocketClient {
 
     private TradePair tradePair;
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer liveTradesConsumer) {
+    public void streamLiveTrades(@NotNull TradePair tradePair, ExchangeStreamConsumer liveTradesConsumer) {
 
         if (!isOpen()) {
             logger.warn("WebSocket not connected, cannot subscribe to Binance trades");
@@ -170,7 +174,7 @@ public class BinanceWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public void unsubscribeStream(@NotNull String streamName) {
-        if (streamName == null || streamName.isBlank()) {
+        if (streamName.isBlank()) {
             return;
         }
 

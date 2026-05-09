@@ -73,12 +73,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.NavigableMap;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -602,7 +597,7 @@ public class CandleStickChart extends Region {
                                     throwable == null ? "unknown" : throwable.getMessage(),
                                     throwable));
 
-                    websocketClient.streamLiveTrades(tradePair, exchangeS);
+                    websocketClient.streamLiveTrades(tradePair,exchangeS);
                     streamingStarted = true;
 
                     log.info("Live trade WebSocket stream started for {}", tradePair);

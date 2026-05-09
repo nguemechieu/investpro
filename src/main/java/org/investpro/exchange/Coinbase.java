@@ -81,6 +81,8 @@ public class Coinbase extends Exchange {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
+            Collections.synchronizedMap(new HashMap<>());
 
     private final HttpClient httpClient;
     private HttpRequest.Builder requestBuilder;
@@ -2311,44 +2313,10 @@ public class Coinbase extends Exchange {
         }
 
         // Adapter to convert ExchangeStreamConsumer to LiveTradesConsumer
-        LiveTradesConsumer liveTradesConsumer = new LiveTradesConsumer() {
-            @Override
-            public boolean containsKey(TradePair pair) {
-                return pair != null && pair.equals(tradePair);
-            }
 
-            @Override
-            public void remove(TradePair pair) {
-                // No-op for streaming adapter
-            }
-
-            @Override
-            public void put(TradePair pair) {
-                // No-op for streaming adapter
-            }
-
-            @Override
-            public Trade get(TradePair pair) {
-                return null;
-            }
-
-            @Override
-            public void accept(Trade trade) {
-                if (trade != null) {
-                    consumer.onTrade(getName(), tradePair, trade);
-                }
-            }
-
-            @Override
-            public void acceptTrades(Trade trade) {
-                if (trade != null) {
-                    consumer.onTrade(getName(), tradePair, trade);
-                }
-            }
-        };
 
         try {
-            ((CoinbaseWebSocketClient) websocketClient).streamLiveTrades(tradePair, liveTradesConsumer);
+            websocketClient.streamLiveTrades(tradePair, liveTradeConsumers);
             log.info("Subscribed Coinbase trade stream: {}", tradePair);
         } catch (Exception exception) {
             log.error(

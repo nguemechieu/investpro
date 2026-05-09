@@ -332,7 +332,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public abstract void streamLiveTrades(
             @NotNull TradePair tradePair,
-            @NotNull ExchangeStreamConsumer consumer);
+            ExchangeStreamConsumer liveTradesConsumer);
 
     public abstract void stopStreamLiveTrades(@NotNull TradePair tradePair);
 

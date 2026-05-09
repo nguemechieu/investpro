@@ -13,7 +13,6 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
-import org.investpro.models.trading.LiveTradesConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
@@ -60,7 +59,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
      * Coinbase sends product_id such as BTC-USD.
      * This maps TradePair -> app consumer.
      */
-    protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers =
+    protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
             Collections.synchronizedMap(new HashMap<>());
 
     /**
@@ -272,7 +271,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        LiveTradesConsumer consumer = liveTradeConsumers.get(selectedPair);
+        ExchangeStreamConsumer consumer = liveTradeConsumers.get(selectedPair);
 
         if (consumer == null) {
             log.debug("No Coinbase consumer registered for {}", selectedPair);
@@ -298,45 +297,9 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
-    @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
-        Objects.requireNonNull(tradePair, "tradePair must not be null");
-        Objects.requireNonNull(consumer, "consumer must not be null");
 
-        streamLiveTrades(tradePair, new LiveTradesConsumer() {
-            @Override
-            public boolean containsKey(TradePair pair) {
-                return pair != null && pair.equals(tradePair);
-            }
-
-            @Override
-            public void remove(TradePair pair) {
-                liveTradeConsumers.remove(pair);
-            }
-
-            @Override
-            public void put(TradePair pair) {
-                // No-op. Registration is handled by streamLiveTrades.
-            }
-
-            @Override
-            public Trade get(TradePair pair) {
-                return null;
-            }
-
-            @Override
-            public void accept(Trade trade) {
-                dispatchTradeToExchangeConsumer(tradePair, trade, consumer);
-            }
-
-            @Override
-            public void acceptTrades(Trade trade) {
-                dispatchTradeToExchangeConsumer(tradePair, trade, consumer);
-            }
-        });
-    }
-
-    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull LiveTradesConsumer liveTradesConsumer) {
+@Override
+    public void streamLiveTrades(@NotNull TradePair tradePair, ExchangeStreamConsumer liveTradesConsumer) {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(liveTradesConsumer, "liveTradesConsumer must not be null");
 

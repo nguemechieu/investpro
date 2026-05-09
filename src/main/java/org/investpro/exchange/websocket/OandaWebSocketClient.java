@@ -22,6 +22,9 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 
@@ -34,6 +37,8 @@ import java.util.function.Consumer;
 @Setter
 @Slf4j
 public class OandaWebSocketClient extends ExchangeWebSocketClient {
+    protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
+            Collections.synchronizedMap(new HashMap<>());
 
     private static final Logger logger = LoggerFactory.getLogger(OandaWebSocketClient.class);
     private  TradePair tradePair;
@@ -41,7 +46,7 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private ExchangeStreamConsumer liveTradeConsumers;
+
 
     public OandaWebSocketClient(URI uri, Draft draft) {
         super(uri, draft);
@@ -121,7 +126,7 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer liveTradesConsumer) {
+    public void streamLiveTrades(@NotNull TradePair tradePair, ExchangeStreamConsumer liveTradesConsumer) {
 
         if (!isOpen()) {
             logger.warn("WebSocket not connected, cannot subscribe to trades");

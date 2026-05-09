@@ -6,9 +6,16 @@ import org.java_websocket.drafts.Draft;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class IBKWebSocketClient  extends ExchangeWebSocketClient {
+
+    protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
+            Collections.synchronizedMap(new HashMap<>());
+
     public IBKWebSocketClient(URI serverUri, Draft draft) {
         super(serverUri, draft);
     }
@@ -24,7 +31,7 @@ public class IBKWebSocketClient  extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+    public void streamLiveTrades(@NotNull TradePair tradePair, ExchangeStreamConsumer liveTradesConsumer) {
 
     }
 
