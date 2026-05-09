@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import lombok.Getter;
 
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.TradePair;
@@ -35,6 +36,8 @@ import java.util.function.Consumer;
 @Getter
 
 @Slf4j
+@ToString
+
 public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     protected final Map<String, Consumer<String>> streamHandlers = new ConcurrentHashMap<>();

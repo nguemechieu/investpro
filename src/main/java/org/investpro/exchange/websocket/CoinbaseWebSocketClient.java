@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.LiveTradesConsumer;
@@ -42,6 +43,7 @@ import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 @Setter
 @Getter
 @Slf4j
+@ToString
 public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     public static final String MARKET_TRADES_CHANNEL = "market_trades";

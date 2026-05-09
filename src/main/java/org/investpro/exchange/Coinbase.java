@@ -104,10 +104,10 @@ public class Coinbase extends Exchange {
 
         initializePaperTradingAccount();
 
-        this.apiKey = exchangeCredentials == null || exchangeCredentials.apiKey() == null
+        this.apiKey = exchangeCredentials.apiKey() == null
                 ? ""
                 : exchangeCredentials.apiKey().trim();
-        this.apiSecret = exchangeCredentials == null || exchangeCredentials.apiSecret() == null
+        this.apiSecret = exchangeCredentials.apiSecret() == null
                 ? ""
                 : exchangeCredentials.apiSecret().trim();
         this.jwtSigner = createJwtSigner(this.apiKey, this.apiSecret);
@@ -142,6 +142,10 @@ public class Coinbase extends Exchange {
         }
     }
 
+    private boolean hasCredentials() {
+
+        return  apiKey==null||apiSecret==null|| apiKey.trim().isEmpty()|| apiSecret.trim().isEmpty();
+    }
     private CoinbaseWebSocketClient createWebSocketClient() {
         String websocketJwt = websocketJwt();
         log.info("Coinbase WebSocket JWT created: {} characters, empty={}", websocketJwt.length(),
@@ -1935,6 +1939,8 @@ public class Coinbase extends Exchange {
         }
         return AuthResult.success("Coinbase authentication validated");
     }
+
+
 
     @Override
     public CompletableFuture<Boolean> validateOrder(

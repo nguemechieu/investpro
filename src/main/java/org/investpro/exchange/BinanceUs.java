@@ -878,12 +878,11 @@ public class BinanceUs extends Exchange {
 
                 Map<String, String> params = new LinkedHashMap<>();
                 params.put("symbol", binanceSymbol(tradePair));
+                // /api/v3/trades returns most recent trades without time filtering
+                // Only accepts symbol and limit parameters
                 params.put("limit", "500"); // Binance max per request
-                if (instant != null) {
-                    params.put("startTime", Long.toString(instant.toEpochMilli()));
-                }
-                params.put("recvWindow", "5000");
-                params.put("timestamp", Long.toString(System.currentTimeMillis()));
+                // sendSignedBinanceUsRequest will add timestamp automatically
+                // Do not add startTime, recvWindow, or explicit timestamp for this endpoint
 
                 JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/trades", params);
                 List<Trade> trades = new ArrayList<>();
@@ -1676,8 +1675,11 @@ public class BinanceUs extends Exchange {
                 if (tradePair != null) {
                     params.put("symbol", binanceSymbol(tradePair));
                 }
-                params.put("recvWindow", "5000");
-                params.put("timestamp", Long.toString(System.currentTimeMillis()));
+                // Use larger recvWindow (10000ms) to handle clock skew between client and Binance server
+                // This avoids "Timestamp for this request is outside of the recvWindow" errors
+                params.put("recvWindow", "10000");
+                // Let sendSignedBinanceUsRequest add timestamp automatically with better clock handling
+                // Do not manually set timestamp here to avoid clock skew issues
 
                 JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/openOrders", params);
                 List<OpenOrder> openOrders = new ArrayList<>();
