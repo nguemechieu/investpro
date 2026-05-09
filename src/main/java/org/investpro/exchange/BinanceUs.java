@@ -72,7 +72,7 @@ public class BinanceUs extends Exchange {
     private volatile java.util.concurrent.ScheduledExecutorService listenKeyHeartbeatExecutor;
     private volatile long signedRestCooldownUntilMs;
     private volatile long lastSignedRestRequestMs;
-    private volatile long publicRestCooldownUntilMs;
+    private long publicRestCooldownUntilMs;
     private volatile long lastOrderBookRequestMs;
     private static final long SIGNED_REST_MIN_INTERVAL_MS = 1_200L;
     private static final long SIGNED_REST_429_COOLDOWN_MS = 65_000L;
@@ -1687,16 +1687,7 @@ public class BinanceUs extends Exchange {
                 // Do not manually set timestamp here to avoid clock skew issues
 
                 JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/openOrders", params);
-                List<OpenOrder> openOrders = new ArrayList<>();
-
-                if (response.isArray()) {
-                    for (JsonNode orderNode : response) {
-                        OpenOrder openOrder = parseOpenOrder(orderNode);
-                        if (openOrder != null) {
-                            openOrders.add(openOrder);
-                        }
-                    }
-                }
+                List<OpenOrder> openOrders = parseOpenOrders(response);
 
                 logger.debug("Fetched {} open orders", openOrders.size());
                 return openOrders;
@@ -1729,16 +1720,7 @@ public class BinanceUs extends Exchange {
                 params.put("timestamp", Long.toString(System.currentTimeMillis()));
 
                 JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/openOrders", params);
-                List<OpenOrder> openOrders = new ArrayList<>();
-
-                if (response.isArray()) {
-                    for (JsonNode orderNode : response) {
-                        OpenOrder openOrder = parseOpenOrder(orderNode);
-                        if (openOrder != null) {
-                            openOrders.add(openOrder);
-                        }
-                    }
-                }
+                List<OpenOrder> openOrders = parseOpenOrders(response);
 
                 logger.debug("Fetched {} total open orders", openOrders.size());
                 return openOrders;
@@ -2248,6 +2230,44 @@ public class BinanceUs extends Exchange {
             logger.warn("Error parsing open order", exception);
             return null;
         }
+    }
+
+    /**
+     * Parses a list of Binance API open order responses into OpenOrder objects.
+     * Handles both single order nodes and arrays of order nodes synchronously.
+     * 
+     * @param responseNode JsonNode containing either a single order or array of orders
+     * @return List of OpenOrder objects (empty list if parsing fails or no orders)
+     */
+    private List<OpenOrder> parseOpenOrders(JsonNode responseNode) {
+        List<OpenOrder> openOrders = new ArrayList<>();
+        
+        try {
+            if (responseNode == null) {
+                return openOrders;
+            }
+            
+            if (responseNode.isArray()) {
+                for (JsonNode orderNode : responseNode) {
+                    OpenOrder order = parseOpenOrder(orderNode);
+                    if (order != null) {
+                        openOrders.add(order);
+                    }
+                }
+            } else if (responseNode.isObject()) {
+                // Handle single order response
+                OpenOrder order = parseOpenOrder(responseNode);
+                if (order != null) {
+                    openOrders.add(order);
+                }
+            }
+            
+            logger.debug("Parsed {} open orders", openOrders.size());
+        } catch (Exception exception) {
+            logger.error("Failed to parse open orders", exception);
+        }
+        
+        return openOrders;
     }
 
     /**
