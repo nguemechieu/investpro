@@ -31,8 +31,10 @@ import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.NotNull;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +49,10 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Getter
@@ -66,10 +72,10 @@ public class BinanceUs extends Exchange {
     private ExchangeWebSocketClient websocketClient;
     protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
-    private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
+    private final AtomicBoolean connected = new AtomicBoolean(
             false);
     private volatile String listenKey; // Listen key for user stream subscriptions
-    private volatile java.util.concurrent.ScheduledExecutorService listenKeyHeartbeatExecutor;
+    private volatile ScheduledExecutorService listenKeyHeartbeatExecutor;
     private volatile long signedRestCooldownUntilMs;
     private volatile long lastSignedRestRequestMs;
     private long publicRestCooldownUntilMs;
@@ -80,10 +86,10 @@ public class BinanceUs extends Exchange {
     private static final long PUBLIC_REST_429_COOLDOWN_MS = 45_000L;
 
     // Paper trading state
-    private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.Map<String, String> orders = new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.List<Position> positions = new java.util.concurrent.CopyOnWriteArrayList<>();
-    private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final Map<String, Double> balances = new ConcurrentHashMap<>();
+    private final Map<String, String> orders = new ConcurrentHashMap<>();
+    private final List<Position> positions = new CopyOnWriteArrayList<>();
+    private final List<Trade> tradeHistory = new CopyOnWriteArrayList<>();
     private long nextOrderId = 1000;
 
     private String apiKey;
@@ -117,11 +123,11 @@ public class BinanceUs extends Exchange {
     private String normalizeCurrency(String currencyCode) {
         return currencyCode == null || currencyCode.isBlank()
                 ? "USDT"
-                : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
+                : currencyCode.trim().toUpperCase(Locale.ROOT);
     }
 
     private ExchangeWebSocketClient createWebSocketClient() {
-        return new BinanceWebSocketClient(URI.create(BINANCE_US_WS_URL), new org.java_websocket.drafts.Draft_6455());
+        return new BinanceWebSocketClient(URI.create(BINANCE_US_WS_URL), new Draft_6455());
     }
 
     @Override
@@ -447,7 +453,7 @@ public class BinanceUs extends Exchange {
         if (tradePair == null || consumer == null) {
             return;
         }
-        String streamName = (binanceSymbol(tradePair) + "@ticker").toLowerCase(java.util.Locale.ROOT);
+        String streamName = (binanceSymbol(tradePair) + "@ticker").toLowerCase(Locale.ROOT);
         websocketClient.subscribeStream(streamName, (data) -> {
             try {
                 JsonNode node = OBJECT_MAPPER.readTree(data);
@@ -601,7 +607,7 @@ public class BinanceUs extends Exchange {
         if (tradePair == null || consumer == null) {
             return;
         }
-        String streamName = (binanceSymbol(tradePair) + "@depth@100ms").toLowerCase(java.util.Locale.ROOT);
+        String streamName = (binanceSymbol(tradePair) + "@depth@100ms").toLowerCase(Locale.ROOT);
         websocketClient.subscribeStream(streamName, (data) -> {
             try {
                 OrderBook orderBook = parseOrderBook(data, tradePair);
@@ -623,7 +629,7 @@ public class BinanceUs extends Exchange {
             return;
         }
         String interval = supportsTimeframe(secondsPerCandle);
-        String streamName = (binanceSymbol(tradePair) + "@klines_" + interval).toLowerCase(java.util.Locale.ROOT);
+        String streamName = (binanceSymbol(tradePair) + "@klines_" + interval).toLowerCase(Locale.ROOT);
         websocketClient.subscribeStream(streamName, (data) -> {
             try {
                 JsonNode node;
@@ -678,7 +684,7 @@ public class BinanceUs extends Exchange {
     @Override
     public void stopTickerStream(TradePair tradePair) {
         if (websocketClient != null && tradePair != null) {
-            String streamName = (binanceSymbol(tradePair) + "@ticker").toLowerCase(java.util.Locale.ROOT);
+            String streamName = (binanceSymbol(tradePair) + "@ticker").toLowerCase(Locale.ROOT);
             websocketClient.unsubscribeStream(streamName);
             logger.debug("Unsubscribed from ticker stream: {}", streamName);
         }
@@ -704,7 +710,7 @@ public class BinanceUs extends Exchange {
     @Override
     public void stopOrderBookStream(TradePair tradePair) {
         if (websocketClient != null && tradePair != null) {
-            String streamName = (binanceSymbol(tradePair) + "@depth@100ms").toLowerCase(java.util.Locale.ROOT);
+            String streamName = (binanceSymbol(tradePair) + "@depth@100ms").toLowerCase(Locale.ROOT);
             websocketClient.unsubscribeStream(streamName);
             logger.debug("Unsubscribed from order book stream: {}", streamName);
         }
@@ -714,7 +720,7 @@ public class BinanceUs extends Exchange {
     public void stopCandlesStream(TradePair tradePair, int secondsPerCandle) {
         if (websocketClient != null && tradePair != null) {
             String interval = supportsTimeframe(secondsPerCandle);
-            String streamName = (binanceSymbol(tradePair) + "@klines_" + interval).toLowerCase(java.util.Locale.ROOT);
+            String streamName = (binanceSymbol(tradePair) + "@klines_" + interval).toLowerCase(Locale.ROOT);
             websocketClient.unsubscribeStream(streamName);
             logger.debug("Unsubscribed from candles stream: {}", streamName);
         }
@@ -897,7 +903,7 @@ public class BinanceUs extends Exchange {
 
                 if (response.statusCode() != 200) {
                     if (response.statusCode() == 429 || response.statusCode() == 418) {
-                        JsonNode body = OBJECT_MAPPER.readTree(response.body());
+
                         activatePublicRestCooldown(response);
                     }
                     logger.warn("Failed to fetch recent trades: HTTP {}", response.statusCode());
@@ -948,7 +954,7 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
         Objects.requireNonNull(order, "order must not be null");
-        String type = order.getType() == null ? "MARKET" : order.getType().trim().toUpperCase(java.util.Locale.ROOT);
+        String type = order.getType() == null ? "MARKET" : order.getType().trim().toUpperCase(Locale.ROOT);
         Side side = order.getSide() == null ? Side.BUY : order.getSide();
         if ("LIMIT".equals(type)) {
             return createLimitOrder(tradePairFromSymbol(order.getSymbol()), side, order.getQuantity(),
@@ -1014,7 +1020,7 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
         if (orderIds == null || orderIds.isEmpty()) {
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         if (!hasCredentials()) {
@@ -1073,7 +1079,7 @@ public class BinanceUs extends Exchange {
 
         if (!hasCredentials()) {
             logger.debug("Paper trading mode - no live order data");
-            return CompletableFuture.completedFuture(java.util.Optional.empty());
+            return CompletableFuture.completedFuture(Optional.empty());
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1089,7 +1095,7 @@ public class BinanceUs extends Exchange {
                 return Optional.ofNullable(order);
             } catch (Exception exception) {
                 logger.warn("Failed to fetch order {}", orderId, exception);
-                return java.util.Optional.empty();
+                return Optional.empty();
             }
         });
     }
@@ -1129,13 +1135,13 @@ public class BinanceUs extends Exchange {
         if (marketType == null) {
             return false;
         }
-        String name = marketType.name().toUpperCase(java.util.Locale.ROOT);
+        String name = marketType.name().toUpperCase(Locale.ROOT);
         return name.contains("CRYPTO") || name.contains("SPOT");
     }
 
     @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
-        return java.util.Arrays.stream(MARKET_TYPES.values())
+        return Arrays.stream(MARKET_TYPES.values())
                 .filter(this::supportsMarketType)
                 .toList();
     }
@@ -1291,7 +1297,7 @@ public class BinanceUs extends Exchange {
             trade.setAmount(amount);
             trade.setTransactionType(side);
             trade.setLocalTradeId(System.nanoTime());
-            trade.setTimestamp(java.time.Instant.now());
+            trade.setTimestamp(Instant.now());
             trade.setFee(0.0);
             trade.setStopLoss(0.0);
             trade.setTakeProfit(0.0);
@@ -1341,7 +1347,7 @@ public class BinanceUs extends Exchange {
             trade.setAmount(amount);
             trade.setTransactionType(side);
             trade.setLocalTradeId(System.nanoTime());
-            trade.setTimestamp(java.time.Instant.now());
+            trade.setTimestamp(Instant.now());
             trade.setFee(0.0);
             trade.setStopLoss(0.0);
             trade.setTakeProfit(0.0);
@@ -1372,7 +1378,7 @@ public class BinanceUs extends Exchange {
             if (websocketClient != null && !websocketClient.isOpen()) {
                 // Use connectBlocking() to wait for actual connection establishment
                 // with timeout to prevent hanging on stuck connections
-                boolean connected = websocketClient.connectBlocking(10, java.util.concurrent.TimeUnit.SECONDS);
+                boolean connected = websocketClient.connectBlocking(10, TimeUnit.SECONDS);
                 if (!connected) {
                     throw new RuntimeException("WebSocket connection timeout after 10 seconds");
                 }
@@ -1530,12 +1536,12 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
         if (tradePairs == null || tradePairs.isEmpty()) {
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
         return CompletableFuture.completedFuture(
                 tradePairs.stream()
                         .map(this::getLivePrice)
-                        .filter(java.util.Objects::nonNull)
+                        .filter(Objects::nonNull)
                         .toList());
     }
 
@@ -1604,8 +1610,8 @@ public class BinanceUs extends Exchange {
         account.setTotalBalance(balances.getOrDefault("USDT", 0.0));
         account.setAvailableBalance(balances.getOrDefault("USDT", 0.0));
         account.setEquity(equity);
-        account.setBalances(new java.util.LinkedHashMap<>(balances));
-        account.setAvailableBalances(new java.util.LinkedHashMap<>(balances));
+        account.setBalances(new LinkedHashMap<>(balances));
+        account.setAvailableBalances(new LinkedHashMap<>(balances));
         account.setExchangeId("binanceus");
         account.setBrokerName("Binance US");
         account.setPaperTrading(paperTrading);
@@ -1677,11 +1683,11 @@ public class BinanceUs extends Exchange {
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
         if (!hasCredentials()) {
             logger.debug("Paper trading mode - no live open orders");
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
         if (isSignedRestCoolingDown()) {
             logger.debug("Skipping Binance US open-orders REST poll during rate-limit cooldown");
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1711,10 +1717,10 @@ public class BinanceUs extends Exchange {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.warn("Interrupted while fetching open orders", e);
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             } catch (Exception exception) {
                 logger.error("Failed to fetch open orders", exception);
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             }
         });
     }
@@ -1723,11 +1729,11 @@ public class BinanceUs extends Exchange {
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
         if (!hasCredentials()) {
             logger.debug("Paper trading mode - no live open orders");
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
         if (isSignedRestCoolingDown()) {
             logger.debug("Skipping Binance US all-open-orders REST poll during rate-limit cooldown");
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1743,7 +1749,7 @@ public class BinanceUs extends Exchange {
                 return openOrders;
             } catch (Exception exception) {
                 logger.error("Failed to fetch all open orders", exception);
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             }
         });
     }
@@ -1752,11 +1758,11 @@ public class BinanceUs extends Exchange {
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
         if (!hasCredentials()) {
             logger.debug("Paper trading mode - no live order history");
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         if (tradePair == null) {
-            return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -1786,7 +1792,7 @@ public class BinanceUs extends Exchange {
                 return orders;
             } catch (Exception exception) {
                 logger.error("Failed to fetch order history for {}", tradePair, exception);
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             }
         });
     }
@@ -1794,7 +1800,7 @@ public class BinanceUs extends Exchange {
     @Override
     public CompletableFuture<List<Position>> fetchPositions(TradePair tradePair) {
         logger.debug("Binance US spot trading does not support positions");
-        return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
     @Override
@@ -1804,7 +1810,7 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CompletableFuture<Optional<Position>> fetchPosition(TradePair tradePair) {
-        return CompletableFuture.completedFuture(java.util.Optional.empty());
+        return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
@@ -1946,7 +1952,7 @@ public class BinanceUs extends Exchange {
             account.setBrokerName("Binance US");
             account.setPaperTrading(false);
             account.setConnected(true);
-            account.setUpdatedAt(java.time.Instant.now());
+            account.setUpdatedAt(Instant.now());
             return account;
         } catch (Exception exception) {
             if (exception instanceof BinanceUsRateLimitException || isBinanceRateLimitMessage(exception)) {
@@ -2065,8 +2071,8 @@ public class BinanceUs extends Exchange {
 
     private Optional<Long> parseBinanceBanUntilMillis(JsonNode body) {
         String message = body == null ? "" : body.path("msg").asText("");
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("until\\s+(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+        Matcher matcher = Pattern
+                .compile("until\\s+(\\d+)", Pattern.CASE_INSENSITIVE)
                 .matcher(message);
         if (!matcher.find()) {
             return Optional.empty();
@@ -2108,14 +2114,14 @@ public class BinanceUs extends Exchange {
         if (tradePair == null) {
             throw new IllegalArgumentException("tradePair must not be null");
         }
-        return (tradePair.getBaseCode() + tradePair.getCounterCode()).toUpperCase(java.util.Locale.ROOT);
+        return (tradePair.getBaseCode() + tradePair.getCounterCode()).toUpperCase(Locale.ROOT);
     }
 
     private static TradePair tradePairFromSymbol(String symbol) {
         if (symbol == null || symbol.isBlank()) {
             throw new RuntimeException("order symbol must not be blank" + "USDT");
         }
-        String normalized = symbol.trim().replace("-", "/").toUpperCase(java.util.Locale.ROOT);
+        String normalized = symbol.trim().replace("-", "/").toUpperCase(Locale.ROOT);
         String base;
         String quote;
         if (normalized.contains("/")) {
@@ -2149,7 +2155,7 @@ public class BinanceUs extends Exchange {
                 .map(entry -> URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8)
                         + "="
                         + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
-                .collect(java.util.stream.Collectors.joining("&"));
+                .collect(Collectors.joining("&"));
     }
 
     // ========== Stream Helper Methods ==========
@@ -2157,7 +2163,7 @@ public class BinanceUs extends Exchange {
     /**
      * Generates a new user stream listen key for receiving account updates
      */
-    private String generateListenKey() {
+    private @Nullable String generateListenKey() {
         if (listenKey != null && !listenKey.isBlank()) {
             return listenKey; // Reuse existing key
         }
@@ -2189,7 +2195,7 @@ public class BinanceUs extends Exchange {
      */
     private void startListenKeyHeartbeat() {
         if (listenKeyHeartbeatExecutor == null || listenKeyHeartbeatExecutor.isShutdown()) {
-            listenKeyHeartbeatExecutor = java.util.concurrent.Executors.newScheduledThreadPool(1, r -> {
+            listenKeyHeartbeatExecutor = Executors.newScheduledThreadPool(1, r -> {
                 Thread t = new Thread(r, "BinanceUS-ListenKeyHeartbeat");
                 t.setDaemon(true);
                 return t;
@@ -2209,7 +2215,7 @@ public class BinanceUs extends Exchange {
             } catch (Exception exception) {
                 logger.warn("Failed to send listen key heartbeat", exception);
             }
-        }, 30, 30, java.util.concurrent.TimeUnit.MINUTES); // Heartbeat every 30 minutes
+        }, 30, 30, TimeUnit.MINUTES); // Heartbeat every 30 minutes
     }
 
     // ========== JSON Parsing Helper Methods ==========
@@ -2236,8 +2242,8 @@ public class BinanceUs extends Exchange {
             order.setPrice(orderNode.path("price").asDouble(0.0));
             order.setSize(orderNode.path("origQty").asDouble(0.0));
             order.setStatus(OpenOrder.OrderStatus.valueOf(orderNode.path("status").asText("UNKNOWN")));
-            order.setCreatedAt(java.time.Instant.ofEpochMilli(orderNode.path("time").asLong()));
-            order.setUpdatedAt(java.time.Instant.ofEpochMilli(orderNode.path("updateTime").asLong()));
+            order.setCreatedAt(Instant.ofEpochMilli(orderNode.path("time").asLong()));
+            order.setUpdatedAt(Instant.ofEpochMilli(orderNode.path("updateTime").asLong()));
             order.setFilledSize(orderNode.path("executedQty").asDouble(0.0));
             order.setOrderType(OpenOrder.OrderType.valueOf(orderNode.path("type").asText("MARKET")));
             order.setTimeInForce(orderNode.path("timeInForce").asText());
@@ -2310,8 +2316,8 @@ public class BinanceUs extends Exchange {
             order.setPrice(orderNode.path("price").asDouble(0.0));
             order.setQuantity(orderNode.path("origQty").asDouble(0.0));
             order.setStatus(orderNode.path("status").asText("UNKNOWN"));
-            order.setCreatedAt(java.time.Instant.ofEpochMilli(orderNode.path("time").asLong()));
-            order.setUpdatedAt(java.time.Instant.ofEpochMilli(orderNode.path("updateTime").asLong()));
+            order.setCreatedAt(Instant.ofEpochMilli(orderNode.path("time").asLong()));
+            order.setUpdatedAt(Instant.ofEpochMilli(orderNode.path("updateTime").asLong()));
             order.setFilledQuantity(orderNode.path("executedQty").asDouble(0.0));
             order.setCummulativeQuoteQty(orderNode.path("cummulativeQuoteQty").asDouble(0.0));
             order.setType(orderNode.path("type").asText("MARKET"));
@@ -2336,7 +2342,7 @@ public class BinanceUs extends Exchange {
             trade.setAmount(node.path("q").asDouble(0.0));
             trade.setFee(node.path("q").asDouble(0.0) * 0.001); // Assume 0.1% fee
             trade.setTransactionType(node.path("m").asBoolean(false) ? Side.SELL : Side.BUY);
-            trade.setTimestamp(java.time.Instant.ofEpochMilli(node.path("T").asLong()));
+            trade.setTimestamp(Instant.ofEpochMilli(node.path("T").asLong()));
             trade.setLocalTradeId(node.path("t").asLong());
             return trade;
         } catch (Exception exception) {
@@ -2354,30 +2360,34 @@ public class BinanceUs extends Exchange {
             OrderBook orderBook = new OrderBook(tradePair);
 
             // Parse bids
+            List<OrderBook.PriceLevel> bids = new ArrayList<>();
             JsonNode bidsNode = node.path("bids");
             if (bidsNode.isArray()) {
                 for (JsonNode bid : bidsNode) {
                     if (bid.isArray() && bid.size() >= 2) {
                         double price = bid.get(0).asDouble();
                         double quantity = bid.get(1).asDouble();
-                        // Add to order book bids
+                        bids.add(new OrderBook.PriceLevel(price, quantity));
                     }
                 }
             }
+            orderBook.setBids(bids);
 
             // Parse asks
+            List<OrderBook.PriceLevel> asks = new ArrayList<>();
             JsonNode asksNode = node.path("asks");
             if (asksNode.isArray()) {
                 for (JsonNode ask : asksNode) {
                     if (ask.isArray() && ask.size() >= 2) {
                         double price = ask.get(0).asDouble();
                         double quantity = ask.get(1).asDouble();
-                        // Add to order book asks
-
+                        asks.add(new OrderBook.PriceLevel(price, quantity));
                     }
                 }
             }
+            orderBook.setAsks(asks);
 
+            orderBook.setTimestamp(Instant.now());
             return orderBook;
         } catch (Exception exception) {
             logger.debug("Error parsing order book", exception);
@@ -2388,7 +2398,7 @@ public class BinanceUs extends Exchange {
     /**
      * Parses account data from WebSocket stream
      */
-    private Account parseAccount(JsonNode eventNode) {
+    private @Nullable Account parseAccount(JsonNode eventNode) {
         try {
             Account account = new Account();
             account.setExchangeId("binanceus");
@@ -2415,11 +2425,11 @@ public class BinanceUs extends Exchange {
             account.setAvailableBalance(availableMap.getOrDefault("USDT", 0.0));
             account.setEquity(balanceMap.values().stream().mapToDouble(Double::doubleValue).sum());
             account.setConnected(true);
-            account.setUpdatedAt(java.time.Instant.now());
+            account.setUpdatedAt(Instant.now());
 
             return account;
         } catch (Exception exception) {
-            logger.debug("Error parsing account", exception);
+            logger.error("Error parsing account", exception);
             return null;
         }
     }
@@ -2441,7 +2451,7 @@ public class BinanceUs extends Exchange {
             trade.setPrice(eventNode.path("L").asDouble(0.0)); // Fill price
             trade.setAmount(eventNode.path("z").asDouble(0.0)); // Filled quantity
             trade.setFee(eventNode.path("n").asDouble(0.0)); // Commission
-            trade.setTimestamp(java.time.Instant.ofEpochMilli(eventNode.path("T").asLong()));
+            trade.setTimestamp(Instant.ofEpochMilli(eventNode.path("T").asLong()));
             trade.setLocalTradeId(eventNode.path("t").asLong());
 
             return trade;
