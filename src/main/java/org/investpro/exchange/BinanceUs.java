@@ -923,7 +923,7 @@ public class BinanceUs extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int i, TradePair tradePair) {
-        return new BinanceCandleDataSupplier(i, tradePair);
+        return new BinanceCandleDataSupplier(i, tradePair, BINANCE_US_REST_URL + "/api/v3");
     }
 
     @Override

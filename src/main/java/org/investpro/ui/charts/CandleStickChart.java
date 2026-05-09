@@ -581,8 +581,12 @@ public class CandleStickChart extends Region {
                 return;
             boolean streamingStarted = false;
             try {
+                CountDownLatch initLatch = exchange.getWebsocketClient() != null 
+                    ? exchange.getWebsocketClient().getInitializationLatch() 
+                    : null;
                 if (exchange.getWebsocketClient() != null
-                        && exchange.getWebsocketClient().getInitializationLatch().await(10, SECONDS)
+                        && initLatch != null
+                        && initLatch.await(10, SECONDS)
                         && exchange.getWebsocketClient().supportsStreamingTrades(tradePair)) {
 
 

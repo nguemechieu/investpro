@@ -59,7 +59,7 @@ public record CandleData(double openPrice, double closePrice, double highPrice, 
 
     public Instant timestamp() {
 
-        return  Instant.now();
+        return Instant.ofEpochSecond(openTime);
     }
 
    public static TradePair symbol;

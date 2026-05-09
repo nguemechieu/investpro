@@ -86,10 +86,7 @@ public class HistoricalDataRepositoryImpl implements HistoricalDataRepository {
         }
 
         try {
-            List<CandleData> sortedData = data.stream()
-                    .filter(Objects::nonNull)
-                    .sorted(Comparator.comparingLong(this::timestampOf))
-                    .collect(Collectors.toCollection(ArrayList::new));
+            List<CandleData> sortedData = mergeCandles(pair, timeframe, data);
 
             String fileName = generateFileName(pair, startTime, endTime, timeframe);
             Path filePath = Paths.get(DATA_DIR, fileName);
@@ -457,6 +454,63 @@ public class HistoricalDataRepositoryImpl implements HistoricalDataRepository {
         return filterByDateRange(allCandles, startTime, endTime);
     }
 
+    private List<CandleData> loadAllMatchingDataFromDisk(TradePair pair, String timeframe) throws SQLException {
+        List<Path> matchingFiles = findMatchingFiles(pair, timeframe);
+
+        if (matchingFiles.isEmpty()) {
+            return List.of();
+        }
+
+        List<CandleData> allCandles = new ArrayList<>();
+
+        for (Path file : matchingFiles) {
+            try {
+                String jsonData = Files.readString(file, StandardCharsets.UTF_8);
+
+                List<CandleData> data = objectMapper.readValue(
+                        jsonData,
+                        objectMapper.getTypeFactory()
+                                .constructCollectionType(List.class, CandleData.class)
+                );
+
+                if (data != null && !data.isEmpty()) {
+                    allCandles.addAll(data);
+                }
+            } catch (IOException exception) {
+                throw new SQLException("Failed to read historical data file: " + file, exception);
+            }
+        }
+
+        return allCandles;
+    }
+
+    private List<CandleData> mergeCandles(TradePair pair, String timeframe, List<CandleData> newData) throws SQLException {
+        Map<Long, CandleData> byTimestamp = new TreeMap<>();
+
+        String cacheKey = generateCacheKey(pair, timeframe);
+        List<CandleData> cached = memoryCache.get(cacheKey);
+        if (cached != null) {
+            addCandlesByTimestamp(byTimestamp, cached);
+        }
+
+        addCandlesByTimestamp(byTimestamp, loadAllMatchingDataFromDisk(pair, timeframe));
+        addCandlesByTimestamp(byTimestamp, newData);
+
+        return new ArrayList<>(byTimestamp.values());
+    }
+
+    private void addCandlesByTimestamp(Map<Long, CandleData> byTimestamp, List<CandleData> candles) {
+        if (candles == null || candles.isEmpty()) {
+            return;
+        }
+
+        for (CandleData candle : candles) {
+            if (candle != null) {
+                byTimestamp.put(timestampOf(candle), candle);
+            }
+        }
+    }
+
     private List<Path> findMatchingFiles(TradePair pair, String timeframe) throws SQLException {
         Path dataDir = Paths.get(DATA_DIR);
 
@@ -548,7 +602,7 @@ public class HistoricalDataRepositoryImpl implements HistoricalDataRepository {
         }
 
         try {
-            return candle.timestamp().getEpochSecond();
+            return candle.timestamp().toEpochMilli();
         } catch (Exception ignored) {
             return 0L;
         }

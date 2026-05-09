@@ -866,7 +866,12 @@ public class BacktestingPanel extends VBox {
             String timeframeCode = selectedTimeframe.getCode();
 
             Platform.runLater(() -> statusLabel.setText(
-                    "Loading historical data for " + displayTradePair(selectedPair) + " " + timeframeCode));
+                    "Updating historical data from exchange for " + displayTradePair(selectedPair) + " " + timeframeCode));
+
+            refreshHistoricalDataCache(input);
+
+            Platform.runLater(() -> statusLabel.setText(
+                    "Loading saved historical data for " + displayTradePair(selectedPair) + " " + timeframeCode));
 
             List<CandleData> candles = loadEnoughCandles(
                     selectedPair,
@@ -954,6 +959,55 @@ public class BacktestingPanel extends VBox {
                 backtestRunning.set(false);
                 setRunningUi(false);
             });
+        }
+    }
+
+    private void refreshHistoricalDataCache(@NotNull BacktestInput input) {
+        if (systemCore == null || systemCore.getExchange() == null) {
+            log.info("Skipping historical data refresh because no exchange is available");
+            Platform.runLater(() -> dataQualityLabel.setText("Data quality: cached data only - no exchange connected"));
+            return;
+        }
+
+        try {
+            Timeframe timeframe = input.selectedTimeframe();
+            String timeframeCode = timeframe.getCode();
+            LocalDate endDate = input.endDate();
+            int estimatedDaysNeeded = estimateDaysNeeded(timeframe, input.requestedBars());
+            LocalDate fetchStartDate = input.startDate().isBefore(endDate.minusDays(estimatedDaysNeeded))
+                    ? input.startDate()
+                    : endDate.minusDays(estimatedDaysNeeded);
+
+            LocalDateTime fetchStart = fetchStartDate.atStartOfDay();
+            LocalDateTime fetchEnd = endDate.atTime(23, 59, 59);
+
+            HistoricalDataPrefetcher prefetcher = HistoricalDataPrefetcher
+                    .forCurrentExchange(systemCore.getExchange(), historicalDataRepository);
+
+            List<CandleData> fetched = prefetcher.fetchAndCacheDataSync(
+                    input.selectedPair(),
+                    fetchStart,
+                    fetchEnd,
+                    timeframeCode,
+                    progress -> Platform.runLater(() -> {
+                        if (progress >= 0) {
+                            progressBar.setProgress(progress / 100.0);
+                            statusLabel.setText("Updating historical data... " + progress + "%");
+                        }
+                    }));
+
+            Platform.runLater(() -> {
+                if (fetched.isEmpty()) {
+                    dataQualityLabel.setText("Data quality: using existing cached data - exchange returned no candles");
+                } else {
+                    dataQualityLabel.setText("Data quality: saved/updated " + fetched.size()
+                            + " exchange candles before backtest");
+                }
+            });
+        } catch (Exception exception) {
+            log.warn("Historical data refresh failed; continuing with cached data: {}", exception.getMessage());
+            Platform.runLater(() -> dataQualityLabel.setText(
+                    "Data quality: cached data - refresh failed: " + exception.getMessage()));
         }
     }
 

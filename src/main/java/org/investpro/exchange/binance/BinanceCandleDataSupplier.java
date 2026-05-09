@@ -23,12 +23,18 @@ import javafx.beans.property.SimpleIntegerProperty;
 public class BinanceCandleDataSupplier extends CandleDataSupplier {
     private static final Logger logger = LoggerFactory.getLogger(BinanceCandleDataSupplier.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String API_BASE = "https://api.binance.com/api/v3";
+    private static final String DEFAULT_API_BASE = "https://api.binance.com/api/v3";
+    private final String apiBase;
     private final String symbol;
 
     public BinanceCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        this(secondsPerCandle, tradePair, DEFAULT_API_BASE);
+    }
+
+    public BinanceCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiBase) {
         super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
-        this.symbol = tradePair.toString('-');
+        this.apiBase = apiBase == null || apiBase.isBlank() ? DEFAULT_API_BASE : apiBase;
+        this.symbol = tradePair.toCompactSymbol().toUpperCase(Locale.ROOT);
     }
 
     @Override
@@ -69,7 +75,7 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
         long startTimeMs = endTimeMs - (long) numCandles * secondsPerCandle * 1000;
 
         String interval = getIntervalString(secondsPerCandle);
-        String url = "%s/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d".formatted(API_BASE, symbol,
+        String url = "%s/klines?symbol=%s&interval=%s&startTime=%d&endTime=%d&limit=%d".formatted(apiBase, symbol,
                 interval, startTimeMs, endTimeMs, numCandles);
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -126,7 +132,7 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
                 if (candleData.isEmpty()) {
                     endTime.set(-1); // Signal that there's no more data
                 } else {
-                    endTime.set(candleData.get(candleData.size() - 1).openTime());
+                    endTime.set(candleData.getFirst().openTime());
                 }
             }
         } catch (Exception e) {

@@ -12,12 +12,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -62,6 +67,7 @@ public class HistoricalDataPrefetcher {
     private static final int MIN_CANDLES_FOR_BASIC_TEST = 100;
     private static final int MIN_CANDLES_FOR_GOOD_TEST = 300;
     private static final int MIN_CANDLES_FOR_STRONG_TEST = 1_000;
+    private static final int MAX_FETCH_PAGES = 50;
 
     /**
      * Factory interface for creating CandleDataSupplier instances.
@@ -95,18 +101,16 @@ public class HistoricalDataPrefetcher {
 
         DataSupplierFactory factory;
 
-        if (identity.contains("binance")) {
+        if (identity.contains("binanceus") || identity.contains("binance us")) {
+            factory = exchange::getCandleDataSupplier;
+        } else if (identity.contains("binance")) {
             factory = BinanceCandleDataSupplier::new;
         } else if (identity.contains("coinbase")) {
             factory = CoinbaseCandleDataSupplier::new;
         } else if (identity.contains("bitfinex")) {
             factory = BitfinexCandleDataSupplier::new;
         } else {
-            throw new UnsupportedOperationException(
-                    "No historical candle data supplier configured for exchange: "
-                            + exchange.getClass().getName()
-                            + ". Add a supplier mapping in HistoricalDataPrefetcher.forCurrentExchange()."
-            );
+            factory = exchange::getCandleDataSupplier;
         }
 
         return new HistoricalDataPrefetcher(historicalDataRepository, factory);
@@ -185,15 +189,19 @@ public class HistoricalDataPrefetcher {
 
         notifyProgress(progressCallback, 15);
 
-        Future<List<CandleData>> future = supplier.get();
-
-        notifyProgress(progressCallback, 45);
-
-        List<CandleData> fetchedCandles = future.get();
+        List<CandleData> fetchedCandles = fetchPages(
+                supplier,
+                startTime,
+                endTime,
+                expectedCandles,
+                progressCallback);
 
         notifyProgress(progressCallback, 75);
 
-        List<CandleData> cleanedCandles = cleanCandles(fetchedCandles);
+        List<CandleData> cleanedCandles = cleanCandles(fetchedCandles).stream()
+                .filter(candle -> isWithinRange(candle, startTime, endTime))
+                .sorted(Comparator.comparingLong(this::candleTimestampMillis))
+                .toList();
 
         if (cleanedCandles.isEmpty()) {
             log.warn("No historical candles returned for {} {}", pair, timeframeCode);
@@ -224,6 +232,62 @@ public class HistoricalDataPrefetcher {
         notifyProgress(progressCallback, 100);
 
         return cleanedCandles;
+    }
+
+    private List<CandleData> fetchPages(
+            @NotNull CandleDataSupplier supplier,
+            @NotNull LocalDateTime startTime,
+            @NotNull LocalDateTime endTime,
+            int expectedCandles,
+            @Nullable Consumer<Integer> progressCallback
+    ) throws Exception {
+        TreeMap<Long, CandleData> candlesByTimestamp = new TreeMap<>();
+        long startMillis = toEpochMillis(startTime);
+        int targetCandles = Math.max(MIN_CANDLES_FOR_BASIC_TEST, expectedCandles);
+        int pagesNeeded = Math.max(1, (int) Math.ceil(targetCandles / 200.0) + 2);
+        int maxPages = Math.min(MAX_FETCH_PAGES, pagesNeeded);
+
+        long oldestFetched = Long.MAX_VALUE;
+        int unchangedPages = 0;
+
+        for (int page = 1; page <= maxPages; page++) {
+            Future<List<CandleData>> future = supplier.get();
+            List<CandleData> pageCandles = future.get();
+            List<CandleData> cleanedPage = cleanCandles(pageCandles);
+
+            if (cleanedPage.isEmpty()) {
+                break;
+            }
+
+            for (CandleData candle : cleanedPage) {
+                long timestamp = candleTimestampMillis(candle);
+                if (timestamp > 0L) {
+                    candlesByTimestamp.put(timestamp, candle);
+                }
+            }
+
+            long pageOldest = cleanedPage.stream()
+                    .mapToLong(this::candleTimestampMillis)
+                    .filter(timestamp -> timestamp > 0L)
+                    .min()
+                    .orElse(oldestFetched);
+
+            if (pageOldest >= oldestFetched) {
+                unchangedPages++;
+            } else {
+                unchangedPages = 0;
+                oldestFetched = pageOldest;
+            }
+
+            int progress = 15 + (int) Math.min(55, Math.round((page / (double) maxPages) * 55));
+            notifyProgress(progressCallback, progress);
+
+            if (oldestFetched <= startMillis || candlesByTimestamp.size() >= targetCandles || unchangedPages >= 2) {
+                break;
+            }
+        }
+
+        return new ArrayList<>(candlesByTimestamp.values());
     }
 
     private void validateRequest(
@@ -266,6 +330,28 @@ public class HistoricalDataPrefetcher {
         }
 
         return new ArrayList<>(unique);
+    }
+
+    private boolean isWithinRange(CandleData candle, LocalDateTime startTime, LocalDateTime endTime) {
+        long timestamp = candleTimestampMillis(candle);
+        return timestamp >= toEpochMillis(startTime) && timestamp <= toEpochMillis(endTime);
+    }
+
+    private long candleTimestampMillis(CandleData candle) {
+        if (candle == null) {
+            return 0L;
+        }
+
+        try {
+            return candle.timestamp().toEpochMilli();
+        } catch (Exception ignored) {
+            long openTime = candle.getOpenTime();
+            return openTime < 10_000_000_000L ? openTime * 1_000L : openTime;
+        }
+    }
+
+    private long toEpochMillis(LocalDateTime time) {
+        return time.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
     }
 
     /**

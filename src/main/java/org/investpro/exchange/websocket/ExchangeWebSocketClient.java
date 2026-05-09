@@ -40,6 +40,8 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
     protected final Map<String, Consumer<String>> streamHandlers = new ConcurrentHashMap<>();
 
     public final SimpleBooleanProperty connectionEstablished = new SimpleBooleanProperty(false);
+    
+    private final CountDownLatch initializationLatch = new CountDownLatch(1);
 
     private static final int MAX_RECONNECT_ATTEMPTS = 5;
     private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
@@ -74,6 +76,8 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
         try {
             onConnected();
+            // Signal that WebSocket is initialized and ready
+            initializationLatch.countDown();
         } catch (Exception exception) {
             log.warn(
                     "{} onConnected hook failed: {}",
@@ -154,6 +158,10 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public ReadOnlyBooleanProperty connectionEstablishedProperty() {
         return connectionEstablished;
+    }
+
+    public CountDownLatch getInitializationLatch() {
+        return initializationLatch;
     }
 
     public void enableReconnect(boolean enabled) {
