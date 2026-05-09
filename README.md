@@ -99,7 +99,7 @@
 ## Technology Stack
 
 ### Backend
-- **Language**: Java 21 (Eclipse Temurin JDK)
+- **Language**: Java 26 (Eclipse Temurin JDK)
 - **Build Tool**: Maven 3.13.0+
 - **Web Framework**: No Spring dependency (lightweight core)
 - **Async**: CompletableFuture, ExecutorService, ScheduledThreadPool

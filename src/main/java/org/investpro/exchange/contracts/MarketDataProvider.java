@@ -18,9 +18,9 @@ public interface MarketDataProvider {
 
     TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException;
 
-    List<TradePair> getTradePairSymbol();
+    List<TradePair> getTradePairSymbol() throws SQLException, ClassNotFoundException;
 
-    List<TradePair> getTradablePairs();
+    List<TradePair> getTradablePairs() throws SQLException, ClassNotFoundException;
 
     boolean supportsTradePair(TradePair tradePair);
 

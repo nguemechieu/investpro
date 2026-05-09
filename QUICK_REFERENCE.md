@@ -130,22 +130,22 @@ Test end-to-end:
 
 ## Key Files to Know
 
-| Purpose | File | Status |
-|---------|------|--------|
-| System Entry Point | src/main/java/org/investpro/app/InvestProApplication.java | ✅ |
-| Composition Root | src/main/java/org/investpro/core/SystemCore.java | ✅ |
-| Bot Runtime | src/main/java/org/investpro/core/bot/SmartBot.java | ✅ |
-| Execution Pipeline | src/main/java/org/investpro/core/agents/execution/TradeExecutionCoordinator.java | ✅ |
-| Order Executor | src/main/java/org/investpro/core/agents/execution/ExecutionEngine.java | ✅ |
-| Risk Context | src/main/java/org/investpro/risk/TradeRiskContext.java | ⚠️ |
-| AI Service | src/main/java/org/investpro/ai/AiReasoningService.java | ✅ |
-| Final Gate | src/main/java/org/investpro/ai/FinalRiskGate.java | ✅ |
-| Agent Registry | src/main/java/org/investpro/core/agents/AgentRegistry.java | ✅ |
-| Trading UI | src/main/java/org/investpro/ui/TradingWindow.java | ⚠️ |
-| Desktop Stream | src/main/java/org/investpro/ui/DesktopExchangeStreamBridge.java | ⚠️ |
-| Market Agent | src/main/java/org/investpro/core/agents/market/MarketDataAgent.java | ⚠️ |
-| Signal Agent | src/main/java/org/investpro/core/agents/signal/SignalAgent.java | ⚠️ |
-| Risk Agent | src/main/java/org/investpro/core/agents/risk/RiskAgent.java | ⚠️ |
+| Purpose            | File                                                                             | Status |
+|--------------------|----------------------------------------------------------------------------------|--------|
+| System Entry Point | src/main/java/org/investpro/app/InvestProApplication.java                        | ✅      |
+| Composition Root   | src/main/java/org/investpro/core/SystemCore.java                                 | ✅      |
+| Bot Runtime        | src/main/java/org/investpro/core/bot/SmartBot.java                               | ✅      |
+| Execution Pipeline | src/main/java/org/investpro/core/agents/execution/TradeExecutionCoordinator.java | ✅      |
+| Order Executor     | src/main/java/org/investpro/core/agents/execution/ExecutionEngine.java           | ✅      |
+| Risk Context       | src/main/java/org/investpro/risk/TradeRiskContext.java                           | ⚠️     |
+| AI Service         | src/main/java/org/investpro/ai/AiReasoningService.java                           | ✅      |
+| Final Gate         | src/main/java/org/investpro/ai/FinalRiskGate.java                                | ✅      |
+| Agent Registry     | src/main/java/org/investpro/core/agents/AgentRegistry.java                       | ✅      |
+| Trading UI         | src/main/java/org/investpro/ui/TradingWindow.java                                | ⚠️     |
+| Desktop Stream     | src/main/java/org/investpro/ui/DesktopExchangeStreamBridge.java                  | ⚠️     |
+| Market Agent       | src/main/java/org/investpro/core/agents/market/MarketDataAgent.java              | ⚠️     |
+| Signal Agent       | src/main/java/org/investpro/core/agents/signal/SignalAgent.java                  | ⚠️     |
+| Risk Agent         | src/main/java/org/investpro/core/agents/risk/RiskAgent.java                      | ⚠️     |
 
 ---
 

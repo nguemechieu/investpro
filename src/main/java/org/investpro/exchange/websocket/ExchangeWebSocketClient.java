@@ -4,7 +4,7 @@ import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import lombok.Getter;
-import lombok.Setter;
+
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.TradePair;
@@ -34,7 +34,7 @@ import java.util.function.Consumer;
  * - Let subclasses implement exchange-specific subscribe/unsubscribe payloads.
  */
 @Getter
-@Setter
+
 @Slf4j
 public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
@@ -42,7 +42,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public final SimpleBooleanProperty connectionEstablished = new SimpleBooleanProperty(false);
 
-    private final CountDownLatch initializationLatch = new CountDownLatch(1);
+    private CountDownLatch initializationLatch = new CountDownLatch(1);
 
     private static final int MAX_RECONNECT_ATTEMPTS = 5;
     private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
@@ -369,7 +369,6 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
         // Optional subclass hook.
     }
 
-    private CountDownLatch initializationLatch;
 
     private void setInitializationLatch() {
         this.initializationLatch = new CountDownLatch(1);

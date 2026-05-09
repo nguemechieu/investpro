@@ -7,6 +7,7 @@ import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.exchange.websocket.ExchangeWebSocketClient;
@@ -320,16 +321,6 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public void streamOrders(TradePair tradePair, ExchangeStreamConsumer consumer) {
-        log.debug("Stellar Network does not support WebSocket order streaming. Using polling fallback.");
-    }
-
-    @Override
-    public void streamAccountData(ExchangeStreamConsumer consumer) {
-        log.debug("Stellar Network does not support WebSocket account streaming. Using polling fallback.");
-    }
-
-    @Override
     public String getName() {
         return "STELLAR";
     }
@@ -491,18 +482,18 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public List<TradePair> getTradePairSymbol() {
+    public List<TradePair> getTradePairSymbol() throws SQLException, ClassNotFoundException {
         return List.of(new TradePair("XLM", "USD"), new TradePair("XLM", "USDC"));
     }
 
     @Override
-    public List<TradePair> getTradablePairs() {
+    public List<TradePair> getTradablePairs() throws SQLException, ClassNotFoundException {
         return List.of(new TradePair("XLM", "USD"), new TradePair("XLM", "USDC"));
     }
 
     @Override
     public boolean supportsTradePair(TradePair tradePair) {
-        return tradePair != null && tradePair.getBase().equalsIgnoreCase("XLM");
+        return tradePair != null && tradePair.getBaseCurrency().getCode().equalsIgnoreCase("XLM");
     }
 
     @Override
@@ -579,11 +570,11 @@ public class StellarNetwork extends Exchange {
     public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
             double stopLoss, double takeProfit, double slippage) {
         Order order = new Order();
-        order.setOrderId(String.valueOf(id));
+        order.setId((long) id);
         order.setTradePair(tradePair);
         order.setType(type);
         order.setPrice(price);
-        order.setAmount(amount);
+        order.setQuantity(amount);
         order.setSide(side);
         return order;
     }
@@ -607,11 +598,6 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<List<String>> cancelOrders(List<String> orderIds) {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<String> cancelAllOrders() {
         return null;
     }
 
@@ -771,6 +757,7 @@ public class StellarNetwork extends Exchange {
 
     }
 
+
     @Override
     public void stopStreaming(ExchangeStreamSubscription subscription) {
 
@@ -786,10 +773,6 @@ public class StellarNetwork extends Exchange {
 
     }
 
-    @Override
-    public void streamTrades(TradePair tradePair, ExchangeStreamConsumer consumer) {
-
-    }
 
     @Override
     public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
@@ -923,22 +906,7 @@ public class StellarNetwork extends Exchange {
         return List.of();
     }
 
-    @Override
-    public List<Trade> getTrades(TradePair tradePair) {
-        return tradeHistory;
-    }
 
-    @Override
-    public List<OpenOrder> getOpenOrders() {
-        return List.of();
-    }
-
-    @Override
-    public List<OpenOrder> getOpenOrders(TradePair tradePair) {
-        return List.of();
-    }
-
-    @Override
     public void cancelAllOrders() {
         orders.clear();
     }

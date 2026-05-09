@@ -400,7 +400,8 @@ public final class StrategyRegistry {
     /**
      * Instantiates all registered strategy definitions upfront.
      *
-     * This ensures all strategies are "wired" and available for use by the StrategyEngine
+     * This ensures all strategies are "wired" and available for use by the
+     * StrategyEngine
      * rather than being lazily instantiated on-demand.
      *
      * @return The count of successfully instantiated strategies

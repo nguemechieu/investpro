@@ -50,8 +50,7 @@ public final class StrategyInitializer {
         log.info(
                 "Strategy initialization complete. instantiatedStrategies={}, definitions={}",
                 registry.instantiatedCount(),
-                registry.definitionCount()
-        );
+                registry.definitionCount());
     }
 
     private static void instantiateAllStrategies(@NotNull StrategyRegistry registry) {
@@ -71,8 +70,7 @@ public final class StrategyInitializer {
 
     private static void registerLegacyStrategy(
             @NotNull StrategyRegistry registry,
-            @NotNull TradingStrategy strategy
-    ) {
+            @NotNull TradingStrategy strategy) {
         try {
             strategy.validateConfiguration();
             registry.register(strategy.getMetadata().getStrategyId(), strategy);
@@ -80,15 +78,13 @@ public final class StrategyInitializer {
             log.info(
                     "Registered legacy strategy: id={}, name={}",
                     strategy.getMetadata().getStrategyId(),
-                    strategy.getMetadata().getDisplayName()
-            );
+                    strategy.getMetadata().getDisplayName());
 
         } catch (Exception exception) {
             log.error(
                     "Failed to register legacy strategy: {}",
                     strategy.getClass().getSimpleName(),
-                    exception
-            );
+                    exception);
         }
     }
 
@@ -96,7 +92,8 @@ public final class StrategyInitializer {
      * Register all catalog definitions without creating UnifiedStrategy instances.
      *
      * This mirrors the Python registry pattern:
-     * definitions are loaded first, then concrete strategy objects are created lazily.
+     * definitions are loaded first, then concrete strategy objects are created
+     * lazily.
      */
     private static void registerCatalogDefinitions(@NotNull StrategyRegistry registry) {
         int registered = 0;
@@ -113,8 +110,7 @@ public final class StrategyInitializer {
                 log.warn(
                         "Failed to register strategy definition: {}",
                         definition.getName(),
-                        exception
-                );
+                        exception);
             }
         }
 

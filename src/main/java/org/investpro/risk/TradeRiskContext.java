@@ -29,7 +29,6 @@ import org.investpro.models.trading.TradePair;
  * authoritative backend decision service.
  */
 
-
 @Getter
 @Slf4j
 @Value
@@ -497,6 +496,255 @@ public class TradeRiskContext {
      */
     public boolean hasBracketRiskPlan() {
         return hasValidEntryPrice() && hasStopLoss() && hasTakeProfit();
+    }
+
+    // =========================================================================
+    // Advanced risk assessment methods
+    // =========================================================================
+
+    /**
+     * Comprehensive risk viability check combining all constraints.
+     *
+     * @return true if the trade passes all risk gates
+     */
+    public boolean isTradeViable() {
+        return isValidForRiskEvaluation()
+                && hasBracketRiskPlan()
+                && hasEnoughAvailableCash()
+                && isRiskWithinPerTradeLimit()
+                && isRiskWithinCumulativeLimit()
+                && isLeverageWithinLimit()
+                && isDrawdownWithinLimit()
+                && hasPositiveExpectancy();
+    }
+
+    /**
+     * Check if trade has positive expected value.
+     */
+    public boolean hasPositiveExpectancy() {
+        return calculateExpectedValue() > 0.0;
+    }
+
+    /**
+     * Check if reward/risk ratio meets minimum threshold (default 1.0).
+     */
+    public boolean meetMinimumRewardRiskRatio() {
+        return calculateRewardRiskRatio() >= 1.0;
+    }
+
+    /**
+     * Check if reward/risk ratio meets a specific threshold.
+     */
+    public boolean meetMinimumRewardRiskRatio(double minimumRatio) {
+        if (minimumRatio <= 0.0) {
+            return true;
+        }
+
+        return calculateRewardRiskRatio() >= minimumRatio;
+    }
+
+    /**
+     * Get risk severity level: LOW, MEDIUM, HIGH, CRITICAL based on portfolio heat.
+     */
+    public String getRiskSeverityLevel() {
+        double portfolioHeat = getPortfolioHeatPercent();
+
+        if (portfolioHeat < 2.0) {
+            return "LOW";
+        } else if (portfolioHeat < 5.0) {
+            return "MEDIUM";
+        } else if (portfolioHeat < 10.0) {
+            return "HIGH";
+        } else {
+            return "CRITICAL";
+        }
+    }
+
+    /**
+     * Calculate volatility-adjusted position size: base size reduced by volatility.
+     * <p>
+     * Formula:
+     * adjustedSize = requestedPositionSize * (1.0 - volatility *
+     * volatilityAdjustmentFactor)
+     */
+    public double getVolatilityAdjustedPositionSize(double volatilityAdjustmentFactor) {
+        if (volatilityAdjustmentFactor < 0.0) {
+            return requestedPositionSize;
+        }
+
+        double adjustmentFactor = 1.0 - (volatility * volatilityAdjustmentFactor);
+        return safePositive(requestedPositionSize * Math.max(0.1, adjustmentFactor));
+    }
+
+    /**
+     * Calculate volatility-adjusted leverage: reduced by volatility.
+     * <p>
+     * Formula:
+     * adjustedLeverage = requestedLeverage / (1.0 + volatility *
+     * volatilityAdjustmentFactor)
+     */
+    public double getVolatilityAdjustedLeverage(double volatilityAdjustmentFactor) {
+        if (volatilityAdjustmentFactor < 0.0) {
+            return requestedLeverage;
+        }
+
+        double denominator = 1.0 + (volatility * volatilityAdjustmentFactor);
+        return safePositive(requestedLeverage / denominator);
+    }
+
+    /**
+     * Calculate risk-adjusted stop-loss price based on volatility.
+     * Wider stop-loss during high volatility to reduce whipsaws.
+     */
+    public double getVolatilityAdjustedStopLoss(double volatilityExpansionFactor) {
+        if (!hasValidEntryPrice() || !hasStopLoss() || volatilityExpansionFactor < 0.0) {
+            return stopLossPrice;
+        }
+
+        double baseDistance = Math.abs(entryPrice - stopLossPrice);
+        double adjustedDistance = baseDistance * (1.0 + volatility * volatilityExpansionFactor);
+        double isLong = entryPrice > stopLossPrice ? 1.0 : -1.0;
+
+        return entryPrice - (adjustedDistance * isLong);
+    }
+
+    /**
+     * Get margin utilization percentage: used margin / available cash.
+     */
+    public double getMarginUtilizationPercent() {
+        if (availableCash <= 0.0) {
+            return 0.0;
+        }
+
+        return (usedMargin / availableCash) * 100.0;
+    }
+
+    /**
+     * Get free margin as percentage of available cash.
+     */
+    public double getFreeMarginPercent() {
+        if (availableCash <= 0.0) {
+            return 0.0;
+        }
+
+        return (freeMargin / availableCash) * 100.0;
+    }
+
+    /**
+     * Calculate max position size based on available cash and leverage.
+     */
+    public double getMaxPositionSizeByAvailableCash() {
+        if (availableCash <= 0.0 || entryPrice <= 0.0) {
+            return 0.0;
+        }
+
+        return safePositive((availableCash * requestedLeverage) / entryPrice);
+    }
+
+    /**
+     * Calculate max position size based on risk limit.
+     */
+    public double getMaxPositionSizeByRiskLimit() {
+        if (accountEquity <= 0.0 || !hasStopLoss() || entryPrice <= stopLossPrice) {
+            return 0.0;
+        }
+
+        double maxRiskAmount = (accountEquity * maxRiskPerTrade) / 100.0;
+        double priceRisk = Math.abs(entryPrice - stopLossPrice);
+
+        if (priceRisk <= 0.0) {
+            return 0.0;
+        }
+
+        return safePositive(maxRiskAmount / priceRisk);
+    }
+
+    /**
+     * Get recommended position size: minimum of cash and risk limit constraints.
+     */
+    public double getRecommendedMaxPositionSize() {
+        double byAvailableCash = getMaxPositionSizeByAvailableCash();
+        double byRiskLimit = getMaxPositionSizeByRiskLimit();
+
+        if (byAvailableCash <= 0.0) {
+            return byRiskLimit;
+        }
+
+        if (byRiskLimit <= 0.0) {
+            return byAvailableCash;
+        }
+
+        return Math.min(byAvailableCash, byRiskLimit);
+    }
+
+    /**
+     * Check if position size exceeds recommended max.
+     */
+    public boolean isPositionSizeExceedsRecommended() {
+        double maxSize = getRecommendedMaxPositionSize();
+        return maxSize > 0.0 && requestedPositionSize > maxSize;
+    }
+
+    /**
+     * Get slippage impact in account currency.
+     */
+    public double getSlippageImpact() {
+        return calculatePositionNotional() * (estimatedSlippagePercent / 100.0);
+    }
+
+    /**
+     * Get total cost of trade: fees + slippage.
+     */
+    public double getTotalTradeCost() {
+        return estimatedFee + getSlippageImpact();
+    }
+
+    /**
+     * Calculate net expected value after fees and slippage.
+     */
+    public double getNetExpectedValue() {
+        return calculateExpectedValue() - getTotalTradeCost();
+    }
+
+    /**
+     * Get a diagnostic string for logging and debugging.
+     */
+    public String toDebugString() {
+        return String.format(
+                "TradeRiskContext{symbol=%s, equity=%.2f, cash=%.2f, size=%.2f, "
+                        + "entry=%.2f, stop=%.2f, tp=%.2f, risk=%.2f(%.2f%%), "
+                        + "reward=%.2f(%.2f%%), rr=%.2f, leverage=%.2f, "
+                        + "volatility=%.2f, heat=%.2f%%, viable=%s}",
+                getSymbolText(),
+                accountEquity,
+                availableCash,
+                requestedPositionSize,
+                entryPrice,
+                stopLossPrice,
+                takeProfitPrice,
+                calculateTradeRisk(),
+                calculateTradeRiskPercent(),
+                calculateTradeReward(),
+                calculateTradeRewardPercent(),
+                calculateRewardRiskRatio(),
+                requestedLeverage,
+                volatility,
+                getPortfolioHeatPercent(),
+                isTradeViable());
+    }
+
+    /**
+     * Get a summary string for UI display.
+     */
+    public String toSummaryString() {
+        return String.format(
+                "%s: Risk %.2f%% | Heat %.2f%% | RR %.2f | EV %.2f | %s",
+                getSymbolText(),
+                calculateTradeRiskPercent(),
+                getPortfolioHeatPercent(),
+                calculateRewardRiskRatio(),
+                calculateExpectedValue(),
+                getRiskSeverityLevel());
     }
 
     /**
