@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
-
 @Getter
 @Setter
 @Slf4j
@@ -65,12 +64,14 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+    public void buy(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
+            double takeProfit, double slippage) {
         createMarketOrder(tradePair, Side.BUY, size);
     }
 
     @Override
-    public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+    public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
+            double takeProfit, double slippage) {
         createMarketOrder(tradePair, Side.SELL, size);
     }
 
@@ -467,15 +468,15 @@ public class StellarNetwork extends Exchange {
 
                 // Notes
                 .notes("""
-                    Stellar Network distributed exchange capability profile.
-                    Supports cryptocurrency trading via the Stellar Distributed Exchange (DEX).
-                    Primary asset: Stellar Lumens (XLM) - the native blockchain token.
-                    Uses REST API polling (no WebSocket) for market data.
-                    Supports custom asset pairs on the Stellar blockchain.
-                    All trading requires XLM for transaction fees.
-                    Paper (test) mode uses Testnet; live mode uses Mainnet.
-                    Account and order data require authenticated API access.
-                    """)
+                        Stellar Network distributed exchange capability profile.
+                        Supports cryptocurrency trading via the Stellar Distributed Exchange (DEX).
+                        Primary asset: Stellar Lumens (XLM) - the native blockchain token.
+                        Uses REST API polling (no WebSocket) for market data.
+                        Supports custom asset pairs on the Stellar blockchain.
+                        All trading requires XLM for transaction fees.
+                        Paper (test) mode uses Testnet; live mode uses Mainnet.
+                        Account and order data require authenticated API access.
+                        """)
                 .build();
     }
 
@@ -535,7 +536,8 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair,
+            Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
@@ -574,7 +576,8 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side, double stopLoss, double takeProfit, double slippage) {
+    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
+            double stopLoss, double takeProfit, double slippage) {
         Order order = new Order();
         order.setOrderId(String.valueOf(id));
         order.setTradePair(tradePair);
@@ -587,11 +590,13 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException("Stellar Network does not support stop orders"));
+        return CompletableFuture
+                .failedFuture(new UnsupportedOperationException("Stellar Network does not support stop orders"));
     }
 
     @Override
-    public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount, double entryPrice, double stopLoss, double takeProfit) {
+    public CompletableFuture<String> createBracketOrder(TradePair tradePair, Side side, double amount,
+            double entryPrice, double stopLoss, double takeProfit) {
         return null;
     }
 
@@ -681,7 +686,8 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss, double takeProfit, double slippage) {
+    public CompletableFuture<Boolean> validateOrder(TradePair tradePair, MARKET_TYPES marketType, double size,
+            double side, double stopLoss, double takeProfit, double slippage) {
         return null;
     }
 
@@ -878,19 +884,17 @@ public class StellarNetwork extends Exchange {
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesSince(TradePair tradePair, Instant since) {
         return CompletableFuture.completedFuture(
-            tradeHistory.stream()
-                .filter(t -> t.getTime().isAfter(since))
-                .toList()
-        );
+                tradeHistory.stream()
+                        .filter(t -> t.getTime().isAfter(since))
+                        .toList());
     }
 
     @Override
     public CompletableFuture<List<Trade>> fetchAccountTradesBetween(TradePair tradePair, Instant from, Instant to) {
         return CompletableFuture.completedFuture(
-            tradeHistory.stream()
-                .filter(t -> t.getTime().isAfter(from) && t.getTime().isBefore(to))
-                .toList()
-        );
+                tradeHistory.stream()
+                        .filter(t -> t.getTime().isAfter(from) && t.getTime().isBefore(to))
+                        .toList());
     }
 
     // Additional required methods
@@ -955,7 +959,8 @@ public class StellarNetwork extends Exchange {
     }
 
     @Override
-    public List<CandleData> getCandles(TradePair tradePair, Timeframe timeframe, int limit, Long startTime, Long endTime) {
+    public List<CandleData> getCandles(TradePair tradePair, Timeframe timeframe, int limit, Long startTime,
+            Long endTime) {
         return List.of();
     }
 

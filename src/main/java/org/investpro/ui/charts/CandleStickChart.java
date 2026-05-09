@@ -238,8 +238,6 @@ public class CandleStickChart extends Region {
     private final ScheduledExecutorService updateInProgressCandleExecutor;
     private double canvasX;
 
-
-
     public CandleStickChart(
             Exchange exchange,
             CandleDataSupplier candleDataSupplier,
@@ -581,16 +579,15 @@ public class CandleStickChart extends Region {
                 return;
             boolean streamingStarted = false;
             try {
-                CountDownLatch initLatch = exchange.getWebsocketClient() != null 
-                    ? exchange.getWebsocketClient().getInitializationLatch() 
-                    : null;
+                CountDownLatch initLatch = exchange.getWebsocketClient() != null
+                        ? exchange.getWebsocketClient().getInitializationLatch()
+                        : null;
                 if (exchange.getWebsocketClient() != null
                         && initLatch != null
                         && initLatch.await(10, SECONDS)
                         && exchange.getWebsocketClient().supportsStreamingTrades(tradePair)) {
 
-
-                    ExchangeStreamConsumer exchangeS= new UiExchangeStreamConsumer();
+                    ExchangeStreamConsumer exchangeS = new UiExchangeStreamConsumer();
                     exchange.getWebsocketClient().streamLiveTrades(tradePair, exchangeS);
                     streamingStarted = true;
                 }

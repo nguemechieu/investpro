@@ -24,7 +24,8 @@ import java.util.function.Consumer;
 /**
  * Neutral base WebSocket client for all exchange adapters.
  *
- * Do not put Binance, Coinbase, OANDA, or Alpaca-specific subscription logic here.
+ * Do not put Binance, Coinbase, OANDA, or Alpaca-specific subscription logic
+ * here.
  *
  * Responsibilities:
  * - Own WebSocket connection state.
@@ -40,22 +41,20 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
     protected final Map<String, Consumer<String>> streamHandlers = new ConcurrentHashMap<>();
 
     public final SimpleBooleanProperty connectionEstablished = new SimpleBooleanProperty(false);
-    
+
     private final CountDownLatch initializationLatch = new CountDownLatch(1);
 
     private static final int MAX_RECONNECT_ATTEMPTS = 5;
     private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
     private static final int MAX_RECONNECT_DELAY_SECONDS = 60;
 
-    private final ScheduledExecutorService reconnectExecutor =
-            Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread thread = new Thread(
-                        r,
-                        "WebSocket-Reconnect-" + safeHost(getURI())
-                );
-                thread.setDaemon(true);
-                return thread;
-            });
+    private final ScheduledExecutorService reconnectExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(
+                r,
+                "WebSocket-Reconnect-" + safeHost(getURI()));
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
 
@@ -83,8 +82,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                     "{} onConnected hook failed: {}",
                     getClass().getSimpleName(),
                     exception.getMessage(),
-                    exception
-            );
+                    exception);
         }
     }
 
@@ -101,8 +99,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                     "{} failed to process raw message: {}",
                     getClass().getSimpleName(),
                     exception.getMessage(),
-                    exception
-            );
+                    exception);
         }
 
         dispatchRawMessage(message);
@@ -117,16 +114,14 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                 getClass().getSimpleName(),
                 remote,
                 code,
-                reason
-        );
+                reason);
 
         if (shouldNotReconnect(code, reason)) {
             log.error(
                     "{} WebSocket rejected request. Auto-reconnect disabled. code={} reason={}",
                     getClass().getSimpleName(),
                     code,
-                    reason
-            );
+                    reason);
             manualClose = true;
             return;
         }
@@ -144,8 +139,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                 "{} WebSocket error: {}",
                 getClass().getSimpleName(),
                 exception == null ? "Unknown error" : exception.getMessage(),
-                exception
-        );
+                exception);
 
         if (reconnectEnabled && !manualClose) {
             scheduleReconnect();
@@ -180,8 +174,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
             log.debug(
                     "{} error during disconnect: {}",
                     getClass().getSimpleName(),
-                    exception.getMessage()
-            );
+                    exception.getMessage());
         } finally {
             setConnectionEstablished(false);
         }
@@ -196,8 +189,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
             log.debug(
                     "{} reconnect executor shutdown failed: {}",
                     getClass().getSimpleName(),
-                    exception.getMessage()
-            );
+                    exception.getMessage());
         }
 
         streamHandlers.clear();
@@ -210,15 +202,13 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
             log.error(
                     "{} WebSocket reconnection failed after {} attempts. Giving up.",
                     getClass().getSimpleName(),
-                    MAX_RECONNECT_ATTEMPTS
-            );
+                    MAX_RECONNECT_ATTEMPTS);
             return;
         }
 
         long delaySeconds = Math.min(
                 INITIAL_RECONNECT_DELAY_SECONDS * (long) Math.pow(2, attempt),
-                MAX_RECONNECT_DELAY_SECONDS
-        );
+                MAX_RECONNECT_DELAY_SECONDS);
 
         reconnectAttempts.incrementAndGet();
 
@@ -227,8 +217,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                 getClass().getSimpleName(),
                 attempt + 1,
                 MAX_RECONNECT_ATTEMPTS,
-                delaySeconds
-        );
+                delaySeconds);
 
         reconnectExecutor.schedule(() -> {
             try {
@@ -240,8 +229,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                         "{} attempting WebSocket reconnection {}/{}",
                         getClass().getSimpleName(),
                         reconnectAttempts.get(),
-                        MAX_RECONNECT_ATTEMPTS
-                );
+                        MAX_RECONNECT_ATTEMPTS);
 
                 reconnectBlocking();
 
@@ -250,8 +238,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                         "{} WebSocket reconnect failed: {}",
                         getClass().getSimpleName(),
                         exception.getMessage(),
-                        exception
-                );
+                        exception);
             }
         }, delaySeconds, TimeUnit.SECONDS);
     }
@@ -265,8 +252,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
             log.debug(
                     "{} close before reconnect failed: {}",
                     getClass().getSimpleName(),
-                    exception.getMessage()
-            );
+                    exception.getMessage());
         }
 
         manualClose = false;
@@ -294,8 +280,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
                         getClass().getSimpleName(),
                         entry.getKey(),
                         exception.getMessage(),
-                        exception
-                );
+                        exception);
             }
         }
     }
@@ -356,15 +341,13 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public abstract void subscribeStream(
             @NotNull String streamName,
-            @NotNull Consumer<String> handler
-    );
+            @NotNull Consumer<String> handler);
 
     public abstract void unsubscribeStream(@NotNull String streamName);
 
     public abstract void streamLiveTrades(
             @NotNull TradePair tradePair,
-            @NotNull ExchangeStreamConsumer consumer
-    );
+            @NotNull ExchangeStreamConsumer consumer);
 
     public abstract void stopStreamLiveTrades(@NotNull TradePair tradePair);
 
@@ -386,12 +369,10 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
         // Optional subclass hook.
     }
 
-    private  CountDownLatch initializationLatch;
-
-
+    private CountDownLatch initializationLatch;
 
     private void setInitializationLatch() {
-         this.initializationLatch= new CountDownLatch(1);
+        this.initializationLatch = new CountDownLatch(1);
         initializationLatch.countDown();
     }
 }

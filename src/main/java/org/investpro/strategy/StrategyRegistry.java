@@ -7,6 +7,7 @@ import org.investpro.strategy.impl.UserStrategyAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -394,6 +395,51 @@ public final class StrategyRegistry {
 
         log.warn("Cannot unregister strategy '{}' - not found in registry", normalized);
         return false;
+    }
+
+    /**
+     * Instantiates all registered strategy definitions upfront.
+     *
+     * This ensures all strategies are "wired" and available for use by the StrategyEngine
+     * rather than being lazily instantiated on-demand.
+     *
+     * @return The count of successfully instantiated strategies
+     */
+    public synchronized int instantiateAllStrategies() {
+        int instantiatedCount = 0;
+        List<String> definitionNames = new ArrayList<>(definitions.keySet());
+
+        for (String name : definitionNames) {
+            try {
+                TradingStrategy strategy = getStrategy(name);
+
+                if (strategy != null && !strategies.containsKey(name)) {
+                    strategies.put(name, strategy);
+                    instantiatedCount++;
+
+                    log.debug("Instantiated strategy: {}", name);
+                }
+            } catch (Exception exception) {
+                log.warn("Failed to instantiate strategy '{}': {}", name, exception.getMessage());
+            }
+        }
+
+        log.info("Instantiated {} strategies for multi-strategy consensus", instantiatedCount);
+        return instantiatedCount;
+    }
+
+    /**
+     * Get the total count of instantiated strategies.
+     */
+    public int instantiatedCount() {
+        return strategies.size();
+    }
+
+    /**
+     * Get the total count of registered definitions.
+     */
+    public int definitionCount() {
+        return definitions.size();
     }
 
     private boolean isBlank(String value) {

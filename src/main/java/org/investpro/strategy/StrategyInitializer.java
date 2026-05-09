@@ -42,6 +42,9 @@ public final class StrategyInitializer {
         registerCatalogDefinitions(registry);
         registerDefaultUnifiedStrategy(registry);
 
+        // Wire all strategies for multi-strategy consensus
+        instantiateAllStrategies(registry);
+
         initialized = true;
 
         log.info(
@@ -49,6 +52,15 @@ public final class StrategyInitializer {
                 registry.instantiatedCount(),
                 registry.definitionCount()
         );
+    }
+
+    private static void instantiateAllStrategies(@NotNull StrategyRegistry registry) {
+        try {
+            int instantiatedCount = registry.instantiateAllStrategies();
+            log.info("Wired {} strategies for use in multi-strategy consensus engine", instantiatedCount);
+        } catch (Exception exception) {
+            log.warn("Failed to instantiate all strategies: {}", exception.getMessage(), exception);
+        }
     }
 
     private static void registerLegacyStrategies(@NotNull StrategyRegistry registry) {
