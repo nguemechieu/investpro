@@ -14,9 +14,6 @@ import org.investpro.backtesting.InstitutionalBacktestMetrics;
 import org.investpro.i18n.LocalizationService;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Professional backtesting report panel displaying institutional-grade metrics.
  * Shows comprehensive performance analysis with color-coded indicators.

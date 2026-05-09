@@ -17,8 +17,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import static org.investpro.i18n.LocalizationService.t;
-
 /**
  * Modern Economic Calendar Panel with professional visualization.
  *

@@ -2287,7 +2287,12 @@ public class TradingDesk extends BorderPane {
             if (existingSession != null && existingSession.account() != null) {
                 updateAccountSummary(existingSession.account());
             }
-            systemCore = createSystemCore(exchange);
+            try {
+                systemCore = createSystemCore(exchange);
+            } catch (SQLException | ClassNotFoundException e) {
+                log.error("Failed to create SystemCore", e);
+                showAlert("Failed to initialize trading system: " + e.getMessage());
+            }
             systemCoreEventsSubscribed = false;
             enablePositionAutoRefresh();
             initializeSymbolAgentPanels();
@@ -2359,7 +2364,13 @@ public class TradingDesk extends BorderPane {
         brokerAccessGranted = true;
         brokerSessions.put(safe(exchangeSelector.getValue()), new BrokerSession(exchange, true, account));
 
-        systemCore = createSystemCore(exchange);
+        try {
+            systemCore = createSystemCore(exchange);
+        } catch (SQLException | ClassNotFoundException e) {
+            log.error("Failed to create SystemCore", e);
+            rejectConnectionValidation(e);
+            return;
+        }
         systemCoreEventsSubscribed = false;
         initializeSymbolAgentPanels();
 
@@ -2951,7 +2962,7 @@ public class TradingDesk extends BorderPane {
         log.info("Displaying system announcements");
     }
 
-    private SystemCore createSystemCore(Exchange exchange) {
+    private SystemCore createSystemCore(Exchange exchange) throws SQLException, ClassNotFoundException {
         if (exchange == null) {
             throw new IllegalArgumentException("exchange cannot be null");
         }
@@ -3022,7 +3033,12 @@ public class TradingDesk extends BorderPane {
                 && !systemCore.getSmartBot().isStarted();
 
         if (coreMissing || botMissing || botNotStarted) {
-            systemCore = createSystemCore(exchange);
+            try {
+                systemCore = createSystemCore(exchange);
+            } catch (SQLException | ClassNotFoundException e) {
+                log.error("Failed to create SystemCore", e);
+                throw new RuntimeException("Failed to initialize trading system", e);
+            }
             initializeSymbolAgentPanels();
             systemCore.start(tradingService, selectedPair);
             systemCore.getSmartBot().setSelectedTradePair(selectedPair);
@@ -4453,7 +4469,7 @@ public class TradingDesk extends BorderPane {
         alert.setTitle(title);
         alert.setHeaderText(title);
         alert.setContentText(message);
-        alert.showAndWait();
+        alert.show();
     }
 
     private void journal(String message) {
@@ -4462,7 +4478,7 @@ public class TradingDesk extends BorderPane {
                 safe(message))));
     }
 
-    private String rootMessage(Throwable throwable) {
+    private @NotNull String rootMessage(Throwable throwable) {
         if (throwable == null) {
             return "Unknown error";
         }

@@ -1,6 +1,7 @@
 package org.investpro.strategy.lab;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyRegistry;
@@ -10,13 +11,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
  * Service for managing strategy assignments to symbol/timeframe combinations.
- *
+ * <p>
  * Responsibilities:
- * - Auto-assign best strategy from ranking
+ * - Auto-assign the best strategy from ranking
  * - Auto-assign from consensus result
  * - Manual assignment with optional locking
  * - Unassign strategies
@@ -25,16 +27,18 @@ import java.util.Optional;
  * - Prevent auto-replacement of manual locked assignments
  */
 @Getter
+@Setter
 @Slf4j
 public class StrategyAssignmentService {
 
     /**
      * -- GETTER --
-     *  Get repository for direct access.
+     * Get repository for direct access.
      */
-    private final StrategyAssignmentRepository repository;
+    private StrategyAssignmentRepository repository;
 
     public StrategyAssignmentService() {
+
         this.repository = StrategyAssignmentRepository.getInstance();
     }
 
@@ -50,7 +54,7 @@ public class StrategyAssignmentService {
             @NotNull String symbol,
             @NotNull Timeframe timeframe,
             @NotNull java.util.List<StrategyPerformanceReport> rankedReports) {
-        if (rankedReports == null || rankedReports.isEmpty()) {
+        if (rankedReports.isEmpty()) {
             log.warn("No strategies to assign for {}/{}", symbol, timeframe.getCode());
             return null;
         }
@@ -67,7 +71,7 @@ public class StrategyAssignmentService {
             return existing.get();
         }
 
-        // Find best tradable strategy
+        // Find the best tradable strategy
         StrategyRankingEngine ranking = new StrategyRankingEngine();
         StrategyPerformanceReport best = ranking.getBestTradable(rankedReports);
 
@@ -75,9 +79,8 @@ public class StrategyAssignmentService {
             log.warn("No tradable strategy found for {}/{}", symbol, timeframe.getCode());
 
             // Disable existing assignment if any
-            if (existing.isPresent()) {
-                repository.disable(existing.get().getAssignmentId(), "No tradable strategy found");
-            }
+            existing.ifPresent(strategyAssignment -> repository.disable(strategyAssignment.getAssignmentId(),
+                    "No tradable strategy found"));
 
             return null;
         }
@@ -103,7 +106,7 @@ public class StrategyAssignmentService {
         repository.save(assignment);
 
         log.info(
-                "Auto-assigned best strategy: {}/{} -> {} (score: {:.1f})",
+                "Auto-assigned best strategy: {}/{} -> {} {}(score: {:.1f})",
                 symbol,
                 timeframe.getCode(),
                 best.getStrategyName(),
@@ -137,7 +140,7 @@ public class StrategyAssignmentService {
         repository.save(assignment);
 
         log.info(
-                "Assigned from consensus: {}/{} -> {} (confidence: {:.1f%})",
+                "Assigned from consensus: {}/{} -> {} {}(confidence: {:.1f%})",
                 consensus.getSymbol(),
                 consensus.getTimeframe().getCode(),
                 consensus.getSelectedStrategyName(),
@@ -220,7 +223,7 @@ public class StrategyAssignmentService {
 
     /**
      * Resolve assigned strategy for trading.
-     *
+     * <p>
      * Returns the TradingStrategy instance that should be used for this
      * symbol/timeframe,
      * or null if no assignment exists or is disabled.
@@ -262,4 +265,17 @@ public class StrategyAssignmentService {
         }
     }
 
+    public String strategyId;
+
+    public StrategyAssignment getMode() {
+        return null;
+    }
+
+    public double getScoreAtAssignment() {
+        return 0.0;
+    }
+
+    public LocalDateTime getAssignedAt() {
+        return null;
+    }
 }

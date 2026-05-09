@@ -16,7 +16,6 @@ public final class OnboardingStyles {
 
     public static final String COLOR_DARK_BG = "#0f172a";
     public static final String COLOR_SURFACE_BG = "#1e293b";
-    public static final String COLOR_SURFACE_BG_LIGHT = "#263449";
 
     public static final String COLOR_PRIMARY_TEXT = "#f1f5f9";
     public static final String COLOR_SECONDARY_TEXT = "#cbd5e1";

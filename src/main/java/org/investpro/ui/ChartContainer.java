@@ -126,8 +126,10 @@ public class ChartContainer extends Region {
 
     private ChartToolbar toolbar;
     private CandleStickChart candleStickChart;
+    private EnhancedChartDisplay enhancedChartDisplay;
     private Set<Integer> supportedGranularities;
 
+    private boolean useEnhancedDisplay = true; // Feature flag to enable/disable enhanced display
     private Consumer<String> onChartError;
     private Runnable onChartCreated;
     private Runnable onChartDisposed;
@@ -290,6 +292,24 @@ public class ChartContainer extends Region {
         candleChartContainer.heightProperty().addListener((observable, oldValue, newValue) -> requestLayout());
     }
 
+    /**
+     * Enable or disable enhanced TradingView-like display
+     */
+    public void setUseEnhancedDisplay(boolean enabled) {
+        this.useEnhancedDisplay = enabled;
+    }
+
+    public boolean isUsingEnhancedDisplay() {
+        return useEnhancedDisplay && enhancedChartDisplay != null;
+    }
+
+    /**
+     * Get the enhanced chart display component (if enabled)
+     */
+    public EnhancedChartDisplay getEnhancedChartDisplay() {
+        return enhancedChartDisplay;
+    }
+
     private void createInitialChart() {
         try {
             CandleStickChart chart = buildChart(secondsPerCandle.get());
@@ -425,21 +445,143 @@ public class ChartContainer extends Region {
 
         registerToolbar(newChart);
 
-        if (!animated || oldChart == null) {
-            disposeChart(oldChart);
+        // Install enhanced display if enabled
+        if (useEnhancedDisplay) {
+            installEnhancedDisplay(newChart, oldChart, animated);
+        } else {
+            // Install basic chart
+            if (!animated || oldChart == null) {
+                disposeChart(oldChart);
+                candleChartContainer.getChildren().setAll(newChart);
+                newChart.setOpacity(1.0);
+                executeOnChartCreated();
+                return;
+            }
+
+            performFadeTransitionBasic(oldChart, newChart);
+        }
+    }
+
+    private void installEnhancedDisplay(CandleStickChart newChart, CandleStickChart oldChart, boolean animated) {
+        if (disposed) {
+            return;
+        }
+
+        try {
+            // Create or update enhanced display
+            if (enhancedChartDisplay != null && !animated) {
+                enhancedChartDisplay.dispose();
+            }
+
+            enhancedChartDisplay = new EnhancedChartDisplay(exchange, tradePair, newChart, tradingService);
+
+            if (!animated || oldChart == null) {
+                disposeChart(oldChart);
+                candleChartContainer.getChildren().setAll(enhancedChartDisplay);
+                enhancedChartDisplay.setOpacity(1.0);
+                executeOnChartCreated();
+                return;
+            }
+
+            // Fade transition for enhanced display
+            performFadeTransitionEnhanced(oldChart, enhancedChartDisplay);
+        } catch (Exception e) {
+            log.error("Failed to install enhanced display, falling back to basic chart", e);
+            useEnhancedDisplay = false;
+            installChart(newChart, animated);
+        }
+    }
+
+    private void performFadeTransitionBasic(CandleStickChart oldChart, CandleStickChart newChart) {
+        if (oldChart == null) {
             candleChartContainer.getChildren().setAll(newChart);
-            newChart.setOpacity(1.0);
             executeOnChartCreated();
             return;
         }
 
-        performFadeTransition(oldChart, newChart);
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(FADE_OUT_DURATION), oldChart);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.0);
+
+        fadeOut.setOnFinished(event -> {
+            disposeChart(oldChart);
+
+            if (disposed) {
+                disposeChart(newChart);
+                return;
+            }
+
+            candleChartContainer.getChildren().setAll(newChart);
+            newChart.setOpacity(0.0);
+
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(FADE_IN_DURATION), newChart);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.setOnFinished(done -> executeOnChartCreated());
+            fadeIn.play();
+        });
+
+        fadeOut.play();
+    }
+
+    private void performFadeTransitionEnhanced(CandleStickChart oldChart, EnhancedChartDisplay enhancedDisplay) {
+        if (oldChart == null) {
+            candleChartContainer.getChildren().setAll(enhancedDisplay);
+            enhancedDisplay.setOpacity(0.0);
+
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(FADE_IN_DURATION), enhancedDisplay);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.setOnFinished(done -> executeOnChartCreated());
+            fadeIn.play();
+            return;
+        }
+
+        javafx.scene.Node currentDisplay = !candleChartContainer.getChildren().isEmpty()
+                ? candleChartContainer.getChildren().get(0)
+                : null;
+
+        if (currentDisplay == null) {
+            candleChartContainer.getChildren().setAll(enhancedDisplay);
+            enhancedDisplay.setOpacity(1.0);
+            executeOnChartCreated();
+            return;
+        }
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(FADE_OUT_DURATION), currentDisplay);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.0);
+
+        fadeOut.setOnFinished(event -> {
+            disposeChart(oldChart);
+            if (disposed) {
+                enhancedDisplay.dispose();
+                return;
+            }
+
+            candleChartContainer.getChildren().setAll(enhancedDisplay);
+            enhancedDisplay.setOpacity(0.0);
+
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(FADE_IN_DURATION), enhancedDisplay);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.setOnFinished(done -> executeOnChartCreated());
+            fadeIn.play();
+        });
+
+        fadeOut.play();
     }
 
     private void performFadeTransition(CandleStickChart oldChart, CandleStickChart newChart) {
         if (oldChart == null) {
             candleChartContainer.getChildren().setAll(newChart);
-            executeOnChartCreated();
+            newChart.setOpacity(0.0);
+
+            FadeTransition fadeIn = new FadeTransition(Duration.millis(FADE_IN_DURATION), newChart);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
+            fadeIn.setOnFinished(done -> executeOnChartCreated());
+            fadeIn.play();
             return;
         }
 

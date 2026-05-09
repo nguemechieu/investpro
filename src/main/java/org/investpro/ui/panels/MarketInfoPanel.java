@@ -351,12 +351,7 @@ public class MarketInfoPanel extends ScrollPane {
         mainContent.getChildren().add(createHeaderBox());
     }
 
-    /**
-     * Load sample data for testing
-     */
-    public void loadSampleData() {
-        updateStats(MarketStats.createDummyBitcoinStats());
-    }
+
 
     /**
      * Update market info panel for a trading pair

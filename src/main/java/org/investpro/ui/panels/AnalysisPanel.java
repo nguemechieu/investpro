@@ -911,8 +911,7 @@ public class AnalysisPanel extends VBox {
                 return List.of();
             }
 
-            Set<String> assets = new TreeSet<>();
-            assets.addAll(correlations.keySet());
+            Set<String> assets = new TreeSet<>(correlations.keySet());
 
             for (Map<String, Double> row : correlations.values()) {
                 if (row != null) {
@@ -1355,7 +1354,7 @@ public class AnalysisPanel extends VBox {
             }
 
             @SafeVarargs
-            private final Object firstNonNull(SupplierWithException<Object>... suppliers) {
+            private Object firstNonNull(SupplierWithException<Object>... suppliers) {
                 for (SupplierWithException<Object> supplier : suppliers) {
                     try {
                         Object value = supplier.get();

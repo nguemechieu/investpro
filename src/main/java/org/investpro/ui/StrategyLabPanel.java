@@ -1,50 +1,66 @@
 package org.investpro.ui;
 
 import javafx.application.Platform;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.core.SystemCore;
 import org.investpro.i18n.LocalizationService;
+import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyAssignment;
-import org.investpro.strategy.lab.*;
+import org.investpro.strategy.StrategyCatalog;
+import org.investpro.strategy.lab.StrategyConsensusResult;
+import org.investpro.strategy.lab.StrategyLabService;
+import org.investpro.strategy.lab.StrategyLabSnapshot;
+import org.investpro.strategy.lab.StrategyPerformanceReport;
+import org.investpro.strategy.lab.StrategyVote;
 import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
+import java.sql.SQLException;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
- * JavaFX panel for Strategy Lab.
- *
+ * JavaFX panel for InvestPro Strategy Lab.
+ * <p>
  * Displays:
  * - Strategy testing controls
  * - Active assignment information
  * - Strategy rankings
- * - Voting/consensus results
+ * - Voting / consensus results
  * - Consensus summary
- * - Test status and logs
- *
- * All backtests run asynchronously without blocking UI.
+ * - Async test status and logs
  */
 @Getter
 @Setter
 @Slf4j
 public class StrategyLabPanel extends BorderPane {
 
+    private static final DateTimeFormatter LOG_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    private final SystemCore systemCore;
     private final StrategyLabService labService;
 
-    // State
-    private String selectedSymbol = "BTC/USD";
+    private String selectedSymbol = "USD/USD";
     private Timeframe selectedTimeframe = Timeframe.H1;
-    private boolean isRunning = false;
+    private volatile boolean running;
 
-    // UI Components - Controls
-    private ComboBox<String> symbolCombo;
+    private ComboBox<TradePair> symbolCombo;
     private ComboBox<Timeframe> timeframeCombo;
+    private ComboBox<String> strategyCombo;
     private TextField strategyFilterField;
+
     private Button testSelectedButton;
     private Button testAllStrategiesButton;
     private Button testAllTimeframesButton;
@@ -54,18 +70,15 @@ public class StrategyLabPanel extends BorderPane {
     private Button unassignButton;
     private Button disableAssignmentButton;
 
-    // UI Components - Display
     private Label activeAssignmentLabel;
     private Label activeStrategyLabel;
     private Label activeScoreLabel;
     private Label activeModeLabel;
     private Label activeAssignedAtLabel;
 
-    // Tables
     private TableView<StrategyPerformanceReport> rankingTable;
     private TableView<StrategyVote> votingTable;
 
-    // Consensus
     private Label consensusLabel;
     private Label consensusConfidenceLabel;
     private Label selectedStrategyLabel;
@@ -74,174 +87,236 @@ public class StrategyLabPanel extends BorderPane {
     private Label holdVotesLabel;
     private Label consensusReasonLabel;
 
-    // Status
     private ProgressBar progressBar;
     private Label statusLabel;
     private TextArea logsArea;
 
-    public StrategyLabPanel(@NotNull StrategyLabService labService) {
-        this.labService = labService;
+    private StrategyLabSnapshot snapshot;
+    private StrategyConsensusResult consensus;
+
+    public StrategyLabPanel(@NotNull SystemCore systemCore) throws SQLException, ClassNotFoundException {
+        this.systemCore = Objects.requireNonNull(systemCore, "systemCore must not be null");
+        this.labService = Objects.requireNonNull(systemCore.getLabService(), "labService must not be null");
+
         initializeUI();
         LocalizationService.applyTranslations(this);
         refreshUI();
     }
 
-    /**
-     * Initialize all UI components.
-     */
-    private void initializeUI() {
 
+    private void initializeUI() throws SQLException, ClassNotFoundException {
+        getStyleClass().add("strategy-lab-panel");
 
-        // Top: Controls
         setTop(createControlsSection());
-
-        // Center: Tabbed content
         setCenter(createContentTabs());
-
-        // Bottom: Status/Logs
         setBottom(createStatusSection());
-    }
+        if (snapshot.hasConsensusData()) {
+            consensus = snapshot.getConsensus();
 
-    /**
-     * Create controls section (top).
-     */
-    private VBox createControlsSection() {
+            if (snapshot.isConsensusReached()) {
+                consensusLabel.setText("Consensus: " + Objects.requireNonNull(consensus).getConsensusSide());
+            } else {
+                consensusLabel.setText("Consensus: No strong consensus");
+            }
+        } else {
+            consensusLabel.setText("Consensus: No data");
+        }
+    }
+   
+
+    private VBox createControlsSection() throws SQLException, ClassNotFoundException {
         VBox box = new VBox(8);
         box.setPadding(new Insets(10));
+        box.getStyleClass().add("strategy-lab-controls");
 
-
-        // Row 1: Symbol, Timeframe, Filter
         HBox row1 = new HBox(8);
         row1.setStyle("-fx-alignment: center-left;");
 
         Label symbolLabel = new Label("Symbol:");
         symbolCombo = new ComboBox<>();
-        symbolCombo.getItems().addAll("BTC/USD", "ETH/USD", "EUR/USD");
-        symbolCombo.setValue("BTC/USD");
-        symbolCombo.setOnAction(e -> {
-            selectedSymbol = symbolCombo.getValue();
-            refreshUI();
+        symbolCombo.setPrefWidth(170);
+
+        if (systemCore.getExchange() != null) {
+            List<TradePair> symbols = systemCore.getExchange().getTradePairSymbol();
+            if (symbols != null) {
+                symbolCombo.getItems().setAll(symbols);
+            }
+        }
+
+        if (!symbolCombo.getItems().isEmpty()) {
+            symbolCombo.getSelectionModel().selectFirst();
+            selectedSymbol = symbolCombo.getValue().toString('/');
+        }
+
+        symbolCombo.setOnAction(event -> {
+            TradePair selected = symbolCombo.getValue();
+            if (selected != null) {
+                selectedSymbol = selected.toString('/');
+                refreshUI();
+            }
         });
 
         Label timeframeLabel = new Label("Timeframe:");
         timeframeCombo = new ComboBox<>();
-        timeframeCombo.getItems().addAll(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1);
-        timeframeCombo.setValue(Timeframe.H1);
-        timeframeCombo.setOnAction(e -> {
+        timeframeCombo.setPrefWidth(120);
+
+        if (systemCore.getExchange() != null && systemCore.getExchange().getSupportedTimeframes() != null) {
+            timeframeCombo.getItems().setAll(systemCore.getExchange().getSupportedTimeframes());
+        }
+
+        if (timeframeCombo.getItems().contains(Timeframe.H1)) {
+            timeframeCombo.setValue(Timeframe.H1);
+        } else if (!timeframeCombo.getItems().isEmpty()) {
+            timeframeCombo.getSelectionModel().selectFirst();
+        }
+
+        if (timeframeCombo.getValue() != null) {
             selectedTimeframe = timeframeCombo.getValue();
-            refreshUI();
+        }
+
+        timeframeCombo.setOnAction(event -> {
+            Timeframe selected = timeframeCombo.getValue();
+            if (selected != null) {
+                selectedTimeframe = selected;
+                refreshUI();
+            }
         });
 
-        Label filterLabel = new Label("Strategy Filter:");
+        Label strategyLabel = new Label("Strategy:");
+        strategyCombo = new ComboBox<>();
+        strategyCombo.setPrefWidth(210);
+        strategyCombo.getItems().setAll(new ArrayList<>(StrategyCatalog.availableStrategyNames()));
+
+        if (!strategyCombo.getItems().isEmpty()) {
+            strategyCombo.getSelectionModel().selectFirst();
+        }
+
+
+
+        Label filterLabel = new Label("Filter:");
         strategyFilterField = new TextField();
         strategyFilterField.setPromptText("Search strategies...");
         strategyFilterField.setPrefWidth(200);
+        strategyFilterField.textProperty().addListener((obs, oldValue, newValue) -> applyStrategyFilter());
 
-        row1.getChildren().addAll(
-                symbolLabel, symbolCombo,
-                timeframeLabel, timeframeCombo,
-                new Separator(javafx.geometry.Orientation.VERTICAL),
-                filterLabel, strategyFilterField);
+        row1.getChildren().setAll(
+                symbolLabel,
+                symbolCombo,
+                timeframeLabel,
+                timeframeCombo,
+                new Separator(Orientation.VERTICAL),
+                strategyLabel,
+                strategyCombo,
+                filterLabel,
+                strategyFilterField
+        );
 
-        // Row 2: Test/Rank Buttons
         HBox row2 = new HBox(8);
         row2.setStyle("-fx-alignment: center-left;");
 
-        testSelectedButton = new Button("Test Selected");
-        testSelectedButton.setStyle("-fx-padding: 8px 16px;");
-        testSelectedButton.setOnAction(e -> testSelectedStrategy());
+        testSelectedButton = button("Test Selected", this::testSelectedStrategy);
+        testAllStrategiesButton = button("Test All Strategies", this::testAllStrategies);
+        testAllTimeframesButton = button("Test All Timeframes", this::testAllTimeframes);
+        rankButton = button("Refresh Rank", this::refreshUI);
 
-        testAllStrategiesButton = new Button("Test All Strategies");
-        testAllStrategiesButton.setStyle("-fx-padding: 8px 16px;");
-        testAllStrategiesButton.setOnAction(e -> testAllStrategies());
-
-        testAllTimeframesButton = new Button("Test All Timeframes");
-        testAllTimeframesButton.setStyle("-fx-padding: 8px 16px;");
-        testAllTimeframesButton.setOnAction(e -> testAllTimeframes());
-
-        rankButton = new Button("Rank");
-        rankButton.setStyle("-fx-padding: 8px 16px;");
-        rankButton.setOnAction(e -> refreshUI());
-
-        row2.getChildren().addAll(
+        row2.getChildren().setAll(
                 testSelectedButton,
                 testAllStrategiesButton,
                 testAllTimeframesButton,
-                rankButton);
+                rankButton
+        );
 
-        // Row 3: Assignment Buttons
         HBox row3 = new HBox(8);
         row3.setStyle("-fx-alignment: center-left;");
 
-        assignBestButton = new Button("Assign Best");
-        assignBestButton.setStyle("-fx-padding: 8px 16px; -fx-text-fill: green;");
-        assignBestButton.setOnAction(e -> assignBest());
+        assignBestButton = button("Assign Best", this::assignBest);
+        manualAssignButton = button("Manual Assign", this::openManualAssignDialog);
+        unassignButton = button("Unassign", this::unassign);
+        disableAssignmentButton = button("Disable Assignment", this::openDisableDialog);
 
-        manualAssignButton = new Button("Manual Assign");
-        manualAssignButton.setStyle("-fx-padding: 8px 16px;");
-        manualAssignButton.setOnAction(e -> openManualAssignDialog());
+        assignBestButton.setStyle("-fx-padding: 8px 16px; -fx-text-fill: #16a34a;");
+        unassignButton.setStyle("-fx-padding: 8px 16px; -fx-text-fill: #f59e0b;");
+        disableAssignmentButton.setStyle("-fx-padding: 8px 16px; -fx-text-fill: #ef4444;");
 
-        unassignButton = new Button("Unassign");
-        unassignButton.setStyle("-fx-padding: 8px 16px; -fx-text-fill: orange;");
-        unassignButton.setOnAction(e -> unassign());
-
-        disableAssignmentButton = new Button("Disable Assignment");
-        disableAssignmentButton.setStyle("-fx-padding: 8px 16px; -fx-text-fill: red;");
-        disableAssignmentButton.setOnAction(e -> openDisableDialog());
-
-        row3.getChildren().addAll(
+        row3.getChildren().setAll(
                 assignBestButton,
                 manualAssignButton,
                 unassignButton,
-                disableAssignmentButton);
+                disableAssignmentButton
+        );
 
-        box.getChildren().addAll(row1, row2, row3);
+        box.getChildren().setAll(row1, row2, row3);
         return box;
     }
 
-    /**
-     * Create main content tabs.
-     */
+    private Button button(String text, Runnable action) {
+        Button button = new Button(text);
+        button.setStyle("-fx-padding: 8px 16px;");
+        button.setOnAction(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+        return button;
+    }
+
+    private void applyStrategyFilter() {
+        if (strategyCombo == null) {
+            return;
+        }
+
+        String filter = strategyFilterField == null ? "" : safe(strategyFilterField.getText()).toLowerCase();
+        List<String> all = new ArrayList<>(StrategyCatalog.availableStrategyNames());
+
+        if (!filter.isBlank()) {
+            all = all.stream()
+                    .filter(name -> name != null && name.toLowerCase().contains(filter))
+                    .toList();
+        }
+
+        strategyCombo.getItems().setAll(all);
+
+        if (!strategyCombo.getItems().isEmpty()) {
+            strategyCombo.getSelectionModel().selectFirst();
+        }
+    }
+
     private TabPane createContentTabs() {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        tabPane.getTabs().addAll(
+        tabPane.getTabs().setAll(
                 createAssignmentTab(),
                 createRankingTab(),
                 createVotingTab(),
-                createConsensusTab());
+                createConsensusTab()
+        );
 
         return tabPane;
     }
 
-    /**
-     * Create "Active Assignment" tab.
-     */
     private Tab createAssignmentTab() {
         Tab tab = new Tab("Active Assignment");
 
         VBox box = new VBox(8);
         box.setPadding(new Insets(15));
 
-        // Card: Assignment Info
-        VBox card = createCard(
+        box.getChildren().add(createCard(
                 "Current Strategy Assignment",
-                createAssignmentInfoContent());
+                createAssignmentInfoContent()
+        ));
 
-        box.getChildren().add(card);
-        tab.setContent(new ScrollPane(box));
+        ScrollPane scrollPane = new ScrollPane(box);
+        scrollPane.setFitToWidth(true);
 
+        tab.setContent(scrollPane);
         return tab;
     }
 
-    /**
-     * Create assignment info content.
-     */
     private VBox createAssignmentInfoContent() {
         VBox box = new VBox(6);
         box.setPadding(new Insets(10));
-        box.setStyle("-fx-border-color: #f0f0f0; -fx-border-radius: 4;");
+        box.setStyle("-fx-border-color: #e5e7eb; -fx-border-radius: 4;");
 
         activeAssignmentLabel = new Label("No assignment");
         activeAssignmentLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
@@ -251,222 +326,182 @@ public class StrategyLabPanel extends BorderPane {
         activeModeLabel = new Label("Mode: -");
         activeAssignedAtLabel = new Label("Assigned: -");
 
-        box.getChildren().addAll(
+        box.getChildren().setAll(
                 activeAssignmentLabel,
                 new Separator(),
                 activeStrategyLabel,
                 activeScoreLabel,
                 activeModeLabel,
-                activeAssignedAtLabel);
+                activeAssignedAtLabel
+        );
 
         return box;
     }
 
-    /**
-     * Create "Rankings" tab.
-     */
     private Tab createRankingTab() {
         Tab tab = new Tab("Strategy Rankings");
 
         rankingTable = new TableView<>();
         rankingTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        rankingTable.setPlaceholder(new Label("No strategy rankings available."));
 
-        // Columns
         TableColumn<StrategyPerformanceReport, Integer> rankCol = new TableColumn<>("Rank");
-        rankCol.setCellValueFactory(cellData -> {
-            int idx = rankingTable.getItems().indexOf(cellData.getValue()) + 1;
-            return new javafx.beans.property.SimpleObjectProperty<>(idx);
-        });
+        rankCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(
+                rankingTable.getItems().indexOf(cellData.getValue()) + 1
+        ));
+        rankCol.setPrefWidth(65);
 
         TableColumn<StrategyPerformanceReport, String> nameCol = new TableColumn<>("Strategy");
-        nameCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getStrategyName()));
+        nameCol.setCellValueFactory(cellData -> new SimpleStringProperty(
+                safe(cellData.getValue().getStrategyName())
+        ));
+        nameCol.setPrefWidth(220);
 
-        TableColumn<StrategyPerformanceReport, Double> scoreCol = new TableColumn<>("Score");
-        scoreCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getScore()));
-        scoreCol.setCellFactory(col -> new TableCell<StrategyPerformanceReport, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.1f", item));
-            }
-        });
+        TableColumn<StrategyPerformanceReport, Double> scoreCol =
+                doubleColumn("Score", StrategyPerformanceReport::getScore, "%.1f");
 
-        TableColumn<StrategyPerformanceReport, Double> winRateCol = new TableColumn<>("Win Rate");
-        winRateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getWinRate()));
-        winRateCol.setCellFactory(col -> new TableCell<StrategyPerformanceReport, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.1f%%", item * 100));
-            }
-        });
+        TableColumn<StrategyPerformanceReport, Double> winRateCol =
+                doubleColumn("Win Rate", report -> report.getWinRate() * 100.0, "%.1f%%");
 
-        TableColumn<StrategyPerformanceReport, Double> returnCol = new TableColumn<>("Return %");
-        returnCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getTotalReturn()));
-        returnCol.setCellFactory(col -> new TableCell<StrategyPerformanceReport, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.2f%%", item));
-            }
-        });
+        TableColumn<StrategyPerformanceReport, Double> returnCol =
+                doubleColumn("Return", StrategyPerformanceReport::getTotalReturn, "%.2f%%");
 
-        TableColumn<StrategyPerformanceReport, Double> ddCol = new TableColumn<>("Max DD");
-        ddCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getMaxDrawdown()));
-        ddCol.setCellFactory(col -> new TableCell<StrategyPerformanceReport, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.1f%%", item * 100));
-            }
-        });
+        TableColumn<StrategyPerformanceReport, Double> drawdownCol =
+                doubleColumn("Max DD", report -> report.getMaxDrawdown() * 100.0, "%.1f%%");
 
-        TableColumn<StrategyPerformanceReport, Double> pfCol = new TableColumn<>("Profit Factor");
-        pfCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getProfitFactor()));
-        pfCol.setCellFactory(col -> new TableCell<StrategyPerformanceReport, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.2f", item));
-            }
-        });
+        TableColumn<StrategyPerformanceReport, Double> profitFactorCol =
+                doubleColumn("Profit Factor", StrategyPerformanceReport::getProfitFactor, "%.2f");
 
         TableColumn<StrategyPerformanceReport, Integer> tradesCol = new TableColumn<>("Trades");
-        tradesCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getTotalTrades()));
+        tradesCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(
+                cellData.getValue().getTotalTrades()
+        ));
+        tradesCol.setPrefWidth(80);
 
-        @SuppressWarnings("unchecked")
-        TableColumn<StrategyPerformanceReport, Double>[] allCols = new TableColumn[] {
-                rankCol, nameCol, scoreCol, winRateCol, returnCol, ddCol, pfCol, tradesCol
-        };
-
-        rankingTable.getColumns().addAll(allCols);
+        rankingTable.getColumns().setAll(
+                rankCol,
+                nameCol,
+                scoreCol,
+                winRateCol,
+                returnCol,
+                drawdownCol,
+                profitFactorCol,
+                tradesCol
+        );
 
         tab.setContent(rankingTable);
         return tab;
     }
 
-    /**
-     * Create "Voting" tab.
-     */
+    private TableColumn<StrategyPerformanceReport, Double> doubleColumn(
+            String title,
+            java.util.function.Function<StrategyPerformanceReport, Double> extractor,
+            String format
+    ) {
+        TableColumn<StrategyPerformanceReport, Double> column = new TableColumn<>(title);
+
+        column.setCellValueFactory(cellData -> {
+            Double value = extractor.apply(cellData.getValue());
+            return new SimpleObjectProperty<>(value == null ? 0.0 : value);
+        });
+
+        column.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.format(format, item));
+            }
+        });
+
+        return column;
+    }
+
     private Tab createVotingTab() {
         Tab tab = new Tab("Voting Results");
 
         votingTable = new TableView<>();
         votingTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        votingTable.setPlaceholder(new Label("No voting data available."));
 
-        TableColumn<StrategyVote, String> stratCol = new TableColumn<>("Strategy");
-        stratCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getStrategyName()));
+        TableColumn<StrategyVote, String> strategyCol = new TableColumn<>("Strategy");
+        strategyCol.setCellValueFactory(cellData -> new SimpleStringProperty(
+                safe(cellData.getValue().getStrategyName())
+        ));
 
         TableColumn<StrategyVote, String> sideCol = new TableColumn<>("Side");
-        sideCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getSide().toString()));
+        sideCol.setCellValueFactory(cellData -> new SimpleStringProperty(
+                cellData.getValue().getSide().toString()
+        ));
 
-        TableColumn<StrategyVote, Double> confCol = new TableColumn<>("Confidence");
-        confCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getConfidence()));
-        confCol.setCellFactory(col -> new TableCell<StrategyVote, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.2f", item));
-            }
-        });
+        TableColumn<StrategyVote, Double> confidenceCol =
+                voteDoubleColumn("Confidence", StrategyVote::getConfidence, "%.2f");
 
-        TableColumn<StrategyVote, Double> scoreCol = new TableColumn<>("Score");
-        scoreCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getScore()));
-        scoreCol.setCellFactory(col -> new TableCell<StrategyVote, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.1f", item));
-            }
-        });
+        TableColumn<StrategyVote, Double> scoreCol =
+                voteDoubleColumn("Score", StrategyVote::getScore, "%.1f");
 
-        TableColumn<StrategyVote, Double> weightCol = new TableColumn<>("Weight");
-        weightCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(
-                cellData.getValue().getWeight()));
-        weightCol.setCellFactory(col -> new TableCell<StrategyVote, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty)
-                    setText(null);
-                else
-                    setText(String.format("%.2f", item));
-            }
-        });
+        TableColumn<StrategyVote, Double> weightCol =
+                voteDoubleColumn("Weight", StrategyVote::getWeight, "%.2f");
 
         TableColumn<StrategyVote, String> reasonCol = new TableColumn<>("Reason");
-        reasonCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getReason()));
+        reasonCol.setCellValueFactory(cellData -> new SimpleStringProperty(
+                safe(cellData.getValue().getReason())
+        ));
+        reasonCol.setPrefWidth(320);
 
-        @SuppressWarnings("unchecked")
-        TableColumn<StrategyVote, ?>[] allCols = new TableColumn[] {
-                stratCol, sideCol, confCol, scoreCol, weightCol, reasonCol
-        };
-
-        votingTable.getColumns().addAll(allCols);
+        votingTable.getColumns().setAll(
+                strategyCol,
+                sideCol,
+                confidenceCol,
+                scoreCol,
+                weightCol,
+                reasonCol
+        );
 
         tab.setContent(votingTable);
         return tab;
     }
 
-    /**
-     * Create "Consensus" tab.
-     */
+    private TableColumn<StrategyVote, Double> voteDoubleColumn(
+            String title,
+            java.util.function.Function<StrategyVote, Double> extractor,
+            String format
+    ) {
+        TableColumn<StrategyVote, Double> column = new TableColumn<>(title);
+
+        column.setCellValueFactory(cellData -> {
+            Double value = extractor.apply(cellData.getValue());
+            return new SimpleObjectProperty<>(value == null ? 0.0 : value);
+        });
+
+        column.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.format(format, item));
+            }
+        });
+
+        return column;
+    }
+
     private Tab createConsensusTab() {
         Tab tab = new Tab("Consensus Summary");
 
         VBox box = new VBox(10);
         box.setPadding(new Insets(15));
+        box.getChildren().add(createCard("Consensus Result", createConsensusContent()));
 
-        VBox consensusCard = createCard(
-                "Consensus Result",
-                createConsensusContent());
+        ScrollPane scrollPane = new ScrollPane(box);
+        scrollPane.setFitToWidth(true);
 
-        box.getChildren().add(consensusCard);
-        tab.setContent(new ScrollPane(box));
-
+        tab.setContent(scrollPane);
         return tab;
     }
 
-    /**
-     * Create consensus content.
-     */
     private VBox createConsensusContent() {
         VBox box = new VBox(8);
         box.setPadding(new Insets(10));
-        box.setStyle("-fx-border-color: #f0f0f0; -fx-border-radius: 4;");
+        box.setStyle("-fx-border-color: #e5e7eb; -fx-border-radius: 4;");
 
         consensusLabel = new Label("Consensus: HOLD");
         consensusLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
@@ -478,12 +513,12 @@ public class StrategyLabPanel extends BorderPane {
         buyVotesLabel = new Label("BUY: 0 votes");
         sellVotesLabel = new Label("SELL: 0 votes");
         holdVotesLabel = new Label("HOLD: 0 votes");
-        votesBox.getChildren().addAll(buyVotesLabel, sellVotesLabel, holdVotesLabel);
+        votesBox.getChildren().setAll(buyVotesLabel, sellVotesLabel, holdVotesLabel);
 
         consensusReasonLabel = new Label("Reason: No consensus data");
         consensusReasonLabel.setWrapText(true);
 
-        box.getChildren().addAll(
+        box.getChildren().setAll(
                 consensusLabel,
                 new Separator(),
                 consensusConfidenceLabel,
@@ -491,19 +526,17 @@ public class StrategyLabPanel extends BorderPane {
                 new Separator(),
                 votesBox,
                 new Separator(),
-                consensusReasonLabel);
+                consensusReasonLabel
+        );
 
         return box;
     }
 
-    /**
-     * Create status/logs section (bottom).
-     */
     private VBox createStatusSection() {
         VBox box = new VBox(8);
         box.setPadding(new Insets(10));
         box.setStyle("-fx-border-color: #ddd; -fx-border-width: 1 0 0 0;");
-        box.setPrefHeight(150);
+        box.setPrefHeight(160);
 
         progressBar = new ProgressBar(0);
         progressBar.setPrefWidth(Double.MAX_VALUE);
@@ -516,206 +549,290 @@ public class StrategyLabPanel extends BorderPane {
         logsArea.setPrefHeight(100);
         logsArea.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 10;");
 
-        box.getChildren().addAll(
-                new HBox(8, new Label("Progress:"), progressBar),
+        HBox progressRow = new HBox(8, new Label("Progress:"), progressBar);
+        HBox.setHgrow(progressBar, Priority.ALWAYS);
+
+        box.getChildren().setAll(
+                progressRow,
                 statusLabel,
                 new Label("Logs:"),
-                logsArea);
+                logsArea
+        );
 
         return box;
     }
 
-    /**
-     * Helper to create a card.
-     */
     private VBox createCard(String title, VBox content) {
         VBox card = new VBox();
         card.setStyle("-fx-border-color: #ddd; -fx-border-radius: 4; -fx-background-color: #fafafa;");
 
         Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-padding: 10;");
         titleLabel.setMaxWidth(Double.MAX_VALUE);
-        titleLabel
-                .setStyle("-fx-padding: 10; -fx-font-size: 13; -fx-font-weight: bold; -fx-background-color: #f0f0f0;");
+        titleLabel.setStyle(
+                "-fx-padding: 10; -fx-font-size: 13; -fx-font-weight: bold; -fx-background-color: #f0f0f0;"
+        );
 
-        card.getChildren().addAll(titleLabel, content);
+        card.getChildren().setAll(titleLabel, content);
         return card;
     }
 
-    /**
-     * Refresh UI with current data.
-     */
     private void refreshUI() {
-        StrategyLabSnapshot snapshot = labService.getSnapshot(selectedSymbol, selectedTimeframe);
+        runOnFx(() -> {
+            try {
+                if (rankingTable == null || votingTable == null) {
+                    return;
+                }
 
-        // Update rankings table
-        rankingTable.getItems().clear();
-        rankingTable.getItems().addAll(snapshot.getRankings());
+                snapshot = labService.getSnapshot(selectedSymbol, selectedTimeframe);
 
-        // Update active assignment
-        if (snapshot.hasAssignment()) {
-            StrategyAssignment assignment = snapshot.getActiveAssignment();
-            activeAssignmentLabel.setText(
-                    assignment.getStrategyId() + " (" + assignment.getMode().getDisplayName() + ")");
-            activeStrategyLabel.setText("Strategy: " + assignment.getStrategyId());
-            activeScoreLabel.setText(String.format("Score: %.1f", assignment.getScoreAtAssignment()));
-            activeModeLabel.setText("Mode: " + assignment.getMode().getDisplayName());
-            activeAssignedAtLabel.setText("Assigned: " + assignment.getAssignedAt());
-        } else {
+                if (snapshot == null) {
+                    clearSnapshotViews();
+                    statusLabel.setText("No strategy lab snapshot available.");
+                    return;
+                }
+
+                rankingTable.setItems(FXCollections.observableArrayList(snapshot.getRankings()));
+
+                updateAssignmentView(snapshot);
+                updateConsensusView(snapshot);
+
+                statusLabel.setText("Ready");
+
+            } catch (Exception exception) {
+                log.error("Failed to refresh Strategy Lab UI", exception);
+                appendLog("Refresh failed: " + rootMessage(exception));
+                statusLabel.setText("Refresh failed.");
+            }
+        });
+    }
+
+    private void updateConsensusView(@NotNull StrategyLabSnapshot snapshot) {
+        if (!snapshot.hasConsensusData()) {
+            clearConsensusView();
+            return;
+        }
+
+        StrategyConsensusResult result = snapshot.getConsensus();
+
+        Objects.requireNonNull(result);
+        String consensusSide = result.getConsensusSide().toString();
+
+
+        consensusLabel.setText(
+                snapshot.isConsensusReached()
+                        ? "Consensus: " + consensusSide
+                        : "Consensus: No strong consensus"
+        );
+
+        consensusConfidenceLabel.setText(
+                String.format("Confidence: %.1f%%", safeDouble(result.getConsensusConfidence()) * 100.0)
+        );
+
+        selectedStrategyLabel.setText(
+                "Selected: " + safeText(result.getSelectedStrategyName(), "-")
+        );
+
+        buyVotesLabel.setText(
+                String.format("BUY: %d votes (%.1f)", result.getBuyVotes(), safeDouble(result.getBuyScore()))
+        );
+
+        sellVotesLabel.setText(
+                String.format("SELL: %d votes (%.1f)", result.getSellVotes(), safeDouble(result.getSellScore()))
+        );
+
+        holdVotesLabel.setText(
+                String.format("HOLD: %d votes (%.1f)", result.getHoldVotes(), safeDouble(result.getHoldScore()))
+        );
+
+        consensusReasonLabel.setText(
+                "Reason: " + safeText(result.getReason(), "No reason provided")
+        );
+
+        votingTable.getItems().setAll(
+                result.getVotes() == null ? List.of() : result.getVotes()
+        );
+    }
+
+    private void clearConsensusView() {
+        clearSnapshotViews();
+    }
+
+
+    private void clearSnapshotViews() {
+        consensus = null;
+        consensusLabel.setText("Consensus: No data");
+        consensusConfidenceLabel.setText("Confidence: -");
+        selectedStrategyLabel.setText("Selected: -");
+        buyVotesLabel.setText("BUY: 0 votes");
+        sellVotesLabel.setText("SELL: 0 votes");
+        holdVotesLabel.setText("HOLD: 0 votes");
+        consensusReasonLabel.setText("Reason: No consensus generated");
+        votingTable.getItems().clear();
+    }
+
+    private String safeText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private double safeDouble(double value) {
+        return Double.isFinite(value) ? value : 0.0;
+    }
+    private void updateAssignmentView(@NotNull StrategyLabSnapshot snapshot) {
+        if (!snapshot.hasAssignment()) {
             activeAssignmentLabel.setText("No assignment");
             activeStrategyLabel.setText("Strategy: -");
             activeScoreLabel.setText("Score: -");
             activeModeLabel.setText("Mode: -");
             activeAssignedAtLabel.setText("Assigned: -");
+            return;
         }
 
-        // Update consensus
-        if (snapshot.hasConsensus()) {
-            StrategyConsensusResult consensus = snapshot.getConsensus();
-            consensusLabel.setText("Consensus: " + consensus.getConsensusSide().toString());
-            consensusConfidenceLabel.setText(
-                    String.format("Confidence: %.1f%%", consensus.getConsensusConfidence() * 100));
-            selectedStrategyLabel.setText("Selected: " + consensus.getSelectedStrategyName());
-            buyVotesLabel
-                    .setText(String.format("BUY: %d votes (%.1f)", consensus.getBuyVotes(), consensus.getBuyScore()));
-            sellVotesLabel.setText(
-                    String.format("SELL: %d votes (%.1f)", consensus.getSellVotes(), consensus.getSellScore()));
-            holdVotesLabel.setText(
-                    String.format("HOLD: %d votes (%.1f)", consensus.getHoldVotes(), consensus.getHoldScore()));
-            consensusReasonLabel.setText("Reason: " + consensus.getReason());
+        StrategyAssignment assignment = snapshot.getAssignment();
 
-            votingTable.getItems().clear();
-            votingTable.getItems().addAll(consensus.getVotes());
-        } else {
-            consensusLabel.setText("Consensus: No data");
-            consensusConfidenceLabel.setText("Confidence: -");
-            selectedStrategyLabel.setText("Selected: -");
-            buyVotesLabel.setText("BUY: 0 votes");
-            sellVotesLabel.setText("SELL: 0 votes");
-            holdVotesLabel.setText("HOLD: 0 votes");
-            consensusReasonLabel.setText("Reason: No consensus generated");
-            votingTable.getItems().clear();
+        if (assignment == null) {
+            activeAssignmentLabel.setText("No assignment");
+            activeStrategyLabel.setText("Strategy: -");
+            activeScoreLabel.setText("Score: -");
+            activeModeLabel.setText("Mode: -");
+            activeAssignedAtLabel.setText("Assigned: -");
+            return;
         }
 
-        statusLabel.setText("Ready");
+        activeAssignmentLabel.setText(
+                safe(assignment.getStrategyId()) + " (" + assignment.getMode().getDisplayName() + ")"
+        );
+        activeStrategyLabel.setText("Strategy: " + safe(assignment.getStrategyId()));
+        activeScoreLabel.setText(String.format("Score: %.1f", assignment.getScoreAtAssignment()));
+        activeModeLabel.setText("Mode: " + assignment.getMode().getDisplayName());
+        activeAssignedAtLabel.setText("Assigned: " + assignment.getAssignedAt());
     }
 
-    /**
-     * Test selected strategy (not implemented, placeholder).
-     */
+
+
     private void testSelectedStrategy() {
-        appendLog("Testing selected strategy on " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
-        disableControls(true);
+        String strategyName = strategyCombo == null ? null : strategyCombo.getValue();
 
-        labService.testStrategies(selectedSymbol, selectedTimeframe, List.of("Trend Following"))
-                .thenRun(() -> Platform.runLater(() -> {
-                    appendLog("Test completed");
-                    refreshUI();
-                    disableControls(false);
-                }))
-                .exceptionally(ex -> {
-                    appendLog("Test failed: " + ex.getMessage());
-                    disableControls(false);
-                    return null;
-                });
+        if (strategyName == null || strategyName.isBlank()) {
+            appendLog("No strategy selected.");
+            return;
+        }
+
+        appendLog("Testing strategy '" + strategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
+        setRunning(true, "Testing selected strategy...");
+
+        labService.testStrategies(selectedSymbol, selectedTimeframe, List.of(strategyName))
+                .whenComplete((ignored, throwable) -> runOnFx(() -> {
+                    if (throwable != null) {
+                        appendLog("Test failed: " + rootMessage(throwable));
+                    } else {
+                        appendLog("Test completed.");
+                        refreshUI();
+                    }
+
+                    setRunning(false, "Ready");
+                }));
     }
 
-    /**
-     * Test all strategies.
-     */
     private void testAllStrategies() {
         appendLog("Testing all strategies on " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
-        disableControls(true);
+        setRunning(true, "Testing all strategies...");
 
-        labService.testStrategies(selectedSymbol, selectedTimeframe,
-                new java.util.ArrayList<>(org.investpro.strategy.StrategyCatalog.availableStrategyNames()))
-                .thenRun(() -> Platform.runLater(() -> {
-                    appendLog("All tests completed");
-                    refreshUI();
-                    disableControls(false);
-                }))
-                .exceptionally(ex -> {
-                    appendLog("Tests failed: " + ex.getMessage());
-                    disableControls(false);
-                    return null;
-                });
+        labService.testStrategies(
+                        selectedSymbol,
+                        selectedTimeframe,
+                        new ArrayList<>(StrategyCatalog.availableStrategyNames())
+                )
+                .whenComplete((ignored, throwable) -> runOnFx(() -> {
+                    if (throwable != null) {
+                        appendLog("Tests failed: " + rootMessage(throwable));
+                    } else {
+                        appendLog("All tests completed.");
+                        refreshUI();
+                    }
+
+                    setRunning(false, "Ready");
+                }));
     }
 
-    /**
-     * Test all timeframes.
-     */
     private void testAllTimeframes() {
         appendLog("Testing all strategies on all timeframes for " + selectedSymbol + "...");
-        disableControls(true);
+        setRunning(true, "Testing all timeframes...");
 
-        labService.testAllStrategies(selectedSymbol, List.of(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1))
-                .thenRun(() -> Platform.runLater(() -> {
-                    appendLog("All tests completed");
-                    refreshUI();
-                    disableControls(false);
-                }))
-                .exceptionally(ex -> {
-                    appendLog("Tests failed: " + ex.getMessage());
-                    disableControls(false);
-                    return null;
-                });
+        labService.testAllStrategies(
+                        selectedSymbol,
+                        List.of(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
+                )
+                .whenComplete((ignored, throwable) -> runOnFx(() -> {
+                    if (throwable != null) {
+                        appendLog("Tests failed: " + rootMessage(throwable));
+                    } else {
+                        appendLog("All timeframe tests completed.");
+                        refreshUI();
+                    }
+
+                    setRunning(false, "Ready");
+                }));
     }
 
-    /**
-     * Assign best strategy.
-     */
     private void assignBest() {
         appendLog("Assigning best strategy for " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
 
-        StrategyAssignment assignment = labService.assignBest(selectedSymbol, selectedTimeframe);
-        if (assignment != null) {
-            appendLog("✓ Assigned: " + assignment.getStrategyId());
-        } else {
-            appendLog("✗ Failed to find suitable strategy");
-        }
+        try {
+            StrategyAssignment assignment = labService.assignBest(selectedSymbol, selectedTimeframe);
 
-        refreshUI();
+            if (assignment != null) {
+                appendLog("Assigned: " + assignment.getStrategyId());
+            } else {
+                appendLog("No suitable strategy found.");
+            }
+
+            refreshUI();
+
+        } catch (Exception exception) {
+            log.error("Failed to assign best strategy", exception);
+            appendLog("Assign best failed: " + rootMessage(exception));
+        }
     }
 
-    /**
-     * Manually assign strategy.
-     */
     private void openManualAssignDialog() {
-        // Create dialog
         Dialog<String> dialog = new Dialog<>();
         dialog.setTitle("Manual Strategy Assignment");
         dialog.setHeaderText("Select a strategy to assign");
 
-        ComboBox<String> strategyCombo = new ComboBox<>();
-        strategyCombo.getItems().addAll(
-                new java.util.ArrayList<>(org.investpro.strategy.StrategyCatalog.availableStrategyNames()));
+        ComboBox<String> combo = new ComboBox<>();
+        combo.getItems().setAll(new ArrayList<>(StrategyCatalog.availableStrategyNames()));
 
-        VBox content = new VBox(10);
+        if (!combo.getItems().isEmpty()) {
+            combo.getSelectionModel().selectFirst();
+        }
+
+        VBox content = new VBox(10, new Label("Strategy:"), combo);
         content.setPadding(new Insets(15));
-        content.getChildren().addAll(
-                new Label("Strategy:"),
-                strategyCombo);
 
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 
-        dialog.setResultConverter(buttonType -> {
-            if (buttonType == ButtonType.OK) {
-                return strategyCombo.getValue();
-            }
-            return null;
-        });
+        dialog.setResultConverter(buttonType ->
+                buttonType == ButtonType.OK ? combo.getValue() : null
+        );
 
         dialog.showAndWait().ifPresent(strategyName -> {
-            StrategyAssignment assignment = labService.manuallyAssign(selectedSymbol, selectedTimeframe, strategyName);
-            appendLog("✓ Manually assigned: " + assignment.getStrategyId());
-            refreshUI();
+            try {
+                StrategyAssignment assignment = labService.manuallyAssign(selectedSymbol, selectedTimeframe, strategyName);
+
+                if (assignment != null) {
+                    appendLog("Manually assigned: " + assignment.getStrategyId());
+                }
+
+                refreshUI();
+
+            } catch (Exception exception) {
+                log.error("Manual assignment failed", exception);
+                appendLog("Manual assignment failed: " + rootMessage(exception));
+            }
         });
     }
 
-    /**
-     * Unassign strategy.
-     */
     private void unassign() {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Unassign Strategy");
@@ -723,17 +840,22 @@ public class StrategyLabPanel extends BorderPane {
         alert.setContentText("This symbol/timeframe will have no automatic strategy trading.");
 
         alert.showAndWait().ifPresent(result -> {
-            if (result == ButtonType.OK) {
+            if (result != ButtonType.OK) {
+                return;
+            }
+
+            try {
                 labService.unassign(selectedSymbol, selectedTimeframe);
-                appendLog("✓ Unassigned: " + selectedSymbol + "/" + selectedTimeframe.getCode());
+                appendLog("Unassigned: " + selectedSymbol + "/" + selectedTimeframe.getCode());
                 refreshUI();
+
+            } catch (Exception exception) {
+                log.error("Unassign failed", exception);
+                appendLog("Unassign failed: " + rootMessage(exception));
             }
         });
     }
 
-    /**
-     * Disable assignment dialog.
-     */
     private void openDisableDialog() {
         Dialog<String> dialog = new Dialog<>();
         dialog.setTitle("Disable Assignment");
@@ -744,64 +866,91 @@ public class StrategyLabPanel extends BorderPane {
         reasonArea.setPrefRowCount(3);
         reasonArea.setPromptText("Reason for disabling...");
 
-        VBox content = new VBox(10);
+        VBox content = new VBox(10, new Label("Reason:"), reasonArea);
         content.setPadding(new Insets(15));
-        content.getChildren().addAll(
-                new Label("Reason:"),
-                reasonArea);
 
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 
-        dialog.setResultConverter(buttonType -> {
-            if (buttonType == ButtonType.OK) {
-                return reasonArea.getText();
-            }
-            return null;
-        });
+        dialog.setResultConverter(buttonType ->
+                buttonType == ButtonType.OK ? reasonArea.getText() : null
+        );
 
         dialog.showAndWait().ifPresent(reason -> {
-            labService.getAssignmentService().getActiveAssignment(selectedSymbol, selectedTimeframe)
-                    .ifPresent(assignment -> {
-                        labService.getAssignmentService().disableAssignment(assignment.getAssignmentId(), reason);
-                        appendLog("✓ Disabled: " + assignment.getStrategyId());
-                        refreshUI();
-                    });
-        });
-    }
+            try {
+                labService.getAssignmentService()
+                        .getActiveAssignment(selectedSymbol, selectedTimeframe)
+                        .ifPresentOrElse(assignment -> {
+                            labService.getAssignmentService().disableAssignment(assignment.getAssignmentId(), reason);
+                            appendLog("Disabled: " + assignment.getStrategyId());
+                            refreshUI();
+                        }, () -> appendLog("No active assignment to disable."));
 
-    /**
-     * Append log message.
-     */
-    private void appendLog(String message) {
-        Platform.runLater(() -> {
-            String timestamp = java.time.LocalDateTime.now().format(
-                    DateTimeFormatter.ofPattern("HH:mm:ss"));
-            logsArea.appendText("[" + timestamp + "] " + message + "\n");
-        });
-    }
-
-    /**
-     * Disable/enable controls.
-     */
-    private void disableControls(boolean disabled) {
-        Platform.runLater(() -> {
-            testSelectedButton.setDisable(disabled);
-            testAllStrategiesButton.setDisable(disabled);
-            testAllTimeframesButton.setDisable(disabled);
-            rankButton.setDisable(disabled);
-            assignBestButton.setDisable(disabled);
-            manualAssignButton.setDisable(disabled);
-            unassignButton.setDisable(disabled);
-            disableAssignmentButton.setDisable(disabled);
-
-            if (disabled) {
-                statusLabel.setText("Testing in progress...");
-                progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
-            } else {
-                statusLabel.setText("Ready");
-                progressBar.setProgress(1.0);
+            } catch (Exception exception) {
+                log.error("Disable assignment failed", exception);
+                appendLog("Disable failed: " + rootMessage(exception));
             }
         });
+    }
+
+    private void appendLog(String message) {
+        runOnFx(() -> {
+            if (logsArea == null) {
+                return;
+            }
+
+            String timestamp = java.time.LocalDateTime.now().format(LOG_TIME_FORMAT);
+            logsArea.appendText("[" + timestamp + "] " + safe(message) + "\n");
+        });
+    }
+
+    private void setRunning(boolean running, String status) {
+        this.running = running;
+
+        runOnFx(() -> {
+            testSelectedButton.setDisable(running);
+            testAllStrategiesButton.setDisable(running);
+            testAllTimeframesButton.setDisable(running);
+            rankButton.setDisable(running);
+            assignBestButton.setDisable(running);
+            manualAssignButton.setDisable(running);
+            unassignButton.setDisable(running);
+            disableAssignmentButton.setDisable(running);
+
+            statusLabel.setText(status == null || status.isBlank() ? "Ready" : status);
+            progressBar.setProgress(running ? ProgressBar.INDETERMINATE_PROGRESS : 0.0);
+        });
+    }
+
+    private void runOnFx(Runnable runnable) {
+        if (runnable == null) {
+            return;
+        }
+
+        if (Platform.isFxApplicationThread()) {
+            runnable.run();
+        } else {
+            Platform.runLater(runnable);
+        }
+    }
+
+    private String rootMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error";
+        }
+
+        Throwable current = throwable;
+
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+
+        return current.getMessage() == null || current.getMessage().isBlank()
+                ? current.getClass().getSimpleName()
+                : current.getMessage();
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

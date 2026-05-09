@@ -38,6 +38,7 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyBootstrapper;
 import org.investpro.strategy.StrategyEngine;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.ui.panels.SettingsPanel;
 
 import org.investpro.utils.Side;
@@ -45,6 +46,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -71,6 +73,8 @@ public class SystemCore {
   private   SystemHealthSnapshot health ;
 
     public StrategyAssignment strategyAssignment;
+
+    public StrategyLabService labService;
 
     public enum StreamingMode {
         EVERYTHING("All market + account data"),
@@ -132,7 +136,7 @@ public class SystemCore {
 private  SymbolAgentManager symbolAgentManager;
 private SystemCoreDependencies systemCoreDependencies;
 private SymbolExecutionFilter symbolExecutionFilter;
-    public SystemCore(@NotNull Exchange exchange, Properties config) {
+    public SystemCore(@NotNull Exchange exchange, Properties config) throws SQLException, ClassNotFoundException {
 
 
         this.exchange = Objects.requireNonNull(exchange, "exchange cannot be null");
@@ -191,6 +195,8 @@ private SymbolExecutionFilter symbolExecutionFilter;
         this.systemCoreDependencies = new SystemCoreDependencies(exchange, tradingService, strategyEngine,
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
+        this.labService=new StrategyLabService();
+        labService.testAllStrategies(exchange.getSelectedTradePair().toString('/'),exchange.getSupportedTimeframes());
         // Initialize the system event recorder and monitor service after all components
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();

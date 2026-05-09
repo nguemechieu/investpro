@@ -284,6 +284,7 @@ public class OnboardingView extends StackPane {
 
         BorderPane pane = new BorderPane(centerPane);
         pane.setStyle("-fx-background-color: #0f172a;");
+        pane.setTop(loadMarketButton);
         fadeTo(pane);
     }
 
@@ -357,7 +358,7 @@ public class OnboardingView extends StackPane {
         }
 
         credGrid.addRow(2, new Label("Telegram Token"), telegramToken);
-        credGrid.addRow(3, new Label("Trading Mode"), tradingModeBox);
+        credGrid.addRow(3, new Label("Mode "), tradingModeBox);
 
         CheckBox rememberCredentialsCheckBox = new CheckBox("Remember these credentials");
         rememberCredentialsCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
@@ -385,7 +386,7 @@ public class OnboardingView extends StackPane {
             // auto-detected)
             if (selectedExchange == SupportedExchange.OANDA) {
                 if (apiKeyField.getText().isBlank()) {
-                    validation.setText("OANDA Token is required.");
+                    validation.setText( " Token is required.");
                     return;
                 }
                 // For OANDA, pass token as apiKey and accountId as apiSecret
@@ -547,7 +548,7 @@ public class OnboardingView extends StackPane {
         progressBar.setProgress(0);
         progressBar.setPrefWidth(420);
 
-        Label title = new Label("Loading Market ...");
+        Label title = new Label("Loading...");
         title.setStyle("-fx-text-fill: #3b82f6; -fx-font-size: 16px; -fx-font-weight: bold;");
 
         VBox overlay = new VBox(18, title, statusLabel, progressBar);
@@ -671,7 +672,7 @@ public class OnboardingView extends StackPane {
         fadeOut.setFromValue(1);
         fadeOut.setToValue(0);
         fadeOut.setOnFinished(event -> {
-            getChildren().setAll(next);
+            getChildren().add(next);
             FadeTransition fadeIn = new FadeTransition(Duration.millis(220), this);
             fadeIn.setFromValue(0);
             fadeIn.setToValue(1);
@@ -690,7 +691,7 @@ public class OnboardingView extends StackPane {
         authService.forgetRememberedUser();
         // Clear all exchange credentials
         for (String exchange : new String[] { "COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA",
-                "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX" }) {
+                "INTERACTIVE BROKERS", "BITMEX","STELLAR-NETWORK", "BITSTAMP", "BITTREX" }) {
             preferences.remove("exchange_api_key_%s".formatted(exchange));
             preferences.remove("exchange_api_secret_%s".formatted(exchange));
             preferences.remove("exchange_account_id_%s".formatted(exchange));

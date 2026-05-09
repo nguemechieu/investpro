@@ -12,6 +12,7 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.strategy.StrategyCatalog;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
@@ -23,7 +24,7 @@ import java.sql.SQLException;
 @Slf4j
 @Getter
 @Setter
-public class StrategyAssignmentPanel extends StackPane{
+public class StrategyAssignmentPanel extends VBox{
 
         private ComboBox<TradePair> symbolCombo;
         private ComboBox<String> strategyCombo;
@@ -123,9 +124,7 @@ public class StrategyAssignmentPanel extends StackPane{
                 Label strategyLabel = new Label("Strategy Type:");
                 strategyLabel.setStyle("-fx-text-fill: #a0aec0;");
                 strategyCombo = new ComboBox<>();
-                strategyCombo.getItems().addAll(
-                                "Moving Average", "RSI Oscillator", "MACD", "Bollinger Bands",
-                                "Stochastic", "Ichimoku", "EMA Crossover", "Support/Resistance");
+                strategyCombo.getItems().addAll(StrategyCatalog.availableStrategyNames());
                 strategyCombo.setPrefWidth(250);
                 strategyCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
                 grid.add(strategyLabel, 0, 1);

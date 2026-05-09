@@ -46,7 +46,7 @@ public class StrategyLabService {
      */
     private final Map<String, StrategyConsensusResult> consensusCache = new ConcurrentHashMap<>();
 
-    private StrategyLabService() {
+    public StrategyLabService() {
         this.backtestRunner = new StrategyBacktestRunner();
         this.rankingEngine = new StrategyRankingEngine();
         this.votingEngine = new StrategyVotingEngine();

@@ -2400,4 +2400,30 @@ public class CandleStickChart extends Region {
         }
     }
 
+    /**
+     * Zoom in on the chart (show fewer candles)
+     */
+    public void zoomIn() {
+        if (visibleCandles > MIN_VISIBLE_CANDLES) {
+            visibleCandles = Math.max(MIN_VISIBLE_CANDLES, visibleCandles - 5);
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Zoom out on the chart (show more candles)
+     */
+    public void zoomOut() {
+        visibleCandles = Math.min(MAX_VISIBLE_CANDLES, visibleCandles + 5);
+        requestChartRedraw();
+    }
+
+    /**
+     * Reset zoom to default view
+     */
+    public void resetZoom() {
+        visibleCandles = TARGET_VISIBLE_CANDLES;
+        requestChartRedraw();
+    }
+
 }

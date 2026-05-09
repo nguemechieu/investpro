@@ -1,5 +1,7 @@
 package org.investpro.ui;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.data.Db1;
@@ -15,6 +17,8 @@ import java.util.Properties;
  * Allows users to reset their password by verifying their username and email.
  */
 @Slf4j
+@Getter
+@Setter
 public class PasswordReset extends Stage {
     private TextField usernameField;
     private TextField emailField;
