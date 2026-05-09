@@ -64,7 +64,7 @@ public class BinanceUs extends Exchange {
     private static final String REST_BASE_URL = "";
     private static final String MARKET_DATA_WS_URL = "";
     private ExchangeWebSocketClient websocketClient;
-    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
+    protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
     private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
             false);
@@ -881,17 +881,34 @@ public class BinanceUs extends Exchange {
 
                 Map<String, String> params = new LinkedHashMap<>();
                 params.put("symbol", binanceSymbol(tradePair));
-                // /api/v3/trades returns most recent trades without time filtering
-                // Only accepts symbol and limit parameters
+                // /api/v3/trades is a PUBLIC endpoint that only accepts symbol and limit
+                // Do NOT use sendSignedBinanceUsRequest for this endpoint
                 params.put("limit", "500"); // Binance max per request
-                // sendSignedBinanceUsRequest will add timestamp automatically
-                // Do not add startTime, recvWindow, or explicit timestamp for this endpoint
 
-                JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/trades", params);
+                // Build unsigned request (public endpoint)
+                String query = formEncode(params);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(BINANCE_US_REST_URL + "/api/v3/trades?" + query))
+                        .header("User-Agent", "InvestPro/1.0")
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() != 200) {
+                    if (response.statusCode() == 429 || response.statusCode() == 418) {
+                        JsonNode body = OBJECT_MAPPER.readTree(response.body());
+                        activatePublicRestCooldown(response);
+                    }
+                    logger.warn("Failed to fetch recent trades: HTTP {}", response.statusCode());
+                    return Collections.emptyList();
+                }
+
+                JsonNode responseNode = OBJECT_MAPPER.readTree(response.body());
                 List<Trade> trades = new ArrayList<>();
 
-                if (response.isArray()) {
-                    for (JsonNode tradeNode : response) {
+                if (responseNode.isArray()) {
+                    for (JsonNode tradeNode : responseNode) {
                         Trade trade = parseTrade(tradeNode.toString(), tradePair);
                         if (trade != null) {
                             trades.add(trade);
@@ -2236,17 +2253,18 @@ public class BinanceUs extends Exchange {
      * Parses a list of Binance API open order responses into OpenOrder objects.
      * Handles both single order nodes and arrays of order nodes synchronously.
      * 
-     * @param responseNode JsonNode containing either a single order or array of orders
+     * @param responseNode JsonNode containing either a single order or array of
+     *                     orders
      * @return List of OpenOrder objects (empty list if parsing fails or no orders)
      */
     private List<OpenOrder> parseOpenOrders(JsonNode responseNode) {
         List<OpenOrder> openOrders = new ArrayList<>();
-        
+
         try {
             if (responseNode == null) {
                 return openOrders;
             }
-            
+
             if (responseNode.isArray()) {
                 for (JsonNode orderNode : responseNode) {
                     OpenOrder order = parseOpenOrder(orderNode);
@@ -2261,12 +2279,12 @@ public class BinanceUs extends Exchange {
                     openOrders.add(order);
                 }
             }
-            
+
             logger.debug("Parsed {} open orders", openOrders.size());
         } catch (Exception exception) {
             logger.error("Failed to parse open orders", exception);
         }
-        
+
         return openOrders;
     }
 
@@ -2355,7 +2373,6 @@ public class BinanceUs extends Exchange {
                         double price = ask.get(0).asDouble();
                         double quantity = ask.get(1).asDouble();
                         // Add to order book asks
-
 
                     }
                 }
