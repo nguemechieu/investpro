@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
@@ -535,6 +536,7 @@ public class StellarNetwork extends Exchange {
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
         return new TradePair("XLM", "USDC");
     }
+    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
 
     @Override
     public List<TradePair> getTradePairSymbol() throws SQLException, ClassNotFoundException {

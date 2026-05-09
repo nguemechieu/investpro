@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
@@ -81,8 +82,7 @@ public class Coinbase extends Exchange {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
-            Collections.synchronizedMap(new HashMap<>());
+    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
 
     private final HttpClient httpClient;
     private HttpRequest.Builder requestBuilder;
@@ -141,7 +141,9 @@ public class Coinbase extends Exchange {
             this.websocketClient = createWebSocketClient();
         } catch (Exception exception) {
             log.error("Failed to initialize Coinbase websocket client", exception);
+            logCredentialWarnings();
         }
+
     }
 
     private boolean hasCredentials() {
@@ -539,6 +541,7 @@ public class Coinbase extends Exchange {
             log.debug("Private key validation failed: contains BEGIN={}, contains PRIVATE KEY={}",
                     value != null && value.contains("BEGIN"),
                     value != null && value.contains("PRIVATE KEY"));
+            logCredentialDiagnostics(apiKey,apiSecret,this.getDisplayName());
         }
         return result;
     }

@@ -11,6 +11,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
@@ -81,6 +82,7 @@ public class Oanda extends Exchange {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
 
     private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
 

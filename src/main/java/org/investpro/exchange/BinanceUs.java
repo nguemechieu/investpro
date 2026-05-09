@@ -12,6 +12,7 @@ import org.investpro.data.Account;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
 
+import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.credentials.ExchangeSigning;
 import org.investpro.exchange.models.AuthCheckResult;
@@ -63,6 +64,8 @@ public class BinanceUs extends Exchange {
     private static final String REST_BASE_URL = "";
     private static final String MARKET_DATA_WS_URL = "";
     private ExchangeWebSocketClient websocketClient;
+    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
+
     private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
             false);
     private volatile String listenKey; // Listen key for user stream subscriptions
@@ -1637,7 +1640,7 @@ public class BinanceUs extends Exchange {
 
                 if (response.statusCode() != 200) {
                     if (response.statusCode() == 429 || response.statusCode() == 418) {
-                        activatePublicRestCooldown(response, "/api/v3/depth");
+                        activatePublicRestCooldown(response);
                     }
                     logger.warn("Failed to fetch order book: HTTP {}", response.statusCode());
                     return new OrderBook(tradePair);
@@ -2037,7 +2040,7 @@ public class BinanceUs extends Exchange {
         }
     }
 
-    private void activatePublicRestCooldown(HttpResponse<String> response, String path) {
+    private void activatePublicRestCooldown(HttpResponse<String> response) {
         long cooldownMs = parseRetryAfterMillis(response)
                 .orElse(PUBLIC_REST_429_COOLDOWN_MS);
         publicRestCooldownUntilMs = Math.max(
@@ -2045,7 +2048,7 @@ public class BinanceUs extends Exchange {
                 System.currentTimeMillis() + cooldownMs);
         logger.warn(
                 "Binance US public REST rate limit on {}. Cooling down public REST for {}ms.",
-                path,
+                "/api/v3/depth",
                 cooldownMs);
     }
 

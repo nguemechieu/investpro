@@ -398,7 +398,6 @@ public class TradingDesk extends BorderPane {
         return topSection;
     }
 
-
     @Contract(" -> new")
     private @NotNull MenuBar createMenuBar() {
         Menu fileMenu = new Menu(t("menu.file"));
@@ -503,8 +502,7 @@ public class TradingDesk extends BorderPane {
                         log.error("Error showing strategy assignment panel", ex);
                         showWarning(
                                 "Strategy Assignment",
-                                "Unable to open strategy assignment panel: " + ex.getMessage()
-                        );
+                                "Unable to open strategy assignment panel: " + ex.getMessage());
                     }
                 }),
                 menuItem(t("menu.researchReports"), null, this::openResearchReports)));
@@ -2362,6 +2360,14 @@ public class TradingDesk extends BorderPane {
         connectButton.setDisable(false);
         journal("Credentials validated for %s".formatted(exchangeSelector.getValue()));
 
+        // Sync trading mode selector with configured trading mode from credentials
+        if (tradingModeSelector != null && configuredTradingMode != null) {
+            tradingModeSelector.getSelectionModel().select(configuredTradingMode);
+            if (exchange != null) {
+                exchange.setUserSelectedTradingMode(configuredTradingMode);
+            }
+        }
+
         // Setup email notifications for OANDA if configured
         setupOandaEmailNotifications(account);
 
@@ -4180,6 +4186,12 @@ public class TradingDesk extends BorderPane {
         TextField telegramField = new TextField(telegramToken);
         TextField emailField = new TextField(oandaEmailNotification);
 
+        // Trading mode selector
+        ComboBox<String> tradingModeCombo = new ComboBox<>();
+        tradingModeCombo.getItems().addAll("LIVE", "PAPER");
+        tradingModeCombo.setValue(configuredTradingMode != null ? configuredTradingMode : "LIVE");
+        tradingModeCombo.setPrefWidth(Double.MAX_VALUE);
+
         boolean oanda = "OANDA".equalsIgnoreCase(selectedExchange);
         apiKeyField.setPromptText(oanda ? "OANDA Token" : "API Key");
         secretField.setPromptText(oanda ? "Account ID optional" : "API Secret");
@@ -4190,9 +4202,10 @@ public class TradingDesk extends BorderPane {
 
         grid.addRow(0, new Label(oanda ? "Token" : "API Key"), apiKeyField);
         grid.addRow(1, new Label(oanda ? "Account ID" : "API Secret"), secretField);
-        grid.addRow(2, new Label("Telegram Token"), telegramField);
+        grid.addRow(2, new Label("Trading Mode"), tradingModeCombo);
+        grid.addRow(3, new Label("Telegram Token"), telegramField);
         if (oanda) {
-            grid.addRow(3, new Label("Email Notifications"), emailField);
+            grid.addRow(4, new Label("Email Notifications"), emailField);
         }
 
         dialog.getDialogPane().setContent(grid);
@@ -4200,6 +4213,7 @@ public class TradingDesk extends BorderPane {
             if (buttonType == connectType) {
                 configuredApiKey = safe(apiKeyField.getText());
                 configuredApiSecret = safe(secretField.getText());
+                configuredTradingMode = tradingModeCombo.getValue();
                 telegramToken = safe(telegramField.getText());
                 if (oanda) {
                     oandaEmailNotification = safe(emailField.getText());

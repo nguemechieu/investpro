@@ -83,14 +83,14 @@ public class OrderPanel extends BorderPane {
     private double bidPrice = 0.0;
     private double askPrice = 0.0;
     private java.util.Deque<Double> priceHistory = new ConcurrentLinkedDeque<>();
-private  SystemCore systemCore;
+    private SystemCore systemCore;
+
     public OrderPanel(SystemCore systemCore) {
         setPrefSize(800, 580);
         setPadding(new Insets(0));
         setStyle("-fx-background-color: #0f172a;");
 
-        this.systemCore=systemCore;
-
+        this.systemCore = systemCore;
 
         try {
             setupUI(systemCore.getExchange().getTradePairSymbol(), systemCore.getSelectedTradePair());
@@ -269,7 +269,7 @@ private  SystemCore systemCore;
 
         symbolCombo = new ComboBox<>();
         if (availableSymbols != null) {
-            symbolCombo.getItems().addAll(availableSymbols.stream().map(c->c.toString('/')).toList());
+            symbolCombo.getItems().addAll(availableSymbols.stream().map(c -> c.toString('/')).toList());
         }
         if (selectedSymbol != null) {
             symbolCombo.setValue(displaySymbol(selectedSymbol));
@@ -437,8 +437,8 @@ private  SystemCore systemCore;
     private void updateUIForOrderType() {
         OpenOrder.OrderType selectedType = orderTypeCombo.getValue();
         boolean isMarket = selectedType == OpenOrder.OrderType.MARKET;
-        boolean isLimitOrStopLimit = selectedType == OpenOrder.OrderType.LIMIT || 
-                                     selectedType == OpenOrder.OrderType.STOP_LIMIT;
+        boolean isLimitOrStopLimit = selectedType == OpenOrder.OrderType.LIMIT ||
+                selectedType == OpenOrder.OrderType.STOP_LIMIT;
 
         priceField.setDisable(isMarket);
         expirationDatePicker.setDisable(isMarket);
@@ -452,29 +452,30 @@ private  SystemCore systemCore;
             styleInput(expirationDatePicker);
         }
 
-        // For LIMIT and STOP_LIMIT orders, highlight stopLoss and takeProfit as required
+        // For LIMIT and STOP_LIMIT orders, highlight stopLoss and takeProfit as
+        // required
         if (isLimitOrStopLimit) {
             // Highlight fields with red/green borders to show they are required
             stopLossSpinner.setStyle(
                     "-fx-font-size: 14px; " +
-                    "-fx-background-color: #0b1120; " +
-                    "-fx-control-inner-background: #0b1120; " +
-                    "-fx-text-fill: #ffffff; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-border-color: #ef4444; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-padding: 6;");
+                            "-fx-background-color: #0b1120; " +
+                            "-fx-control-inner-background: #0b1120; " +
+                            "-fx-text-fill: #ffffff; " +
+                            "-fx-background-radius: 8; " +
+                            "-fx-border-color: #ef4444; " +
+                            "-fx-border-width: 2; " +
+                            "-fx-border-radius: 8; " +
+                            "-fx-padding: 6;");
             takeProfitSpinner.setStyle(
                     "-fx-font-size: 14px; " +
-                    "-fx-background-color: #0b1120; " +
-                    "-fx-control-inner-background: #0b1120; " +
-                    "-fx-text-fill: #ffffff; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-border-color: #10b981; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-padding: 6;");
+                            "-fx-background-color: #0b1120; " +
+                            "-fx-control-inner-background: #0b1120; " +
+                            "-fx-text-fill: #ffffff; " +
+                            "-fx-background-radius: 8; " +
+                            "-fx-border-color: #10b981; " +
+                            "-fx-border-width: 2; " +
+                            "-fx-border-radius: 8; " +
+                            "-fx-padding: 6;");
         } else {
             styleInput(stopLossSpinner);
             styleInput(takeProfitSpinner);
@@ -540,7 +541,8 @@ private  SystemCore systemCore;
                 return;
             }
 
-            // For LIMIT and STOP_LIMIT orders, always require stoploss and take profit prices
+            // For LIMIT and STOP_LIMIT orders, always require stoploss and take profit
+            // prices
             if (orderType == OpenOrder.OrderType.LIMIT || orderType == OpenOrder.OrderType.STOP_LIMIT) {
                 if (stopLoss <= 0.0) {
                     showError("Stop Loss price is required for " + orderType + " orders");
@@ -747,10 +749,9 @@ private  SystemCore systemCore;
         Instant nextHour = now.plusSeconds(3600);
 
         // Keeping variables to make future integration obvious.
-        NewsDataProvider newsDataProvider=new NewsDataProvider();
+        NewsDataProvider newsDataProvider = new NewsDataProvider();
 
-
-        return newsDataProvider.fetchAndSummarizeNews(currency,"N/A",100,nextHour.getNano()).toString();
+        return newsDataProvider.fetchAndSummarizeNews(currency, "N/A", 100, nextHour.getNano()).toString();
     }
 
     private void showError(String message) {

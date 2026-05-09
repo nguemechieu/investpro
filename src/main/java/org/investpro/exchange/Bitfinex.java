@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.credentials.ExchangeSigning;
 import org.investpro.exchange.models.AuthCheckResult;
@@ -155,7 +156,7 @@ public class Bitfinex extends Exchange {
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
         List<TradePair> pairs = getTradePairSymbol();
-        return pairs.isEmpty() ? TradePair.of("BTC", "USD") : pairs.get(0);
+        return pairs.isEmpty() ? TradePair.of("BTC", "USD") : pairs.getFirst();
     }
 
     @Override
@@ -440,6 +441,7 @@ public class Bitfinex extends Exchange {
                         """)
                 .build();
     }
+    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
 
     @Override
     public AuthCheckResult checkAuthentication() {
