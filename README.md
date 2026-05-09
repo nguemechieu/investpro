@@ -12,7 +12,7 @@
 
 
 **InvestPro** is a professional, multi-exchange trading platform built with Java 26 and JavaFX. It provides a comprehensive suite of tools for algorithmic trading, portfolio management, market data analysis, and automated signal generation across multiple exchanges and asset classes.
-
+![image](src/main/resources/images/InvestPro-USD-JPY-20260509-161851.png)
 **Key Highlights:**
 - ✅ Real-time WebSocket streaming to avoid rate limits
 - ✅ Paper trading with $10k USD/USDT initialization

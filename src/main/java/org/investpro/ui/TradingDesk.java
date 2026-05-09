@@ -3224,6 +3224,14 @@ public class TradingDesk extends BorderPane {
             symbolAgentMarketWatch.refreshMarketWatchData();
         }
 
+        // Ensure market info panel is initialized and updated with selected symbol
+        if (marketInfoPanel == null) {
+            marketInfoPanel = new MarketInfoPanel(exchange, newsDataProvider);
+        } else {
+            marketInfoPanel.setExchange(exchange);
+        }
+        marketInfoPanel.updateForPair(selected);
+
         // Load orderbook data for the selected symbol
         loadOrderBook(selected);
 
