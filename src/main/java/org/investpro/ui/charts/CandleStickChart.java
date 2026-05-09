@@ -3,6 +3,7 @@ package org.investpro.ui.charts;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.indicators.ChartIndicator;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -591,7 +592,17 @@ public class CandleStickChart extends Region {
                         && initLatch.await(10, SECONDS)
                         && websocketClient.supportsStreamingTrades(tradePair)) {
 
-                    websocketClient.streamLiveTrades(tradePair, new UiExchangeStreamConsumer());
+                    ExchangeStreamConsumer exchangeS = new UiExchangeStreamConsumer()
+                            .onTradeUpdate(updateInProgressCandleTask::accept)
+                            .onStatus(message -> log.debug("Chart stream status for {}: {}", tradePair, message))
+                            .onError((exchangeName, throwable) -> log.warn(
+                                    "Chart live trade stream error. exchange={} pair={} error={}",
+                                    exchangeName,
+                                    tradePair,
+                                    throwable == null ? "unknown" : throwable.getMessage(),
+                                    throwable));
+
+                    websocketClient.streamLiveTrades(tradePair, exchangeS);
                     streamingStarted = true;
 
                     log.info("Live trade WebSocket stream started for {}", tradePair);
@@ -1255,6 +1266,7 @@ public class CandleStickChart extends Region {
 
     private boolean isCryptoSymbol(String symbol) {
         // Common crypto symbols
+        @SuppressWarnings("SpellCheckingInspection")
         String crypto = "BTC,ETH,XRP,LTC,BCH,EOS,BNB,XLM,XMR,DASH,ZEC,DOGE,ADA,IOTA,NEO,LINK,DOT,SOL,USDT,USDC,DAI,BUSD,WBTC,WETH";
         return crypto.contains(symbol);
     }
@@ -1404,10 +1416,15 @@ public class CandleStickChart extends Region {
                 colors.put("DnFractal", javafx.scene.paint.Color.web("#e74c3c"));
             }
             case "Ichimoku Cloud" -> {
+                // noinspection SpellCheckingInspection
                 colors.put("TenkanSen", javafx.scene.paint.Color.web("#3498db"));
+                // noinspection SpellCheckingInspection
                 colors.put("KijunSen", javafx.scene.paint.Color.web("#f39c12"));
+                // noinspection SpellCheckingInspection
                 colors.put("SenkouSpanA", javafx.scene.paint.Color.web("#2ecc71"));
+                // noinspection SpellCheckingInspection
                 colors.put("SenkouSpanB", javafx.scene.paint.Color.web("#e74c3c"));
+                // noinspection SpellCheckingInspection
                 colors.put("ChikouSpan", javafx.scene.paint.Color.web("#9370DB"));
             }
             case "Volume Weighted Average Price" -> colors.put("VWAP", javafx.scene.paint.Color.web("#1abc9c"));
@@ -1763,7 +1780,6 @@ public class CandleStickChart extends Region {
         if (data.isEmpty())
             return;
 
-        int oldIndex = firstVisibleIndex;
         firstVisibleIndex = clampInt(firstVisibleIndex + candles, 0, Math.max(0, data.size() - visibleCandles));
 
         // Provide visual feedback when reaching boundaries
@@ -1846,13 +1862,6 @@ public class CandleStickChart extends Region {
         return "%.2f".formatted(value);
     }
 
-    public void addPriceLine(double price, Color color, String label) {
-        if (!Double.isFinite(price) || price <= 0)
-            return;
-        addPriceLine(
-                new PriceLine(price, color == null ? Color.web("#f59e0b") : color, label == null ? "" : label.trim()));
-    }
-
     public void addPriceLine(@Nullable PriceLine priceLine) {
         if (priceLine == null || !priceLine.isValid())
             return;
@@ -1880,26 +1889,9 @@ public class CandleStickChart extends Region {
         addPriceLine(PriceLine.entry(price));
     }
 
-    public void setBidPriceLine(double price) {
-        replacePriceLineByLabel(PriceLine.bid(price));
-    }
-
-    public void setAskPriceLine(double price) {
-        replacePriceLineByLabel(PriceLine.ask(price));
-    }
-
     private void replacePriceLineByLabel(@NotNull PriceLine replacement) {
         priceLines.removeIf(line -> Objects.equals(line.getLabel(), replacement.getLabel()));
         priceLines.add(replacement.copy());
-        requestChartRedraw();
-    }
-
-    public List<PriceLine> getPriceLines() {
-        return priceLines.stream().map(PriceLine::copy).toList();
-    }
-
-    public void removePriceLine(double price) {
-        priceLines.removeIf(line -> Double.compare(line.getPrice(), price) == 0);
         requestChartRedraw();
     }
 
@@ -1911,10 +1903,6 @@ public class CandleStickChart extends Region {
     public void setPriceLinesVisible(boolean visible) {
         showPriceLines = visible;
         requestChartRedraw();
-    }
-
-    public boolean isPriceLinesVisible() {
-        return showPriceLines;
     }
 
     public void togglePriceLines() {
@@ -1930,11 +1918,6 @@ public class CandleStickChart extends Region {
         }
     }
 
-    public void removeIndicator(String indicatorName) {
-        indicators.removeIf(i -> i.getName().equals(indicatorName));
-        requestChartRedraw();
-    }
-
     public void clearIndicators() {
         indicators.clear();
         requestChartRedraw();
@@ -1944,10 +1927,6 @@ public class CandleStickChart extends Region {
         return List.copyOf(indicators);
     }
 
-    public boolean hasIndicator(String indicatorName) {
-        return indicators.stream().anyMatch(i -> i.getName().equals(indicatorName));
-    }
-
     public void setBackgroundImage(@Nullable Image image) {
         this.backgroundImage = image;
         requestChartRedraw();
@@ -1955,11 +1934,6 @@ public class CandleStickChart extends Region {
 
     public void clearBackgroundImage() {
         setBackgroundImage(null);
-    }
-
-    public void setBackgroundImageOpacity(double opacity) {
-        this.backgroundImageOpacity = clamp(opacity, 0.0, 1.0);
-        requestChartRedraw();
     }
 
     private void recalculateIndicators() {
@@ -1983,10 +1957,6 @@ public class CandleStickChart extends Region {
             crosshairMouseY = -1;
         }
         requestChartRedraw();
-    }
-
-    public boolean isCrosshairVisible() {
-        return showCrosshair;
     }
 
     /**
