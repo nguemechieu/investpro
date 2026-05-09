@@ -23,7 +23,6 @@ import javafx.stage.Stage;
 import javafx.stage.FileChooser;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.SneakyThrows;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
@@ -995,8 +994,7 @@ public class TradingDesk extends BorderPane {
 
                     row.getChildren().addAll(priceLabel, sizeLabel, filler, totalLabel);
                     // Set background with depth visualization
-                    row.setStyle("-fx-background-color: #0f3460; " +
-                            "-fx-background-image: linear-gradient(to right, " + depthColor + ", transparent); " +
+                    row.setStyle("-fx-background-color: " + depthColor + "; " +
                             "-fx-padding: 0;");
                     setGraphic(row);
                     setText(null);
@@ -1047,8 +1045,7 @@ public class TradingDesk extends BorderPane {
 
                     row.getChildren().addAll(totalLabel, filler, sizeLabel, priceLabel);
                     // Set background with depth visualization (right-aligned for asks)
-                    row.setStyle("-fx-background-color: #0f3460; " +
-                            "-fx-background-image: linear-gradient(to left, " + depthColor + ", transparent); " +
+                    row.setStyle("-fx-background-color: " + depthColor + "; " +
                             "-fx-padding: 0;");
                     setGraphic(row);
                     setText(null);
@@ -1290,14 +1287,7 @@ public class TradingDesk extends BorderPane {
         detachButton.getStyleClass().add("terminal-button");
         detachButton.setOnAction(event -> detachConsoleWindow());
 
-        Button closeButton = new Button("✕");
-        closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;");
-        closeButton.setOnMouseEntered(e -> closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #ef4444; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnMouseExited(e -> closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnAction(event -> toggleConsoleVisibility());
+        Button closeButton = getButton1();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -1327,6 +1317,18 @@ public class TradingDesk extends BorderPane {
         console.getStyleClass().addAll("system-console", "bottom-terminal");
         VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
         return console;
+    }
+
+    private @NotNull Button getButton1() {
+        Button closeButton = new Button("✕");
+        closeButton.setStyle(
+                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;");
+        closeButton.setOnMouseEntered(e -> closeButton.setStyle(
+                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #ef4444; -fx-background-color: transparent; -fx-cursor: hand;"));
+        closeButton.setOnMouseExited(e -> closeButton.setStyle(
+                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;"));
+        closeButton.setOnAction(event -> toggleConsoleVisibility());
+        return closeButton;
     }
 
     private void toggleConsoleVisibility() {
@@ -1467,9 +1469,18 @@ public class TradingDesk extends BorderPane {
 
         // For BorderPane-based components, use them directly without ScrollPane
         // For other components, wrap in ScrollPane
+        Scene scene = getScene(content, width, height);
+        scene.setFill(Color.web("#1a1a2e"));
+        stage.setScene(scene);
+        stage.show();
+
+        log.info("Independent window opened: {}", title);
+    }
+
+    private @NotNull Scene getScene(Node content, double width, double height) {
         javafx.scene.Parent sceneContent;
-        if (content instanceof javafx.scene.layout.BorderPane) {
-            sceneContent = (javafx.scene.layout.BorderPane) content;
+        if (content instanceof BorderPane) {
+            sceneContent = (BorderPane) content;
         } else {
             ScrollPane scrollPane = new ScrollPane(content);
             scrollPane.setFitToWidth(true);
@@ -1479,11 +1490,7 @@ public class TradingDesk extends BorderPane {
         }
 
         Scene scene = new Scene(sceneContent, width, height);
-        scene.setFill(Color.web("#1a1a2e"));
-        stage.setScene(scene);
-        stage.show();
-
-        log.info("Independent window opened: {}", title);
+        return scene;
     }
 
     private void openSystemMonitorWindow() {
