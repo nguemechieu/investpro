@@ -1489,8 +1489,7 @@ public class TradingDesk extends BorderPane {
             sceneContent = scrollPane;
         }
 
-        Scene scene = new Scene(sceneContent, width, height);
-        return scene;
+        return new Scene(sceneContent, width, height);
     }
 
     private void openSystemMonitorWindow() {
@@ -1705,7 +1704,7 @@ public class TradingDesk extends BorderPane {
         TableColumn<PositionHealthScore, String> summaryCol = tableColumn("Summary", PositionHealthScore::getSummary,
                 320);
 
-        positionHealthTable.getColumns().setAll(statusCol, scoreCol, pnlCol, riskCol, technicalCol, liquidityCol,
+        positionHealthTable.getColumns().addAll(statusCol, scoreCol, pnlCol, riskCol, technicalCol, liquidityCol,
                 portfolioCol, summaryCol);
 
         VBox content = new VBox(positionHealthTable);
@@ -1736,7 +1735,7 @@ public class TradingDesk extends BorderPane {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No symbols loaded"));
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        table.getColumns().setAll(
+        table.getColumns().addAll(
                 tableColumn("Symbol", pair -> pair == null ? "" : pair.toString('/'), 100),
                 tableColumn("Bid", pair -> pair == null ? "" : marketPrice(pair.getBid()), 80),
                 tableColumn("Ask", pair -> pair == null ? "" : marketPrice(pair.getAsk()), 80),
@@ -1827,7 +1826,7 @@ public class TradingDesk extends BorderPane {
         positionsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         positionsTable.setPlaceholder(new Label("No open positions"));
         positionsTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        positionsTable.getColumns().setAll(
+        positionsTable.getColumns().addAll(
                 tableColumn("Symbol", order -> safe(order.getSymbol()), 90),
                 tableColumn("Type", order -> safe(order.getSide().name()), 70),
                 tableColumn("Qty", order -> number(order.getQuantity()), 90),
@@ -1863,7 +1862,7 @@ public class TradingDesk extends BorderPane {
         TableView<Trade> table = new TableView<>(accountTradeItems);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No account trades"));
-        table.getColumns().setAll(
+        table.getColumns().addAll(
                 tableColumn("Time", trade -> dateTime(trade.getTimestamp()), 140),
                 tableColumn("Type", trade -> String.valueOf(trade.getTransactionType()), 70),
                 tableColumn("Size", trade -> number(trade.getAmount()), 80),
@@ -1934,7 +1933,7 @@ public class TradingDesk extends BorderPane {
         TableView<OpenOrder> table = new TableView<>(accountOpenOrderItems);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No open orders"));
-        table.getColumns().setAll(
+        table.getColumns().addAll(
                 tableColumn("Date", order -> order.getCreatedAt() != null ? dateTime(order.getCreatedAt()) : "", 150),
                 tableColumn("Symbol", order -> order.getTradePair() != null ? order.getTradePair().toString('/') : "",
                         110),
@@ -4956,13 +4955,13 @@ public class TradingDesk extends BorderPane {
         } catch (Exception exception) {
             journal("Backtesting panel failed to open: " + exception.getMessage());
             log.error("Backtesting panel failed to open", exception);
-            showAlert("Backtesting", "Unable to open backtesting: " + exception.getMessage());
+            showAlert("Unable to open backtesting: " + exception.getMessage());
         }
     }
 
-    private void showAlert(String backtesting, String s) {
+    private void showAlert(String s) {
         Stage stage = new Stage();
-        VBox vBox = new VBox(new Label(backtesting + "\n----------\n" + s));
+        VBox vBox = new VBox(new Label("Backtesting" + "\n----------\n" + s));
         Scene root = new Scene(new StackPane(vBox));
 
         stage.setScene(root);
@@ -5292,7 +5291,7 @@ public class TradingDesk extends BorderPane {
     private @NotNull String getBitcoinDominance() {
         MarketSnapshot snapshot = marketSnapshot();
         return snapshot.hasMarketData() && snapshot.bitcoinDominancePercent() >= 0.0
-                ? formatPercent(snapshot.bitcoinDominancePercent(), 1)
+                ? formatPercent(snapshot.bitcoinDominancePercent())
                 : "N/A";
     }
 
@@ -5313,7 +5312,7 @@ public class TradingDesk extends BorderPane {
 
     private String getStrategyWinRate() {
         StrategyStats stats = strategyStats();
-        return stats.totalTrades() > 0 ? formatPercent(stats.winRatePercent(), 1) : "N/A";
+        return stats.totalTrades() > 0 ? formatPercent(stats.winRatePercent()) : "N/A";
     }
 
     private String getStrategyProfitFactor() {
@@ -5689,8 +5688,8 @@ public class TradingDesk extends BorderPane {
         return formatter.format(value);
     }
 
-    private String formatPercent(double value, int decimals) {
-        return formatNumber(value, decimals) + "%";
+    private String formatPercent(double value) {
+        return formatNumber(value, 2) + "%";
     }
 
     private String formatSignedPercent(double value, int decimals) {

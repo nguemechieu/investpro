@@ -40,14 +40,22 @@ public interface MarketDataProvider {
             TradePair tradePair,
             Instant currentCandleStartedAt,
             long secondsIntoCurrentCandle,
-            int secondsPerCandle
-    );
+            int secondsPerCandle);
 
     CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt);
 
     CompletableFuture<?> getOrderBook(TradePair tradePair);
 
     CompletableFuture<OrderBook> fetchOrderBook(TradePair tradePair);
+
+    /**
+     * Fetch order books for multiple trading pairs in batch.
+     * Returns a list of order books corresponding to the input trade pairs.
+     * 
+     * @param tradePairs list of trading pairs to fetch order books for
+     * @return CompletableFuture containing list of order books
+     */
+    CompletableFuture<List<OrderBook>> fetchOrderBooks(List<TradePair> tradePairs);
 
     String supportsTimeframe(int secondsPerCandle);
 

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.*;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.models.trading.Order;
+import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.AuthResult;
 import org.investpro.utils.MARKET_TYPES;
@@ -14,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Getter
@@ -31,7 +33,6 @@ public abstract class Exchange implements
         ExchangeCapabilities,
         PrecisionProvider {
 
-
     private String telegramToken;
     private String emailNotification;
     private String userSelectedTradingMode;
@@ -40,16 +41,13 @@ public abstract class Exchange implements
     protected Exchange(@NotNull ExchangeCredentials credentials) {
         this.credentials = credentials;
 
-
         this.userSelectedTradingMode = credentials.sandbox() ? "PAPER" : "LIVE";
-        log.debug(this.getClass().getSimpleName() + " created ",this);
+        log.debug(this.getClass().getSimpleName() + " created ", this);
     }
-
 
     public void setTokens(String telegramToken) {
         setTelegramToken(telegramToken);
     }
-
 
     public TradePair getSelecTradePair() throws Exception {
         return getSelectedTradePair();
@@ -60,8 +58,7 @@ public abstract class Exchange implements
             MARKET_TYPES marketType,
             double size,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         buy(tradePair, marketType, size, 0.0, stopLoss, takeProfit, 0.0);
     }
 
@@ -70,15 +67,13 @@ public abstract class Exchange implements
             MARKET_TYPES marketType,
             double size,
             double stopLoss,
-            double takeProfit
-    ) {
+            double takeProfit) {
         sell(tradePair, marketType, size, 0.0, stopLoss, takeProfit, 0.0);
     }
 
     public void cancelALL() {
         cancelAllOrders();
     }
-
 
     public Order createOrder(
             long id,
@@ -89,8 +84,7 @@ public abstract class Exchange implements
             Side side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    ) {
+            double slippage) {
         Instant timestamp = now() == null ? Instant.now() : now();
 
         return new Order(
@@ -103,8 +97,7 @@ public abstract class Exchange implements
                 price,
                 stopLoss,
                 takeProfit,
-                slippage
-        );
+                slippage);
     }
 
     public boolean canSubmitLiveOrders() {
@@ -118,11 +111,31 @@ public abstract class Exchange implements
                 && (canSubmitLiveOrders() || (supportsPaperTradingMode() && isPaperTrading()));
     }
 
+    /**
+     * Default batch implementation: fetch order books for multiple trading pairs.
+     * Can be overridden by subclasses for optimized batch operations.
+     * 
+     * @param tradePairs list of trading pairs
+     * @return CompletableFuture containing list of order books
+     */
+    @Override
+    public CompletableFuture<List<OrderBook>> fetchOrderBooks(List<TradePair> tradePairs) {
+        if (tradePairs == null || tradePairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.allOf(
+                tradePairs.stream()
+                        .map(this::fetchOrderBook)
+                        .toArray(CompletableFuture[]::new))
+                .thenApply(v -> tradePairs.stream()
+                        .map(pair -> new OrderBook(pair))
+                        .toList());
+    }
 
     protected UnsupportedOperationException unsupported(String methodName) {
         return new UnsupportedOperationException(
-                "%s does not support %s".formatted(getName(), methodName)
-        );
+                "%s does not support %s".formatted(getName(), methodName));
     }
 
     protected static <T> @NotNull CompletableFuture<T> failedFuture(Throwable throwable) {
@@ -131,7 +144,6 @@ public abstract class Exchange implements
         return future;
     }
 
-
     public abstract void buy(
             TradePair tradePair,
             MARKET_TYPES marketType,
@@ -139,8 +151,7 @@ public abstract class Exchange implements
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    );
+            double slippage);
 
     public abstract void sell(
             TradePair tradePair,
@@ -149,8 +160,7 @@ public abstract class Exchange implements
             double side,
             double stopLoss,
             double takeProfit,
-            double slippage
-    );
+            double slippage);
 
-    public abstract AuthResult AuthCheckResult(String selectedExchange) ;
+    public abstract AuthResult AuthCheckResult(String selectedExchange);
 }

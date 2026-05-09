@@ -120,7 +120,7 @@ public class BinanceUs extends Exchange {
                 : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
-    private ExchangeWebSocketClient createWebSocketClient() throws Exception {
+    private ExchangeWebSocketClient createWebSocketClient() {
         return new BinanceWebSocketClient(URI.create(BINANCE_US_WS_URL), new org.java_websocket.drafts.Draft_6455());
     }
 
@@ -2335,6 +2335,8 @@ public class BinanceUs extends Exchange {
                         double price = ask.get(0).asDouble();
                         double quantity = ask.get(1).asDouble();
                         // Add to order book asks
+
+
                     }
                 }
             }
