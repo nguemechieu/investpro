@@ -352,6 +352,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
      */
     protected void onRawMessage(@NotNull String message) {
         // Optional subclass hook.
+        log.debug(message);
     }
 
 

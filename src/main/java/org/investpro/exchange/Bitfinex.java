@@ -156,7 +156,8 @@ public class Bitfinex extends Exchange {
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
         List<TradePair> pairs = getTradePairSymbol();
-        return pairs.isEmpty() ? TradePair.of("BTC", "USD") : pairs.getFirst();
+        return pairs.isEmpty() ? TradePair.of("BTC",
+                "USD") : pairs.getFirst();
     }
 
     @Override

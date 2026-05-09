@@ -42,7 +42,6 @@ import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -71,20 +70,20 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Random;
 
+@Slf4j
 @EqualsAndHashCode(callSuper = true)
 
 @Getter
 @Setter
-@Slf4j
+
 public class Oanda extends Exchange {
 
+   private  static  final Logger logger=log;
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
-
-    private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
 
     private static final String OANDA_API_URL = "https://api-fxtrade.oanda.com";
     // "https://stream-fxtrade.oanda.com/v3/accounts/<ACCOUNT>/pricing/stream?instruments=EUR_USD%2CUSD_CAD"
@@ -190,7 +189,7 @@ public class Oanda extends Exchange {
             this.websocketClient.addHeader("Authorization", "Bearer %s".formatted(this.apiKey));
             this.websocketAvailable = false;
         } catch (Exception exception) {
-            logger.warn("OANDA WebSocket-style client unavailable. Polling/HTTP streaming fallback will be used.",
+            log.warn("OANDA WebSocket-style client unavailable. Polling/HTTP streaming fallback will be used.",
                     exception);
             this.websocketAvailable = false;
         }
@@ -389,18 +388,18 @@ public class Oanda extends Exchange {
     @Override
     public void connect() {
         if (apiKey.isBlank()) {
-            logger.warn("OANDA token is empty. Adapter cannot connect.");
+            log.warn("OANDA token is empty. Adapter cannot connect.");
             return;
         }
 
         resolveAccountId();
 
         if (accountId.isBlank()) {
-            logger.warn("OANDA account id could not be resolved.");
+            log.warn("OANDA account id could not be resolved.");
             return;
         }
 
-        logger.info("OANDA adapter connected using account {}", mask(accountId));
+        log.info("OANDA adapter connected using account {}", mask(accountId));
     }
 
     @Override
@@ -412,7 +411,7 @@ public class Oanda extends Exchange {
                 websocketClient.close();
             }
         } catch (Exception exception) {
-            logger.warn("Failed to close OANDA websocket client", exception);
+            log.warn("Failed to close OANDA websocket client", exception);
         }
     }
 
@@ -499,7 +498,7 @@ public class Oanda extends Exchange {
             HttpResponse<String> response = send(request);
 
             if (!isSuccess(response)) {
-                logger.warn("OANDA instruments failed HTTP {}: {}", response.statusCode(), response.body());
+                log.warn("OANDA instruments failed HTTP {}: {}", response.statusCode(), response.body());
                 return Collections.emptyList();
             }
 
@@ -507,7 +506,7 @@ public class Oanda extends Exchange {
             JsonNode instruments = root.path("instruments");
 
             if (!instruments.isArray()) {
-                logger.warn("OANDA instruments response had unexpected format: {}", response.body());
+                log.warn("OANDA instruments response had unexpected format: {}", response.body());
                 return Collections.emptyList();
             }
 
@@ -532,14 +531,14 @@ public class Oanda extends Exchange {
                     pair.setTradingSession(OandaTradingSessionFactory.forInstrument(name));
                     pairs.add(pair);
                 } catch (SQLException | ClassNotFoundException exception) {
-                    logger.debug("Skipping OANDA instrument {}", name, exception);
+                    log.debug("Skipping OANDA instrument {}", name, exception);
                 }
             }
 
             return pairs;
 
         } catch (Exception exception) {
-            logger.error("Failed to load OANDA trade pairs", exception);
+            log.error("Failed to load OANDA trade pairs", exception);
             return Collections.emptyList();
         }
     }
@@ -602,7 +601,7 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.warn("OANDA in-progress candle failed HTTP {}: {}", response.statusCode(),
+                        log.warn("OANDA in-progress candle failed HTTP {}: {}", response.statusCode(),
                                 response.body());
                         return Optional.empty();
                     }
@@ -690,11 +689,11 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(orderBookRequest, HttpResponse.BodyHandlers.ofString())
                 .thenCompose(response -> {
                     if (isSuccess(response)) {
-                        logger.debug("OANDA orderBook endpoint succeeded for {}", tradePair);
+                        log.debug("OANDA orderBook endpoint succeeded for {}", tradePair);
                         return CompletableFuture.completedFuture(parseOandaOrderBook(response.body(), tradePair));
                     }
 
-                    logger.debug("OANDA orderBook HTTP {}, attempting positionBook fallback", response.statusCode());
+                    log.debug("OANDA orderBook HTTP {}, attempting positionBook fallback", response.statusCode());
 
                     // Attempt 2: Try positionBook endpoint
                     String positionBookUrl = "%s/v3/instruments/%s/positionBook".formatted(OANDA_API_URL,
@@ -704,12 +703,12 @@ public class Oanda extends Exchange {
                     return httpClient.sendAsync(positionBookRequest, HttpResponse.BodyHandlers.ofString())
                             .thenCompose(posResponse -> {
                                 if (isSuccess(posResponse)) {
-                                    logger.debug("OANDA positionBook endpoint succeeded for {}", tradePair);
+                                    log.debug("OANDA positionBook endpoint succeeded for {}", tradePair);
                                     return CompletableFuture
                                             .completedFuture(parseOandaPositionBook(posResponse.body(), tradePair));
                                 }
 
-                                logger.debug("OANDA positionBook HTTP {}, attempting pricing fallback",
+                                log.debug("OANDA positionBook HTTP {}, attempting pricing fallback",
                                         posResponse.statusCode());
 
                                 // Attempt 3: Fallback to pricing endpoint
@@ -718,7 +717,7 @@ public class Oanda extends Exchange {
                 });
     }
 
-    public CompletableFuture<String> fetchPositionBook(TradePair tradePair) {
+    public CompletableFuture<String>fetchPositionBook(TradePair tradePair) {
         if (tradePair == null) {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
@@ -780,11 +779,11 @@ public class Oanda extends Exchange {
             orderBook.setAsks(asks);
             orderBook.setTimestamp(Instant.now());
 
-            logger.debug("Parsed OANDA orderBook for {} with {} bids and {} asks", tradePair, bids.size(), asks.size());
+            log.debug("Parsed OANDA orderBook for {} with {} bids and {} asks", tradePair, bids.size(), asks.size());
 
             return orderBook;
         } catch (Exception e) {
-            logger.warn("Failed to parse OANDA orderBook response: {}", e.getMessage());
+            log.warn("Failed to parse OANDA orderBook response: {}", e.getMessage());
             return new OrderBook(tradePair);
         }
     }
@@ -805,11 +804,11 @@ public class Oanda extends Exchange {
             OrderBook orderBook = new OrderBook(tradePair);
 
             // For now, return typed empty book until full parser is ready
-            logger.debug("Parsed OANDA positionBook for {}", tradePair);
+            log.debug("Parsed OANDA positionBook for {}", tradePair);
 
             return orderBook;
         } catch (Exception e) {
-            logger.warn("Failed to parse OANDA positionBook response: {}", e.getMessage());
+            log.warn("Failed to parse OANDA positionBook response: {}", e.getMessage());
             return new OrderBook(tradePair);
         }
     }
@@ -828,7 +827,7 @@ public class Oanda extends Exchange {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
-            logger.debug("No account ID for OANDA pricing fallback");
+            log.debug("No account ID for OANDA pricing fallback");
             return CompletableFuture.completedFuture(new OrderBook(tradePair));
         }
 
@@ -840,7 +839,7 @@ public class Oanda extends Exchange {
         return sendWithExponentialBackoff(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.debug("OANDA pricing fallback failed HTTP {}", response.statusCode());
+                        log.debug("OANDA pricing fallback failed HTTP {}", response.statusCode());
                         return new OrderBook(tradePair);
                     }
 
@@ -848,7 +847,7 @@ public class Oanda extends Exchange {
                         JsonNode prices = OBJECT_MAPPER.readTree(response.body()).path("prices");
 
                         if (!prices.isArray() || prices.isEmpty()) {
-                            logger.debug("OANDA pricing response empty");
+                            log.debug("OANDA pricing response empty");
                             return new OrderBook(tradePair);
                         }
 
@@ -858,7 +857,7 @@ public class Oanda extends Exchange {
                         double ask = firstPrice(price.path("asks"));
 
                         if (bid <= 0 || ask <= 0) {
-                            logger.debug("OANDA pricing fallback: no valid bid/ask");
+                            log.debug("OANDA pricing fallback: no valid bid/ask");
                             return new OrderBook(tradePair);
                         }
 
@@ -868,12 +867,12 @@ public class Oanda extends Exchange {
                         orderBook.getAsks().add(new OrderBook.PriceLevel(ask, 0));
                         orderBook.setTimestamp(Instant.now());
 
-                        logger.info("OANDA pricing fallback succeeded for {}: bid={}, ask={}", tradePair, bid, ask);
+                        log.info("OANDA pricing fallback succeeded for {}: bid={}, ask={}", tradePair, bid, ask);
 
                         return orderBook;
 
                     } catch (Exception e) {
-                        logger.warn("Failed to parse OANDA pricing for fallback: {}", e.getMessage());
+                        log.warn("Failed to parse OANDA pricing for fallback: {}", e.getMessage());
                         return new OrderBook(tradePair);
                     }
                 });
@@ -884,7 +883,7 @@ public class Oanda extends Exchange {
         try {
             return fetchTicker(tradePair).join();
         } catch (Exception exception) {
-            logger.warn("OANDA live price fetch failed for {}", tradePair, exception);
+            log.warn("OANDA live price fetch failed for {}", tradePair, exception);
             return emptyTicker();
         }
     }
@@ -969,7 +968,7 @@ public class Oanda extends Exchange {
             HttpResponse<String> response = sendCritical(request);
 
             if (!isSuccess(response)) {
-                logger.warn("OANDA account summary failed HTTP {}: {}", response.statusCode(), response.body());
+                log.warn("OANDA account summary failed HTTP {}: {}", response.statusCode(), response.body());
                 return null;
             }
 
@@ -1024,11 +1023,11 @@ public class Oanda extends Exchange {
             // Cache the account
             setAccountCached(cacheKey, userAccount);
 
-            logger.debug("OANDA account loaded: {} ({})", userAccount.getUsername(), userAccount.getAccountId());
+            log.debug("OANDA account loaded: {} ({})", userAccount.getUsername(), userAccount.getAccountId());
             return userAccount;
 
         } catch (Exception exception) {
-            logger.error("Failed to fetch OANDA account details", exception);
+            log.error("Failed to fetch OANDA account details", exception);
             return null;
         }
     }
@@ -1137,7 +1136,7 @@ public class Oanda extends Exchange {
                 HttpResponse<String> response = send(request);
 
                 if (!isSuccess(response)) {
-                    logger.warn("OANDA create order failed HTTP {}: {}", response.statusCode(), response.body());
+                    log.warn("OANDA create order failed HTTP {}: {}", response.statusCode(), response.body());
                     return "";
                 }
 
@@ -1149,7 +1148,7 @@ public class Oanda extends Exchange {
                 return !fillId.isBlank() ? fillId : createId;
 
             } catch (Exception exception) {
-                logger.error("Failed to create OANDA order", exception);
+                log.error("Failed to create OANDA order", exception);
                 return "";
             }
         }, oandaExecutor);
@@ -1266,7 +1265,7 @@ public class Oanda extends Exchange {
 
     @Override
     public void cancelALL() {
-        cancelAllOrders().thenAccept(result -> logger.info("OANDA cancelALL result: {}", result));
+        cancelAllOrders().thenAccept(result -> log.info("OANDA cancelALL result: {}", result));
     }
 
     @Override
@@ -1338,7 +1337,7 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.warn("OANDA open orders failed HTTP {}: {}", response.statusCode(), response.body());
+                        log.warn("OANDA open orders failed HTTP {}: {}", response.statusCode(), response.body());
                         return Collections.emptyList();
                     }
 
@@ -1352,7 +1351,7 @@ public class Oanda extends Exchange {
             JsonNode orders = root.path("orders");
             return parseOpenOrders(orders);
         } catch (Exception e) {
-            logger.warn("Failed to parse OANDA all open orders: {}", e.getMessage());
+            log.warn("Failed to parse OANDA all open orders: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
@@ -1420,18 +1419,9 @@ public class Oanda extends Exchange {
 
             return order;
         } catch (Exception e) {
-            logger.debug("Failed to parse OANDA open order node: {}", node, e);
+            log.debug("Failed to parse OANDA open order node: {}", node, e);
             return null;
         }
-    }
-
-    }catch(
-
-    Exception exception)
-    {
-        logger.warn("Unable to parse OANDA open orders", exception);
-        return Collections.emptyList();
-    }
     }
 
     @Override
@@ -1453,7 +1443,7 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.warn("OANDA order history failed HTTP {}: {}", response.statusCode(), response.body());
+                        log.warn("OANDA order history failed HTTP {}: {}", response.statusCode(), response.body());
                         return Collections.emptyList();
                     }
 
@@ -1519,7 +1509,7 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        logger.warn("OANDA positions failed HTTP {}: {}", response.statusCode(), response.body());
+                        log.warn("OANDA positions failed HTTP {}: {}", response.statusCode(), response.body());
                         return Collections.emptyList();
                     }
 

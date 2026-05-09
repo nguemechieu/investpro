@@ -1188,7 +1188,7 @@ public class InteractiveBrokers extends Exchange {
                 double high = firstDouble(node, "h", "high");
                 double low = firstDouble(node, "l", "low");
                 double volume = firstDouble(node, "v", "volume");
-                int time = (int) Math.max(1L, firstLong(node, "t", "time") / 1000L);
+                int time = (int) Math.max(1L, firstLong(node) / 1000L);
                 if (open > 0 && close > 0 && high > 0 && low > 0) {
                     candles.add(new CandleData(open, close, high, low, time, volume));
                 }
@@ -1505,8 +1505,8 @@ public class InteractiveBrokers extends Exchange {
         }
     }
 
-    private long firstLong(JsonNode node, String... names) {
-        String text = firstText(node, names).replace(",", "");
+    private long firstLong(JsonNode node) {
+        String text = firstText(node, new String[]{"t", "time"}).replace(",", "");
         if (text.isBlank()) {
             return 0L;
         }

@@ -161,10 +161,8 @@ public class BinanceWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
-        if (tradePair != null) {
-            liveTradeConsumers.remove(tradePair);
-            logger.info("Unsubscribed from Binance live trades for %s".formatted(tradePair));
-        }
+        liveTradeConsumers.remove(tradePair);
+        logger.info("Unsubscribed from Binance live trades for %s".formatted(tradePair));
     }
 
     @Override

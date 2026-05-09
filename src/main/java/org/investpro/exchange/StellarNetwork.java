@@ -1,5 +1,6 @@
 package org.investpro.exchange;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -755,7 +757,7 @@ public class StellarNetwork extends Exchange {
     /**
      * Parses a single Stellar open order from JsonNode.
      */
-    private OpenOrder parseOpenOrder(JsonNode node) {
+    private @Nullable OpenOrder parseOpenOrder(JsonNode node) {
         try {
             if (node == null || !node.isObject()) {
                 return null;

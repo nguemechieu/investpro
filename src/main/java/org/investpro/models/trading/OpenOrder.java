@@ -37,7 +37,7 @@ public class OpenOrder {
         FILLED,
         CANCELLED,
         REJECTED,
-        EXPIRED
+        UNKNOWN, EXPIRED
     }
 
     public enum OrderType {

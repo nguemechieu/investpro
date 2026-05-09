@@ -170,10 +170,8 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
-        if (tradePair != null) {
-            liveTradeConsumers.remove(tradePair);
-            logger.info("Unsubscribed from Bitfinex live trades for " + tradePair);
-        }
+        liveTradeConsumers.remove(tradePair);
+        logger.info("Unsubscribed from Bitfinex live trades for " + tradePair);
     }
 
     @Override
@@ -183,6 +181,7 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public void unsubscribeStream(@NotNull String streamName) {
+        liveTradeConsumers.remove(streamName, null);
 
     }
 

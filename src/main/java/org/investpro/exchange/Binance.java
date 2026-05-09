@@ -29,6 +29,7 @@ import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import lombok.extern.slf4j.Slf4j;
 
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 @Getter
 @Setter
@@ -1199,7 +1201,7 @@ public class Binance extends Exchange {
             order.setOrderId(node.path("orderId").asText());
 
             String symbol = node.path("symbol").asText();
-            TradePair tradePair = tradePairFromSymbol(symbol);
+            TradePair tradePair = tradePairFromSymbol(symbol,"USDT");
             order.setTradePair(tradePair);
 
             String side = node.path("side").asText();
@@ -1412,19 +1414,23 @@ public class Binance extends Exchange {
         return (tradePair.getBaseCode() + tradePair.getCounterCode()).toUpperCase(java.util.Locale.ROOT);
     }
 
-    private static TradePair tradePairFromSymbol(String symbol, String defaultQuote) {
+    @Contract("null, _ -> fail")
+    private static @NotNull TradePair tradePairFromSymbol(String symbol, String defaultQuote) {
         if (symbol == null || symbol.isBlank()) {
             throw new IllegalArgumentException("order symbol must not be blank");
         }
+
         String normalized = symbol.trim().replace("-", "/").toUpperCase(java.util.Locale.ROOT);
         String base;
         String quote;
+
+
         if (normalized.contains("/")) {
             String[] parts = normalized.split("/", 2);
             base = parts[0];
             quote = parts[1];
         } else {
-            quote = List.of("USDT", "USDC", "USD", "BTC", "ETH", "EUR").stream()
+            quote = Stream.of("USDT", "USDC", "USD", "BTC", "ETH", "EUR")
                     .filter(normalized::endsWith)
                     .findFirst()
                     .orElse(defaultQuote);

@@ -37,6 +37,8 @@ import java.util.function.Consumer;
 @Setter
 @Slf4j
 public class OandaWebSocketClient extends ExchangeWebSocketClient {
+    private static final String HEARTBEATS_CHANNEL ="" ;
+    private static final @NotNull String MARKET_TRADES_CHANNEL ="" ;
     protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
             Collections.synchronizedMap(new HashMap<>());
 
@@ -46,6 +48,7 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private ExchangeStreamConsumer pendingSubscriptions;
 
 
     public OandaWebSocketClient(URI uri, Draft draft) {
@@ -201,4 +204,22 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
 //        }
     }
 
+    private OandaWebSocketClient.OandaStream parseOandaStream(String streamKey) {
+        
+        return  null;
+    }
+
+    public  void  sendSubscribe(TradePair channel, @NotNull String streamKey) throws Exception{
+        
+}
+
+    public class OandaStream {
+        public @NotNull String tradePair() {
+            return  null;
+        }
+
+        public @NotNull String channel() {
+            return  null;
+        }
+    }
 }

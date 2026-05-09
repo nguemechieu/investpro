@@ -30,7 +30,6 @@ import java.util.concurrent.Future;
 
 public class OandaCandleDataSupplier extends CandleDataSupplier {
 
-
     private static final Logger logger = LoggerFactory.getLogger(OandaCandleDataSupplier.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -53,16 +52,13 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         this.apiToken = firstNonBlank(apiToken, configuredToken());
     }
 
-
-
     @Override
     public Set<Integer> getSupportedGranularities() {
         return new TreeSet<>(Set.of(
                 5, 10, 15, 30,
                 60, 120, 240, 300, 600, 900, 1800,
                 3600, 7200, 10800, 14400, 21600, 28800, 43200,
-                86400, 604800
-        ));
+                86400, 604800));
     }
 
     @Override
@@ -76,7 +72,8 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
     }
 
     @Override
-    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+    public CompletableFuture<Optional<?>> fetchCandleDataForInProgressCandle(@NotNull TradePair tradePair,
+            Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
@@ -98,7 +95,9 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         }
 
         if (endTime.get() == -1) {
-            endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
+            // Set end time to current time minus 5 seconds to ensure it's in the past
+            // OANDA API rejects 'to' times that are in the future or too close to "now"
+            endTime.set((int) ((Instant.now().toEpochMilli() / 1000L) - 5));
         }
 
         String endDateString = DateTimeFormatter.ISO_INSTANT
@@ -114,8 +113,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
                         urlEncode(toOandaInstrument(tradePair)),
                         toOandaGranularity(secondsPerCandle),
                         urlEncode(startDateString),
-                        urlEncode(endDateString)
-                );
+                        urlEncode(endDateString));
 
         if (startTime == EARLIEST_DATA) {
             // signal more data is false
@@ -123,15 +121,15 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
         }
 
         return HTTP_CLIENT.sendAsync(
-                        HttpRequest.newBuilder()
-                                .uri(URI.create(uriStr))
-                                .timeout(java.time.Duration.ofSeconds(30))
-                                .header("Authorization", "Bearer " + apiToken)
-                                .header("Accept-Datetime-Format", "RFC3339")
-                                .header("User-Agent", "InvestPro/1.0")
-                                .GET()
-                                .build(),
-                        HttpResponse.BodyHandlers.ofString())
+                HttpRequest.newBuilder()
+                        .uri(URI.create(uriStr))
+                        .timeout(java.time.Duration.ofSeconds(30))
+                        .header("Authorization", "Bearer " + apiToken)
+                        .header("Accept-Datetime-Format", "RFC3339")
+                        .header("User-Agent", "InvestPro/1.0")
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         logger.warn("OANDA candles failed HTTP {}: {}", response.statusCode(), response.body());
@@ -210,8 +208,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
                     mid.path("h").asDouble(),
                     mid.path("l").asDouble(),
                     openTime,
-                    candle.path("volume").asDouble(0.0)
-            ));
+                    candle.path("volume").asDouble(0.0)));
         }
 
         candleData.sort(Comparator.comparingInt(CandleData::openTime));
@@ -221,8 +218,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
     private String toOandaInstrument(TradePair pair) {
         return "%s_%s".formatted(
                 pair.getBaseCurrency().getCode().replace("/", "").replace("-", "").toUpperCase(Locale.ROOT),
-                pair.getCounterCurrency().getCode().replace("/", "").replace("-", "").toUpperCase(Locale.ROOT)
-        );
+                pair.getCounterCurrency().getCode().replace("/", "").replace("-", "").toUpperCase(Locale.ROOT));
     }
 
     private String urlEncode(String value) {
@@ -249,22 +245,21 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
                 System.getenv("OANDA_API_KEY"),
                 System.getenv("oanda_api_key"),
                 System.getProperty("investpro.oanda.apiKey"),
-                System.getProperty("oanda_api_key")
-        );
+                System.getProperty("oanda_api_key"));
 
         if (!token.isBlank()) {
             return token;
         }
 
         Properties properties = new Properties();
-        try (InputStream stream = OandaCandleDataSupplier.class.getClassLoader().getResourceAsStream("conf.properties")) {
+        try (InputStream stream = OandaCandleDataSupplier.class.getClassLoader()
+                .getResourceAsStream("conf.properties")) {
             if (stream != null) {
                 properties.load(stream);
                 return firstNonBlank(
                         properties.getProperty("oanda_api_key"),
                         properties.getProperty("OANDA_API_KEY"),
-                        properties.getProperty("investpro.oanda.apiKey")
-                );
+                        properties.getProperty("investpro.oanda.apiKey"));
             }
         } catch (Exception exception) {
             logger.debug("Unable to load OANDA token from conf.properties", exception);

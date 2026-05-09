@@ -31,11 +31,11 @@ import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 /**
  * Coinbase Advanced Trade WebSocket client.
- *
+ * <p>
  * Endpoint examples:
  * - Public market data: wss://advanced-trade-ws.coinbase.com
  * - User/authenticated data: wss://advanced-trade-ws-user.coinbase.com
- *
+ * <p>
  * Main public trade channel:
  * - market_trades
  */
@@ -327,26 +327,6 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
-    private void dispatchTradeToExchangeConsumer(
-            @NotNull TradePair tradePair,
-            @Nullable Trade trade,
-            @NotNull ExchangeStreamConsumer consumer
-    ) {
-        if (trade == null) {
-            return;
-        }
-
-        try {
-            consumer.onTrade("Coinbase", tradePair, trade);
-        } catch (Exception exception) {
-            log.warn(
-                    "Coinbase trade consumer failed. pair={} error={}",
-                    tradePair,
-                    exception.getMessage(),
-                    exception
-            );
-        }
-    }
 
     @Override
     public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
@@ -380,15 +360,15 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public boolean supportsStreamingTrades(@NotNull TradePair tradePair) {
-        return tradePair != null && !toCoinbaseProductId(tradePair).isBlank();
+        return !toCoinbaseProductId(tradePair).isBlank();
     }
-
+    private CoinbaseStream stream;
     @Override
     public void subscribeStream(@NotNull String streamName, @NotNull Consumer<String> handler) {
         Objects.requireNonNull(streamName, "streamName must not be null");
         Objects.requireNonNull(handler, "handler must not be null");
 
-        CoinbaseStream stream = parseCoinbaseStream(streamName);
+        stream = parseCoinbaseStream(streamName);
 
         if (stream == null) {
             log.warn("Invalid Coinbase stream name: {}", streamName);
@@ -415,7 +395,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public void unsubscribeStream(@NotNull String streamName) {
-        CoinbaseStream stream = parseCoinbaseStream(streamName);
+         stream = parseCoinbaseStream(streamName);
 
         if (stream == null) {
             log.warn("Invalid Coinbase stream name for unsubscribe: {}", streamName);
@@ -535,7 +515,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                 .replace("_", "-");
     }
 
-    private TradePair tradePairFromCoinbaseProductId(String productId) {
+    private @NotNull TradePair tradePairFromCoinbaseProductId(String productId) {
         String normalized = normalizeCoinbaseProductId(productId);
 
         if (!normalized.contains("-")) {
