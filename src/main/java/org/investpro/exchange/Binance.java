@@ -1103,6 +1103,51 @@ public class Binance extends Exchange {
         return CompletableFuture.completedFuture(new OrderBook(tradePair));
     }
 
+    /**
+     * Parses order book data from API response or WebSocket stream.
+     * Handles both array format [price, quantity] and object format.
+     */
+    private OrderBook parseOrderBook(String data, TradePair tradePair) {
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(data);
+            OrderBook orderBook = new OrderBook(tradePair);
+
+            // Parse bids
+            List<OrderBook.PriceLevel> bids = new ArrayList<>();
+            JsonNode bidsNode = node.path("bids");
+            if (bidsNode.isArray()) {
+                for (JsonNode bid : bidsNode) {
+                    if (bid.isArray() && bid.size() >= 2) {
+                        double price = bid.get(0).asDouble();
+                        double quantity = bid.get(1).asDouble();
+                        bids.add(new OrderBook.PriceLevel(price, quantity));
+                    }
+                }
+            }
+            orderBook.setBids(bids);
+
+            // Parse asks
+            List<OrderBook.PriceLevel> asks = new ArrayList<>();
+            JsonNode asksNode = node.path("asks");
+            if (asksNode.isArray()) {
+                for (JsonNode ask : asksNode) {
+                    if (ask.isArray() && ask.size() >= 2) {
+                        double price = ask.get(0).asDouble();
+                        double quantity = ask.get(1).asDouble();
+                        asks.add(new OrderBook.PriceLevel(price, quantity));
+                    }
+                }
+            }
+            orderBook.setAsks(asks);
+
+            orderBook.setTimestamp(Instant.now());
+            return orderBook;
+        } catch (Exception exception) {
+            log.debug("Error parsing Binance order book", exception);
+            return new OrderBook(tradePair);
+        }
+    }
+
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
         return failedFuture(unsupported("fetchOpenOrders"));

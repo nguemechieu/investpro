@@ -82,7 +82,7 @@ public class Oanda extends Exchange {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    protected final ExchangeStreamConsumer liveTradeConsumers =new UiExchangeStreamConsumer();
+    protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
     private static final Logger logger = LoggerFactory.getLogger(Oanda.class);
 
@@ -757,14 +757,37 @@ public class Oanda extends Exchange {
     private @NotNull OrderBook parseOandaOrderBook(String body, TradePair tradePair) {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(body);
-            JsonNode bids = root.path("orderBook").path("buckets");
-            JsonNode asks = root.path("orderBook").path("buckets");
+            JsonNode bucketsNode = root.path("orderBook").path("buckets");
 
             OrderBook orderBook = new OrderBook(tradePair);
 
-            // For now, return typed empty book until full parser is ready
-            // This keeps the structure safe and prevents NPEs
-            logger.debug("Parsed OANDA orderBook for {}", tradePair);
+            // Parse bids and asks from buckets array
+            List<OrderBook.PriceLevel> bids = new ArrayList<>();
+            List<OrderBook.PriceLevel> asks = new ArrayList<>();
+
+            if (bucketsNode.isArray()) {
+                for (JsonNode bucket : bucketsNode) {
+                    if (bucket.isObject()) {
+                        double price = bucket.path("price").asDouble();
+                        long bidCount = bucket.path("bidCount").asLong(0);
+                        long askCount = bucket.path("askCount").asLong(0);
+
+                        // Create price levels for bids and asks based on counts
+                        if (bidCount > 0) {
+                            bids.add(new OrderBook.PriceLevel(price, bidCount));
+                        }
+                        if (askCount > 0) {
+                            asks.add(new OrderBook.PriceLevel(price, askCount));
+                        }
+                    }
+                }
+            }
+
+            orderBook.setBids(bids);
+            orderBook.setAsks(asks);
+            orderBook.setTimestamp(Instant.now());
+
+            logger.debug("Parsed OANDA orderBook for {} with {} bids and {} asks", tradePair, bids.size(), asks.size());
 
             return orderBook;
         } catch (Exception e) {

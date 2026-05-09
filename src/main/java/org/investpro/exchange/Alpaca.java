@@ -952,7 +952,7 @@ public class Alpaca extends Exchange {
 
     @Override
     public CompletableFuture<OrderBook> fetchOrderBook(TradePair tradePair) {
-        return null;
+        return CompletableFuture.completedFuture(new OrderBook(tradePair));
     }
 
     @Override
