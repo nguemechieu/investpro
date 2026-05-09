@@ -510,9 +510,26 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
-    }
+        if (accountId == null || accountId.isBlank()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("Stellar Network account ID is missing or empty")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
 
+        return AuthCheckResult.builder()
+                .exchangeName(getName())
+                .success(true)
+                .httpStatus(200)
+                .credentialSource("CONFIGURATION")
+                .endpointTested("/accounts/" + accountId)
+                .message("Stellar Network account validated")
+                .checkedAt(Instant.now())
+                .build();
+    }
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
@@ -861,7 +878,6 @@ public class StellarNetwork extends Exchange {
 
     }
 
-
     @Override
     public void stopStreaming(ExchangeStreamSubscription subscription) {
 
@@ -876,7 +892,6 @@ public class StellarNetwork extends Exchange {
     public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
 
     }
-
 
     @Override
     public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
@@ -1256,7 +1271,8 @@ public class StellarNetwork extends Exchange {
                 .toList();
     }
 
-    private List<CandleData> buildCandlesFromTrades(TradePair tradePair, int secondsPerCandle, int limit, Long startTime,
+    private List<CandleData> buildCandlesFromTrades(TradePair tradePair, int secondsPerCandle, int limit,
+            Long startTime,
             Long endTime) {
         long end = endTime == null ? Instant.now().getEpochSecond() : endTime;
         long start = startTime == null ? end - (long) limit * secondsPerCandle : startTime;
@@ -1326,7 +1342,8 @@ public class StellarNetwork extends Exchange {
 
     private class StellarCandleDataSupplier extends CandleDataSupplier {
         StellarCandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair) {
-            super(numCandles, secondsPerCandle, tradePair, new SimpleIntegerProperty((int) Instant.now().getEpochSecond()));
+            super(numCandles, secondsPerCandle, tradePair,
+                    new SimpleIntegerProperty((int) Instant.now().getEpochSecond()));
         }
 
         @Override

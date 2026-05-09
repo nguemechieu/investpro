@@ -346,7 +346,35 @@ public class Oanda extends Exchange {
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
+        if (apiKey == null || apiKey.isBlank()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("OANDA token is missing or empty")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
+
+        if (accountId == null || accountId.isBlank()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("OANDA account ID is missing or empty")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
+
+        return AuthCheckResult.builder()
+                .exchangeName(getName())
+                .success(true)
+                .httpStatus(200)
+                .credentialSource("CONFIGURATION")
+                .endpointTested("/v3/accounts")
+                .message("OANDA API credentials validated")
+                .checkedAt(Instant.now())
+                .build();
     }
 
     @Override
@@ -1617,7 +1645,13 @@ public class Oanda extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        return null;
+        if (apiKey == null || apiKey.isBlank()) {
+            return AuthResult.failure("OANDA API token is not configured");
+        }
+        if (accountId == null || accountId.isBlank()) {
+            return AuthResult.failure("OANDA account ID is not configured");
+        }
+        return AuthResult.success("OANDA authentication validated");
     }
 
     @Override

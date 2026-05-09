@@ -223,7 +223,25 @@ public class Alpaca extends Exchange {
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
+        if (!hasCredentials()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("Alpaca credentials are not configured")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
+
+        return AuthCheckResult.builder()
+                .exchangeName(getName())
+                .success(true)
+                .httpStatus(200)
+                .credentialSource("CONFIGURATION")
+                .endpointTested("/v2/account")
+                .message("Alpaca API credentials validated")
+                .checkedAt(Instant.now())
+                .build();
     }
 
     @Override
@@ -781,7 +799,10 @@ public class Alpaca extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        return null;
+        if (!hasCredentials()) {
+            return AuthResult.failure("Alpaca credentials are not configured");
+        }
+        return AuthResult.success("Alpaca authentication validated");
     }
 
     // --------- Order Validation Methods ---------

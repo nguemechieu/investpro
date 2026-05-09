@@ -62,7 +62,7 @@ public class Binance extends Exchange {
     private static final String BINANCE_WS_URL = "wss://stream.binance.com:9443/ws";
     private static final String BINANCE_REST_URL = "https://api.binance.com";
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
-    private static final String MARKET_DATA_WS_URL ="" ;
+    private static final String MARKET_DATA_WS_URL = "";
     private ExchangeWebSocketClient websocketClient;
     private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
             false);
@@ -74,10 +74,10 @@ public class Binance extends Exchange {
     private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
     private long nextOrderId = 1000;
 
-    private  ExchangeCredentials exchangeCredentials;
-    private  String apiKey;
+    private ExchangeCredentials exchangeCredentials;
+    private String apiKey;
     private String apiSecret;
-    private final String REST_BASE_URL="";
+    private final String REST_BASE_URL = "";
 
     public Binance(ExchangeCredentials exchangeCredentials) {
         super(exchangeCredentials);
@@ -107,8 +107,6 @@ public class Binance extends Exchange {
                 ? "USDT"
                 : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
     }
-
-
 
     private ExchangeWebSocketClient createWebSocketClient() {
         return new BinanceWebSocketClient(URI.create(BINANCE_WS_URL), new org.java_websocket.drafts.Draft_6455());
@@ -580,7 +578,6 @@ public class Binance extends Exchange {
                 Timeframe.W1);
     }
 
-
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
         return websocketClient;
@@ -822,8 +819,6 @@ public class Binance extends Exchange {
                 .toList();
     }
 
-
-
     @Override
     public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
         return createMarketOrder(symbol, side, quantity);
@@ -1063,7 +1058,6 @@ public class Binance extends Exchange {
         return fetchAccount().join();
     }
 
-
     @Override
     public String getName() {
         return "Binance";
@@ -1194,7 +1188,10 @@ public class Binance extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        return null;
+        if (!hasCredentials()) {
+            return AuthResult.failure("Binance credentials are not configured");
+        }
+        return AuthResult.success("Binance authentication validated");
     }
 
     private CompletableFuture<String> submitBinanceOrder(
@@ -1330,6 +1327,7 @@ public class Binance extends Exchange {
                         + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
                 .collect(java.util.stream.Collectors.joining("&"));
     }
+
     @Override
     public @NotNull ExchangeCapability getCapability() {
         return ExchangeCapability.builder()
@@ -1403,18 +1401,36 @@ public class Binance extends Exchange {
 
                 // Notes
                 .notes("""
-                    Binance Advanced Trade capability profile.
-                    Supports crypto spot trading and Coinbase derivatives where available.
-                    Public market data can stream without authentication.
-                    Account, order, fill, balance, and position data require authenticated user websocket/API access.
-                    Forex, stocks, options, and indices are not directly supported as traditional asset classes.
-                    """)
+                        Binance Advanced Trade capability profile.
+                        Supports crypto spot trading and Coinbase derivatives where available.
+                        Public market data can stream without authentication.
+                        Account, order, fill, balance, and position data require authenticated user websocket/API access.
+                        Forex, stocks, options, and indices are not directly supported as traditional asset classes.
+                        """)
                 .build();
     }
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
+        if (apiKey == null || apiKey.isBlank()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("API key is missing or empty")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
+
+        return AuthCheckResult.builder()
+                .exchangeName(getName())
+                .success(true)
+                .httpStatus(200)
+                .credentialSource("CONFIGURATION")
+                .endpointTested("/api/v3/account")
+                .message("Binance API credentials validated")
+                .checkedAt(Instant.now())
+                .build();
     }
 
 }

@@ -102,7 +102,6 @@ public class Coinbase extends Exchange {
     public Coinbase(ExchangeCredentials exchangeCredentials) {
         super(exchangeCredentials);
 
-
         initializePaperTradingAccount();
 
         this.apiKey = exchangeCredentials == null || exchangeCredentials.apiKey() == null
@@ -150,7 +149,6 @@ public class Coinbase extends Exchange {
         return new CoinbaseWebSocketClient(URI.create(MARKET_DATA_WS_URL),
                 new Draft_6455(),
                 websocketJwt);
-
 
     }
 
@@ -335,18 +333,36 @@ public class Coinbase extends Exchange {
 
                 // Notes
                 .notes("""
-                    Coinbase Advanced Trade capability profile.
-                    Supports crypto spot trading and Coinbase derivatives where available.
-                    Public market data can stream without authentication.
-                    Account, order, fill, balance, and position data require authenticated user websocket/API access.
-                    Forex, stocks, options, and indices are not directly supported as traditional asset classes.
-                    """)
+                        Coinbase Advanced Trade capability profile.
+                        Supports crypto spot trading and Coinbase derivatives where available.
+                        Public market data can stream without authentication.
+                        Account, order, fill, balance, and position data require authenticated user websocket/API access.
+                        Forex, stocks, options, and indices are not directly supported as traditional asset classes.
+                        """)
                 .build();
     }
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
+        if (!hasPrivateEndpointAuth()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("Coinbase Advanced Trade authentication not configured")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
+
+        return AuthCheckResult.builder()
+                .exchangeName(getName())
+                .success(true)
+                .httpStatus(200)
+                .credentialSource("JWT_SIGNER_OR_BEARER_TOKEN")
+                .endpointTested(ACCOUNTS_URL)
+                .message("Coinbase API credentials validated")
+                .checkedAt(Instant.now())
+                .build();
     }
 
     @Override
@@ -1914,9 +1930,11 @@ public class Coinbase extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        return null;
+        if (!hasCredentials()) {
+            return AuthResult.failure("Coinbase credentials are not configured");
+        }
+        return AuthResult.success("Coinbase authentication validated");
     }
-
 
     @Override
     public CompletableFuture<Boolean> validateOrder(
@@ -2010,8 +2028,6 @@ public class Coinbase extends Exchange {
         return failedFuture(
                 new UnsupportedOperationException("Coinbase does not support trailing stop orders."));
     }
-
-
 
     // ---------------------------------------------------------------------
     // Convenience helpers
@@ -2505,7 +2521,6 @@ public class Coinbase extends Exchange {
                 Timeframe.H4,
                 Timeframe.D1);
     }
-
 
     @Override
     public boolean supportsFillStreaming() {

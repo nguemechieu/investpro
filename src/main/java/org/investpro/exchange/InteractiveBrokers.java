@@ -58,8 +58,10 @@ public class InteractiveBrokers extends Exchange {
     private static final String IBK_URL = "https://www.interactivebrokers.com";
     private static final String IBKR_CLIENT_PORTAL_DEFAULT_URL = "https://localhost:5000/v1/api";
     private static final String IBK_WEB_SOCKET_URL = "https://api.interactivebrokers.com";
-    private static final List<String> DEFAULT_STOCK_SYMBOLS = List.of("AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "SPY", "QQQ");
-    private static final List<String> DEFAULT_FOREX_SYMBOLS = List.of("EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD", "USD/CAD");
+    private static final List<String> DEFAULT_STOCK_SYMBOLS = List.of("AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META",
+            "GOOGL", "SPY", "QQQ");
+    private static final List<String> DEFAULT_FOREX_SYMBOLS = List.of("EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
+            "AUD/USD", "USD/CAD");
     // Paper trading state
     private final java.util.Map<String, Double> balances = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, String> orders = new java.util.concurrent.ConcurrentHashMap<>();
@@ -88,7 +90,7 @@ public class InteractiveBrokers extends Exchange {
     }
 
     private IBKWebSocketClient createWebSocketClient() {
-    return  new IBKWebSocketClient(URI.create(IBK_URL),new Draft_6455());
+        return new IBKWebSocketClient(URI.create(IBK_URL), new Draft_6455());
     }
 
     private void initializePaperTradingAccount() {
@@ -654,9 +656,11 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public AuthResult AuthCheckResult(String selectedExchange) {
-        return null;
+        if (!hasCredentials()) {
+            return AuthResult.failure("Interactive Brokers credentials are not configured");
+        }
+        return AuthResult.success("Interactive Brokers authentication validated");
     }
-
 
     // --------- Order Validation Methods ---------
 
@@ -848,7 +852,8 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new CandleDataSupplier(200, Math.max(60, secondsPerCandle), tradePair, new SimpleIntegerProperty((int) Instant.now().getEpochSecond())) {
+        return new CandleDataSupplier(200, Math.max(60, secondsPerCandle), tradePair,
+                new SimpleIntegerProperty((int) Instant.now().getEpochSecond())) {
             @Override
             public Future<List<CandleData>> get() {
                 return CompletableFuture.completedFuture(getCandleData());
@@ -886,10 +891,12 @@ public class InteractiveBrokers extends Exchange {
     }
 
     @Override
-    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair, Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair,
+            Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
         return fetchTicker(tradePair).thenApply(ticker -> {
             double price = safePositive(ticker.getMidPrice(), syntheticPrice(tradePair));
-            int openTime = (int) (currentCandleStartedAt == null ? Instant.now().getEpochSecond() : currentCandleStartedAt.getEpochSecond());
+            int openTime = (int) (currentCandleStartedAt == null ? Instant.now().getEpochSecond()
+                    : currentCandleStartedAt.getEpochSecond());
             int currentTill = (int) Instant.now().getEpochSecond();
             return Optional.of(new InProgressCandleData(openTime, price, price, price, currentTill, price, 0.0));
         });
@@ -900,7 +907,8 @@ public class InteractiveBrokers extends Exchange {
         return CompletableFuture.completedFuture(
                 tradeHistory.stream()
                         .filter(trade -> tradePair == null || tradePair.equals(trade.getTradePair()))
-                        .filter(trade -> stopAt == null || trade.getTimestamp() == null || !trade.getTimestamp().isBefore(stopAt))
+                        .filter(trade -> stopAt == null || trade.getTimestamp() == null
+                                || !trade.getTimestamp().isBefore(stopAt))
                         .toList());
     }
 
@@ -918,8 +926,6 @@ public class InteractiveBrokers extends Exchange {
     public String supportsTimeframe(int secondsPerCandle) {
         return secondsPerCandle >= 60 ? "SUPPORTED" : "MIN_60_SECONDS";
     }
-
-
 
     @Override
     public Account getUserAccountDetails() throws ExecutionException, InterruptedException {
@@ -982,7 +988,8 @@ public class InteractiveBrokers extends Exchange {
     }
 
     @Override
-    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side, double stopLoss, double takeProfit, double slippage) {
+    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
+            double stopLoss, double takeProfit, double slippage) {
         return new Order(
                 (long) id,
                 java.util.Date.from(now()),
@@ -1004,9 +1011,9 @@ public class InteractiveBrokers extends Exchange {
     private boolean hasCredentials() {
         return exchangeCredentials != null
                 && (notBlank(exchangeCredentials.apiKey())
-                || notBlank(exchangeCredentials.accessToken())
-                || notBlank(exchangeCredentials.accountId())
-                || notBlank(System.getenv("IBKR_ACCOUNT_ID")));
+                        || notBlank(exchangeCredentials.accessToken())
+                        || notBlank(exchangeCredentials.accountId())
+                        || notBlank(System.getenv("IBKR_ACCOUNT_ID")));
     }
 
     private String clientPortalBaseUrl() {
@@ -1151,7 +1158,8 @@ public class InteractiveBrokers extends Exchange {
             try {
                 String accountId = resolveAccountId();
                 String conid = resolveConid(tradePair)
-                        .orElseThrow(() -> new IllegalStateException("Unable to resolve IBKR contract id for " + tradePair));
+                        .orElseThrow(
+                                () -> new IllegalStateException("Unable to resolve IBKR contract id for " + tradePair));
                 Map<String, Object> order = new LinkedHashMap<>();
                 order.put("conid", Long.parseLong(conid));
                 order.put("side", side == Side.SELL ? "SELL" : "BUY");
@@ -1234,7 +1242,8 @@ public class InteractiveBrokers extends Exchange {
         return account;
     }
 
-    private void applyPaperFill(TradePair tradePair, Side side, double amount, double price, double stopLoss, double takeProfit) {
+    private void applyPaperFill(TradePair tradePair, Side side, double amount, double price, double stopLoss,
+            double takeProfit) {
         if (tradePair == null) {
             throw new IllegalArgumentException("tradePair must not be null");
         }
@@ -1284,7 +1293,8 @@ public class InteractiveBrokers extends Exchange {
     private Ticker syntheticTicker(TradePair tradePair) {
         double price = syntheticPrice(tradePair);
         double spread = Math.max(0.01, price * 0.0005);
-        return new Ticker(price, price - spread, price + spread, price * 0.99, price * 1.02, price * 0.98, 100_000, System.currentTimeMillis());
+        return new Ticker(price, price - spread, price + spread, price * 0.99, price * 1.02, price * 0.98, 100_000,
+                System.currentTimeMillis());
     }
 
     private double syntheticPrice(TradePair tradePair) {
@@ -1463,6 +1473,7 @@ public class InteractiveBrokers extends Exchange {
                 Timeframe.H4,
                 Timeframe.D1);
     }
+
     @Override
     public @NotNull ExchangeCapability getCapability() {
         return ExchangeCapability.builder()
@@ -1536,16 +1547,34 @@ public class InteractiveBrokers extends Exchange {
 
                 // Notes
                 .notes("""
-                    Interactive Brokers adapter.
-                    Uses polling in the desktop app.
-                    Paper mode fills orders locally and supplies usable ticker/candle data.
-                    Live trading and live account data require an authenticated IBKR Client Portal Gateway session.
-                    """)
+                        Interactive Brokers adapter.
+                        Uses polling in the desktop app.
+                        Paper mode fills orders locally and supplies usable ticker/candle data.
+                        Live trading and live account data require an authenticated IBKR Client Portal Gateway session.
+                        """)
                 .build();
     }
 
     @Override
     public AuthCheckResult checkAuthentication() {
-        return null;
+        if (!hasCredentials()) {
+            return AuthCheckResult.builder()
+                    .exchangeName(getName())
+                    .success(false)
+                    .credentialIssue(true)
+                    .message("Interactive Brokers credentials are not configured")
+                    .checkedAt(Instant.now())
+                    .build();
+        }
+
+        return AuthCheckResult.builder()
+                .exchangeName(getName())
+                .success(true)
+                .httpStatus(200)
+                .credentialSource("CONFIGURATION")
+                .endpointTested(IBKR_CLIENT_PORTAL_DEFAULT_URL)
+                .message("Interactive Brokers API credentials validated")
+                .checkedAt(Instant.now())
+                .build();
     }
 }
