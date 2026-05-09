@@ -398,8 +398,9 @@ public class TradingDesk extends BorderPane {
         return topSection;
     }
 
-    @SneakyThrows
-    private MenuBar createMenuBar() {
+
+    @Contract(" -> new")
+    private @NotNull MenuBar createMenuBar() {
         Menu fileMenu = new Menu(t("menu.file"));
 
         fileMenu.getItems().setAll(List.of(
@@ -495,11 +496,15 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.marketResearch"), null, this::openMarketResearch),
                 menuItem(t("menu.strategyResearch"), null, this::openStrategyResearch),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.strategyAssignment"), null, e -> {
+                menuItem(t("menu.strategyAssignment"), null, () -> {
                     try {
                         showStrategyAssignmentPanel();
                     } catch (SQLException | ClassNotFoundException ex) {
                         log.error("Error showing strategy assignment panel", ex);
+                        showWarning(
+                                "Strategy Assignment",
+                                "Unable to open strategy assignment panel: " + ex.getMessage()
+                        );
                     }
                 }),
                 menuItem(t("menu.researchReports"), null, this::openResearchReports)));

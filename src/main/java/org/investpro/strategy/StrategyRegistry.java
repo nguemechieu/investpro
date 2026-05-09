@@ -54,7 +54,7 @@ public final class StrategyRegistry {
      */
     private final UnifiedStrategy defaultStrategy = new UnifiedStrategy("Trend Following");
 
-    private StrategyRegistry() {
+    public StrategyRegistry() {
         registerBuiltInStrategies();
     }
 
