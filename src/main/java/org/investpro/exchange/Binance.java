@@ -7,11 +7,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.credentials.ExchangeSigning;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.exchange.models.ExchangeCapability;
+import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.service.AuthResult;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -41,6 +49,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+@Getter
+@Setter
 @Slf4j
 public class Binance extends Exchange {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Binance.class);
@@ -52,6 +62,7 @@ public class Binance extends Exchange {
     private static final String BINANCE_WS_URL = "wss://stream.binance.com:9443/ws";
     private static final String BINANCE_REST_URL = "https://api.binance.com";
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+    private static final String MARKET_DATA_WS_URL ="" ;
     private ExchangeWebSocketClient websocketClient;
     private final java.util.concurrent.atomic.AtomicBoolean connected = new java.util.concurrent.atomic.AtomicBoolean(
             false);
@@ -63,11 +74,16 @@ public class Binance extends Exchange {
     private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
     private long nextOrderId = 1000;
 
-    public Binance(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
+    private  ExchangeCredentials exchangeCredentials;
+    private  String apiKey;
+    private String apiSecret;
+    private final String REST_BASE_URL="";
 
-        this.apiKey = apiKey;
-        this.apiSecret = apiSecret;
+    public Binance(ExchangeCredentials exchangeCredentials) {
+        super(exchangeCredentials);
+
+        this.apiKey = exchangeCredentials.apiKey();
+        this.apiSecret = exchangeCredentials.apiSecret();
         initializePaperTradingAccount();
 
         try {
@@ -92,14 +108,7 @@ public class Binance extends Exchange {
                 : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
-    /**
-     * Constructor with Telegram token and email notification support
-     */
-    public Binance(String apiKey, String apiSecret, String telegramToken, String emailNotification) {
-        this(apiKey, apiSecret);
-        this.setTelegramToken(telegramToken);
-        this.setEmailNotification(emailNotification);
-    }
+
 
     private ExchangeWebSocketClient createWebSocketClient() {
         return new BinanceWebSocketClient(URI.create(BINANCE_WS_URL), new org.java_websocket.drafts.Draft_6455());
@@ -206,6 +215,10 @@ public class Binance extends Exchange {
     @Override
     public boolean supportsLiveTrading() {
         return hasCredentials();
+    }
+
+    private boolean hasCredentials() {
+        return exchangeCredentials != null;
     }
 
     @Override
@@ -399,6 +412,11 @@ public class Binance extends Exchange {
     }
 
     @Override
+    public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
 
     }
@@ -562,9 +580,6 @@ public class Binance extends Exchange {
                 Timeframe.W1);
     }
 
-    @Override
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-    }
 
     @Override
     public ExchangeWebSocketClient getWebsocketClient() {
@@ -807,6 +822,8 @@ public class Binance extends Exchange {
                 .toList();
     }
 
+
+
     @Override
     public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
         return createMarketOrder(symbol, side, quantity);
@@ -1046,10 +1063,6 @@ public class Binance extends Exchange {
         return fetchAccount().join();
     }
 
-    @Override
-    public double getSize() {
-        return 0;
-    }
 
     @Override
     public String getName() {
@@ -1177,6 +1190,11 @@ public class Binance extends Exchange {
     public void sell(TradePair tradePair, MARKET_TYPES marketType, double size, double side, double stopLoss,
             double takeProfit, double slippage) {
 
+    }
+
+    @Override
+    public AuthResult AuthCheckResult(String selectedExchange) {
+        return null;
     }
 
     private CompletableFuture<String> submitBinanceOrder(
@@ -1311,6 +1329,92 @@ public class Binance extends Exchange {
                         + "="
                         + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
                 .collect(java.util.stream.Collectors.joining("&"));
+    }
+    @Override
+    public @NotNull ExchangeCapability getCapability() {
+        return ExchangeCapability.builder()
+                .exchangeName("BINANCE")
+                .exchangeId("binance")
+                .displayName(" Binance World Trade")
+                .apiBaseUrl(REST_BASE_URL)
+                .webSocketBaseUrl(MARKET_DATA_WS_URL)
+
+                // Market coverage
+                .supportsCrypto(true)
+                .supportsSpot(true)
+                .supportsFutures(true)
+                .supportsDerivatives(true)
+                .supportsForex(false)
+                .supportsStocks(false)
+                .supportsOptions(false)
+                .supportsIndices(false)
+
+                // Trading support
+                .supportsLiveTrading(true)
+                .supportsPaperTradingMode(true)
+                .supportsMarketOrders(true)
+                .supportsLimitOrders(true)
+                .supportsStopOrders(true)
+                .supportsBracketOrders(false)
+                .supportsStopLossTakeProfit(false)
+                .supportsTrailingStop(false)
+                .supportsLeverage(true)
+
+                // Account / portfolio
+                .supportsAccountInfo(true)
+                .supportsBalances(true)
+                .supportsPositions(true)
+                .supportsAccountTrades(true)
+                .supportsOpenOrders(true)
+                .supportsOrderHistory(true)
+                .supportsFills(true)
+
+                // Market data
+                .supportsTicker(true)
+                .supportsTickers(true)
+                .supportsOrderBook(true)
+                .supportsFullOrderBook(true)
+                .supportsDistributionBook(true)
+                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
+                .supportsHistoricalCandles(true)
+                .supportsRecentTrades(true)
+
+                // Streaming
+                .supportsWebSocket(true)
+                .supportsNativeWebSocket(true)
+                .supportsWebSocketStreaming(true)
+                .supportsTickerStreaming(true)
+                .supportsTradeStreaming(true)
+                .supportsCandleStreaming(true)
+                .supportsOrderBookStreaming(true)
+                .supportsAccountStreaming(true)
+                .supportsOrderStreaming(true)
+                .supportsFillStreaming(true)
+                .supportsPositionStreaming(true)
+                .supportsBalanceStreaming(true)
+                .supportsHttpStreaming(false)
+                .supportsPollingFallback(true)
+
+                // Infrastructure / limits
+                .supportsRateLimitInfo(true)
+                .requiresAuthenticationForTrading(true)
+                .requiresAuthenticationForAccountInfo(true)
+                .requiresAuthenticationForMarketData(false)
+
+                // Notes
+                .notes("""
+                    Binance Advanced Trade capability profile.
+                    Supports crypto spot trading and Coinbase derivatives where available.
+                    Public market data can stream without authentication.
+                    Account, order, fill, balance, and position data require authenticated user websocket/API access.
+                    Forex, stocks, options, and indices are not directly supported as traditional asset classes.
+                    """)
+                .build();
+    }
+
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        return null;
     }
 
 }

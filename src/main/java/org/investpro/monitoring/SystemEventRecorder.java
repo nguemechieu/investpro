@@ -1,6 +1,7 @@
 package org.investpro.monitoring;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
@@ -13,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Getter
+@Setter
 public class SystemEventRecorder {
     // Market data events
     private volatile Instant lastMarketTickAt;

@@ -23,10 +23,6 @@ public class MarketInfoDataProvider {
 
     private final NewsDataProvider newsDataProvider;
 
-    public MarketInfoDataProvider() {
-        this(null);
-    }
-
     public MarketInfoDataProvider(NewsDataProvider newsDataProvider) {
         this.newsDataProvider = newsDataProvider;
     }

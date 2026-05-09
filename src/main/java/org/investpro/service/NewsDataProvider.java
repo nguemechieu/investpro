@@ -1,6 +1,7 @@
 package org.investpro.service;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.market.NewsEvent;
 
@@ -19,13 +20,15 @@ import java.util.stream.Collectors;
  * - Signal generation from news
  */
 @Slf4j
+@Getter
+@Setter
 public class NewsDataProvider {
 
         private final List<NewsEvent> newsEvents = new CopyOnWriteArrayList<>();
         private final List<NewsEventListener> listeners = new CopyOnWriteArrayList<>();
         private final RssNewsService rssNewsService;
 
-        @Getter
+
         private boolean newsBlackoutEnabled = true; // Master toggle for news lockout
 
         // Calendar of major economic indicators by currency
@@ -338,9 +341,7 @@ public class NewsDataProvider {
          * Clear the news cache (useful after symbol changes or periodic refresh).
          */
         public void clearNewsCache() {
-                if (rssNewsService != null) {
-                        rssNewsService.clearCache();
-                }
+            rssNewsService.clearCache();
         }
 
         private void notifyListeners(NewsEvent event, String action) {

@@ -1,6 +1,6 @@
 package org.investpro.exchange.diagnostics;
 
-import org.investpro.exchange.ExchangeAdapter;
+import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.services.ExchangeService;
@@ -68,7 +68,7 @@ public class ExchangeDiagnosticsService {
     public ExchangeDiagnosticSnapshot runDiagnostics(@NotNull String exchangeName) {
         logger.info("Running diagnostics for exchange: {}", exchangeName);
 
-        ExchangeAdapter adapter = exchangeService.getAdapter(exchangeName);
+        ExchangeIdentity adapter = exchangeService.getAdapter(exchangeName);
         ExchangeCapability capability = adapter.getCapability();
 
         // Auth check
@@ -89,6 +89,7 @@ public class ExchangeDiagnosticsService {
                 .lastPriceSuccess(false)
                 .lastOrderBookSuccess(false)
                 .lastAccountSuccess(false)
+
                 .snapshotTime(Instant.now())
                 .build();
 

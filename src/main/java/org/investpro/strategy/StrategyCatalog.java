@@ -1,5 +1,6 @@
 package org.investpro.strategy;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
@@ -475,7 +476,8 @@ public final class StrategyCatalog {
         return normalized;
     }
 
-    public static List<String> availableStrategyNames() {
+    @Contract(" -> new")
+    public static @NotNull List<String> availableStrategyNames() {
         return new ArrayList<>(STRATEGY_DEFINITIONS.keySet());
     }
 

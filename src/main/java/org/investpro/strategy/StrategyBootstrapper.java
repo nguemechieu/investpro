@@ -2,6 +2,7 @@ package org.investpro.strategy;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * StrategyBootstrapper ensures strategies are initialized exactly once at
@@ -68,6 +69,9 @@ public final class StrategyBootstrapper {
 
             StrategyInitializer.initializeStrategies();
 
+            // Load user-developed strategies from strategies/ directory
+            loadUserStrategies();
+
             StrategyRegistry registry = StrategyRegistry.getInstance();
 
             int definitionCount = safeDefinitionCount(registry);
@@ -121,6 +125,45 @@ public final class StrategyBootstrapper {
     }
 
     /**
+     * Load user-developed strategies from the strategies/ directory.
+     *
+     * This discovers UserStrategy implementations packaged as JAR files using
+     * the ServiceLoader pattern (META-INF/services/).
+     *
+     * Non-fatal errors are logged but do not stop initialization.
+     */
+    private static void loadUserStrategies() {
+        try {
+            log.info("Loading user-developed strategies from strategies/ directory...");
+
+            org.investpro.strategy.user.UserStrategyLoader loader = new org.investpro.strategy.user.UserStrategyLoader(
+                    "strategies");
+
+            int loadedCount = loader.loadIntoRegistry();
+
+            if (loadedCount > 0) {
+                log.info("Successfully loaded {} user strategy(ies)", loadedCount);
+                loader.logSummary();
+            } else {
+                log.info("No user strategies found in strategies/ directory (optional)");
+            }
+
+            if (loader.getFailedCount() > 0) {
+                log.warn(
+                        "Failed to load {} user strategy(ies): {}",
+                        loader.getFailedCount(),
+                        loader.getFailedStrategies());
+            }
+
+        } catch (Exception e) {
+            log.warn(
+                    "User strategy loading failed (non-fatal): {}. Continue with built-in strategies only.",
+                    e.getMessage(),
+                    e);
+        }
+    }
+
+    /**
      * Check whether initialization has been attempted.
      */
     public static boolean wasInitializationAttempted() {
@@ -137,7 +180,7 @@ public final class StrategyBootstrapper {
     /**
      * Human-readable initialization status.
      */
-    public static String getStatusSummary() {
+    public static @NotNull String getStatusSummary() {
         if (initialized) {
             return "Strategy framework initialized.";
         }

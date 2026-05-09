@@ -1,6 +1,6 @@
 package org.investpro.exchange.diagnostics;
 
-import org.investpro.exchange.ExchangeAdapter;
+import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.MarketDepthType;
@@ -33,7 +33,7 @@ class ExchangeDiagnosticsServiceTest {
     private ExchangeDiagnosticsService diagnosticsService;
 
     @Mock
-    private ExchangeAdapter mockAdapter;
+    private ExchangeIdentity mockAdapter;
 
     @BeforeEach
     void setUp() {
@@ -168,8 +168,8 @@ class ExchangeDiagnosticsServiceTest {
                 .marketDepthType(MarketDepthType.TOP_OF_BOOK)
                 .build();
 
-        ExchangeAdapter mockCoinbase = mock(ExchangeAdapter.class);
-        ExchangeAdapter mockOanda = mock(ExchangeAdapter.class);
+        ExchangeIdentity mockCoinbase = mock(ExchangeIdentity.class);
+        ExchangeIdentity mockOanda = mock(ExchangeIdentity.class);
 
         when(mockCoinbase.getCapability()).thenReturn(coinbase);
         when(mockOanda.getCapability()).thenReturn(oanda);

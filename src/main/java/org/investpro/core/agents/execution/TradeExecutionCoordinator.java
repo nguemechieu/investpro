@@ -1,14 +1,16 @@
 package org.investpro.core.agents.execution;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.AiTradeReviewRequest;
 import org.investpro.ai.AiTradeReviewResponse;
 import org.investpro.ai.FinalRiskGate;
 import org.investpro.data.Account;
-import org.investpro.execution.ExecutionIntent;
-import org.investpro.execution.PositionTransitionPolicy;
-import org.investpro.execution.SymbolTradeLockManager;
+import org.investpro.core.execution.ExecutionIntent;
+import org.investpro.core.execution.PositionTransitionPolicy;
+import org.investpro.core.execution.SymbolTradeLockManager;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
@@ -45,6 +47,8 @@ import static org.investpro.utils.Side.HOLD;
  * It only coordinates validation, AI review, final approval, and execution.
  */
 @Slf4j
+@Getter
+@Setter
 public class TradeExecutionCoordinator {
 
     private final RiskManagementSystem riskManagementSystem;
@@ -443,7 +447,7 @@ public class TradeExecutionCoordinator {
         }
 
         try {
-            Account account = exchange.getAccount();
+            Account account = exchange.fetchAccount().get();
             if (account == null) {
                 return riskContext;
             }
@@ -462,10 +466,7 @@ public class TradeExecutionCoordinator {
                     exchange.getName(),
                     balance,
                     equity);
-            return riskContext.toBuilder()
-                    .accountBalance(balance)
-                    .accountEquity(equity > 0.0 ? equity : riskContext.getAccountEquity())
-                    .build();
+            return copyRiskContextWithAccountSnapshot(riskContext, balance, equity);
         } catch (Exception exception) {
             log.warn(
                     "TradeExecutionCoordinator: cached account snapshot unavailable for {}: {}",
@@ -473,6 +474,52 @@ public class TradeExecutionCoordinator {
                     rootMessage(exception));
             return riskContext;
         }
+    }
+
+    private TradeRiskContext copyRiskContextWithAccountSnapshot(
+            @NotNull TradeRiskContext source,
+            double accountBalance,
+            double accountEquity) {
+        return TradeRiskContext.builder()
+                .symbol(source.getSymbol())
+                .assetClass(source.getAssetClass())
+                .contractType(source.getContractType())
+                .broker(source.getBroker())
+                .accountEquity(accountEquity > 0.0 ? accountEquity : source.getAccountEquity())
+                .availableCash(source.getAvailableCash())
+                .currentOpenRisk(source.getCurrentOpenRisk())
+                .usedMargin(source.getUsedMargin())
+                .freeMargin(source.getFreeMargin())
+                .accountBalance(accountBalance)
+                .requestedPositionSize(source.getRequestedPositionSize())
+                .requestedLeverage(source.getRequestedLeverage())
+                .entryPrice(source.getEntryPrice())
+                .stopLossPrice(source.getStopLossPrice())
+                .takeProfitPrice(source.getTakeProfitPrice())
+                .bidPrice(source.getBidPrice())
+                .askPrice(source.getAskPrice())
+                .currentPrice(source.getCurrentPrice())
+                .expectedWinRate(source.getExpectedWinRate())
+                .expectedRewardRiskRatio(source.getExpectedRewardRiskRatio())
+                .expectedValue(source.getExpectedValue())
+                .riskProfile(source.getRiskProfile())
+                .marketBehavior(source.getMarketBehavior())
+                .executionStrategy(source.getExecutionStrategy())
+                .liquidityProfile(source.getLiquidityProfile())
+                .psychologyProfile(source.getPsychologyProfile())
+                .probabilityLevel(source.getProbabilityLevel())
+                .capitalProtection(source.getCapitalProtection())
+                .systemDesign(source.getSystemDesign())
+                .tradingSessionStatus(source.getTradingSessionStatus())
+                .tradingSessionNotes(source.getTradingSessionNotes())
+                .volatility(source.getVolatility())
+                .maxRiskPerTrade(source.getMaxRiskPerTrade())
+                .maxCumulativeRisk(source.getMaxCumulativeRisk())
+                .maxAllowedLeverage(source.getMaxAllowedLeverage())
+                .maxAllowedDrawdownPercent(source.getMaxAllowedDrawdownPercent())
+                .estimatedSlippagePercent(source.getEstimatedSlippagePercent())
+                .estimatedFee(source.getEstimatedFee())
+                .build();
     }
 
     private boolean isCooldownActive(@Nullable String exchangeName, @NotNull String symbolText) {
@@ -527,11 +574,13 @@ public class TradeExecutionCoordinator {
             AiTradeReviewResponse aiResponse,
             FinalRiskGate.OrderApprovalDecision finalDecision) {
         log.warn(
-                "Manual review required. symbol={} side={} summary={} explanation={}",
+                "Manual review required. symbol={} side={} summary={} explanation={},decision={},ai={}",
                 riskContext.getSymbol(),
                 side,
                 finalDecision.getSummary(),
-                finalDecision.getExplanation());
+                finalDecision.getExplanation(),
+                riskDecision,aiResponse
+                );
 
         /*
          * Later:
@@ -544,8 +593,8 @@ public class TradeExecutionCoordinator {
 
     private void logWaitDecision(
             Side side,
-            TradeRiskContext riskContext,
-            FinalRiskGate.OrderApprovalDecision finalDecision) {
+            @NotNull TradeRiskContext riskContext,
+            FinalRiskGate.@NotNull OrderApprovalDecision finalDecision) {
         log.info(
                 "Trade wait decision. symbol={} side={} summary={} explanation={}",
                 riskContext.getSymbol(),

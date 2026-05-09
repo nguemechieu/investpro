@@ -7,7 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import org.investpro.models.trading.LiveTradesConsumer;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
@@ -19,20 +22,26 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
+import java.util.function.Consumer;
+
 
 /**
  * Oanda-specific WebSocket client for real-time trade streaming.
  * Extends ExchangeWebSocketClient with Oanda-specific message handling.
  * Uses Oanda REST v3 API format for trades.
  */
+@Getter
+@Setter
+@Slf4j
 public class OandaWebSocketClient extends ExchangeWebSocketClient {
 
     private static final Logger logger = LoggerFactory.getLogger(OandaWebSocketClient.class);
-    
+    private  TradePair tradePair;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private ExchangeStreamConsumer liveTradeConsumers;
 
     public OandaWebSocketClient(URI uri, Draft draft) {
         super(uri, draft);
@@ -57,6 +66,16 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
         } catch (JsonProcessingException ex) {
             logger.error("Failed to parse Oanda WebSocket message: " + ex.getMessage(), ex);
         }
+    }
+
+    @Override
+    public void subscribeStream(@NotNull String streamName, @NotNull Consumer<String> handler) {
+
+    }
+
+    @Override
+    public void unsubscribeStream(@NotNull String streamName) {
+
     }
 
     /**
@@ -92,7 +111,7 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
 
             // Send to registered consumer
             if (liveTradeConsumers.containsKey(getTradePair())) {
-                LiveTradesConsumer consumer = liveTradeConsumers.get(getTradePair());
+                ExchangeStreamConsumer consumer = liveTradeConsumers.get(getTradePair());
                 consumer.acceptTrades(newTrade);
                 logger.debug("Processed Oanda trade: %d at %s".formatted(tradeId, price));
             }
@@ -102,12 +121,8 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-        if (liveTradesConsumer == null) {
-            logger.error("Attempted to stream trades with null consumer");
-            return;
-        }
-        
+    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer liveTradesConsumer) {
+
         if (!isOpen()) {
             logger.warn("WebSocket not connected, cannot subscribe to trades");
             return;
@@ -129,15 +144,56 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
-        if (tradePair != null) {
-            liveTradeConsumers.remove(tradePair);
-            logger.info("Unsubscribed from live trades for %s".formatted(tradePair));
-        }
+    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
+        liveTradeConsumers.remove(tradePair);
+        logger.info("Unsubscribed from live trades for %s".formatted(tradePair));
     }
 
     @Override
-    public boolean supportsStreamingTrades(TradePair tradePair) {
-        return liveTradeConsumers.containsKey(tradePair);
+    public boolean supportsStreamingTrades(@NotNull TradePair tradePair) {
+        return false;
     }
+
+
+    /**
+     * Called by the neutral ExchangeWebSocketClient after socket opens.
+     */
+    @Override
+    protected void onConnected() {
+//        try {
+//            sendSubscribe(null, HEARTBEATS_CHANNEL);
+//        } catch (Exception exception) {
+//            log.debug("Unable to subscribe Coinbase heartbeats", exception);
+//        }
+//
+//        synchronized (liveTradeConsumers) {
+//            for (TradePair pair : liveTradeConsumers.keySet()) {
+//                try {
+//                    sendSubscribe(pair, MARKET_TRADES_CHANNEL);
+//                    pendingSubscriptions.remove(pair);
+//                    log.info("Resubscribed Coinbase market trades for {}", pair);
+//                } catch (Exception exception) {
+//                    pendingSubscriptions.add(pair);
+//                    log.warn("Unable to resubscribe Coinbase trades for {}", pair, exception);
+//                }
+//            }
+//        }
+//
+//        synchronized (rawStreamHandlers) {
+//            for (String streamKey : rawStreamHandlers.keySet()) {
+//                OandaWebSocketClient.OandaStream stream = parseOandaStream(streamKey);
+//                if (stream == null) {
+//                    continue;
+//                }
+//
+//                try {
+//                    sendSubscribe(stream.tradePair(), stream.channel());
+//                    log.info("Resubscribed Coinbase raw stream {}", stream.key());
+//                } catch (Exception exception) {
+//                    log.warn("Unable to resubscribe Coinbase raw stream {}", stream.key(), exception);
+//                }
+//            }
+//        }
+    }
+
 }

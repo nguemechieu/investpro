@@ -1,5 +1,7 @@
 package org.investpro.core.agents.execution;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,6 +20,8 @@ import org.investpro.utils.Side;
  * Uses StrategySignal to determine the action instead of just side direction.
  */
 @Slf4j
+@Getter
+@Setter
 public class ExecutionAgent implements Agent {
     private AgentContext context;
     private boolean running;

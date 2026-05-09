@@ -37,7 +37,7 @@ public class BehaviourGuardService {
     private final Preferences prefs;
     private BehaviourGuardConfig currentConfig;
 
-    private BehaviourGuardService() {
+    public BehaviourGuardService() {
         this.prefs = Preferences.userRoot().node(PREFS_NODE);
         loadConfig();
     }
@@ -52,7 +52,7 @@ public class BehaviourGuardService {
     /**
      * Load configuration from preferences
      */
-    public BehaviourGuardConfig loadConfig() {
+    public void loadConfig() {
         try {
             currentConfig = BehaviourGuardConfig.builder()
                     .guardEnabled(prefs.getBoolean(GUARD_ENABLED, true))
@@ -74,11 +74,9 @@ public class BehaviourGuardService {
                     .build();
 
             log.info("Loaded behaviour guard config: {}", currentConfig);
-            return currentConfig;
         } catch (Exception e) {
             log.warn("Failed to load behaviour guard config, using defaults", e);
             currentConfig = BehaviourGuardConfig.defaults();
-            return currentConfig;
         }
     }
 

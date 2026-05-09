@@ -8,7 +8,7 @@ import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyMetadata;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDateTime;

@@ -8,8 +8,7 @@ import org.investpro.enums.ContractType;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.*;
-import org.investpro.service.StrategySelectionService;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 
 import java.time.Instant;
 import java.util.ArrayList;

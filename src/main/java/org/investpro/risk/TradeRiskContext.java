@@ -1,7 +1,9 @@
 package org.investpro.risk;
 
 import lombok.Builder;
+import lombok.Getter;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.RiskProfile;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.ExecutionStrategy;
@@ -15,17 +17,21 @@ import org.investpro.models.trading.TradePair;
 
 /**
  * Immutable context capturing all risk inputs for a potential trade.
- *
+ * <p>
  * This object is the risk snapshot passed into:
  * - RiskManagementSystem.evaluateTrade(...)
  * - AiTradeReviewRequest.from(...)
  * - TradeExecutionCoordinator.processSignal(...)
  * - ExecutionEngine.executeApprovedOrder(...)
- *
+ * <p>
  * It is intentionally immutable and server-capable so it can later be sent to
  * an
  * authoritative backend decision service.
  */
+
+
+@Getter
+@Slf4j
 @Value
 @Builder(toBuilder = true)
 public class TradeRiskContext {
@@ -181,7 +187,7 @@ public class TradeRiskContext {
 
     /**
      * Calculate trade risk in currency amount.
-     *
+     * <p>
      * Formula:
      * abs(entry - stopLoss) * positionSize
      */
@@ -207,7 +213,7 @@ public class TradeRiskContext {
 
     /**
      * Calculate potential reward in currency amount.
-     *
+     * <p>
      * Formula:
      * abs(takeProfit - entry) * positionSize
      */
@@ -251,7 +257,7 @@ public class TradeRiskContext {
 
     /**
      * Calculate position notional value.
-     *
+     * <p>
      * Formula:
      * entryPrice * requestedPositionSize
      */
@@ -287,7 +293,7 @@ public class TradeRiskContext {
 
     /**
      * Calculate expected value in account currency.
-     *
+     * <p>
      * Formula:
      * winRate * reward - lossRate * risk - estimatedFee
      */

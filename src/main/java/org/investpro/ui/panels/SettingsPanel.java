@@ -1,5 +1,9 @@
 package org.investpro.ui.panels;
 
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -8,9 +12,18 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
+import org.investpro.i18n.LocalizationService;
 import org.jetbrains.annotations.NotNull;
 
+import jakarta.mail.Message;
+import jakarta.mail.Session;
+
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 import java.util.prefs.Preferences;
+
+import static org.investpro.i18n.LocalizationService.t;
 
 /**
  * System Settings Panel.
@@ -67,6 +80,7 @@ public class SettingsPanel extends VBox {
     private ComboBox<String> openaiModelCombo;
     private Spinner<Double> temperatureSpinner;
     private Spinner<Integer> maxTokensSpinner;
+    private Button testOpenAIButton;
 
     // Telegram configuration
     private CheckBox enableTelegramCheckbox;
@@ -94,6 +108,7 @@ public class SettingsPanel extends VBox {
         getStyleClass().add("settings-panel");
 
         setupUi();
+        LocalizationService.applyTranslations(this);
         loadSettings();
     }
 
@@ -280,11 +295,16 @@ public class SettingsPanel extends VBox {
         temperatureSpinner = doubleSpinner(0.0, 2.0, 0.7, 0.1);
         maxTokensSpinner = intSpinner(1, 4000, 1000, 100);
 
+        testOpenAIButton = new Button("Test Connection");
+        testOpenAIButton.setStyle(buttonStyle("#8b5cf6"));
+        testOpenAIButton.setOnAction(event -> testOpenAIConnection());
+
         grid.add(enableOpenAiCheckbox, 0, 0, 2, 1);
         addRow(grid, 1, "API Key:", openaiApiKeyField);
         addRow(grid, 2, "Model:", openaiModelCombo);
         addRow(grid, 3, "Temperature (0-2):", temperatureSpinner);
         addRow(grid, 4, "Max Tokens:", maxTokensSpinner);
+        grid.add(testOpenAIButton, 1, 5);
 
         return new VBox(8, sectionTitle, grid);
     }
@@ -375,42 +395,320 @@ public class SettingsPanel extends VBox {
     }
 
     private void testTelegramConnection() {
-        String botToken = telegramBotTokenField.getText();
-        String chatId = telegramChatIdField.getText();
+        String botToken = telegramBotTokenField.getText().trim();
+        String chatId = telegramChatIdField.getText().trim();
 
         if (botToken.isEmpty() || chatId.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Validation Error", "Please enter bot token and chat ID");
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"), "Please enter bot token and chat ID");
             return;
         }
 
-        try {
-            // TODO: Implement actual Telegram connection test
-            showAlert(Alert.AlertType.INFORMATION, "Success", "Telegram connection test passed!");
-            statusLabel.setText("Telegram connection test successful");
-        } catch (Exception e) {
-            showAlert(Alert.AlertType.ERROR, "Connection Failed", "Error: " + e.getMessage());
-            statusLabel.setText("Telegram connection test failed");
-        }
-    }
+        // Disable button and show loading state
+        testTelegramButton.setDisable(true);
+        testTelegramButton.setText("Testing...");
+        statusLabel.setText("Testing Telegram connection...");
 
+        // Run test in background thread
+        Thread testThread = new Thread(() -> {
+            try {
+                // Test 1: Verify bot token format (should be numbers:string)
+                if (!botToken.matches("^\\d+:[a-zA-Z0-9_-]+$")) {
+                    throw new IllegalArgumentException("Invalid bot token format");
+                }
+
+                // Test 2: Verify chat ID is numeric
+                try {
+                    Long.parseLong(chatId);
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Chat ID must be a number");
+                }
+
+                // Test 3: Make HTTP request to Telegram Bot API
+                String apiUrl = "https://api.telegram.org/bot" + botToken + "/getMe";
+                java.net.URL url = URI.create(apiUrl).toURL();
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                int responseCode = conn.getResponseCode();
+
+                if (responseCode == 200) {
+                    // Test 4: Try sending a test message
+                    String sendUrl = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+                    java.net.URL sendUrlObj = URI.create(sendUrl).toURL();
+                    java.net.HttpURLConnection sendConn = (java.net.HttpURLConnection) sendUrlObj.openConnection();
+                    sendConn.setRequestMethod("POST");
+                    sendConn.setConnectTimeout(5000);
+                    sendConn.setReadTimeout(5000);
+                    sendConn.setDoOutput(true);
+                    sendConn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+                    String payload = "chat_id=" + chatId + "&text=" + java.net.URLEncoder.encode(
+                            "✅ InvestPro Telegram connection test successful!", StandardCharsets.UTF_8);
+                    try (java.io.OutputStream os = sendConn.getOutputStream()) {
+                        byte[] input = payload.getBytes(StandardCharsets.UTF_8);
+                        os.write(input, 0, input.length);
+                    }
+
+                    int sendResponseCode = sendConn.getResponseCode();
+                    if (sendResponseCode == 200) {
+                        Platform.runLater(() -> {
+                            showAlert(Alert.AlertType.INFORMATION, t("common.success"),
+                                    "✅ Telegram connection successful!\n" +
+                                            "Bot verified and test message sent to chat.");
+                            statusLabel.setText("Telegram connection test successful");
+                            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+                        });
+                    } else {
+                        throw new RuntimeException("Failed to send test message (code: " + sendResponseCode + ")");
+                    }
+                } else if (responseCode == 401) {
+                    throw new RuntimeException("Invalid bot token (401 Unauthorized)");
+                } else {
+                    throw new RuntimeException("Telegram API error (code: " + responseCode + ")");
+                }
+
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    log.error("Telegram test failed", e);
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "Telegram connection failed:\n" + e.getMessage());
+                    statusLabel.setText("Telegram connection test failed: " + e.getMessage());
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    testTelegramButton.setDisable(false);
+                    testTelegramButton.setText("Test Connection");
+                });
+            }
+        });
+
+        testThread.setName("telegram-test-thread");
+        testThread.setDaemon(true);
+        testThread.start();
+    }
+    Properties props = new Properties();
     private void testEmailConnection() {
-        String smtpServer = smtpServerField.getText();
-        String emailAddress = emailAddressField.getText();
+        String smtpServer = smtpServerField.getText().trim();
+        int smtpPort = smtpPortSpinner.getValue();
+        String emailAddress = emailAddressField.getText().trim();
         String password = emailPasswordField.getText();
+        boolean useTls = enableTlsCheckbox.isSelected();
 
         if (smtpServer.isEmpty() || emailAddress.isEmpty() || password.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Validation Error", "Please fill in all required fields");
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
+                    "Please fill in all required fields: SMTP Server, Email, and Password");
             return;
         }
 
-        try {
-            // TODO: Implement actual email connection test
-            showAlert(Alert.AlertType.INFORMATION, "Success", "Email connection test passed!");
-            statusLabel.setText("Email connection test successful");
-        } catch (Exception e) {
-            showAlert(Alert.AlertType.ERROR, "Connection Failed", "Error: " + e.getMessage());
-            statusLabel.setText("Email connection test failed");
+        // Validate email format
+        if (!emailAddress.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
+                    "Invalid email address format");
+            return;
         }
+
+        // Disable button and show loading state
+        testEmailButton.setDisable(true);
+        testEmailButton.setText("Testing...");
+        statusLabel.setText("Testing Email connection...");
+
+        // Run test in background thread
+        Thread testThread = new Thread(() -> {
+            try {
+                // Test SMTP connection using JavaMail API
+
+                props.put("mail.smtp.host", smtpServer);
+                props.put("mail.smtp.port", String.valueOf(smtpPort));
+                props.put("mail.smtp.auth", "true");
+                props.put("mail.smtp.starttls.enable", String.valueOf(useTls));
+                props.put("mail.smtp.starttls.required", String.valueOf(useTls));
+                props.put("mail.smtp.socketFactory.port", String.valueOf(smtpPort));
+                if (useTls) {
+                    props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+                }
+                props.put("mail.smtp.connectiontimeout", "5000");
+                props.put("mail.smtp.timeout", "5000");
+
+                // Create session with authentication
+                Session session = Session.getInstance(props,
+                        new jakarta.mail.Authenticator() {
+                            @Override
+                            protected jakarta.mail.PasswordAuthentication getPasswordAuthentication() {
+                                return new jakarta.mail.PasswordAuthentication(emailAddress, password);
+                            }
+                        });
+
+                session.setDebug(false);
+
+                // Create test message
+                Message message = new MimeMessage(session);
+                message.setFrom(new InternetAddress(emailAddress));
+                message.setRecipients(Message.RecipientType.TO,
+                        InternetAddress.parse(emailAddress));
+                message.setSubject("InvestPro Email Test");
+                message.setText("""
+                        ✅ InvestPro email connection test successful!
+
+                        This is a test message from InvestPro trading platform.
+                        Email notifications are now configured and ready to use.""");
+
+                // Send test message
+                Transport.send(message);
+
+                Platform.runLater(() -> {
+                    showAlert(Alert.AlertType.INFORMATION, t("common.success"),
+                            "✅ Email connection successful!\n" +
+                                    "Test message sent to: " + emailAddress);
+                    statusLabel.setText("Email connection test successful");
+                    statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+                });
+
+            } catch (jakarta.mail.AuthenticationFailedException e) {
+                Platform.runLater(() -> {
+                    log.error("Email authentication failed", e);
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "Authentication failed. Check your email and password.");
+                    statusLabel.setText("Email test failed: Authentication error");
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } catch (jakarta.mail.MessagingException e) {
+                Platform.runLater(() -> {
+                    log.error("Email test failed", e);
+                    String errorMsg = e.getMessage();
+                    if (errorMsg.contains("Connection refused")) {
+                        errorMsg = "Cannot connect to SMTP server. Check server address and port.";
+                    } else if (errorMsg.contains("timeout")) {
+                        errorMsg = "Connection timeout. SMTP server is not responding.";
+                    }
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "Email connection failed:\n" + errorMsg);
+                    statusLabel.setText("Email test failed: " + errorMsg);
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    log.error("Email test failed", e);
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "Unexpected error:\n" + e.getMessage());
+                    statusLabel.setText("Email test failed: " + e.getMessage());
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    testEmailButton.setDisable(false);
+                    testEmailButton.setText("Test Connection");
+                });
+            }
+        });
+
+        testThread.setName("email-test-thread");
+        testThread.setDaemon(true);
+        testThread.start();
+    }
+
+    private void testOpenAIConnection() {
+        String apiKey = openaiApiKeyField.getText().trim();
+        String model = openaiModelCombo.getValue();
+
+        if (apiKey.isEmpty()) {
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
+                    "Please enter your OpenAI API key");
+            return;
+        }
+
+        if (!apiKey.startsWith("sk-")) {
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
+                    "Invalid API key format (should start with 'sk-')");
+            return;
+        }
+
+        // Disable button and show loading state
+        testOpenAIButton.setDisable(true);
+        testOpenAIButton.setText("Testing...");
+        statusLabel.setText("Testing OpenAI connection...");
+        statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+
+        // Run test in background thread
+        Thread testThread = new Thread(() -> {
+            try {
+                // Create HTTP request to OpenAI API
+                String apiUrl = "https://api.openai.com/v1/models/" + model;
+                java.net.URL url = URI.create(apiUrl).toURL();
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+                conn.setRequestProperty("Accept", "application/json");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                int responseCode = conn.getResponseCode();
+
+                if (responseCode == 200) {
+                    // Successfully authenticated and model exists
+                    Platform.runLater(() -> {
+                        showAlert(Alert.AlertType.INFORMATION, t("common.success"),
+                                "✅ OpenAI connection successful!\n" +
+                                        "API key validated and model '" + model + "' is accessible.");
+                        statusLabel.setText("OpenAI connection test successful");
+                        statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+                    });
+                } else if (responseCode == 401) {
+                    throw new RuntimeException("Invalid API key (401 Unauthorized). Check your API key.");
+                } else if (responseCode == 404) {
+                    throw new RuntimeException("Model not found (404). Check your model name or subscription.");
+                } else if (responseCode == 429) {
+                    throw new RuntimeException("Rate limited (429). Too many requests. Wait and try again.");
+                } else {
+                    throw new RuntimeException("OpenAI API error (code: " + responseCode + ")");
+                }
+
+                conn.disconnect();
+
+            } catch (java.net.MalformedURLException e) {
+                Platform.runLater(() -> {
+                    log.error("OpenAI test failed - invalid URL", e);
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "Invalid model name or URL format.");
+                    statusLabel.setText("OpenAI test failed: Invalid URL");
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } catch (java.io.IOException e) {
+                Platform.runLater(() -> {
+                    log.error("OpenAI test failed", e);
+                    String errorMsg = e.getMessage();
+                    if (errorMsg != null && errorMsg.contains("timeout")) {
+                        errorMsg = "Connection timeout. Check your internet connection.";
+                    } else if (errorMsg == null) {
+                        errorMsg = "Network error - unable to reach OpenAI API";
+                    }
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "OpenAI connection failed:\n" + errorMsg);
+                    statusLabel.setText("OpenAI test failed: " + errorMsg);
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    log.error("OpenAI test failed", e);
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
+                            "OpenAI connection failed:\n" + e.getMessage());
+                    statusLabel.setText("OpenAI test failed: " + e.getMessage());
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    testOpenAIButton.setDisable(false);
+                    testOpenAIButton.setText("Test Connection");
+                });
+            }
+        });
+
+        testThread.setName("openai-test-thread");
+        testThread.setDaemon(true);
+        testThread.start();
     }
 
     private void updateStreamingModeDescription(SystemCore.StreamingMode mode) {
@@ -420,52 +718,118 @@ public class SettingsPanel extends VBox {
     }
 
     private void handleStartStreaming() {
-        try {
-            if (systemCore == null) {
-                showAlert(Alert.AlertType.WARNING, "Error", "SystemCore is not available");
-                return;
-            }
-
-            SystemCore.StreamingMode mode = streamingModeCombo.getValue();
-            if (mode == null) {
-                mode = SystemCore.StreamingMode.SAFE_DEFAULT;
-            }
-
-            // Use the selected trading pair or default
-            if (systemCore.getSelectedTradePair() != null) {
-                systemCore.startStreaming(systemCore.getSelectedTradePair(), mode);
-            } else {
-                systemCore.switchStreamingMode(mode);
-                showAlert(Alert.AlertType.INFORMATION, "Info",
-                        "Streaming mode set to " + mode.name() + ". Please select a symbol to start streaming.");
-                return;
-            }
-
-            updateStreamingStatusUI(true);
-            statusLabel.setText("Streaming started with mode: " + mode.name());
-            log.info("Started streaming in mode: {}", mode);
-        } catch (Exception e) {
-            log.error("Error starting stream", e);
-            showAlert(Alert.AlertType.ERROR, "Error", "Failed to start streaming: " + e.getMessage());
-            updateStreamingStatusUI(false);
+        if (systemCore == null) {
+            showAlert(Alert.AlertType.WARNING, t("common.error"), "SystemCore is not available");
+            statusLabel.setText("Error: SystemCore not initialized");
+            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            return;
         }
+
+        if (!enableStreamingCheckbox.isSelected()) {
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
+                    "Please enable Live Market Streaming first");
+            return;
+        }
+
+        SystemCore.StreamingMode mode = streamingModeCombo.getValue();
+        if (mode == null) {
+            mode = SystemCore.StreamingMode.SAFE_DEFAULT;
+            streamingModeCombo.setValue(mode);
+        }
+
+        // Show loading state
+        startStreamingButton.setDisable(true);
+        startStreamingButton.setText("⏳ Starting...");
+        statusLabel.setText("Starting streaming in " + mode.name() + " mode...");
+        statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+
+        // Run in background thread to avoid blocking UI
+        SystemCore.StreamingMode finalMode = mode;
+        SystemCore.StreamingMode finalMode1 = mode;
+        Thread streamThread = new Thread(() -> {
+            try {
+                if (systemCore.getSelectedTradePair() == null) {
+                    Platform.runLater(() -> {
+                        statusLabel.setText("No trading pair selected");
+                        statusLabel.setStyle("-fx-text-fill: #fbbf24; -fx-font-size: 11;");
+                        showAlert(Alert.AlertType.INFORMATION, t("common.info"),
+                                "Please select a trading symbol first.\nStreaming mode set to " + finalMode.name());
+                        systemCore.switchStreamingMode(finalMode);
+                    });
+                } else {
+                    systemCore.startStreaming(systemCore.getSelectedTradePair(), finalMode1);
+                    Platform.runLater(() -> {
+                        updateStreamingStatusUI(true);
+                        statusLabel.setText("✅ Streaming started with mode: " + finalMode1.name());
+                        statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+                        log.info("Streaming started: pair={}, mode={}", systemCore.getSelectedTradePair(), finalMode1);
+                    });
+                }
+            } catch (Exception e) {
+                log.error("Error starting stream", e);
+                Platform.runLater(() -> {
+                    statusLabel.setText("Error: " + e.getMessage());
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                    showAlert(Alert.AlertType.ERROR, t("common.error"),
+                            "Failed to start streaming:\n" + e.getMessage());
+                    updateStreamingStatusUI(false);
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    startStreamingButton.setDisable(systemCore.isStreaming() || !enableStreamingCheckbox.isSelected());
+                    startStreamingButton.setText("▶ Start Streaming");
+                });
+            }
+        });
+
+        streamThread.setName("stream-start-thread");
+        streamThread.setDaemon(true);
+        streamThread.start();
     }
 
     private void handleStopStreaming() {
-        try {
-            if (systemCore == null) {
-                showAlert(Alert.AlertType.WARNING, "Error", "SystemCore is not available");
-                return;
-            }
-
-            systemCore.stopStreaming();
-            updateStreamingStatusUI(false);
-            statusLabel.setText("Streaming stopped");
-            log.info("Stopped streaming");
-        } catch (Exception e) {
-            log.error("Error stopping stream", e);
-            showAlert(Alert.AlertType.ERROR, "Error", "Failed to stop streaming: " + e.getMessage());
+        if (systemCore == null) {
+            showAlert(Alert.AlertType.WARNING, t("common.error"), "SystemCore is not available");
+            statusLabel.setText("Error: SystemCore not initialized");
+            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            return;
         }
+
+        // Show loading state
+        stopStreamingButton.setDisable(true);
+        stopStreamingButton.setText("⏳ Stopping...");
+        statusLabel.setText("Stopping streaming...");
+        statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+
+        // Run in background thread
+        Thread stopThread = new Thread(() -> {
+            try {
+                systemCore.stopStreaming();
+                Platform.runLater(() -> {
+                    updateStreamingStatusUI(false);
+                    statusLabel.setText("✅ Streaming stopped");
+                    statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+                    log.info("Streaming stopped");
+                });
+            } catch (Exception e) {
+                log.error("Error stopping stream", e);
+                Platform.runLater(() -> {
+                    statusLabel.setText("Error: " + e.getMessage());
+                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                    showAlert(Alert.AlertType.ERROR, t("common.error"),
+                            "Failed to stop streaming:\n" + e.getMessage());
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    stopStreamingButton.setDisable(true);
+                    stopStreamingButton.setText("⏸ Stop Streaming");
+                });
+            }
+        });
+
+        stopThread.setName("stream-stop-thread");
+        stopThread.setDaemon(true);
+        stopThread.start();
     }
 
     private void updateStreamingUI() {
@@ -475,7 +839,7 @@ public class SettingsPanel extends VBox {
     }
 
     private void updateStreamingStatusUI(boolean isStreaming) {
-        streamingStatusLabel.setText(isStreaming ? "✓ Streaming active" : "Not streaming");
+        streamingStatusLabel.setText(isStreaming ? t("settings.streamingActive") : t("settings.notStreaming"));
         streamingStatusLabel
                 .setStyle("-fx-text-fill: " + (isStreaming ? "#10b981" : "#a0aec0") + "; -fx-font-size: 11;");
         startStreamingButton.setDisable(isStreaming || !enableStreamingCheckbox.isSelected());
@@ -505,22 +869,34 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveSettings() {
-        SystemSafetySettings settings = buildSettingsFromUi();
-        settings.save();
+        try {
+            statusLabel.setText("Saving settings...");
+            statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
 
-        applySettingsToSystemCore(settings);
-        saveStreamingSettings();
-        saveOpenAiSettings();
-        saveTelegramSettings();
-        saveEmailSettings();
+            SystemSafetySettings settings = buildSettingsFromUi();
+            settings.save();
 
-        statusLabel.setText("Settings saved and applied.");
-        log.info("System settings saved: {}", settings);
+            applySettingsToSystemCore(settings);
+            saveStreamingSettings();
+            saveOpenAiSettings();
+            saveTelegramSettings();
+            saveEmailSettings();
 
-        showAlert(
-                Alert.AlertType.INFORMATION,
-                "Settings Saved",
-                "System settings were saved and applied successfully.");
+            statusLabel.setText("✅ Settings saved successfully");
+            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+            log.info("System settings saved: {}", settings);
+
+            showAlert(
+                    Alert.AlertType.INFORMATION,
+                    t("settings.savedTitle"),
+                    t("settings.savedMessage") + "\n\nAll settings have been persisted to disk.");
+        } catch (Exception e) {
+            log.error("Error saving settings", e);
+            statusLabel.setText("Error saving settings: " + e.getMessage());
+            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            showAlert(Alert.AlertType.ERROR, t("common.error"),
+                    "Failed to save settings:\n" + e.getMessage());
+        }
     }
 
     private void saveStreamingSettings() {
@@ -532,65 +908,97 @@ public class SettingsPanel extends VBox {
     }
 
     private void applySettings() {
-        SystemSafetySettings settings = buildSettingsFromUi();
-        applySettingsToSystemCore(settings);
+        try {
+            statusLabel.setText("Applying settings...");
+            statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
 
-        // Save streaming settings
-        saveStreamingSettings();
-        saveOpenAiSettings();
-        saveTelegramSettings();
-        saveEmailSettings();
+            SystemSafetySettings settings = buildSettingsFromUi();
+            applySettingsToSystemCore(settings);
 
-        statusLabel.setText("Settings applied.");
-        log.info("System settings applied: {}", settings);
+            // Save streaming settings
+            saveStreamingSettings();
+            saveOpenAiSettings();
+            saveTelegramSettings();
+            saveEmailSettings();
+
+            statusLabel.setText("✅ Settings applied to system");
+            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+            log.info("System settings applied: {}", settings);
+
+            showAlert(Alert.AlertType.INFORMATION, t("common.info"),
+                    "Settings applied successfully!\n\nThese settings are now active and will take effect immediately.");
+        } catch (Exception e) {
+            log.error("Error applying settings", e);
+            statusLabel.setText("Error applying settings: " + e.getMessage());
+            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            showAlert(Alert.AlertType.ERROR, t("common.error"),
+                    "Failed to apply settings:\n" + e.getMessage());
+        }
     }
 
     private void resetSettings() {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Reset Settings");
-        confirm.setHeaderText("Reset system settings?");
-        confirm.setContentText("This will restore all settings to defaults.");
+        confirm.setTitle(t("settings.resetTitle"));
+        confirm.setHeaderText(t("settings.resetHeader"));
+        confirm.setContentText(t("settings.resetMessage") + "\n\nThis action cannot be undone.");
+        confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.CANCEL);
 
-        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.YES) {
+            statusLabel.setText("Reset cancelled");
             return;
         }
 
-        SystemSafetySettings defaults = SystemSafetySettings.defaults();
-        applySettingsToUi(defaults);
-        defaults.save();
-        applySettingsToSystemCore(defaults);
+        try {
+            statusLabel.setText("Resetting to defaults...");
+            statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
 
-        // Reset streaming settings to defaults
-        streamingModeCombo.setValue(SystemCore.StreamingMode.SAFE_DEFAULT);
-        enableStreamingCheckbox.setSelected(false);
-        saveStreamingSettings();
-        updateStreamingUI();
+            SystemSafetySettings defaults = SystemSafetySettings.defaults();
+            applySettingsToUi(defaults);
+            defaults.save();
+            applySettingsToSystemCore(defaults);
 
-        // Reset OpenAI settings
-        enableOpenAiCheckbox.setSelected(false);
-        openaiApiKeyField.clear();
-        openaiModelCombo.setValue("gpt-4o");
-        temperatureSpinner.getValueFactory().setValue(0.7);
-        maxTokensSpinner.getValueFactory().setValue(1000);
-        saveOpenAiSettings();
+            // Reset streaming settings to defaults
+            streamingModeCombo.setValue(SystemCore.StreamingMode.SAFE_DEFAULT);
+            enableStreamingCheckbox.setSelected(false);
+            saveStreamingSettings();
+            updateStreamingUI();
 
-        // Reset Telegram settings
-        enableTelegramCheckbox.setSelected(false);
-        telegramBotTokenField.clear();
-        telegramChatIdField.clear();
-        saveTelegramSettings();
+            // Reset OpenAI settings
+            enableOpenAiCheckbox.setSelected(false);
+            openaiApiKeyField.clear();
+            openaiModelCombo.setValue("gpt-4o");
+            temperatureSpinner.getValueFactory().setValue(0.7);
+            maxTokensSpinner.getValueFactory().setValue(1000);
+            saveOpenAiSettings();
 
-        // Reset Email settings
-        enableEmailCheckbox.setSelected(false);
-        smtpServerField.clear();
-        smtpPortSpinner.getValueFactory().setValue(587);
-        emailAddressField.clear();
-        emailPasswordField.clear();
-        enableTlsCheckbox.setSelected(true);
-        saveEmailSettings();
+            // Reset Telegram settings
+            enableTelegramCheckbox.setSelected(false);
+            telegramBotTokenField.clear();
+            telegramChatIdField.clear();
+            saveTelegramSettings();
 
-        statusLabel.setText("Settings reset to defaults.");
-        log.info("System settings reset to defaults");
+            // Reset Email settings
+            enableEmailCheckbox.setSelected(false);
+            smtpServerField.clear();
+            smtpPortSpinner.getValueFactory().setValue(587);
+            emailAddressField.clear();
+            emailPasswordField.clear();
+            enableTlsCheckbox.setSelected(true);
+            saveEmailSettings();
+
+            statusLabel.setText("✅ All settings reset to defaults");
+            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+            log.info("System settings reset to defaults");
+
+            showAlert(Alert.AlertType.INFORMATION, t("common.success"),
+                    "All settings have been reset to their default values.");
+        } catch (Exception e) {
+            log.error("Error resetting settings", e);
+            statusLabel.setText("Error resetting settings: " + e.getMessage());
+            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            showAlert(Alert.AlertType.ERROR, t("common.error"),
+                    "Failed to reset settings:\n" + e.getMessage());
+        }
     }
 
     private void loadSettings() {
@@ -618,7 +1026,7 @@ public class SettingsPanel extends VBox {
         // Load Email settings
         loadEmailSettings();
 
-        statusLabel.setText("Settings loaded.");
+        statusLabel.setText(t("settings.loaded"));
         log.info("System settings loaded: {}", settings);
     }
 

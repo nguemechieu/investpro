@@ -6,28 +6,40 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundImage;
+import javafx.scene.layout.BackgroundPosition;
+import javafx.scene.layout.BackgroundRepeat;
+import javafx.scene.layout.BackgroundSize;
 import javafx.stage.Stage;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.repository.*;
 import org.investpro.strategy.StrategyBootstrapper;
 import org.investpro.ui.MarketConfiguration;
 import org.investpro.ui.OnboardingView;
-import org.investpro.ui.TradingWindow;
+import org.investpro.ui.TradingDesk;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.net.URL;
 import java.text.ParseException;
-import java.time.LocalDate;
 import java.util.Objects;
 
 /**
  * InvestPro - Professional Multi-Exchange Trading Terminal.
- *
+ * <p>
  * Main JavaFX entry point.
- *
+ * <p>
  * Flow:
  * - Start onboarding
  * - User chooses broker/configuration
- * - Open MT4-style trading terminal
+ * - Open trading terminal
  */
+@Slf4j
+@Getter
+@Setter
 public class InvestPro extends Application {
 
     private static final double DEFAULT_WIDTH = 1530;
@@ -35,10 +47,15 @@ public class InvestPro extends Application {
     private static final double MIN_WIDTH = 1200;
     private static final double MIN_HEIGHT = 720;
 
+    private static final String APP_ICON_RESOURCE = "images/Invest.png";
+    private static final String APP_CSS_RESOURCE = "css/app.css";
+
     private Stage primaryStage;
+    private Scene mainScene;
+
     private final AnchorPane root = new AnchorPane();
 
-    private TradingWindow tradingWindow;
+    private TradingDesk tradingDesk;
 
     public static void main(String[] args) {
         launch(args);
@@ -46,56 +63,63 @@ public class InvestPro extends Application {
 
     public InvestPro() {
         super();
+
+        try {
+            this.tradeRepository = RepositoryFactory.createTradeRepository();
+            this.orderRepository = RepositoryFactory.createOrderRepository();
+            this.currencyRepository = RepositoryFactory.createCurrencyRepository();
+
+        } catch (Exception exception) {
+            throw new RuntimeException("Failed to initialize InvestPro repositories", exception);
+        }
     }
 
     @Override
     public void start(@NotNull Stage primaryStage) {
         this.primaryStage = Objects.requireNonNull(primaryStage, "primaryStage must not be null");
 
-        // Initialize strategy framework early
-        StrategyBootstrapper.initialize();
+        try {
+            StrategyBootstrapper.initialize();
 
-        configurePrimaryStage();
-        configureRootScene();
+            configurePrimaryStage();
+            showOnboarding();
 
-        showOnboarding();
+            primaryStage.show();
 
-        primaryStage.show();
+        } catch (Exception exception) {
+            log.error("Failed to start InvestPro", exception);
+            showErrorAlert(exception);
+        }
     }
 
     private void configurePrimaryStage() {
-        primaryStage.setTitle(buildWindowTitle());
+        root.getStyleClass().add("root");
 
-        // Set window icon
-        try {
-            Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/Invest.png")));
-            primaryStage.getIcons().add(icon);
-        } catch (Exception e) {
-            System.err.println("Failed to load window icon: " + e.getMessage());
-        }
+        mainScene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+
+        loadStylesheet(mainScene);
+        loadWindowIcon();
+        loadBackgroundImage();
+
+        primaryStage.setTitle(buildWindowTitle());
+        primaryStage.setScene(mainScene);
 
         primaryStage.setMinWidth(MIN_WIDTH);
         primaryStage.setMinHeight(MIN_HEIGHT);
-        primaryStage.setWidth(DEFAULT_WIDTH);
-        primaryStage.setHeight(DEFAULT_HEIGHT);
         primaryStage.setResizable(true);
 
+        /*
+         * Better than setFullScreen(true) for desktop apps:
+         * - no forced fullscreen warning
+         * - behaves like normal professional workstation software
+         * - user can still resize/minimize
+         */
+        primaryStage.setMaximized(true);
+
         primaryStage.setOnCloseRequest(event -> {
-            shutdownTradingTerminal();
-            Platform.exit();
+            event.consume();
+            closeApplication();
         });
-    }
-
-    private void configureRootScene() {
-        // root.setStyle("-fx-background-color: #0f172a;");
-
-        root.getChildren().clear();
-        root.getStyleClass().add("root");
-
-        Scene scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-        installStylesheet(scene);
-
-        primaryStage.setScene(scene);
     }
 
     public void showOnboarding() {
@@ -104,26 +128,24 @@ public class InvestPro extends Application {
         primaryStage.setTitle("%s - Onboarding".formatted(buildWindowTitle()));
     }
 
+    private TradeRepository tradeRepository;
+    private OrderRepository orderRepository;
+    private CurrencyRepository currencyRepository;
+
     private void showTradingTerminal(MarketConfiguration configuration) {
         try {
             shutdownTradingTerminal();
 
-            tradingWindow = new TradingWindow(configuration);
-            setRootContent(tradingWindow);
+            tradingDesk = new TradingDesk(configuration,tradeRepository,orderRepository,currencyRepository);
+            setRootContent(tradingDesk);
 
-            primaryStage.setTitle("%s - Terminal".formatted(buildWindowTitle()));
+            primaryStage.setTitle("%s - Trading Desk".formatted(buildWindowTitle()));
 
-        } catch (ParseException | IOException | InterruptedException | ClassNotFoundException exception) {
-            Thread.currentThread().interrupt();
-            showErrorAlert(
-                    "Terminal Error",
-                    "Failed to open the trading terminal.",
-                    exception);
         } catch (Exception exception) {
-            showErrorAlert(
-                    "Terminal Error",
-                    "Failed to open the trading terminal.",
-                    exception);
+
+            log.error("Failed to open trading terminal", exception);
+            showErrorAlert(exception);
+
         }
     }
 
@@ -138,64 +160,135 @@ public class InvestPro extends Application {
         AnchorPane.setLeftAnchor(node, 0.0);
     }
 
-    private void installStylesheet(Scene scene) {
+    private void loadWindowIcon() {
         try {
-            String cssResource = Objects.requireNonNull(
-                    InvestPro.class.getResource("..\\..\\app.css"),
-                    "Missing /app.css resource").toExternalForm();
+            URL iconUrl = getClass().getClassLoader().getResource(InvestPro.APP_ICON_RESOURCE);
 
-            scene.getStylesheets().setAll(cssResource);
+            if (iconUrl == null) {
+                log.warn("Window icon not found: {}", InvestPro.APP_ICON_RESOURCE);
+                return;
+            }
+
+            Image icon = new Image(iconUrl.toExternalForm());
+
+            if (icon.isError()) {
+                log.warn("Failed to load window icon: {}", InvestPro.APP_ICON_RESOURCE);
+                return;
+            }
+
+            primaryStage.getIcons().add(icon);
+            primaryStage.centerOnScreen();
+            primaryStage.setResizable(true);
+
+            log.info("Loaded window icon: {}", InvestPro.APP_ICON_RESOURCE);
+
         } catch (Exception exception) {
-            throw new RuntimeException("Unable to load /app.css: %s%n", exception);
+            log.warn("Failed to load window icon: {}", InvestPro.APP_ICON_RESOURCE, exception);
+        }
+    }
+
+    private void loadStylesheet(Scene scene) {
+        Objects.requireNonNull(scene, "scene must not be null");
+
+        try {
+            URL cssUrl = getClass().getClassLoader().getResource(InvestPro.APP_CSS_RESOURCE);
+
+            if (cssUrl == null) {
+                log.warn("Stylesheet not found: {}", InvestPro.APP_CSS_RESOURCE);
+                return;
+            }
+
+            scene.getStylesheets().setAll(cssUrl.toExternalForm());
+            log.info("Loaded stylesheet: {}", InvestPro.APP_CSS_RESOURCE);
+
+        } catch (Exception exception) {
+            log.warn("Failed to load stylesheet: {}", InvestPro.APP_CSS_RESOURCE, exception);
+        }
+    }
+
+    private void loadBackgroundImage() {
+        try {
+            URL imageUrl = getClass().getClassLoader().getResource("images/Invest.png");
+
+            if (imageUrl == null) {
+                log.warn("Background image not found: images/Invest.png");
+                return;
+            }
+
+            Image backgroundImage = new Image(imageUrl.toExternalForm());
+
+            if (backgroundImage.isError()) {
+                log.warn("Failed to load background image: images/Invest.png");
+                return;
+            }
+
+            BackgroundImage bgImage = new BackgroundImage(
+                    backgroundImage,
+                    BackgroundRepeat.NO_REPEAT,
+                    BackgroundRepeat.NO_REPEAT,
+                    BackgroundPosition.CENTER,
+                    new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false,false,true, true));
+
+            Background background = new Background(bgImage);
+            root.setBackground(background);
+
+
+            log.info("Loaded background image: images/Invest.png");
+
+        } catch (Exception exception) {
+            log.warn("Failed to load background image", exception);
+        }
+    }
+
+    private void closeApplication() {
+        try {
+            shutdownTradingTerminal();
+        } catch (Exception exception) {
+            log.warn("Error while shutting down trading terminal", exception);
+            throw new RuntimeException(exception);
+        } finally {
+            Platform.exit();
+            System.exit(0);
         }
     }
 
     private void shutdownTradingTerminal() {
-        if (tradingWindow == null) {
+        if (tradingDesk == null) {
             return;
         }
 
         try {
-            /*
-             * Add public void shutdown() to TradingWindow later if you want to:
-             * - stop SmartBot
-             * - stop exchange streams
-             * - close WebSockets
-             * - shutdown schedulers
-             *
-             * For now this keeps the app compatible.
-             */
-            tryInvokeShutdown(tradingWindow);
+            tryInvokeShutdown(tradingDesk);
         } catch (Exception exception) {
-            System.err.println("Trading terminal shutdown failed: " + exception.getMessage());
+            log.error("Trading terminal shutdown failed: {}", exception.getMessage(), exception);
         } finally {
-            tradingWindow = null;
+            tradingDesk = null;
         }
     }
 
     private void tryInvokeShutdown(Object target) {
+        if (target == null) {
+            return;
+        }
+
         try {
             target.getClass().getMethod("shutdown").invoke(target);
         } catch (NoSuchMethodException ignored) {
-            // TradingWindow does not expose shutdown() yet.
+            log.debug("TradingDesk does not expose shutdown() yet.");
         } catch (Exception exception) {
-            throw new RuntimeException(exception);
+            throw new RuntimeException("Failed to invoke shutdown on " + target.getClass().getSimpleName(), exception);
         }
     }
 
     private @NotNull String buildWindowTitle() {
-        return "Professional Trading Terminal | © 2020-%d InvestPro .Inc"
-                .formatted(LocalDate.now().getYear());
+        return "InvestPro---------------------------------------------------------------------------------------------Desk | ";
     }
 
-    private void showErrorAlert(String title, String message, Throwable throwable) {
-        // Defer dialog display to allow JavaFX to finish animation/layout processing
-        // This prevents "showAndWait is not allowed during animation or layout
-        // processing" error
+    private void showErrorAlert(Throwable throwable) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle(title);
-            alert.setHeaderText(message);
+            alert.setTitle("Terminal Error");
+            alert.setHeaderText("Failed to open the trading terminal.");
             alert.setContentText(
                     throwable == null || throwable.getMessage() == null
                             ? "Unknown error"

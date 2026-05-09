@@ -1,9 +1,12 @@
 package org.investpro.ui;
 
+import lombok.Getter;
+
 /**
  * Enum for tab names in the trading terminal UI.
  * Centralizes tab naming for consistency and easier refactoring.
  */
+@Getter
 public enum TabName {
     MARKET_INFO("MarketInfo", "Market Statistics", "📊"),
     OVERVIEW("Overview", "Trading Overview", "👁️"),
@@ -38,27 +41,5 @@ public enum TabName {
         this.icon = icon;
     }
 
-    public String getTabId() {
-        return tabId;
-    }
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getIcon() {
-        return icon;
-    }
-
-    /**
-     * Get TabName by its ID
-     */
-    public static TabName fromId(String tabId) {
-        for (TabName tab : TabName.values()) {
-            if (tab.tabId.equals(tabId)) {
-                return tab;
-            }
-        }
-        throw new IllegalArgumentException("Unknown tab ID: " + tabId);
-    }
 }

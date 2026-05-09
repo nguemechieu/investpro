@@ -6,6 +6,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.exchange.models.ExchangeCapability;
+import org.investpro.exchange.models.MarketDepthType;
+import org.investpro.exchange.websocket.CoinbaseWebSocketClient;
 import org.investpro.models.trading.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,18 +20,18 @@ import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.TradePair;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.service.AuthResult;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.CoinbaseJwtSigner;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.investpro.exchange.coinbase.CoinbaseCandleDataSupplier;
-import org.investpro.exchange.websocket.CoinbaseExchangeWebSocketClient;
+
 import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.exchange.infrastructure.PollingExchangeStreamer;
 import org.investpro.exchange.infrastructure.BotTradingConfig;
 import org.investpro.exchange.infrastructure.SignalProcessor;
-import org.investpro.exchange.infrastructure.OrderCommandConsumer;
 import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +55,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.zip.GZIPInputStream;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -92,31 +99,18 @@ public class Coinbase extends Exchange {
     private final BotTradingConfig botConfig;
     private final SignalProcessor signalProcessor;
 
-    public Coinbase(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
+    public Coinbase(ExchangeCredentials exchangeCredentials) {
+        super(exchangeCredentials);
 
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.apiSecret = apiSecret == null ? "" : apiSecret.trim();
 
-        if (!this.apiKey.isEmpty() && !this.apiSecret.isEmpty()) {
-            log.info("Coinbase: Using credentials from provided parameters");
-        } else {
-            // Fallback to environment variables only when no explicit credentials were
-            // supplied.
-            String envKeyName = CoinbaseCredentialProvider.getKeyName();
-            String envPrivateKey = CoinbaseCredentialProvider.getPrivateKey();
+        initializePaperTradingAccount();
 
-            if (envKeyName != null && !envKeyName.isBlank() && envPrivateKey != null && !envPrivateKey.isBlank()) {
-                this.apiKey = envKeyName.trim();
-                this.apiSecret = envPrivateKey.trim();
-                log.info(
-                        "Coinbase: Using credentials from environment variables (COINBASE_KEY_NAME, COINBASE_PRIVATE_KEY)");
-            } else {
-                log.warn(
-                        "Coinbase: No credentials provided. Set COINBASE_KEY_NAME and COINBASE_PRIVATE_KEY environment variables, or provide apiKey/apiSecret parameters.");
-            }
-        }
-
+        this.apiKey = exchangeCredentials == null || exchangeCredentials.apiKey() == null
+                ? ""
+                : exchangeCredentials.apiKey().trim();
+        this.apiSecret = exchangeCredentials == null || exchangeCredentials.apiSecret() == null
+                ? ""
+                : exchangeCredentials.apiSecret().trim();
         this.jwtSigner = createJwtSigner(this.apiKey, this.apiSecret);
 
         this.httpClient = HttpClient.newBuilder()
@@ -142,13 +136,53 @@ public class Coinbase extends Exchange {
 
         this.signalProcessor = new SignalProcessor(this, this.botConfig, accountBalance);
 
+        try {
+            this.websocketClient = createWebSocketClient();
+        } catch (Exception exception) {
+            log.error("Failed to initialize Coinbase websocket client", exception);
+        }
+    }
+
+    private CoinbaseWebSocketClient createWebSocketClient() {
         String websocketJwt = websocketJwt();
         log.info("Coinbase WebSocket JWT created: {} characters, empty={}", websocketJwt.length(),
                 websocketJwt.isEmpty());
-        this.websocketClient = new CoinbaseExchangeWebSocketClient(
-                URI.create(MARKET_DATA_WS_URL),
+        return new CoinbaseWebSocketClient(URI.create(MARKET_DATA_WS_URL),
                 new Draft_6455(),
                 websocketJwt);
+
+
+    }
+
+    private final Map<String, Double> balances = new ConcurrentHashMap<>();
+    private final Map<String, String> orders = new ConcurrentHashMap<>();
+    private final List<Trade> tradeHistory = new CopyOnWriteArrayList<>();
+    private final List<Position> positions = new CopyOnWriteArrayList<>();
+
+    private long nextOrderId = 10_000L;
+
+    private void initializePaperTradingAccount() {
+        balances.clear();
+
+        // Coinbase spot-style paper account.
+        balances.put("USD", 10_000.0);
+        balances.put("USDC", 10_000.0);
+
+        // Common assets initialized to zero.
+        balances.put("BTC", 0.0);
+        balances.put("ETH", 0.0);
+        balances.put("SOL", 0.0);
+        balances.put("XRP", 0.0);
+        balances.put("ADA", 0.0);
+        balances.put("DOGE", 0.0);
+        balances.put("LTC", 0.0);
+        balances.put("XLM", 0.0);
+
+        orders.clear();
+        tradeHistory.clear();
+        positions.clear();
+
+        log.info("Coinbase paper trading account initialized with $10,000 USD and $10,000 USDC");
     }
 
     public static @NotNull String decodeBody(byte[] byteArray, String encoding) {
@@ -229,6 +263,93 @@ public class Coinbase extends Exchange {
     }
 
     @Override
+    public @NotNull ExchangeCapability getCapability() {
+        return ExchangeCapability.builder()
+                .exchangeName("COINBASE")
+                .exchangeId("coinbase")
+                .displayName("Coinbase Advanced Trade")
+                .apiBaseUrl(REST_BASE_URL)
+                .webSocketBaseUrl(MARKET_DATA_WS_URL)
+
+                // Market coverage
+                .supportsCrypto(true)
+                .supportsSpot(true)
+                .supportsFutures(true)
+                .supportsDerivatives(true)
+                .supportsForex(false)
+                .supportsStocks(false)
+                .supportsOptions(false)
+                .supportsIndices(false)
+
+                // Trading support
+                .supportsLiveTrading(true)
+                .supportsPaperTradingMode(true)
+                .supportsMarketOrders(true)
+                .supportsLimitOrders(true)
+                .supportsStopOrders(true)
+                .supportsBracketOrders(false)
+                .supportsStopLossTakeProfit(false)
+                .supportsTrailingStop(false)
+                .supportsLeverage(true)
+
+                // Account / portfolio
+                .supportsAccountInfo(true)
+                .supportsBalances(true)
+                .supportsPositions(true)
+                .supportsAccountTrades(true)
+                .supportsOpenOrders(true)
+                .supportsOrderHistory(true)
+                .supportsFills(true)
+
+                // Market data
+                .supportsTicker(true)
+                .supportsTickers(true)
+                .supportsOrderBook(true)
+                .supportsFullOrderBook(true)
+                .supportsDistributionBook(true)
+                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
+                .supportsHistoricalCandles(true)
+                .supportsRecentTrades(true)
+
+                // Streaming
+                .supportsWebSocket(true)
+                .supportsNativeWebSocket(true)
+                .supportsWebSocketStreaming(true)
+                .supportsTickerStreaming(true)
+                .supportsTradeStreaming(true)
+                .supportsCandleStreaming(true)
+                .supportsOrderBookStreaming(true)
+                .supportsAccountStreaming(true)
+                .supportsOrderStreaming(true)
+                .supportsFillStreaming(true)
+                .supportsPositionStreaming(true)
+                .supportsBalanceStreaming(true)
+                .supportsHttpStreaming(false)
+                .supportsPollingFallback(true)
+
+                // Infrastructure / limits
+                .supportsRateLimitInfo(true)
+                .requiresAuthenticationForTrading(true)
+                .requiresAuthenticationForAccountInfo(true)
+                .requiresAuthenticationForMarketData(false)
+
+                // Notes
+                .notes("""
+                    Coinbase Advanced Trade capability profile.
+                    Supports crypto spot trading and Coinbase derivatives where available.
+                    Public market data can stream without authentication.
+                    Account, order, fill, balance, and position data require authenticated user websocket/API access.
+                    Forex, stocks, options, and indices are not directly supported as traditional asset classes.
+                    """)
+                .build();
+    }
+
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<String> placeMarketOrder(TradePair symbol, Side side, double quantity) {
         return createMarketOrder(symbol, side, quantity);
     }
@@ -285,7 +406,7 @@ public class Coinbase extends Exchange {
 
         // Pass JWT token to WebSocket client for authenticated endpoints
         String jwt = websocketJwt();
-        websocketClient = new CoinbaseExchangeWebSocketClient(
+        websocketClient = new CoinbaseWebSocketClient(
                 URI.create(MARKET_DATA_WS_URL),
                 new Draft_6455(),
                 jwt);
@@ -400,6 +521,53 @@ public class Coinbase extends Exchange {
         return result;
     }
 
+    private void logCredentialDiagnostics(String keyName, String privateKey, String source) {
+        log.debug("Coinbase credential diagnostics from {}:", source);
+
+        // Key name format check
+        if (keyName != null && keyName.contains("organizations/") && keyName.contains("/apiKeys/")) {
+            log.debug("  ✓ Key name format appears correct");
+        } else {
+            log.warn("  ⚠ Key name format suspicious. Expected: organizations/{{org_id}}/apiKeys/{{key_id}}");
+            log.warn("    Got: {}", maskSensitive(keyName));
+        }
+
+        // Private key format check
+        if (privateKey != null && privateKey.contains("BEGIN") && privateKey.contains("PRIVATE KEY")) {
+            log.debug("  ✓ Private key contains PEM markers");
+
+            if (privateKey.contains("-----BEGIN EC PRIVATE KEY-----")) {
+                log.debug("    → EC PRIVATE KEY format");
+            } else if (privateKey.contains("-----BEGIN PRIVATE KEY-----")) {
+                log.debug("    → PRIVATE KEY format (PKCS8)");
+            }
+        } else {
+            log.error("  ✗ Private key missing PEM markers (BEGIN ... PRIVATE KEY)");
+        }
+
+        log.debug("  Key name length: {} chars, Private key length: {} chars",
+                keyName != null ? keyName.length() : 0,
+                privateKey != null ? privateKey.length() : 0);
+    }
+
+    private void logCredentialWarnings() {
+        log.error("Coinbase API credentials are missing. 401 authentication will fail.");
+        log.error("To fix, set these environment variables:");
+        log.error("  COINBASE_KEY_NAME = organizations/{{org_id}}/apiKeys/{{key_id}}");
+        log.error("  COINBASE_PRIVATE_KEY = {{EC private key PEM content}}");
+        log.error("");
+        log.error("Then restart InvestPro.");
+    }
+
+    private static String maskSensitive(String value) {
+        if (value == null || value.length() < 10) {
+            return value;
+        }
+        String start = value.substring(0, 10);
+        String end = value.substring(Math.max(0, value.length() - 5));
+        return start + "..." + end;
+    }
+
     private CoinbaseJwtSigner createJwtSigner(String keyName, String privateKey) {
         if (keyName == null || keyName.isBlank() || !looksLikePrivateKey(privateKey)) {
             return null;
@@ -408,7 +576,7 @@ public class Coinbase extends Exchange {
         return new CoinbaseJwtSigner(keyName, privateKey);
     }
 
-    private String websocketJwt() {
+    private @NotNull String websocketJwt() {
         if (jwtSigner == null) {
             log.warn(
                     "JWT signer is null - unable to generate WebSocket JWT. Public channels will work but authenticated channels won't.");
@@ -469,7 +637,20 @@ public class Coinbase extends Exchange {
             if (httpResponse.statusCode() >= 400) {
                 String errorMsg = "Coinbase HTTP %d for %s: %s"
                         .formatted(httpResponse.statusCode(), request.uri(), httpResponse.body());
-                log.error(errorMsg);
+
+                // Special diagnostics for 401 Unauthorized
+                if (httpResponse.statusCode() == 401) {
+                    log.error(errorMsg);
+                    log.error("HTTP 401 means your API credentials are invalid. Check:");
+                    log.error("  1. COINBASE_KEY_NAME format: organizations/{{org_id}}/apiKeys/{{key_id}}");
+                    log.error("  2. COINBASE_PRIVATE_KEY: complete EC private key in PEM format");
+                    log.error("  3. Coinbase dashboard: API key is ENABLED and has 'View accounts' permission");
+                    log.error("  4. API key is not revoked or expired");
+                    log.error("See COINBASE_401_FIX.md for detailed troubleshooting.");
+                } else {
+                    log.error(errorMsg);
+                }
+
                 throw new RuntimeException(errorMsg);
             }
 
@@ -1732,35 +1913,10 @@ public class Coinbase extends Exchange {
     }
 
     @Override
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-        if (auto) {
-            // Enable bot trading and process signal
-            botConfig.setEnabled(true);
-            log.info("Bot trading ENABLED for Coinbase. Configured symbols: {}",
-                    signalProcessor.getConfiguredSymbolsAsString());
-
-            // Process signal if provided
-            if (signal != null && !signal.isBlank()) {
-                log.info("Processing signal: {}", signal);
-                signalProcessor.processSignal(signal);
-            }
-        } else {
-            // Disable bot trading
-            botConfig.setEnabled(false);
-            log.info("Bot trading DISABLED for Coinbase");
-        }
+    public AuthResult AuthCheckResult(String selectedExchange) {
+        return null;
     }
 
-    /**
-     * Process incoming trading signal
-     */
-    public void processTradeSignal(String signal) {
-        if (botConfig.isEnabled()) {
-            signalProcessor.processSignal(signal);
-        } else {
-            log.debug("Bot trading is disabled, ignoring signal: {}", signal);
-        }
-    }
 
     @Override
     public CompletableFuture<Boolean> validateOrder(
@@ -1855,51 +2011,7 @@ public class Coinbase extends Exchange {
                 new UnsupportedOperationException("Coinbase does not support trailing stop orders."));
     }
 
-    // ---------------------------------------------------------------------
-    // Order command consumer
-    // ---------------------------------------------------------------------
 
-    @Override
-    public void createOrderAsync(Order order, OrderCommandConsumer consumer) {
-        if (consumer != null) {
-            consumer.onSubmitted(order);
-        }
-
-        try {
-            createOrder(order)
-                    .thenAccept(orderResponse -> {
-                        String orderId = orderResponse == null ? "" : orderResponse.trim();
-
-                        if (orderId.startsWith("{")) {
-                            try {
-                                JsonNode root = readJson(orderResponse);
-                                orderId = firstText(root, "order_id", "orderId");
-
-                                if (orderId.isBlank()) {
-                                    orderId = root.path("success_response").path("order_id").asText("");
-                                }
-                            } catch (Exception exception) {
-                                log.debug("Unable to parse Coinbase order id from response: {}", orderResponse,
-                                        exception);
-                            }
-                        }
-
-                        if (consumer != null) {
-                            consumer.onAccepted(orderId, order);
-                        }
-                    })
-                    .exceptionally(exception -> {
-                        if (consumer != null) {
-                            consumer.onError(order, exception);
-                        }
-                        return null;
-                    });
-        } catch (Exception exception) {
-            if (consumer != null) {
-                consumer.onError(order, exception);
-            }
-        }
-    }
 
     // ---------------------------------------------------------------------
     // Convenience helpers
@@ -2147,7 +2259,7 @@ public class Coinbase extends Exchange {
     public void stopAllStreams() {
         try {
             if (websocketClient != null) {
-                websocketClient.stopAllStreamLiveTrades();
+                websocketClient.stopStreamLiveTrades(tradePair);
             }
         } catch (Exception exception) {
             log.debug("Coinbase stopAllStreamLiveTrades failed", exception);
@@ -2163,15 +2275,21 @@ public class Coinbase extends Exchange {
 
     @Override
     public void streamTrades(TradePair tradePair, ExchangeStreamConsumer consumer) {
-        if (tradePair == null || consumer == null) {
+        Objects.requireNonNull(tradePair, "tradePair must not be null");
+        Objects.requireNonNull(consumer, "consumer must not be null");
+
+        if (websocketClient == null) {
+            log.warn("Cannot stream Coinbase trades - WebSocket client is not initialized");
             return;
         }
 
-        connectStream();
+        if (!isStreamConnected()) {
+            log.warn("Cannot stream Coinbase trades - WebSocket is not connected. pair={}", tradePair);
+            return;
+        }
 
-        websocketClient.setTradePair(tradePair);
-
-        websocketClient.streamLiveTrades(tradePair, new LiveTradesConsumer() {
+        // Adapter to convert ExchangeStreamConsumer to LiveTradesConsumer
+        LiveTradesConsumer liveTradesConsumer = new LiveTradesConsumer() {
             @Override
             public boolean containsKey(TradePair pair) {
                 return pair != null && pair.equals(tradePair);
@@ -2179,10 +2297,12 @@ public class Coinbase extends Exchange {
 
             @Override
             public void remove(TradePair pair) {
+                // No-op for streaming adapter
             }
 
             @Override
             public void put(TradePair pair) {
+                // No-op for streaming adapter
             }
 
             @Override
@@ -2203,7 +2323,23 @@ public class Coinbase extends Exchange {
                     consumer.onTrade(getName(), tradePair, trade);
                 }
             }
-        });
+        };
+
+        try {
+            ((CoinbaseWebSocketClient) websocketClient).streamLiveTrades(tradePair, liveTradesConsumer);
+            log.info("Subscribed Coinbase trade stream: {}", tradePair);
+        } catch (Exception exception) {
+            log.error(
+                    "Failed to subscribe Coinbase trade stream for {}: {}",
+                    tradePair,
+                    exception.getMessage(),
+                    exception);
+        }
+    }
+
+    @Override
+    public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+        streamTrades(tradePair, consumer);
     }
 
     @Override
@@ -2370,10 +2506,6 @@ public class Coinbase extends Exchange {
                 Timeframe.D1);
     }
 
-    @Override
-    public double getSize() {
-        return 0;
-    }
 
     @Override
     public boolean supportsFillStreaming() {

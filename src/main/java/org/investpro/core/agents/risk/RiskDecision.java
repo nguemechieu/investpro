@@ -31,7 +31,7 @@ public class RiskDecision {
         this.action = action == null ? "HOLD" : action.toUpperCase();
         this.approvedSize = Math.max(0.0, approvedSize);
         this.maxLoss = Math.max(0.0, maxLoss);
-        this.reasons = Collections.unmodifiableList(new ArrayList<>(reasons == null ? List.of() : reasons));
+        this.reasons = List.copyOf(reasons == null ? List.of() : reasons);
         this.sourcePayload = sourcePayload;
         this.timestamp = Instant.now();
     }

@@ -235,23 +235,4 @@ public final class UserAuthService {
         return Base64.getDecoder().decode(value);
     }
 
-    public record AuthResult(boolean success, String message) {
-        public static AuthResult success(String message) {
-            return new AuthResult(true, message);
-        }
-
-        public static AuthResult failure(String message) {
-            return new AuthResult(false, message);
-        }
-    }
-
-    public record ResetTokenResult(boolean success, String token, String email, String message) {
-        public static ResetTokenResult success(String token, String email, String message) {
-            return new ResetTokenResult(true, token, email, message);
-        }
-
-        public static ResetTokenResult failure(String message) {
-            return new ResetTokenResult(false, "", "", message);
-        }
-    }
 }

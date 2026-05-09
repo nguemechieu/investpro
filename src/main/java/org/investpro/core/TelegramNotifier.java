@@ -98,7 +98,7 @@ public class TelegramNotifier {
         return chatId != null && !chatId.isBlank();
     }
 
-    @SuppressWarnings("unused")
+
     public void setChatId(String chatIdOrChannelId) {
         this.chatId = normalizeChatId(chatIdOrChannelId);
     }

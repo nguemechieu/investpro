@@ -1,30 +1,50 @@
 package org.investpro.ui.panels;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.core.SystemCore;
+import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
+import org.investpro.service.NewsDataProvider;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.NotNull;
 
-import java.time.LocalDate;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutionException;
+
+import static org.investpro.i18n.LocalizationService.t;
 
 /**
- * Order Panel - Interactive order creation and placement interface.
- * Allows users to place BUY/SELL orders with various order types (MARKET,
- * LIMIT, etc.)
- * Features bid/ask visualization, risk management with take-profit/stop-loss,
- * and expiration control.
+ * Modern Order Panel.
+ * <p>
+ * Allows users to prepare BUY/SELL orders with:
+ * - Symbol
+ * - Order type
+ * - Volume
+ * - Optional limit/stop price
+ * - Take profit
+ * - Stop loss
+ * - Expiration
+ * - Comment
+ * <p>
+ * Important:
+ * This panel currently validates and logs the order.
+ * Wire onExecuteOrder(...) to your TradeExecutionCoordinator to place real
+ * orders safely.
  */
 @Slf4j
 @Getter
@@ -34,332 +54,469 @@ public class OrderPanel extends BorderPane {
     private ComboBox<String> symbolCombo;
     private ComboBox<OpenOrder.OrderType> orderTypeCombo;
     private ComboBox<Side> sideCombo;
+
     private Spinner<Double> volumeSpinner;
     private Spinner<Double> takeProfitSpinner;
     private Spinner<Double> stopLossSpinner;
+
     private TextArea commentArea;
     private TextField priceField;
     private DatePicker expirationDatePicker;
+
+    private Label symbolTitleLabel;
     private Label currentPriceLabel;
-    private Label bidAskLabel;
-    private Button executeButton;
+    private Label bidLabel;
+    private Label askLabel;
+    private Label spreadLabel;
+    private Label summaryLabel;
+
+    private Button buyButton;
+    private Button sellButton;
+    private Button placeOrderButton;
     private Button cancelButton;
+
+    private Canvas priceChart;
+    private javafx.scene.canvas.GraphicsContext chartContext;
 
     private double currentPrice = 0.0;
     private double bidPrice = 0.0;
     private double askPrice = 0.0;
+    private java.util.Deque<Double> priceHistory = new ConcurrentLinkedDeque<>();
+private  SystemCore systemCore;
+    public OrderPanel(SystemCore systemCore) {
+        setPrefSize(800, 580);
+        setPadding(new Insets(0));
+        setStyle("-fx-background-color: #0f172a;");
 
-    public OrderPanel(List<String> availableSymbols, TradePair selectedSymbol, OrderBook orderBook) {
-        setPrefSize(1000, 700);
-        setStyle("-fx-background-color: #1a1a2e; -fx-border-color: #374151; -fx-border-width: 1;");
+        this.systemCore=systemCore;
 
-        // Update current prices from order book
-        if (orderBook != null && !orderBook.getBids().isEmpty() && !orderBook.getAsks().isEmpty()) {
-            this.bidPrice = orderBook.getBids().getFirst().getPrice();
-            this.askPrice = orderBook.getAsks().getFirst().getPrice();
-            this.currentPrice = (bidPrice + askPrice) / 2;
+
+
+        setupUI(systemCore.getExchange().getTradePairSymbol(), systemCore.getSelectedTradePair());
+        try {
+            updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(systemCore.getSelectedTradePair()).get());
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
         }
-
-        setupUI(availableSymbols, selectedSymbol);
+        try {
+            LocalizationService.applyTranslations(this);
+        } catch (Exception exception) {
+            log.debug("Localization skipped for OrderPanel: {}", exception.getMessage());
+        }
     }
 
-    private void setupUI(List<String> availableSymbols, TradePair selectedSymbol) {
-        // Header
-        Label titleLabel = new Label("Place Order");
-        titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
-        HBox headerBox = new HBox(titleLabel);
-        headerBox.setPadding(new Insets(16));
-        headerBox.setStyle("-fx-background-color: #16213e; -fx-border-color: #374151; -fx-border-width: 0 0 1 0;");
-        setTop(headerBox);
+    private void setupUI(List<TradePair> availableSymbols, TradePair selectedSymbol) {
+        setTop(createHeader(selectedSymbol));
 
-        // Main Content Area
-        HBox mainContent = new HBox(16);
-        mainContent.setPadding(new Insets(16));
-        mainContent.setStyle("-fx-background-color: #1a1a2e;");
+        HBox mainContent = new HBox(18);
+        mainContent.setPadding(new Insets(18));
+        mainContent.setStyle("-fx-background-color: #0f172a;");
 
-        // Left panel - Chart and Bid/Ask Info
         VBox leftPanel = createLeftPanel(selectedSymbol);
+        leftPanel.setPrefWidth(430);
         HBox.setHgrow(leftPanel, Priority.ALWAYS);
 
-        // Right panel - Order form
         VBox rightPanel = createRightPanel(availableSymbols, selectedSymbol);
-        rightPanel.setPrefWidth(350);
+        rightPanel.setPrefWidth(430);
 
         mainContent.getChildren().addAll(leftPanel, createDivider(), rightPanel);
-        setCenter(mainContent);
 
-        // Bottom panel - Buttons
-        HBox bottomBox = createBottomPanel();
-        setBottom(bottomBox);
+        setCenter(mainContent);
+        setBottom(createBottomPanel());
+
+        updateUIForOrderType();
+        updateSummary();
+
+    }
+
+    private @NotNull HBox createHeader(TradePair selectedSymbol) {
+        Label titleLabel = new Label("Place Order");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        Label subtitleLabel = new Label("Prepare buy/sell orders with risk controls.");
+        subtitleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #94a3b8;");
+
+        VBox titleBox = new VBox(4, titleLabel, subtitleLabel);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        symbolTitleLabel = new Label(selectedSymbol != null ? displaySymbol(selectedSymbol) : "No Symbol");
+        symbolTitleLabel.setStyle(
+                "-fx-font-size: 14px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #38bdf8; " +
+                        "-fx-background-color: rgba(56, 189, 248, 0.12); " +
+                        "-fx-padding: 8 14; " +
+                        "-fx-background-radius: 999;");
+
+        HBox headerBox = new HBox(12, titleBox, spacer, symbolTitleLabel);
+        headerBox.setAlignment(Pos.CENTER_LEFT);
+        headerBox.setPadding(new Insets(18));
+        headerBox.setStyle(
+                "-fx-background-color: linear-gradient(to right, #111827, #16213e); " +
+                        "-fx-border-color: #263244; " +
+                        "-fx-border-width: 0 0 1 0;");
+
+        return headerBox;
     }
 
     private VBox createLeftPanel(TradePair selectedSymbol) {
         VBox panel = new VBox(12);
-        panel.setPadding(new Insets(12));
-        panel.setStyle(
-                "-fx-background-color: #0f3460; -fx-border-color: #374151; -fx-border-width: 1; -fx-border-radius: 6;");
+        panel.setPadding(new Insets(14));
+        panel.setStyle(cardStyle());
 
-        // Title
-        Label titleLabel = new Label("Market Information");
-        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+        Label titleLabel = new Label("Market Snapshot");
+        titleLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
-        // Symbol display
-        Label symbolLabel = new Label(selectedSymbol != null ? selectedSymbol.getSymbol() : "N/A");
-        symbolLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
+        Label symbolLabel = new Label(selectedSymbol != null ? displaySymbol(selectedSymbol) : "N/A");
+        symbolLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
 
-        // Price information
-        currentPriceLabel = new Label(String.format("Current: $%.2f", currentPrice));
-        currentPriceLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #a0aec0;");
+        currentPriceLabel = new Label(formatPrice(currentPrice));
+        currentPriceLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #cbd5e1; -fx-font-weight: bold;");
 
-        // Bid/Ask information
-        bidAskLabel = new Label(String.format("Bid: $%.2f | Ask: $%.2f | Spread: $%.4f",
-                bidPrice, askPrice, Math.abs(askPrice - bidPrice)));
-        bidAskLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #10b981;");
+        HBox quoteCards = new HBox(8);
+        quoteCards.getChildren().addAll(
+                createQuoteCard("BID", bidPrice, "#10b981"),
+                createQuoteCard("ASK", askPrice, "#ef4444"),
+                createQuoteCard("SPREAD", Math.abs(askPrice - bidPrice), "#f59e0b"));
 
-        // Placeholder for chart
-        VBox chartArea = new VBox();
-        chartArea.setStyle("-fx-background-color: #16213e; -fx-border-color: #374151; -fx-border-width: 1;");
-        chartArea.setPrefHeight(300);
-        chartArea.setAlignment(Pos.CENTER);
-        Label chartPlaceholder = new Label("📊 Bid/Ask Chart\n(Real-time chart would display here)");
-        chartPlaceholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #a0aec0;");
-        chartArea.getChildren().add(chartPlaceholder);
+        priceChart = new Canvas(350, 160);
+        chartContext = priceChart.getGraphicsContext2D();
+        priceChart.setStyle("-fx-border-color: #263244; -fx-border-radius: 8;");
+        drawPriceChart();
+
+        VBox chartArea = new VBox(8);
+        chartArea.setAlignment(Pos.TOP_CENTER);
+        chartArea.setPrefHeight(180);
+        chartArea.setStyle(
+                "-fx-background-color: linear-gradient(to bottom, #0b1120, #111827); " +
+                        "-fx-border-color: #263244; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 10; " +
+                        "-fx-background-radius: 10;");
+
+        Label chartLabel = new Label("Price Activity");
+        chartLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #cbd5e1;");
+
+        chartArea.getChildren().addAll(chartLabel, priceChart);
         VBox.setVgrow(chartArea, Priority.ALWAYS);
+
+        summaryLabel = new Label("Order summary will appear here.");
+        summaryLabel.setWrapText(true);
+        summaryLabel.setStyle(
+                "-fx-font-size: 12px; " +
+                        "-fx-text-fill: #cbd5e1; " +
+                        "-fx-background-color: #0b1120; " +
+                        "-fx-padding: 12; " +
+                        "-fx-background-radius: 10; " +
+                        "-fx-border-color: #263244; " +
+                        "-fx-border-radius: 10;");
 
         panel.getChildren().addAll(
                 titleLabel,
                 symbolLabel,
                 currentPriceLabel,
-                bidAskLabel,
-                new Separator(),
-                chartArea);
+                quoteCards,
+                chartArea,
+                summaryLabel);
 
         return panel;
     }
 
-    private VBox createRightPanel(List<String> availableSymbols, TradePair selectedSymbol) {
-        VBox panel = new VBox(12);
-        panel.setPadding(new Insets(12));
-        panel.setStyle(
-                "-fx-background-color: #0f3460; -fx-border-color: #374151; -fx-border-width: 1; -fx-border-radius: 6;");
+    private VBox createQuoteCard(String title, double value, String accentColor) {
+        VBox card = new VBox(3);
+        card.setPadding(new Insets(10));
+        card.setMinWidth(100);
+        card.setStyle(
+                "-fx-background-color: #0b1120; " +
+                        "-fx-border-color: " + accentColor + "; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 10; " +
+                        "-fx-background-radius: 10;");
 
-        Label titleLabel = new Label("Order Details");
-        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+        Label titleNode = new Label(title);
+        titleNode.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #94a3b8;");
 
-        // Symbol selection
+        Label valueNode = new Label(formatDouble(value));
+        valueNode.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: " + accentColor + ";");
+
+        if ("BID".equalsIgnoreCase(title)) {
+            bidLabel = valueNode;
+        } else if ("ASK".equalsIgnoreCase(title)) {
+            askLabel = valueNode;
+        } else if ("SPREAD".equalsIgnoreCase(title)) {
+            spreadLabel = valueNode;
+        }
+
+        card.getChildren().addAll(titleNode, valueNode);
+        HBox.setHgrow(card, Priority.ALWAYS);
+
+        return card;
+    }
+
+    private VBox createRightPanel(List<TradePair> availableSymbols, TradePair selectedSymbol) {
+        VBox panel = new VBox(11);
+        panel.setPadding(new Insets(14));
+        panel.setStyle(cardStyle());
+
+        Label titleLabel = new Label("Order Ticket");
+        titleLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
         symbolCombo = new ComboBox<>();
-        symbolCombo.getItems().addAll(availableSymbols);
+        if (availableSymbols != null) {
+            symbolCombo.getItems().addAll(availableSymbols.stream().map(c->c.toString('/')).toList());
+        }
         if (selectedSymbol != null) {
-            symbolCombo.setValue(selectedSymbol.getSymbol());
+            symbolCombo.setValue(displaySymbol(selectedSymbol));
+        } else if (!symbolCombo.getItems().isEmpty()) {
+            symbolCombo.setValue(symbolCombo.getItems().getFirst());
         }
         symbolCombo.setPrefWidth(Double.MAX_VALUE);
-        symbolCombo.setStyle("-fx-font-size: 12px;");
-        HBox symbolBox = createLabeledControl("Symbol:", symbolCombo);
+        styleInput(symbolCombo);
+        symbolCombo.setOnAction(event -> {
+            if (symbolTitleLabel != null) {
+                symbolTitleLabel.setText(symbolCombo.getValue() == null ? "No Symbol" : symbolCombo.getValue());
+            }
+            updateSummary();
+        });
 
-        // Volume
-        volumeSpinner = new Spinner<>(0.0, 1000000.0, 1.0, 0.1);
-        volumeSpinner.setEditable(true);
-        volumeSpinner.setPrefWidth(Double.MAX_VALUE);
-        HBox volumeBox = createLabeledControl("Volume:", volumeSpinner);
+        volumeSpinner = doubleSpinner(1.0, 0.1);
+        volumeSpinner.valueProperty().addListener((obs, oldValue, newValue) -> updateSummary());
 
-        // Take Profit
-        takeProfitSpinner = new Spinner<>(0.0, 1000000.0, 0.0, 10.0);
-        takeProfitSpinner.setEditable(true);
-        takeProfitSpinner.setPrefWidth(Double.MAX_VALUE);
-        HBox tpBox = createLabeledControl("Take Profit:", takeProfitSpinner);
+        takeProfitSpinner = doubleSpinner(0.0, 10.0);
+        takeProfitSpinner.valueProperty().addListener((obs, oldValue, newValue) -> updateSummary());
 
-        // Stop Loss
-        stopLossSpinner = new Spinner<>(0.0, 1000000.0, 0.0, 10.0);
-        stopLossSpinner.setEditable(true);
-        stopLossSpinner.setPrefWidth(Double.MAX_VALUE);
-        HBox slBox = createLabeledControl("Stop Loss:", stopLossSpinner);
+        stopLossSpinner = doubleSpinner(0.0, 10.0);
+        stopLossSpinner.valueProperty().addListener((obs, oldValue, newValue) -> updateSummary());
 
-        // Comment
-        commentArea = new TextArea();
-        commentArea.setWrapText(true);
-        commentArea.setPrefHeight(70);
-        commentArea.setStyle("-fx-font-size: 11px; -fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
-        commentArea.setPromptText("Optional comment...");
-        Label commentLabel = new Label("Comment:");
-        commentLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #a0aec0;");
-
-        // Order Type
         orderTypeCombo = new ComboBox<>();
         orderTypeCombo.getItems().addAll(OpenOrder.OrderType.values());
         orderTypeCombo.setValue(OpenOrder.OrderType.MARKET);
         orderTypeCombo.setPrefWidth(Double.MAX_VALUE);
-        orderTypeCombo.setStyle("-fx-font-size: 12px;");
-        orderTypeCombo.setOnAction(event -> updateUIForOrderType());
-        HBox orderTypeBox = createLabeledControl("Order Type:", orderTypeCombo);
+        styleInput(orderTypeCombo);
+        orderTypeCombo.setOnAction(event -> {
+            updateUIForOrderType();
+            updateSummary();
+        });
 
-        // Side (Buy/Sell)
         sideCombo = new ComboBox<>();
         sideCombo.getItems().addAll(Side.BUY, Side.SELL);
         sideCombo.setValue(Side.BUY);
         sideCombo.setPrefWidth(Double.MAX_VALUE);
-        sideCombo.setStyle("-fx-font-size: 12px;");
-        HBox sideBox = createLabeledControl("Side:", sideCombo);
+        styleInput(sideCombo);
+        sideCombo.setOnAction(event -> {
+            updateActionButtonStyles();
+            updateSummary();
+        });
 
-        // Price field (hidden for market orders)
-        priceField = new TextField();
-        priceField.setText(String.format("%.2f", currentPrice));
+        priceField = new TextField(formatDouble(currentPrice));
         priceField.setPrefWidth(Double.MAX_VALUE);
-        priceField.setStyle("-fx-font-size: 12px;");
-        HBox priceBox = createLabeledControl("Price:", priceField);
+        styleInput(priceField);
+        priceField.textProperty().addListener((obs, oldValue, newValue) -> updateSummary());
 
-        // Expiration date (hidden for market orders)
-        expirationDatePicker = new DatePicker();
-        expirationDatePicker.setValue(LocalDate.now().plusDays(1));
+        expirationDatePicker = new DatePicker(LocalDate.now().plusDays(1));
         expirationDatePicker.setPrefWidth(Double.MAX_VALUE);
-        expirationDatePicker.setStyle("-fx-font-size: 12px;");
-        HBox expirationBox = createLabeledControl("Expiration:", expirationDatePicker);
+        styleInput(expirationDatePicker);
 
-        // Add all controls to panel
+        commentArea = new TextArea();
+        commentArea.setWrapText(true);
+        commentArea.setPrefHeight(60);
+        commentArea.setPromptText("Optional comment...");
+        commentArea.setStyle(
+                "-fx-font-size: 14px; " +
+                        "-fx-control-inner-background: #0b1120; " +
+                        "-fx-text-fill: #ffffff; " +
+                        "-fx-prompt-text-fill: #64748b;");
+
+        GridPane form = new GridPane();
+        form.setHgap(12);
+        form.setVgap(12);
+
+        addFormRow(form, 0, "Symbol", symbolCombo);
+        addFormRow(form, 1, "Order Type", orderTypeCombo);
+        addFormRow(form, 2, "Side", sideCombo);
+        addFormRow(form, 3, "Volume", volumeSpinner);
+        addFormRow(form, 4, "Price", priceField);
+        addFormRow(form, 5, "Take Profit", takeProfitSpinner);
+        addFormRow(form, 6, "Stop Loss", stopLossSpinner);
+        addFormRow(form, 7, "Expiration", expirationDatePicker);
+
+        Label commentLabel = fieldLabel("Comment");
+
         panel.getChildren().addAll(
                 titleLabel,
-                symbolBox,
-                volumeBox,
-                tpBox,
-                slBox,
+                form,
                 commentLabel,
-                commentArea,
-                new Separator(),
-                orderTypeBox,
-                sideBox,
-                priceBox,
-                expirationBox);
+                commentArea);
 
-        VBox.setVgrow(commentArea, Priority.NEVER);
         return panel;
     }
 
     private HBox createBottomPanel() {
         HBox bottomBox = new HBox(12);
-        bottomBox.setPadding(new Insets(16));
+        bottomBox.setPadding(new Insets(16, 18, 18, 18));
         bottomBox.setAlignment(Pos.CENTER_RIGHT);
-        bottomBox.setStyle("-fx-background-color: #16213e; -fx-border-color: #374151; -fx-border-width: 1 0 0 0;");
+        bottomBox.setStyle(
+                "-fx-background-color: #111827; " +
+                        "-fx-border-color: #263244; " +
+                        "-fx-border-width: 1 0 0 0;");
 
-        executeButton = new Button("Buy");
-        executeButton.setPrefWidth(120);
-        executeButton.setPrefHeight(40);
-        executeButton.setStyle(
-                "-fx-background-color: #10b981; -fx-text-fill: white; " +
-                        "-fx-font-size: 13px; -fx-font-weight: bold; " +
-                        "-fx-border-radius: 4; -fx-padding: 10 20;");
-        executeButton.setOnAction(event -> onExecuteOrder());
+        buyButton = new Button("BUY");
+        buyButton.setPrefWidth(140);
+        buyButton.setPrefHeight(46);
+        buyButton.setStyle(actionButtonStyle("#10b981"));
+        buyButton.setOnAction(event -> {
+            sideCombo.setValue(Side.BUY);
+            onExecuteOrder(Side.BUY);
+        });
 
-        cancelButton = new Button("Cancel");
+        sellButton = new Button("SELL");
+        sellButton.setPrefWidth(140);
+        sellButton.setPrefHeight(46);
+        sellButton.setStyle(actionButtonStyle("#ef4444"));
+        sellButton.setOnAction(event -> {
+            sideCombo.setValue(Side.SELL);
+            onExecuteOrder(Side.SELL);
+        });
+
+        placeOrderButton = new Button("PLACE ORDER");
+        placeOrderButton.setPrefWidth(160);
+        placeOrderButton.setPrefHeight(46);
+        placeOrderButton.setStyle(actionButtonStyle("#3b82f6"));
+        placeOrderButton.setOnAction(event -> onExecuteOrder(sideCombo.getValue()));
+
+        cancelButton = new Button("CLEAR");
         cancelButton.setPrefWidth(120);
-        cancelButton.setPrefHeight(40);
+        cancelButton.setPrefHeight(46);
         cancelButton.setStyle(
-                "-fx-background-color: #ef4444; -fx-text-fill: white; " +
-                        "-fx-font-size: 13px; -fx-font-weight: bold; " +
-                        "-fx-border-radius: 4; -fx-padding: 10 20;");
+                "-fx-background-color: #374151; " +
+                        "-fx-text-fill: #e5e7eb; " +
+                        "-fx-font-size: 13px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-background-radius: 10; " +
+                        "-fx-cursor: hand;");
         cancelButton.setOnAction(event -> onCancel());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        bottomBox.getChildren().addAll(spacer, executeButton, cancelButton);
+        bottomBox.getChildren().addAll(spacer, buyButton, sellButton, placeOrderButton, cancelButton);
+
         return bottomBox;
     }
 
-    private HBox createLabeledControl(String labelText, Control control) {
+    private void addFormRow(GridPane grid, int row, String label, Control control) {
+        Label labelNode = fieldLabel(label);
+        labelNode.setPrefWidth(85);
+
+        control.setMaxWidth(Double.MAX_VALUE);
+        GridPane.setHgrow(control, Priority.ALWAYS);
+
+        grid.add(labelNode, 0, row);
+        grid.add(control, 1, row);
+    }
+
+    private Label fieldLabel(String labelText) {
         Label label = new Label(labelText);
-        label.setPrefWidth(80);
-        label.setStyle("-fx-font-size: 12px; -fx-text-fill: #a0aec0;");
-        HBox box = new HBox(8, label, control);
-        box.setAlignment(Pos.CENTER_LEFT);
-        return box;
+        label.setStyle("-fx-font-size: 14px; -fx-text-fill: #cbd5e1; -fx-font-weight: bold;");
+        return label;
     }
 
     private Separator createDivider() {
-        Separator sep = new Separator();
-        sep.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        sep.setStyle("-fx-opacity: 0.3;");
-        return sep;
+        Separator separator = new Separator();
+        separator.setOrientation(Orientation.VERTICAL);
+        separator.setStyle("-fx-opacity: 0.25;");
+        return separator;
     }
 
     private void updateUIForOrderType() {
         OpenOrder.OrderType selectedType = orderTypeCombo.getValue();
         boolean isMarket = selectedType == OpenOrder.OrderType.MARKET;
 
-        // Show/hide price field
         priceField.setDisable(isMarket);
-        priceField.setStyle(isMarket ? "-fx-font-size: 12px; -fx-opacity: 0.5;" : "-fx-font-size: 12px;");
-
-        // Show/hide expiration date
         expirationDatePicker.setDisable(isMarket);
-        expirationDatePicker.setStyle(isMarket ? "-fx-font-size: 12px; -fx-opacity: 0.5;" : "-fx-font-size: 12px;");
 
-        // Update button text and colors
         if (isMarket) {
-            Side side = sideCombo.getValue();
-            if (side == Side.BUY) {
-                executeButton.setText("Buy");
-                executeButton.setStyle(
-                        "-fx-background-color: #10b981; -fx-text-fill: white; " +
-                                "-fx-font-size: 13px; -fx-font-weight: bold; " +
-                                "-fx-border-radius: 4; -fx-padding: 10 20;");
-            } else {
-                executeButton.setText("Sell");
-                executeButton.setStyle(
-                        "-fx-background-color: #ef4444; -fx-text-fill: white; " +
-                                "-fx-font-size: 13px; -fx-font-weight: bold; " +
-                                "-fx-border-radius: 4; -fx-padding: 10 20;");
-            }
+            priceField.setText(formatDouble(currentPrice));
+            priceField.setStyle(disabledInputStyle());
+            expirationDatePicker.setStyle(disabledInputStyle());
         } else {
-            executeButton.setText("Place Order");
-            executeButton.setStyle(
-                    "-fx-background-color: #3b82f6; -fx-text-fill: white; " +
-                            "-fx-font-size: 13px; -fx-font-weight: bold; " +
-                            "-fx-border-radius: 4; -fx-padding: 10 20;");
+            styleInput(priceField);
+            styleInput(expirationDatePicker);
         }
 
-        // Update price field with current price for market orders
-        if (isMarket) {
-            priceField.setText(String.format("%.2f", currentPrice));
+        placeOrderButton.setText(isMarket ? "PLACE MARKET" : "PLACE ORDER");
+
+        updateActionButtonStyles();
+    }
+
+    private void updateActionButtonStyles() {
+        if (buyButton == null || sellButton == null || sideCombo == null) {
+            return;
+        }
+
+        Side side = sideCombo.getValue();
+
+        if (side == Side.BUY) {
+            buyButton.setStyle(actionButtonStyle("#10b981"));
+            sellButton.setStyle(secondaryActionButtonStyle("#ef4444"));
+        } else if (side == Side.SELL) {
+            buyButton.setStyle(secondaryActionButtonStyle("#10b981"));
+            sellButton.setStyle(actionButtonStyle("#ef4444"));
         }
     }
 
-    private void onExecuteOrder() {
+    private void onExecuteOrder(Side requestedSide) {
         try {
             String symbol = symbolCombo.getValue();
-            double volume = volumeSpinner.getValue();
-            double takeProfit = takeProfitSpinner.getValue();
-            double stopLoss = stopLossSpinner.getValue();
-            String comment = commentArea.getText();
+            double volume = safeDouble(volumeSpinner.getValue());
+            double takeProfit = safeDouble(takeProfitSpinner.getValue());
+            double stopLoss = safeDouble(stopLossSpinner.getValue());
+            String comment = commentArea.getText() == null ? "" : commentArea.getText().trim();
             OpenOrder.OrderType orderType = orderTypeCombo.getValue();
-            Side side = sideCombo.getValue();
-            double price = Double.parseDouble(priceField.getText());
+            Side side = requestedSide == null ? sideCombo.getValue() : requestedSide;
+
+            if (side == null) {
+                showError("Please select BUY or SELL.");
+                return;
+            }
+
+            sideCombo.setValue(side);
+
+            if (symbol == null || symbol.isBlank()) {
+                showError(t("order.selectSymbol"));
+                return;
+            }
+
+            if (volume <= 0.0) {
+                showError(t("order.volumePositive"));
+                return;
+            }
+
+            if (orderType == null) {
+                showError("Please select an order type.");
+                return;
+            }
+
+            double price = resolveOrderPrice(orderType);
+
+            if (orderType != OpenOrder.OrderType.MARKET && price <= 0.0) {
+                showError(t("order.pricePositive"));
+                return;
+            }
+
             LocalDate expirationDate = expirationDatePicker.getValue();
 
-            if (symbol == null || symbol.isEmpty()) {
-                showError("Please select a symbol");
-                return;
-            }
-
-            if (volume <= 0) {
-                showError("Volume must be greater than 0");
-                return;
-            }
-
-            if (orderType != OpenOrder.OrderType.MARKET && price <= 0) {
-                showError("Price must be greater than 0 for non-market orders");
-                return;
-            }
-
-            // Check for news events if news filter is enabled
             String newsWarning = checkNewsEventConflict(symbol);
-            if (newsWarning != null && !newsWarning.isEmpty()) {
-                // Ask user if they want to proceed despite news events
+            if (newsWarning != null && !newsWarning.isBlank()) {
                 Alert newsAlert = new Alert(Alert.AlertType.WARNING);
-                newsAlert.setTitle("News Event Warning");
-                newsAlert.setHeaderText("Upcoming News Events Detected");
-                newsAlert.setContentText(newsWarning + "\n\nDo you want to proceed with the order anyway?");
+                newsAlert.setTitle(t("news.eventWarning"));
+                newsAlert.setHeaderText(t("news.upcomingDetected"));
+                newsAlert.setContentText(newsWarning + "\n\n" + t("news.proceedQuestion"));
 
-                ButtonType proceedButton = new ButtonType("Proceed Anyway");
-                ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+                ButtonType proceedButton = new ButtonType(t("news.proceedAnyway"));
+                ButtonType cancelButton = new ButtonType(t("action.cancel"), ButtonBar.ButtonData.CANCEL_CLOSE);
                 newsAlert.getButtonTypes().setAll(proceedButton, cancelButton);
 
                 Optional<ButtonType> result = newsAlert.showAndWait();
@@ -369,85 +526,304 @@ public class OrderPanel extends BorderPane {
                 }
             }
 
-            // Log order details
             log.info(
-                    "Order placed - Symbol: {}, Type: {}, Side: {}, Volume: {}, Price: {}, TP: {}, SL: {}, Expiration: {}",
-                    symbol, orderType, side, volume, price, takeProfit, stopLoss, expirationDate);
+                    "Order prepared - Symbol: {}, Type: {}, Side: {}, Volume: {}, Price: {}, TP: {}, SL: {}, Expiration: {}, Comment: {}",
+                    symbol,
+                    orderType,
+                    side,
+                    volume,
+                    price,
+                    takeProfit,
+                    stopLoss,
+                    expirationDate,
+                    comment);
 
-            showSuccess("Order placed successfully!\nSymbol: " + symbol + "\nSide: " + side + "\nVolume: " + volume);
+            showSuccess("%s %s order prepared for %s x %.4f at %s".formatted(
+                    side,
+                    orderType,
+                    symbol,
+                    volume,
+                    orderType == OpenOrder.OrderType.MARKET ? "market" : formatDouble(price)));
 
-        } catch (NumberFormatException e) {
-            showError("Invalid price format");
+        } catch (NumberFormatException exception) {
+            showError(t("order.invalidPrice"));
+        } catch (Exception exception) {
+            log.error("Order preparation failed", exception);
+            showError("Order failed: " + exception.getMessage());
         }
     }
 
+    private double resolveOrderPrice(OpenOrder.OrderType orderType) {
+        if (orderType == OpenOrder.OrderType.MARKET) {
+            return currentPrice;
+        }
+
+        String text = priceField.getText();
+
+        if (text == null || text.isBlank()) {
+            return 0.0;
+        }
+
+        return Double.parseDouble(text.trim());
+    }
+
     private void onCancel() {
-        // Reset form
         volumeSpinner.getValueFactory().setValue(1.0);
         takeProfitSpinner.getValueFactory().setValue(0.0);
         stopLossSpinner.getValueFactory().setValue(0.0);
         commentArea.clear();
-        priceField.setText(String.format("%.2f", currentPrice));
+        priceField.setText(formatDouble(currentPrice));
         expirationDatePicker.setValue(LocalDate.now().plusDays(1));
+        orderTypeCombo.setValue(OpenOrder.OrderType.MARKET);
+        sideCombo.setValue(Side.BUY);
+
+        updateUIForOrderType();
+        updateSummary();
+
         log.info("Order form cleared");
+    }
+
+    private void updatePricesFromOrderBook(OrderBook orderBook) {
+        if (orderBook == null || orderBook.getBids().isEmpty() || orderBook.getAsks().isEmpty()) {
+            return;
+        }
+
+        this.bidPrice = orderBook.getBids().getFirst().getPrice();
+        this.askPrice = orderBook.getAsks().getFirst().getPrice();
+        this.currentPrice = (bidPrice + askPrice) / 2.0;
+
+        // Track price history for chart (keep last 50 prices)
+        priceHistory.addLast(currentPrice);
+        if (priceHistory.size() > 50) {
+            priceHistory.removeFirst();
+        }
+
+    }
+
+    private void drawPriceChart() {
+        if (priceChart == null || chartContext == null || priceHistory.isEmpty()) {
+            return;
+        }
+
+        double width = priceChart.getWidth();
+        double height = priceChart.getHeight();
+
+        // Clear chart
+        chartContext.setFill(Color.web("#0b1120"));
+        chartContext.fillRect(0, 0, width, height);
+
+        // Find min/max prices for scaling
+        double minPrice = priceHistory.stream().mapToDouble(Double::doubleValue).min().orElse(currentPrice * 0.99);
+        double maxPrice = priceHistory.stream().mapToDouble(Double::doubleValue).max().orElse(currentPrice * 1.01);
+        double priceRange = maxPrice - minPrice;
+        if (priceRange < 0.00001) {
+            priceRange = currentPrice * 0.01;
+        }
+
+        // Draw grid lines
+        chartContext.setStroke(Color.web("#263244"));
+        chartContext.setLineWidth(0.5);
+        for (int i = 0; i <= 4; i++) {
+            double y = (height / 4.0) * i;
+            chartContext.strokeLine(0, y, width, y);
+        }
+
+        // Draw price area
+        java.util.List<Double> prices = new java.util.ArrayList<>(priceHistory);
+        int priceCount = prices.size();
+        double candleWidth = width / (double) (priceCount + 1);
+
+        for (int i = 0; i < priceCount; i++) {
+            double price = prices.get(i);
+            double x = (i + 1) * candleWidth;
+            double normalizedPrice = (price - minPrice) / priceRange;
+            double y = height - (normalizedPrice * height);
+
+            // Draw candlestick
+            Color color = price >= currentPrice ? Color.web("#10b981") : Color.web("#ef4444");
+            chartContext.setFill(color);
+
+            double candleHeight = Math.max(2, candleWidth * 0.4);
+            chartContext.fillRect(x - candleWidth / 3, y - candleHeight / 2, candleWidth / 1.5, candleHeight);
+        }
+
+        // Draw current price line
+        double normalizedCurrent = (currentPrice - minPrice) / priceRange;
+        double currentY = height - (normalizedCurrent * height);
+        chartContext.setStroke(Color.web("#38bdf8"));
+        chartContext.setLineWidth(2);
+        chartContext.strokeLine(0, currentY, width, currentY);
+
+        // Draw bid/ask zone
+        double normalizedBid = (bidPrice - minPrice) / priceRange;
+        double normalizedAsk = (askPrice - minPrice) / priceRange;
+        double bidY = height - (normalizedBid * height);
+        double askY = height - (normalizedAsk * height);
+
+        chartContext.setStroke(Color.web("#10b981", 0.4));
+        chartContext.setLineWidth(1.5);
+        chartContext.strokeLine(0, bidY, width, bidY);
+
+        chartContext.setStroke(Color.web("#ef4444", 0.4));
+        chartContext.setLineWidth(1.5);
+        chartContext.strokeLine(0, askY, width, askY);
+    }
+
+    private void updateSummary() {
+        if (summaryLabel == null) {
+            return;
+        }
+
+        String symbol = symbolCombo == null ? "" : symbolCombo.getValue();
+        Side side = sideCombo == null ? Side.BUY : sideCombo.getValue();
+        OpenOrder.OrderType type = orderTypeCombo == null ? OpenOrder.OrderType.MARKET : orderTypeCombo.getValue();
+
+        double volume = volumeSpinner == null ? 0.0 : safeDouble(volumeSpinner.getValue());
+        double tp = takeProfitSpinner == null ? 0.0 : safeDouble(takeProfitSpinner.getValue());
+        double sl = stopLossSpinner == null ? 0.0 : safeDouble(stopLossSpinner.getValue());
+
+        summaryLabel.setText(
+                "Summary: %s %s %s units of %s | price=%s | TP=%s | SL=%s".formatted(
+                        side == null ? "BUY" : side,
+                        type == null ? "MARKET" : type,
+                        formatDouble(volume),
+                        symbol == null || symbol.isBlank() ? "N/A" : symbol,
+                        type == OpenOrder.OrderType.MARKET ? "market"
+                                : safeText(priceField == null ? "" : priceField.getText()),
+                        tp <= 0.0 ? "none" : formatDouble(tp),
+                        sl <= 0.0 ? "none" : formatDouble(sl)));
+    }
+
+    private String checkNewsEventConflict(String symbol) {
+        String currency = symbol != null && symbol.contains("/") ? symbol.split("/")[1] : symbol;
+
+        Instant now = Instant.now();
+        Instant nextHour = now.plusSeconds(3600);
+
+        // Keeping variables to make future integration obvious.
+        NewsDataProvider newsDataProvider=new NewsDataProvider();
+
+
+        return newsDataProvider.fetchAndSummarizeNews(currency,"N/A",100,nextHour.getNano()).toString();
     }
 
     private void showError(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Order Error");
-        alert.setHeaderText("Order Placement Failed");
+        alert.setTitle(t("order.errorTitle"));
+        alert.setHeaderText(t("order.failedHeader"));
         alert.setContentText(message);
         alert.showAndWait();
     }
 
     private void showSuccess(String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Order Placed");
-        alert.setHeaderText("Success");
+        alert.setTitle(t("order.placedTitle"));
+        alert.setHeaderText(t("common.success"));
         alert.setContentText(message);
         alert.showAndWait();
     }
 
-    public void updateOrderBook(OrderBook orderBook) {
-        if (orderBook != null && !orderBook.getBids().isEmpty() && !orderBook.getAsks().isEmpty()) {
-            this.bidPrice = orderBook.getBids().getFirst().getPrice();
-            this.askPrice = orderBook.getAsks().getFirst().getPrice();
-            this.currentPrice = (bidPrice + askPrice) / 2;
+    private @NotNull Spinner<Double> doubleSpinner(double initial, double step) {
+        Spinner<Double> spinner = new Spinner<>(0.0, 1000000.0, initial, step);
+        spinner.setEditable(true);
+        spinner.setPrefWidth(Double.MAX_VALUE);
+        spinner.getEditor().setStyle(inputEditorStyle());
+        return spinner;
+    }
 
-            currentPriceLabel.setText(String.format("Current: $%.2f", currentPrice));
-            bidAskLabel.setText(String.format("Bid: $%.2f | Ask: $%.2f | Spread: $%.4f",
-                    bidPrice, askPrice, Math.abs(askPrice - bidPrice)));
+    private void styleInput(Control control) {
+        control.setStyle(inputStyle());
+    }
 
-            if (orderTypeCombo.getValue() == OpenOrder.OrderType.MARKET) {
-                priceField.setText(String.format("%.2f", currentPrice));
+    private String inputStyle() {
+        return "-fx-font-size: 14px; " +
+                "-fx-background-color: #0b1120; " +
+                "-fx-control-inner-background: #0b1120; " +
+                "-fx-text-fill: #ffffff; " +
+                "-fx-prompt-text-fill: #64748b; " +
+                "-fx-background-radius: 8; " +
+                "-fx-border-color: #263244; " +
+                "-fx-border-radius: 8; " +
+                "-fx-padding: 6;";
+    }
+
+    private String inputEditorStyle() {
+        return "-fx-font-size: 14px; " +
+                "-fx-control-inner-background: #0b1120; " +
+                "-fx-text-fill: #ffffff; " +
+                "-fx-padding: 4;";
+    }
+
+    private String disabledInputStyle() {
+        return inputStyle() + "-fx-opacity: 0.55;";
+    }
+
+    private String actionButtonStyle(String color) {
+        return "-fx-background-color: " + color + "; " +
+                "-fx-text-fill: white; " +
+                "-fx-font-size: 14px; " +
+                "-fx-font-weight: bold; " +
+                "-fx-background-radius: 10; " +
+                "-fx-cursor: hand;";
+    }
+
+    private String secondaryActionButtonStyle(String color) {
+        return "-fx-background-color: transparent; " +
+                "-fx-text-fill: " + color + "; " +
+                "-fx-font-size: 14px; " +
+                "-fx-font-weight: bold; " +
+                "-fx-border-color: " + color + "; " +
+                "-fx-border-width: 1.5; " +
+                "-fx-border-radius: 10; " +
+                "-fx-background-radius: 10; " +
+                "-fx-cursor: hand;";
+    }
+
+    private String cardStyle() {
+        return "-fx-background-color: " + "#111827" + "; " +
+                "-fx-border-color: " + "#263244" + "; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: " + 12 + "; " +
+                "-fx-background-radius: " + 12 + ";";
+    }
+
+    private String displaySymbol(TradePair tradePair) {
+        if (tradePair == null) {
+            return "";
+        }
+
+        try {
+            return tradePair.toString('/');
+        } catch (Exception ignored) {
+            try {
+                return tradePair.getSymbol();
+            } catch (Exception ignoredAgain) {
+                return tradePair.toString();
             }
         }
     }
 
-    /**
-     * Check for upcoming news events that might conflict with order placement.
-     * Returns a warning message if news events are nearby, null otherwise.
-     */
-    private String checkNewsEventConflict(String symbol) {
-        // Extract currency from symbol (e.g., "BTC/USD" -> "USD")
-        String currency = symbol.contains("/") ? symbol.split("/")[1] : symbol;
+    private String formatPrice(double value) {
+        return "%s: %s".formatted("Mid", formatDouble(value));
+    }
 
-        // Placeholder for news event checking
-        // In a real implementation, this would integrate with NewsDataProvider
-        // and check for events near the current time based on the currency
+    private String formatDouble(double value) {
+        if (!Double.isFinite(value)) {
+            return "0.00000";
+        }
 
-        // Example: Check for upcoming news in the next 60 minutes for the currency
-        Instant now = Instant.now();
-        Instant nextHour = now.plusSeconds(3600);
+        return String.format("%.5f", value);
+    }
 
-        // This is a template - actual implementation would:
-        // 1. Get NewsDataProvider instance
-        // 2. Query for events in currency between now and nextHour
-        // 3. Check filter window setting from TradingProfileSettingsPanel
-        // 4. Return warning message if conflicts found
+    private double safeDouble(Double value) {
+        if (value == null || !Double.isFinite(value)) {
+            return 0.0;
+        }
 
-        // For now, return null (no warning)
-        // TODO: Integrate with NewsDataProvider and check against actual news events
-        return null;
+        return value;
+    }
+
+    private @NotNull String safeText(String value) {
+        return value == null || value.isBlank() ? "N/A" : value.trim();
     }
 }

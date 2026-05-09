@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.enums.StrategyCategory;
 import org.investpro.indicators.INDICATORS;
-import org.investpro.strategy.StrategySignal;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.i18n.LocalizationService;
+import org.investpro.enums.timeframe.Timeframe;
 
 import java.util.Arrays;
 
@@ -39,6 +39,7 @@ public class StrategyBuilderPanel extends VBox {
         getStyleClass().add("strategy-builder-panel");
         this.systemCore = systemCore;
         setupUI();
+        LocalizationService.applyTranslations(this);
     }
 
     private void setupUI() {

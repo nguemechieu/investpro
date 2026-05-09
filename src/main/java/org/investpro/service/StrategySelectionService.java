@@ -6,7 +6,7 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.TradingStrategy;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -72,7 +72,7 @@ public class StrategySelectionService {
 
         // Find best strategy from results
         StrategyBacktestResult best = candidateResults.stream()
-                .filter(r -> r.meetsQualityStandards())
+                .filter(StrategyBacktestResult::meetsQualityStandards)
                 .max(Comparator.comparingDouble(r -> r.getScore() != null ? r.getScore().getTotalScore() : 0.0))
                 .orElse(null);
 

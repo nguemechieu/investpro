@@ -7,6 +7,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.chart.AreaChart;
+import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
@@ -24,6 +25,7 @@ import org.investpro.core.SystemCore;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.data.CandleData;
+import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
 import org.investpro.repository.HistoricalDataRepository;
 import org.investpro.repository.HistoricalDataRepositoryImpl;
@@ -33,7 +35,8 @@ import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UnifiedStrategy;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.utils.HistoricalDataPrefetcher;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
@@ -60,7 +63,7 @@ import static org.investpro.utils.Side.SELL;
  * - selected timeframe
  * - selected order type: MARKET, LIMIT, STOP_LIMIT
  * - selected initial balance
- *
+ * <p>
  * Important:
  * This panel does not place live orders.
  * It only simulates strategy behavior against historical candle data.
@@ -93,17 +96,19 @@ public class BacktestingPanel extends VBox {
     private Label profitFactorLabel;
     private Label dataQualityLabel;
 
+    private LineChart<Number, Number> priceActionChart;
     private AreaChart<Number, Number> equityCurveChart;
 
+    private Button runBacktestButton;
     private Button compareBtn;
     private Button exportBtn;
 
     private InstitutionalBacktestMetrics currentMetrics;
     private BacktestReportPanel reportPanel;
 
-    private final SymbolAgentManager symbolAgentManager;
+    private SymbolAgentManager symbolAgentManager;
     private final HistoricalDataRepository historicalDataRepository;
-    private final SystemCore systemCore;
+    private  SystemCore systemCore;
     private final AtomicBoolean backtestRunning = new AtomicBoolean(false);
 
     private static final double DEFAULT_INITIAL_EQUITY = 10_000.0;
@@ -121,35 +126,30 @@ public class BacktestingPanel extends VBox {
      */
     private static final int MIN_ABSOLUTE_TEST_BARS = 150;
 
-    public BacktestingPanel() {
-        this(null, null, null);
-    }
 
     public BacktestingPanel(SystemCore systemCore) {
-        this(
-                systemCore != null && systemCore.getSmartBot() != null
-                        ? systemCore.getSmartBot().getSymbolAgentManager()
-                        : null,
-                HistoricalDataRepositoryImpl.getInstance(),
+        this(HistoricalDataRepositoryImpl.getInstance(),
                 systemCore);
+
     }
 
     public BacktestingPanel(
-            SymbolAgentManager symbolAgentManager,
             HistoricalDataRepository historicalDataRepository,
             SystemCore systemCore) {
-        this.symbolAgentManager = symbolAgentManager;
+
         this.historicalDataRepository = historicalDataRepository != null
                 ? historicalDataRepository
                 : HistoricalDataRepositoryImpl.getInstance();
-        this.systemCore = systemCore;
 
+        this.systemCore = systemCore;
+        this.symbolAgentManager = systemCore == null ? null : systemCore.getSymbolAgentManager();
         setPadding(new Insets(16));
         setSpacing(12);
         setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
         getStyleClass().add("backtest-panel");
 
         setupUI();
+        LocalizationService.applyTranslations(this);
     }
 
     private void setupUI() {
@@ -187,7 +187,7 @@ public class BacktestingPanel extends VBox {
         strategyCombo = new ComboBox<>();
         List<String> strategies = loadStrategyNames();
         strategyCombo.setItems(FXCollections.observableArrayList(strategies));
-        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.get(0));
+        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.getFirst());
         strategyCombo.setPrefHeight(35);
         HBox strategyBox = createLabeledInput("Strategy:", strategyCombo);
 
@@ -203,7 +203,7 @@ public class BacktestingPanel extends VBox {
                         ? Timeframe.H1
                         : timeframeCombo.getItems().isEmpty()
                                 ? null
-                                : timeframeCombo.getItems().get(0));
+                                : timeframeCombo.getItems().getFirst());
         timeframeCombo.setPrefHeight(35);
         timeframeCombo.setCellFactory(comboBox -> new ListCell<>() {
             @Override
@@ -247,20 +247,25 @@ public class BacktestingPanel extends VBox {
         initialBalanceSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
         HBox initialBalanceBox = createLabeledInput("Initial Balance:", initialBalanceSpinner);
 
-        Button runBacktestBtn = new Button("▶ Run Backtest");
-        runBacktestBtn.setStyle(primaryButtonStyle("#10b981"));
-        runBacktestBtn.setOnAction(event -> runBacktestAsync());
+        runBacktestButton = new Button("Run Backtest");
+        runBacktestButton.setStyle(primaryButtonStyle("#10b981"));
+        runBacktestButton.setOnAction(event -> runBacktestAsync());
 
-        compareBtn = new Button("📊 Compare");
+        Button prefetchButton = new Button("Prefetch Data");
+        prefetchButton.setStyle(primaryButtonStyle("#8b5cf6"));
+        prefetchButton.setOnAction(event -> prefetchHistoricalDataAsync());
+
+        compareBtn = new Button("Compare");
         compareBtn.setStyle(primaryButtonStyle("#3b82f6"));
         compareBtn.setDisable(true);
         compareBtn.setOnAction(event -> compareResults());
 
-        Button cancelBtn = new Button("✕ Cancel");
+        Button cancelBtn = new Button("Cancel");
         cancelBtn.setStyle(primaryButtonStyle("#ef4444"));
         cancelBtn.setOnAction(event -> {
             backtestRunning.set(false);
             statusLabel.setText("Cancel requested...");
+            setRunningUi(false);
         });
 
         statusLabel = new Label("Ready to backtest");
@@ -275,7 +280,7 @@ public class BacktestingPanel extends VBox {
 
         HBox buttonBox = new HBox(10);
         buttonBox.setAlignment(Pos.CENTER_LEFT);
-        buttonBox.getChildren().addAll(runBacktestBtn, compareBtn, cancelBtn);
+        buttonBox.getChildren().addAll(runBacktestButton, prefetchButton, compareBtn, cancelBtn);
 
         section.getChildren().addAll(
                 sectionTitle,
@@ -310,6 +315,7 @@ public class BacktestingPanel extends VBox {
 
         HBox metricsBox = createMetricsBox();
 
+        priceActionChart = createPriceActionChart();
         equityCurveChart = createEquityCurveChart();
 
         tradesTable = createTradesTable();
@@ -317,13 +323,16 @@ public class BacktestingPanel extends VBox {
         tradesScrollPane.setFitToWidth(true);
         tradesScrollPane.setPrefHeight(240);
 
-        exportBtn = new Button("⬇ Export Results");
+        exportBtn = new Button("Export Results");
         exportBtn.setStyle(primaryButtonStyle("#6366f1"));
         exportBtn.setDisable(true);
         exportBtn.setOnAction(event -> exportResults());
 
         Label equityLabel = new Label("Equity Curve");
         equityLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
+
+        Label priceActionLabel = new Label("Bot Trade Visualizer");
+        priceActionLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
 
         Label tradesLabel = new Label("Trade Details");
         tradesLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
@@ -333,7 +342,8 @@ public class BacktestingPanel extends VBox {
 
         // Create tabs for traditional and professional views
         Tab standardTab = new Tab("Standard View",
-                createStandardResultsView(metricsBox, equityLabel, equityCurveChart, tradesLabel, tradesScrollPane));
+                createStandardResultsView(metricsBox, priceActionLabel, priceActionChart, equityLabel, equityCurveChart,
+                        tradesLabel, tradesScrollPane));
         standardTab.setClosable(false);
 
         Tab professionalTab = new Tab("Professional Report", reportPanel);
@@ -352,7 +362,10 @@ public class BacktestingPanel extends VBox {
         return section;
     }
 
-    private VBox createStandardResultsView(HBox metricsBox, Label equityLabel,
+    private VBox createStandardResultsView(HBox metricsBox,
+            Label priceActionLabel,
+            LineChart<Number, Number> priceActionChart,
+            Label equityLabel,
             AreaChart<Number, Number> equityCurveChart,
             Label tradesLabel, ScrollPane tradesScrollPane) {
         VBox view = new VBox(10);
@@ -361,11 +374,14 @@ public class BacktestingPanel extends VBox {
 
         view.getChildren().addAll(
                 metricsBox,
+                priceActionLabel,
+                priceActionChart,
                 equityLabel,
                 equityCurveChart,
                 tradesLabel,
                 tradesScrollPane);
 
+        VBox.setVgrow(priceActionChart, Priority.ALWAYS);
         VBox.setVgrow(equityCurveChart, Priority.SOMETIMES);
         VBox.setVgrow(tradesScrollPane, Priority.ALWAYS);
 
@@ -395,21 +411,36 @@ public class BacktestingPanel extends VBox {
     }
 
     private Label createMetricLabel(String name, String value) {
-        VBox vbox = new VBox(2);
-
-        Label nameLabel = new Label(name);
-        nameLabel.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11px;");
-
-        Label valueLabel = new Label(value);
-        valueLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 16px; -fx-font-weight: bold;");
-
-        vbox.getChildren().addAll(nameLabel, valueLabel);
-        vbox.setStyle("-fx-padding: 5px;");
-
-        Label label = new Label();
-        label.setGraphic(vbox);
-
+        Label label = new Label(metricText(name, value));
+        label.setStyle("-fx-padding: 8px; -fx-text-fill: #10b981; -fx-font-size: 13px; -fx-font-weight: bold;");
+        label.setWrapText(true);
         return label;
+    }
+
+    private String metricText(String name, String value) {
+        return name + "\n" + value;
+    }
+
+    private LineChart<Number, Number> createPriceActionChart() {
+        NumberAxis xAxis = new NumberAxis();
+        xAxis.setLabel("Candle #");
+        xAxis.setForceZeroInRange(false);
+        xAxis.setStyle("-fx-text-fill: #a0aec0; -fx-tick-label-fill: #a0aec0;");
+
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel("Price");
+        yAxis.setForceZeroInRange(false);
+        yAxis.setStyle("-fx-text-fill: #a0aec0; -fx-tick-label-fill: #a0aec0;");
+
+        LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
+        chart.setTitle("Price Action with Bot Entries and Exits");
+        chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        chart.setCreateSymbols(true);
+        chart.setPrefHeight(360);
+        chart.setStyle("-fx-background-color: #0f3460;");
+
+        return chart;
     }
 
     private AreaChart<Number, Number> createEquityCurveChart() {
@@ -483,6 +514,22 @@ public class BacktestingPanel extends VBox {
         try {
             List<String> strategies = new ArrayList<>(StrategyCatalog.availableStrategyNames());
 
+            // Add user-developed strategies if any are registered
+            try {
+                List<TradingStrategy> userStrategies = StrategyRegistry.getInstance().getUserStrategies();
+                for (TradingStrategy userStrategy : userStrategies) {
+                    try {
+                        String userStrategyId = String.valueOf(userStrategy.getId());
+                        String displayName = "[User] " + userStrategyId;
+                        strategies.add(displayName);
+                    } catch (Exception e) {
+                        log.debug("Error adding user strategy to backtest list: {}", e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Could not load user strategies from StrategyRegistry: {}", e.getMessage());
+            }
+
             if (!strategies.isEmpty()) {
                 return strategies;
             }
@@ -523,17 +570,18 @@ public class BacktestingPanel extends VBox {
     }
 
     private void loadSymbols() {
-        List<TradePair> symbols = new ArrayList<>();
 
         SymbolAgentManager manager = symbolAgentManager;
 
-        if (manager == null && systemCore != null) {
+        List<TradePair> symbols = new ArrayList<>();
+
+        if (systemCore != null) {
             try {
-                if (systemCore.getSmartBot() != null) {
-                    manager = systemCore.getSmartBot().getSymbolAgentManager();
+                if (systemCore.getExchange() != null && systemCore.getExchange().getTradePairSymbol() != null) {
+                    symbols.addAll(systemCore.getExchange().getTradePairSymbol());
                 }
             } catch (Exception exception) {
-                log.debug("Unable to read SymbolAgentManager from SystemCore: {}", exception.getMessage());
+                log.warn("Failed to load trade pair symbols from exchange: {}", exception.getMessage());
             }
         }
 
@@ -543,7 +591,7 @@ public class BacktestingPanel extends VBox {
                         manager.getAllStates()
                                 .stream()
                                 .map(SymbolAgentState::getSymbol)
-                                .filter(Objects::nonNull)
+
                                 .distinct()
                                 .toList());
             } catch (Exception exception) {
@@ -561,6 +609,16 @@ public class BacktestingPanel extends VBox {
             }
         }
 
+        if (symbols.isEmpty() && systemCore != null) {
+            try {
+                if (systemCore.getExchange() != null) {
+                    symbols.addAll(systemCore.getExchange().getTradePairSymbol());
+                }
+            } catch (Exception exception) {
+                log.warn("Failed to load trade pair symbols from exchange: {}", exception.getMessage());
+            }
+        }
+
         if (symbols.isEmpty()) {
             try {
                 symbols.addAll(List.of(
@@ -574,10 +632,15 @@ public class BacktestingPanel extends VBox {
             }
         }
 
+        symbols = symbols.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
         symbolCombo.setItems(FXCollections.observableArrayList(symbols));
 
         if (!symbols.isEmpty()) {
-            symbolCombo.setValue(symbols.get(0));
+            symbolCombo.setValue(symbols.getFirst());
         }
 
         symbolCombo.setCellFactory(comboBox -> new ListCell<>() {
@@ -597,26 +660,152 @@ public class BacktestingPanel extends VBox {
         });
     }
 
+    /**
+     * Pre-fetch historical data from API and cache for backtesting.
+     */
+    private void prefetchHistoricalDataAsync() {
+        if (backtestRunning.get()) {
+            statusLabel.setText("Operation already running...");
+            return;
+        }
+
+        TradePair selectedPair = symbolCombo.getValue();
+        Timeframe selectedTimeframe = timeframeCombo.getValue();
+        LocalDate startDate = startDatePicker.getValue();
+        LocalDate endDate = endDatePicker.getValue();
+
+        if (selectedPair == null || selectedTimeframe == null || startDate == null || endDate == null) {
+            statusLabel.setText("Please select symbol, timeframe, and date range");
+            return;
+        }
+
+        if (endDate.isBefore(startDate)) {
+            statusLabel.setText("Invalid date range: end date must be after start date");
+            return;
+        }
+
+        backtestRunning.set(true);
+        statusLabel.setText("Pre-fetching historical data from API...");
+        progressBar.setProgress(-1);
+        setRunningUi(true);
+
+        Thread prefetchThread = new Thread(() -> {
+            try {
+                prefetchHistoricalData(selectedPair, selectedTimeframe, startDate, endDate);
+            } catch (Exception exception) {
+                log.error("Data prefetch error", exception);
+                Platform.runLater(() -> {
+                    statusLabel.setText("Prefetch error: " + exception.getMessage());
+                    progressBar.setProgress(0);
+                    backtestRunning.set(false);
+                    setRunningUi(false);
+                });
+            }
+        });
+
+        prefetchThread.setName("data-prefetch-worker");
+        prefetchThread.setDaemon(true);
+        prefetchThread.start();
+    }
+
+    /**
+     * Perform historical data prefetch and caching.
+     */
+    private void prefetchHistoricalData(
+            @NotNull TradePair pair,
+            @NotNull Timeframe timeframe,
+            @NotNull LocalDate startDate,
+            @NotNull LocalDate endDate) {
+
+        try {
+            String timeframeCode = timeframe.getCode();
+            LocalDateTime start = startDate.atStartOfDay();
+            LocalDateTime end = endDate.atTime(23, 59, 59);
+
+            Platform.runLater(() -> statusLabel.setText(
+                    "Fetching " + displayTradePair(pair) + " " + timeframeCode
+                            + " data from " + startDate + " to " + endDate + "..."));
+
+            if (systemCore == null || systemCore.getExchange() == null) {
+                Platform.runLater(() -> {
+                    statusLabel.setText("No live exchange is available. Backtests can still run with cached or sample data.");
+                    dataQualityLabel.setText("Data quality: cached/sample data only");
+                    progressBar.setProgress(0);
+                    backtestRunning.set(false);
+                    setRunningUi(false);
+                });
+                return;
+            }
+
+            // Create prefetcher for Binance (most reliable)
+            HistoricalDataPrefetcher prefetcher = HistoricalDataPrefetcher
+                    .forCurrentExchange(systemCore.getExchange(), historicalDataRepository);
+
+            // Fetch and cache data with progress updates
+            List<CandleData> fetchedData = prefetcher.fetchAndCacheDataSync(
+                    pair,
+                    start,
+                    end,
+                    timeframeCode,
+                    progress -> Platform.runLater(() -> {
+                        if (progress >= 0) {
+                            progressBar.setProgress(progress / 100.0);
+                            statusLabel.setText(
+                                    "Fetching data... " + progress + "%");
+                        } else {
+                            statusLabel.setText("Prefetch completed with errors");
+                        }
+                    }));
+
+            Platform.runLater(() -> {
+                if (fetchedData.isEmpty()) {
+                    statusLabel.setText("No data fetched. The pair may not be available on Binance.");
+                    dataQualityLabel.setText("Data quality: failed");
+                } else {
+                    statusLabel.setText(
+                            "Successfully cached " + fetchedData.size() + " real candles for "
+                                    + displayTradePair(pair) + " " + timeframeCode
+                                    + ". Ready for backtesting!");
+                    dataQualityLabel.setText("Data quality: real historical data cached (" + fetchedData.size()
+                            + " candles)");
+                    progressBar.setProgress(1.0);
+                }
+                backtestRunning.set(false);
+                setRunningUi(false);
+            });
+
+        } catch (Exception exception) {
+            log.error("Prefetch failed", exception);
+            Platform.runLater(() -> {
+                statusLabel.setText("Prefetch failed: " + exception.getMessage());
+                progressBar.setProgress(0);
+                backtestRunning.set(false);
+                setRunningUi(false);
+            });
+        }
+    }
+
     private void runBacktestAsync() {
         if (backtestRunning.get()) {
             statusLabel.setText("Backtest already running...");
             return;
         }
 
+        BacktestInput input = readBacktestInput();
+        if (!input.isValid()) {
+            statusLabel.setText(input.validationMessage());
+            progressBar.setProgress(0);
+            return;
+        }
+
         backtestRunning.set(true);
         statusLabel.setText("Loading data...");
         progressBar.setProgress(-1);
-
-        if (exportBtn != null) {
-            exportBtn.setDisable(true);
-        }
-        if (compareBtn != null) {
-            compareBtn.setDisable(true);
-        }
+        setRunningUi(true);
 
         Thread backTestThread = new Thread(() -> {
             try {
-                runBacktest();
+                runBacktest(input);
             } catch (Exception exception) {
                 log.error("Backtest error", exception);
                 Platform.runLater(() -> {
@@ -624,6 +813,7 @@ public class BacktestingPanel extends VBox {
                     dataQualityLabel.setText("Data quality: failed");
                     progressBar.setProgress(0);
                     backtestRunning.set(false);
+                    setRunningUi(false);
                 });
             }
         });
@@ -633,37 +823,47 @@ public class BacktestingPanel extends VBox {
         backTestThread.start();
     }
 
-    private void runBacktest() {
+    private BacktestInput readBacktestInput() {
+        String strategyName = strategyCombo.getValue();
+        TradePair selectedPair = symbolCombo.getValue();
+        Timeframe selectedTimeframe = timeframeCombo.getValue();
+        MARKET_TYPES orderType = resolveOrderType(orderTypeCombo.getValue());
+        double initialBalance = readDoubleSpinner(initialBalanceSpinner, DEFAULT_INITIAL_EQUITY);
+        LocalDate startDate = startDatePicker.getValue();
+        LocalDate endDate = endDatePicker.getValue();
+        int requestedBars = Math.max(MIN_ABSOLUTE_TEST_BARS, readIntegerSpinner(barCountSpinner, 2_000));
+
+        if (strategyName == null || strategyName.isBlank() || selectedPair == null || selectedTimeframe == null) {
+            return BacktestInput.invalid("Please select strategy, symbol, and timeframe");
+        }
+
+        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
+            return BacktestInput.invalid("Invalid date range");
+        }
+
+        return new BacktestInput(
+                strategyName,
+                selectedPair,
+                selectedTimeframe,
+                orderType,
+                initialBalance,
+                startDate,
+                endDate,
+                requestedBars,
+                "");
+    }
+
+    private void runBacktest(@NotNull BacktestInput input) {
         try {
-            String strategyName = strategyCombo.getValue();
-            TradePair selectedPair = symbolCombo.getValue();
-            Timeframe selectedTimeframe = timeframeCombo.getValue();
-            MARKET_TYPES orderType = resolveOrderType(orderTypeCombo.getValue());
-            double initialBalance = getInitialBalance();
-
-            LocalDate startDate = startDatePicker.getValue();
-            LocalDate endDate = endDatePicker.getValue();
-
-            if (strategyName == null || strategyName.isBlank() || selectedPair == null || selectedTimeframe == null) {
-                Platform.runLater(() -> {
-                    statusLabel.setText("Please select strategy, symbol, and timeframe");
-                    progressBar.setProgress(0);
-                    backtestRunning.set(false);
-                });
-                return;
-            }
-
-            if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
-                Platform.runLater(() -> {
-                    statusLabel.setText("Invalid date range");
-                    progressBar.setProgress(0);
-                    backtestRunning.set(false);
-                });
-                return;
-            }
-
+            String strategyName = input.strategyName();
+            TradePair selectedPair = input.selectedPair();
+            Timeframe selectedTimeframe = input.selectedTimeframe();
+            MARKET_TYPES orderType = input.orderType();
+            double initialBalance = input.initialBalance();
+            LocalDate startDate = input.startDate();
+            LocalDate endDate = input.endDate();
+            int requestedBars = input.requestedBars();
             String timeframeCode = selectedTimeframe.getCode();
-            int requestedBars = Math.max(MIN_ABSOLUTE_TEST_BARS, barCountSpinner.getValue());
 
             Platform.runLater(() -> statusLabel.setText(
                     "Loading historical data for " + displayTradePair(selectedPair) + " " + timeframeCode));
@@ -687,6 +887,7 @@ public class BacktestingPanel extends VBox {
                     statusLabel.setText(readiness.message());
                     progressBar.setProgress(0);
                     backtestRunning.set(false);
+                    setRunningUi(false);
                 });
                 return;
             }
@@ -715,14 +916,16 @@ public class BacktestingPanel extends VBox {
 
             Platform.runLater(() -> {
                 tradesTable.setItems(FXCollections.observableArrayList(trades));
+                updatePriceActionChart(finalCandles, trades);
                 updateEquityChart(trades, initialBalance);
                 updateMetrics(metrics);
 
+                boolean hasTrades = !trades.isEmpty();
                 if (exportBtn != null) {
-                    exportBtn.setDisable(false);
+                    exportBtn.setDisable(!hasTrades);
                 }
                 if (compareBtn != null) {
-                    compareBtn.setDisable(false);
+                    compareBtn.setDisable(!hasTrades);
                 }
 
                 statusLabel.setText(
@@ -739,6 +942,7 @@ public class BacktestingPanel extends VBox {
 
                 progressBar.setProgress(1.0);
                 backtestRunning.set(false);
+                setRunningUi(false);
             });
 
         } catch (Exception exception) {
@@ -748,22 +952,65 @@ public class BacktestingPanel extends VBox {
                 dataQualityLabel.setText("Data quality: error");
                 progressBar.setProgress(0);
                 backtestRunning.set(false);
+                setRunningUi(false);
             });
         }
     }
 
     private double getInitialBalance() {
-        if (initialBalanceSpinner == null || initialBalanceSpinner.getValue() == null) {
-            return DEFAULT_INITIAL_EQUITY;
-        }
-
-        double value = initialBalanceSpinner.getValue();
+        double value = readDoubleSpinner(initialBalanceSpinner, DEFAULT_INITIAL_EQUITY);
 
         if (Double.isNaN(value) || Double.isInfinite(value) || value <= 0.0) {
             return DEFAULT_INITIAL_EQUITY;
         }
 
         return value;
+    }
+
+    private int readIntegerSpinner(Spinner<Integer> spinner, int fallback) {
+        if (spinner == null) {
+            return fallback;
+        }
+
+        try {
+            String text = spinner.getEditor() == null ? "" : spinner.getEditor().getText();
+            if (text != null && !text.isBlank()) {
+                return Integer.parseInt(text.trim().replace(",", ""));
+            }
+        } catch (Exception ignored) {
+            // fallback below
+        }
+
+        return spinner.getValue() == null ? fallback : spinner.getValue();
+    }
+
+    private double readDoubleSpinner(Spinner<Double> spinner, double fallback) {
+        if (spinner == null) {
+            return fallback;
+        }
+
+        try {
+            String text = spinner.getEditor() == null ? "" : spinner.getEditor().getText();
+            if (text != null && !text.isBlank()) {
+                return Double.parseDouble(text.trim().replace(",", ""));
+            }
+        } catch (Exception ignored) {
+            // fallback below
+        }
+
+        return spinner.getValue() == null ? fallback : spinner.getValue();
+    }
+
+    private void setRunningUi(boolean running) {
+        if (runBacktestButton != null) {
+            runBacktestButton.setDisable(running);
+        }
+        if (exportBtn != null && running) {
+            exportBtn.setDisable(true);
+        }
+        if (compareBtn != null && running) {
+            compareBtn.setDisable(true);
+        }
     }
 
     /**
@@ -1035,7 +1282,9 @@ public class BacktestingPanel extends VBox {
                             quantity,
                             cleanNumber(profit),
                             cleanNumber(returnPercent),
-                            exit.reason()));
+                            exit.reason(),
+                            entryIndex,
+                            i));
 
                     inPosition = false;
                     positionSide = HOLD;
@@ -1071,6 +1320,24 @@ public class BacktestingPanel extends VBox {
     }
 
     private TradingStrategy resolveStrategy(String strategyName) {
+        if (strategyName == null || strategyName.isBlank()) {
+            return null;
+        }
+
+        // Handle user strategies with "[User] " prefix
+        if (strategyName.startsWith("[User] ")) {
+            String userStrategyId = strategyName.substring("[User] ".length()).trim();
+            try {
+                Optional<TradingStrategy> userStrategy = StrategyRegistry.getInstance().findById(userStrategyId);
+                if (userStrategy.isPresent()) {
+                    return userStrategy.get();
+                }
+            } catch (Exception e) {
+                log.debug("Could not resolve user strategy '{}': {}", userStrategyId, e.getMessage());
+            }
+        }
+
+        // Try registry lookup (built-in and catalog strategies)
         try {
             TradingStrategy strategy = StrategyRegistry.getInstance().getStrategy(strategyName);
 
@@ -1081,6 +1348,7 @@ public class BacktestingPanel extends VBox {
             log.debug("Could not resolve strategy from registry: {}", exception.getMessage());
         }
 
+        // Fallback to UnifiedStrategy for catalog variants
         try {
             return new UnifiedStrategy(strategyName);
         } catch (Exception exception) {
@@ -1398,23 +1666,134 @@ public class BacktestingPanel extends VBox {
 
     private void updateMetrics(InstitutionalBacktestMetrics metrics) {
         if (metrics == null) {
-            totalReturnLabel.setText("--");
-            winRateLabel.setText("--");
-            maxDrawdownLabel.setText("--");
-            sharpeLabel.setText("--");
-            profitFactorLabel.setText("--");
+            totalReturnLabel.setText(metricText("Total Return", "--"));
+            winRateLabel.setText(metricText("Win Rate", "--"));
+            maxDrawdownLabel.setText(metricText("Max Drawdown", "--"));
+            sharpeLabel.setText(metricText("Sharpe Ratio", "--"));
+            profitFactorLabel.setText(metricText("Profit Factor", "--"));
             return;
         }
 
-        totalReturnLabel.setText(String.format("%.2f%%", metrics.getTotalReturnPercent()));
-        winRateLabel.setText(String.format("%.1f%%", metrics.getWinRate()));
-        maxDrawdownLabel.setText(String.format("-%.2f%%", metrics.getMaxDrawdownPercent()));
-        sharpeLabel.setText(String.format("%.2f", metrics.getSharpeRatio()));
-        profitFactorLabel.setText(String.format("%.2f", metrics.getProfitFactor()));
+        totalReturnLabel.setText(metricText("Total Return", String.format("%.2f%%", metrics.getTotalReturnPercent())));
+        winRateLabel.setText(metricText("Win Rate", String.format("%.1f%%", metrics.getWinRate())));
+        maxDrawdownLabel.setText(metricText("Max Drawdown", String.format("-%.2f%%", metrics.getMaxDrawdownPercent())));
+        sharpeLabel.setText(metricText("Sharpe Ratio", String.format("%.2f", metrics.getSharpeRatio())));
+        profitFactorLabel.setText(metricText("Profit Factor", String.format("%.2f", metrics.getProfitFactor())));
 
         // Display advanced metrics if available
         if (reportPanel != null) {
             reportPanel.displayReport(metrics);
+        }
+    }
+
+    private void updatePriceActionChart(List<CandleData> candles, List<BacktestTrade> trades) {
+        if (priceActionChart == null) {
+            return;
+        }
+
+        priceActionChart.getData().clear();
+
+        if (candles == null || candles.isEmpty()) {
+            return;
+        }
+
+        int firstIndex = Math.max(0, candles.size() - 700);
+        XYChart.Series<Number, Number> priceSeries = new XYChart.Series<>();
+        priceSeries.setName("Price");
+
+        for (int i = firstIndex; i < candles.size(); i++) {
+            CandleData candle = candles.get(i);
+            if (candle == null || candle.closePrice() <= 0.0) {
+                continue;
+            }
+            priceSeries.getData().add(new XYChart.Data<>(i, candle.closePrice()));
+        }
+
+        priceActionChart.getData().add(priceSeries);
+
+        if (trades != null) {
+            for (BacktestTrade trade : trades) {
+                if (trade == null || trade.getEntryIndex() < firstIndex || trade.getExitIndex() < firstIndex) {
+                    continue;
+                }
+
+                addTradeMarker(trade.getEntryIndex(), trade.getPrice(), trade.getSide() == BUY ? "BUY" : "SELL",
+                        trade.getSide() == BUY ? "#22c55e" : "#ef4444",
+                        "%s entry @ %.5f".formatted(trade.getSide(), trade.getPrice()));
+
+                addTradeMarker(trade.getExitIndex(), trade.getExitPrice(), "EXIT",
+                        trade.getProfit() >= 0.0 ? "#38bdf8" : "#f59e0b",
+                        "Exit @ %.5f | P&L %.2f | %s".formatted(trade.getExitPrice(), trade.getProfit(),
+                                trade.getReason()));
+
+                addTradeConnector(trade);
+            }
+        }
+
+        Platform.runLater(() -> stylePriceActionChart(priceSeries));
+    }
+
+    private void addTradeMarker(int index, double price, String name, String color, String tooltipText) {
+        if (index < 0 || price <= 0.0) {
+            return;
+        }
+
+        XYChart.Series<Number, Number> marker = new XYChart.Series<>();
+        marker.setName(name);
+        XYChart.Data<Number, Number> point = new XYChart.Data<>(index, price);
+        marker.getData().add(point);
+        priceActionChart.getData().add(marker);
+
+        Platform.runLater(() -> {
+            if (point.getNode() != null) {
+                point.getNode().setStyle(
+                        "-fx-background-color: " + color + ", white; " +
+                                "-fx-background-radius: 7px; " +
+                                "-fx-padding: 6px;");
+                Tooltip.install(point.getNode(), new Tooltip(tooltipText));
+            }
+            if (marker.getNode() != null) {
+                marker.getNode().lookupAll(".chart-series-line")
+                        .forEach(node -> node.setStyle("-fx-stroke: transparent;"));
+            }
+        });
+    }
+
+    private void addTradeConnector(BacktestTrade trade) {
+        if (trade.getEntryIndex() < 0 || trade.getExitIndex() < 0) {
+            return;
+        }
+
+        XYChart.Series<Number, Number> connector = new XYChart.Series<>();
+        connector.setName("Trade");
+        connector.getData().add(new XYChart.Data<>(trade.getEntryIndex(), trade.getPrice()));
+        connector.getData().add(new XYChart.Data<>(trade.getExitIndex(), trade.getExitPrice()));
+        priceActionChart.getData().add(connector);
+
+        Platform.runLater(() -> {
+            String color = trade.getProfit() >= 0.0 ? "#22c55e" : "#ef4444";
+            if (connector.getNode() != null) {
+                connector.getNode().lookupAll(".chart-series-line")
+                        .forEach(node -> node.setStyle("-fx-stroke: " + color + "; -fx-stroke-width: 1.5px;"));
+            }
+            for (XYChart.Data<Number, Number> point : connector.getData()) {
+                if (point.getNode() != null) {
+                    point.getNode().setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+                }
+            }
+        });
+    }
+
+    private void stylePriceActionChart(XYChart.Series<Number, Number> priceSeries) {
+        if (priceSeries.getNode() != null) {
+            priceSeries.getNode().lookupAll(".chart-series-line")
+                    .forEach(node -> node.setStyle("-fx-stroke: #e5e7eb; -fx-stroke-width: 1.6px;"));
+        }
+
+        for (XYChart.Data<Number, Number> point : priceSeries.getData()) {
+            if (point.getNode() != null) {
+                point.getNode().setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+            }
         }
     }
 
@@ -1471,6 +1850,14 @@ public class BacktestingPanel extends VBox {
         }
 
         equityCurveChart.getData().add(series);
+    }
+
+    private String metricDisplayValue(Label metricLabel) {
+        if (metricLabel == null || metricLabel.getText() == null) {
+            return "";
+        }
+        String[] lines = metricLabel.getText().split("\\R");
+        return lines.length == 0 ? "" : lines[lines.length - 1].trim();
     }
 
     private void exportResults() {
@@ -1550,11 +1937,11 @@ public class BacktestingPanel extends VBox {
 
         csvContent.append("\n\nMetrics Summary\n");
         csvContent.append(String.format(Locale.ROOT, "Initial Balance,$%.2f\n", getInitialBalance()));
-        csvContent.append(String.format("Total Return,%s\n", totalReturnLabel.getText()));
-        csvContent.append(String.format("Win Rate,%s\n", winRateLabel.getText()));
-        csvContent.append(String.format("Max Drawdown,%s\n", maxDrawdownLabel.getText()));
-        csvContent.append(String.format("Sharpe Ratio,%s\n", sharpeLabel.getText()));
-        csvContent.append(String.format("Profit Factor,%s\n", profitFactorLabel.getText()));
+        csvContent.append(String.format("Total Return,%s\n", metricDisplayValue(totalReturnLabel)));
+        csvContent.append(String.format("Win Rate,%s\n", metricDisplayValue(winRateLabel)));
+        csvContent.append(String.format("Max Drawdown,%s\n", metricDisplayValue(maxDrawdownLabel)));
+        csvContent.append(String.format("Sharpe Ratio,%s\n", metricDisplayValue(sharpeLabel)));
+        csvContent.append(String.format("Profit Factor,%s\n", metricDisplayValue(profitFactorLabel)));
 
         return csvContent;
     }
@@ -1594,7 +1981,7 @@ public class BacktestingPanel extends VBox {
             VBox metricsBox = createMetricsSection();
             VBox tradeBox = createTradeSummarySection();
 
-            Button closeBtn = new Button("✕ Close");
+            Button closeBtn = new Button("Close");
             closeBtn.setStyle(primaryButtonStyle("#ef4444"));
             closeBtn.setOnAction(e -> comparisonStage.close());
 
@@ -1675,11 +2062,15 @@ public class BacktestingPanel extends VBox {
         grid.setHgap(30);
         grid.setVgap(12);
 
-        addMetricRow(grid, 0, "Total Return:", validateDisplayValue(totalReturnLabel.getText(), "0.00%"), "#10b981");
-        addMetricRow(grid, 1, "Win Rate:", validateDisplayValue(winRateLabel.getText(), "0.00%"), "#3b82f6");
-        addMetricRow(grid, 2, "Max Drawdown:", validateDisplayValue(maxDrawdownLabel.getText(), "0.00%"), "#f59e0b");
-        addMetricRow(grid, 3, "Sharpe Ratio:", validateDisplayValue(sharpeLabel.getText(), "0.00"), "#8b5cf6");
-        addMetricRow(grid, 4, "Profit Factor:", validateDisplayValue(profitFactorLabel.getText(), "0.00"), "#ec4899");
+        addMetricRow(grid, 0, "Total Return:", validateDisplayValue(metricDisplayValue(totalReturnLabel), "0.00%"),
+                "#10b981");
+        addMetricRow(grid, 1, "Win Rate:", validateDisplayValue(metricDisplayValue(winRateLabel), "0.00%"), "#3b82f6");
+        addMetricRow(grid, 2, "Max Drawdown:", validateDisplayValue(metricDisplayValue(maxDrawdownLabel), "0.00%"),
+                "#f59e0b");
+        addMetricRow(grid, 3, "Sharpe Ratio:", validateDisplayValue(metricDisplayValue(sharpeLabel), "0.00"),
+                "#8b5cf6");
+        addMetricRow(grid, 4, "Profit Factor:", validateDisplayValue(metricDisplayValue(profitFactorLabel), "0.00"),
+                "#ec4899");
 
         section.getChildren().addAll(sectionTitle, grid);
         return section;
@@ -1833,6 +2224,27 @@ public class BacktestingPanel extends VBox {
     private record ExitDecision(boolean exit, double exitPrice, String reason) {
     }
 
+    private record BacktestInput(
+            String strategyName,
+            TradePair selectedPair,
+            Timeframe selectedTimeframe,
+            MARKET_TYPES orderType,
+            double initialBalance,
+            LocalDate startDate,
+            LocalDate endDate,
+            int requestedBars,
+            String validationMessage) {
+
+        static BacktestInput invalid(String validationMessage) {
+            return new BacktestInput(null, null, null, MARKET_TYPES.MARKET, DEFAULT_INITIAL_EQUITY,
+                    null, null, MIN_ABSOLUTE_TEST_BARS, validationMessage);
+        }
+
+        boolean isValid() {
+            return validationMessage == null || validationMessage.isBlank();
+        }
+    }
+
     /**
      * BacktestTrade stores one completed simulated trade.
      */
@@ -1848,5 +2260,7 @@ public class BacktestingPanel extends VBox {
         private double profit;
         private double returnPercent;
         private String reason;
+        private int entryIndex;
+        private int exitIndex;
     }
 }

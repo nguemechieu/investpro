@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyDefinition;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;

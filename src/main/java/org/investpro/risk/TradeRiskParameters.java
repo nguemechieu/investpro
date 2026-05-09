@@ -1,10 +1,12 @@
 package org.investpro.risk;
 
 import lombok.Getter;
+import lombok.Setter;
 
 /**
  * Container for calculated trade risk parameters
  */
+@Setter
 @Getter
 public class TradeRiskParameters {
     private final double positionSize;

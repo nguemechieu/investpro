@@ -13,6 +13,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import org.investpro.i18n.LocalizationService;
 /**
  * Navigation panel for switching between exchanges and managing exchange connections.
  * Provides UI controls for selecting different crypto exchanges and viewing exchange status.
@@ -107,6 +108,7 @@ public class Navigation extends Stage {
         this.setHeight(500);
         this.setScene(new javafx.scene.Scene(root));
         root.setStyle("-fx-base: #0f172a;");
+        LocalizationService.applyTranslations(root);
     }
 
     /**

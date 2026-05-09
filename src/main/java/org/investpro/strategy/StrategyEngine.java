@@ -10,7 +10,7 @@ import org.investpro.enums.TradingSessionStatus;
 import org.investpro.models.trading.TradePair;
 import org.investpro.research.StrategyRankingEngine;
 import org.investpro.risk.TradeRiskContext;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

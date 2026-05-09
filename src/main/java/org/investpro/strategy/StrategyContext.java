@@ -2,12 +2,13 @@ package org.investpro.strategy;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.TradingSessionStatus;
 import org.investpro.market.InstrumentTradingSession;
 import org.investpro.models.trading.TradePair;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,36 +19,37 @@ import java.util.List;
  */
 @Getter
 @Builder
+@Setter
 public class StrategyContext {
-    private final TradePair symbol;
+    private  TradePair symbol;
 
-    private final Timeframe timeframe;
+    private  Timeframe timeframe;
     
     // Market data
-    private final List<CandleData> candles; // Current candles, oldest to newest
-    private final double currentPrice;
-    private final double bid;
-    private final double ask;
+    private  List<CandleData> candles; // Current candles, oldest to newest
+    private  double currentPrice;
+    private double bid;
+    private double ask;
     
     // Market state
-    private final MarketBehavior marketBehavior;
-    private final double volatility; // Recent volatility measure
-    private final double averageVolume;
-    private final InstrumentTradingSession tradingSession;
-    private final TradingSessionStatus tradingSessionStatus;
+    private  MarketBehavior marketBehavior;
+    private  double volatility; // Recent volatility measure
+    private  double averageVolume;
+    private  InstrumentTradingSession tradingSession;
+    private  TradingSessionStatus tradingSessionStatus;
     
     // Timing
     @Builder.Default
     private final Instant timestamp = Instant.now();
     
     // Strategy state
-    private final int barsAvailable;
+    private  int barsAvailable;
     
     public CandleData getLatestCandle() {
         if (candles == null || candles.isEmpty()) {
             return null;
         }
-        return candles.get(candles.size() - 1);
+        return candles.getLast();
     }
 
     public CandleData getPreviousCandle(int barsBack) {

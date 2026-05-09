@@ -97,21 +97,6 @@ public class OrderService implements CrudService<Order, String> {
     }
 
     /**
-     * Find all orders for a specific trading pair.
-     *
-     * @param tradePair the trading pair
-     * @return list of orders for the pair
-     * @throws SQLException if database operation fails
-     */
-    public List<Order> findByTradePair(TradePair tradePair) throws SQLException {
-        if (tradePair == null) {
-            throw new IllegalArgumentException("tradePair must not be null");
-        }
-
-        return repository.findByTradePair(tradePair);
-    }
-
-    /**
      * Find orders by status.
      *
      * @param status the order status

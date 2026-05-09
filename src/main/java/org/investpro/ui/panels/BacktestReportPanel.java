@@ -7,8 +7,12 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.backtesting.InstitutionalBacktestMetrics;
+import org.investpro.i18n.LocalizationService;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,6 +22,8 @@ import java.util.Map;
  * Shows comprehensive performance analysis with color-coded indicators.
  */
 @Slf4j
+@Getter
+@Setter
 public class BacktestReportPanel extends ScrollPane {
 
     private final VBox reportContent;
@@ -38,6 +44,7 @@ public class BacktestReportPanel extends ScrollPane {
         setContent(reportContent);
         setStyle("-fx-background-color: #0f3460; -fx-control-inner-background: #0f3460;");
         setFitToWidth(true);
+        LocalizationService.applyTranslations(this);
     }
 
     public void displayReport(InstitutionalBacktestMetrics metrics) {
@@ -53,9 +60,10 @@ public class BacktestReportPanel extends ScrollPane {
                 createAdvancedMetricsSection(),
                 createConfidenceScoreSection(),
                 createSummarySection());
+        LocalizationService.applyTranslations(this);
     }
 
-    private VBox createHeader() {
+    private @NotNull VBox createHeader() {
         VBox header = new VBox(8);
         header.setStyle("-fx-border-color: #3b82f6; -fx-border-width: 0 0 2 0; -fx-padding: 0 0 12 0;");
 

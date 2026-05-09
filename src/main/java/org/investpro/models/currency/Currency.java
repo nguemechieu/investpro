@@ -9,6 +9,7 @@ import  org.investpro.utils.SymmetricPair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -46,15 +47,19 @@ public abstract class Currency {
 
     static {
         try {
-            try {
-                conf.load(Currency.class.getClassLoader().getResourceAsStream("conf.properties"));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+            try (InputStream inputStream = Currency.class.getClassLoader().getResourceAsStream("conf.properties")) {
+                if (inputStream != null) {
+                    conf.load(inputStream);
+                } else {
+                    log.warn("conf.properties not found in classpath; using default currency database configuration");
+                }
+            } catch (IOException exception) {
+                log.warn("Unable to load conf.properties; using default currency database configuration", exception);
             }
             db1 = new Db1(conf);
             db1.createTables();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+        } catch (ClassNotFoundException exception) {
+            throw new RuntimeException(exception);
         }
     }
     protected String code;

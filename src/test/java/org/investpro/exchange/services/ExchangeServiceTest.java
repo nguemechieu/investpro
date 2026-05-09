@@ -1,14 +1,17 @@
 package org.investpro.exchange.services;
 
-import org.investpro.exchange.ExchangeAdapter;
+import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.MarketDepthType;
+import org.investpro.utils.MARKET_TYPES;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -61,7 +64,7 @@ class ExchangeServiceTest {
     void testGetAdapter() {
         service.register("Coinbase", coinbaseAdapter);
 
-        ExchangeAdapter retrieved = service.getAdapter("Coinbase");
+        ExchangeIdentity retrieved = service.getAdapter("Coinbase");
         assertThat(retrieved).isSameAs(coinbaseAdapter);
     }
 
@@ -78,10 +81,10 @@ class ExchangeServiceTest {
     void testGetAdapterOptional() {
         service.register("Coinbase", coinbaseAdapter);
 
-        Optional<ExchangeAdapter> found = service.getAdapterOptional("Coinbase");
+        Optional<ExchangeIdentity> found = service.getAdapterOptional("Coinbase");
         assertThat(found).isPresent().contains(coinbaseAdapter);
 
-        Optional<ExchangeAdapter> notFound = service.getAdapterOptional("NonExistent");
+        Optional<ExchangeIdentity> notFound = service.getAdapterOptional("NonExistent");
         assertThat(notFound).isEmpty();
     }
 
@@ -140,7 +143,7 @@ class ExchangeServiceTest {
     /**
      * Simple stub adapter implementation for testing.
      */
-    private static class StubExchangeAdapter implements ExchangeAdapter {
+    private static class StubExchangeAdapter implements ExchangeIdentity {
         private final String name;
         private final ExchangeCapability capability;
 
@@ -152,13 +155,59 @@ class ExchangeServiceTest {
                     .build();
         }
 
+
         @Override
-        public String getExchangeName() {
-            return name;
+        public String getName() {
+            return getClass().getSimpleName();
         }
 
         @Override
-        public ExchangeCapability getCapability() {
+        public String getSignal() {
+            return "";
+        }
+
+        @Override
+        public String getExchangeId() {
+            return "";
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "";
+        }
+
+        @Override
+        public boolean isSandbox() {
+            return false;
+        }
+
+        @Override
+        public boolean isPaperTrading() {
+            return false;
+        }
+
+        @Override
+        public String getTimestamp() {
+            return "";
+        }
+
+        @Override
+        public Instant now() {
+            return null;
+        }
+
+        @Override
+        public boolean supportsMarketType(MARKET_TYPES marketType) {
+            return false;
+        }
+
+        @Override
+        public List<MARKET_TYPES> getSupportedMarketTypes() {
+            return List.of();
+        }
+
+        @Override
+        public @NotNull ExchangeCapability getCapability() {
             return capability;
         }
 
@@ -171,51 +220,6 @@ class ExchangeServiceTest {
                     .build();
         }
 
-        @Override
-        public java.util.List<org.investpro.models.trading.TradePair> getInstruments() {
-            return java.util.Collections.emptyList();
-        }
 
-        @Override
-        public Optional<org.investpro.models.trading.Ticker> getLatestPrice(
-                org.investpro.models.trading.TradePair pair) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<org.investpro.models.trading.OrderBook> getOrderBook(
-                org.investpro.models.trading.TradePair pair) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<? extends Object> getAccountSnapshot() {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<org.investpro.exchange.models.OrderValidationResult> validateOrder(Object orderRequest) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<org.investpro.exchange.models.OrderResult> placeOrder(Object orderRequest) {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean supportsWebSocketStreaming() {
-            return false;
-        }
-
-        @Override
-        public boolean supportsOrderBookStreaming() {
-            return false;
-        }
-
-        @Override
-        public String getApiBaseUrl() {
-            return "https://api.example.com";
-        }
     }
 }

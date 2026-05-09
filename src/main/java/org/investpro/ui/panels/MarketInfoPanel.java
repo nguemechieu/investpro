@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
+import org.investpro.i18n.LocalizationService;
 import org.investpro.market.MarketStats;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.MarketInfoDataProvider;
@@ -48,6 +49,7 @@ public class MarketInfoPanel extends ScrollPane {
         setContent(mainContent);
 
         setupUI();
+        LocalizationService.applyTranslations(this);
     }
 
     private void setupUI() {
@@ -112,7 +114,7 @@ public class MarketInfoPanel extends ScrollPane {
         // Volume (24h)
         String volumeText = valueOrNA(stats.getVolume24h(), stats.getFormattedVolume24h());
         String volumeChange = String.format("%+.2f%%", stats.getVolumeChange24h());
-        grid.getChildren().add(createStatRowWithChange("Volume (24h)", volumeText, volumeChange,
+        grid.getChildren().add(createStatRowWithChange(volumeText, volumeChange,
                 stats.getVolumeChange24h() >= 0 ? Color.web("#10b981") : Color.web("#ef4444")));
 
         // Circulating supply
@@ -296,13 +298,13 @@ public class MarketInfoPanel extends ScrollPane {
         return row;
     }
 
-    private HBox createStatRowWithChange(String label, String value, String change, Color changeColor) {
+    private HBox createStatRowWithChange(String value, String change, Color changeColor) {
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(8));
         row.setStyle("-fx-background-color: #ffffff; -fx-padding: 8; -fx-border-radius: 4;");
 
-        Label labelNode = new Label(label);
+        Label labelNode = new Label("Volume (24h)");
         labelNode.setStyle("-fx-font-size: 12; -fx-text-fill: #374151; -fx-font-weight: 500;");
         labelNode.setMinWidth(150);
 

@@ -1,5 +1,7 @@
 package org.investpro.portfolio;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.Position;
 import org.jetbrains.annotations.NotNull;
@@ -11,6 +13,8 @@ import java.util.*;
  * Analyzes correlation risk between candidate trade and existing positions.
  */
 @Slf4j
+@Getter
+@Setter
 public class CorrelationRiskAnalyzer {
     // Default correlation assumptions when no matrix provided
     private static final double SAME_ASSET_CLASS_CORRELATION = 0.7;

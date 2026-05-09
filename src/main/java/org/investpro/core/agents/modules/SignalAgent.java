@@ -11,13 +11,17 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyDecisionResult;
 import org.investpro.service.StrategyDecisionService;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.utils.CandleAggregator;
+import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -37,6 +41,7 @@ public class SignalAgent implements Agent {
     private StrategyDecisionService decisionService;
     private final Map<String, List<CandleData>> candleHistory = new ConcurrentHashMap<>();
     private static final int MAX_CANDLES_PER_CONTEXT = 500;
+    private static final int MIN_SEEDED_CANDLES = 120;
 
     public SignalAgent() {
         this.decisionService = new StrategyDecisionService();
@@ -106,7 +111,8 @@ public class SignalAgent implements Agent {
             String timeframe = resolveTimeframe(metadata);
             TradePair tradePair = resolveTradePair(metadata);
 
-            List<CandleData> candles = resolveCandles(symbol, timeframe, event.payload());
+            List<CandleData> candles = seedHistoryIfNeeded(symbol, timeframe, tradePair,
+                    resolveCandles(symbol, timeframe, event.payload()));
 
             if (symbol == null || timeframe == null || candles == null || candles.isEmpty()) {
                 log.debug("Incomplete candle data: symbol={}, timeframe={}, candleCount={}",
@@ -275,6 +281,56 @@ public class SignalAgent implements Agent {
             return candles;
         }
         return candles.subList(candles.size() - MAX_CANDLES_PER_CONTEXT, candles.size());
+    }
+
+    private List<CandleData> seedHistoryIfNeeded(
+            String symbol,
+            String timeframe,
+            TradePair tradePair,
+            List<CandleData> currentCandles) {
+        if (currentCandles == null) {
+            currentCandles = List.of();
+        }
+        if (currentCandles.size() >= MIN_SEEDED_CANDLES || context == null || context.getExchange() == null
+                || tradePair == null) {
+            return currentCandles;
+        }
+
+        try {
+            int seconds = CandleAggregator.TIMEFRAME_SECONDS.getOrDefault(timeframe, 3600);
+            CandleDataSupplier supplier = context.getExchange().getCandleDataSupplier(seconds, tradePair);
+            if (supplier == null) {
+                return currentCandles;
+            }
+
+            List<CandleData> seeded = supplier.get().get(4, TimeUnit.SECONDS);
+            if (seeded == null || seeded.isEmpty()) {
+                return currentCandles;
+            }
+
+            List<CandleData> merged = new ArrayList<>(seeded);
+            merged.addAll(currentCandles);
+            List<CandleData> sorted = merged.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toMap(
+                            CandleData::openTime,
+                            candle -> candle,
+                            (first, second) -> second,
+                            java.util.TreeMap::new))
+                    .values()
+                    .stream()
+                    .sorted(Comparator.comparingInt(CandleData::openTime))
+                    .toList();
+
+            List<CandleData> trimmed = new ArrayList<>(trimCandles(sorted));
+            candleHistory.put("%s_%s".formatted(symbol, timeframe), trimmed);
+            log.info("SignalAgent seeded {} candles for {}/{}", trimmed.size(), symbol, timeframe);
+            return List.copyOf(trimmed);
+        } catch (Exception exception) {
+            log.debug("SignalAgent could not seed candle history for {}/{}: {}", symbol, timeframe,
+                    exception.getMessage());
+            return currentCandles;
+        }
     }
 
     private double number(Object value, double fallback) {

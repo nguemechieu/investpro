@@ -1,12 +1,9 @@
 package org.investpro.core;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import javafx.scene.Scene;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.PixelReader;
-import javafx.scene.image.PixelWriter;
 import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -20,12 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -36,7 +28,7 @@ import java.util.*;
 
 /**
  * Telegram Command Handler for executing trading commands from Telegram.
- *
+ * <p>
  * Features:
  * - Real-time polling for incoming messages
  * - Responds with accurate and updated account data
@@ -44,7 +36,7 @@ import java.util.*;
  * - Market data reporting with bid/ask spreads
  * - Risk metrics and system health reporting
  * - Screenshot capture and sending via Telegram
- *
+ * <p>
  * Supported Commands:
  * /start - Start the bot
  * /help - Show available commands
@@ -61,8 +53,6 @@ import java.util.*;
 @Getter
 @Slf4j
 public class TelegramCommandHandler {
-    private static final String TELEGRAM_API_BASE = "https://api.telegram.org/bot";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final TelegramNotifier telegramNotifier;
     private final SystemCore systemCore;
@@ -70,9 +60,9 @@ public class TelegramCommandHandler {
     private final HttpClient httpClient;
     private final Stage primaryStage= new Stage();
 
-    private volatile long lastUpdateId = -1L;
-    private volatile boolean polling = false;
-    private volatile Thread pollingThread;
+    private final long lastUpdateId = -1L;
+    private final boolean polling = false;
+
 
     public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier) {
         this.systemCore = systemCore;
@@ -80,151 +70,9 @@ public class TelegramCommandHandler {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
-        startPolling();
+
     }
 
-    /**
-     * Start polling for incoming Telegram messages.
-     */
-    public void startPolling() {
-        if (polling) {
-            log.warn("Telegram command polling already started");
-            return;
-        }
-
-        if (!telegramNotifier.isEnabled()) {
-            log.warn("Telegram bot token not configured");
-            return;
-        }
-
-        polling = true;
-        pollingThread = new Thread(this::pollLoop, "TelegramCommandHandler-Polling");
-        pollingThread.setDaemon(true);
-        pollingThread.start();
-
-        log.info("Telegram command handler polling started");
-    }
-
-    /**
-     * Stop polling for messages.
-     */
-    public void stopPolling() {
-        polling = false;
-
-        if (pollingThread != null) {
-            pollingThread.interrupt();
-            try {
-                pollingThread.join(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        log.info("Telegram command handler polling stopped");
-    }
-
-    private void pollLoop() {
-        while (polling && !Thread.currentThread().isInterrupted()) {
-            try {
-                List<JsonNode> updates = getUpdates();
-
-                for (JsonNode update : updates) {
-                    try {
-                        processUpdate(update);
-                    } catch (Exception e) {
-                        log.error("Error processing Telegram update", e);
-                    }
-                }
-
-                if (updates.isEmpty()) {
-                    Thread.sleep(1000);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                log.error("Error in Telegram polling loop", e);
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        }
-
-        log.info("Telegram command handler polling loop ended");
-    }
-
-    private List<JsonNode> getUpdates() {
-        List<JsonNode> updates = new ArrayList<>();
-
-        if (!telegramNotifier.isEnabled()) {
-            return updates;
-        }
-
-        try {
-            String url = "%s%s/getUpdates".formatted(TELEGRAM_API_BASE, telegramNotifier.getBotToken());
-
-            if (lastUpdateId >= 0) {
-                url += "?offset=%d&timeout=30".formatted(lastUpdateId + 1);
-            } else {
-                url += "?timeout=30";
-            }
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(35))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() < 400) {
-                JsonNode root = OBJECT_MAPPER.readTree(response.body());
-
-                if (root.path("ok").asBoolean(false)) {
-                    ArrayNode result = root.withArray("result");
-
-                    for (JsonNode update : result) {
-                        long updateId = update.path("update_id").asLong(-1L);
-                        if (updateId > lastUpdateId) {
-                            lastUpdateId = updateId;
-                        }
-                        updates.add(update);
-                    }
-                }
-            }
-        } catch (IOException | InterruptedException e) {
-            log.debug("Error fetching Telegram updates: {}", e.getMessage());
-        }
-
-        return updates;
-    }
-
-    private void processUpdate(JsonNode update) {
-        JsonNode message = update.path("message");
-
-        if (message.isMissingNode() || !message.path("text").isTextual()) {
-            return;
-        }
-
-        String text = message.path("text").asText("");
-        String chatId = message.path("chat").path("id").asText("");
-        String userName = message.path("from").path("username").asText("user");
-
-        if (text.isBlank() || chatId.isBlank()) {
-            return;
-        }
-
-        log.debug("Telegram message from @{}: {}", userName, text);
-
-        String response = handleCommand(text, chatId);
-
-        if (response != null && !response.isBlank()) {
-            sendMessage(chatId, response);
-        }
-    }
 
     /**
      * Process a Telegram command and return response text
@@ -287,7 +135,7 @@ public class TelegramCommandHandler {
         try {
             StringBuilder report = new StringBuilder("*Account Status*\\n\\n");
 
-            Account account = systemCore.getExchange().getAccount();
+            Account account = systemCore.getExchange().fetchAccount().get();
 
             if (account != null) {
                 report.append("💰 Balance: $").append(formatPrice(account.getAvailableBalance())).append("\\n");
@@ -317,7 +165,7 @@ public class TelegramCommandHandler {
         try {
             StringBuilder report = new StringBuilder("*Balance Breakdown*\\n\\n");
 
-            Account account = systemCore.getExchange().getAccount();
+            Account account = systemCore.getExchange().fetchAccount().get();
 
             if (account != null) {
                 report.append("💵 Cash Balance: $").append(formatPrice(account.getTotalBalance())).append("\\n");
@@ -345,7 +193,7 @@ public class TelegramCommandHandler {
 
     private String getPositionsReport() {
         try {
-            List<Position> positions = systemCore.getExchange().fetchPositions().get();
+            List<Position> positions = systemCore.getExchange().fetchAllPositions().get();
 
             if (positions == null || positions.isEmpty()) {
                 return "📭 No open positions";
@@ -451,7 +299,7 @@ public class TelegramCommandHandler {
         try {
             StringBuilder report = new StringBuilder("*Risk Management Status*\\n\\n");
 
-            Account account = systemCore.getExchange().getAccount();
+            Account account = systemCore.getExchange().fetchAccount().get();
 
             if (account != null) {
                 double marginLevel = account.getLeverage();
@@ -510,30 +358,6 @@ public class TelegramCommandHandler {
         }
     }
 
-    private void sendMessage(String chatId, String message) {
-        if (message == null || message.isBlank() || chatId == null || chatId.isBlank()) {
-            return;
-        }
-
-        try {
-            String url = "%s%s/sendMessage".formatted(TELEGRAM_API_BASE,telegramNotifier.getBotToken());
-
-            String body = "chat_id=" + URLEncoder.encode(chatId, StandardCharsets.UTF_8) +
-                    "&text=" + URLEncoder.encode(message, StandardCharsets.UTF_8) +
-                    "&parse_mode=Markdown";
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-
-            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (Exception e) {
-            log.error("Error sending Telegram message", e);
-        }
-    }
 
     private String formatPrice(double price) {
         return String.format("%.2f", Math.abs(price));
@@ -547,8 +371,8 @@ public class TelegramCommandHandler {
      * Capture the current JavaFX scene and send as screenshot to Telegram.
      * Returns message text to be sent to user.
      */
-    private String captureAndSendScreenshot(String chatId) {
-        if (primaryStage == null || primaryStage.getScene() == null) {
+    private @NotNull String captureAndSendScreenshot(String chatId) {
+        if (primaryStage.getScene() == null) {
             return "❌ No UI stage available for screenshot. Please initialize the application first.";
         }
 
@@ -596,16 +420,14 @@ public class TelegramCommandHandler {
         }
     }
 
-    private static @NotNull BufferedImage getBufferedImage(WritableImage snapshot) {
+    private static @NotNull BufferedImage getBufferedImage(@NotNull WritableImage snapshot) {
         BufferedImage bufferedImage = new BufferedImage(
                 (int) snapshot.getWidth(),
                 (int) snapshot.getHeight(),
                 BufferedImage.TYPE_INT_RGB);
 
         PixelReader pixelReader = snapshot.getPixelReader();
-        PixelWriter pixelWriter = new WritableImage(
-                (int) snapshot.getWidth(),
-                (int) snapshot.getHeight()).getPixelWriter();
+
 
         // Copy pixels from snapshot to buffered image
         for (int y = 0; y < (int) snapshot.getHeight(); y++) {

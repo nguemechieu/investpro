@@ -1,10 +1,11 @@
 package org.investpro.strategy.lab;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.TradingStrategy;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,9 +24,14 @@ import java.util.Optional;
  * - Resolve assigned strategy for runtime trading
  * - Prevent auto-replacement of manual locked assignments
  */
+@Getter
 @Slf4j
 public class StrategyAssignmentService {
 
+    /**
+     * -- GETTER --
+     *  Get repository for direct access.
+     */
     private final StrategyAssignmentRepository repository;
 
     public StrategyAssignmentService() {
@@ -256,10 +262,4 @@ public class StrategyAssignmentService {
         }
     }
 
-    /**
-     * Get repository for direct access.
-     */
-    public StrategyAssignmentRepository getRepository() {
-        return repository;
-    }
 }

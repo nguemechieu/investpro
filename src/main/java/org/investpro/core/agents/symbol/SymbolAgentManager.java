@@ -34,6 +34,28 @@ public class SymbolAgentManager {
     }
 
     /**
+     * Ensure a symbol is visible to UI/status surfaces even before evaluation has
+     * started.
+     */
+    public SymbolAgentState ensureSymbol(@NotNull TradePair symbol) {
+        return symbolStates.computeIfAbsent(symbol, this::defaultState);
+    }
+
+    /**
+     * Seed the manager with all currently loaded market-watch symbols.
+     */
+    public void initializeSymbols(@Nullable Collection<TradePair> symbols) {
+        if (symbols == null || symbols.isEmpty()) {
+            return;
+        }
+        for (TradePair symbol : symbols) {
+            if (symbol != null) {
+                ensureSymbol(symbol);
+            }
+        }
+    }
+
+    /**
      * Update the state of a symbol.
      */
     public void updateState(@NotNull TradePair symbol, @NotNull SymbolAgentState state) {
@@ -107,6 +129,17 @@ public class SymbolAgentManager {
      */
     public void clear() {
         symbolStates.clear();
+    }
+
+    private SymbolAgentState defaultState(@NotNull TradePair symbol) {
+        SymbolAgentState state = SymbolAgentState.builder()
+                .symbol(symbol)
+                .state(SymbolEvaluationState.NOT_STARTED)
+                .canTradeLive(false)
+                .lastIssue("Waiting for strategy evaluation")
+                .build();
+        state.updateTimestamp();
+        return state;
     }
 
     /**

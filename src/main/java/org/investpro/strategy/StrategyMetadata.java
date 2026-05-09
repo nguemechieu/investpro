@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.StrategyCategory;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 
 import java.util.HashSet;
 import java.util.Set;

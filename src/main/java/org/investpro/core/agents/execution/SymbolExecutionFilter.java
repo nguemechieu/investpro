@@ -5,14 +5,13 @@ import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
 /**
  * Filters symbols before execution.
- *
+ * <p>
  * Purpose:
  * - prevent bot trading on disabled symbols
  * - allow manual overrides

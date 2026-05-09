@@ -1,6 +1,6 @@
 package org.investpro.exchange.services;
 
-import org.investpro.exchange.ExchangeAdapter;
+import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.jetbrains.annotations.NotNull;
@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ExchangeService {
     private static final Logger logger = LoggerFactory.getLogger(ExchangeService.class);
 
-    private final Map<String, ExchangeAdapter> adapters = new ConcurrentHashMap<>();
+    private final Map<String, ExchangeIdentity> adapters = new ConcurrentHashMap<>();
 
     public ExchangeService() {
         logger.info("ExchangeService initialized");
@@ -41,12 +41,9 @@ public class ExchangeService {
      * @param exchangeName Unique exchange identifier (e.g., "Coinbase", "OANDA")
      * @param adapter      The adapter implementation
      */
-    public void register(@NotNull String exchangeName, @NotNull ExchangeAdapter adapter) {
+    public void register(@NotNull String exchangeName, @NotNull ExchangeIdentity adapter) {
         if (exchangeName.isBlank()) {
             throw new IllegalArgumentException("exchangeName must not be blank");
-        }
-        if (adapter == null) {
-            throw new IllegalArgumentException("adapter must not be null");
         }
         adapters.put(exchangeName, adapter);
         logger.info("Registered exchange adapter: {}", exchangeName);
@@ -68,8 +65,8 @@ public class ExchangeService {
      * @throws IllegalArgumentException if adapter not found
      */
     @NotNull
-    public ExchangeAdapter getAdapter(@NotNull String exchangeName) {
-        ExchangeAdapter adapter = adapters.get(exchangeName);
+    public ExchangeIdentity getAdapter(@NotNull String exchangeName) {
+        ExchangeIdentity adapter = adapters.get(exchangeName);
         if (adapter == null) {
             throw new IllegalArgumentException("Exchange adapter not found: " + exchangeName);
         }
@@ -80,7 +77,7 @@ public class ExchangeService {
      * Get an adapter by name, wrapped in Optional.
      */
     @NotNull
-    public Optional<ExchangeAdapter> getAdapterOptional(@NotNull String exchangeName) {
+    public Optional<ExchangeIdentity> getAdapterOptional(@NotNull String exchangeName) {
         return Optional.ofNullable(adapters.get(exchangeName));
     }
 

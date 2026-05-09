@@ -3,6 +3,7 @@ package org.investpro.strategy;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.impl.UnifiedStrategy;
+import org.investpro.strategy.impl.UserStrategyAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Registry for catalog-driven trading strategies.
@@ -78,7 +80,6 @@ public final class StrategyRegistry {
                 continue;
             }
 
-
             String normalized = StrategyCatalog.normalizeStrategyName(definition.getName());
 
             definitions.putIfAbsent(normalized, definition);
@@ -100,6 +101,14 @@ public final class StrategyRegistry {
         Objects.requireNonNull(strategy, "strategy must not be null");
 
         String normalized = StrategyCatalog.normalizeStrategyName(name);
+
+        // Check for duplicate registration (especially important for user strategies)
+        if (strategies.containsKey(normalized) || definitions.containsKey(normalized)) {
+            log.warn(
+                    "Strategy with ID '{}' is already registered. Skipping duplicate registration.",
+                    normalized);
+            return;
+        }
 
         StrategyDefinition definition = StrategyCatalog.definition(normalized);
         definitions.put(normalized, definition);
@@ -175,8 +184,7 @@ public final class StrategyRegistry {
         log.debug(
                 "Instantiated strategy: name={}, baseName={}",
                 definition.getName(),
-                definition.getBaseName()
-        );
+                definition.getBaseName());
 
         return strategy;
     }
@@ -219,8 +227,7 @@ public final class StrategyRegistry {
 
     public synchronized TradingStrategy configure(@Nullable String strategyName, @Nullable StrategyParameters params) {
         String targetName = StrategyCatalog.normalizeStrategyName(
-                strategyName == null || strategyName.isBlank() ? activeName : strategyName
-        );
+                strategyName == null || strategyName.isBlank() ? activeName : strategyName);
 
         setActive(targetName);
 
@@ -295,6 +302,98 @@ public final class StrategyRegistry {
     public void clearInstantiatedStrategies() {
         strategies.clear();
         log.info("Cleared instantiated strategies. Definitions remain loaded: {}", definitions.size());
+    }
+
+    // =========================================================================
+    // User Strategy Management
+    // =========================================================================
+
+    /**
+     * Find a strategy by its ID.
+     *
+     * @param strategyId the strategy ID to search for
+     * @return Optional containing the strategy if found, empty otherwise
+     */
+    public Optional<TradingStrategy> findById(@NotNull String strategyId) {
+        Objects.requireNonNull(strategyId, "strategyId must not be null");
+
+        String normalized = StrategyCatalog.normalizeStrategyName(strategyId);
+
+        return Optional.ofNullable(strategies.get(normalized))
+                .or(() -> Optional.ofNullable(instantiateStrategy(normalized)));
+    }
+
+    /**
+     * Get all registered strategies (both built-in and user-developed).
+     *
+     * @return List of all TradingStrategy instances
+     */
+    public List<TradingStrategy> getAllStrategies() {
+        return strategies.values()
+                .stream()
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    /**
+     * Get only user-developed strategies (UserStrategyAdapter instances).
+     *
+     * @return List of user strategies only
+     */
+    public List<TradingStrategy> getUserStrategies() {
+        return strategies.values()
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(strategy -> strategy instanceof UserStrategyAdapter)
+                .toList();
+    }
+
+    /**
+     * Check if a strategy ID is already registered (duplicate check).
+     *
+     * @param strategyId the ID to check
+     * @return true if already registered, false otherwise
+     */
+    public synchronized boolean hasDuplicate(@NotNull String strategyId) {
+        Objects.requireNonNull(strategyId, "strategyId must not be null");
+
+        String normalized = StrategyCatalog.normalizeStrategyName(strategyId);
+
+        return strategies.containsKey(normalized) || definitions.containsKey(normalized);
+    }
+
+    /**
+     * Unregister a strategy from the registry.
+     *
+     * Used to disable or remove strategies (e.g., on validation failure).
+     *
+     * @param strategyId the ID of the strategy to remove
+     * @return true if successfully unregistered, false if not found
+     */
+    public synchronized boolean unregister(@NotNull String strategyId) {
+        Objects.requireNonNull(strategyId, "strategyId must not be null");
+
+        String normalized = StrategyCatalog.normalizeStrategyName(strategyId);
+
+        boolean removedFromStrategies = strategies.remove(normalized) != null;
+        boolean removedFromDefinitions = definitions.remove(normalized) != null;
+
+        if (removedFromStrategies || removedFromDefinitions) {
+            log.info("Unregistered strategy: {}", normalized);
+
+            // Reset active strategy if we just unregistered it
+            if (normalized.equals(activeName)) {
+                activeName = definitions.isEmpty() && strategies.isEmpty()
+                        ? null
+                        : definitions.keySet().stream().findFirst().orElse(null);
+                log.info("Reset active strategy to: {}", activeName);
+            }
+
+            return true;
+        }
+
+        log.warn("Cannot unregister strategy '{}' - not found in registry", normalized);
+        return false;
     }
 
     private boolean isBlank(String value) {

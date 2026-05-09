@@ -79,10 +79,17 @@ public class SystemMonitorService {
                 overallStatus = ComponentStatus.DEGRADED;
             }
 
-            boolean canTrade = (overallStatus == ComponentStatus.HEALTHY ||
-                    (overallStatus == ComponentStatus.DEGRADED && blockers.isEmpty())) &&
-                    exchange.getStatus() != ComponentStatus.FAILED &&
-                    risk.getStatus() != ComponentStatus.FAILED;
+            /*
+             * Startup warnings such as "No active subscription" or
+             * "No active strategy signal yet" should not prevent the UI from
+             * enabling the bot. The stream is often started immediately after
+             * auto-trading is enabled, and the first strategy signal can only
+             * exist after market data begins flowing.
+             */
+            boolean canTrade = blockers.isEmpty()
+                    && exchange.getStatus() != ComponentStatus.FAILED
+                    && risk.getStatus() != ComponentStatus.FAILED
+                    && systemCore.canSubmitOrders();
 
             String summary = String.format("System: %s | Trading: %s",
                     overallStatus.getDisplayName(),
@@ -119,6 +126,18 @@ public class SystemMonitorService {
         try {
             String diagnostics = systemCore.getSystemDiagnostics();
             boolean connected = diagnostics != null && diagnostics.contains("Connected");
+            boolean canSubmitOrders = systemCore.canSubmitOrders();
+
+            if (!canSubmitOrders) {
+                return ComponentHealth.builder()
+                        .componentName("Exchange")
+                        .status(ComponentStatus.FAILED)
+                        .summary("Order submission unavailable")
+                        .issue("Exchange is not connected or trading mode does not allow orders")
+                        .lastCheckedAt(Instant.now())
+                        .blockers(List.of("Exchange cannot submit live or paper orders"))
+                        .build();
+            }
 
             return ComponentHealth.builder()
                     .componentName("Exchange")

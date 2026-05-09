@@ -7,9 +7,10 @@ import javafx.scene.layout.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.i18n.LocalizationService;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.lab.*;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.format.DateTimeFormatter;
@@ -81,6 +82,7 @@ public class StrategyLabPanel extends BorderPane {
     public StrategyLabPanel(@NotNull StrategyLabService labService) {
         this.labService = labService;
         initializeUI();
+        LocalizationService.applyTranslations(this);
         refreshUI();
     }
 
@@ -267,7 +269,7 @@ public class StrategyLabPanel extends BorderPane {
         Tab tab = new Tab("Strategy Rankings");
 
         rankingTable = new TableView<>();
-        rankingTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        rankingTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         // Columns
         TableColumn<StrategyPerformanceReport, Integer> rankCol = new TableColumn<>("Rank");
@@ -372,7 +374,7 @@ public class StrategyLabPanel extends BorderPane {
         Tab tab = new Tab("Voting Results");
 
         votingTable = new TableView<>();
-        votingTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        votingTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         TableColumn<StrategyVote, String> stratCol = new TableColumn<>("Strategy");
         stratCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(

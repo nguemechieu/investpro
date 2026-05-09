@@ -1,20 +1,29 @@
 package org.investpro.exchange;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
-import org.investpro.exchange.infrastructure.BrokerExchangeAdapter;
+import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.infrastructure.StreamTransport;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
-import org.investpro.models.trading.TradePair;
-import org.investpro.models.trading.Order;
-import org.investpro.models.trading.OpenOrder;
-import org.investpro.models.trading.Position;
-import org.investpro.models.trading.Trade;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.exchange.models.ExchangeCapability;
+import org.investpro.exchange.models.MarketDepthType;
+import org.investpro.exchange.websocket.AlpacaWebSocket;
+import org.investpro.exchange.websocket.ExchangeWebSocketClient;
+import org.investpro.models.trading.*;
+import org.investpro.service.AuthResult;
+import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
+import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
@@ -22,6 +31,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,8 +39,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
-public class Alpaca extends BrokerExchangeAdapter {
+@Getter
+@Setter
+@Slf4j
+public class Alpaca extends Exchange {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
     private static final String ALPACA_LIVE_URL = "https://api.alpaca.markets";
@@ -42,10 +56,25 @@ public class Alpaca extends BrokerExchangeAdapter {
     private final java.util.List<Position> positions = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
     private long nextOrderId = 1000;
+    private AlpacaWebSocket alpacaWebSocket;
+    private ExchangeCredentials exchangeCredentials;
 
-    public Alpaca(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
+    public Alpaca(ExchangeCredentials exchangeCredentials) {
+        super(exchangeCredentials);
+        this.exchangeCredentials = exchangeCredentials;
         initializePaperTradingAccount();
+
+        try {
+            this.alpacaWebSocket = createWebSocketClient();
+        } catch (Exception ex) {
+            log.error("Failed to initialize BinanceUs websocket client", ex);
+        }
+
+    }
+
+    private AlpacaWebSocket createWebSocketClient() {
+
+        return new AlpacaWebSocket(URI.create(ALPACA_LIVE_URL), new Draft_6455());
     }
 
     private void initializePaperTradingAccount() {
@@ -59,6 +88,11 @@ public class Alpaca extends BrokerExchangeAdapter {
     }
 
     @Override
+    public String getSignal() {
+        return "";
+    }
+
+    @Override
     public String getExchangeId() {
         return "alpaca";
     }
@@ -66,6 +100,11 @@ public class Alpaca extends BrokerExchangeAdapter {
     @Override
     public String getDisplayName() {
         return "Alpaca";
+    }
+
+    @Override
+    public boolean isSandbox() {
+        return false;
     }
 
     @Override
@@ -79,8 +118,112 @@ public class Alpaca extends BrokerExchangeAdapter {
     }
 
     @Override
+    public String getTimestamp() {
+        return "";
+    }
+
+    @Override
+    public Instant now() {
+        return null;
+    }
+
+    @Override
+    public boolean supportsMarketType(MARKET_TYPES marketType) {
+        return false;
+    }
+
+    @Override
     public List<MARKET_TYPES> getSupportedMarketTypes() {
         return List.of(MARKET_TYPES.STOCKS);
+    }
+
+    @Override
+    public @NotNull ExchangeCapability getCapability() {
+        return ExchangeCapability.builder()
+                .exchangeName("ALPACA")
+                .exchangeId("alpaca")
+                .displayName("Alpaca Trading")
+                .apiBaseUrl(isPaperTrading() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL)
+
+                // Market coverage - Alpaca specializes in US equities/stocks
+                .supportsCrypto(false)
+                .supportsSpot(true)
+                .supportsStocks(true)
+                .supportsEquities(true)
+                .supportsFutures(false)
+                .supportsDerivatives(false)
+                .supportsForex(false)
+                .supportsOptions(false)
+                .supportsIndices(false)
+                .supportsCommodities(false)
+
+                // Trading support
+                .supportsLiveTrading(!isPaperTrading())
+                .supportsPaperTradingMode(true)
+                .supportsSandbox(isPaperTrading())
+                .supportsMarketOrders(true)
+                .supportsLimitOrders(true)
+                .supportsStopOrders(true)
+                .supportsStopLimitOrders(true)
+                .supportsBracketOrders(false)
+                .supportsStopLossTakeProfit(true)
+                .supportsTrailingStopOrders(true)
+                .supportsMarginTrading(true)
+                .supportsLeverage(true)
+
+                // Account / portfolio
+                .supportsAccountInfo(true)
+                .supportsBalances(true)
+                .supportsPositions(true)
+                .supportsAccountTrades(true)
+                .supportsOpenOrders(true)
+                .supportsOrderHistory(true)
+                .supportsFills(true)
+                .supportsOrderValidation(true)
+
+                // Market data
+                .supportsTicker(true)
+                .supportsTickers(true)
+                .supportsOrderBook(true)
+                .supportsHistoricalCandles(true)
+                .supportsRecentTrades(true)
+                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+
+                // Streaming
+                .supportsWebSocket(true)
+                .supportsWebSocketStreaming(true)
+                .supportsTickerStreaming(true)
+                .supportsTradeStreaming(true)
+                .supportsCandleStreaming(true)
+                .supportsOrderBookStreaming(false)
+                .supportsAccountStreaming(true)
+                .supportsOrderStreaming(true)
+                .supportsFillStreaming(true)
+                .supportsPositionStreaming(true)
+                .supportsBalanceStreaming(true)
+                .supportsHttpStreaming(false)
+                .supportsPollingFallback(true)
+
+                // Infrastructure / limits
+                .supportsRateLimitInfo(true)
+                .requiresAuthenticationForTrading(true)
+                .requiresAuthenticationForAccountInfo(true)
+                .requiresAuthenticationForMarketData(true)
+
+                // Notes
+                .notes("""
+                        Alpaca Trading capability profile.
+                        Specializes in US stocks and equities trading.
+                        Supports both paper (sandbox) and live trading modes.
+                        Minimum $25,000 required for pattern day trader (PDT) margin account.
+                        Market data and trading require authenticated access.
+                        """)
+                .build();
+    }
+
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        return null;
     }
 
     @Override
@@ -91,6 +234,17 @@ public class Alpaca extends BrokerExchangeAdapter {
     @Override
     public CompletableFuture<String> placeLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
         return createLimitOrder(symbol, side, quantity, limitPrice);
+    }
+
+    @Override
+    public CompletableFuture<String> createOrder(Order order) throws JsonProcessingException {
+        return null;
+    }
+
+    @Override
+    public Order createOrder(int id, TradePair tradePair, String type, double price, double amount, Side side,
+            double stopLoss, double takeProfit, double slippage) {
+        return null;
     }
 
     // --------- Capability Methods ---------
@@ -235,6 +389,11 @@ public class Alpaca extends BrokerExchangeAdapter {
     }
 
     @Override
+    public void stopAllStreams() {
+
+    }
+
+    @Override
     public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
         // Polling-based
     }
@@ -242,6 +401,11 @@ public class Alpaca extends BrokerExchangeAdapter {
     @Override
     public void streamTrades(TradePair tradePair, ExchangeStreamConsumer consumer) {
         // Polling-based
+    }
+
+    @Override
+    public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+
     }
 
     @Override
@@ -332,6 +496,21 @@ public class Alpaca extends BrokerExchangeAdapter {
     }
 
     @Override
+    public boolean supportsOrderBookStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsCandleStreaming() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsTradeStreaming() {
+        return false;
+    }
+
+    @Override
     public boolean supportsAccountStreaming() {
         return false;
     }
@@ -399,6 +578,10 @@ public class Alpaca extends BrokerExchangeAdapter {
             orders.put(orderId, "FILLED");
             return orderId;
         });
+    }
+
+    private boolean hasCredentials() {
+        return exchangeCredentials != null;
     }
 
     @Override
@@ -597,8 +780,8 @@ public class Alpaca extends BrokerExchangeAdapter {
     }
 
     @Override
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-        // Not implemented for Alpaca yet
+    public AuthResult AuthCheckResult(String selectedExchange) {
+        return null;
     }
 
     // --------- Order Validation Methods ---------
@@ -681,6 +864,82 @@ public class Alpaca extends BrokerExchangeAdapter {
     }
 
     @Override
+    public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
+        return null;
+    }
+
+    @Override
+    public List<TradePair> getTradePairSymbol() {
+        return List.of();
+    }
+
+    @Override
+    public List<TradePair> getTradablePairs() {
+        return List.of();
+    }
+
+    @Override
+    public boolean supportsTradePair(TradePair tradePair) {
+        return false;
+    }
+
+    @Override
+    public double getLivePrice() {
+        return 0;
+    }
+
+    @Override
+    public Ticker getLivePrice(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Ticker>> fetchTickers(List<TradePair> tradePairs) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
+        return null;
+    }
+
+    @Override
+    public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Optional<InProgressCandleData>> fetchCandleDataForInProgressCandle(TradePair tradePair,
+            Instant currentCandleStartedAt, long secondsIntoCurrentCandle, int secondsPerCandle) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<?> getOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<OrderBook> fetchOrderBook(TradePair tradePair) {
+        return null;
+    }
+
+    @Override
+    public String supportsTimeframe(int secondsPerCandle) {
+        return "";
+    }
+
+    @Override
     public List<Timeframe> getSupportedTimeframes() {
         return List.of(
                 Timeframe.M1,
@@ -692,12 +951,14 @@ public class Alpaca extends BrokerExchangeAdapter {
                 Timeframe.D1);
     }
 
+    @Override
+    public Account getUserAccountDetails() throws ExecutionException, InterruptedException {
+        return null;
+    }
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        if (!hasCredentials()) {
-            return super.fetchAccount();
-        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 HttpResponse<String> response = HTTP_CLIENT.send(alpacaRequest("/v2/account")
@@ -734,6 +995,31 @@ public class Alpaca extends BrokerExchangeAdapter {
                 throw new IllegalStateException("Unable to fetch Alpaca account.", exception);
             }
         });
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchEquity() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchMarginUsed() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Double> fetchFreeMargin() {
+        return null;
     }
 
     private CompletableFuture<String> submitAlpacaOrder(
@@ -774,8 +1060,8 @@ public class Alpaca extends BrokerExchangeAdapter {
     private HttpRequest.Builder alpacaRequest(String path) {
         return HttpRequest.newBuilder()
                 .uri(URI.create(alpacaBaseUrl() + path))
-                .header("APCA-API-KEY-ID", apiKey)
-                .header("APCA-API-SECRET-KEY", apiSecret)
+                .header("APCA-API-KEY-ID", exchangeCredentials.apiKey())
+                .header("APCA-API-SECRET-KEY", exchangeCredentials.apiSecret())
                 .header("User-Agent", "InvestPro/1.0");
     }
 
@@ -799,5 +1085,40 @@ public class Alpaca extends BrokerExchangeAdapter {
             throw new IllegalArgumentException("Order amount and price values must be positive.");
         }
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    @Override
+    public void connect() {
+
+    }
+
+    @Override
+    public void disconnect() {
+
+    }
+
+    @Override
+    public void reconnect() {
+
+    }
+
+    @Override
+    public Boolean isConnected() {
+        return null;
+    }
+
+    @Override
+    public ExchangeWebSocketClient getWebsocketClient() {
+        return null;
+    }
+
+    @Override
+    public boolean supportsWebSocket() {
+        return false;
+    }
+
+    @Override
+    public boolean isWebsocketAvailable() {
+        return false;
     }
 }

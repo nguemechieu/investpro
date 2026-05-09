@@ -1,5 +1,6 @@
 package org.investpro.execution;
 
+import org.investpro.core.execution.SymbolTradeLockManager;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;

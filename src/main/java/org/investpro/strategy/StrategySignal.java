@@ -20,8 +20,9 @@ import java.util.Map;
  * - Risk/reward ratios
  * - Confidence and expected value metrics
  * - Win/loss probabilities
+ * - Suggested trade amount/quantity
  *
- * Side = direction only (use strategy signal instead).
+ * Side = direction only.
  * StrategySignal = full signal context with all trading parameters.
  */
 @Value
@@ -82,12 +83,18 @@ public class StrategySignal {
     double takeProfitPrice;
 
     /**
+     * Suggested amount/quantity/units for the trade.
+     *
+     * For OANDA forex, this can represent units.
+     * For crypto/stocks, this can represent base quantity.
+     *
+     * RiskManagementSystem or TradeExecutionCoordinator may override this.
+     */
+    @Builder.Default
+    double amount = 0.0;
+
+    /**
      * Risk/reward ratio.
-     * <p>
-     * Example:
-     * risk = entry - stop
-     * reward = takeProfit - entry
-     * riskRewardRatio = reward / risk
      */
     double riskRewardRatio;
 
@@ -194,6 +201,10 @@ public class StrategySignal {
         return entryPrice > 0.0;
     }
 
+    public boolean hasAmount() {
+        return amount > 0.0 && Double.isFinite(amount);
+    }
+
     public boolean hasValidRiskReward() {
         return riskRewardRatio > 0.0 && Double.isFinite(riskRewardRatio);
     }
@@ -241,6 +252,12 @@ public class StrategySignal {
                 .build();
     }
 
+    public StrategySignal withAmount(double newAmount) {
+        return this.toBuilder()
+                .amount(Math.max(0.0, newAmount))
+                .build();
+    }
+
     public StrategySignal withWarning(String warning) {
         return this.toBuilder()
                 .warning(warning)
@@ -266,10 +283,31 @@ public class StrategySignal {
         return this.toBuilder()
                 .side(side == null ? Side.HOLD : side)
                 .confidence(safeConfidence)
+                .amount(amount > 0.0 && Double.isFinite(amount) ? amount : 0.0)
                 .riskRewardRatio(safeRiskReward)
                 .createdAt(safeCreatedAt)
                 .build();
     }
+
+    public String getReason() {
+        if (reasons == null || reasons.isEmpty()) {
+            return "";
+        }
+
+        return String.join("; ", reasons);
+    }
+
+    public String getWarningText() {
+        if (warnings == null || warnings.isEmpty()) {
+            return "";
+        }
+
+        return String.join("; ", warnings);
+    }
+
+    // =========================================================================
+    // Factory methods
+    // =========================================================================
 
     public static StrategySignal hold(String symbol, String timeframe, String strategyId, String reason) {
         return StrategySignal.builder()
@@ -278,6 +316,7 @@ public class StrategySignal {
                 .strategyId(strategyId)
                 .side(Side.HOLD)
                 .confidence(0.0)
+                .amount(0.0)
                 .reason(reason == null || reason.isBlank() ? "No trade setup." : reason)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -291,7 +330,32 @@ public class StrategySignal {
             double entryPrice,
             double stopLossPrice,
             double takeProfitPrice,
-            String reason) {
+            String reason
+    ) {
+        return buy(
+                symbol,
+                timeframe,
+                strategyId,
+                confidence,
+                entryPrice,
+                stopLossPrice,
+                takeProfitPrice,
+                0.0,
+                reason
+        );
+    }
+
+    public static StrategySignal buy(
+            String symbol,
+            String timeframe,
+            String strategyId,
+            double confidence,
+            double entryPrice,
+            double stopLossPrice,
+            double takeProfitPrice,
+            double amount,
+            String reason
+    ) {
         return StrategySignal.builder()
                 .symbol(symbol)
                 .timeframe(timeframe)
@@ -301,6 +365,7 @@ public class StrategySignal {
                 .entryPrice(entryPrice)
                 .stopLossPrice(stopLossPrice)
                 .takeProfitPrice(takeProfitPrice)
+                .amount(Math.max(0.0, amount))
                 .riskRewardRatio(calculateRatio(entryPrice, stopLossPrice, takeProfitPrice))
                 .reason(reason)
                 .createdAt(LocalDateTime.now())
@@ -315,7 +380,32 @@ public class StrategySignal {
             double entryPrice,
             double stopLossPrice,
             double takeProfitPrice,
-            String reason) {
+            String reason
+    ) {
+        return sell(
+                symbol,
+                timeframe,
+                strategyId,
+                confidence,
+                entryPrice,
+                stopLossPrice,
+                takeProfitPrice,
+                0.0,
+                reason
+        );
+    }
+
+    public static StrategySignal sell(
+            String symbol,
+            String timeframe,
+            String strategyId,
+            double confidence,
+            double entryPrice,
+            double stopLossPrice,
+            double takeProfitPrice,
+            double amount,
+            String reason
+    ) {
         return StrategySignal.builder()
                 .symbol(symbol)
                 .timeframe(timeframe)
@@ -325,6 +415,7 @@ public class StrategySignal {
                 .entryPrice(entryPrice)
                 .stopLossPrice(stopLossPrice)
                 .takeProfitPrice(takeProfitPrice)
+                .amount(Math.max(0.0, amount))
                 .riskRewardRatio(calculateRatio(entryPrice, stopLossPrice, takeProfitPrice))
                 .reason(reason)
                 .createdAt(LocalDateTime.now())
@@ -352,9 +443,5 @@ public class StrategySignal {
         }
 
         return Math.max(min, Math.min(max, value));
-    }
-
-    public String getReason() {
-        return reasons.stream().reduce("", (s1, s2) -> s1 + s2);
     }
 }

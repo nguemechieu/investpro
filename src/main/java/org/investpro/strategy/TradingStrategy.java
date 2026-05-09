@@ -3,7 +3,7 @@ package org.investpro.strategy;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
 import org.investpro.enums.MarketBehavior;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 
 public interface TradingStrategy {
 

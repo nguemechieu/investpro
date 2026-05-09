@@ -3,6 +3,7 @@ package org.investpro.exchange.infrastructure;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.investpro.data.Account;
 import  org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.credentials.ExchangeCredentials;
 import  org.investpro.models.trading.Order;
 import  org.investpro.models.trading.OrderBook;
 import  org.investpro.models.trading.Ticker;
@@ -38,10 +39,12 @@ public abstract class BrokerExchangeAdapter extends Exchange {
     private final java.util.Map<String, String> paperOrders = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicLong nextPaperOrderId = new java.util.concurrent.atomic.AtomicLong(1000);
 
-    protected BrokerExchangeAdapter(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
+    protected BrokerExchangeAdapter(ExchangeCredentials exchangeCredentials) {
+        super(exchangeCredentials);
         paperBalances.put("USD", 10000.0);
     }
+
+
 
     @Override
     public String getSignal() {
@@ -191,10 +194,7 @@ public abstract class BrokerExchangeAdapter extends Exchange {
         return "polling";
     }
 
-    @Override
-    public double getSize() {
-        return 1.0;
-    }
+
 
     @Override
     public Account getUserAccountDetails() throws ExecutionException, InterruptedException {

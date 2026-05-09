@@ -6,11 +6,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.Getter;
+import lombok.Setter;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.credentials.ExchangeSigning;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.exchange.models.ExchangeCapability;
+import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.service.AuthResult;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -22,8 +30,6 @@ import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.jetbrains.annotations.NotNull;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -38,7 +44,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-
+@Getter
+@Setter
 @Slf4j
 public class Bitfinex extends Exchange {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Bitfinex.class);
@@ -59,9 +66,11 @@ public class Bitfinex extends Exchange {
     private final java.util.List<Position> positions = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final java.util.List<Trade> tradeHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
     private long nextOrderId = 1000;
+    private ExchangeCredentials exchangeCredentials;
 
-    public Bitfinex(String s, String s1) {
-        super(s, s1);
+    public Bitfinex(ExchangeCredentials exchangeCredentials) {
+        super(exchangeCredentials);
+        this.exchangeCredentials = exchangeCredentials;
         initializePaperTradingAccount();
 
         try {
@@ -83,15 +92,6 @@ public class Bitfinex extends Exchange {
         return currencyCode == null || currencyCode.isBlank()
                 ? "USD"
                 : currencyCode.trim().toUpperCase(java.util.Locale.ROOT);
-    }
-
-    /**
-     * Constructor with Telegram token and email notification support
-     */
-    public Bitfinex(String apiKey, String apiSecret, String telegramToken, String emailNotification) {
-        this(apiKey, apiSecret);
-        this.setTelegramToken(telegramToken);
-        this.setEmailNotification(emailNotification);
     }
 
     private ExchangeWebSocketClient createWebSocketClient() throws Exception {
@@ -272,6 +272,11 @@ public class Bitfinex extends Exchange {
         });
     }
 
+    private boolean hasCredentials() {
+
+        return false;
+    }
+
     @Override
     public CompletableFuture<String> createStopOrder(TradePair tradePair, Side side, double amount, double stopPrice) {
         return failedFuture(unsupported("createStopOrder"));
@@ -347,6 +352,97 @@ public class Bitfinex extends Exchange {
         return java.util.Arrays.stream(MARKET_TYPES.values())
                 .filter(this::supportsMarketType)
                 .toList();
+    }
+
+    @Override
+    public @NotNull ExchangeCapability getCapability() {
+        return ExchangeCapability.builder()
+                .exchangeName("BITFINEX")
+                .exchangeId("bitfinex")
+                .displayName("Bitfinex Cryptocurrency Exchange")
+                .apiBaseUrl("https://api.bitfinex.com/v2")
+                .webSocketBaseUrl("wss://api.bitfinex.com/2")
+                .authenticationType("API_KEY")
+
+                // Market coverage - Bitfinex is primarily crypto
+                .supportsCrypto(true)
+                .supportsSpot(true)
+                .supportsFutures(true)
+                .supportsDerivatives(true)
+                .supportsForex(false)
+                .supportsStocks(false)
+                .supportsOptions(false)
+                .supportsIndices(false)
+                .supportsCommodities(false)
+
+                // Trading support
+                .supportsLiveTrading(true)
+                .supportsPaperTradingMode(true)
+                .supportsMarketOrders(true)
+                .supportsLimitOrders(true)
+                .supportsStopOrders(true)
+                .supportsStopLimitOrders(true)
+                .supportsBracketOrders(false)
+                .supportsStopLossTakeProfit(false)
+                .supportsTrailingStop(true)
+                .supportsMarginTrading(true)
+                .supportsLeverage(true)
+
+                // Account / portfolio
+                .supportsAccountInfo(true)
+                .supportsBalances(true)
+                .supportsPositions(true)
+                .supportsAccountTrades(true)
+                .supportsOpenOrders(true)
+                .supportsOrderHistory(true)
+                .supportsFills(true)
+
+                // Market data
+                .supportsTicker(true)
+                .supportsTickers(true)
+                .supportsOrderBook(true)
+                .supportsFullOrderBook(true)
+                .supportsDistributionBook(true)
+                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
+                .supportsHistoricalCandles(true)
+                .supportsRecentTrades(true)
+                .supportsStreamingPrices(true)
+
+                // Streaming
+                .supportsNativeWebSocket(true)
+                .supportsWebSocketStreaming(true)
+                .supportsTickerStreaming(true)
+                .supportsOrderBookStreaming(true)
+                .supportsTradeStreaming(true)
+                .supportsCandleStreaming(true)
+                .supportsAccountStreaming(true)
+                .supportsOrderStreaming(true)
+                .supportsFillStreaming(true)
+                .supportsPositionStreaming(true)
+                .supportsBalanceStreaming(true)
+                .supportsPollingFallback(false)
+
+                // Infrastructure / limits
+                .supportsRateLimitInfo(true)
+                .requiresAuthenticationForTrading(true)
+                .requiresAuthenticationForAccountInfo(true)
+                .requiresAuthenticationForMarketData(false)
+
+                // Notes
+                .notes("""
+                        Bitfinex cryptocurrency exchange capability profile.
+                        Supports spot and derivatives (perpetual futures) trading for cryptocurrencies.
+                        Features margin trading and leveraged positions for experienced traders.
+                        WebSocket is the primary API transport; REST API available as fallback.
+                        Public market data can be accessed without authentication.
+                        Account and order data require authenticated API access.
+                        """)
+                .build();
+    }
+
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        return null;
     }
 
     @Override
@@ -584,11 +680,6 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
-    public double getSize() {
-        return 0;
-    }
-
-    @Override
     public double getLivePrice() {
         return 0;
     }
@@ -688,8 +779,8 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-
+    public AuthResult AuthCheckResult(String selectedExchange) {
+        return null;
     }
 
     @Override
@@ -954,6 +1045,11 @@ public class Bitfinex extends Exchange {
     }
 
     @Override
+    public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
 
     }
@@ -1182,11 +1278,12 @@ public class Bitfinex extends Exchange {
         String body = OBJECT_MAPPER.writeValueAsString(payload);
         String nonce = Long.toString(System.currentTimeMillis() * 1000);
         String signaturePayload = "/api" + path + nonce + body;
-        String signature = ExchangeSigning.hmacHex("HmacSHA384", apiSecret, signaturePayload);
+
+        String signature = ExchangeSigning.hmacHex("HmacSHA384", exchangeCredentials.apiSecret(), signaturePayload);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BITFINEX_REST_URL + path))
                 .header("bfx-nonce", nonce)
-                .header("bfx-apikey", apiKey)
+                .header("bfx-apikey", exchangeCredentials.apiKey())
                 .header("bfx-signature", signature)
                 .header("Content-Type", "application/json")
                 .header("User-Agent", "InvestPro/1.0")

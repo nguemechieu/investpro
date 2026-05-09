@@ -10,6 +10,9 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
+import org.investpro.exchange.credentials.ExchangeCredentials;
+import org.investpro.exchange.models.AuthCheckResult;
+import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.FiatCurrency;
 import org.investpro.models.trading.Order;
@@ -19,7 +22,8 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.service.AuthResult;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
@@ -64,7 +68,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Random;
-import org.investpro.exchange.oanda.OandaRateLimiter;
 
 @EqualsAndHashCode(callSuper = true)
 
@@ -159,11 +162,11 @@ public class Oanda extends Exchange {
                 '}';
     }
 
-    public Oanda(String apiKey, String apiSecret) {
-        super(apiKey, apiSecret);
+    public Oanda(ExchangeCredentials exchangeCredentials) {
+        super(exchangeCredentials);
 
-        this.apiKey = safe(apiKey);
-        this.apiSecret = safe(apiSecret);
+        this.apiKey = exchangeCredentials.apiKey();
+        this.apiSecret = exchangeCredentials.apiSecret();
 
         /*
          * For this adapter:
@@ -173,7 +176,9 @@ public class Oanda extends Exchange {
          * If apiSecret is blank, the adapter will auto-detect account id from
          * /v3/accounts.
          */
-        this.accountId = safe(apiSecret);
+        this.accountId = exchangeCredentials.accountId();
+
+        initializePaperTradingAccount();
 
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(20))
@@ -194,13 +199,7 @@ public class Oanda extends Exchange {
         }
     }
 
-    /**
-     * Constructor with notification credentials
-     */
-    public Oanda(String apiKey, String apiSecret, String telegramToken, String emailNotification) {
-        this(apiKey, apiSecret);
-        this.setTelegramToken(telegramToken);
-        this.setEmailNotification(emailNotification);
+    private void initializePaperTradingAccount() {
     }
 
     // ---------------------------------------------------------------------
@@ -254,6 +253,98 @@ public class Oanda extends Exchange {
     public List<MARKET_TYPES> getSupportedMarketTypes() {
         return List.of(
                 MARKET_TYPES.FOREX);
+    }
+
+    @Override
+    public @NotNull ExchangeCapability getCapability() {
+        return ExchangeCapability.builder()
+                .exchangeName("OANDA")
+                .exchangeId("oanda")
+                .displayName("OANDA Forex & CFD Trading")
+                .apiBaseUrl(OANDA_API_URL)
+                .webSocketBaseUrl(OANDA_STREAM_URL)
+                .authenticationType("API_KEY")
+
+                // Market coverage - OANDA specializes in forex and CFD
+                .supportsCrypto(false)
+                .supportsSpot(true)
+                .supportsFutures(false)
+                .supportsDerivatives(true)
+                .supportsForex(true)
+                .supportsStocks(false)
+                .supportsOptions(false)
+                .supportsIndices(false)
+
+                // Trading support
+                .supportsLiveTrading(true)
+                .supportsPaperTradingMode(true)
+                .supportsSandbox(true)
+                .supportsMarketOrders(true)
+                .supportsLimitOrders(true)
+                .supportsStopOrders(true)
+                .supportsStopLimitOrders(true)
+                .supportsBracketOrders(false)
+                .supportsStopLossTakeProfit(true)
+                .supportsTrailingStopOrders(true)
+                .supportsMarginTrading(true)
+                .supportsLeverage(true)
+
+                // Account / portfolio
+                .supportsAccountInfo(true)
+                .supportsBalances(true)
+                .supportsPositions(true)
+                .supportsAccountTrades(true)
+                .supportsOpenOrders(true)
+                .supportsOrderHistory(true)
+                .supportsFills(true)
+
+                // Market data
+                .supportsTicker(true)
+                .supportsTickers(true)
+                .supportsOrderBook(false)
+                .supportsFullOrderBook(false)
+                .supportsDistributionBook(false)
+                .supportsHistoricalCandles(true)
+                .supportsRecentTrades(false)
+                .supportsStreamingPrices(true)
+
+                // Streaming
+                .supportsWebSocket(true)
+                .supportsNativeWebSocket(true)
+                .supportsWebSocketStreaming(true)
+                .supportsTickerStreaming(true)
+                .supportsTradeStreaming(false)
+                .supportsCandleStreaming(true)
+                .supportsOrderBookStreaming(false)
+                .supportsAccountStreaming(true)
+                .supportsOrderStreaming(true)
+                .supportsFillStreaming(true)
+                .supportsPositionStreaming(true)
+                .supportsBalanceStreaming(true)
+                .supportsHttpStreaming(false)
+                .supportsPollingFallback(true)
+
+                // Infrastructure / limits
+                .supportsRateLimitInfo(true)
+                .requiresAuthenticationForTrading(true)
+                .requiresAuthenticationForAccountInfo(true)
+                .requiresAuthenticationForMarketData(false)
+
+                // Notes
+                .notes("""
+                        OANDA Forex & CFD Trading capability profile.
+                        Specializes in currency pairs (forex), indices, commodities, and CFD instruments.
+                        Supports both live and sandbox (demo) accounts for learning and testing.
+                        High leverage available (up to 50:1 depending on regulatory region).
+                        Streaming prices and candles via REST API with polling support.
+                        Account, order, position, and balance data require authenticated API access.
+                        """)
+                .build();
+    }
+
+    @Override
+    public AuthCheckResult checkAuthentication() {
+        return null;
     }
 
     @Override
@@ -1102,7 +1193,7 @@ public class Oanda extends Exchange {
         }
 
         List<CompletableFuture<String>> futures = orderIds.stream()
-                .filter(id -> !safe(id).isBlank())
+                .filter(id -> !id.isBlank())
                 .map(this::cancelOrder)
                 .toList();
 
@@ -1523,8 +1614,8 @@ public class Oanda extends Exchange {
     }
 
     @Override
-    public void autoTrading(@NotNull Boolean auto, String signal) {
-
+    public AuthResult AuthCheckResult(String selectedExchange) {
+        return null;
     }
 
     @Override
@@ -1842,6 +1933,11 @@ public class Oanda extends Exchange {
     }
 
     @Override
+    public void subscribeTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+
+    }
+
+    @Override
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
         pollingStreamer.streamOrderBook(tradePair, consumer);
     }
@@ -1986,13 +2082,7 @@ public class Oanda extends Exchange {
                 Timeframe.H4,
                 Timeframe.D1,
                 Timeframe.W1,
-                Timeframe.MN
-        );
-    }
-
-    @Override
-    public double getSize() {
-        return 0;
+                Timeframe.MN);
     }
 
     @Override
@@ -2071,7 +2161,7 @@ public class Oanda extends Exchange {
      */
     public CompletableFuture<String> replaceOrder(String orderId, Order newOrder) {
         Objects.requireNonNull(newOrder, "newOrder must not be null");
-        if (safe(orderId).isBlank()) {
+        if (orderId.isBlank()) {
             return failedFuture(new IllegalArgumentException("orderId must not be blank"));
         }
 

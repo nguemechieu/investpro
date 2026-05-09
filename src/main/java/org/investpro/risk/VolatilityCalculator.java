@@ -47,19 +47,7 @@ public class VolatilityCalculator {
         List<Double> trueRanges = new java.util.ArrayList<>();
 
         for (int i = 1; i < candles.size(); i++) {
-            CandleData current = candles.get(i);
-            CandleData previous = candles.get(i - 1);
-
-            double high = current.highPrice();
-            double low = current.lowPrice();
-            double prevClose = previous.closePrice();
-
-            // True Range = max(high - low, |high - prevClose|, |low - prevClose|)
-            double tr = Math.max(
-                    high - low,
-                    Math.max(
-                            Math.abs(high - prevClose),
-                            Math.abs(low - prevClose)));
+            double tr = getTr(candles, i);
 
             trueRanges.add(tr);
         }
@@ -75,6 +63,22 @@ public class VolatilityCalculator {
         }
 
         return sum / period;
+    }
+
+    private static double getTr(List<CandleData> candles, int i) {
+        CandleData current = candles.get(i);
+        CandleData previous = candles.get(i - 1);
+
+        double high = current.highPrice();
+        double low = current.lowPrice();
+        double prevClose = previous.closePrice();
+
+        // True Range = max(high - low, |high - prevClose|, |low - prevClose|)
+        return Math.max(
+                high - low,
+                Math.max(
+                        Math.abs(high - prevClose),
+                        Math.abs(low - prevClose)));
     }
 
     /**

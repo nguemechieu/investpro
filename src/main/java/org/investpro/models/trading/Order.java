@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import  org.investpro.utils.Side;
 
+import java.time.Instant;
 import java.util.Date;
 
 @Getter
@@ -65,29 +66,15 @@ public class Order {
         this.orderType = type;
     }
 
-    // Explicit getters (Lombok @Getter not being invoked)
-    public String getSymbol() {
-        return symbol;
-    }
 
-    public double getQuantity() {
-        return quantity;
-    }
+    private TradePair tradePair;
 
-    public double getPrice() {
-        return price;
-    }
+    private Instant createdAt;
+    private Instant updatedAt;
 
-    public String getStatus() {
-        return status;
-    }
+    private double cummulativeQuoteQty;
 
-    public Date getDate() {
-        return date;
-    }
+    private double filledQuantity;
 
-    public Side getSide() {
-        return side;
-    }
-
+    private  Instant timeInForce;
 }

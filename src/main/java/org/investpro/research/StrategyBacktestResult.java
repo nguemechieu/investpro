@@ -2,7 +2,8 @@ package org.investpro.research;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.investpro.timeframe.Timeframe;
+import lombok.Setter;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
@@ -17,6 +18,7 @@ import java.util.List;
  */
 @Getter
 @Builder
+@Setter
 public class StrategyBacktestResult {
     private final String strategyId;
     private final String symbol;

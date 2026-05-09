@@ -71,7 +71,7 @@ public interface Repository<T, ID> {
      *
      * @throws SQLException if database operation fails
      */
-    void deleteAll() throws SQLException;
+   public void deleteAll() throws SQLException;
     
     /**
      * Check if an entity exists by ID.

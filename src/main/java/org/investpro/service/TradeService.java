@@ -1,5 +1,7 @@
 package org.investpro.service;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
@@ -39,10 +41,12 @@ import java.util.stream.Collectors;
  * - profit
  */
 @Slf4j
+@Getter
+@Setter
 public class TradeService implements CrudService<Trade, String> {
 
-    private final TradeRepository repository;
-    private final StrategySelectionService strategySelectionService;
+    private  TradeRepository repository;
+    private StrategySelectionService strategySelectionService;
 
     /**
      * Initialize the service with a trade repository.

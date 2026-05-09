@@ -1,6 +1,7 @@
 package org.investpro.data;
 
 
+import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
@@ -16,6 +17,8 @@ public record CandleData(double openPrice, double closePrice, double highPrice, 
         this(openPrice, closePrice, highPrice, lowPrice, openTime, volume, (highPrice + lowPrice + openPrice + closePrice) / 4,
                 volume, false);
     }
+
+
 
     @Override
     public boolean equals(Object object) {
@@ -58,4 +61,6 @@ public record CandleData(double openPrice, double closePrice, double highPrice, 
 
         return  Instant.now();
     }
+
+   public static TradePair symbol;
 }

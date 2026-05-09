@@ -1,5 +1,7 @@
 package org.investpro.execution;
 
+import org.investpro.core.execution.ExecutionIntent;
+import org.investpro.core.execution.PositionTransitionPolicy;
 import org.investpro.utils.Side;
 import org.junit.jupiter.api.Test;
 

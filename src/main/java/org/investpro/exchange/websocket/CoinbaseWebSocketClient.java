@@ -8,60 +8,44 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import javafx.application.Platform;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.LiveTradesConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
-import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft;
-import org.java_websocket.handshake.ServerHandshake;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
 /**
  * Coinbase Advanced Trade WebSocket client.
  *
- * Primary endpoint:
+ * Endpoint examples:
  * - Public market data: wss://advanced-trade-ws.coinbase.com
- * - User/authenticated channels: wss://advanced-trade-ws-user.coinbase.com
+ * - User/authenticated data: wss://advanced-trade-ws-user.coinbase.com
  *
- * Main public market channel used here:
+ * Main public trade channel:
  * - market_trades
- *
- * Notes:
- * - market_trades does not require JWT.
- * - authenticated/user channels require JWT.
- * - This client supports multiple TradePair subscriptions.
- * - Incoming trades are routed by Coinbase product_id, not by one global TradePair.
  */
 @Setter
 @Getter
-public class CoinbaseWebSocketClient extends WebSocketClient {
+@Slf4j
+public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     public static final String MARKET_TRADES_CHANNEL = "market_trades";
     public static final String HEARTBEATS_CHANNEL = "heartbeats";
-
-    private static final Logger logger = LoggerFactory.getLogger(CoinbaseWebSocketClient.class);
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -71,107 +55,100 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
     private final String jwt;
 
     /**
-     * UI/broker connection state.
-     */
-    public BooleanProperty connectionEstablished = new SimpleBooleanProperty(false);
-
-    /**
-     * Source of truth for active symbol routing.
-     *
      * Coinbase sends product_id such as BTC-USD.
-     * We match that product_id against these TradePair keys.
+     * This maps TradePair -> app consumer.
      */
     protected final Map<TradePair, LiveTradesConsumer> liveTradeConsumers =
             Collections.synchronizedMap(new HashMap<>());
 
     /**
-     * Pairs registered before the WebSocket is open, or pairs that failed to subscribe.
+     * Generic raw stream handlers for subscribeStream(...).
+     */
+    private final Map<String, Consumer<String>> rawStreamHandlers = new ConcurrentHashMap<>();
+
+    /**
+     * Pairs waiting for socket open/resubscribe.
      */
     private final Set<TradePair> pendingSubscriptions =
             Collections.synchronizedSet(new HashSet<>());
 
-    /**
-     * Last/default pair.
-     *
-     * This is only a fallback for legacy Coinbase Pro-style messages that may not include product_id.
-     * Do not use this as the main routing mechanism.
-     */
     private volatile @Nullable TradePair defaultTradePair;
 
-    public CoinbaseWebSocketClient(URI uri, Draft draft, String jwt) {
+    public CoinbaseWebSocketClient(@NotNull URI uri, @NotNull Draft draft, @Nullable String jwt) {
         super(uri, draft);
         this.jwt = jwt == null ? "" : jwt.trim();
     }
 
+    /**
+     * Called by the neutral ExchangeWebSocketClient after socket opens.
+     */
     @Override
-    public void onOpen(ServerHandshake serverHandshake) {
-        setConnectionEstablished(true);
-        logger.info("Coinbase WebSocket opened: {}", getURI());
-
-        /*
-         * Heartbeats help keep subscriptions open.
-         */
+    protected void onConnected() {
         try {
             sendSubscribe(null, HEARTBEATS_CHANNEL);
         } catch (Exception exception) {
-            logger.debug("Unable to subscribe to Coinbase heartbeats", exception);
+            log.debug("Unable to subscribe Coinbase heartbeats", exception);
         }
 
         synchronized (liveTradeConsumers) {
-            for (TradePair subscribedPair : liveTradeConsumers.keySet()) {
+            for (TradePair pair : liveTradeConsumers.keySet()) {
                 try {
-                    sendSubscribe(subscribedPair, MARKET_TRADES_CHANNEL);
-                    pendingSubscriptions.remove(subscribedPair);
-                    logger.info("Resubscribed to Coinbase market trades for {}", subscribedPair);
+                    sendSubscribe(pair, MARKET_TRADES_CHANNEL);
+                    pendingSubscriptions.remove(pair);
+                    log.info("Resubscribed Coinbase market trades for {}", pair);
                 } catch (Exception exception) {
-                    pendingSubscriptions.add(subscribedPair);
-                    logger.warn("Unable to resubscribe to Coinbase trades for {}", subscribedPair, exception);
+                    pendingSubscriptions.add(pair);
+                    log.warn("Unable to resubscribe Coinbase trades for {}", pair, exception);
+                }
+            }
+        }
+
+        synchronized (rawStreamHandlers) {
+            for (String streamKey : rawStreamHandlers.keySet()) {
+                CoinbaseStream stream = parseCoinbaseStream(streamKey);
+                if (stream == null) {
+                    continue;
+                }
+
+                try {
+                    sendSubscribe(stream.tradePair(), stream.channel());
+                    log.info("Resubscribed Coinbase raw stream {}", stream.key());
+                } catch (Exception exception) {
+                    log.warn("Unable to resubscribe Coinbase raw stream {}", stream.key(), exception);
                 }
             }
         }
     }
 
+    /**
+     * Called by the neutral ExchangeWebSocketClient before generic raw dispatch.
+     */
     @Override
-    public void onMessage(String message) {
-        if (message == null || message.trim().isEmpty()) {
-            logger.warn("Received empty Coinbase WebSocket message");
-            return;
-        }
-
+    protected void onRawMessage(@NotNull String message) {
         JsonNode messageJson;
 
         try {
             messageJson = OBJECT_MAPPER.readTree(message);
         } catch (JsonProcessingException exception) {
-            logger.error("Failed to parse Coinbase WebSocket message: {}", exception.getMessage(), exception);
+            log.error("Failed to parse Coinbase WebSocket message: {}", exception.getMessage(), exception);
             return;
         }
 
         String type = messageJson.path("type").asText("");
         String channel = messageJson.path("channel").asText("");
 
-        logger.debug("Coinbase WS message type={} channel={}", type, channel);
+        log.debug("Coinbase WS message type={} channel={}", type, channel);
 
         if ("error".equalsIgnoreCase(type)) {
             handleErrorMessage(messageJson);
             return;
         }
 
-        /*
-         * Coinbase Advanced Trade messages usually contain:
-         * {
-         *   "channel": "...",
-         *   "events": [...]
-         * }
-         */
         if (messageJson.has("channel") || messageJson.has("events")) {
             processAdvancedTradeMessage(messageJson);
             return;
         }
 
-        /*
-         * Backward compatibility for old Coinbase Pro-style messages.
-         */
         if (!type.isBlank()) {
             processLegacyMessage(messageJson, type);
         }
@@ -181,25 +158,23 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
         String channel = messageJson.path("channel").asText("");
 
         if ("subscriptions".equalsIgnoreCase(channel)) {
-            setConnectionEstablished(true);
-            logger.info("Coinbase subscription acknowledged: {}", messageJson);
+            log.info("Coinbase subscription acknowledged: {}", messageJson);
             return;
         }
 
         if (HEARTBEATS_CHANNEL.equalsIgnoreCase(channel)) {
-            setConnectionEstablished(true);
             return;
         }
 
         if (!MARKET_TRADES_CHANNEL.equalsIgnoreCase(channel)) {
-            logger.debug("Ignoring Coinbase channel {}", channel);
+            log.debug("Ignoring Coinbase channel {}", channel);
             return;
         }
 
         JsonNode events = messageJson.path("events");
 
         if (!events.isArray()) {
-            logger.debug("Coinbase market_trades message had no events array: {}", messageJson);
+            log.debug("Coinbase market_trades message had no events array: {}", messageJson);
             return;
         }
 
@@ -237,18 +212,17 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
     private void processLegacyMessage(@NotNull JsonNode messageJson, @NotNull String type) {
         try {
             switch (type) {
-                case "heartbeat" -> setConnectionEstablished(true);
-
-                case "subscriptions" -> {
-                    setConnectionEstablished(true);
-                    logger.info("Coinbase legacy subscription acknowledged: {}", messageJson);
+                case "heartbeat" -> {
+                    // Nothing else needed.
                 }
+
+                case "subscriptions" -> log.info("Coinbase legacy subscription acknowledged: {}", messageJson);
 
                 case "match" -> {
                     TradePair selectedPair = defaultTradePair;
 
                     if (selectedPair == null) {
-                        logger.debug("Skipping Coinbase legacy match because no defaultTradePair is set");
+                        log.debug("Skipping Coinbase legacy match because no defaultTradePair is set");
                         return;
                     }
 
@@ -264,10 +238,10 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
 
                 case "error" -> handleErrorMessage(messageJson);
 
-                default -> logger.debug("Ignoring unsupported Coinbase message type={}", type);
+                default -> log.debug("Ignoring unsupported Coinbase message type={}", type);
             }
         } catch (Exception exception) {
-            logger.error(
+            log.error(
                     "Error processing Coinbase legacy message type={}: {}",
                     type,
                     exception.getMessage(),
@@ -285,28 +259,28 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
             String timeText
     ) {
         if (price <= 0 || size <= 0) {
-            logger.debug("Skipping invalid Coinbase trade product={} price={} size={}", productId, price, size);
+            log.debug("Skipping invalid Coinbase trade product={} price={} size={}", productId, price, size);
             return;
         }
 
         TradePair selectedPair = findTradePair(productId);
 
         if (selectedPair == null) {
-            logger.debug("No Coinbase live consumer found for product_id={}", productId);
+            log.debug("No Coinbase live consumer found for product_id={}", productId);
             return;
         }
 
         LiveTradesConsumer consumer = liveTradeConsumers.get(selectedPair);
 
         if (consumer == null) {
-            logger.debug("No Coinbase consumer registered for {}", selectedPair);
+            log.debug("No Coinbase consumer registered for {}", selectedPair);
             return;
         }
 
         try {
             Side side = parseSide(sideText);
 
-            Trade newTrade = new Trade(
+            Trade trade = new Trade(
                     selectedPair,
                     price,
                     size,
@@ -315,19 +289,317 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
                     parseInstant(timeText)
             );
 
-            consumer.acceptTrades(newTrade);
+            consumer.acceptTrades(trade);
+
         } catch (Exception exception) {
-            logger.error("Error processing Coinbase trade message: {}", exception.getMessage(), exception);
+            log.error("Error processing Coinbase trade message: {}", exception.getMessage(), exception);
         }
     }
 
-    /**
-     * Finds the registered TradePair that matches Coinbase's product_id.
-     * <p>
-     * Example:
-     * product_id = BTC-USD
-     * TradePair.toString('-') = BTC-USD
-     */
+    @Override
+    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer consumer) {
+        Objects.requireNonNull(tradePair, "tradePair must not be null");
+        Objects.requireNonNull(consumer, "consumer must not be null");
+
+        streamLiveTrades(tradePair, new LiveTradesConsumer() {
+            @Override
+            public boolean containsKey(TradePair pair) {
+                return pair != null && pair.equals(tradePair);
+            }
+
+            @Override
+            public void remove(TradePair pair) {
+                liveTradeConsumers.remove(pair);
+            }
+
+            @Override
+            public void put(TradePair pair) {
+                // No-op. Registration is handled by streamLiveTrades.
+            }
+
+            @Override
+            public Trade get(TradePair pair) {
+                return null;
+            }
+
+            @Override
+            public void accept(Trade trade) {
+                dispatchTradeToExchangeConsumer(tradePair, trade, consumer);
+            }
+
+            @Override
+            public void acceptTrades(Trade trade) {
+                dispatchTradeToExchangeConsumer(tradePair, trade, consumer);
+            }
+        });
+    }
+
+    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull LiveTradesConsumer liveTradesConsumer) {
+        Objects.requireNonNull(tradePair, "tradePair must not be null");
+        Objects.requireNonNull(liveTradesConsumer, "liveTradesConsumer must not be null");
+
+        this.defaultTradePair = tradePair;
+        liveTradeConsumers.put(tradePair, liveTradesConsumer);
+
+        if (!isOpen()) {
+            pendingSubscriptions.add(tradePair);
+            log.warn("Coinbase WebSocket not open yet; registered {} for subscription after connect.", tradePair);
+            return;
+        }
+
+        try {
+            sendSubscribe(tradePair, MARKET_TRADES_CHANNEL);
+            pendingSubscriptions.remove(tradePair);
+            log.info("Subscribed Coinbase market trades for {}", tradePair);
+        } catch (Exception exception) {
+            pendingSubscriptions.add(tradePair);
+            log.error(
+                    "Failed to subscribe Coinbase trades for {}: {}",
+                    tradePair,
+                    exception.getMessage(),
+                    exception
+            );
+        }
+    }
+
+    private void dispatchTradeToExchangeConsumer(
+            @NotNull TradePair tradePair,
+            @Nullable Trade trade,
+            @NotNull ExchangeStreamConsumer consumer
+    ) {
+        if (trade == null) {
+            return;
+        }
+
+        try {
+            consumer.onTrade("Coinbase", tradePair, trade);
+        } catch (Exception exception) {
+            log.warn(
+                    "Coinbase trade consumer failed. pair={} error={}",
+                    tradePair,
+                    exception.getMessage(),
+                    exception
+            );
+        }
+    }
+
+    @Override
+    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
+        liveTradeConsumers.remove(tradePair);
+        pendingSubscriptions.remove(tradePair);
+
+        if (tradePair.equals(defaultTradePair)) {
+            defaultTradePair = findAnyRegisteredPair();
+        }
+
+        if (isOpen()) {
+            try {
+                sendUnsubscribe(tradePair, MARKET_TRADES_CHANNEL);
+            } catch (Exception exception) {
+                log.warn("Unable to send Coinbase unsubscribe for {}", tradePair, exception);
+            }
+        }
+
+        log.info("Unsubscribed Coinbase market trades for {}", tradePair);
+    }
+
+    public void stopAllStreamLiveTrades() {
+        for (TradePair tradePair : List.copyOf(liveTradeConsumers.keySet())) {
+            stopStreamLiveTrades(tradePair);
+        }
+
+        liveTradeConsumers.clear();
+        pendingSubscriptions.clear();
+        defaultTradePair = null;
+    }
+
+    @Override
+    public boolean supportsStreamingTrades(@NotNull TradePair tradePair) {
+        return tradePair != null && !toCoinbaseProductId(tradePair).isBlank();
+    }
+
+    @Override
+    public void subscribeStream(@NotNull String streamName, @NotNull Consumer<String> handler) {
+        Objects.requireNonNull(streamName, "streamName must not be null");
+        Objects.requireNonNull(handler, "handler must not be null");
+
+        CoinbaseStream stream = parseCoinbaseStream(streamName);
+
+        if (stream == null) {
+            log.warn("Invalid Coinbase stream name: {}", streamName);
+            return;
+        }
+
+        rawStreamHandlers.put(stream.key(), handler);
+        registerHandler(stream.key(), handler);
+
+        if (!isOpen()) {
+            log.warn("Coinbase WebSocket not open yet; registered raw stream {}", stream.key());
+            return;
+        }
+
+        try {
+            sendSubscribe(stream.tradePair(), stream.channel());
+            log.info("Subscribed Coinbase raw stream {}", stream.key());
+        } catch (Exception exception) {
+            rawStreamHandlers.remove(stream.key());
+            removeHandler(stream.key());
+            log.error("Failed to subscribe Coinbase raw stream {}", stream.key(), exception);
+        }
+    }
+
+    @Override
+    public void unsubscribeStream(@NotNull String streamName) {
+        CoinbaseStream stream = parseCoinbaseStream(streamName);
+
+        if (stream == null) {
+            log.warn("Invalid Coinbase stream name for unsubscribe: {}", streamName);
+            return;
+        }
+
+        rawStreamHandlers.remove(stream.key());
+        removeHandler(stream.key());
+
+        if (!isOpen()) {
+            return;
+        }
+
+        try {
+            sendUnsubscribe(stream.tradePair(), stream.channel());
+            log.info("Unsubscribed Coinbase raw stream {}", stream.key());
+        } catch (Exception exception) {
+            log.warn("Failed to unsubscribe Coinbase raw stream {}", stream.key(), exception);
+        }
+    }
+
+    protected void sendSubscribe(@Nullable TradePair tradePair, @NotNull String channel) {
+        sendSubscriptionMessage("subscribe", tradePair, channel);
+    }
+
+    protected void sendUnsubscribe(@Nullable TradePair tradePair, @NotNull String channel) {
+        sendSubscriptionMessage("unsubscribe", tradePair, channel);
+    }
+
+    private void sendSubscriptionMessage(
+            @NotNull String type,
+            @Nullable TradePair tradePair,
+            @NotNull String channel
+    ) {
+        ObjectNode message = OBJECT_MAPPER.createObjectNode()
+                .put("type", type)
+                .put("channel", channel);
+
+        if (tradePair != null) {
+            ArrayNode productIds = message.putArray("product_ids");
+            productIds.add(toCoinbaseProductId(tradePair));
+        }
+
+        if (!jwt.isBlank()) {
+            message.put("jwt", jwt);
+        }
+
+        String payload = message.toString();
+
+        log.debug("Sending Coinbase WS payload: {}", payload);
+        send(payload);
+    }
+
+    private @Nullable CoinbaseStream parseCoinbaseStream(String streamName) {
+        try {
+            if (streamName == null || streamName.isBlank()) {
+                return null;
+            }
+
+            String clean = streamName.trim();
+
+            String channel;
+            String productId;
+
+            if (clean.contains(":")) {
+                String[] parts = clean.split(":", 2);
+                channel = normalizeCoinbaseChannel(parts[0]);
+                productId = normalizeCoinbaseProductId(parts[1]);
+            } else if (clean.contains("@")) {
+                String[] parts = clean.split("@", 2);
+                productId = normalizeCoinbaseProductId(parts[0]);
+                channel = normalizeCoinbaseChannel(parts[1]);
+            } else {
+                return null;
+            }
+
+            if (channel.isBlank() || productId.isBlank()) {
+                return null;
+            }
+
+            TradePair pair = tradePairFromCoinbaseProductId(productId);
+
+            return new CoinbaseStream(channel, pair);
+
+        } catch (Exception exception) {
+            log.warn("Failed to parse Coinbase stream {}: {}", streamName, exception.getMessage());
+            return null;
+        }
+    }
+
+    private String normalizeCoinbaseChannel(String channel) {
+        if (channel == null) {
+            return "";
+        }
+
+        String normalized = channel.trim().toLowerCase(Locale.ROOT);
+
+        return switch (normalized) {
+            case "trade", "trades", "market_trade", "market_trades" -> MARKET_TRADES_CHANNEL;
+            case "heartbeat", "heartbeats" -> HEARTBEATS_CHANNEL;
+            case "ticker", "tickers" -> "ticker";
+            case "level2", "orderbook", "order_book", "depth" -> "level2";
+            case "candles", "candle", "klines", "kline" -> "candles";
+            default -> normalized;
+        };
+    }
+
+    private String normalizeCoinbaseProductId(String productId) {
+        if (productId == null) {
+            return "";
+        }
+
+        return productId
+                .trim()
+                .toUpperCase(Locale.ROOT)
+                .replace("/", "-")
+                .replace("_", "-");
+    }
+
+    private TradePair tradePairFromCoinbaseProductId(String productId) {
+        String normalized = normalizeCoinbaseProductId(productId);
+
+        if (!normalized.contains("-")) {
+            throw new IllegalArgumentException("Invalid Coinbase product id: " + productId);
+        }
+
+        String[] parts = normalized.split("-", 2);
+
+        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
+            throw new IllegalArgumentException("Invalid Coinbase product id: " + productId);
+        }
+
+        try {
+            return TradePair.of(parts[0], parts[1]);
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Unable to create TradePair from Coinbase product id: " + productId, exception);
+        }
+    }
+
+    private void handleErrorMessage(@NotNull JsonNode messageJson) {
+        String errorMessage = firstText(messageJson, "message", "reason");
+
+        if (errorMessage.isBlank()) {
+            errorMessage = messageJson.toString();
+        }
+
+        log.error("Coinbase WebSocket error: {}", errorMessage);
+    }
+
     private @Nullable TradePair findTradePair(String productId) {
         if (productId == null || productId.isBlank()) {
             TradePair fallbackPair = defaultTradePair;
@@ -358,154 +630,12 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
         return null;
     }
 
-    /**
-     * Subscribe to live market trades for a specific trading pair.
-     */
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
-
-        if (liveTradesConsumer == null) {
-            logger.error("Attempted to stream Coinbase trades with null consumer for {}", tradePair);
-            return;
-        }
-
-        this.defaultTradePair = tradePair;
-        liveTradeConsumers.put(tradePair, liveTradesConsumer);
-
-        if (!isOpen()) {
-            pendingSubscriptions.add(tradePair);
-            logger.warn(
-                    "Coinbase WebSocket not open yet; registered {} for subscription after connect.",
-                    tradePair
-            );
-            return;
-        }
-
-        try {
-            sendSubscribe(tradePair, MARKET_TRADES_CHANNEL);
-            pendingSubscriptions.remove(tradePair);
-            logger.info("Subscribed to Coinbase market trades for {}", tradePair);
-        } catch (Exception exception) {
-            pendingSubscriptions.add(tradePair);
-            logger.error(
-                    "Failed to subscribe to Coinbase trades for {}: {}",
-                    tradePair,
-                    exception.getMessage(),
-                    exception
-            );
-        }
-    }
-
-    /**
-     * Stop streaming live trades for a specific trading pair.
-     */
-    public void stopStreamLiveTrades(TradePair tradePair) {
-        if (tradePair == null) {
-            return;
-        }
-
-        liveTradeConsumers.remove(tradePair);
-        pendingSubscriptions.remove(tradePair);
-
-        if (tradePair.equals(defaultTradePair)) {
-            defaultTradePair = findAnyRegisteredPair();
-        }
-
-        if (isOpen()) {
-            try {
-                sendUnsubscribe(tradePair, MARKET_TRADES_CHANNEL);
-            } catch (Exception exception) {
-                logger.warn("Unable to send Coinbase unsubscribe for {}", tradePair, exception);
-            }
-        }
-
-        logger.info("Unsubscribed from Coinbase market trades for {}", tradePair);
-    }
-
-    public void stopAllStreamLiveTrades() {
-        for (TradePair tradePair : List.copyOf(liveTradeConsumers.keySet())) {
-            stopStreamLiveTrades(tradePair);
-        }
-
-        liveTradeConsumers.clear();
-        pendingSubscriptions.clear();
-        defaultTradePair = null;
-    }
-
-    /**
-     * Coinbase Advanced Trade supports market_trades for valid product IDs.
-     * This method should not depend on whether a consumer is already registered.
-     */
-    public boolean supportsStreamingTrades(TradePair tradePair) {
-        return tradePair != null && !toCoinbaseProductId(tradePair).isBlank();
-    }
-
-    protected void sendSubscribe(TradePair tradePair, String channel) {
-        sendSubscriptionMessage("subscribe", tradePair, channel);
-    }
-
-    protected void sendUnsubscribe(TradePair tradePair, String channel) {
-        sendSubscriptionMessage("unsubscribe", tradePair, channel);
-    }
-
-    private void sendSubscriptionMessage(
-            String type,
-            TradePair tradePair,
-            String channel
-    ) {
-        ObjectNode message = OBJECT_MAPPER.createObjectNode()
-                .put("type", type)
-                .put("channel", channel);
-
-        if (tradePair != null) {
-            ArrayNode productIds = message.putArray("product_ids");
-            productIds.add(toCoinbaseProductId(tradePair));
-        }
-
-        /*
-         * Public market channels do not require JWT.
-         * Authenticated/user channels require JWT.
-         */
-        if (!jwt.isBlank()) {
-            message.put("jwt", jwt);
-        }
-
-        String payload = message.toString();
-
-        logger.debug("Sending Coinbase WS subscription payload: {}", payload);
-        send(payload);
-    }
-
-    private void handleErrorMessage(@NotNull JsonNode messageJson) {
-        String errorMessage = firstText(messageJson, "message", "reason");
-
-        if (errorMessage.isBlank()) {
-            errorMessage = messageJson.toString();
-        }
-
-        logger.error("Coinbase WebSocket error: {}", errorMessage);
-    }
-
     public @Nullable TradePair getTradePair() {
         return defaultTradePair;
     }
 
     public void setTradePair(@NotNull TradePair tradePair) {
         this.defaultTradePair = tradePair;
-    }
-
-    private void setConnectionEstablished(boolean value) {
-        try {
-            if (Platform.isFxApplicationThread()) {
-                connectionEstablished.set(value);
-            } else {
-                Platform.runLater(() -> connectionEstablished.set(value));
-            }
-        } catch (IllegalStateException exception) {
-            /*
-             * In tests or headless environments, JavaFX may not be initialized.
-             */
-            connectionEstablished.set(value);
-        }
     }
 
     private @NotNull String firstText(JsonNode node, String... names) {
@@ -592,27 +722,9 @@ public class CoinbaseWebSocketClient extends WebSocketClient {
         return null;
     }
 
-    @Override
-    public void onClose(int code, String reason, boolean remote) {
-        setConnectionEstablished(false);
-
-        String remoteText = remote ? "remote" : "local";
-        logger.info("Coinbase WebSocket closed ({}, code={}): {}", remoteText, code, reason);
-
-        synchronized (liveTradeConsumers) {
-            pendingSubscriptions.addAll(liveTradeConsumers.keySet());
+    private record CoinbaseStream(String channel, TradePair tradePair) {
+        private String key() {
+            return channel + ":" + tradePair.toString('-').toUpperCase(Locale.ROOT);
         }
-    }
-
-    @Override
-    public void onError(Exception exception) {
-        setConnectionEstablished(false);
-
-        if (exception == null) {
-            logger.error("Coinbase WebSocket unknown error");
-            return;
-        }
-
-        logger.error("Coinbase WebSocket error: {}", exception.getMessage(), exception);
     }
 }

@@ -7,10 +7,12 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
+import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.repository.StrategyAssignmentRepository;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Strategy Assignment Panel - Assign trading strategies to symbols and manage
@@ -19,7 +21,7 @@ import org.investpro.timeframe.Timeframe;
 @Slf4j
 @Getter
 @Setter
-public class StrategyAssignmentPanel extends VBox {
+public class StrategyAssignmentPanel extends StackPane{
 
         private ComboBox<TradePair> symbolCombo;
         private ComboBox<String> strategyCombo;
@@ -41,11 +43,13 @@ public class StrategyAssignmentPanel extends VBox {
 
         private TextArea strategyNotesArea;
         private SystemCore systemCore;
+        private  StrategyAssignment strategyAssignment;
 
-        public StrategyAssignmentPanel(SystemCore systemCore) {
+        public StrategyAssignmentPanel(@NotNull SystemCore systemCore) {
                 this.setStyle("-fx-background-color: #1a1a2e; -fx-padding: 16;");
-                this.setSpacing(12);
+
                 this.systemCore=systemCore;
+                this.strategyAssignment=systemCore.getStrategyAssignment();
 
                 // Title
                 Label titleLabel = new Label("Strategy Assignment");
@@ -88,9 +92,10 @@ public class StrategyAssignmentPanel extends VBox {
 
                 this.getChildren().addAll(titleLabel, scrollPane, buttonBox);
                 VBox.setVgrow(scrollPane, Priority.ALWAYS);
+                LocalizationService.applyTranslations(this);
         }
 
-        private VBox createSelectionSection() {
+        private @NotNull VBox createSelectionSection() {
                 VBox section = new VBox(8);
                 section.setStyle(
                                 "-fx-border-color: #374151; -fx-border-radius: 4; -fx-padding: 12; -fx-background-color: #16213e;");

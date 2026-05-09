@@ -5,7 +5,7 @@ import lombok.Setter;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 
 /**
  * Runtime context shared by all agents.

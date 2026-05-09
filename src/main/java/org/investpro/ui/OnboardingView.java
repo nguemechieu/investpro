@@ -3,6 +3,11 @@ package org.investpro.ui;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.exchange.*;
+import org.investpro.exchange.contracts.CredentialProvider;
+import org.investpro.exchange.factory.ExchangeFactory;
+import org.investpro.exchange.providers.UiCredentialProvider;
+import org.investpro.i18n.LocalizationService;
+import org.investpro.i18n.SupportedLanguage;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -33,14 +38,18 @@ import javafx.scene.layout.VBox;
 import javafx.scene.Cursor;
 import javafx.util.Duration;
 
+import org.investpro.service.AuthResult;
+import org.investpro.service.ResetTokenResult;
 import org.investpro.service.UserAuthService;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.prefs.Preferences;
+
+import static org.investpro.i18n.LocalizationService.t;
 
 /**
  * Onboarding view for InvestPro application.
@@ -56,7 +65,7 @@ public class OnboardingView extends StackPane {
     private final TextField usernameField = new TextField();
     private final PasswordField passwordField = new PasswordField();
     private final TextField emailField = new TextField();
-    private final CheckBox rememberMeCheckBox = new CheckBox("Remember me");
+    private final CheckBox rememberMeCheckBox = new CheckBox(t("onboarding.rememberMe"));
     private final ComboBox<String> marketTypeBox = new ComboBox<>();
     private final ComboBox<String> venueBox = new ComboBox<>();
     private final ComboBox<String> exchangeBox = new ComboBox<>();
@@ -69,29 +78,31 @@ public class OnboardingView extends StackPane {
     public OnboardingView(Consumer<MarketConfiguration> onReady) {
         this.onReady = Objects.requireNonNull(onReady);
         setPrefSize(1540, 780);
-        OnboardingStyles.paneStyle("-fx-background-color: #0f172a;");
-        OnboardingStyles.labelStyle(11,"#cbd5e1;","16");
+
+        OnboardingStyles.labelStyle(11, "#cbd5e1;", "16");
 
         loadRememberedCredentials();
         getChildren().setAll(createLoginStep());
     }
 
     private @NotNull BorderPane createLoginStep() {
-        Label appName = new Label("InvestPro -Login");
+        rememberMeCheckBox.setText(t("onboarding.rememberMe"));
+
+        Label appName = new Label(t("onboarding.loginTitle"));
         appName.setStyle("-fx-font-size: 44px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
 
-        Label prompt = new Label("Log in to your account or create one to start trading.");
+        Label prompt = new Label(t("onboarding.loginPrompt"));
         prompt.setStyle("-fx-font-size: 16px; -fx-text-fill: #cbd5e1;");
 
-        usernameField.setPromptText("Username");
+        usernameField.setPromptText(t("onboarding.username"));
         usernameField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
-        passwordField.setPromptText("Password");
+        passwordField.setPromptText(t("onboarding.password"));
         passwordField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
-        emailField.setPromptText("Email for new accounts");
+        emailField.setPromptText(t("onboarding.email"));
         emailField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
         emailField.setVisible(false);
@@ -101,22 +112,22 @@ public class OnboardingView extends StackPane {
         rememberMeCheckBox.setVisible(true);
         rememberMeCheckBox.setManaged(true);
 
-        Button forgetButton = new Button("Forget");
+        Button forgetButton = new Button(t("onboarding.forget"));
         forgetButton.setStyle("-fx-padding: 4 12; -fx-background-color: #1e40af; -fx-text-fill: white;");
         forgetButton.setOnAction(event -> forgetCredentials());
 
-        Button forgotPasswordButton = new Button("Forgot Password");
+        Button forgotPasswordButton = new Button(t("onboarding.forgotPassword"));
         forgotPasswordButton.setStyle(
                 "-fx-padding: 4 12; -fx-background-color: transparent; -fx-border-color: #475569; -fx-text-fill: #bfdbfe;");
 
         HBox rememberBox = new HBox(10, rememberMeCheckBox, forgetButton, forgotPasswordButton);
         rememberBox.setAlignment(Pos.CENTER);
 
-        Button loginButton = new Button("Log In");
+        Button loginButton = new Button(t("onboarding.logIn"));
         loginButton.setStyle(
                 "-fx-padding: 10 20; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
 
-        Button createButton = new Button("Create Account");
+        Button createButton = new Button(t("onboarding.createAccount"));
         createButton.setStyle(
                 "-fx-padding: 10 20; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
 
@@ -133,12 +144,12 @@ public class OnboardingView extends StackPane {
                 emailField.setVisible(true);
                 emailField.setManaged(true);
                 validation.setStyle("-fx-text-fill: #fbbf24;");
-                validation.setText("Enter an email, username, and password, then create the account.");
+                validation.setText(t("onboarding.createHint"));
                 return;
             }
 
             char[] password = passwordField.getText().toCharArray();
-            UserAuthService.AuthResult result = authService.register(
+            AuthResult result = authService.register(
                     usernameField.getText(),
                     emailField.getText(),
                     password);
@@ -155,7 +166,7 @@ public class OnboardingView extends StackPane {
 
         loginButton.setOnAction(event -> {
             char[] password = passwordField.getText().toCharArray();
-            UserAuthService.AuthResult result = authService.signIn(usernameField.getText(), password);
+            AuthResult result = authService.signIn(usernameField.getText(), password);
             Arrays.fill(password, '\0');
             validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
             validation.setText(result.message());
@@ -183,8 +194,33 @@ public class OnboardingView extends StackPane {
         centerPane.setAlignment(Pos.CENTER);
 
         BorderPane pane = new BorderPane(centerPane);
+        pane.setTop(createLanguageSelector(() -> getChildren().setAll(createLoginStep())));
         pane.setStyle("-fx-background-color: #0f172a;");
         return pane;
+    }
+
+    private HBox createLanguageSelector(Runnable onChanged) {
+        ComboBox<SupportedLanguage> languageBox = new ComboBox<>();
+        languageBox.getItems().setAll(SupportedLanguage.values());
+        languageBox.setValue(LocalizationService.getCurrentLanguage());
+        languageBox.setPrefWidth(170);
+        languageBox.setStyle(
+                "-fx-background-color: #1e293b; -fx-text-fill: #f1f5f9; -fx-border-color: #475569;");
+        languageBox.setOnAction(event -> {
+            SupportedLanguage selected = languageBox.getValue();
+            if (selected != null) {
+                LocalizationService.setCurrentLanguage(selected);
+                if (onChanged != null) {
+                    onChanged.run();
+                }
+            }
+        });
+
+        HBox box = new HBox(8, new Label(LocalizationService.t("language.menu")), languageBox);
+        box.setAlignment(Pos.CENTER_RIGHT);
+        box.setPadding(new Insets(14, 18, 0, 18));
+        box.setStyle("-fx-text-fill: #cbd5e1;");
+        return box;
     }
 
     private void showConfigurationStep() {
@@ -394,7 +430,13 @@ public class OnboardingView extends StackPane {
             String apiSecret = selectedExchange.equals("OANDA") ? accountIdField.getText().trim()
                     : apiSecretField.getText().trim();
 
-            AuthenticationResult authResult = authenticateWithBroker(selectedExchange, apiKey, apiSecret);
+
+            AuthResult authResult = authenticateExchange(
+                    selectedExchange,
+                    apiKey,
+                    apiSecret,
+                    accountIdField.getText(),
+                    selectedTradingMode);
 
             if (!authResult.success()) {
                 validation.setStyle("-fx-text-fill: #ef4444;");
@@ -543,7 +585,7 @@ public class OnboardingView extends StackPane {
         lookupDialog.setHeaderText("Find your InvestPro account");
         lookupDialog.setContentText("Username or email:");
         lookupDialog.showAndWait().ifPresent(lookup -> {
-            UserAuthService.ResetTokenResult tokenResult = authService.beginPasswordReset(lookup);
+            ResetTokenResult tokenResult = authService.beginPasswordReset(lookup);
             if (!tokenResult.success()) {
                 validation.setStyle("-fx-text-fill: #ef4444;");
                 validation.setText(tokenResult.message());
@@ -595,7 +637,7 @@ public class OnboardingView extends StackPane {
                         return;
                     }
                     char[] password = newPasswordField.getText().toCharArray();
-                    UserAuthService.AuthResult result = authService.resetPassword(
+                    AuthResult result = authService.resetPassword(
                             accountField.getText(),
                             tokenField.getText(),
                             password);
@@ -644,8 +686,8 @@ public class OnboardingView extends StackPane {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         authService.forgetRememberedUser();
         // Clear all exchange credentials
-        for (String exchange : new String[] { "COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA",
-                "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX" }) {
+        for (String exchange : new String[]{"COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA",
+                "INTERACTIVE BROKERS", "BITMEX", "BITSTAMP", "BITTREX"}) {
             preferences.remove("exchange_api_key_%s".formatted(exchange));
             preferences.remove("exchange_api_secret_%s".formatted(exchange));
             preferences.remove("exchange_account_id_%s".formatted(exchange));
@@ -658,7 +700,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId,
-            String token) {
+                                                   String token) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         preferences.put("exchange_api_key_%s".formatted(exchange), apiKey);
         preferences.put("exchange_api_secret_%s".formatted(exchange), apiSecret);
@@ -667,7 +709,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void loadRememberedExchangeCredentials(String exchange, TextField apiKeyField, PasswordField apiSecretField,
-            TextField accountIdField) {
+                                                   TextField accountIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         String savedApiKey = preferences.get("exchange_api_key_%s".formatted(exchange), "");
         String savedApiSecret = preferences.get("exchange_api_secret_%s".formatted(exchange), "");
@@ -688,221 +730,97 @@ public class OnboardingView extends StackPane {
         }
     }
 
-    /**
-     * Authenticates with the broker using the provided credentials.
-     * Creates an exchange instance and attempts to connect.
-     *
-     * @param exchangeName the name of the exchange
-     * @param apiKey       the API key or token
-     * @param apiSecret    the API secret (optional for some exchanges)
-     * @return a result object containing success status and message
-     */
-    private AuthenticationResult authenticateWithBroker(String exchangeName, String apiKey, String apiSecret) {
+    private @NotNull Exchange createExchange(
+            String selectedExchange,
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String tradingMode
+    ) {
+        String exchangeId = normalizeExchangeId(selectedExchange);
+
+        CredentialProvider credentialProvider = new UiCredentialProvider(
+                exchangeId,
+                apiKey,
+                apiSecret,
+                accountId,
+                tradingMode
+        );
+
+        ExchangeFactory exchangeFactory = new ExchangeFactory(credentialProvider);
+
+        Exchange exchange = exchangeFactory.create(exchangeId);
+        exchange.connect();
+
+        return exchange;
+    }
+
+    private @NotNull AuthResult authenticateExchange(
+            String selectedExchange,
+            String apiKey,
+            String apiSecret,
+            String accountId,
+            String tradingMode
+    ) {
         try {
-
-            // Create exchange instance with provided credentials
-            Exchange exchange = createExchange(exchangeName, apiKey, apiSecret);
-
-            // Attempt to authenticate
-            return attemptExchangeAuthentication(exchangeName, exchange);
-
-        } catch (RuntimeException e) {
-            String errorMessage = e.getMessage() != null ? e.getMessage() : "Authentication failed";
-
-            // Log the full error for debugging
-            log.error("Authentication failed for {}: {}", exchangeName, errorMessage, e);
-
-            // Extract and show exchange-specific error details
-            String userMessage = parseExchangeError(exchangeName, errorMessage);
-            return new AuthenticationResult(false, userMessage);
-        } catch (Exception e) {
-            log.error("Unexpected error during authentication for {}: {}", exchangeName, e.getMessage(), e);
-            return new AuthenticationResult(false,
-                    "Unexpected error during authentication: %s".formatted(e.getMessage()));
+            Exchange exchange = createExchange(selectedExchange, apiKey, apiSecret, accountId, tradingMode);
+            AuthResult authResult = exchange.AuthCheckResult(selectedExchange);
+            if (authResult != null) {
+                return authResult;
+            }
+            if (Boolean.TRUE.equals(exchange.isConnected())) {
+                return AuthResult.success("%s connected successfully.".formatted(selectedExchange));
+            }
+            return AuthResult.failure("%s did not confirm a connection.".formatted(selectedExchange));
+        } catch (Exception exception) {
+            log.warn("Broker authentication failed for {}", selectedExchange, exception);
+            return AuthResult.failure(
+                    "Authentication failed for %s: %s".formatted(selectedExchange, rootMessage(exception)));
         }
     }
 
-    /**
-     * Parses exchange-specific error messages and returns a user-friendly message.
-     * This method extracts the actual error from the exchange API response.
-     */
-    private @NotNull String parseExchangeError(String exchangeName, @NotNull String errorMessage) {
-        // Check for HTTP status codes and common errors
-        if (errorMessage.contains("401") || errorMessage.contains("Unauthorized")) {
-            log.warn("Authentication failed - 401 Unauthorized for {}", exchangeName);
-            return "Invalid credentials. Status: 401 Unauthorized. Check your API key and secret.";
+    private String rootMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null && current.getCause() != null) {
+            current = current.getCause();
         }
-
-        if (errorMessage.contains("403") || errorMessage.contains("Forbidden")) {
-            log.warn("Authentication failed - 403 Forbidden for {}", exchangeName);
-            return "Access forbidden. Status: 403. Your API key may not have the required permissions.";
-        }
-
-        if (errorMessage.contains("429") || errorMessage.contains("Too Many Requests")) {
-            return "Too many authentication attempts. Please wait a moment and try again.";
-        }
-
-        if (errorMessage.contains("timeout") || errorMessage.contains("Timeout")) {
-            return "Connection timeout. Check your network and try again.";
-        }
-
-        if (errorMessage.contains("refused") || errorMessage.contains("Connection refused")) {
-            return "Connection refused. %s might be temporarily unavailable.".formatted(exchangeName);
-        }
-
-        // Try to extract JSON error from the response (common in REST APIs)
-        if (errorMessage.contains("HTTP") && errorMessage.contains(":")) {
-            // Format: "Coinbase HTTP 401 for https://...: {json error response}"
-            int httpIndex = errorMessage.indexOf("HTTP");
-            if (httpIndex >= 0) {
-                String httpPart = errorMessage.substring(httpIndex);
-                log.debug("Extracted HTTP error details: {}", httpPart);
-
-                // Check if there's a JSON error body
-                if (httpPart.contains("{")) {
-                    try {
-                        int jsonStart = httpPart.indexOf("{");
-                        int jsonEnd = httpPart.lastIndexOf("}");
-                        if (jsonEnd > jsonStart) {
-                            String jsonError = httpPart.substring(jsonStart, jsonEnd + 1);
-                            log.debug("Extracted JSON error from response: {}", jsonError);
-
-                            // Try to extract "message" field if it's JSON
-                            if (jsonError.contains("\"message\"")) {
-                                int msgStart = jsonError.indexOf("\"message\"");
-                                int colonIndex = jsonError.indexOf(":", msgStart);
-                                int quoteStart = jsonError.indexOf("\"", colonIndex);
-                                int quoteEnd = jsonError.indexOf("\"", quoteStart + 1);
-                                if (quoteStart >= 0 && quoteEnd > quoteStart) {
-                                    String message = jsonError.substring(quoteStart + 1, quoteEnd);
-                                    return "Exchange error: " + message;
-                                }
-                            }
-
-                            // If not standard JSON, show the whole error body (truncated)
-                            if (jsonError.length() > 200) {
-                                return "Exchange error: " + jsonError.substring(0, 200) + "...";
-                            } else {
-                                return "Exchange error: " + jsonError;
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.debug("Could not parse JSON error response", e);
-                    }
-                }
-
-                return "Exchange error: " + httpPart.substring(0, Math.min(150, httpPart.length()));
-            }
-        }
-
-        // For other runtime exceptions, show the full message but cap length
-        if (errorMessage.length() > 300) {
-            return "Authentication failed: " + errorMessage.substring(0, 300) + "...";
-        }
-
-        return "Authentication failed: " + errorMessage;
+        String message = current == null ? null : current.getMessage();
+        return message == null || message.isBlank()
+                ? "Unknown error"
+                : message;
     }
 
-    /**
-     * Attempt to connect and verify credentials
-     */
-    private AuthenticationResult attemptExchangeAuthentication(String exchangeName, Exchange exchange) {
-        try {
-            if (exchange instanceof Coinbase coinbase) {
-                coinbase.getUserAccountDetails();
-                return new AuthenticationResult(true, "Successfully authenticated with %s".formatted(exchangeName));
-            }
-
-            exchange.connect();
-
-            // Check if connection was successful
-            Boolean isConnected = exchange.isConnected();
-            if (isConnected == null || !isConnected) {
-                exchange.disconnect();
-                return new AuthenticationResult(false,
-                        "Connection to %s failed. Please verify your credentials.".formatted(exchangeName));
-            }
-
-            exchange.disconnect();
-            return new AuthenticationResult(true, "Successfully authenticated with %s".formatted(exchangeName));
-        } catch (RuntimeException e) {
-            String errorMessage = e.getMessage() != null ? e.getMessage() : "Authentication failed";
-            log.error("Exchange connection failed for {}: {}", exchangeName, errorMessage, e);
-            String userMessage = parseExchangeError(exchangeName, errorMessage);
-            return new AuthenticationResult(false, userMessage);
+    private @NotNull String normalizeExchangeId(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Exchange name is required");
         }
-    }
 
-    /**
-     * Creates an exchange instance based on the exchange name and credentials.
-     */
-    private @Nullable Exchange createExchange(String exchangeName, String apiKey, String apiSecret) {
-        String name = safe(exchangeName).toUpperCase();
-        return switch (name) {
-            case "BINANCE US" -> new BinanceUs(apiKey, apiSecret);
-            case "BINANCE" -> new Binance(apiKey, apiSecret);
-            case "OANDA" -> new Oanda(apiKey, apiSecret);
-            case "BITFINEX" -> new Bitfinex(apiKey, apiSecret);
-            case "ALPACA" -> new Alpaca(apiKey, apiSecret);
-            case "INTERACTIVE BROKERS", "IBKR" -> new InteractiveBrokers(apiKey, apiSecret);
-            case "COINBASE" -> new Coinbase(apiKey, apiSecret);
-            default -> null;
+        String normalized = value
+                .trim()
+                .toLowerCase(java.util.Locale.ROOT)
+                .replace(" ", "")
+                .replace("-", "_");
+
+        return switch (normalized) {
+            case "binance", "binanceus", "binance_us", "binance_us_spot" -> "binanceus";
+
+            case "coinbase",
+                 "coinbaseadvanced",
+                 "coinbase_advanced",
+                 "coinbaseadvancedtrade",
+                 "coinbase_advanced_trade" -> "coinbase";
+
+            case "oanda", "oanda_fx", "oanda_forex" -> "oanda";
+
+            case "alpaca", "alpaca_stocks", "alpaca_equities" -> "alpaca";
+
+            case "bitfinex" -> "bitfinex";
+
+            case "kraken" -> "kraken";
+
+            case "stellar", "stellar_network", "stellarnetwork" -> "stellar-network";
+
+            default -> throw new IllegalArgumentException("Unsupported exchange: " + value);
         };
     }
-
-    /**
-     * Safely trims a string, returning empty string if null.
-     */
-    private String safe(String value) {
-        return value == null ? "" : value.trim();
-    }
-
-    /**
-     * Result of a broker authentication attempt.
-     */
-    private record AuthenticationResult(boolean success, String message) {
-    }
-
-    // /**
-    // * Get available venues for a broker.
-    // */
-    // public java.util.List<String> getAvailableVenues(String brokerName) {
-    // return switch (brokerName.toUpperCase()) {
-    // case "COINBASE" -> java.util.Arrays.asList("Spot", "US Futures",
-    // "International Perpetuals");
-    // case "OANDA" -> List.of("FX/CFD");
-    // case "BINANCE" -> java.util.Arrays.asList("Spot", "Futures");
-    // case "BINANCE US" -> List.of("Spot");
-    // case "BITFINEX" -> java.util.Arrays.asList("Spot", "Derivatives");
-    // case "ALPACA" -> java.util.Arrays.asList("Stocks", "Crypto");
-    // case "INTERACTIVE BROKERS", "IBKR" -> Arrays.asList("Stocks", "Forex");
-    // default -> List.of("Default");
-    // };
-    // }
-    //
-    // /**
-    // * Parse venue name string to BrokerVenue enum.
-    // */
-    // private BrokerVenue parseVenue(String brokerName, String venueName) {
-    // String broker = brokerName.toUpperCase();
-    // String venue = venueName.toUpperCase();
-    //
-    // return switch (broker) {
-    // case "COINBASE" -> switch (venue) {
-    // case "SPOT" -> BrokerVenue.COINBASE_SPOT;
-    // case "US FUTURES", "FUTURES" -> BrokerVenue.COINBASE_US_FUTURES;
-    // case "INTERNATIONAL PERPETUALS", "PERPETUALS" ->
-    // BrokerVenue.COINBASE_INTERNATIONAL_PERPETUALS;
-    // default -> BrokerVenue.UNKNOWN;
-    // };
-    // case "OANDA" -> BrokerVenue.OANDA_FX_CFD;
-    // case "BINANCE" -> switch (venue) {
-    // case "SPOT" -> BrokerVenue.BINANCE_SPOT;
-    // case "FUTURES" -> BrokerVenue.BINANCE_FUTURES;
-    // default -> BrokerVenue.UNKNOWN;
-    // };
-    // default -> BrokerVenue.UNKNOWN;
-    // };
-    //
-    // }
 }

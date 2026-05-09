@@ -2,9 +2,8 @@ package org.investpro.strategy.lab;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;

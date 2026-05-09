@@ -210,4 +210,9 @@ public class Ticker {
                         getInstant()
                 );
     }
+    private TradePair tradePair;
+
+    private double  quoteAssetVolume;
+
+    private  double tradeCount;
 }

@@ -2,14 +2,13 @@ package org.investpro.exchange.infrastructure;
 
 import org.investpro.data.Account;
 import org.investpro.data.CandleData;
-import org.investpro.models.trading.OrderBook;
-import org.investpro.models.trading.OpenOrder;
-import org.investpro.models.trading.Position;
-import org.investpro.models.trading.Ticker;
-import org.investpro.models.trading.Trade;
-import org.investpro.models.trading.TradePair;
+import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
+import org.investpro.models.trading.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Receives real-time exchange/broker stream updates.
@@ -23,11 +22,7 @@ import java.util.List;
  */
 public interface ExchangeStreamConsumer {
 
-    default void onConnected(String exchangeName) {
-    }
-
-    default void onDisconnected(String exchangeName, String reason) {
-    }
+    void onStatus(@Nullable String exchangeName, @Nullable String message);
 
     default void onError(String exchangeName, Throwable throwable) {
     }
@@ -36,16 +31,6 @@ public interface ExchangeStreamConsumer {
     }
 
     default void onTrade(String exchangeName, TradePair tradePair, Trade trade) {
-    }
-
-    default void onTrades(String exchangeName, TradePair tradePair, List<Trade> trades) {
-        if (trades == null) {
-            return;
-        }
-
-        for (Trade trade : trades) {
-            onTrade(exchangeName, tradePair, trade);
-        }
     }
 
     default void onOrderBook(String exchangeName, TradePair tradePair, OrderBook orderBook) {
@@ -60,6 +45,10 @@ public interface ExchangeStreamConsumer {
     default void onOpenOrder(String exchangeName, OpenOrder order) {
     }
 
+    void onBalance(@Nullable String exchangeName, @Nullable Account account);
+
+    void onOrder(@Nullable String exchangeName, @Nullable OpenOrder order);
+
     default void onOpenOrders(String exchangeName, List<OpenOrder> orders) {
         if (orders == null) {
             return;
@@ -73,6 +62,10 @@ public interface ExchangeStreamConsumer {
     default void onPosition(String exchangeName, Position position) {
     }
 
+    void onOrders(String exchangeName, List<OpenOrder> orders);
+
+    void onFill(String exchangeName, TradePair tradePair, Trade fill);
+
     default void onPositions(String exchangeName, List<Position> positions) {
         if (positions == null) {
             return;
@@ -83,21 +76,46 @@ public interface ExchangeStreamConsumer {
         }
     }
 
-    default void onOrderAccepted(String exchangeName, String orderId) {
-    }
-
-    default void onOrderRejected(String exchangeName, String clientOrderId, String reason) {
-    }
-
-    default void onOrderFilled(String exchangeName, String orderId, Trade fill) {
-    }
-
     default void onBalanceChanged(String exchangeName, Account account) {
+
     }
 
-    default void onOrderCancelled(String exchangeName, String orderId) {
+    default boolean containsKey(TradePair tradePair) {
+        return false;
     }
 
-    default void onRawMessage(String exchangeName, String channel, String rawJson) {
+    default ExchangeStreamConsumer get(TradePair tradePair) {
+        return null;
     }
+
+    default void put(@NotNull TradePair tradePair, ExchangeStreamConsumer liveTradesConsumer) {
+    }
+
+    default void remove(TradePair tradePair) {
+    }
+
+    default void acceptTrades(Trade newTrade) {
+    }
+
+    default void onConnected(String exchangeName) {
+    }
+
+    default void onDisconnected(String exchangeName, String reason) {
+    }
+
+    void onOrderAccepted(String exchangeName, String orderId);
+
+    void onOrderRejected(String exchangeName, String clientOrderId, String reason);
+
+    void onOrderFilled(String exchangeName, String orderId, Trade fill);
+
+    void onOrderCancelled(String exchangeName, String orderId);
+
+    void onRawMessage(String exchangeName, String channel, String rawJson);
+
+    boolean hasReceivedEvents();
+
+    boolean hasErrors();
+
+    UiExchangeStreamConsumer onOrdersUpdate(@Nullable Consumer<List<OpenOrder>> setAll);
 }

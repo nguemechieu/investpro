@@ -1,29 +1,34 @@
 package org.investpro.strategy;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
-import org.investpro.timeframe.Timeframe;
+import lombok.ToString;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Represents the assignment of a strategy to a specific symbol/timeframe.
- *
+ * <p>
  * A StrategyAssignment tells the engine which strategy should be used for a
  * specific market and timeframe combination.
- *
+ * <p>
  * Examples:
  * - BTC/USD + H1 -> trend-following
  * - EUR/USD + M15 -> mean-reversion
  * - AAPL + D1 -> breakout
+ * <p>
+ * This class is intentionally a clean data model.
+ * It must not contain execution, exchange, indicator, news, AI, or SystemCore logic.
  */
 @Getter
+@ToString
 @Builder(toBuilder = true)
 public class StrategyAssignment {
 
@@ -44,12 +49,13 @@ public class StrategyAssignment {
     private final Timeframe timeframe;
 
     /**
-     * Strategy ID registered in StrategyRegistry.
+     * Strategy ID assigned to this symbol/timeframe.
      *
-     * Example:
+     * Examples:
      * - trend-following
      * - mean-reversion
      * - breakout
+     * - user.simple_ema
      */
     private final String strategyId;
 
@@ -67,6 +73,8 @@ public class StrategyAssignment {
 
     /**
      * Score at the time this strategy was assigned.
+     *
+     * Usually produced by backtesting, paper trading, voting, or consensus ranking.
      */
     @Builder.Default
     private final double scoreAtAssignment = 0.0;
@@ -105,6 +113,8 @@ public class StrategyAssignment {
 
     /**
      * Locked assignments cannot be automatically replaced.
+     *
+     * Manual assignments should normally be locked.
      */
     @Builder.Default
     private final boolean locked = false;
@@ -115,6 +125,11 @@ public class StrategyAssignment {
     @Nullable
     private final String disableReason;
 
+    /**
+     * Jackson constructor.
+     * <p>
+     * Keeps JSON loading safe while preserving validation/defaults.
+     */
     @JsonCreator
     public StrategyAssignment(
             @JsonProperty("assignmentId") String assignmentId,
@@ -126,37 +141,46 @@ public class StrategyAssignment {
             @JsonProperty("scoreAtAssignment") double scoreAtAssignment,
             @JsonProperty("assignedAt") Instant assignedAt,
             @JsonProperty("expiresAt") @Nullable Instant expiresAt,
-            @JsonProperty("active") boolean active,
+            @JsonProperty("active") Boolean active,
             @JsonProperty("reason") @Nullable String reason,
             @JsonProperty("warnings") String warnings,
-            @JsonProperty("locked") boolean locked,
+            @JsonProperty("locked") Boolean locked,
             @JsonProperty("disableReason") @Nullable String disableReason
     ) {
-        this.assignmentId = isBlank(assignmentId) ? generateId() : assignmentId;
+        this.assignmentId = isBlank(assignmentId) ? generateId() : assignmentId.trim();
         this.symbol = normalizeRequired(symbol, "symbol");
-        this.timeframe = Objects.requireNonNull(timeframe, "timeframe must not be null");
+        this.timeframe = requireTimeframe(timeframe);
         this.strategyId = normalizeRequired(strategyId, "strategyId");
 
         this.mode = mode == null ? StrategyAssignmentMode.AUTO : mode;
         this.assignedBy = assignedBy == null ? AssignedBy.SYSTEM : assignedBy;
-        this.scoreAtAssignment = scoreAtAssignment;
+        this.scoreAtAssignment = sanitizeScore(scoreAtAssignment);
         this.assignedAt = assignedAt == null ? Instant.now() : assignedAt;
         this.expiresAt = expiresAt;
-        this.active = active;
+        this.active = active == null || active;
         this.reason = normalizeNullable(reason);
-        this.warnings = warnings == null ? "" : warnings;
-        this.locked = locked;
+        this.warnings = warnings == null ? "" : warnings.trim();
+        this.locked = locked != null && locked;
         this.disableReason = normalizeNullable(disableReason);
     }
 
+    /**
+     * True when assignment is disabled either by mode or active flag.
+     */
     public boolean isDisabled() {
         return mode == StrategyAssignmentMode.DISABLED || !active;
     }
 
+    /**
+     * True when assignment has an expiry date and that expiry is in the past.
+     */
     public boolean isExpired() {
         return expiresAt != null && Instant.now().isAfter(expiresAt);
     }
 
+    /**
+     * True when assignment can be used for live/paper/backtest routing.
+     */
     public boolean isValid() {
         return active
                 && !isExpired()
@@ -166,6 +190,9 @@ public class StrategyAssignment {
                 && !isBlank(strategyId);
     }
 
+    /**
+     * True if the system is allowed to replace this assignment automatically.
+     */
     public boolean canBeAutoReplaced() {
         return !locked
                 && mode != StrategyAssignmentMode.MANUAL
@@ -188,53 +215,271 @@ public class StrategyAssignment {
         return warnings != null && !warnings.isBlank();
     }
 
+    public boolean hasReason() {
+        return reason != null && !reason.isBlank();
+    }
+
+    public boolean hasDisableReason() {
+        return disableReason != null && !disableReason.isBlank();
+    }
+
+    /**
+     * Returns the best available disabled reason.
+     */
     public String getDisableReason() {
         if (!isDisabled()) {
             return "";
         }
 
-        if (disableReason != null && !disableReason.isBlank()) {
+        if (!isBlank(disableReason)) {
             return disableReason;
         }
 
-        if (reason != null && !reason.isBlank()) {
+        if (!isBlank(reason)) {
             return reason;
+        }
+
+        if (mode == StrategyAssignmentMode.DISABLED) {
+            return "Strategy assignment mode is disabled.";
+        }
+
+        if (!active) {
+            return "Strategy assignment is inactive.";
         }
 
         return "Strategy assignment is disabled.";
     }
 
+    /**
+     * Stable key for maps: symbol::timeframe.
+     */
+    @JsonIgnore
+    public String getKey() {
+        return key(symbol, timeframe);
+    }
+
+    /**
+     * Human-readable label for UI/logging.
+     */
+    @JsonIgnore
+    public String getDisplayName() {
+        return "%s / %s -> %s".formatted(
+                symbol,
+                timeframe == null ? "UNKNOWN" : timeframe.getCode(),
+                strategyId
+        );
+    }
+
+    /**
+     * Disable this assignment.
+     */
     public StrategyAssignment disabled(@NotNull String disableReason) {
         return this.toBuilder()
                 .active(false)
                 .mode(StrategyAssignmentMode.DISABLED)
-                .disableReason(disableReason)
+                .disableReason(normalizeNullable(disableReason))
                 .build();
     }
 
+    /**
+     * Activate this assignment as AUTO.
+     */
     public StrategyAssignment activated(@Nullable String reason) {
         return this.toBuilder()
                 .active(true)
                 .mode(StrategyAssignmentMode.AUTO)
-                .reason(reason)
+                .reason(normalizeNullable(reason))
                 .disableReason(null)
                 .build();
     }
 
+    /**
+     * Lock this assignment from auto-replacement.
+     */
     public StrategyAssignment locked() {
         return this.toBuilder()
                 .locked(true)
                 .build();
     }
 
+    /**
+     * Unlock this assignment so the system may auto-replace it.
+     */
     public StrategyAssignment unlocked() {
         return this.toBuilder()
                 .locked(false)
                 .build();
     }
 
+    /**
+     * Return copy with new score.
+     */
+    public StrategyAssignment withScore(double score) {
+        return this.toBuilder()
+                .scoreAtAssignment(sanitizeScore(score))
+                .build();
+    }
+
+    /**
+     * Return copy with new reason.
+     */
+    public StrategyAssignment withReason(@Nullable String reason) {
+        return this.toBuilder()
+                .reason(normalizeNullable(reason))
+                .build();
+    }
+
+    /**
+     * Return copy with new warnings.
+     */
+    public StrategyAssignment withWarnings(@Nullable String warnings) {
+        return this.toBuilder()
+                .warnings(warnings == null ? "" : warnings.trim())
+                .build();
+    }
+
+    /**
+     * Return copy with expiration.
+     */
+    public StrategyAssignment withExpiration(@Nullable Instant expiresAt) {
+        return this.toBuilder()
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    /**
+     * Return copy as manual user assignment.
+     */
+    public StrategyAssignment asManual(@Nullable String reason) {
+        return this.toBuilder()
+                .mode(StrategyAssignmentMode.MANUAL)
+                .assignedBy(AssignedBy.USER)
+                .locked(true)
+                .reason(normalizeNullable(reason))
+                .build();
+    }
+
+    /**
+     * Return copy as AI-assisted assignment.
+     */
+    public StrategyAssignment asAiAssisted(@Nullable String reason) {
+        return this.toBuilder()
+                .mode(StrategyAssignmentMode.AI_ASSISTED)
+                .assignedBy(AssignedBy.AI)
+                .reason(normalizeNullable(reason))
+                .build();
+    }
+
+    /**
+     * Return copy as automatic system assignment.
+     */
+    public StrategyAssignment asAuto(@Nullable String reason) {
+        return this.toBuilder()
+                .mode(StrategyAssignmentMode.AUTO)
+                .assignedBy(AssignedBy.SYSTEM)
+                .reason(normalizeNullable(reason))
+                .build();
+    }
+
+    /**
+     * Factory for automatic system assignment.
+     */
+    public static StrategyAssignment auto(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            double score,
+            @Nullable String reason
+    ) {
+        return StrategyAssignment.builder()
+                .symbol(normalizeRequired(symbol, "symbol"))
+                .timeframe(requireTimeframe(timeframe))
+                .strategyId(normalizeRequired(strategyId, "strategyId"))
+                .mode(StrategyAssignmentMode.AUTO)
+                .assignedBy(AssignedBy.SYSTEM)
+                .scoreAtAssignment(sanitizeScore(score))
+                .reason(normalizeNullable(reason))
+                .build();
+    }
+
+    /**
+     * Factory for manual user assignment.
+     */
+    public static StrategyAssignment manual(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            @Nullable String reason
+    ) {
+        return StrategyAssignment.builder()
+                .symbol(normalizeRequired(symbol, "symbol"))
+                .timeframe(requireTimeframe(timeframe))
+                .strategyId(normalizeRequired(strategyId, "strategyId"))
+                .mode(StrategyAssignmentMode.MANUAL)
+                .assignedBy(AssignedBy.USER)
+                .reason(normalizeNullable(reason))
+                .locked(true)
+                .build();
+    }
+
+    /**
+     * Factory for AI-assisted assignment.
+     */
+    public static StrategyAssignment aiAssisted(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            double score,
+            @Nullable String reason
+    ) {
+        return StrategyAssignment.builder()
+                .symbol(normalizeRequired(symbol, "symbol"))
+                .timeframe(requireTimeframe(timeframe))
+                .strategyId(normalizeRequired(strategyId, "strategyId"))
+                .mode(StrategyAssignmentMode.AI_ASSISTED)
+                .assignedBy(AssignedBy.AI)
+                .scoreAtAssignment(sanitizeScore(score))
+                .reason(normalizeNullable(reason))
+                .build();
+    }
+
+    /**
+     * Factory for disabled assignment.
+     */
+    public static StrategyAssignment disabled(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            @NotNull String disableReason
+    ) {
+        return StrategyAssignment.builder()
+                .symbol(normalizeRequired(symbol, "symbol"))
+                .timeframe(requireTimeframe(timeframe))
+                .strategyId(normalizeRequired(strategyId, "strategyId"))
+                .mode(StrategyAssignmentMode.DISABLED)
+                .assignedBy(AssignedBy.SYSTEM)
+                .active(false)
+                .disableReason(normalizeNullable(disableReason))
+                .build();
+    }
+
+    /**
+     * Stable map key helper.
+     */
+    public static String key(@NotNull String symbol, @NotNull Timeframe timeframe) {
+        return normalizeRequired(symbol, "symbol") + "::" + requireTimeframe(timeframe).getCode();
+    }
+
     public static @NotNull String generateId() {
         return "assign_" + UUID.randomUUID();
+    }
+
+    private static Timeframe requireTimeframe(Timeframe timeframe) {
+        if (timeframe == null) {
+            throw new IllegalArgumentException("timeframe must not be null");
+        }
+
+        return timeframe;
     }
 
     private static String normalizeRequired(String value, String fieldName) {
@@ -258,19 +503,12 @@ public class StrategyAssignment {
         return value == null || value.trim().isEmpty();
     }
 
-    @Override
-    public String toString() {
-        return String.format(
-                "%s/%s -> %s (mode: %s, assignedBy: %s, active: %s, locked: %s, expired: %s)",
-                symbol,
-                timeframe != null ? timeframe.getCode() : "UNKNOWN",
-                strategyId,
-                mode != null ? mode.getDisplayName() : "UNKNOWN",
-                assignedBy != null ? assignedBy.getDisplayName() : "UNKNOWN",
-                active,
-                locked,
-                isExpired()
-        );
+    private static double sanitizeScore(double score) {
+        if (!Double.isFinite(score)) {
+            return 0.0;
+        }
+
+        return Math.max(0.0, score);
     }
 
     @Getter

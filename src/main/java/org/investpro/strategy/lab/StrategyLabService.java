@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

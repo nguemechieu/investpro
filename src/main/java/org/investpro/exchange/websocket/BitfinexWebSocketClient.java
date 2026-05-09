@@ -7,7 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import org.investpro.models.trading.LiveTradesConsumer;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
@@ -19,11 +22,15 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
+import java.util.function.Consumer;
 
 /**
  * Bitfinex WebSocket client for real-time trade streaming.
  * Extends ExchangeWebSocketClient with Bitfinex-specific message handling.
  */
+@Slf4j
+@Getter
+@Setter
 public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
 
     private static final Logger logger = LoggerFactory.getLogger(BitfinexWebSocketClient.class);
@@ -32,6 +39,7 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private ExchangeStreamConsumer liveTradeConsumers;
 
     public BitfinexWebSocketClient(URI uri, Draft draft) {
         super(uri, draft);
@@ -113,7 +121,7 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
 
             // Send to registered consumer
             if (liveTradeConsumers.containsKey(getTradePair())) {
-                LiveTradesConsumer consumer = liveTradeConsumers.get(getTradePair());
+                ExchangeStreamConsumer consumer = liveTradeConsumers.get(getTradePair());
                 consumer.acceptTrades(newTrade);
                 logger.debug("Processed Bitfinex trade: %d at %s".formatted(tradeId, price));
             }
@@ -122,8 +130,10 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
+    private TradePair tradePair;
+
     @Override
-    public void streamLiveTrades(@NotNull TradePair tradePair, LiveTradesConsumer liveTradesConsumer) {
+    public void streamLiveTrades(@NotNull TradePair tradePair, @NotNull ExchangeStreamConsumer liveTradesConsumer) {
         if (liveTradesConsumer == null) {
             logger.error("Attempted to stream trades with null consumer");
             return;
@@ -155,7 +165,7 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public void stopStreamLiveTrades(TradePair tradePair) {
+    public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
         if (tradePair != null) {
             liveTradeConsumers.remove(tradePair);
             logger.info("Unsubscribed from Bitfinex live trades for " + tradePair);
@@ -163,7 +173,60 @@ public class BitfinexWebSocketClient extends ExchangeWebSocketClient {
     }
 
     @Override
-    public boolean supportsStreamingTrades(TradePair tradePair) {
+    public boolean supportsStreamingTrades(@NotNull TradePair tradePair) {
         return liveTradeConsumers.containsKey(tradePair);
+    }
+
+    @Override
+    public void unsubscribeStream(@NotNull String streamName) {
+
+    }
+
+
+    @Override
+    public void subscribeStream(@NotNull String streamName, @NotNull Consumer<String> handler) {
+
+    }
+
+
+    /**
+     * Called by the neutral ExchangeWebSocketClient after socket opens.
+     */
+    @Override
+    protected void onConnected() {
+//        try {
+//            sendSubscribe(null, HEARTBEATS_CHANNEL);
+//        } catch (Exception exception) {
+//            log.debug("Unable to subscribe Coinbase heartbeats", exception);
+//        }
+//
+//        synchronized (liveTradeConsumers) {
+//            for (TradePair pair : liveTradeConsumers.keySet()) {
+//                try {
+//                    sendSubscribe(pair, MARKET_TRADES_CHANNEL);
+//                    pendingSubscriptions.remove(pair);
+//                    log.info("Resubscribed Coinbase market trades for {}", pair);
+//                } catch (Exception exception) {
+//                    pendingSubscriptions.add(pair);
+//                    log.warn("Unable to resubscribe Coinbase trades for {}", pair, exception);
+//                }
+//            }
+//        }
+//
+//        synchronized (rawStreamHandlers) {
+//            for (String streamKey : rawStreamHandlers.keySet()) {
+//                CoinbaseWebSocketClient.CoinbaseStream stream = parseCoinbaseStream(streamKey);
+//                if (stream == null) {
+//                    continue;
+//                }
+//
+//                try {
+//                    sendSubscribe(stream.tradePair(), stream.channel());
+//                    log.info("Resubscribed Coinbase raw stream {}", stream.key());
+//                } catch (Exception exception) {
+//                    log.warn("Unable to resubscribe Coinbase raw stream {}", stream.key(), exception);
+//                }
+//            }
+//        }
     }
 }

@@ -6,10 +6,9 @@ import org.investpro.enums.StrategyCategory;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
 import org.investpro.strategy.*;
-import org.investpro.timeframe.Timeframe;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.time.LocalDateTime;
 import java.util.*;

@@ -13,29 +13,58 @@ import org.jetbrains.annotations.NotNull;
 import java.io.PrintWriter;
 import java.sql.*;
 import java.util.Properties;
+
 @Slf4j
 
 public class Db1 implements Db {
-    Connection conn;
-    // = DriverManager.getConnection("jdbc:sqlite:cryptoinvestor");
+    private Connection conn;
+    private static final int BUSY_TIMEOUT_MS = 10000; // 10 seconds
+    private static final String PRAGMA_BUSY_TIMEOUT = "PRAGMA busy_timeout = %d;";
+    private static final String PRAGMA_WAL_MODE = "PRAGMA journal_mode = WAL;";
 
     public Db1(@NotNull Properties conf) throws ClassNotFoundException {
+        Class.forName("org.sqlite.JDBC");
+        initializeConnection(conf);
+    }
 
-        Class.forName(
-                "org.sqlite.JDBC");
-
+    private void initializeConnection(@NotNull Properties conf) {
         try {
             String databaseFile = conf.getProperty("sqlite_db_file", "investpro_db.sql");
-            this.conn = DriverManager.getConnection("jdbc:sqlite:%s".formatted(databaseFile));
-        } catch (SQLException e) {
-            log.error("Error connecting to the database\n%s".formatted(e.getMessage()));
+            String connectionUrl = "jdbc:sqlite:%s".formatted(databaseFile);
 
+            // Create connection with journal mode settings
+            this.conn = DriverManager.getConnection(connectionUrl);
+
+            if (conn != null) {
+                // Enable WAL mode for concurrent access
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute(PRAGMA_WAL_MODE);
+                    log.info("SQLite WAL mode enabled for better concurrent access");
+                }
+
+                // Set busy timeout so SQLite retries instead of failing immediately
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute(PRAGMA_BUSY_TIMEOUT.formatted(BUSY_TIMEOUT_MS));
+                    log.info("SQLite busy timeout set to {} ms", BUSY_TIMEOUT_MS);
+                }
+
+                // Enable auto-commit with proper transaction handling
+                conn.setAutoCommit(true);
+                log.info("Database connection initialized for {}", databaseFile);
+            }
+        } catch (SQLException e) {
+            log.error("Error connecting to the database: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to initialize database connection", e);
         }
     }
 
     @Override
     public void createTables() {
-        try {
+        if (conn == null) {
+            log.warn("Database connection is null, cannot create tables");
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
             String sql = "CREATE TABLE IF NOT EXISTS currencies ( " +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "currency_type VARCHAR(255), " +
@@ -46,12 +75,11 @@ public class Db1 implements Db {
                     "symbol VARCHAR(255), " +
                     "image VARCHAR(255) " +
                     ")";
-            this.conn.createStatement().executeUpdate(sql);
+            stmt.executeUpdate(sql);
             ensureCurrencyColumns();
         } catch (SQLException e) {
-            log.error("Error creating the database tables\n%s".formatted(e.getMessage()));
+            log.error("Error creating the database tables: {}", e.getMessage(), e);
         }
-
     }
 
     @Override
@@ -60,8 +88,7 @@ public class Db1 implements Db {
             log.warn("Database connection is null, cannot drop tables");
             return;
         }
-        try {
-            Statement stmt = conn.createStatement();
+        try (Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE IF EXISTS currencies");
             stmt.execute("DROP TABLE IF EXISTS trades");
             stmt.execute("DROP TABLE IF EXISTS orders");
@@ -78,8 +105,7 @@ public class Db1 implements Db {
             log.warn("Database connection is null, cannot truncate tables");
             return;
         }
-        try {
-            Statement stmt = conn.createStatement();
+        try (Statement stmt = conn.createStatement()) {
             stmt.execute("DELETE FROM currencies");
             stmt.execute("DELETE FROM trades");
             stmt.execute("DELETE FROM orders");
@@ -111,8 +137,7 @@ public class Db1 implements Db {
             log.warn("Database connection is null, cannot create indexes");
             return;
         }
-        try {
-            Statement stmt = conn.createStatement();
+        try (Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_currency_code ON currencies(code)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_orders_symbol ON orders(symbol)");
@@ -128,8 +153,7 @@ public class Db1 implements Db {
             log.warn("Database connection is null, cannot drop indexes");
             return;
         }
-        try {
-            Statement stmt = conn.createStatement();
+        try (Statement stmt = conn.createStatement()) {
             stmt.execute("DROP INDEX IF EXISTS idx_currency_code");
             stmt.execute("DROP INDEX IF EXISTS idx_trades_timestamp");
             stmt.execute("DROP INDEX IF EXISTS idx_orders_symbol");
@@ -219,83 +243,118 @@ public class Db1 implements Db {
     @Override
     public int find(String table, String column, String value) {
         int da = 0;
-        try {
-            da = conn.createStatement()
-                    .executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
-        } catch (SQLException e) {
-            log.error("Error finding the data\n%s".formatted(e.getMessage()));
-
+        if (conn == null) {
+            log.warn("Database connection is null, cannot find data");
+            return da;
         }
-
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?")) {
+            stmt.setString(1, value);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    da = rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Error finding the data: {}", e.getMessage(), e);
+        }
         return da;
     }
 
     @Override
     public void findAll(String table, String column, String value) {
-        try {
-            conn.createStatement().executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
-        } catch (SQLException e) {
-            log.error("Error finding all the data\n%s".formatted(e.getMessage()));
+        if (conn == null) {
+            log.warn("Database connection is null, cannot find data");
+            return;
         }
-
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "SELECT * FROM " + table + " WHERE " + column + " = ?")) {
+            stmt.setString(1, value);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    log.debug("Found record: {}", rs.toString());
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Error finding all the data: {}", e.getMessage(), e);
+        }
     }
 
     @Override
     public void update(String table, String column, String value) {
-        try {
-            conn.createStatement().executeUpdate("UPDATE %s SET %s = '%s'".formatted(table, column, value));
-        } catch (SQLException e) {
-            log.error("Error updating the database\n%s".formatted(e.getMessage()));
+        if (conn == null) {
+            log.warn("Database connection is null, cannot update data");
+            return;
         }
-
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "UPDATE " + table + " SET " + column + " = ?")) {
+            stmt.setString(1, value);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Error updating the database: {}", e.getMessage(), e);
+        }
     }
 
     @Override
     public void insert(String table, String column, String value) {
-        try {
-            conn.createStatement().executeUpdate("INSERT INTO %s (%s) VALUES ('%s')".formatted(table, column, value));
-        } catch (SQLException e) {
-
-            log.error("Error inserting the database\n%s".formatted(e.getMessage()));
+        if (conn == null) {
+            log.warn("Database connection is null, cannot insert data");
+            return;
         }
-
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO " + table + " (" + column + ") VALUES (?)")) {
+            stmt.setString(1, value);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Error inserting the database: {}", e.getMessage(), e);
+        }
     }
 
     @Override
     public void delete(String table, String column, String value) {
-        try {
-            conn.createStatement().executeUpdate("DELETE FROM %s WHERE %s = '%s'".formatted(table, column, value));
-        } catch (SQLException e) {
-            log.error("Error deleting the database\n%s".formatted(e.getMessage()));
+        if (conn == null) {
+            log.warn("Database connection is null, cannot delete data");
+            return;
         }
-
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "DELETE FROM " + table + " WHERE " + column + " = ?")) {
+            stmt.setString(1, value);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            log.error("Error deleting the database: {}", e.getMessage(), e);
+        }
     }
 
     @Override
     public void create(String table, String column, String value) {
-        try {
-            conn.createStatement()
-                    .executeUpdate("CREATE TABLE IF NOT EXISTS %s (%s VARCHAR(255))".formatted(table, column));
-        } catch (SQLException e) {
-            log.error("Error creating the database table\n%s".formatted(e.getMessage()));
+        if (conn == null) {
+            log.warn("Database connection is null, cannot create table");
+            return;
         }
-
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS " + table + " (" + column + " VARCHAR(255))");
+        } catch (SQLException e) {
+            log.error("Error creating the database table: {}", e.getMessage(), e);
+        }
     }
 
     @Override
     public void findById(String table, String column, String value) {
-        try {
-            conn.createStatement().executeUpdate("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
-            ResultSet rs = conn.createStatement()
-                    .executeQuery("SELECT * FROM %s WHERE %s = '%s'".formatted(table, column, value));
-            while (rs.next()) {
-                log.info(rs.getString(column));
-            }
-
-        } catch (SQLException e) {
-            log.error("Error finding the database\n%s".formatted(e.getMessage()));
+        if (conn == null) {
+            log.warn("Database connection is null, cannot find data by id");
+            return;
         }
-
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "SELECT * FROM " + table + " WHERE " + column + " = ?")) {
+            stmt.setString(1, value);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    log.info("Found: {}", rs.getString(column));
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Error finding the database: {}", e.getMessage(), e);
+        }
     }
 
     @Override
@@ -355,20 +414,29 @@ public class Db1 implements Db {
 
     @Override
     public void save(@NotNull Currency currency) {
+        if (conn == null) {
+            log.warn("Database connection is null, cannot save currency");
+            return;
+        }
         try {
             createTables();
-            PreparedStatement existing = conn.prepareStatement(
-                    "SELECT 1 FROM currencies WHERE code = ? AND currency_type = ?");
-            existing.setString(1, currency.getCode());
-            existing.setString(2, currency.getCurrencyType().name());
+            try (PreparedStatement existing = conn.prepareStatement(
+                    "SELECT 1 FROM currencies WHERE code = ? AND currency_type = ?")) {
+                existing.setString(1, currency.getCode());
+                existing.setString(2, currency.getCurrencyType().name());
 
-            if (existing.executeQuery().next()) {
-                log.info("Currency already exists with code: %s".formatted(currency.getCode()));
-            } else {
-                PreparedStatement insert = conn.prepareStatement(
-                        "INSERT INTO currencies (currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image) "
-                                +
-                                "VALUES (?, ?, ?, ?, ?, ?, ?)");
+                try (ResultSet rs = existing.executeQuery()) {
+                    if (rs.next()) {
+                        log.info("Currency already exists with code: {}", currency.getCode());
+                        return;
+                    }
+                }
+            }
+
+            try (PreparedStatement insert = conn.prepareStatement(
+                    "INSERT INTO currencies (currency_type, code, full_display_name, short_display_name, fractional_digits, symbol, image) "
+                            +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
                 insert.setString(1, currency.getCurrencyType().name());
                 insert.setString(2, currency.getCode());
                 insert.setString(3, currency.getFullDisplayName());
@@ -379,15 +447,12 @@ public class Db1 implements Db {
                 insert.executeUpdate();
 
                 CurrencyType type = currency.getCurrencyType();
-
                 Currency.CURRENCIES.put(new SymmetricPair<>(currency.getCode(), type), currency);
 
-                log.info(
-                        "New Currency with code: %swas added  to the  database".formatted(currency.getCode()));
-
+                log.info("New Currency with code: {} was added to the database", currency.getCode());
             }
-
         } catch (SQLException e) {
+            log.error("Error saving currency: {}", e.getMessage(), e);
             throw new RuntimeException(e);
         }
     }
@@ -465,16 +530,19 @@ public class Db1 implements Db {
             return;
         }
 
-        conn.createStatement()
-                .executeUpdate("ALTER TABLE currencies ADD COLUMN %s %s".formatted(columnName, columnType));
-        log.info("Added missing currencies.%s column".formatted(columnName));
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE currencies ADD COLUMN " + columnName + " " + columnType);
+            log.info("Added missing currencies.{} column", columnName);
+        }
     }
 
     private boolean currencyColumnExists(String columnName) throws SQLException {
-        ResultSet columns = conn.createStatement().executeQuery("PRAGMA table_info(currencies)");
-        while (columns.next()) {
-            if (columnName.equalsIgnoreCase(columns.getString("name"))) {
-                return true;
+        try (Statement stmt = conn.createStatement();
+                ResultSet columns = stmt.executeQuery("PRAGMA table_info(currencies)")) {
+            while (columns.next()) {
+                if (columnName.equalsIgnoreCase(columns.getString("name"))) {
+                    return true;
+                }
             }
         }
         return false;

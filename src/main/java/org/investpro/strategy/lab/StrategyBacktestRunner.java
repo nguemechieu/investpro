@@ -5,7 +5,6 @@ import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.TradingSessionStatus;
 import org.investpro.strategy.*;
-import org.investpro.timeframe.Timeframe;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 

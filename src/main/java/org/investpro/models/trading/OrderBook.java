@@ -39,14 +39,14 @@ public class OrderBook {
      * Get the best bid (highest price buyers are willing to pay)
      */
     public PriceLevel getBestBid() {
-        return bids != null && !bids.isEmpty() ? bids.get(0) : null;
+        return bids != null && !bids.isEmpty() ? bids.getFirst() : null;
     }
 
     /**
      * Get the best ask (lowest price sellers will accept)
      */
     public PriceLevel getBestAsk() {
-        return asks != null && !asks.isEmpty() ? asks.get(0) : null;
+        return asks != null && !asks.isEmpty() ? asks.getFirst() : null;
     }
 
     /**
@@ -109,14 +109,7 @@ public class OrderBook {
         }
     }
 
-    // Explicit getters (Lombok @Data not being invoked)
-    public List<PriceLevel> getBids() {
-        return bids;
-    }
 
-    public List<PriceLevel> getAsks() {
-        return asks;
-    }
 
     @Override
     public String toString() {
