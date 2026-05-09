@@ -28,15 +28,16 @@
 
 ## Supported Exchanges & Brokers
 
-| Exchange | Streaming | Trading | Paper Mode | Live Mode |
-|----------|-----------|---------|-----------|-----------|
-| **Binance US** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes |
-| **Binance Global** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes |
-| **Coinbase Pro** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes |
-| **OANDA** | ✅ WebSocket | ✅ Forex | ✅ Yes | ✅ Yes |
-| **Interactive Brokers** | ✅ WebSocket | ✅ Multi | ✅ Yes | ✅ Yes |
-| **Alpaca** | ✅ WebSocket | ✅ Stocks | ✅ Yes | ✅ Yes |
-| **Bitfinex** | ✅ WebSocket | ✅ Crypto | ✅ Yes | ✅ Yes |
+| Exchange | Streaming | Trading | Paper Mode | Live Mode | Auth Check |
+|----------|-----------|---------|-----------|-----------|------------|
+| **Binance US** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **Binance Global** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **Coinbase** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **OANDA** | ✅ WebSocket | ✅ Forex/CFD | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **Interactive Brokers** | ✅ WebSocket | ✅ Multi-Asset | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **Alpaca** | ✅ WebSocket | ✅ Stocks/Crypto | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **Bitfinex** | ✅ WebSocket | ✅ Crypto | ✅ Yes | ✅ Yes | ✅ Implemented |
+| **Stellar Network** | ✅ WebSocket | ✅ Crypto | ✅ Yes | ✅ Yes | ✅ Implemented |
 
 ---
 

@@ -1675,10 +1675,12 @@ public class BinanceUs extends Exchange {
                 if (tradePair != null) {
                     params.put("symbol", binanceSymbol(tradePair));
                 }
-                // Use larger recvWindow (10000ms) to handle clock skew between client and Binance server
+                // Use larger recvWindow (10000ms) to handle clock skew between client and
+                // Binance server
                 // This avoids "Timestamp for this request is outside of the recvWindow" errors
                 params.put("recvWindow", "10000");
-                // Let sendSignedBinanceUsRequest add timestamp automatically with better clock handling
+                // Let sendSignedBinanceUsRequest add timestamp automatically with better clock
+                // handling
                 // Do not manually set timestamp here to avoid clock skew issues
 
                 JsonNode response = sendSignedBinanceUsRequest("GET", "/api/v3/openOrders", params);
