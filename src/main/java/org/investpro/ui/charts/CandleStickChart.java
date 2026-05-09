@@ -1415,8 +1415,8 @@ public class CandleStickChart extends Region {
                 colors.put("UpFractal", javafx.scene.paint.Color.web("#2ecc71"));
                 colors.put("DnFractal", javafx.scene.paint.Color.web("#e74c3c"));
             }
+            // noinspection SpellCheckingInspection
             case "Ichimoku Cloud" -> {
-                // noinspection SpellCheckingInspection
                 colors.put("TenkanSen", javafx.scene.paint.Color.web("#3498db"));
                 // noinspection SpellCheckingInspection
                 colors.put("KijunSen", javafx.scene.paint.Color.web("#f39c12"));
@@ -1631,7 +1631,7 @@ public class CandleStickChart extends Region {
         double atrPct = calculateATRPercentage(visible);
 
         // Calculate trend strength based on EMA comparison
-        double emaSlow = calculateEMA(visible, 50);
+        double emaSlow = calculateEMA(visible);
 
         double currentPrice = visible.getLast().closePrice();
         double trendStrength = (currentPrice - emaSlow) / emaSlow;
@@ -1680,12 +1680,13 @@ public class CandleStickChart extends Region {
     }
 
     /**
-     * Calculate Exponential Moving Average.
+     * Calculate Exponential Moving Average (50-period).
      */
-    private double calculateEMA(List<CandleData> candles, int period) {
+    private double calculateEMA(@NotNull List<CandleData> candles) {
         if (candles.isEmpty())
             return 0;
 
+        int period = 50;
         double k = 2.0 / (period + 1);
         double ema = candles.getFirst().closePrice();
 
@@ -1887,12 +1888,6 @@ public class CandleStickChart extends Region {
 
     public void addEntryPriceLine(double price) {
         addPriceLine(PriceLine.entry(price));
-    }
-
-    private void replacePriceLineByLabel(@NotNull PriceLine replacement) {
-        priceLines.removeIf(line -> Objects.equals(line.getLabel(), replacement.getLabel()));
-        priceLines.add(replacement.copy());
-        requestChartRedraw();
     }
 
     public void clearPriceLines() {
