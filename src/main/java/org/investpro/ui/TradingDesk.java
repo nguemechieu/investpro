@@ -134,6 +134,7 @@ public class TradingDesk extends BorderPane {
     private final ComboBox<String> timeframeSelector = new ComboBox<>();
     private final ComboBox<String> botSymbolScopeSelector = new ComboBox<>();
     private final ComboBox<String> orderTypeSelector = new ComboBox<>();
+    private final ComboBox<String> tradingModeSelector = new ComboBox<>();
     private final Label exchangeVenueLabel = new Label(t("label.venue"));
 
     private final Button connectButton = new Button(t("toolbar.connect"));
@@ -253,8 +254,6 @@ public class TradingDesk extends BorderPane {
 
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
     }
-
-
 
     public TradingDesk(
             MarketConfiguration configuration,
@@ -585,19 +584,19 @@ public class TradingDesk extends BorderPane {
         exchangeSelector.setPrefWidth(180);
         symbolSelector.setPrefWidth(220);
         timeframeSelector.setPrefWidth(120);
+        tradingModeSelector.setPrefWidth(120);
 
         Label brand = new Label("InvestPro ");
         brand.getStyleClass().add("terminal-brand");
-
-        Label modeBadge = new Label(t("toolbar.liveTerminal"));
-        modeBadge.getStyleClass().add("terminal-mode-badge");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         ToolBar toolBar = new ToolBar(
                 brand,
-                modeBadge,
+                new Separator(Orientation.VERTICAL),
+                new Label(t("toolbar.mode")),
+                tradingModeSelector,
                 new Separator(Orientation.VERTICAL),
                 new Label(t("toolbar.broker")),
                 exchangeSelector,
@@ -2042,8 +2041,24 @@ public class TradingDesk extends BorderPane {
             }
         });
 
+        configureTradingModeSelector();
         configureOrderTypeSelector();
         configureTimeframeSelector();
+    }
+
+    private void configureTradingModeSelector() {
+        tradingModeSelector.getItems().setAll("PAPER", "LIVE");
+        tradingModeSelector.getSelectionModel().select(configuredTradingMode);
+        
+        tradingModeSelector.setOnAction(event -> {
+            String selectedMode = tradingModeSelector.getSelectionModel().getSelectedItem();
+            if (selectedMode != null && exchange != null) {
+                configuredTradingMode = selectedMode;
+                exchange.setUserSelectedTradingMode(selectedMode);
+                log.info("Trading mode switched to: {}", selectedMode);
+                appendAgentActivity("Trading mode: " + selectedMode);
+            }
+        });
     }
 
     private void configureOrderTypeSelector() {
@@ -2073,9 +2088,9 @@ public class TradingDesk extends BorderPane {
         }
         if (exchange == null || exchange.supportsBracketOrders()) {
             orderTypes.add("BRACKET");
-        }
-
-        orderTypeSelector.getItems().setAll(orderTypes);
+                        
+                        
+                        eSelector.getItems().setAll(orderTypes);
         orderTypeSelector.getSelectionModel().select(orderTypes.contains(selected) ? selected : "MARKET");
     }
 
@@ -2085,10 +2100,10 @@ public class TradingDesk extends BorderPane {
         exchangeVenueLabel.setMinWidth(90);
     }
 
-    private void configureTimeframeSelector() {
-        timeframeSelector.getItems().clear();
-
-        List<String> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
+                         confi
+                        eSelector.getItems().clear();
+                                
+                                ing> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
                 ? exchange.getSupportedTimeframes()
                 .stream()
                 .map(String::valueOf)
@@ -2209,6 +2224,7 @@ public class TradingDesk extends BorderPane {
             systemCore = null;
             systemCoreEventsSubscribed = false;
         }
+                    
 
         disablePositionAutoRefresh();
 
@@ -2264,6 +2280,7 @@ public class TradingDesk extends BorderPane {
             showExchangeCredentialDialog(selectedExchange);
         }
     }
+                
 
     private void connectSelectedExchange() {
         String selectedExchange = exchangeSelector.getSelectionModel().getSelectedItem();
