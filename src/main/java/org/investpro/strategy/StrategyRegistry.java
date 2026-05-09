@@ -429,19 +429,7 @@ public final class StrategyRegistry {
         return instantiatedCount;
     }
 
-    /**
-     * Get the total count of instantiated strategies.
-     */
-    public int instantiatedCount() {
-        return strategies.size();
-    }
 
-    /**
-     * Get the total count of registered definitions.
-     */
-    public int definitionCount() {
-        return definitions.size();
-    }
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();

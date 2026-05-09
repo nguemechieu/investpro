@@ -101,11 +101,11 @@ default void onEvent(AgentEvent event) {}
 
 **Must expose**:
 ```java
-void startBot(TradingService tradingService, TradePair pair)
-void stopBot()
-void setAutoTradingEnabled(boolean enabled)
-void setAiReasoningEnabled(boolean enabled)
-SmartBot getSmartBot()
+void startBot(TradingService tradingService, TradePair pair);
+void stopBot();
+void setAutoTradingEnabled(boolean enabled);
+void setAiReasoningEnabled(boolean enabled);
+SmartBot getSmartBot();
 ```
 
 **Must NOT**:
@@ -159,11 +159,11 @@ public record ExchangeCapabilities(
 **File**: `src/main/java/org/investpro/investpro/ui/TradingWindow.java`
 **Must implement**:
 ```java
-void startDesktopStream(TradePair symbol)
-void stopDesktopStream()
-void updateTickerFromStream(Ticker ticker)
-void updateOrderBookFromStream(OrderBook orderBook)
-void updateAccountFromStream(Account account)
+void startDesktopStream(TradePair symbol);
+void stopDesktopStream();
+void updateTickerFromStream(Ticker ticker);
+void updateOrderBookFromStream(OrderBook orderBook);
+void updateAccountFromStream(Account account);
 ```
 
 **Must NOT**:

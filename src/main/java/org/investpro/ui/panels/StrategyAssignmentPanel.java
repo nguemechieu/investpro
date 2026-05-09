@@ -14,6 +14,8 @@ import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
+import java.sql.SQLException;
+
 /**
  * Strategy Assignment Panel - Assign trading strategies to symbols and manage
  * parameters
@@ -45,7 +47,7 @@ public class StrategyAssignmentPanel extends StackPane{
         private SystemCore systemCore;
         private  StrategyAssignment strategyAssignment;
 
-        public StrategyAssignmentPanel(@NotNull SystemCore systemCore) {
+        public StrategyAssignmentPanel(@NotNull SystemCore systemCore) throws SQLException, ClassNotFoundException {
                 this.setStyle("-fx-background-color: #1a1a2e; -fx-padding: 16;");
 
                 this.systemCore=systemCore;
@@ -95,7 +97,7 @@ public class StrategyAssignmentPanel extends StackPane{
                 LocalizationService.applyTranslations(this);
         }
 
-        private @NotNull VBox createSelectionSection() {
+        private @NotNull VBox createSelectionSection() throws SQLException, ClassNotFoundException {
                 VBox section = new VBox(8);
                 section.setStyle(
                                 "-fx-border-color: #374151; -fx-border-radius: 4; -fx-padding: 12; -fx-background-color: #16213e;");

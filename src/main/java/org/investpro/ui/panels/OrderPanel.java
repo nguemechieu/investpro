@@ -19,6 +19,7 @@ import org.investpro.service.NewsDataProvider;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -91,8 +92,11 @@ private  SystemCore systemCore;
         this.systemCore=systemCore;
 
 
-
-        setupUI(systemCore.getExchange().getTradePairSymbol(), systemCore.getSelectedTradePair());
+        try {
+            setupUI(systemCore.getExchange().getTradePairSymbol(), systemCore.getSelectedTradePair());
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
         try {
             updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(systemCore.getSelectedTradePair()).get());
         } catch (InterruptedException | ExecutionException e) {

@@ -23,6 +23,7 @@ import javafx.stage.Stage;
 import javafx.stage.FileChooser;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.SneakyThrows;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
@@ -47,7 +48,7 @@ import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.models.trading.*;
 import org.investpro.repository.CurrencyRepository;
 import org.investpro.repository.OrderRepository;
-import org.investpro.repository.RepositoryFactory;
+
 import org.investpro.repository.TradeRepository;
 import org.investpro.risk.PositionHealthScore;
 import org.investpro.service.CurrencyService;
@@ -73,9 +74,10 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 
+import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.text.ParseException;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -126,7 +128,8 @@ public class TradingDesk extends BorderPane {
             "OANDA",
             "BITFINEX",
             "ALPACA",
-            "INTERACTIVE BROKERS"
+            "INTERACTIVE BROKERS",
+            "STELLAR NETWORK"
     };
 
     private final ComboBox<String> exchangeSelector = new ComboBox<>();
@@ -395,6 +398,7 @@ public class TradingDesk extends BorderPane {
         return topSection;
     }
 
+    @SneakyThrows
     private MenuBar createMenuBar() {
         Menu fileMenu = new Menu(t("menu.file"));
 
@@ -491,7 +495,13 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.marketResearch"), null, this::openMarketResearch),
                 menuItem(t("menu.strategyResearch"), null, this::openStrategyResearch),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.strategyAssignment"), null, this::showStrategyAssignmentPanel),
+                menuItem(t("menu.strategyAssignment"), null, e -> {
+                    try {
+                        showStrategyAssignmentPanel();
+                    } catch (SQLException | ClassNotFoundException ex) {
+                        log.error("Error showing strategy assignment panel", ex);
+                    }
+                }),
                 menuItem(t("menu.researchReports"), null, this::openResearchReports)));
 
         Menu settingsMenu = new Menu(t("menu.settings"));
@@ -517,7 +527,7 @@ public class TradingDesk extends BorderPane {
                         () -> showInfo("Help", "InvestPro Help - F5 refreshes data, Ctrl+` toggles terminal.")),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.about"), null, () -> showInfo("About InvestPro",
-                        "InvestPro - Professional Trading Terminal\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
+                        "InvestPro ----------------------------------------------------------- Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
 
         return new MenuBar(fileMenu, editMenu, insertMenu, viewMenu, chartsMenu, toolsMenu, strategyMenu, researchMenu,
                 settingsMenu, languageMenu, windowMenu,
@@ -2049,7 +2059,7 @@ public class TradingDesk extends BorderPane {
     private void configureTradingModeSelector() {
         tradingModeSelector.getItems().setAll("PAPER", "LIVE");
         tradingModeSelector.getSelectionModel().select(configuredTradingMode);
-        
+
         tradingModeSelector.setOnAction(event -> {
             String selectedMode = tradingModeSelector.getSelectionModel().getSelectedItem();
             if (selectedMode != null && exchange != null) {
@@ -2077,8 +2087,14 @@ public class TradingDesk extends BorderPane {
         configureExchangeVenueLabel();
     }
 
+    private void configureExchangeVenueLabel() {
+        exchangeVenueLabel.setText("Venue: -");
+        exchangeVenueLabel.setStyle("-fx-text-fill: #6b7280; -fx-font-size: 11;");
+        exchangeVenueLabel.setMinWidth(90);
+    }
+
     private void refreshOrderTypeOptions() {
-        String selected = orderTypeSelector.getSelectionModel().getSelectedItem();
+        final String[] selected = { orderTypeSelector.getSelectionModel().getSelectedItem() };
         List<String> orderTypes = new ArrayList<>();
         orderTypes.add("MARKET");
         orderTypes.add("LIMIT");
@@ -2088,26 +2104,19 @@ public class TradingDesk extends BorderPane {
         }
         if (exchange == null || exchange.supportsBracketOrders()) {
             orderTypes.add("BRACKET");
-                        
-                        
-                        eSelector.getItems().setAll(orderTypes);
-        orderTypeSelector.getSelectionModel().select(orderTypes.contains(selected) ? selected : "MARKET");
+        }
+
+        orderTypeSelector.getItems().setAll(orderTypes);
+        orderTypeSelector.getSelectionModel().select(orderTypes.contains(selected[0]) ? selected[0] : "MARKET");
     }
 
-    private void configureExchangeVenueLabel() {
-        exchangeVenueLabel.setText("Venue: -");
-        exchangeVenueLabel.setStyle("-fx-text-fill: #6b7280; -fx-font-size: 11;");
-        exchangeVenueLabel.setMinWidth(90);
-    }
+    private void configureTimeframeSelector() {
 
-                         confi
-                        eSelector.getItems().clear();
-                                
-                                ing> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
+        List<String> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
                 ? exchange.getSupportedTimeframes()
-                .stream()
-                .map(String::valueOf)
-                .toList()
+                        .stream()
+                        .map(String::valueOf)
+                        .toList()
                 : List.of("1m", "5m", "15m", "30m", "1h", "4h", "1d");
 
         timeframeSelector.getItems().setAll(supportedTimeframes);
@@ -2117,10 +2126,10 @@ public class TradingDesk extends BorderPane {
         String selectedTimeframe = supportedTimeframes.contains(savedTimeframe)
                 ? savedTimeframe
                 : supportedTimeframes.contains("1h")
-                ? "1h"
-                : supportedTimeframes.isEmpty()
-                ? null
-                : supportedTimeframes.getFirst();
+                        ? "1h"
+                        : supportedTimeframes.isEmpty()
+                                ? null
+                                : supportedTimeframes.getFirst();
 
         if (selectedTimeframe != null) {
             timeframeSelector.getSelectionModel().select(selectedTimeframe);
@@ -2224,7 +2233,6 @@ public class TradingDesk extends BorderPane {
             systemCore = null;
             systemCoreEventsSubscribed = false;
         }
-                    
 
         disablePositionAutoRefresh();
 
@@ -2241,7 +2249,8 @@ public class TradingDesk extends BorderPane {
                 configuredApiSecret = "";
                 telegramToken = "";
             }
-            exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId, configuredTradingMode);
+            exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
+                    configuredTradingMode);
             // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
             new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
         }
@@ -2280,7 +2289,6 @@ public class TradingDesk extends BorderPane {
             showExchangeCredentialDialog(selectedExchange);
         }
     }
-                
 
     private void connectSelectedExchange() {
         String selectedExchange = exchangeSelector.getSelectionModel().getSelectedItem();
@@ -2297,7 +2305,8 @@ public class TradingDesk extends BorderPane {
 
         loadExchangeCredentials(selectedExchange);
 
-        exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId, configuredTradingMode);
+        exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
+                configuredTradingMode);
         // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
         new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
         setTelegramToken(telegramToken);
@@ -2540,7 +2549,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void submitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
-                                   double amount) {
+            double amount) {
         switch (orderType) {
             case "MARKET" -> submitMarketOrderInternal(tradePair, side, amount);
             case "LIMIT" -> showLimitOrderDialog(tradePair, side, amount);
@@ -3841,7 +3850,7 @@ public class TradingDesk extends BorderPane {
         dialog.showAndWait();
     }
 
-    private void showStrategyAssignmentPanel() {
+    private void showStrategyAssignmentPanel() throws SQLException, ClassNotFoundException {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Strategy Assignment");
         dialog.setHeaderText("Assign and configure trading strategies for symbols");
@@ -4198,7 +4207,8 @@ public class TradingDesk extends BorderPane {
 
         dialog.showAndWait().ifPresent(saved -> {
             if (saved) {
-                exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId, configuredTradingMode);
+                exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
+                        configuredTradingMode);
                 // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
                 new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
                 setTelegramToken(telegramToken);
@@ -4243,6 +4253,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private UiExchangeStreamConsumer uiStreamConsumer;
+
     private void initializeUiStreamConsumer() {
         uiStreamConsumer = new UiExchangeStreamConsumer()
                 .onTickerUpdate(ticker -> {
@@ -4288,11 +4299,10 @@ public class TradingDesk extends BorderPane {
                 })
                 .onError((exchangeName, throwable) -> journal("Stream error from %s: %s".formatted(
                         exchangeName,
-                        throwable == null ? "unknown" : throwable.getMessage()
-                )))
-        ;
+                        throwable == null ? "unknown" : throwable.getMessage())));
 
     }
+
     private void updateOrderBookUi(@NotNull OrderBook orderBook) {
         currentOrderBook = orderBook;
 
@@ -4310,8 +4320,7 @@ public class TradingDesk extends BorderPane {
             String apiKey,
             String apiSecret,
             String accountId,
-            String tradingMode
-    ) {
+            String tradingMode) {
         String normalizedName = normalizeExchangeName(exchangeName);
         boolean paperMode = "PAPER".equalsIgnoreCase(safe(tradingMode))
                 || "SANDBOX".equalsIgnoreCase(safe(tradingMode));
@@ -4324,8 +4333,7 @@ public class TradingDesk extends BorderPane {
                 normalizedName.equals("COINBASE") ? safe(apiSecret) : null,
                 null,
                 safe(accountId),
-                paperMode
-        );
+                paperMode);
 
         Exchange createdExchange = switch (normalizedName) {
             case "BINANCE US" -> new BinanceUs(credentials);
@@ -4928,9 +4936,8 @@ public class TradingDesk extends BorderPane {
 
     private void showAlert(String backtesting, String s) {
         Stage stage = new Stage();
-        VBox vBox=new VBox(new Label(backtesting+"\n----------\n"+s));
-        Scene root =new Scene(new StackPane(vBox));
-
+        VBox vBox = new VBox(new Label(backtesting + "\n----------\n" + s));
+        Scene root = new Scene(new StackPane(vBox));
 
         stage.setScene(root);
         stage.showAndWait();
@@ -5136,15 +5143,21 @@ public class TradingDesk extends BorderPane {
             CompletableFuture<OrderBook> orderBookFuture = exchange != null
                     && selectedSymbol != null
                     && exchange.supportsOrderBook()
-                    ? exchange.fetchOrderBook(selectedSymbol)
-                    : CompletableFuture.completedFuture(null);
+                            ? exchange.fetchOrderBook(selectedSymbol)
+                            : CompletableFuture.completedFuture(null);
 
             orderBookFuture
                     .exceptionally(exception -> {
                         log.debug("Order panel opened without order book data", exception);
                         return null;
                     })
-                    .thenAccept(orderBook -> runOnFx(() -> showOrderPanelWindow(selectedSymbol)));
+                    .thenAccept(orderBook -> runOnFx(() -> {
+                        try {
+                            showOrderPanelWindow(selectedSymbol);
+                        } catch (SQLException | ClassNotFoundException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }));
 
         } catch (Exception e) {
             log.error("Error opening order panel", e);
@@ -5152,7 +5165,7 @@ public class TradingDesk extends BorderPane {
         }
     }
 
-    private void showOrderPanelWindow(TradePair selectedSymbol) {
+    private void showOrderPanelWindow(TradePair selectedSymbol) throws SQLException, ClassNotFoundException {
         OrderPanel orderPanel = new OrderPanel(systemCore);
 
         Stage orderStage = new Stage();

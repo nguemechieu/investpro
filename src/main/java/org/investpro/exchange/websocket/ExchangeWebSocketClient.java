@@ -1,7 +1,6 @@
 package org.investpro.exchange.websocket;
 
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import lombok.Getter;
 
@@ -23,10 +22,10 @@ import java.util.function.Consumer;
 
 /**
  * Neutral base WebSocket client for all exchange adapters.
- *
+ * <p>
  * Do not put Binance, Coinbase, OANDA, or Alpaca-specific subscription logic
  * here.
- *
+ * <p>
  * Responsibilities:
  * - Own WebSocket connection state.
  * - Own generic raw stream handlers.
@@ -42,8 +41,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public final SimpleBooleanProperty connectionEstablished = new SimpleBooleanProperty(false);
 
-    private CountDownLatch initializationLatch = new CountDownLatch(1);
-
+    private CountDownLatch initializationLatch;
     private static final int MAX_RECONNECT_ATTEMPTS = 5;
     private static final int INITIAL_RECONNECT_DELAY_SECONDS = 2;
     private static final int MAX_RECONNECT_DELAY_SECONDS = 60;
@@ -59,7 +57,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
 
     private volatile boolean manualClose = false;
-    private volatile boolean reconnectEnabled = true;
+    private final boolean reconnectEnabled = true;
 
     protected ExchangeWebSocketClient(@NotNull URI serverUri, @NotNull Draft draft) {
         super(serverUri, draft);
@@ -72,7 +70,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
         manualClose = false;
 
         log.info("{} WebSocket opened: {}", getClass().getSimpleName(), getURI());
-
+        this.initializationLatch = new CountDownLatch(1);
         try {
             onConnected();
             // Signal that WebSocket is initialized and ready
@@ -148,18 +146,6 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     public boolean isConnected() {
         return connectionEstablished.get() && isOpen();
-    }
-
-    public ReadOnlyBooleanProperty connectionEstablishedProperty() {
-        return connectionEstablished;
-    }
-
-    public CountDownLatch getInitializationLatch() {
-        return initializationLatch;
-    }
-
-    public void enableReconnect(boolean enabled) {
-        this.reconnectEnabled = enabled;
     }
 
     public void disconnectSafely() {
@@ -293,10 +279,6 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
         streamHandlers.remove(normalizeStreamName(streamName));
     }
 
-    protected boolean hasHandler(@NotNull String streamName) {
-        return streamHandlers.containsKey(normalizeStreamName(streamName));
-    }
-
     protected String normalizeStreamName(@NotNull String streamName) {
         return streamName.trim().toLowerCase(Locale.ROOT);
     }
@@ -355,14 +337,14 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
 
     /**
      * Called after the socket opens.
-     *
+     * <p>
      * Subclasses should resubscribe active streams here.
      */
     protected abstract void onConnected();
 
     /**
      * Called for every incoming raw websocket message before generic dispatch.
-     *
+     * <p>
      * Subclasses can parse exchange-specific JSON here.
      */
     protected void onRawMessage(@NotNull String message) {
@@ -370,8 +352,5 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
     }
 
 
-    private void setInitializationLatch() {
-        this.initializationLatch = new CountDownLatch(1);
-        initializationLatch.countDown();
-    }
+
 }

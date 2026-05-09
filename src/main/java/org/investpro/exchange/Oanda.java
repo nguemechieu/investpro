@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.credentials.ExchangeCredentials;
@@ -73,6 +74,7 @@ import java.util.Random;
 
 @Getter
 @Setter
+@Slf4j
 public class Oanda extends Exchange {
 
     protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
@@ -104,7 +106,7 @@ public class Oanda extends Exchange {
         private final AtomicInteger count = new AtomicInteger(0);
 
         @Override
-        public Thread newThread(Runnable r) {
+        public Thread newThread(@NotNull Runnable r) {
             Thread t = new Thread(r, "oanda-http-worker-" + count.incrementAndGet());
             t.setDaemon(false);
             return t;
