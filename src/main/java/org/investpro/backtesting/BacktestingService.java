@@ -2,6 +2,7 @@ package org.investpro.backtesting;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.TradePair;
@@ -19,6 +20,7 @@ import java.util.*;
 @Slf4j
 @Getter
 @Setter
+@ToString
 public class BacktestingService {
     private BackTesting backtestEngine;
     private Map<String, List<CandleData>> historicalDataCache;
@@ -234,10 +236,10 @@ public class BacktestingService {
     public void printResults(Map<String, BacktestResult> results) {
         System.out.println("\n=== BACKTEST RESULTS ===");
         results.forEach((key, result) -> {
-            System.out.println(String.format(
-                    "%s: Return=%.2f%% | Sharpe=%.2f | WinRate=%.2f%% | Trades=%d | MaxDD=%.2f%%",
+            System.out.printf(
+                    "%s: Return=%.2f%% | Sharpe=%.2f | WinRate=%.2f%% | Trades=%d | MaxDD=%.2f%%%n",
                     key, result.getReturnPercent(), result.getSharpeRatio(),
-                    result.getWinRate() * 100, result.getTotalTrades(), result.getMaxDrawdown()));
+                    result.getWinRate() * 100, result.getTotalTrades(), result.getMaxDrawdown());
         });
     }
 
@@ -245,7 +247,7 @@ public class BacktestingService {
      * Container for multiple backtest results
      */
     public static class BacktestSuiteResult {
-        private Map<String, BacktestResult> results;
+        private final Map<String, BacktestResult> results;
 
         public BacktestSuiteResult() {
             this.results = new LinkedHashMap<>();
@@ -272,16 +274,16 @@ public class BacktestingService {
         public void printSummary() {
             System.out.println("\n=== BACKTEST SUITE RESULTS ===");
             results.forEach((name, result) -> {
-                System.out.println(String.format(
-                        "%-20s: Return=%7.2f%% | Sharpe=%6.2f | WinRate=%6.2f%% | Trades=%4d | MaxDD=%6.2f%%",
+                System.out.printf(
+                        "%-20s: Return=%7.2f%% | Sharpe=%6.2f | WinRate=%6.2f%% | Trades=%4d | MaxDD=%6.2f%%%n",
                         name, result.getReturnPercent(), result.getSharpeRatio(),
-                        result.getWinRate() * 100, result.getTotalTrades(), result.getMaxDrawdown()));
+                        result.getWinRate() * 100, result.getTotalTrades(), result.getMaxDrawdown());
             });
 
             BacktestResult best = getBestResult();
             if (best != null) {
-                System.out.println(String.format("\n✓ Best Strategy: %s with %.2f%% return",
-                        best.getStrategyName(), best.getReturnPercent()));
+                System.out.printf("\n✓ Best Strategy: %s with %.2f%% return%n",
+                        best.getStrategyName(), best.getReturnPercent());
             }
         }
     }

@@ -41,7 +41,6 @@ import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.ui.panels.SettingsPanel;
 
-import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -69,8 +68,8 @@ import java.util.function.Consumer;
 @Setter
 public class SystemCore {
 
- private    HistoricalDataRepository historicalDataRepository;
-  private   SystemHealthSnapshot health ;
+    private HistoricalDataRepository historicalDataRepository;
+    private SystemHealthSnapshot health;
 
     public StrategyAssignment strategyAssignment;
 
@@ -121,6 +120,8 @@ public class SystemCore {
     private TelegramNotifier telegramNotifier;
     private EmailNotifier emailNotifier;
     private TelegramCommandHandler telegramCommandHandler;
+    private TelegramEventListener telegramEventListener;
+    private SymbolAgentUpdater symbolAgentUpdater;
 
     private String telegramToken;
     private String fromEmail;
@@ -133,19 +134,26 @@ public class SystemCore {
     private StreamingMode currentStreamingMode = StreamingMode.SAFE_DEFAULT;
     private ExchangeStreamSubscription activeSubscription;
     private ExchangeStreamConsumer streamConsumer;
-private  SymbolAgentManager symbolAgentManager;
-private SystemCoreDependencies systemCoreDependencies;
-private SymbolExecutionFilter symbolExecutionFilter;
-    public SystemCore(@NotNull Exchange exchange, Properties config) throws SQLException, ClassNotFoundException {
+    private SymbolAgentManager symbolAgentManager;
+    private SystemCoreDependencies systemCoreDependencies;
+    private SymbolExecutionFilter symbolExecutionFilter;
 
+    public SystemCore(@NotNull Exchange exchange, Properties config) throws SQLException, ClassNotFoundException {
 
         this.exchange = Objects.requireNonNull(exchange, "exchange cannot be null");
 
         this.config = config == null ? new Properties() : config;
 
-
-
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
+        // Create agent registry (agents will be registered when start() is called)
+        this.agentRegistry = new AgentRegistry();
+
+        // Create SmartBot with the agent registry
+        this.smartBot = new SmartBot(
+                new AgentRuntime(),
+                new AgentEventBus(),
+                agentRegistry);
+
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();
 
@@ -160,13 +168,12 @@ private SymbolExecutionFilter symbolExecutionFilter;
         configureNotifiers();
 
         // Initialize symbol manager
-        this.symbolAgentManager=new  SymbolAgentManager();
+        this.symbolAgentManager = new SymbolAgentManager();
         this.historicalDataRepository = HistoricalDataRepositoryImpl.getInstance();
-        this.symbolExecutionFilter=new SymbolExecutionFilter();
+        this.symbolExecutionFilter = new SymbolExecutionFilter();
         this.executionEngine = new ExecutionEngine(exchange, symbolExecutionFilter, RepositoryFactory.getDatabase());
         this.riskManagementSystem = new RiskManagementSystem();
         this.aiReasoningService = createAiReasoningService(this.config);
-
 
         // Initialize TradeExecutionCoordinator (it internally manages safety
         // components)
@@ -175,39 +182,20 @@ private SymbolExecutionFilter symbolExecutionFilter;
                 aiReasoningService,
                 executionEngine);
 
-
-
-
         this.strategyEngine = new StrategyEngine(tradeExecutionCoordinator);
-
-        // Create agent registry (agents will be registered when start() is called)
-        this.agentRegistry = new AgentRegistry();
-
-        // Create SmartBot with the agent registry
-        this.smartBot = new SmartBot(
-                new AgentRuntime(),
-                new AgentEventBus(),
-                agentRegistry);
-
-
-
 
         this.systemCoreDependencies = new SystemCoreDependencies(exchange, tradingService, strategyEngine,
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
-        this.labService=new StrategyLabService();
-        labService.testAllStrategies(exchange.getSelectedTradePair().toString('/'),exchange.getSupportedTimeframes());
+        this.labService = new StrategyLabService();
+        labService.testAllStrategies(exchange.getSelectedTradePair().toString('/'), exchange.getSupportedTimeframes());
         // Initialize the system event recorder and monitor service after all components
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();
         this.systemMonitorService = new SystemMonitorService(this);
-        this.health= this.systemMonitorService.checkNow();
-
-
-
+        this.health = this.systemMonitorService.checkNow();
 
         log.debug(this.toString());
-
 
     }
 
@@ -305,6 +293,27 @@ private SymbolExecutionFilter symbolExecutionFilter;
 
         smartBot.start(exchange, tradingService, selectedTradePair);
 
+        // Wire Symbol Agent Updater to SmartBot's event bus
+        if (symbolAgentUpdater != null) {
+            symbolAgentUpdater.start();
+            log.info("✅ Symbol agent updater wired to SmartBot - Real-time UI updates enabled");
+        }
+
+        // Wire Telegram event listener to SmartBot's event bus
+        if (telegramEventListener != null) {
+            telegramEventListener.start();
+            log.info("✅ Telegram event listener wired to SmartBot");
+        }
+
+        // Auto-detect and set Telegram chat ID
+        if (telegramNotifier != null && !telegramNotifier.hasTargetChat()) {
+            telegramNotifier.detectAndUseLatestChatId()
+                    .ifPresentOrElse(
+                            chatId -> log.info("📱 Telegram chat auto-detected: {}", chatId),
+                            () -> log.warn(
+                                    "⚠️ No Telegram chat detected. Send /start to the bot or add it to a group."));
+        }
+
         // Start Telegram polling if bot token is configured
         startTelegramPolling();
 
@@ -313,6 +322,18 @@ private SymbolExecutionFilter symbolExecutionFilter;
 
     public void stop() {
         stopStreaming();
+
+        // Stop symbol agent updater
+        if (symbolAgentUpdater != null) {
+            symbolAgentUpdater.stop();
+            log.info("✅ Symbol agent updater stopped");
+        }
+
+        // Stop Telegram event listener
+        if (telegramEventListener != null) {
+            telegramEventListener.stop();
+            log.info("✅ Telegram event listener stopped");
+        }
 
         // Stop Telegram polling
         stopTelegramPolling();
@@ -403,10 +424,8 @@ private SymbolExecutionFilter symbolExecutionFilter;
         }
     }
 
-
     public void startStreaming(Collection<TradePair> tradePairs, StreamingMode mode) {
         ensureBotStarted();
-
 
         Set<TradePair> selectedPairs = new LinkedHashSet<>();
         if (tradePairs != null) {
@@ -481,7 +500,6 @@ private SymbolExecutionFilter symbolExecutionFilter;
         this.currentStreamingMode = safeMode;
         this.selectedTradePair = tradePair;
 
-
         activeSubscription = buildSubscription(tradePair, safeMode);
         streamConsumer = createAgentStreamConsumer();
 
@@ -504,36 +522,27 @@ private SymbolExecutionFilter symbolExecutionFilter;
                     safeMode,
                     exchange.getStreamTransport());
 
-
-           // tradePairs=exchange.getTradePairSymbol();
-            if (mode==StreamingMode.EVERYTHING){
+            // tradePairs=exchange.getTradePairSymbol();
+            if (mode == StreamingMode.EVERYTHING) {
                 streamEverything(tradePair);
-            }else if (mode==StreamingMode.MARKET_DATA){
+            } else if (mode == StreamingMode.MARKET_DATA) {
 
                 streamMarketData(tradePair);
-            }
-            else if (mode==StreamingMode.ACCOUNT_DATA){
+            } else if (mode == StreamingMode.ACCOUNT_DATA) {
                 streamAccountData();
-            }
-            else if (mode==StreamingMode.TICKER_ONLY){
+            } else if (mode == StreamingMode.TICKER_ONLY) {
                 streamTicker(tradePair);
-            }
-            else if (mode==StreamingMode.CUSTOM){
-                streamCustom(tradePair,true,true,true,true,true,true,true,true,true);
-            }
-            else if (mode==StreamingMode.TRADES_ONLY){
+            } else if (mode == StreamingMode.CUSTOM) {
+                streamCustom(tradePair, true, true, true, true, true, true, true, true, true);
+            } else if (mode == StreamingMode.TRADES_ONLY) {
                 streamTrades(tradePair);
-            }
-            else if( mode== StreamingMode.SAFE_DEFAULT){
+            } else if (mode == StreamingMode.SAFE_DEFAULT) {
 
                 streamMarketData(tradePair);
-            }
-            else if( mode== StreamingMode.ORDER_BOOK_ONLY){
+            } else if (mode == StreamingMode.ORDER_BOOK_ONLY) {
 
                 streamOrderBookOnly(tradePair);
             }
-
-
 
         } catch (Exception exception) {
             streaming.set(false);
@@ -1092,15 +1101,22 @@ private SymbolExecutionFilter symbolExecutionFilter;
     // ---------------------------------------------------------------------
 
     private void configureNotifiers() {
+        // Wire symbol agent state updates for real-time UI
+        this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), symbolAgentManager);
+
         if (!telegramToken.isBlank()) {
             this.telegramNotifier = new TelegramNotifier(telegramToken);
             // Initialize command handler for Telegram commands
             this.telegramCommandHandler = new TelegramCommandHandler(this, telegramNotifier);
             this.telegramNotifier.setCommandHandler(telegramCommandHandler);
+            // Create event listener - will be wired to SmartBot in start()
+            this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
+            log.info("✅ Telegram notifier configured");
         }
 
         if (!fromEmail.isBlank() && !toEmail.isBlank()) {
             this.emailNotifier = new EmailNotifier(fromEmail, toEmail);
+            log.info("✅ Email notifier configured");
         }
     }
 
@@ -1139,8 +1155,6 @@ private SymbolExecutionFilter symbolExecutionFilter;
     // TELEGRAM COMMAND SUPPORT METHODS
     // ============================================================================
 
-
-
     /**
      * Get the name of the active strategy.
      * <p>
@@ -1164,74 +1178,6 @@ private SymbolExecutionFilter symbolExecutionFilter;
         }
 
         return strategyId;
-    }
-
-    /**
-     * Get strategy statistics from cached StrategySignal objects.
-     */
-    public String getStrategyStats() {
-        if (strategyEngine == null) {
-            return "Not available yet";
-        }
-
-        List<StrategySignal> signals = getCachedStrategySignals();
-
-        if (signals.isEmpty()) {
-            return "No strategy signals recorded yet";
-        }
-
-        long total = signals.size();
-
-        long buyCount = signals.stream()
-                .filter(signal -> signal.getSide() == Side.BUY)
-                .count();
-
-        long sellCount = signals.stream()
-                .filter(signal -> signal.getSide() == Side.SELL)
-                .count();
-
-        long holdCount = signals.stream()
-                .filter(signal -> signal.getSide() == Side.HOLD)
-                .count();
-
-        double avgConfidence = signals.stream()
-                .mapToDouble(StrategySignal::getConfidence)
-                .average()
-                .orElse(0.0);
-
-        double avgRiskReward = signals.stream()
-                .mapToDouble(StrategySignal::getRiskRewardRatio)
-                .filter(value -> Double.isFinite(value) && value > 0)
-                .average()
-                .orElse(0.0);
-
-        StrategySignal latest = getMostRecentStrategySignal();
-
-        String latestSummary = latest == null
-                ? "None"
-                : "%s %s confidence=%.2f reason=%s".formatted(
-                        safe(latest.getStrategyId()),
-                        latest.getSide(),
-                        latest.getConfidence(),
-                        safeSignalReason(latest));
-
-        return """
-                Strategy Statistics
-                Total cached signals: %d
-                BUY signals: %d
-                SELL signals: %d
-                HOLD signals: %d
-                Average confidence: %.2f
-                Average risk/reward: %.2f
-                Latest signal: %s
-                """.formatted(
-                total,
-                buyCount,
-                sellCount,
-                holdCount,
-                avgConfidence,
-                avgRiskReward,
-                latestSummary);
     }
 
     /**
@@ -1479,29 +1425,6 @@ private SymbolExecutionFilter symbolExecutionFilter;
     }
 
     /**
-     * Calculate return percentage using real PnL and best available account
-     * equity/balance.
-     * <p>
-     * If account balance/equity cannot be loaded, returns 0 instead of a fake
-     * value.
-     */
-    public double calculateReturnPercentage() {
-        double totalPnl = calculateTotalPnL();
-
-        if (tradeExecutionCoordinator == null || exchange == null || totalPnl == 0.0) {
-            return 0.0;
-        }
-
-        double accountValue = getBestAvailableAccountValue();
-
-        if (!Double.isFinite(accountValue) || accountValue <= 0.0) {
-            return 0.0;
-        }
-
-        return (totalPnl / accountValue) * 100.0;
-    }
-
-    /**
      * Get a trade pair by symbol
      * Returns the matching pair or null if not found/selected
      */
@@ -1572,8 +1495,6 @@ private SymbolExecutionFilter symbolExecutionFilter;
     public boolean isTelegramPollingActive() {
         return telegramNotifier != null && telegramNotifier.isPollingEnabled();
     }
-
-
 
     // =====================================================================
     // AI
@@ -1710,7 +1631,7 @@ private SymbolExecutionFilter symbolExecutionFilter;
         // Telegram status
         return "📊 SystemCore Diagnostics\n\n" +
 
-                // Exchange info
+        // Exchange info
                 "*Exchange*\n" +
                 "Name: " + exchange.getName() + "\n" +
                 "ID: " + exchange.getExchangeId() + "\n" +
@@ -1771,241 +1692,4 @@ private SymbolExecutionFilter symbolExecutionFilter;
         return systemMonitorService.checkNow().isCanTrade();
     }
 
-    /**
-     * Get a formatted summary of the system health for display in Telegram or logs.
-     * Includes overall status, component summaries, warnings, and recommended
-     * actions.
-     *
-     * @return formatted multi-line health summary with emojis and component status
-     */
-    public String getSystemHealthSummary() {
-
-        StringBuilder summary = new StringBuilder();
-        summary.append("📊 *System Health Report*\n");
-        summary.append("━".repeat(40)).append("\n");
-
-        // Overall status
-        summary.append("\n*Overall Status:* ");
-        summary.append(health.getOverallStatus().getDisplayName()).append("\n");
-        summary.append("*Can Trade:* ").append(health.isCanTrade() ? "✅ YES" : "❌ NO").append("\n");
-
-        // Component summary
-        summary.append("\n*Component Status:*\n");
-        summary.append("• Exchange: ").append(health.getExchange().getStatus().getDisplayName()).append(" - ")
-                .append(health.getExchange().getSummary()).append("\n");
-        summary.append("• Market Data: ").append(health.getMarketData().getStatus().getDisplayName()).append(" - ")
-                .append(health.getMarketData().getSummary()).append("\n");
-        summary.append("• Account: ").append(health.getAccount().getStatus().getDisplayName()).append(" - ")
-                .append(health.getAccount().getSummary()).append("\n");
-        summary.append("• Strategy: ").append(health.getStrategy().getStatus().getDisplayName()).append(" - ")
-                .append(health.getStrategy().getSummary()).append("\n");
-        summary.append("• Risk: ").append(health.getRisk().getStatus().getDisplayName()).append(" - ")
-                .append(health.getRisk().getSummary()).append("\n");
-        summary.append("• Execution: ").append(health.getExecution().getStatus().getDisplayName()).append(" - ")
-                .append(health.getExecution().getSummary()).append("\n");
-        summary.append("• Agents: ").append(health.getAgents().getStatus().getDisplayName()).append(" - ")
-                .append(health.getAgents().getSummary()).append("\n");
-        summary.append("• AI: ").append(health.getAi().getStatus().getDisplayName()).append(" - ")
-                .append(health.getAi().getSummary()).append("\n");
-        summary.append("• Notifications: ").append(health.getNotifications().getStatus().getDisplayName()).append(" - ")
-                .append(health.getNotifications().getSummary()).append("\n");
-
-        // System-level warnings
-        if (!health.getWarnings().isEmpty()) {
-            summary.append("\n⚠️ *Warnings:*\n");
-            for (String warning : health.getWarnings()) {
-                summary.append("• ").append(warning).append("\n");
-            }
-        }
-
-        // System-level blockers
-        if (!health.getBlockers().isEmpty()) {
-            summary.append("\n🚨 *Blockers:*\n");
-            for (String blocker : health.getBlockers()) {
-                summary.append("• ").append(blocker).append("\n");
-            }
-        }
-
-        return summary.toString();
-    }
-
-    // =====================================================================
-    // Market Data & Order Information Methods for Telegram
-    // =====================================================================
-
-    /**
-     * Get detailed order information by order ID
-     */
-    public String getOrderDetails(String orderId) {
-        try {
-            if (tradeExecutionCoordinator == null) {
-                return "Order details unavailable";
-            }
-
-            // Try to parse as Long to find order by ID
-            try {
-                Long.parseLong(orderId);
-                // Note: tradeExecutionCoordinator may not have a getOrderById method
-                // This would need to be implemented in the actual coordinator
-                return "Order ID: " + orderId + "\nStatus: Pending\nDetails not available";
-            } catch (NumberFormatException e) {
-                return "Invalid order ID format";
-            }
-        } catch (Exception e) {
-            log.debug("Error getting order details", e);
-            return null;
-        }
-    }
-
-
-    /**
-     * Get recent trades (limited to specified count)
-     * Note: Returns "Not available yet" - integrate with real trade repository
-     */
-    public String getRecentTrades(int limit) {
-        try {
-            if (tradeExecutionCoordinator == null) {
-                return "Not available yet";
-            }
-            // TODO: integrate with TradeExecutionCoordinator to fetch real trades
-            return "Not available yet";
-        } catch (Exception e) {
-            log.debug("Error getting recent trades", e);
-            return "Not available yet";
-        }
-    }
-
-    /**
-     * Get volume trend for a symbol
-     */
-    public String getVolumeTrend(String symbol) {
-        try {
-
-            if (strategyEngine == null) {
-                return "Unknown";
-            }
-            // This would typically analyze volume data; for now return based on simple
-            // heuristic
-            return "Stable";
-        } catch (Exception e) {
-            log.debug("Error getting volume trend", e);
-            return "Unknown";
-        }
-    }
-
-    /**
-     * Get moving average for a symbol
-     */
-    public double getMovingAverage(String symbol) {
-        try {
-            TradePair pair = getTradePair(symbol);
-            if (pair == null) {
-                return 0;
-            }
-            // Return current price as proxy for moving average
-            return (pair.getBid() + pair.getAsk()) / 2;
-        } catch (Exception e) {
-            log.debug("Error getting moving average", e);
-            return 0;
-        }
-    }
-
-    /**
-     * Get RSI (Relative Strength Index) for a symbol (0-100)
-     */
-    public int getRSI(String symbol) {
-        try {
-            // Default RSI value (neutral zone)
-            return 50;
-        } catch (Exception e) {
-            log.debug("Error getting RSI", e);
-            return 50;
-        }
-    }
-
-    /**
-     * Get MACD (Moving Average Convergence Divergence) status
-     */
-    public String getMACD(String symbol) {
-        try {
-            return "Neutral";
-        } catch (Exception e) {
-            log.debug("Error getting MACD", e);
-            return "Unknown";
-        }
-    }
-
-    /**
-     * Get trade recommendation for a symbol
-     */
-    public String getTradeRecommendation(String symbol) {
-        try {
-            if (strategyEngine == null) {
-                return "Analysis unavailable - strategy engine not initialized";
-            }
-
-            // Get current pair info
-            TradePair pair = getTradePair(symbol);
-            if (pair == null) {
-                return "Symbol not found";
-            }
-
-            // Simple recommendation based on spread and volume
-            double spread = pair.getAsk() - pair.getBid();
-            double spreadPct = (spread / pair.getBid()) * 100;
-
-            if (spreadPct < 0.1) {
-                return "🟢 *BUY* - Low spread suggests good liquidity";
-            } else if (spreadPct < 0.5) {
-                return "🟡 *HOLD* - Moderate spread, wait for better entry";
-            } else {
-                return "🔴 *SELL* - High spread indicates low liquidity";
-            }
-        } catch (Exception e) {
-            log.debug("Error getting trade recommendation", e);
-            return "Recommendation unavailable";
-        }
-    }
-
-    /**
-     * Get latest market news
-     * Note: Returns "Not available yet" - integrate with news service
-     */
-    public String getLatestNews() {
-        try {
-            // TODO: integrate with real news provider
-            return "Not available yet";
-        } catch (Exception e) {
-            log.debug("Error getting news", e);
-            return "Not available yet";
-        }
-    }
-
-    /**
-     * Get top gainers
-     * Note: Returns "Not available yet" - integrate with market data provider
-     */
-    public String getTopGainers(int limit) {
-        try {
-            // TODO: integrate with market data provider
-            return "Not available yet";
-        } catch (Exception e) {
-            log.debug("Error getting top gainers", e);
-            return "Not available yet";
-        }
-    }
-
-    /**
-     * Get top losers
-     * Note: Returns "Not available yet" - integrate with market data provider
-     */
-    public String getTopLosers(int limit) {
-        try {
-            // TODO: integrate with market data provider
-            return "Not available yet";
-        } catch (Exception e) {
-            log.debug("Error getting top losers", e);
-            return "Not available yet";
-        }
-    }
 }

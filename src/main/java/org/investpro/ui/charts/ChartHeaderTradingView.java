@@ -5,11 +5,8 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+
 import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * TradingView-like professional chart header displaying key metrics.

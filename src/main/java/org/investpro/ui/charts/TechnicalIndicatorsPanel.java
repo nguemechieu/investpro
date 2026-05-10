@@ -10,6 +10,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import java.util.Map;
  */
 @Getter
 @Setter
+@Slf4j
 public class TechnicalIndicatorsPanel extends VBox {
     private static final String BG_COLOR = "#0f1724";
     private static final String SECONDARY_BG = "#1a1f2e";
@@ -145,6 +147,8 @@ public class TechnicalIndicatorsPanel extends VBox {
     /**
      * Individual indicator display box
      */
+    @Getter
+    @Slf4j
     public static class IndicatorValueBox extends VBox {
         private final Label nameLabel;
         private final Label valueLabel;

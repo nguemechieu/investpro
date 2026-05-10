@@ -8,6 +8,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Region;
 import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,7 +41,7 @@ import java.util.*;
 public class MarketWatchPanel extends BorderPane {
 
     private final SystemCore systemCore;
-    private  SymbolAgentManager symbolAgentManager;
+    private SymbolAgentManager symbolAgentManager;
     private final TableView<MarketWatchRow> table = new TableView<>();
     private final Map<TradePair, MarketWatchRow> rowCache = new LinkedHashMap<>();
 
@@ -54,10 +55,10 @@ public class MarketWatchPanel extends BorderPane {
         // Safely get SymbolAgentManager with error logging
         try {
 
-                this.symbolAgentManager = systemCore.getSymbolAgentManager();
-                if (this.symbolAgentManager == null) {
-                    log.error("SymbolAgentManager is null from SmartBot");
-                }
+            this.symbolAgentManager = systemCore.getSymbolAgentManager();
+            if (this.symbolAgentManager == null) {
+                log.error("SymbolAgentManager is null from SmartBot");
+            }
 
         } catch (Exception e) {
             log.error("Error initializing SymbolAgentManager in MarketWatchPanel", e);
@@ -72,24 +73,47 @@ public class MarketWatchPanel extends BorderPane {
         // Setup table columns
         setupTableColumns();
 
-        // Setup table styling with size constraints
+        // Setup table styling with modern appearance
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.setStyle("-fx-font-size: 11px;");
+        table.setStyle(
+                "-fx-font-size: 11px; " +
+                        "-fx-control-inner-background: #0f172a; " +
+                        "-fx-table-cell-border-color: #1e293b; " +
+                        "-fx-text-fill: #e0e7ff;");
+
+        // Add alternating row colors for better readability
+        table.setRowFactory(tv -> new TableRow<MarketWatchRow>() {
+            @Override
+            protected void updateItem(MarketWatchRow item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setStyle("");
+                } else {
+                    // Alternate colors for better readability
+                    String bgColor = getIndex() % 2 == 0 ? "#0f172a" : "#1a1f3a";
+                    setStyle("-fx-background-color: " + bgColor + "; " +
+                            "-fx-text-fill: #e0e7ff;");
+                }
+            }
+        });
+
         table.setPrefHeight(400);
         table.setMinHeight(200);
-        table.setFixedCellSize(25); // Set fixed cell height to prevent rendering issues
+        table.setFixedCellSize(26); // Slightly increased for better visibility
 
-        // Create controls
+        // Create enhanced controls bar
         HBox controls = createControlsBar();
 
         // Layout
         VBox content = new VBox(8, controls, table);
         content.setPadding(new Insets(8));
         content.setMinHeight(300);
+        content.setStyle("-fx-background-color: #0a0e27;");
         VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
 
         this.setCenter(content);
         this.setPadding(new Insets(4));
+        this.setStyle("-fx-background-color: #0a0e27;");
     }
 
     private void setupTableColumns() {
@@ -262,27 +286,78 @@ public class MarketWatchPanel extends BorderPane {
     }
 
     private HBox createControlsBar() {
-        Label titleLabel = new Label("Market Watch - Symbol Agent Status");
-        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
+        Label titleLabel = new Label("📊 Market Watch - Symbol Agent Status");
+        titleLabel.setStyle(
+                "-fx-font-size: 13px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #60a5fa; " +
+                        "-fx-font-family: 'Segoe UI', sans-serif;");
+
+        Label statusLabel = new Label("Status: ");
+        Label symbolCountLabel = new Label("Symbols: 0");
+        symbolCountLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
 
         Button refreshButton = new Button("⟳ Refresh");
-        refreshButton.setOnAction(e -> refreshMarketWatchData());
+        refreshButton.setStyle(
+                "-fx-padding: 6 12; " +
+                        "-fx-background-color: #3b82f6; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-border-radius: 3; " +
+                        "-fx-cursor: hand;");
+        refreshButton.setOnAction(e -> {
+            refreshMarketWatchData();
+            symbolCountLabel.setText("Symbols: " + rowCache.size());
+        });
 
         Button pauseButton = new Button("⏸ Pause");
+        pauseButton.setStyle(
+                "-fx-padding: 6 12; " +
+                        "-fx-background-color: #8b5cf6; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-border-radius: 3; " +
+                        "-fx-cursor: hand;");
         pauseButton.setOnAction(e -> {
             if (refreshTimer != null && refreshTimer.getStatus() == javafx.animation.Animation.Status.RUNNING) {
                 refreshTimer.stop();
                 pauseButton.setText("▶ Resume");
+                pauseButton.setStyle(
+                        "-fx-padding: 6 12; " +
+                                "-fx-background-color: #10b981; " +
+                                "-fx-text-fill: white; " +
+                                "-fx-border-radius: 3; " +
+                                "-fx-cursor: hand;");
             } else {
                 startAutoRefresh();
                 pauseButton.setText("⏸ Pause");
+                pauseButton.setStyle(
+                        "-fx-padding: 6 12; " +
+                                "-fx-background-color: #8b5cf6; " +
+                                "-fx-text-fill: white; " +
+                                "-fx-border-radius: 3; " +
+                                "-fx-cursor: hand;");
             }
         });
 
-        HBox.setHgrow(titleLabel, javafx.scene.layout.Priority.ALWAYS);
-        HBox controls = new HBox(8, titleLabel, refreshButton, pauseButton);
-        controls.setPadding(new Insets(4));
-        controls.setStyle("-fx-background-color: #1e293b; -fx-border-color: #475569; -fx-border-width: 0 0 1 0;");
+        Button exportButton = new Button("📥 Export");
+        exportButton.setStyle(
+                "-fx-padding: 6 12; " +
+                        "-fx-background-color: #06b6d4; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-border-radius: 3; " +
+                        "-fx-cursor: hand;");
+        exportButton.setOnAction(e -> exportToCSV());
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
+        HBox controls = new HBox(12, titleLabel, statusLabel, symbolCountLabel, spacer,
+                refreshButton, pauseButton, exportButton);
+        controls.setPadding(new Insets(8, 12, 8, 12));
+        controls.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        controls.setStyle(
+                "-fx-background-color: linear-gradient(to right, #1a1f35, #1e293b); " +
+                        "-fx-border-color: #334155; " +
+                        "-fx-border-width: 0 0 1 0;");
         return controls;
     }
 
@@ -393,6 +468,44 @@ public class MarketWatchPanel extends BorderPane {
     public void shutdown() {
         if (refreshTimer != null) {
             refreshTimer.stop();
+        }
+    }
+
+    /**
+     * Export market watch data to CSV file
+     */
+    private void exportToCSV() {
+        try {
+            // Create CSV header
+            StringBuilder csv = new StringBuilder();
+            csv.append("Symbol,Bid,Ask,Spread %,Session,Trading Mode,Strategy,Timeframe,Score,Live Ready,Issue\n");
+
+            // Add rows
+            for (MarketWatchRow row : rowCache.values()) {
+                csv.append(String.format("%s,%.5f,%.5f,%.4f,%s,%s,%s,%s,%.2f,%s,%s\n",
+                        row.getSymbol(),
+                        row.getBid(),
+                        row.getAsk(),
+                        row.getSpreadPercent(),
+                        row.getSession(),
+                        row.getTradingMode(),
+                        row.getActiveStrategy(),
+                        row.getActiveTimeframe(),
+                        row.getStrategyScore(),
+                        row.isLiveReady(),
+                        row.getIssue() == null ? "" : row.getIssue()));
+            }
+
+            // Save to file
+            java.nio.file.Path exportPath = java.nio.file.Paths.get(System.getProperty("user.home"),
+                    "Downloads",
+                    "MarketWatch_" + java.time.LocalDateTime.now().format(
+                            java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv");
+
+            java.nio.file.Files.writeString(exportPath, csv.toString());
+            log.info("Market watch data exported to {}", exportPath);
+        } catch (Exception e) {
+            log.error("Failed to export market watch data", e);
         }
     }
 }

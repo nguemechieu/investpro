@@ -7,11 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class RiskAgentTest {
 
@@ -50,7 +46,7 @@ class RiskAgentTest {
         assertTrue((Boolean) result.get("halt_pipeline"));
         assertTrue((Boolean) result.get("risk_blocked"));
         assertEquals("Position too large", result.get("risk_reason"));
-        assertTrue(result.get("trade_review") instanceof RiskReviewResult);
+        assertInstanceOf(RiskReviewResult.class, result.get("trade_review"));
     }
 
     @Test

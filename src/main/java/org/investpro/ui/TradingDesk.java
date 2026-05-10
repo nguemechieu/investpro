@@ -736,9 +736,14 @@ public class TradingDesk extends BorderPane {
 
         watchTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
+        // Create OrderBook display for MarketWatch using shared
+        // orderBookBids/orderBookAsks
+        VBox sharedOrderBookView = createSharedOrderBookView();
+
         watchTabs.getTabs().setAll(
                 new Tab("Symbols", marketWatchTable),
-                new Tab("Market Stats", marketInfoPanel));
+                new Tab("Market Stats", marketInfoPanel),
+                new Tab("Order Book", sharedOrderBookView));
 
         VBox box = new VBox(8, header, watchTabs);
         box.setPadding(new Insets(8));
@@ -843,6 +848,83 @@ public class TradingDesk extends BorderPane {
         return closeButton;
     }
 
+    /**
+     * Creates a compact orderbook view for the MarketWatch sidebar that shares
+     * the same orderBookBids/orderBookAsks data as the main Order Book tab.
+     * This eliminates duplicate orderbook fetches and keeps data consistent.
+     */
+    private @NotNull VBox createSharedOrderBookView() {
+        // Use HBox with two columns for compact side-by-side view
+        ListView<OrderBook.PriceLevel> bidsList = createCompactListView(true);
+        ListView<OrderBook.PriceLevel> asksList = createCompactListView(false);
+
+        HBox mainContent = new HBox(0, bidsList, asksList);
+        HBox.setHgrow(bidsList, Priority.ALWAYS);
+        HBox.setHgrow(asksList, Priority.ALWAYS);
+        mainContent.setStyle("-fx-background-color: #0f3460;");
+
+        // Header with current spread info
+        Label spreadLabel = new Label("Spread: --");
+        spreadLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #9ca3af; -fx-padding: 8;");
+
+        // Update spread on orderbook changes
+        java.util.function.Consumer<Object> updateSpread = (obj) -> {
+            if (!orderBookBids.isEmpty() && !orderBookAsks.isEmpty()) {
+                double bid = orderBookBids.get(0).getPrice();
+                double ask = orderBookAsks.get(0).getPrice();
+                double spread = ask - bid;
+                spreadLabel.setText(String.format("Spread: %.8f (%.4f%%)", spread, (spread / bid) * 100));
+            } else {
+                spreadLabel.setText("Spread: No Data");
+            }
+        };
+
+        orderBookBids.addListener((javafx.beans.InvalidationListener) observable -> updateSpread.accept(null));
+        orderBookAsks.addListener((javafx.beans.InvalidationListener) observable -> updateSpread.accept(null));
+
+        VBox container = new VBox(6, spreadLabel, mainContent);
+        container.setStyle("-fx-background-color: #0f3460;");
+        container.setPadding(new Insets(8));
+        VBox.setVgrow(mainContent, Priority.ALWAYS);
+        return container;
+    }
+
+    /**
+     * Creates a compact list view for bids or asks (for MarketWatch sidebar).
+     * Binds directly to the shared orderBookBids/orderBookAsks observable lists.
+     */
+    private @NotNull ListView<OrderBook.PriceLevel> createCompactListView(boolean isBids) {
+        ListView<OrderBook.PriceLevel> listView = new ListView<>(isBids ? orderBookBids : orderBookAsks);
+        listView.setStyle(
+                "-fx-background-color: #0f3460; -fx-text-fill: #ffffff; -fx-control-inner-background: #0f3460;");
+        listView.setCellFactory(param -> createCompactOrderBookCell(isBids));
+        listView.setPrefHeight(300);
+        return listView;
+    }
+
+    /**
+     * Creates a compact cell renderer for orderbook prices (one-line display).
+     */
+    private @NotNull javafx.scene.control.ListCell<OrderBook.PriceLevel> createCompactOrderBookCell(boolean isBids) {
+        return new javafx.scene.control.ListCell<OrderBook.PriceLevel>() {
+            @Override
+            protected void updateItem(OrderBook.PriceLevel item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    String text = String.format("%.8f | %.4f", item.getPrice(), item.getSize());
+                    setText(text);
+                    String color = isBids ? "#10b981" : "#ef4444"; // Green for bids, red for asks
+                    setStyle(String.format(
+                            "-fx-font-family: 'Courier New'; -fx-font-size: 10; -fx-text-fill: %s; -fx-padding: 2;",
+                            color));
+                }
+            }
+        };
+    }
+
     private @NotNull VBox createBidsSection() {
         HBox header = createOrderBookHeader(true);
         ListView<OrderBook.PriceLevel> listView = createBidsListView();
@@ -890,8 +972,8 @@ public class TradingDesk extends BorderPane {
         }
 
         // Get best bid and ask
-        double bestBid = orderBookBids.getFirst().getPrice();
-        double bestAsk = orderBookAsks.getFirst().getPrice();
+        double bestBid = orderBookBids.get(0).getPrice();
+        double bestAsk = orderBookAsks.get(0).getPrice();
         double midPrice = (bestBid + bestAsk) / 2.0;
         double spread = bestAsk - bestBid;
         double spreadPercent = (spread / midPrice) * 100;
@@ -1369,7 +1451,7 @@ public class TradingDesk extends BorderPane {
             marketWatchVisible = false;
         } else {
             if (!horizontalWorkbench.getItems().contains(marketWatchWrapper)) {
-                horizontalWorkbench.getItems().addFirst(marketWatchWrapper);
+                horizontalWorkbench.getItems().add(0, marketWatchWrapper);
             }
             horizontalWorkbench.setDividerPositions(0.22, 0.78);
             marketWatchVisible = true;
@@ -1400,14 +1482,13 @@ public class TradingDesk extends BorderPane {
     }
 
     private void detachConsoleWindow() {
-        if (mainVerticalWorkbench == null || systemConsole == null
-                || !mainVerticalWorkbench.getItems().contains(systemConsole)) {
+        if (centerSplit == null || systemConsole == null || !centerSplit.getItems().contains(systemConsole)) {
             return;
         }
 
-        mainVerticalWorkbench.getItems().remove(systemConsole);
+        centerSplit.getItems().remove(systemConsole);
         consoleVisible = false;
-        mainVerticalWorkbench.layout();
+        centerSplit.layout();
 
         Stage stage = new Stage();
         stage.setTitle("System Console");
@@ -1425,14 +1506,14 @@ public class TradingDesk extends BorderPane {
     }
 
     private void reattachConsole() {
-        if (mainVerticalWorkbench == null || systemConsole == null) {
+        if (centerSplit == null || systemConsole == null) {
             return;
         }
 
-        if (!mainVerticalWorkbench.getItems().contains(systemConsole)) {
-            mainVerticalWorkbench.getItems().add(systemConsole);
+        if (!centerSplit.getItems().contains(systemConsole)) {
+            centerSplit.getItems().add(systemConsole);
         }
-        mainVerticalWorkbench.setDividerPositions(0.68);
+        centerSplit.setDividerPositions(0.72);
         consoleVisible = true;
         journal("Console re-attached.");
         saveAppState();
@@ -1442,7 +1523,6 @@ public class TradingDesk extends BorderPane {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
         tab.setClosable(true);
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
-        terminalTabPane.getTabs().add(tab);
         return tab;
     }
 
@@ -2030,7 +2110,7 @@ public class TradingDesk extends BorderPane {
         return !safe(configuredApiKey).isBlank() && !safe(configuredApiSecret).isBlank();
     }
 
-    boolean canUseAutoRefreshExecutor() {
+    private boolean isAutoRefreshExecutorUnavailable() {
         return autoRefreshExecutor.isShutdown() || autoRefreshExecutor.isTerminated();
     }
 
@@ -2138,7 +2218,7 @@ public class TradingDesk extends BorderPane {
                         ? "1h"
                         : supportedTimeframes.isEmpty()
                                 ? null
-                                : supportedTimeframes.getFirst();
+                                : supportedTimeframes.get(0);
 
         if (selectedTimeframe != null) {
             timeframeSelector.getSelectionModel().select(selectedTimeframe);
@@ -2397,6 +2477,7 @@ public class TradingDesk extends BorderPane {
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
         if (selected != null) {
             loadOrderBook(selected);
+            startDesktopStream(selected);
         }
 
         updateConnectionStatus();
@@ -2743,7 +2824,9 @@ public class TradingDesk extends BorderPane {
         }
 
         activeOrderBookPair = tradePair;
-        displayOrderBook(null);
+        // DO NOT clear orderbook data - keep displaying previous data while fetching
+        // new data
+        // This prevents the on/off blinking effect when switching between chart tabs
 
         if (!exchange.supportsOrderBook()) {
             log.debug("Order book not supported for {}", exchange.getDisplayName());
@@ -3131,12 +3214,12 @@ public class TradingDesk extends BorderPane {
         if (items == null || value == null) {
             return;
         }
-        if (items.size() == 1 && items.getFirst().contains("will appear here")) {
+        if (items.size() == 1 && items.get(0).contains("will appear here")) {
             items.clear();
         }
-        items.addFirst(value);
+        items.add(0, value);
         while (items.size() > maxItems) {
-            items.removeLast();
+            items.remove(items.size() - 1);
         }
     }
 
@@ -3232,7 +3315,7 @@ public class TradingDesk extends BorderPane {
                 .findFirst()
                 .orElse(null);
 
-        TradePair selected = rememberedPair != null ? rememberedPair : tradePairs.getFirst();
+        TradePair selected = rememberedPair != null ? rememberedPair : tradePairs.get(0);
         symbolSelector.getSelectionModel().select(selected);
         marketWatchTable.getSelectionModel().select(selected);
         symbolCountLabel.setText(t("label.symbols", tradePairs.size()));
@@ -3621,7 +3704,7 @@ public class TradingDesk extends BorderPane {
             return;
         }
         // Replace all history with fetched data (reverse order to show newest first)
-        accountHistoryItems.setAll(orders.reversed());
+        accountHistoryItems.setAll(reverseCopy(orders));
         journal("Account history updated: " + orders.size() + " order(s)");
     }
 
@@ -3645,7 +3728,7 @@ public class TradingDesk extends BorderPane {
                 .peek(this::calculateTradeProfit)
                 .toList();
         // Replace all trades with fetched data (reverse order to show newest first)
-        accountTradeItems.setAll(tradesWithProfit.reversed());
+        accountTradeItems.setAll(reverseCopy(tradesWithProfit));
         journal("Trades updated: " + tradesWithProfit.size() + " trade(s)");
     }
 
@@ -3805,7 +3888,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void enablePositionAutoRefresh() {
-        if (canUseAutoRefreshExecutor()) {
+        if (isAutoRefreshExecutorUnavailable()) {
             return;
         }
         autoRefreshExecutor.scheduleAtFixedRate(() -> {
@@ -3821,7 +3904,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void startAutoRefreshTasks() {
-        if (canUseAutoRefreshExecutor()) {
+        if (isAutoRefreshExecutorUnavailable()) {
             return;
         }
         autoRefreshExecutor.scheduleAtFixedRate(() -> runOnFx(this::updateConnectionStatus), 2, 5, TimeUnit.SECONDS);
@@ -4314,10 +4397,10 @@ public class TradingDesk extends BorderPane {
                 })
                 .onTradeUpdate(trade -> {
                     if (trade != null) {
-                        accountTradeItems.addFirst(trade);
+                        accountTradeItems.add(0, trade);
 
                         while (accountTradeItems.size() > 500) {
-                            accountTradeItems.removeLast();
+                            accountTradeItems.remove(accountTradeItems.size() - 1);
                         }
                     }
                 })
@@ -4343,7 +4426,7 @@ public class TradingDesk extends BorderPane {
                 })
                 .onFillUpdate(fill -> {
                     if (fill != null) {
-                        accountTradeItems.addFirst(fill);
+                        accountTradeItems.add(0, fill);
                     }
                 })
                 .onError((exchangeName, throwable) -> journal("Stream error from %s: %s".formatted(
@@ -4600,6 +4683,15 @@ public class TradingDesk extends BorderPane {
         }
     }
 
+    private <T> List<T> reverseCopy(List<T> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        List<T> copy = new ArrayList<>(values);
+        Collections.reverse(copy);
+        return copy;
+    }
+
     private String formatProfit(double value) {
         if (!Double.isFinite(value)) {
             return "$0.00";
@@ -4667,10 +4759,10 @@ public class TradingDesk extends BorderPane {
 
     public void updateTradeFromStream(Trade trade) {
         if (trade != null) {
-            accountTradeItems.addFirst(trade);
+            accountTradeItems.add(0, trade);
 
             while (accountTradeItems.size() > 500) {
-                accountTradeItems.removeLast();
+                accountTradeItems.remove(accountTradeItems.size() - 1);
             }
         }
     }
@@ -4696,10 +4788,10 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        accountOpenOrderItems.addFirst(order);
+        accountOpenOrderItems.add(0, order);
 
         while (accountOpenOrderItems.size() > 500) {
-            accountOpenOrderItems.removeLast();
+            accountOpenOrderItems.remove(accountOpenOrderItems.size() - 1);
         }
     }
 
@@ -4708,10 +4800,10 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        accountPositionItems.addFirst(position);
+        accountPositionItems.add(0, position);
 
         while (accountPositionItems.size() > 500) {
-            accountPositionItems.removeLast();
+            accountPositionItems.remove(accountPositionItems.size() - 1);
         }
     }
 
@@ -4841,9 +4933,14 @@ public class TradingDesk extends BorderPane {
             saveAppState();
 
             /*
-             * After bot stream stops, restart UI-only stream so the desktop keeps updating.
+             * After bot stream stops, restart one UI-owned stream for the active symbol.
+             * Starting one stream per watchlist symbol would repeatedly stop the previous
+             * subscription and leave only the last symbol active.
              */
             TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+            if (selected == null && !marketWatchItems.isEmpty()) {
+                selected = marketWatchItems.get(0);
+            }
             if (selected != null && hasBrokerAccess()) {
                 startDesktopStream(selected);
             }
@@ -4871,7 +4968,7 @@ public class TradingDesk extends BorderPane {
         }
 
         try {
-            TradePair primarySymbol = symbols.getFirst();
+            TradePair primarySymbol = symbols.get(0);
 
             /*
              * Prevent duplicate exchange streams:
@@ -5822,7 +5919,8 @@ public class TradingDesk extends BorderPane {
             double averageWinPercent,
             double averageLossPercent,
             double riskRewardRatio) {
-        static StrategyStats empty() {
+        @Contract(" -> new")
+        static @NotNull StrategyStats empty() {
             return new StrategyStats(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0L, 0L, 0.0, 0.0, 0.0);
         }
     }

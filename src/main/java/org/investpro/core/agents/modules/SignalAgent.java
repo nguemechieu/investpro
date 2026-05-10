@@ -38,7 +38,7 @@ public class SignalAgent implements Agent {
     private volatile boolean running = false;
     private AgentContext context;
     private AgentEventBus eventBus;
-    private StrategyDecisionService decisionService;
+    private final StrategyDecisionService decisionService;
     private final Map<String, List<CandleData>> candleHistory = new ConcurrentHashMap<>();
     private static final int MAX_CANDLES_PER_CONTEXT = 500;
     private static final int MIN_SEEDED_CANDLES = 120;

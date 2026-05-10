@@ -238,7 +238,7 @@ public final class MonitoringTheme {
                 "} ";
     }
 
-    private MonitoringTheme() {
+    public MonitoringTheme() {
         // Utility class
     }
 }

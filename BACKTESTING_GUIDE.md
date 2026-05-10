@@ -229,7 +229,7 @@ System.out.println("Best: " + optimized.getReturnPercent() + "%");
 
 ```java
 public class MyCustomStrategy extends BacktestStrategy {
-    private int lookback;
+    private final int lookback;
     
     public MyCustomStrategy(BacktestConfig config) {
         super("My Strategy", config);

@@ -246,7 +246,7 @@ public class BackTesting {
      * Statistics aggregator for backtest results
      */
     public static class BacktestStatistics {
-        private Collection<BacktestResult> results;
+        private final Collection<BacktestResult> results;
 
         public BacktestStatistics(Collection<BacktestResult> results) {
             this.results = results;

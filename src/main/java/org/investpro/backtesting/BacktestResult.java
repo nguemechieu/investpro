@@ -34,7 +34,7 @@ public class BacktestResult {
     // Execution metrics
     private long backTestDuration; // in milliseconds
     private List<TradeRecord> trades;
-    private Map<String, Object> additionalMetrics;
+    private final Map<String, Object> additionalMetrics;
 
     public BacktestResult() {
         this.trades = new ArrayList<>();

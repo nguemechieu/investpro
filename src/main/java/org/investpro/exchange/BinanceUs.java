@@ -66,7 +66,18 @@ public class BinanceUs extends Exchange {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final String BINANCE_US_WS_URL = "wss://stream.binance.us:9443/ws";
     private static final String BINANCE_US_REST_URL = "https://api.binance.us";
-    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+
+    // Properly configured HTTP client with timeouts and connection pooling
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_2)
+            .connectTimeout(java.time.Duration.ofSeconds(15))
+            .executor(Executors.newVirtualThreadPerTaskExecutor())
+            .build();
+
+    // Retry configuration
+    private static final int MAX_RETRIES = 3;
+    private static final long INITIAL_RETRY_DELAY_MS = 100L;
+    private static final double RETRY_BACKOFF_MULTIPLIER = 2.0;
     private static final String REST_BASE_URL = "";
     private static final String MARKET_DATA_WS_URL = "";
     private ExchangeWebSocketClient websocketClient;
@@ -896,10 +907,11 @@ public class BinanceUs extends Exchange {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(BINANCE_US_REST_URL + "/api/v3/trades?" + query))
                         .header("User-Agent", "InvestPro/1.0")
+                        .timeout(java.time.Duration.ofSeconds(10))
                         .GET()
                         .build();
 
-                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                HttpResponse<String> response = sendWithRetry(request);
 
                 if (response.statusCode() != 200) {
                     if (response.statusCode() == 429 || response.statusCode() == 418) {
@@ -1655,10 +1667,11 @@ public class BinanceUs extends Exchange {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(BINANCE_US_REST_URL + "/api/v3/depth?" + query))
                         .header("User-Agent", "InvestPro/1.0")
+                        .timeout(java.time.Duration.ofSeconds(10))
                         .GET()
                         .build();
 
-                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                HttpResponse<String> response = sendWithRetry(request);
                 JsonNode body = OBJECT_MAPPER.readTree(response.body());
 
                 if (response.statusCode() != 200) {
@@ -2143,6 +2156,59 @@ public class BinanceUs extends Exchange {
         }
     }
 
+    /**
+     * Execute HTTP request with exponential backoff retry on transient failures
+     */
+    private static HttpResponse<String> sendWithRetry(HttpRequest request) throws Exception {
+        long delayMs = INITIAL_RETRY_DELAY_MS;
+        Exception lastException = null;
+
+        for (int attempt = 0; true; attempt++) {
+            try {
+                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+                // Don't retry on rate limit or auth errors
+                if (response.statusCode() == 429 || response.statusCode() == 418 ||
+                        response.statusCode() == 401 || response.statusCode() == 403) {
+                    return response;
+                }
+
+                // Success - return immediately
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    return response;
+                }
+
+                // For other HTTP errors, try a few times
+                if (attempt < MAX_RETRIES && response.statusCode() >= 500) {
+                    delayMs = (long) (delayMs * RETRY_BACKOFF_MULTIPLIER);
+                    Thread.sleep(delayMs);
+                    continue;
+                }
+
+                return response;
+            } catch (java.io.IOException e) {
+                lastException = e;
+
+                // Only retry on connection-level errors
+                if (attempt < MAX_RETRIES) {
+                    logger.debug("HTTP request failed (attempt {}/{}): {}. Retrying in {}ms",
+                            attempt + 1, MAX_RETRIES + 1, e.getMessage(), delayMs);
+
+                    try {
+                        Thread.sleep(delayMs);
+                        delayMs = (long) (delayMs * RETRY_BACKOFF_MULTIPLIER);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw ie;
+                    }
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+    }
+
     private static String decimal(double value) {
         if (!Double.isFinite(value) || value <= 0) {
             throw new IllegalArgumentException("Order amount and price values must be positive.");
@@ -2431,33 +2497,6 @@ public class BinanceUs extends Exchange {
             return account;
         } catch (Exception exception) {
             logger.error("Error parsing account", exception);
-            return null;
-        }
-    }
-
-    /**
-     * Parses fill/execution data from WebSocket stream
-     */
-    private Trade parseFill(JsonNode eventNode) {
-        try {
-            Trade trade = new Trade();
-
-            String symbol = eventNode.path("s").asText();
-            TradePair tradePair = tradePairFromSymbol(symbol);
-            trade.setTradePair(tradePair);
-
-            String side = eventNode.path("S").asText();
-            trade.setTransactionType("SELL".equals(side) ? Side.SELL : Side.BUY);
-
-            trade.setPrice(eventNode.path("L").asDouble(0.0)); // Fill price
-            trade.setAmount(eventNode.path("z").asDouble(0.0)); // Filled quantity
-            trade.setFee(eventNode.path("n").asDouble(0.0)); // Commission
-            trade.setTimestamp(Instant.ofEpochMilli(eventNode.path("T").asLong()));
-            trade.setLocalTradeId(eventNode.path("t").asLong());
-
-            return trade;
-        } catch (Exception exception) {
-            logger.debug("Error parsing fill", exception);
             return null;
         }
     }

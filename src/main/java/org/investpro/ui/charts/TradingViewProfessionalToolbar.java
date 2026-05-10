@@ -300,7 +300,7 @@ public class TradingViewProfessionalToolbar extends VBox {
         });
     }
 
-    private Label createLabel(@NotNull String text) {
+    private @NotNull Label createLabel(@NotNull String text) {
         Label label = new Label(text);
         label.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 11px;");
         return label;

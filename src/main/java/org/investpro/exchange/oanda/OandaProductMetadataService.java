@@ -43,7 +43,7 @@ public class OandaProductMetadataService {
         OandaInstrumentClassifier.Classification classification = 
             classifier.classify(instrumentName, new HashMap<>());
         
-        if (classification.instrumentType == InstrumentType.UNKNOWN) {
+        if (classification.instrumentType() == InstrumentType.UNKNOWN) {
             return null;
         }
         
@@ -53,17 +53,17 @@ public class OandaProductMetadataService {
             instrumentName,
             instrumentName,
             BrokerVenue.OANDA_FX_CFD,
-            classification.assetClass,
+                classification.assetClass(),
             MarketType.CFD,
-            classification.instrumentType,
-            classification.baseAsset,
-            classification.quoteAsset,
-            classification.settlementAsset,
+                classification.instrumentType(),
+                classification.baseAsset(),
+                classification.quoteAsset(),
+                classification.settlementAsset(),
             getPriceIncrement(instrumentName),
             getQuantityIncrement(instrumentName),
             getMinQuantity(instrumentName),
             getMinNotional(instrumentName),
-            getMaxLeverage(classification.instrumentType),
+            getMaxLeverage(classification.instrumentType()),
             true,
             false
         );

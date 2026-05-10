@@ -117,26 +117,8 @@ public class CoinbaseOrderPayloadFactory {
             return null;
         }
     }
-    
-    public static class CoinbaseOrderResponse {
-        public final String orderId;
-        public final String productId;
-        public final String side;
-        public final BigDecimal size;
-        public final BigDecimal price;
-        public final String status;
-        public final String createdAt;
-        
-        public CoinbaseOrderResponse(String orderId, String productId, String side,
-                                    BigDecimal size, BigDecimal price, String status,
-                                    String createdAt) {
-            this.orderId = orderId;
-            this.productId = productId;
-            this.side = side;
-            this.size = size;
-            this.price = price;
-            this.status = status;
-            this.createdAt = createdAt;
-        }
+
+    public record CoinbaseOrderResponse(String orderId, String productId, String side, BigDecimal size,
+                                        BigDecimal price, String status, String createdAt) {
     }
 }

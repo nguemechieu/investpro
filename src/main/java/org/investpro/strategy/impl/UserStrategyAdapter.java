@@ -64,7 +64,7 @@ public class UserStrategyAdapter implements TradingStrategy {
 
             // Safety: if user returns null, use HOLD
             if (signal == null) {
-                log.warn("User strategy {} returned null signal, using HOLD", String.valueOf(getId()));
+                log.warn("User strategy {} returned null signal, using HOLD", getId());
                 return StrategySignal.hold(
                         context.getSymbol() != null ? context.getSymbol().toString() : "UNKNOWN",
                         context.getTimeframe() != null ? context.getTimeframe().toString() : "UNKNOWN",
@@ -78,7 +78,7 @@ public class UserStrategyAdapter implements TradingStrategy {
             return normalized;
 
         } catch (Exception e) {
-            log.error("Exception in user strategy {}: {}", String.valueOf(getId()), e.getMessage(), e);
+            log.error("Exception in user strategy {}: {}", getId(), e.getMessage(), e);
             lastSignalDescription = "Error: " + e.getClass().getSimpleName();
             return StrategySignal.hold(
                     context.getSymbol() != null ? context.getSymbol().toString() : "UNKNOWN",

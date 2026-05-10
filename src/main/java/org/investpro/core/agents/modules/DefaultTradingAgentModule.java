@@ -60,7 +60,7 @@ public class DefaultTradingAgentModule implements AgentModule {
             registerAgent(registry, new org.investpro.core.agents.risk.RiskAgent(createRiskReviewer(dependencies)));
             registerAgent(registry, new PortfolioAgent());
             registerAgent(registry, new PositionManagementAgent());
-            registerAgent(registry, new ExecutionAgent(dependencies.getTradeExecutionCoordinator()));
+            registerAgent(registry, new ExecutionAgent(dependencies.tradeExecutionCoordinator()));
             registerAgent(registry, new AuditAgent());
 
             log.info(
@@ -91,7 +91,7 @@ public class DefaultTradingAgentModule implements AgentModule {
         return request -> CompletableFuture.supplyAsync(() -> {
             StrategySignal signal = request.getSignal();
             TradeRiskContext riskContext = buildRiskContext(dependencies, signal);
-            RiskDecision decision = dependencies.getRiskManagementSystem().evaluateTrade(riskContext);
+            RiskDecision decision = dependencies.riskManagementSystem().evaluateTrade(riskContext);
 
             if (!decision.canProceed()) {
                 return RiskReviewResult.builder()
@@ -135,7 +135,7 @@ public class DefaultTradingAgentModule implements AgentModule {
                 .symbol(pair)
                 .assetClass(pair == null ? "UNKNOWN" : String.valueOf(pair.getAssetClass()))
                 .contractType(pair == null ? "UNKNOWN" : String.valueOf(pair.getContractType()))
-                .broker(dependencies.getExchange() == null ? "" : dependencies.getExchange().getName())
+                .broker(dependencies.exchange() == null ? "" : dependencies.exchange().getName())
                 .accountEquity(1000.0)
                 .availableCash(1000.0)
                 .currentOpenRisk(0.0)
@@ -165,9 +165,9 @@ public class DefaultTradingAgentModule implements AgentModule {
     }
 
     private TradePair resolveTradePair(SystemCoreDependencies dependencies, StrategySignal signal) {
-        if (dependencies.getExchange() != null) {
+        if (dependencies.exchange() != null) {
             try {
-                for (TradePair pair : dependencies.getExchange().getTradePairSymbol()) {
+                for (TradePair pair : dependencies.exchange().getTradePairSymbol()) {
                     if (pair != null && signal.getSymbol() != null
                             && pair.toString('/').equalsIgnoreCase(signal.getSymbol())) {
                         return pair;

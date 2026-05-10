@@ -127,10 +127,10 @@ public abstract class BacktestStrategy {
     public static class SignalEvent {
         public enum Type { BUY, SELL, HOLD }
         
-        private int candleIndex;
-        private Type type;
-        private String reason;
-        private double strength; // 0.0 to 1.0
+        private final int candleIndex;
+        private final Type type;
+        private final String reason;
+        private final double strength; // 0.0 to 1.0
 
         public SignalEvent(int candleIndex, Type type, String reason) {
             this(candleIndex, type, reason, 1.0);

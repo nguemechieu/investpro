@@ -272,7 +272,7 @@ public class Db1 implements Db {
             stmt.setString(1, value);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    log.debug("Found record: {}", rs.toString());
+                    log.debug("Found record: {}", rs);
                 }
             }
         } catch (SQLException e) {

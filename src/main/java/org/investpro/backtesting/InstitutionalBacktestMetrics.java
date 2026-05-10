@@ -28,7 +28,7 @@ public class InstitutionalBacktestMetrics {
     private double totalReturn;
     private double totalReturnPercent;
     private double annualizedReturn;
-    private double initialBalance;
+    private final double initialBalance;
     private double finalBalance;
 
     // Trade statistics
@@ -78,10 +78,10 @@ public class InstitutionalBacktestMetrics {
     private double uptake;
 
     // Additional statistics
-    private List<Double> drawdownSequence;
-    private List<Long> holdingPeriods;
-    private List<Double> monthlyReturns;
-    private Map<Integer, Double> returnsByMonth;
+    private final List<Double> drawdownSequence;
+    private final List<Long> holdingPeriods;
+    private final List<Double> monthlyReturns;
+    private final Map<Integer, Double> returnsByMonth;
 
     private static final double RISK_FREE_RATE = 0.02; // 2% annual risk-free rate
     private static final int TRADING_DAYS_PER_YEAR = 252;
@@ -361,52 +361,52 @@ public class InstitutionalBacktestMetrics {
      * Get a formatted summary of all metrics
      */
     public String getSummary() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("═══════════════════════════════════════════════════════════════\n");
-        sb.append("        INSTITUTIONAL BACKTESTING REPORT\n");
-        sb.append("═══════════════════════════════════════════════════════════════\n\n");
 
-        // Performance metrics
-        sb.append("┌─ PERFORMANCE METRICS ─────────────────────────────────────┐\n");
-        sb.append(String.format("│ Initial Balance:        $%.2f\n", initialBalance));
-        sb.append(String.format("│ Final Balance:          $%.2f\n", finalBalance));
-        sb.append(String.format("│ Total Return:           $%.2f (%.2f%%)\n", totalReturn, totalReturnPercent));
-        sb.append(String.format("│ Annualized Return:      %.2f%%\n", annualizedReturn));
-        sb.append("└───────────────────────────────────────────────────────────┘\n\n");
+        String sb = "═══════════════════════════════════════════════════════════════\n" +
+                "        INSTITUTIONAL BACKTESTING REPORT\n" +
+                "═══════════════════════════════════════════════════════════════\n\n" +
 
-        // Trade statistics
-        sb.append("┌─ TRADE STATISTICS ────────────────────────────────────────┐\n");
-        sb.append(String.format("│ Total Trades:           %d\n", totalTrades));
-        sb.append(String.format("│ Winning Trades:         %d (%.1f%%)\n", winningTrades, winRate));
-        sb.append(String.format("│ Losing Trades:          %d\n", losingTrades));
-        sb.append(String.format("│ Avg Win Size:           $%.2f\n", avgWinSize));
-        sb.append(String.format("│ Avg Loss Size:          $%.2f\n", avgLossSize));
-        sb.append(String.format("│ Profit Factor:          %.2f\n", profitFactor));
-        sb.append(String.format("│ Expectancy per Trade:   $%.2f\n", expectancy));
-        sb.append("└───────────────────────────────────────────────────────────┘\n\n");
+                // Performance metrics
+                "┌─ PERFORMANCE METRICS ─────────────────────────────────────┐\n" +
+                String.format("│ Initial Balance:        $%.2f\n", initialBalance) +
+                String.format("│ Final Balance:          $%.2f\n", finalBalance) +
+                String.format("│ Total Return:           $%.2f (%.2f%%)\n", totalReturn, totalReturnPercent) +
+                String.format("│ Annualized Return:      %.2f%%\n", annualizedReturn) +
+                "└───────────────────────────────────────────────────────────┘\n\n" +
 
-        // Risk metrics
-        sb.append("┌─ RISK METRICS ────────────────────────────────────────────┐\n");
-        sb.append(String.format("│ Max Drawdown:           %.2f%% ($%.2f)\n", maxDrawdownPercent, maxDrawdown));
-        sb.append(String.format("│ Avg Drawdown:           %.2f%%\n", avgDrawdown));
-        sb.append(String.format("│ Sharpe Ratio:           %.2f\n", sharpeRatio));
-        sb.append(String.format("│ Sortino Ratio:          %.2f\n", sortinoRatio));
-        sb.append(String.format("│ Calmar Ratio:           %.2f\n", calmarRatio));
-        sb.append(String.format("│ Recovery Factor:        %.2f\n", recoveryFactor));
-        sb.append("└───────────────────────────────────────────────────────────┘\n\n");
+                // Trade statistics
+                "┌─ TRADE STATISTICS ────────────────────────────────────────┐\n" +
+                String.format("│ Total Trades:           %d\n", totalTrades) +
+                String.format("│ Winning Trades:         %d (%.1f%%)\n", winningTrades, winRate) +
+                String.format("│ Losing Trades:          %d\n", losingTrades) +
+                String.format("│ Avg Win Size:           $%.2f\n", avgWinSize) +
+                String.format("│ Avg Loss Size:          $%.2f\n", avgLossSize) +
+                String.format("│ Profit Factor:          %.2f\n", profitFactor) +
+                String.format("│ Expectancy per Trade:   $%.2f\n", expectancy) +
+                "└───────────────────────────────────────────────────────────┘\n\n" +
 
-        // Advanced metrics
-        sb.append("┌─ ADVANCED METRICS ────────────────────────────────────────┐\n");
-        sb.append(String.format("│ Max Consecutive Wins:   %d\n", maxConsecutiveWins));
-        sb.append(String.format("│ Max Consecutive Losses: %d\n", maxConsecutiveLosses));
-        sb.append(String.format("│ Profit Std Dev:         $%.2f\n", profitStdDev));
-        sb.append(String.format("│ Skewness:               %.2f\n", skewness));
-        sb.append(String.format("│ Kurtosis:               %.2f\n", kurtosis));
-        sb.append(String.format("│ VaR (95%%):              $%.2f\n", var95));
-        sb.append(String.format("│ CVaR (95%%):             $%.2f\n", cvar95));
-        sb.append("└───────────────────────────────────────────────────────────┘\n");
+                // Risk metrics
+                "┌─ RISK METRICS ────────────────────────────────────────────┐\n" +
+                String.format("│ Max Drawdown:           %.2f%% ($%.2f)\n", maxDrawdownPercent, maxDrawdown) +
+                String.format("│ Avg Drawdown:           %.2f%%\n", avgDrawdown) +
+                String.format("│ Sharpe Ratio:           %.2f\n", sharpeRatio) +
+                String.format("│ Sortino Ratio:          %.2f\n", sortinoRatio) +
+                String.format("│ Calmar Ratio:           %.2f\n", calmarRatio) +
+                String.format("│ Recovery Factor:        %.2f\n", recoveryFactor) +
+                "└───────────────────────────────────────────────────────────┘\n\n" +
 
-        return sb.toString();
+                // Advanced metrics
+                "┌─ ADVANCED METRICS ────────────────────────────────────────┐\n" +
+                String.format("│ Max Consecutive Wins:   %d\n", maxConsecutiveWins) +
+                String.format("│ Max Consecutive Losses: %d\n", maxConsecutiveLosses) +
+                String.format("│ Profit Std Dev:         $%.2f\n", profitStdDev) +
+                String.format("│ Skewness:               %.2f\n", skewness) +
+                String.format("│ Kurtosis:               %.2f\n", kurtosis) +
+                String.format("│ VaR (95%%):              $%.2f\n", var95) +
+                String.format("│ CVaR (95%%):             $%.2f\n", cvar95) +
+                "└───────────────────────────────────────────────────────────┘\n";
+
+        return sb;
     }
 
     /**

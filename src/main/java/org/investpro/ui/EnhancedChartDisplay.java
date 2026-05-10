@@ -1,11 +1,11 @@
 package org.investpro.ui;
 
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.Exchange;
@@ -15,7 +15,6 @@ import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.ChartHeaderTradingView;
 import org.investpro.ui.charts.TechnicalIndicatorsPanel;
 import org.investpro.ui.charts.TradeVisualizationOverlay;
-import org.investpro.ui.charts.TradingViewEnhancedChart;
 import org.investpro.ui.charts.TradingViewProfessionalToolbar;
 import org.investpro.ui.charts.VolumeIndicatorPanel;
 import org.jetbrains.annotations.NotNull;
@@ -35,6 +34,7 @@ import java.util.Map;
  * @author NOEL NGUEMECHIEU
  */
 @Getter
+@Setter
 @Slf4j
 public class EnhancedChartDisplay extends BorderPane {
     private static final String BG_COLOR = "#0a0e17";
@@ -197,9 +197,7 @@ public class EnhancedChartDisplay extends BorderPane {
     private void setupChartCallbacks() {
         // Update header when candlestick data updates
         if (candleStickChart != null) {
-            candleStickChart.setCandleSelectionCallback(candle -> {
-                updateChartHeaderFromCandle(candle);
-            });
+            candleStickChart.setCandleSelectionCallback(this::updateChartHeaderFromCandle);
         }
     }
 

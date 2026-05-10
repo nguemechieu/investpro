@@ -135,7 +135,7 @@ public class StrategyBacktestRunner {
                     StrategyBacktestTrade closedTrade = closeTrade(
                             currentTrade,
                             exit.exitPrice,
-                            (int) candle.openTime(),
+                            candle.openTime(),
                             i - entryBar,
                             exit.exitReason,
                             request.getCommissionRate(),
@@ -171,7 +171,7 @@ public class StrategyBacktestRunner {
                     // Enter trade
                     currentTrade = StrategyBacktestTrade.builder()
                             .strategyName(request.getStrategyName())
-                            .symbol(request.getSymbol().toString())
+                            .symbol(request.getSymbol())
                             .timeframe(request.getTimeframe())
                             .side(signal.getSide())
                             .entryPrice(candle.closePrice()) // Use candle close as entry
@@ -194,7 +194,7 @@ public class StrategyBacktestRunner {
             StrategyBacktestTrade closedTrade = closeTrade(
                     currentTrade,
                     lastCandle.closePrice(),
-                    (int) lastCandle.openTime(),
+                    lastCandle.openTime(),
                     candles.size() - entryBar,
                     "Backtest end",
                     request.getCommissionRate(),
@@ -378,7 +378,7 @@ public class StrategyBacktestRunner {
         return StrategyPerformanceReport.builder()
                 .strategyName(request.getStrategyName())
                 .baseStrategyName(baseName)
-                .symbol(request.getSymbol().toString())
+                .symbol(request.getSymbol())
                 .timeframe(request.getTimeframe())
                 .totalTrades(totalTrades)
                 .winningTrades(winCount)
@@ -466,7 +466,7 @@ public class StrategyBacktestRunner {
         score += Math.min(25, winRate * 100);
 
         // Total return: 0-20 points (capped at 20% return)
-        score += Math.min(20, totalReturn * 1.0);
+        score += Math.min(20, totalReturn);
 
         // Profit factor: 0-15 points
         score += Math.min(15, profitFactor * 5);
@@ -501,7 +501,7 @@ public class StrategyBacktestRunner {
         return StrategyPerformanceReport.builder()
                 .strategyName(request.getStrategyName())
                 .baseStrategyName(baseName)
-                .symbol(request.getSymbol().toString())
+                .symbol(request.getSymbol())
                 .timeframe(request.getTimeframe())
                 .totalTrades(0)
                 .winningTrades(0)

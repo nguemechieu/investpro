@@ -157,15 +157,14 @@ public final class LicensePanel extends VBox {
 
     private void showLicenseDetails() {
         LicenseStatus status = licenseManager.getStatus();
-        StringBuilder details = new StringBuilder();
-        details.append("License Type: ").append(status.getLicenseType().getDisplayName()).append("\n");
-        details.append("Licensee: ").append(status.getLicenseeName()).append("\n");
-        details.append("Status: ").append(status.getStatusText()).append("\n");
-        details.append("Days Until Expiration: ").append(status.getDaysUntilExpiration()).append("\n");
-        details.append("Max Connections: ").append(status.getMaxConnections()).append("\n");
-        details.append("Max Strategies: ").append(status.getMaxStrategies()).append("\n");
+        String details = "License Type: " + status.getLicenseType().getDisplayName() + "\n" +
+                "Licensee: " + status.getLicenseeName() + "\n" +
+                "Status: " + status.getStatusText() + "\n" +
+                "Days Until Expiration: " + status.getDaysUntilExpiration() + "\n" +
+                "Max Connections: " + status.getMaxConnections() + "\n" +
+                "Max Strategies: " + status.getMaxStrategies() + "\n";
 
-        Label detailsLabel = new Label(details.toString());
+        Label detailsLabel = new Label(details);
         detailsLabel.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-family: monospace;");
 
         Dialog<Void> dialog = new Dialog<>();

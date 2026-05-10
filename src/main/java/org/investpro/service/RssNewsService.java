@@ -19,15 +19,11 @@ import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * RSS News Service for InvestPro.
@@ -135,16 +131,12 @@ public class RssNewsService {
     private final String userAgent;
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
-    @lombok.Data
-    private static class CacheEntry {
-        private final long createdAt;
-        private final List<Map<String, Object>> events;
-
-        CacheEntry(long createdAt, List<Map<String, Object>> events) {
-            this.createdAt = createdAt;
-            this.events = new ArrayList<>(events);
+    private record CacheEntry(long createdAt, List<Map<String, Object>> events) {
+            private CacheEntry(long createdAt, List<Map<String, Object>> events) {
+                this.createdAt = createdAt;
+                this.events = new ArrayList<>(events);
+            }
         }
-    }
 
     public RssNewsService() {
         this(true, DEFAULT_FEED_URL, 15, 300, DEFAULT_USER_AGENT);
@@ -504,7 +496,7 @@ public class RssNewsService {
                         Duration.between(timestamp.toInstant(), now.toInstant()).toSeconds() / 3600.0);
 
                 @SuppressWarnings("unchecked")
-                Map<String, Object> scoreResult = (Map<String, Object>) scoreHeadline(title, description, source);
+                Map<String, Object> scoreResult = scoreHeadline(title, description, source);
                 double sentimentScore = ((Number) scoreResult.get("sentiment")).doubleValue();
                 double impact = ((Number) scoreResult.get("impact")).doubleValue();
                 @SuppressWarnings("unchecked")
@@ -727,13 +719,13 @@ public class RssNewsService {
             return null;
         }
 
-        long ageSeconds = System.currentTimeMillis() - cached.getCreatedAt();
+        long ageSeconds = System.currentTimeMillis() - cached.createdAt();
         if (ageSeconds > cacheTtlSeconds * 1000) {
             cache.remove(key);
             return null;
         }
 
-        return new ArrayList<>(cached.getEvents());
+        return new ArrayList<>(cached.events());
     }
 
     private void setCached(String key, List<Map<String, Object>> events) {

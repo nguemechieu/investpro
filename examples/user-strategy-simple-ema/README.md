@@ -277,7 +277,7 @@ if (myCondition) {
 Create a configuration class and read from properties file:
 
 ```java
-private double thresholdPercent = 0.02; // 2% threshold
+private final double thresholdPercent = 0.02; // 2% threshold
 ```
 
 ## Troubleshooting

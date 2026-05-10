@@ -71,17 +71,12 @@ public class VolumeIndicatorPanel extends StackPane {
 
     /**
      * Volume bar data structure
+     *
+     * @param isUpCandle true for close > open, false for close <= open
+     * @param index      Position in the chart
      */
-    @Getter
-    @Builder
-    @ToString
-    @AllArgsConstructor
-    public static class VolumeBar {
-        private final double volume;
-        private final boolean isUpCandle; // true for close > open, false for close <= open
-        private final int index; // Position in the chart
-        private final long timestamp;
-        private final String label;
+        @Builder
+        public record VolumeBar(double volume, boolean isUpCandle, int index, long timestamp, String label) {
     }
 
     /**
@@ -242,7 +237,7 @@ public class VolumeIndicatorPanel extends StackPane {
 
             // Draw line segment
             if (lastY != null) {
-                Double lastX = (displayIndex - 1) * (barWidth + CANDLE_SPACING) + barWidth / 2;
+                double lastX = (displayIndex - 1) * (barWidth + CANDLE_SPACING) + barWidth / 2;
                 gc.strokeLine(lastX, lastY, x, y);
             }
 
@@ -278,7 +273,7 @@ public class VolumeIndicatorPanel extends StackPane {
         }
 
         double max = volumeBars.stream()
-                .mapToDouble(VolumeBar::getVolume)
+                .mapToDouble(VolumeBar::volume)
                 .max()
                 .orElse(1000);
 
@@ -294,7 +289,7 @@ public class VolumeIndicatorPanel extends StackPane {
         }
     }
 
-    private String formatVolume(double volume) {
+    private @NotNull String formatVolume(double volume) {
         if (volume >= 1_000_000) {
             return String.format("%.0fM", volume / 1_000_000);
         } else if (volume >= 1_000) {
@@ -320,10 +315,10 @@ public class VolumeIndicatorPanel extends StackPane {
         if (volumeBars.isEmpty())
             return "No volume data";
 
-        double totalVolume = volumeBars.stream().mapToDouble(VolumeBar::getVolume).sum();
+        double totalVolume = volumeBars.stream().mapToDouble(VolumeBar::volume).sum();
         double upVolume = volumeBars.stream()
                 .filter(VolumeBar::isUpCandle)
-                .mapToDouble(VolumeBar::getVolume)
+                .mapToDouble(VolumeBar::volume)
                 .sum();
         double downVolume = totalVolume - upVolume;
 

@@ -127,23 +127,8 @@ public class OandaOrderPayloadFactory {
             return null;
         }
     }
-    
-    public static class OandaOrderResponse {
-        public final String transactionId;
-        public final String instrument;
-        public final String units;
-        public final String price;
-        public final String status;
-        public final String time;
-        
-        public OandaOrderResponse(String transactionId, String instrument, String units,
-                                 String price, String status, String time) {
-            this.transactionId = transactionId;
-            this.instrument = instrument;
-            this.units = units;
-            this.price = price;
-            this.status = status;
-            this.time = time;
-        }
+
+    public record OandaOrderResponse(String transactionId, String instrument, String units, String price, String status,
+                                     String time) {
     }
 }

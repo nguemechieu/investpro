@@ -170,6 +170,8 @@ public class CandleStickChart extends Region {
 
     private final List<PriceLine> priceLines = new ArrayList<>();
     private final List<ChartIndicator> indicators = new ArrayList<>();
+    private final List<ChartEvent> chartEvents = Collections.synchronizedList(new ArrayList<>());
+    private boolean showChartEvents = true; // Toggle for displaying events
     private Image backgroundImage;
     private double backgroundImageOpacity = 0.22;
 
@@ -367,7 +369,7 @@ public class CandleStickChart extends Region {
     }
 
     private void setupNewsEventsButton() {
-        newsEventsButton = new Button("📰 News");
+        newsEventsButton = new Button("📰 Events");
         newsEventsButton.setStyle(
                 "-fx-font-size: 11; " +
                         "-fx-padding: 6 12; " +
@@ -378,27 +380,36 @@ public class CandleStickChart extends Region {
                         "-fx-background-radius: 4; " +
                         "-fx-cursor: hand;");
 
-        newsEventsButton.setOnMouseEntered(e -> newsEventsButton.setStyle(
-                "-fx-font-size: 11; " +
-                        "-fx-padding: 6 12; " +
-                        "-fx-background-color: #1e3a8a; " +
-                        "-fx-text-fill: #ffffff; " +
-                        "-fx-border-color: #3b82f6; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4; " +
-                        "-fx-cursor: hand;"));
+        newsEventsButton.setOnMouseEntered(e -> {
+            if (showChartEvents) {
+                newsEventsButton.setStyle(
+                        "-fx-font-size: 11; " +
+                                "-fx-padding: 6 12; " +
+                                "-fx-background-color: #059669; " +
+                                "-fx-text-fill: #ffffff; " +
+                                "-fx-border-color: #34d399; " +
+                                "-fx-border-radius: 4; " +
+                                "-fx-background-radius: 4; " +
+                                "-fx-cursor: hand;");
+            } else {
+                newsEventsButton.setStyle(
+                        "-fx-font-size: 11; " +
+                                "-fx-padding: 6 12; " +
+                                "-fx-background-color: #1e3a8a; " +
+                                "-fx-text-fill: #ffffff; " +
+                                "-fx-border-color: #3b82f6; " +
+                                "-fx-border-radius: 4; " +
+                                "-fx-background-radius: 4; " +
+                                "-fx-cursor: hand;");
+            }
+        });
 
-        newsEventsButton.setOnMouseExited(e -> newsEventsButton.setStyle(
-                "-fx-font-size: 11; " +
-                        "-fx-padding: 6 12; " +
-                        "-fx-background-color: #1e40af; " +
-                        "-fx-text-fill: #ffffff; " +
-                        "-fx-border-color: #3b82f6; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4; " +
-                        "-fx-cursor: hand;"));
+        newsEventsButton.setOnMouseExited(e -> updateNewsEventsButtonStyle());
 
-        newsEventsButton.setOnAction(event -> showNewsEvents());
+        newsEventsButton.setOnAction(event -> {
+            toggleChartEvents();
+            updateNewsEventsButtonStyle();
+        });
 
         // Create a container for the button positioned at top-right
         HBox buttonContainer = new HBox(newsEventsButton);
@@ -409,43 +420,71 @@ public class CandleStickChart extends Region {
         chartStackPane.getChildren().add(buttonContainer);
     }
 
+    /**
+     * Update news events button style based on visibility state
+     */
+    private void updateNewsEventsButtonStyle() {
+        if (showChartEvents) {
+            newsEventsButton.setStyle(
+                    "-fx-font-size: 11; " +
+                            "-fx-padding: 6 12; " +
+                            "-fx-background-color: #10b981; " +
+                            "-fx-text-fill: #ffffff; " +
+                            "-fx-border-color: #34d399; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-cursor: hand;");
+        } else {
+            newsEventsButton.setStyle(
+                    "-fx-font-size: 11; " +
+                            "-fx-padding: 6 12; " +
+                            "-fx-background-color: #1e40af; " +
+                            "-fx-text-fill: #ffffff; " +
+                            "-fx-border-color: #3b82f6; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-cursor: hand;");
+        }
+    }
+
+    /**
+     * Add sample economic events to the chart for demonstration
+     */
+    public void addSampleEconomicEvents() {
+        if (data.isEmpty())
+            return;
+
+        Instant now = Instant.now();
+        List<ChartEvent> events = new ArrayList<>();
+
+        // Add sample events at different times
+        events.add(ChartEvent.of(
+                ChartEvent.EventType.ECONOMIC_EVENT,
+                now.minusSeconds(3600),
+                "📊 GDP Report",
+                "Strong growth expected"));
+
+        events.add(ChartEvent.of(
+                ChartEvent.EventType.NEWS,
+                now.minusSeconds(1800),
+                "📰 Market News",
+                "Fed announces policy decision"));
+
+        events.add(ChartEvent.of(
+                ChartEvent.EventType.ECONOMIC_EVENT,
+                now.minusSeconds(900),
+                "💼 Earnings",
+                "Q1 earnings beat expectations"));
+
+        addChartEvents(events);
+        log.info("Added {} sample economic events to chart for {}", events.size(), tradePair);
+    }
+
+    /**
+     * Show or interact with news events (now toggles display)
+     */
     private void showNewsEvents() {
-        log.info("CandleStickChart: News events button clicked for {}", tradePair);
-
-        // Create and show news events dialog/window
-        Alert newsDialog = new Alert(Alert.AlertType.INFORMATION);
-        newsDialog.setTitle("📰 Economic Events & News");
-        newsDialog.setHeaderText("Economic Calendar for " + tradePair.toString('/'));
-
-        String content = "Economic Events for: " + tradePair.getBaseCurrency() +
-                " / " + tradePair.getCounterCurrency() + "\n\n" +
-                "⏰ Upcoming Economic Events:\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
-
-                // Display upcoming events - this can be expanded with real data
-                "🔹 Central Bank Announcements\n" +
-                "   - Interest rate decisions\n" +
-                "   - Policy statements\n" +
-                "   - Economic forecasts\n\n" +
-                "🔹 Economic Indicators\n" +
-                "   - GDP releases\n" +
-                "   - Inflation data (CPI, PPI)\n" +
-                "   - Employment reports\n" +
-                "   - Trade balance\n\n" +
-                "🔹 Market Events\n" +
-                "   - Corporate earnings\n" +
-                "   - Dividend announcements\n" +
-                "   - Stock splits\n\n" +
-                "💡 Tip: Monitor economic calendars on:\n" +
-                "   • Investing.com\n" +
-                "   • Trading Economics\n" +
-                "   • Central Bank websites\n" +
-                "   • Major news outlets";
-
-        newsDialog.setContentText(content);
-        newsDialog.setWidth(500);
-        newsDialog.setHeight(600);
-        newsDialog.showAndWait();
+        log.info("CandleStickChart: Chart events are now {}", showChartEvents ? "visible" : "hidden");
     }
 
     private void initializeFirstLayout(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight) {
@@ -989,6 +1028,8 @@ public class CandleStickChart extends Region {
         if (showPriceLines)
             drawPriceLines();
         drawIndicators();
+        if (showChartEvents)
+            drawChartEvents();
         drawCurrentPriceBadge(visible.getLast());
         if (showCrosshair && crosshairMouseX >= 0 && crosshairMouseY >= 0)
             drawCrosshair();
@@ -1426,6 +1467,171 @@ public class CandleStickChart extends Region {
             default -> colors.put("Line", javafx.scene.paint.Color.CYAN);
         }
         return colors;
+    }
+
+    /**
+     * Draw all chart events (trade entries, exits, economic events, etc.)
+     */
+    private void drawChartEvents() {
+        if (chartEvents.isEmpty() || canvas == null || graphicsContext == null)
+            return;
+
+        List<CandleData> visible = visibleCandlesSnapshot();
+        if (visible.isEmpty())
+            return;
+
+        for (ChartEvent event : List.copyOf(chartEvents)) {
+            if (!event.isVisible())
+                continue;
+
+            // Calculate X position from event timestamp
+            double eventX = getEventXPosition(event, visible);
+            if (eventX < 0 || eventX > canvas.getWidth())
+                continue;
+
+            // Draw vertical line
+            graphicsContext.setStroke(Color.web(event.getHexColor()));
+            graphicsContext.setLineWidth(event.getLineWidth());
+            graphicsContext.strokeLine(snapPixel(eventX), 0, snapPixel(eventX), canvas.getHeight());
+
+            // Draw event label/marker
+            drawEventMarker(eventX, event);
+        }
+    }
+
+    /**
+     * Calculate the X position of an event based on its timestamp
+     */
+    private double getEventXPosition(ChartEvent event, List<CandleData> visible) {
+        if (visible.isEmpty())
+            return -1;
+
+        Instant eventTime = event.getTimestamp();
+        if (eventTime == null)
+            return -1;
+
+        CandleData first = visible.getFirst();
+        CandleData last = visible.getLast();
+
+        long eventSeconds = eventTime.getEpochSecond();
+        long firstSeconds = first.openTime();
+        long lastSeconds = last.openTime() + secondsPerCandle;
+
+        if (eventSeconds < firstSeconds || eventSeconds > lastSeconds)
+            return -1; // Event outside visible range
+
+        double ratio = (double) (eventSeconds - firstSeconds) / (lastSeconds - firstSeconds);
+        return snapPixel(ratio * canvas.getWidth());
+    }
+
+    /**
+     * Draw the event marker (icon, label, color dot)
+     */
+    private void drawEventMarker(double eventX, ChartEvent event) {
+        // Draw colored circle at top of the chart
+        double markerY = 15;
+        double markerRadius = 4;
+
+        graphicsContext.setFill(Color.web(event.getHexColor()));
+        graphicsContext.fillOval(eventX - markerRadius, markerY - markerRadius,
+                markerRadius * 2, markerRadius * 2);
+
+        // Draw label background
+        String label = event.getLabel() != null ? event.getLabel() : event.getType().label;
+        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 9));
+        graphicsContext.setTextAlign(TextAlignment.CENTER);
+
+        // Approximate text width (character count * 6.5)
+        double labelWidth = label.length() * 6.5;
+        double labelHeight = 14;
+        double labelX = eventX - labelWidth / 2;
+        double labelY = markerY + markerRadius + 8;
+
+        // Draw semi-transparent background for label
+        graphicsContext.setFill(Color.web("#050b14", 0.9));
+        graphicsContext.fillRect(labelX - 2, labelY - labelHeight / 2, labelWidth + 4, labelHeight);
+
+        // Draw label text
+        graphicsContext.setFill(Color.web(event.getHexColor()));
+        graphicsContext.fillText(label, eventX, labelY + 2);
+
+        // Draw border around label
+        graphicsContext.setStroke(Color.web(event.getHexColor(), 0.6));
+        graphicsContext.setLineWidth(0.5);
+        graphicsContext.strokeRect(labelX - 2, labelY - labelHeight / 2, labelWidth + 4, labelHeight);
+    }
+
+    // Event Management Methods
+
+    /**
+     * Add a chart event to be drawn
+     */
+    public void addChartEvent(ChartEvent event) {
+        if (event == null)
+            return;
+        chartEvents.add(event);
+        requestChartRedraw();
+    }
+
+    /**
+     * Add multiple chart events
+     */
+    public void addChartEvents(List<ChartEvent> events) {
+        if (events == null || events.isEmpty())
+            return;
+        chartEvents.addAll(events);
+        requestChartRedraw();
+    }
+
+    /**
+     * Remove a chart event by ID
+     */
+    public void removeChartEvent(String eventId) {
+        boolean removed = chartEvents.removeIf(e -> e.getId().equals(eventId));
+        if (removed)
+            requestChartRedraw();
+    }
+
+    /**
+     * Clear all chart events
+     */
+    public void clearChartEvents() {
+        if (!chartEvents.isEmpty()) {
+            chartEvents.clear();
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Get all chart events
+     */
+    public List<ChartEvent> getChartEvents() {
+        return new ArrayList<>(chartEvents);
+    }
+
+    /**
+     * Toggle visibility of chart events
+     */
+    public void toggleChartEvents() {
+        showChartEvents = !showChartEvents;
+        requestChartRedraw();
+    }
+
+    /**
+     * Set chart events visibility
+     */
+    public void setShowChartEvents(boolean show) {
+        if (showChartEvents != show) {
+            showChartEvents = show;
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Check if chart events are visible
+     */
+    public boolean isShowChartEvents() {
+        return showChartEvents;
     }
 
     private void updateLatestCandleFromTrade(@NotNull Trade trade) {

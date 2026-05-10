@@ -11,22 +11,9 @@ import java.util.logging.Logger;
  */
 public class OandaInstrumentClassifier {
     private static final Logger logger = Logger.getLogger(OandaInstrumentClassifier.class.getName());
-    
-    public static class Classification {
-        public final InstrumentType instrumentType;
-        public final AssetClass assetClass;
-        public final String baseAsset;
-        public final String quoteAsset;
-        public final String settlementAsset;
-        
-        public Classification(InstrumentType instrumentType, AssetClass assetClass,
-                             String baseAsset, String quoteAsset, String settlementAsset) {
-            this.instrumentType = instrumentType;
-            this.assetClass = assetClass;
-            this.baseAsset = baseAsset;
-            this.quoteAsset = quoteAsset;
-            this.settlementAsset = settlementAsset;
-        }
+
+    public record Classification(InstrumentType instrumentType, AssetClass assetClass, String baseAsset,
+                                 String quoteAsset, String settlementAsset) {
     }
     
     /**

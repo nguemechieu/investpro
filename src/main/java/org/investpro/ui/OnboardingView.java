@@ -302,14 +302,8 @@ public class OnboardingView extends StackPane {
             apiKeyField.setPromptText("API Key");
         }
 
-        PasswordField apiSecretField = new PasswordField();
-        apiSecretField.setPromptText("API Secret");
-        apiSecretField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
-        // For OANDA, API Secret field should be hidden
-        apiSecretField.setVisible(selectedExchange != SupportedExchange.OANDA);
-        apiSecretField.setManaged(selectedExchange != SupportedExchange.OANDA);
+        PasswordField apiSecretField = getPasswordField(selectedExchange);
 
         TextField accountIdField = new TextField();
         accountIdField.setPromptText("Account ID (auto-detected if blank)");
@@ -540,6 +534,18 @@ public class OnboardingView extends StackPane {
         BorderPane pane = new BorderPane(centerPane);
         pane.setStyle("-fx-background-color: #0f172a;");
         fadeTo(pane);
+    }
+
+    private @NotNull PasswordField getPasswordField(SupportedExchange selectedExchange) {
+        PasswordField apiSecretField = new PasswordField();
+        apiSecretField.setPromptText("API Secret");
+        apiSecretField.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+
+        // For OANDA, API Secret field should be hidden
+        apiSecretField.setVisible(selectedExchange != SupportedExchange.OANDA);
+        apiSecretField.setManaged(selectedExchange != SupportedExchange.OANDA);
+        return apiSecretField;
     }
 
     private void showLoadingOverlay() {

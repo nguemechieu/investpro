@@ -182,7 +182,7 @@ public class PortfolioContext {
     public double getMaxPositionSizeWithMargin() {
         if (requestedLeverage <= 0)
             return 0;
-        return (accountEquity * requestedLeverage) / (requestedPositionSize > 0 ? 1 : 1);
+        return (accountEquity * requestedLeverage) / (1);
     }
 
     public boolean isConservativeProfile() {

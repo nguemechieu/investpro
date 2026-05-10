@@ -28,6 +28,9 @@ import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
+import org.investpro.ui.charts.VolumeIndicatorPanel;
+import org.investpro.indicators.ChartIndicator;
+import org.investpro.ui.theme.MonitoringTheme;
 import org.investpro.utils.CandleAggregator;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.PopOver;
@@ -43,6 +46,7 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -127,7 +131,7 @@ public class ChartContainer extends Region {
     private ChartToolbar toolbar;
     private CandleStickChart candleStickChart;
     private EnhancedChartDisplay enhancedChartDisplay;
-    private Set<Integer> supportedGranularities;
+    private Set<Integer> supportedGranularity;
 
     private boolean useEnhancedDisplay = true; // Feature flag to enable/disable enhanced display
     private Consumer<String> onChartError;
@@ -138,14 +142,6 @@ public class ChartContainer extends Region {
     private File lastScreenshotDirectory;
     private boolean disposed;
     private boolean timeframeListenerRegistered;
-
-    public ChartContainer(
-            Exchange exchange,
-            TradePair tradePair,
-            boolean liveSyncing,
-            String telegramToken) {
-        this(exchange, tradePair, liveSyncing, telegramToken, null);
-    }
 
     public ChartContainer(
             Exchange exchange,
@@ -214,7 +210,7 @@ public class ChartContainer extends Region {
 
         try {
             CandleDataSupplier defaultSupplier = buildCandleDataSupplier(secondsPerCandle.get());
-            supportedGranularities = Set.copyOf(defaultSupplier.getSupportedGranularities());
+            supportedGranularity = Set.copyOf(defaultSupplier.getSupportedGranularities());
 
             Separator functionOptionsSeparator = new Separator(Orientation.VERTICAL);
             PopOver optionsPopOver = new PopOver();
@@ -246,7 +242,7 @@ public class ChartContainer extends Region {
         }
     }
 
-    private Label timeframeLabel() {
+    private @NotNull Label timeframeLabel() {
         Label label = new Label("TF:");
         label.getStyleClass().add(TIMEFRAME_LABEL_CLASS);
         label.setStyle(TIMEFRAME_LABEL_STYLE);
@@ -277,7 +273,7 @@ public class ChartContainer extends Region {
         return timeframeSelector;
     }
 
-    private Region spacer() {
+    private @NotNull Region spacer() {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         return spacer;
@@ -290,24 +286,6 @@ public class ChartContainer extends Region {
         candleChartContainer.setStyle(CHART_HOST_STYLE);
         candleChartContainer.widthProperty().addListener((observable, oldValue, newValue) -> requestLayout());
         candleChartContainer.heightProperty().addListener((observable, oldValue, newValue) -> requestLayout());
-    }
-
-    /**
-     * Enable or disable enhanced TradingView-like display
-     */
-    public void setUseEnhancedDisplay(boolean enabled) {
-        this.useEnhancedDisplay = enabled;
-    }
-
-    public boolean isUsingEnhancedDisplay() {
-        return useEnhancedDisplay && enhancedChartDisplay != null;
-    }
-
-    /**
-     * Get the enhanced chart display component (if enabled)
-     */
-    public EnhancedChartDisplay getEnhancedChartDisplay() {
-        return enhancedChartDisplay;
     }
 
     private void createInitialChart() {
@@ -392,7 +370,7 @@ public class ChartContainer extends Region {
                 candleChartContainer.heightProperty());
     }
 
-    private CandleDataSupplier buildCandleDataSupplier(int durationSeconds) {
+    private @NotNull CandleDataSupplier buildCandleDataSupplier(int durationSeconds) {
         Path rawTradeDataPath = configuredRawTradeDataPath();
 
         if (rawTradeDataPath != null) {
@@ -475,6 +453,80 @@ public class ChartContainer extends Region {
 
             enhancedChartDisplay = new EnhancedChartDisplay(exchange, tradePair, newChart, tradingService);
 
+            // Wire chart header and volume data from all candles
+            List<CandleData> allCandles = newChart.getAllCandleData();
+            if (allCandles != null && !allCandles.isEmpty()) {
+                CandleData latestCandle = allCandles.getLast();
+
+                // Update chart header with latest candle data
+                double change = latestCandle.closePrice() - latestCandle.openPrice();
+                double changePercent = (change / latestCandle.openPrice()) * 100;
+                enhancedChartDisplay.updateHeader(
+                        tradePair.toSlashSymbol(),
+                        latestCandle.closePrice(),
+                        change,
+                        changePercent,
+                        latestCandle.openPrice(),
+                        latestCandle.highPrice(),
+                        latestCandle.lowPrice(),
+                        latestCandle.closePrice(),
+                        latestCandle.volume());
+
+                // Wire volume bars for all candles
+                for (int i = 0; i < allCandles.size(); i++) {
+                    CandleData candle = allCandles.get(i);
+                    boolean isUpCandle = candle.closePrice() >= candle.openPrice();
+                    VolumeIndicatorPanel.VolumeBar volumeBar = new VolumeIndicatorPanel.VolumeBar(
+                            candle.volume(),
+                            isUpCandle,
+                            i,
+                            candle.openTime() * 1000L, // Convert seconds to milliseconds
+                            "V: " + String.format("%.2f", candle.volume()));
+                    enhancedChartDisplay.addVolumeBar(volumeBar);
+                }
+
+                // Update technical indicators with actual calculated values
+                List<ChartIndicator> indicators = newChart.getIndicators();
+                if (indicators != null) {
+                    for (ChartIndicator indicator : indicators) {
+                        if (indicator.isCalculated()) {
+                            String formattedValue = formatIndicatorValue(indicator);
+                            String signalColor = getIndicatorSignalColor(indicator);
+                            enhancedChartDisplay.updateIndicator(indicator.getName(), formattedValue, signalColor);
+                        }
+                    }
+                }
+
+                // Update volume panel MA20
+                enhancedChartDisplay.updateVolumeMA();
+            }
+
+            // Wire toolbar settings
+            enhancedChartDisplay.getProfessionalToolbar().setDrawingToolsEnabled(true);
+            if (timeframeSelector.getValue() != null) {
+                enhancedChartDisplay.getProfessionalToolbar().setTimeframe(timeframeSelector.getValue());
+            }
+
+            // Setup toolbar zoom callbacks - wire to actual chart zoom methods
+            enhancedChartDisplay.getProfessionalToolbar().setOnZoomIn(() -> {
+                if (!disposed) {
+                    newChart.zoomIn();
+                }
+            });
+            enhancedChartDisplay.getProfessionalToolbar().setOnZoomOut(() -> {
+                if (!disposed) {
+                    newChart.zoomOut();
+                }
+            });
+            enhancedChartDisplay.getProfessionalToolbar().setOnZoomReset(() -> {
+                if (!disposed) {
+                    newChart.resetZoom();
+                }
+            });
+
+            // Setup timeframe change callback
+            enhancedChartDisplay.getProfessionalToolbar().setOnTimeframeChanged(this::applyTimeframe);
+
             if (!animated || oldChart == null) {
                 disposeChart(oldChart);
                 candleChartContainer.getChildren().setAll(enhancedChartDisplay);
@@ -538,7 +590,7 @@ public class ChartContainer extends Region {
         }
 
         javafx.scene.Node currentDisplay = !candleChartContainer.getChildren().isEmpty()
-                ? candleChartContainer.getChildren().get(0)
+                ? candleChartContainer.getChildren().getFirst()
                 : null;
 
         if (currentDisplay == null) {
@@ -567,6 +619,7 @@ public class ChartContainer extends Region {
             fadeIn.setToValue(1.0);
             fadeIn.setOnFinished(done -> executeOnChartCreated());
             fadeIn.play();
+            performFadeTransition(oldChart, candleStickChart);
         });
 
         fadeOut.play();
@@ -875,7 +928,7 @@ public class ChartContainer extends Region {
         throw new IllegalArgumentException("Auto-trade callback must be a Runnable");
     }
 
-    private String rootMessage(Throwable throwable) {
+    private @NotNull String rootMessage(Throwable throwable) {
         if (throwable == null) {
             return "Unknown error";
         }
@@ -889,5 +942,120 @@ public class ChartContainer extends Region {
         return message == null || message.isBlank()
                 ? current.getClass().getSimpleName()
                 : message;
+    }
+
+    /**
+     * Format indicator value for display in TechnicalIndicatorsPanel
+     */
+    private String formatIndicatorValue(ChartIndicator indicator) {
+        if (indicator == null || !indicator.isCalculated()) {
+            return "—";
+        }
+
+        try {
+            Map<String, double[]> values = indicator.getValues();
+            if (values.isEmpty()) {
+                return "—";
+            }
+
+            // Get the last value from the first line (most indicators have one primary
+            // line)
+            double[] lastLineValues = values.values().iterator().next();
+            if (lastLineValues == null || lastLineValues.length == 0) {
+                return "—";
+            }
+
+            // Get the last calculated value (most recent)
+            double lastValue = lastLineValues[lastLineValues.length - 1];
+
+            if (Double.isNaN(lastValue) || Double.isInfinite(lastValue)) {
+                return "—";
+            }
+
+            String indicatorName = indicator.getName().toUpperCase();
+
+            // Format based on indicator type
+            if (indicatorName.contains("RSI")) {
+                return String.format("%.1f", lastValue); // RSI: 0-100
+            } else if (indicatorName.contains("STOCH")) {
+                return String.format("%.1f", lastValue); // Stochastic: 0-100
+            } else if (indicatorName.contains("MACD") || indicatorName.contains("ATR") ||
+                    indicatorName.contains("BAND") || indicatorName.contains("VOLATILITY")) {
+                return String.format("%.4f", lastValue); // Price-like values
+            } else if (indicatorName.contains("MA") || indicatorName.contains("SMA") ||
+                    indicatorName.contains("EMA") || indicatorName.contains("VWAP")) {
+                return String.format("%.2f", lastValue); // Price values
+            } else if (indicatorName.contains("VOLUME") || indicatorName.contains("OBV")) {
+                return String.format("%.0f", lastValue); // Volume: integer
+            } else {
+                return String.format("%.4f", lastValue); // Default precision
+            }
+        } catch (Exception exception) {
+            log.debug("Failed to format indicator value for {}", indicator.getName(), exception);
+            return "—";
+        }
+    }
+
+    /**
+     * Determine signal color for indicator based on value thresholds
+     */
+    private String getIndicatorSignalColor(ChartIndicator indicator) {
+        if (indicator == null || !indicator.isCalculated()) {
+            return "#9ca3af"; // Gray for invalid
+        }
+
+        try {
+            Map<String, double[]> values = indicator.getValues();
+            if (values.isEmpty()) {
+                return "#9ca3af";
+            }
+
+            double[] lastLineValues = values.values().iterator().next();
+            if (lastLineValues == null || lastLineValues.length == 0) {
+                return "#9ca3af";
+            }
+
+            double lastValue = lastLineValues[lastLineValues.length - 1];
+            String indicatorName = indicator.getName().toUpperCase();
+
+            // RSI signal colors (0-100 scale)
+            if (indicatorName.contains("RSI")) {
+                if (lastValue >= 70) {
+                    return "#F44336"; // Red: Overbought
+                } else if (lastValue <= 30) {
+                    return "#4CAF50"; // Green: Oversold (bullish)
+                } else {
+                    return "#2196F3"; // Blue: Neutral
+                }
+            }
+
+            // Stochastic signal colors (0-100 scale)
+            if (indicatorName.contains("STOCH")) {
+                if (lastValue >= 80) {
+                    return "#F44336"; // Red: Overbought
+                } else if (lastValue <= 20) {
+                    return "#4CAF50"; // Green: Oversold
+                } else {
+                    return "#2196F3"; // Blue: Neutral
+                }
+            }
+
+            // MACD colors (positive/negative)
+            if (indicatorName.contains("MACD")) {
+                return lastValue > 0 ? "#4CAF50" : "#F44336"; // Green if positive, red if negative
+            }
+
+            // Default color based on positive/negative
+            if (lastValue > 0) {
+                return "#4CAF50"; // Green for positive
+            } else if (lastValue < 0) {
+                return "#F44336"; // Red for negative
+            } else {
+                return "#2196F3"; // Blue for zero/neutral
+            }
+        } catch (Exception exception) {
+            log.debug("Failed to determine signal color for {}", indicator.getName(), exception);
+            return "#9ca3af";
+        }
     }
 }

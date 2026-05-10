@@ -288,11 +288,11 @@ public class MyCustomStrategy implements UserStrategy {
             }
             
             if (shouldSell(context)) {
-                return StrategySignal.sell(...);
+                return StrategySignal.sell(...)
             }
             
-            return StrategySignal.hold(...);
-            
+            return StrategySignal.hold(...)
+
         } catch (Exception e) {
             // Always handle errors gracefully
             return StrategySignal.hold(
