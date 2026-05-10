@@ -43,23 +43,6 @@ public final class OnboardingStyles {
     public static final int FONT_BODY = 12;
     public static final int FONT_SMALL = 11;
 
-    // =====================================================================
-    // Layout Constants
-    // =====================================================================
-
-    public static final double WINDOW_WIDTH = 1540;
-    public static final double WINDOW_HEIGHT = 780;
-    public static final double FORM_MAX_WIDTH = 360;
-    public static final double LEFT_PADDING = 120;
-    public static final double FORM_SPACING = 12;
-    public static final double SECTION_SPACING = 18;
-    public static final double GRID_H_GAP = 14;
-    public static final double GRID_V_GAP = 14;
-
-    public static final double LOGO_SIZE = 80;
-    public static final double LOADING_OVERLAY_WIDTH = 520;
-    public static final double LOADING_OVERLAY_HEIGHT = 240;
-
     public OnboardingStyles() {
         throw new AssertionError("Utility class - no instantiation");
     }
@@ -144,27 +127,27 @@ public final class OnboardingStyles {
     // Input Field Styles
     // =====================================================================
 
-    public static final String TEXT_FIELD_STYLE = textFieldStyle();
+    private static final String TEXT_FIELD_STYLE = textFieldStyle();
 
-    public static final String TEXT_FIELD_FOCUSED_STYLE = focusedTextFieldStyle();
+    private static final String TEXT_FIELD_FOCUSED_STYLE = focusedTextFieldStyle();
 
     // =====================================================================
     // Button Styles
     // =====================================================================
 
-    public static final String PRIMARY_BUTTON_STYLE = buttonStyle(COLOR_PRIMARY_BUTTON, FONT_BODY);
+    private static final String PRIMARY_BUTTON_STYLE = buttonStyle(COLOR_PRIMARY_BUTTON, FONT_BODY);
 
-    public static final String PRIMARY_BUTTON_HOVER_STYLE = buttonStyle(COLOR_PRIMARY_BUTTON_HOVER, FONT_BODY);
+    private static final String PRIMARY_BUTTON_HOVER_STYLE = buttonStyle(COLOR_PRIMARY_BUTTON_HOVER, FONT_BODY);
 
-    public static final String SECONDARY_BUTTON_STYLE = buttonStyle(COLOR_SECONDARY_BUTTON, FONT_BODY);
+    private static final String SECONDARY_BUTTON_STYLE = buttonStyle(COLOR_SECONDARY_BUTTON, FONT_BODY);
 
-    public static final String SECONDARY_BUTTON_HOVER_STYLE = buttonStyle(COLOR_SECONDARY_BUTTON_HOVER, FONT_BODY);
+    private static final String SECONDARY_BUTTON_HOVER_STYLE = buttonStyle(COLOR_SECONDARY_BUTTON_HOVER, FONT_BODY);
 
-    public static final String SUCCESS_BUTTON_STYLE = buttonStyle(COLOR_SUCCESS_BUTTON, FONT_BODY);
+    private static final String SUCCESS_BUTTON_STYLE = buttonStyle(COLOR_SUCCESS_BUTTON, FONT_BODY);
 
-    public static final String SUCCESS_BUTTON_HOVER_STYLE = buttonStyle(COLOR_SUCCESS_BUTTON_HOVER, FONT_BODY);
+    private static final String SUCCESS_BUTTON_HOVER_STYLE = buttonStyle(COLOR_SUCCESS_BUTTON_HOVER, FONT_BODY);
 
-    public static final String SMALL_BUTTON_STYLE = """
+    private static final String SMALL_BUTTON_STYLE = """
             -fx-padding: 4 12;
             -fx-background-color: %s;
             -fx-text-fill: white;
@@ -177,38 +160,38 @@ public final class OnboardingStyles {
     // Label Styles
     // =====================================================================
 
-    public static final String TITLE_LABEL_STYLE =
+    private static final String TITLE_LABEL_STYLE =
             labelStyle(FONT_TITLE_LARGE, COLOR_PRIMARY_BUTTON, "700");
 
-    public static final String STEP_TITLE_LABEL_STYLE =
+    private static final String STEP_TITLE_LABEL_STYLE =
             labelStyle(FONT_TITLE, COLOR_PRIMARY_TEXT, "700");
 
-    public static final String SUBTITLE_LABEL_STYLE =
+    private static final String SUBTITLE_LABEL_STYLE =
             labelStyle(FONT_SUBTITLE, COLOR_PRIMARY_BUTTON, "");
 
-    public static final String PROMPT_LABEL_STYLE =
+    private static final String PROMPT_LABEL_STYLE =
             labelStyle(FONT_SUBTITLE, COLOR_SECONDARY_TEXT, "");
 
-    public static final String BODY_LABEL_STYLE =
+    private static final String BODY_LABEL_STYLE =
             labelStyle(FONT_SMALL, COLOR_PRIMARY_TEXT, "");
 
-    public static final String MUTED_LABEL_STYLE =
+    private static final String MUTED_LABEL_STYLE =
             labelStyle(FONT_SMALL, COLOR_MUTED_TEXT, "");
 
-    public static final String ERROR_LABEL_STYLE =
+    private static final String ERROR_LABEL_STYLE =
             labelStyle(FONT_BODY, COLOR_ERROR, "");
 
-    public static final String WARNING_LABEL_STYLE =
+    private static final String WARNING_LABEL_STYLE =
             labelStyle(FONT_BODY, COLOR_WARNING, "");
 
-    public static final String INFO_LABEL_STYLE =
+    private static final String INFO_LABEL_STYLE =
             labelStyle(FONT_BODY, COLOR_INFO, "");
 
     // =====================================================================
     // CheckBox Styles
     // =====================================================================
 
-    public static final String CHECKBOX_STYLE = """
+    private static final String CHECKBOX_STYLE = """
             -fx-text-fill: %s;
             """.formatted(COLOR_PRIMARY_TEXT);
 
@@ -216,7 +199,7 @@ public final class OnboardingStyles {
     // ComboBox Styles
     // =====================================================================
 
-    public static final String COMBO_BOX_STYLE = """
+    private static final String COMBO_BOX_STYLE = """
             -fx-control-inner-background: %s;
             -fx-background-color: %s;
             -fx-text-fill: %s;
@@ -238,13 +221,13 @@ public final class OnboardingStyles {
     // Pane Styles
     // =====================================================================
 
-    public static final String DARK_PANE_STYLE = paneStyle(COLOR_DARK_BG);
+    private static final String DARK_PANE_STYLE = paneStyle(COLOR_DARK_BG);
 
-    public static final String SURFACE_PANE_STYLE = paneStyle(COLOR_SURFACE_BG);
+    private static final String SURFACE_PANE_STYLE = paneStyle(COLOR_SURFACE_BG);
 
-    public static final String CARD_STYLE = cardStyle();
+    private static final String CARD_STYLE = cardStyle();
 
-    public static final String LOADING_PANE_STYLE = """
+    private static final String LOADING_PANE_STYLE = """
             -fx-background-color: %s;
             -fx-border-color: %s;
             -fx-border-radius: 8;
@@ -252,6 +235,6 @@ public final class OnboardingStyles {
             -fx-border-width: 1;
             """.formatted(COLOR_SURFACE_BG, COLOR_BORDER);
 
-    public static final String LOADING_OVERLAY_BG_STYLE =
+    private static final String LOADING_OVERLAY_BG_STYLE =
             "-fx-background-color: rgba(15, 23, 42, 0.85);";
 }

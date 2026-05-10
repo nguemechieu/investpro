@@ -31,7 +31,6 @@ public class BacktestReportPanel extends ScrollPane {
     private static final String COLOR_GOOD = "#3b82f6"; // Blue
     private static final String COLOR_FAIR = "#f59e0b"; // Amber
     private static final String COLOR_POOR = "#ef4444"; // Red
-    private static final String COLOR_NEUTRAL = "#6b7280"; // Gray
 
     public BacktestReportPanel() {
         reportContent = new VBox(12);

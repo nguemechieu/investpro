@@ -34,7 +34,7 @@ import java.util.List;
 @Slf4j
 public class NewsCalendarPanel extends AnchorPane{
     private final NewsDataProvider newsDataProvider;
-    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm");
+   // private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm");
     private final DateTimeFormatter timeOnlyFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
     private VBox eventsList;

@@ -11,28 +11,67 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.i18n.LocalizationService;
-import org.investpro.market.MarketStats;
 import org.investpro.market.MarketMetrics;
+import org.investpro.market.MarketStats;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.MarketInfoDataProvider;
 import org.investpro.service.NewsDataProvider;
 
+import java.awt.Desktop;
+import java.net.URI;
+import java.util.Locale;
+
+import java.util.concurrent.CompletableFuture;
+
 /**
- * Professional market stats panel displaying comprehensive market information.
- * Shows market cap, volume, performance metrics, benchmarks, and asset
- * description.
+ * Multi-asset market information panel for InvestPro / TradeAdviser.
+ * <p>
+ * This panel is intentionally asset-class aware, not crypto-only. It can display
+ * crypto, stocks, ETFs, forex, indices, commodities, and derivative-style market
+ * information as long as MarketInfoDataProvider can return MarketStats and/or
+ * MarketMetrics for the selected TradePair.
+ * <p>
+ * Provider strategy should live in MarketInfoDataProvider, not here. Suggested
+ * provider routing:
+ * - Crypto: CoinGecko / exchange ticker / broker ticker
+ * - Stocks, ETFs, indices: Yahoo-style quote provider, Alpha Vantage, broker ticker
+ * - Forex: broker pricing, Alpha Vantage FX, exchangerate provider
+ * - Commodities / futures / CFDs: broker pricing, Yahoo-style symbol, Alpha Vantage
  */
 @Slf4j
 @Getter
 @Setter
 public class MarketInfoPanel extends ScrollPane {
 
-    private final VBox mainContent = new VBox(16);
-    private final Label symbolLabel = new Label();
-    private final Label priceLabel = new Label();
+    private static final Color BG = Color.web("#0f172a");
+    private static final Color CARD = Color.web("#111827");
+    private static final Color CARD_2 = Color.web("#172033");
+    private static final Color BORDER = Color.web("#263244");
+    private static final Color TEXT = Color.web("#e5e7eb");
+    private static final Color MUTED = Color.web("#94a3b8");
+    private static final Color BLUE = Color.web("#3b82f6");
+    private static final Color GREEN = Color.web("#10b981");
+    private static final Color RED = Color.web("#ef4444");
+    private static final Color AMBER = Color.web("#f59e0b");
+    private static final Color PURPLE = Color.web("#8b5cf6");
+    private static final Color CYAN = Color.web("#06b6d4");
+
+    private final VBox mainContent = new VBox(14);
+    private final VBox headerBox = new VBox(8);
+    private final Label assetClassBadge = new Label("MARKET");
+    private final Label providerBadge = new Label("Provider: -");
+    private final Label symbolLabel = new Label("Select symbol");
+    private final Label nameLabel = new Label("Market information will appear here.");
+    private final Label priceLabel = new Label("N/A");
+    private final Label statusLabel = new Label("Ready");
+
     private final MarketInfoDataProvider dataProvider;
     private Exchange exchange;
+    private TradePair currentPair;
     private String currentSymbol = "";
+    private AssetClass currentAssetClass = AssetClass.UNKNOWN;
+    private MarketStats currentStats;
+    private MarketMetrics currentMetrics;
 
     public MarketInfoPanel() {
         this(null, null);
@@ -41,12 +80,15 @@ public class MarketInfoPanel extends ScrollPane {
     public MarketInfoPanel(Exchange exchange, NewsDataProvider newsDataProvider) {
         this.exchange = exchange;
         this.dataProvider = new MarketInfoDataProvider(newsDataProvider);
+
         setFitToWidth(true);
-        setStyle("-fx-padding: 0; -fx-border-color: #e5e7eb;");
+        setHbarPolicy(ScrollBarPolicy.NEVER);
+        setVbarPolicy(ScrollBarPolicy.AS_NEEDED);
+        setStyle("-fx-background: #0f172a; -fx-background-color: #0f172a; -fx-border-color: #263244;");
         getStyleClass().add("market-stats-panel");
 
-        mainContent.setPadding(new Insets(16));
-        mainContent.setStyle("-fx-background-color: #ffffff;");
+        mainContent.setPadding(new Insets(14));
+        mainContent.setStyle("-fx-background-color: #0f172a;");
         setContent(mainContent);
 
         setupUI();
@@ -54,307 +96,33 @@ public class MarketInfoPanel extends ScrollPane {
     }
 
     private void setupUI() {
-        // Header section
-        VBox headerBox = createHeaderBox();
-        mainContent.getChildren().add(headerBox);
-
-        // Will add stats and other sections when data is available
+        configureHeaderBox();
+        mainContent.getChildren().setAll(headerBox, createEmptyState());
     }
 
-    private VBox createHeaderBox() {
-        VBox header = new VBox(8);
-        header.setStyle(
-                "-fx-background-color: #f3f4f6; -fx-padding: 16; -fx-border-radius: 8; -fx-border-color: #d1d5db; -fx-border-width: 1;");
+    private void configureHeaderBox() {
+        headerBox.setPadding(new Insets(14));
+        headerBox.setStyle(cardStyle("#111827", "#263244"));
 
-        symbolLabel.setStyle("-fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: #111827;");
-        priceLabel.setStyle("-fx-font-size: 28; -fx-font-weight: bold; -fx-text-fill: #1f2937;");
-        priceLabel.setTextFill(Color.web("#000000"));
+        HBox topLine = new HBox(8, assetClassBadge, providerBadge);
+        topLine.setAlignment(Pos.CENTER_LEFT);
 
-        header.getChildren().addAll(symbolLabel, priceLabel);
-        return header;
-    }
+        styleBadge(assetClassBadge, BLUE);
+        styleBadge(providerBadge, MUTED);
 
-    /**
-     * Update display with comprehensive market stats
-     */
-    public void updateStats(MarketStats stats) {
-        if (stats == null) {
-            clearStats();
-            return;
-        }
+        symbolLabel.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
+        nameLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
+        nameLabel.setWrapText(true);
 
-        currentSymbol = stats.getSymbol();
-        symbolLabel.setText(stats.getSymbol() + " - " + stats.getName());
-        priceLabel.setText(formatPrice(stats.getCurrentPrice()));
+        priceLabel.setStyle("-fx-font-size: 30; -fx-font-weight: bold; -fx-text-fill: #e5e7eb;");
+        statusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
+        statusLabel.setWrapText(true);
 
-        mainContent.getChildren().clear();
-        mainContent.getChildren().add(createHeaderBox());
-
-        // Stats section
-        mainContent.getChildren().addAll(
-                new Separator(),
-                createLabel("Stats", true),
-                createStatsGrid(stats),
-                new Separator(),
-                createLabel("Benchmarks", true),
-                createBenchmarksGrid(stats),
-                new Separator(),
-                createLabel("About " + stats.getSymbol(), true),
-                createAboutSection(stats));
-    }
-
-    private VBox createStatsGrid(MarketStats stats) {
-        VBox grid = new VBox(8);
-        grid.setStyle(
-                "-fx-background-color: #f9fafb; -fx-padding: 12; -fx-border-radius: 6; -fx-border-color: #e5e7eb; -fx-border-width: 1;");
-
-        grid.getChildren()
-                .add(createStatRow("Market cap", valueOrNA(stats.getMarketCap(), stats.getFormattedMarketCap()),
-                        Color.web("#3b82f6")));
-
-        // Volume (24h)
-        String volumeText = valueOrNA(stats.getVolume24h(), stats.getFormattedVolume24h());
-        String volumeChange = String.format("%+.2f%%", stats.getVolumeChange24h());
-        grid.getChildren().add(createStatRowWithChange(volumeText, volumeChange,
-                stats.getVolumeChange24h() >= 0 ? Color.web("#10b981") : Color.web("#ef4444")));
-
-        // Circulating supply
-        String supply = stats.getCirculating() > 0.0
-                ? String.format("%.0f %s", stats.getCirculating(), stats.getCirculatingUnit())
-                : "N/A";
-        grid.getChildren().add(createStatRow("Circulating supply", supply, Color.web("#8b5cf6")));
-
-        // Fully diluted market cap
-        grid.getChildren()
-                .add(createStatRow("Fully diluted market cap", valueOrNA(stats.getFullyDilutedMarketCap(),
-                        stats.getFormattedFDMC()), Color.web("#3b82f6")));
-
-        // All Time High
-        String athText = stats.getAllTimeHigh() > 0.0 ? formatPrice(stats.getAllTimeHigh()) : "N/A";
-        String athDate = stats.getAllTimeHighDate() == null || stats.getAllTimeHighDate().isBlank()
-                ? ""
-                : " (" + stats.getAllTimeHighDate() + ")";
-        grid.getChildren().add(createStatRow("All time high" + athDate, athText, Color.web("#10b981")));
-
-        // % down from ATH
-        String athPercent = String.format("-%.2f%%", stats.getPercentDownFromATH());
-        grid.getChildren().add(createStatRow("% down from all time high", athPercent,
-                Color.web(stats.getATHColor())));
-
-        return grid;
-    }
-
-    private VBox createBenchmarksGrid(MarketStats stats) {
-        VBox grid = new VBox(8);
-        grid.setStyle(
-                "-fx-background-color: #f9fafb; -fx-padding: 12; -fx-border-radius: 6; -fx-border-color: #e5e7eb; -fx-border-width: 1;");
-
-        // Coinbase Popularity
-        grid.getChildren()
-                .add(createStatRow("Coinbase Popularity", stats.getCoinbasePopularityRank(), Color.web("#f59e0b")));
-
-        // Performance section
-        VBox performanceBox = new VBox(6);
-        performanceBox.setPadding(new Insets(8));
-        performanceBox.setStyle("-fx-border-color: #e5e7eb; -fx-border-radius: 4;");
-        performanceBox.getChildren().add(createLabel("Performance (Past year)", false));
-        performanceBox.getChildren()
-                .add(createStatRow("Past year", String.format("%+.2f%%", stats.getPerformanceOneYear()),
-                        Color.web(stats.getPerformanceColor(stats.getPerformanceOneYear()))));
-        performanceBox.getChildren()
-                .add(createStatRow("Past month", String.format("%+.2f%%", stats.getPerformanceOneMonth()),
-                        Color.web(stats.getPerformanceColor(stats.getPerformanceOneMonth()))));
-        performanceBox.getChildren()
-                .add(createStatRow("Past week", String.format("%+.2f%%", stats.getPerformanceOneWeek()),
-                        Color.web(stats.getPerformanceColor(stats.getPerformanceOneWeek()))));
-        performanceBox.getChildren()
-                .add(createStatRow("Past day", String.format("%+.2f%%", stats.getPerformanceOneDay()),
-                        Color.web(stats.getPerformanceColor(stats.getPerformanceOneDay()))));
-        grid.getChildren().add(performanceBox);
-
-        // Comparison section
-        VBox comparisonBox = new VBox(6);
-        comparisonBox.setPadding(new Insets(8));
-        comparisonBox.setStyle("-fx-border-color: #e5e7eb; -fx-border-radius: 4;");
-
-        String benchmarkLabel = getBenchmarkLabel();
-        comparisonBox.getChildren().add(createLabel("Comparison vs. " + benchmarkLabel + " & Market", false));
-        comparisonBox.getChildren()
-                .add(createStatRow("vs. " + benchmarkLabel + " (Past year)",
-                        String.format("%+.2f%%", stats.getVsEthOneYear()),
-                        Color.web(stats.getPerformanceColor(stats.getVsEthOneYear()))));
-        comparisonBox.getChildren()
-                .add(createStatRow("vs. Market (Past year)", String.format("%+.2f%%", stats.getVsMarketOneYear()),
-                        Color.web(stats.getPerformanceColor(stats.getVsMarketOneYear()))));
-        grid.getChildren().add(comparisonBox);
-
-        return grid;
+        headerBox.getChildren().setAll(topLine, symbolLabel, nameLabel, priceLabel, statusLabel);
     }
 
     /**
-     * Determine the appropriate benchmark asset based on the current symbol
-     */
-    private String getBenchmarkLabel() {
-        if (currentSymbol == null || currentSymbol.isEmpty()) {
-            return "ETH";
-        }
-
-        String symbol = currentSymbol.toUpperCase();
-
-        // If current symbol is BTC, compare against ETH
-        if (symbol.equals("BTC")) {
-            return "ETH";
-        }
-
-        // If current symbol is ETH, compare against BTC
-        if (symbol.equals("ETH")) {
-            return "BTC";
-        }
-
-        // For all other assets, compare against ETH as primary benchmark
-        return "ETH";
-    }
-
-    private VBox createAboutSection(MarketStats stats) {
-        VBox about = new VBox(12);
-        about.setStyle(
-                "-fx-background-color: #f9fafb; -fx-padding: 12; -fx-border-radius: 6; -fx-border-color: #e5e7eb; -fx-border-width: 1;");
-
-        // Description
-        if (stats.getDescription() != null && !stats.getDescription().isEmpty()) {
-            TextArea descArea = new TextArea(stats.getDescription());
-            descArea.setWrapText(true);
-            descArea.setEditable(false);
-            descArea.setPrefRowCount(4);
-            descArea.setStyle("-fx-control-inner-background: #f9fafb; -fx-font-size: 11;");
-            about.getChildren().add(descArea);
-        }
-
-        // Resources
-        HBox resourcesBox = new HBox(12);
-        resourcesBox.setPadding(new Insets(8));
-        resourcesBox.setStyle("-fx-border-color: #e5e7eb; -fx-border-radius: 4;");
-
-        if (stats.getWebsiteUrl() != null && !stats.getWebsiteUrl().isEmpty()) {
-            Hyperlink website = new Hyperlink("Website");
-            website.setOnAction(e -> openLink(stats.getWebsiteUrl()));
-            resourcesBox.getChildren().add(website);
-        }
-
-        if (stats.getWhitePaperUrl() != null && !stats.getWhitePaperUrl().isEmpty()) {
-            Hyperlink whitepaper = new Hyperlink("Whitepaper");
-            whitepaper.setOnAction(e -> openLink(stats.getWhitePaperUrl()));
-            resourcesBox.getChildren().add(whitepaper);
-        }
-
-        if (stats.getGithubUrl() != null && !stats.getGithubUrl().isEmpty()) {
-            Hyperlink github = new Hyperlink("GitHub");
-            github.setOnAction(e -> openLink(stats.getGithubUrl()));
-            resourcesBox.getChildren().add(github);
-        }
-
-        if (stats.getTwitterUrl() != null && !stats.getTwitterUrl().isEmpty()) {
-            Hyperlink twitter = new Hyperlink("Twitter");
-            twitter.setOnAction(e -> openLink(stats.getTwitterUrl()));
-            resourcesBox.getChildren().add(twitter);
-        }
-
-        if (!resourcesBox.getChildren().isEmpty()) {
-            VBox resourcesSection = new VBox(6);
-            resourcesSection.getChildren().add(createLabel("Resources", false));
-            resourcesSection.getChildren().add(resourcesBox);
-            about.getChildren().add(resourcesSection);
-        }
-
-        // Disclaimer
-        Label disclaimer = new Label(
-                "Displayed prices exclude trading costs. Actual execution may incur additional spread and fees. " +
-                        "Third-party and user-generated content is made available for informational purposes only and should not be treated as investment advice.");
-        disclaimer.setWrapText(true);
-        disclaimer.setStyle("-fx-font-size: 10; -fx-text-fill: #9ca3af;");
-        disclaimer.setPadding(new Insets(8));
-        about.getChildren().add(disclaimer);
-
-        return about;
-    }
-
-    private HBox createStatRow(String label, String value, Color color) {
-        HBox row = new HBox(12);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(8));
-        row.setStyle("-fx-background-color: #ffffff; -fx-padding: 8; -fx-border-radius: 4;");
-
-        Label labelNode = new Label(label);
-        labelNode.setStyle("-fx-font-size: 12; -fx-text-fill: #374151; -fx-font-weight: 500;");
-        labelNode.setMinWidth(150);
-
-        Label valueNode = new Label(value);
-        valueNode.setStyle("-fx-font-size: 12; -fx-font-weight: bold;");
-        valueNode.setTextFill(color);
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        row.getChildren().addAll(labelNode, spacer, valueNode);
-        return row;
-    }
-
-    private HBox createStatRowWithChange(String value, String change, Color changeColor) {
-        HBox row = new HBox(12);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(8));
-        row.setStyle("-fx-background-color: #ffffff; -fx-padding: 8; -fx-border-radius: 4;");
-
-        Label labelNode = new Label("Volume (24h)");
-        labelNode.setStyle("-fx-font-size: 12; -fx-text-fill: #374151; -fx-font-weight: 500;");
-        labelNode.setMinWidth(150);
-
-        VBox valueBox = new VBox(2);
-        Label valueNode = new Label(value);
-        valueNode.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
-        valueNode.setTextFill(Color.web("#000000"));
-
-        Label changeNode = new Label(change);
-        changeNode.setStyle("-fx-font-size: 10;");
-        changeNode.setTextFill(changeColor);
-
-        valueBox.getChildren().addAll(valueNode, changeNode);
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        row.getChildren().addAll(labelNode, spacer, valueBox);
-        return row;
-    }
-
-    private Label createLabel(String text, boolean isSection) {
-        Label label = new Label(text);
-        if (isSection) {
-            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #111827; -fx-padding: 8 0 4 0;");
-        } else {
-            label.setStyle("-fx-font-size: 11; -fx-font-weight: bold; -fx-text-fill: #374151; -fx-padding: 6 0 4 0;");
-        }
-        return label;
-    }
-
-    private void openLink(String url) {
-        try {
-            java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
-        } catch (Exception e) {
-            log.warn("Failed to open link: {}", url, e);
-        }
-    }
-
-    private void clearStats() {
-        symbolLabel.setText("N/A");
-        priceLabel.setText("0.00");
-        mainContent.getChildren().clear();
-        mainContent.getChildren().add(createHeaderBox());
-    }
-
-    /**
-     * Update market info panel for a trading pair
-     * Currently displays sample data - will be enhanced with real API data
+     * Updates this panel for a selected pair.
      */
     public void updateForPair(TradePair pair) {
         if (pair == null) {
@@ -362,140 +130,812 @@ public class MarketInfoPanel extends ScrollPane {
             return;
         }
 
-        symbolLabel.setText(pair.getSymbol());
-        priceLabel.setText("Loading...");
-        mainContent.getChildren().clear();
-        mainContent.getChildren().add(createHeaderBox());
+        currentPair = pair;
+        currentSymbol = normalizeSymbol(pair.getSymbol());
+        currentAssetClass = inferAssetClass(pair);
+        currentStats = null;
+        currentMetrics = null;
 
-        dataProvider.getMarketInfo(exchange, pair)
+        applyLoadingState(pair);
+
+        CompletableFuture<MarketStats> statsFuture = dataProvider.getMarketInfo(exchange, pair);
+
+        statsFuture
                 .thenAccept(stats -> Platform.runLater(() -> updateStats(stats)))
                 .exceptionally(error -> {
                     log.warn("Failed to load market info for {}", pair, error);
-                    Platform.runLater(() -> updateStats(null));
+                    Platform.runLater(() -> {
+                        currentStats = null;
+                        renderCurrentState("Market stats unavailable. Showing available pair metrics only.");
+                    });
                     return null;
                 });
+    }
+
+    /**
+     * Update display with comprehensive market stats.
+     */
+    public void updateStats(MarketStats stats) {
+        currentStats = stats;
+
+        if (stats != null) {
+            currentSymbol = normalizeSymbol(firstNonBlank(stats.getSymbol(), currentSymbol));
+        }
+
+        renderCurrentState(stats == null ? "Market stats unavailable." : "Market stats loaded.");
+    }
+
+    /**
+     * Update display with market metrics / technical analysis data.
+     * Safe to call repeatedly: this method rebuilds the panel instead of appending
+     * duplicate Technical Metrics sections.
+     */
+    public void updateMetrics(MarketMetrics metrics) {
+        currentMetrics = metrics;
+        renderCurrentState(metrics == null ? "Technical metrics unavailable." : "Technical metrics loaded.");
+    }
+
+    private void applyLoadingState(TradePair pair) {
+        symbolLabel.setText(displaySymbol(pair));
+        nameLabel.setText(assetClassLabel(currentAssetClass) + " • Loading market information...");
+        priceLabel.setText("Loading...");
+        assetClassBadge.setText(assetClassLabel(currentAssetClass).toUpperCase(Locale.ROOT));
+        providerBadge.setText("Provider: resolving");
+        statusLabel.setText("Fetching market information from exchange/provider pipeline...");
+        mainContent.getChildren().setAll(headerBox, createLoadingBox());
+    }
+
+    private void renderCurrentState(String status) {
+        updateHeader(status);
+
+        VBox sections = new VBox(12);
+        sections.getChildren().add(createPairSnapshotSection());
+
+        if (currentStats != null) {
+            sections.getChildren().add(createMarketStatsSection(currentStats));
+            sections.getChildren().add(createBenchmarkSection(currentStats));
+            sections.getChildren().add(createAboutSection(currentStats));
+        } else {
+            sections.getChildren().add(createProviderHintSection());
+        }
+
+        if (currentMetrics != null) {
+            sections.getChildren().add(createMetricsSection(currentMetrics));
+        }
+
+        sections.getChildren().add(createProviderRoutingSection());
+        mainContent.getChildren().setAll(headerBox, sections);
+    }
+
+    private void updateHeader(String status) {
+        String symbol = currentPair != null ? displaySymbol(currentPair) : currentSymbol;
+        String name = currentStats == null ? "" : safe(currentStats.getName());
+
+        symbolLabel.setText(firstNonBlank(symbol, "N/A"));
+        nameLabel.setText(buildNameLine(name));
+        priceLabel.setText(resolveDisplayPrice());
+        priceLabel.setTextFill(resolvePriceColor());
+        assetClassBadge.setText(assetClassLabel(currentAssetClass).toUpperCase(Locale.ROOT));
+        providerBadge.setText("Provider: " + providerName(currentAssetClass));
+        statusLabel.setText(status == null ? "Ready" : status);
+    }
+
+    private VBox createPairSnapshotSection() {
+        VBox section = section("Selected Market");
+        GridPane grid = grid();
+
+        addGridRow(grid, 0, "Symbol", currentPair == null ? value(currentSymbol) : value(displaySymbol(currentPair), BLUE));
+        addGridRow(grid, 1, "Asset class", value(assetClassLabel(currentAssetClass), CYAN));
+        addGridRow(grid, 2, "Exchange / venue", value(exchange == null ? "N/A" : safe(exchange.getDisplayName()), PURPLE));
+
+        if (currentPair != null) {
+            addGridRow(grid, 3, "Bid", value(formatPrice(safeDouble(currentPair.getBid())), GREEN));
+            addGridRow(grid, 4, "Ask", value(formatPrice(safeDouble(currentPair.getAsk())), RED));
+            addGridRow(grid, 5, "Last", value(formatPrice(firstPositive(currentPair.getLast(), currentPair.getLastPrice())), TEXT));
+            addGridRow(grid, 6, "Spread", value(formatSpread(currentPair), MUTED));
+            addGridRow(grid, 7, "Volume", value(formatCompact(safeDouble(currentPair.getVolume())), BLUE));
+        }
+
+        section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createMarketStatsSection(MarketStats stats) {
+        VBox section = section(sectionTitleForStats());
+        GridPane grid = grid();
+
+        addGridRow(grid, 0, capLabelForAsset(), valueOrNA(stats.getMarketCap(), stats.getFormattedMarketCap(), BLUE));
+        addGridRow(grid, 1, volumeLabelForAsset(), valueOrNA(stats.getVolume24h(), stats.getFormattedVolume24h(), BLUE));
+        addGridRow(grid, 2, "Volume change", coloredPercent(stats.getVolumeChange24h()));
+        addGridRow(grid, 3, supplyLabelForAsset(), value(supplyText(stats), PURPLE));
+        addGridRow(grid, 4, dilutedLabelForAsset(), valueOrNA(stats.getFullyDilutedMarketCap(), stats.getFormattedFDMC(), BLUE));
+        addGridRow(grid, 5, highLabelForAsset(), value(allTimeHighText(stats), GREEN));
+        addGridRow(grid, 6, "Distance from high", value(distanceFromHighText(stats), colorFromWeb(stats.getATHColor(), AMBER)));
+
+        section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createBenchmarkSection(MarketStats stats) {
+        VBox section = section("Performance & Benchmarks");
+        GridPane grid = grid();
+
+        addGridRow(grid, 0, "Past day", coloredPercent(stats.getPerformanceOneDay()));
+        addGridRow(grid, 1, "Past week", coloredPercent(stats.getPerformanceOneWeek()));
+        addGridRow(grid, 2, "Past month", coloredPercent(stats.getPerformanceOneMonth()));
+        addGridRow(grid, 3, "Past year", coloredPercent(stats.getPerformanceOneYear()));
+
+        String benchmark = getBenchmarkLabel();
+        addGridRow(grid, 4, "vs. " + benchmark + " / primary benchmark", coloredPercent(stats.getVsEthOneYear()));
+        addGridRow(grid, 5, "vs. broad market", coloredPercent(stats.getVsMarketOneYear()));
+        addGridRow(grid, 6, rankingLabelForAsset(), value(firstNonBlank(stats.getCoinbasePopularityRank(), "N/A"), AMBER));
+
+        section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createMetricsSection(MarketMetrics metrics) {
+        VBox section = section("Technical Metrics");
+        GridPane grid = grid();
+
+        addGridRow(grid, 0, "Current price", value(formatPrice(metrics.getCurrentPrice()), TEXT));
+        addGridRow(grid, 1, "Bid", value(formatPrice(metrics.getBid()), GREEN));
+        addGridRow(grid, 2, "Ask", value(formatPrice(metrics.getAsk()), RED));
+        addGridRow(grid, 3, "Spread", value(String.format("%.6f (%.4f%%)", metrics.getSpread(), metrics.getSpreadPercent()), MUTED));
+        addGridRow(grid, 4, "High", value(formatPrice(metrics.getHigh24h()), GREEN));
+        addGridRow(grid, 5, "Low", value(formatPrice(metrics.getLow24h()), RED));
+        addGridRow(grid, 6, "Range", value(String.format("%.6f (%.2f%%)", metrics.getHighLowRange(), metrics.getHighLowRangePercent()), MUTED));
+        addGridRow(grid, 7, "Volume", value(formatCompact(metrics.getVolume24h()), BLUE));
+        addGridRow(grid, 8, "Change", coloredPercent(metrics.getChangePercent24h()));
+        addGridRow(grid, 9, "Volatility", value(String.format("%.2f%% (%s)", metrics.getVolatility(), safe(metrics.getVolatilityLevel())), getVolatilityColor(metrics.getVolatilityLevel())));
+        addGridRow(grid, 10, "Trend", value(String.format("%s (%.0f%%)", safe(metrics.getTrend()), metrics.getTrendStrength()), getTrendColor(metrics.getTrend())));
+        addGridRow(grid, 11, "Technical signal", value(safe(metrics.getTechnicalSignal()), getTechnicalSignalColor(metrics.getTechnicalSignal())));
+        addGridRow(grid, 12, "Technical score", value(String.format("%+.0f", metrics.getTechnicalScore()), metrics.getTechnicalScore() >= 0 ? GREEN : RED));
+        addGridRow(grid, 13, "Below high", value(String.format("-%.2f%%", metrics.getPriceChangeFromHigh()), MUTED));
+        addGridRow(grid, 14, "Above low", value(String.format("+%.2f%%", metrics.getPriceChangeFromLow()), MUTED));
+
+        section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createAboutSection(MarketStats stats) {
+        VBox section = section("About " + firstNonBlank(stats.getSymbol(), currentSymbol, "Market"));
+
+        String description = safe(stats.getDescription());
+        if (!description.isBlank()) {
+            TextArea descArea = new TextArea(description);
+            descArea.setWrapText(true);
+            descArea.setEditable(false);
+            descArea.setPrefRowCount(5);
+            descArea.setStyle("-fx-control-inner-background: #0b1220; -fx-text-fill: #e5e7eb; -fx-font-size: 11; -fx-border-color: #263244;");
+            section.getChildren().add(descArea);
+        } else {
+            Label empty = mutedLabel("No description available for this market yet.");
+            section.getChildren().add(empty);
+        }
+
+        HBox resourcesBox = new HBox(10);
+        resourcesBox.setAlignment(Pos.CENTER_LEFT);
+        addLink(resourcesBox, "Website", stats.getWebsiteUrl());
+        addLink(resourcesBox, "Whitepaper", stats.getWhitePaperUrl());
+        addLink(resourcesBox, "GitHub", stats.getGithubUrl());
+        addLink(resourcesBox, "Social", stats.getTwitterUrl());
+
+        if (!resourcesBox.getChildren().isEmpty()) {
+            section.getChildren().add(resourcesBox);
+        }
+
+        Label disclaimer = mutedLabel("Information is provider/broker supplied and may be delayed or incomplete. Execution prices may differ due to spread, liquidity, commissions, swaps, and broker rules. This is market information, not investment advice.");
+        section.getChildren().add(disclaimer);
+
+        return section;
+    }
+
+    private VBox createProviderHintSection() {
+        VBox section = section("Provider Coverage Needed");
+        Label text = mutedLabel("No MarketStats were returned for this symbol. Your provider layer should route the selected asset class to the best available source, then map the response into MarketStats / MarketMetrics.");
+        section.getChildren().add(text);
+        return section;
+    }
+
+    private VBox createProviderRoutingSection() {
+        VBox section = section("Suggested Provider Routing");
+        GridPane grid = grid();
+
+        addGridRow(grid, 0, "Crypto", value("CoinGecko, exchange ticker, broker ticker", GREEN));
+        addGridRow(grid, 1, "Stocks / ETFs", value("Yahoo-style quote, Alpha Vantage, Alpaca/IBKR", BLUE));
+        addGridRow(grid, 2, "Forex", value("OANDA pricing, Alpha Vantage FX, broker feed", CYAN));
+        addGridRow(grid, 3, "Indices", value("Yahoo-style quote, Alpha Vantage, broker feed", PURPLE));
+        addGridRow(grid, 4, "Commodities / CFDs", value("Broker feed, Alpha Vantage commodities, Yahoo-style quote", AMBER));
+        addGridRow(grid, 5, "Derivatives", value("Broker/exchange metadata first; fallback to underlying quote", RED));
+
+        section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createLoadingBox() {
+        VBox box = section("Loading");
+        ProgressIndicator indicator = new ProgressIndicator();
+        indicator.setPrefSize(36, 36);
+        Label label = mutedLabel("Collecting market stats and pricing metrics...");
+        HBox row = new HBox(12, indicator, label);
+        row.setAlignment(Pos.CENTER_LEFT);
+        box.getChildren().add(row);
+        return box;
+    }
+
+    private VBox createEmptyState() {
+        VBox box = section("Market Info");
+        box.getChildren().add(mutedLabel("Select a symbol to view market data, technical metrics, benchmarks, and asset details."));
+        return box;
+    }
+
+    private VBox section(String title) {
+        VBox box = new VBox(10);
+        box.setPadding(new Insets(12));
+        box.setStyle(cardStyle("#111827", "#263244"));
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
+        box.getChildren().add(titleLabel);
+        return box;
+    }
+
+    private GridPane grid() {
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(8);
+        ColumnConstraints left = new ColumnConstraints();
+        left.setPercentWidth(46);
+        ColumnConstraints right = new ColumnConstraints();
+        right.setPercentWidth(54);
+        grid.getColumnConstraints().setAll(left, right);
+        return grid;
+    }
+
+    private void addGridRow(GridPane grid, int row, String label, Label value) {
+        Label labelNode = new Label(label);
+        labelNode.setWrapText(true);
+        labelNode.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
+
+        value.setWrapText(true);
+        value.setMaxWidth(Double.MAX_VALUE);
+        GridPane.setHgrow(value, Priority.ALWAYS);
+
+        grid.add(labelNode, 0, row);
+        grid.add(value, 1, row);
+    }
+
+    private Label value(String text) {
+        return value(text, TEXT);
+    }
+
+    private Label value(String text, Color color) {
+        Label label = new Label(firstNonBlank(text, "N/A"));
+        label.setStyle("-fx-font-size: 11; -fx-font-weight: bold;");
+        label.setTextFill(color == null ? TEXT : color);
+        return label;
+    }
+
+    private Label coloredPercent(double value) {
+        if (!Double.isFinite(value)) {
+            return value("N/A", MUTED);
+        }
+        return value(String.format("%+.2f%%", value), value >= 0 ? GREEN : RED);
+    }
+
+    private Label valueOrNA(double raw, String formatted, Color color) {
+        return value(raw > 0.0 && Double.isFinite(raw) ? firstNonBlank(formatted, formatCompact(raw)) : "N/A", color);
+    }
+
+    private Label mutedLabel(String text) {
+        Label label = new Label(text);
+        label.setWrapText(true);
+        label.setStyle("-fx-font-size: 11; -fx-text-fill: #94a3b8;");
+        return label;
+    }
+
+    private void addLink(HBox box, String text, String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        Hyperlink link = new Hyperlink(text);
+        link.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11; -fx-font-weight: bold;");
+        link.setOnAction(event -> openLink(url));
+        box.getChildren().add(link);
+    }
+
+    private void styleBadge(Label label, Color color) {
+        label.setPadding(new Insets(3, 8, 3, 8));
+        label.setTextFill(color == null ? TEXT : color);
+        label.setStyle("-fx-font-size: 10; -fx-font-weight: bold; -fx-background-color: #0b1220; -fx-background-radius: 999; -fx-border-color: #263244; -fx-border-radius: 999;");
+    }
+
+    private String cardStyle(String bg, String border) {
+        return "-fx-background-color: " + bg + ";"
+                + " -fx-background-radius: 10;"
+                + " -fx-border-color: " + border + ";"
+                + " -fx-border-radius: 10;"
+                + " -fx-border-width: 1;";
+    }
+
+    private void clearStats() {
+        currentPair = null;
+        currentStats = null;
+        currentMetrics = null;
+        currentSymbol = "";
+        currentAssetClass = AssetClass.UNKNOWN;
+
+        symbolLabel.setText("N/A");
+        nameLabel.setText("No selected market.");
+        priceLabel.setText("N/A");
+        assetClassBadge.setText("MARKET");
+        providerBadge.setText("Provider: -");
+        statusLabel.setText("Select a symbol to load market information.");
+        mainContent.getChildren().setAll(headerBox, createEmptyState());
+    }
+
+    private String resolveDisplayPrice() {
+        if (currentStats != null && currentStats.getCurrentPrice() > 0.0) {
+            return formatPrice(currentStats.getCurrentPrice());
+        }
+        if (currentMetrics != null && currentMetrics.getCurrentPrice() > 0.0) {
+            return formatPrice(currentMetrics.getCurrentPrice());
+        }
+        if (currentPair != null) {
+            double price = firstPositive(currentPair.getLast(), currentPair.getLastPrice(), currentPair.getAsk(), currentPair.getBid());
+            if (price > 0.0) {
+                return formatPrice(price);
+            }
+        }
+        return "N/A";
+    }
+
+    private Color resolvePriceColor() {
+        if (currentMetrics != null && currentMetrics.getChangePercent24h() != 0.0) {
+            return currentMetrics.getChangePercent24h() >= 0 ? GREEN : RED;
+        }
+        if (currentStats != null && currentStats.getPerformanceOneDay() != 0.0) {
+            return currentStats.getPerformanceOneDay() >= 0 ? GREEN : RED;
+        }
+        return TEXT;
+    }
+
+    private String buildNameLine(String statsName) {
+        String venue = exchange == null ? "No venue" : safe(exchange.getDisplayName());
+        String name = firstNonBlank(statsName, assetClassLabel(currentAssetClass));
+        return name + " • " + venue;
+    }
+
+    private String sectionTitleForStats() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF -> "Equity Snapshot";
+            case FOREX -> "FX Snapshot";
+            case INDEX -> "Index Snapshot";
+            case COMMODITY -> "Commodity Snapshot";
+            case FUTURE, OPTION, CFD -> "Derivative Snapshot";
+            case CRYPTO -> "Crypto Snapshot";
+            default -> "Market Snapshot";
+        };
+    }
+
+    private String capLabelForAsset() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF -> "Market value / cap";
+            case FOREX -> "Notional market size";
+            case INDEX -> "Index market value";
+            case COMMODITY -> "Market value";
+            case FUTURE, OPTION, CFD -> "Underlying market value";
+            default -> "Market cap";
+        };
+    }
+
+    private String volumeLabelForAsset() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF -> "Session / 24h volume";
+            case FOREX -> "Quote activity / volume";
+            case INDEX -> "Index volume";
+            case COMMODITY -> "Contract / spot volume";
+            default -> "Volume (24h)";
+        };
+    }
+
+    private String supplyLabelForAsset() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF -> "Shares outstanding / float";
+            case FOREX -> "Base / quote pair";
+            case INDEX -> "Constituents / units";
+            case COMMODITY -> "Contract unit / supply";
+            case FUTURE, OPTION, CFD -> "Contract size / exposure";
+            default -> "Circulating supply";
+        };
+    }
+
+    private String dilutedLabelForAsset() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF -> "Enterprise / diluted value";
+            case FOREX -> "Forward / implied value";
+            case INDEX -> "Full market value";
+            case COMMODITY -> "Fully valued exposure";
+            case FUTURE, OPTION, CFD -> "Notional exposure";
+            default -> "Fully diluted market cap";
+        };
+    }
+
+    private String highLabelForAsset() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF, INDEX -> "52w / all-time high";
+            case FOREX -> "Range high";
+            case COMMODITY -> "Contract / spot high";
+            default -> "All-time high";
+        };
+    }
+
+    private String rankingLabelForAsset() {
+        return switch (currentAssetClass) {
+            case STOCK, ETF -> "Watchlist / popularity rank";
+            case FOREX -> "FX popularity rank";
+            case INDEX -> "Index rank";
+            case COMMODITY -> "Commodity rank";
+            default -> "Provider popularity rank";
+        };
+    }
+
+    private String providerName(AssetClass assetClass) {
+        return switch (assetClass) {
+            case CRYPTO -> "CoinGecko / Exchange";
+            case STOCK, ETF, INDEX -> "Yahoo-style / Alpha Vantage / Broker";
+            case FOREX -> "Broker FX / Alpha Vantage";
+            case COMMODITY -> "Broker / Alpha Vantage / Yahoo-style";
+            case FUTURE, OPTION, CFD -> "Broker metadata / underlying quote";
+            default -> "Auto";
+        };
+    }
+
+    private String getBenchmarkLabel() {
+        return switch (currentAssetClass) {
+            case CRYPTO -> {
+                String symbol = currentSymbol.toUpperCase(Locale.ROOT);
+                yield "BTC".equals(symbol) ? "ETH" : "BTC/ETH";
+            }
+            case STOCK, ETF -> "SPY / QQQ";
+            case FOREX -> "DXY / USD";
+            case INDEX -> "SPY / Global index";
+            case COMMODITY -> "DXY / Commodity index";
+            case FUTURE, OPTION, CFD -> "Underlying";
+            default -> "Benchmark";
+        };
+    }
+
+    private String supplyText(MarketStats stats) {
+        if (currentAssetClass == AssetClass.FOREX && currentPair != null) {
+            return displaySymbol(currentPair);
+        }
+        if (stats.getCirculating() > 0.0) {
+            return String.format("%.0f %s", stats.getCirculating(), safe(stats.getCirculatingUnit()));
+        }
+        return "N/A";
+    }
+
+    private String allTimeHighText(MarketStats stats) {
+        if (stats.getAllTimeHigh() <= 0.0) {
+            return "N/A";
+        }
+        String date = safe(stats.getAllTimeHighDate());
+        return formatPrice(stats.getAllTimeHigh()) + (date.isBlank() ? "" : " (" + date + ")");
+    }
+
+    private String distanceFromHighText(MarketStats stats) {
+        if (!Double.isFinite(stats.getPercentDownFromATH()) || stats.getPercentDownFromATH() == 0.0) {
+            return "N/A";
+        }
+        return String.format("-%.2f%%", Math.abs(stats.getPercentDownFromATH()));
+    }
+
+    private String formatSpread(TradePair pair) {
+        if (pair == null || pair.getBid() <= 0 || pair.getAsk() <= 0 || pair.getAsk() < pair.getBid()) {
+            return "N/A";
+        }
+        double spread = pair.getAsk() - pair.getBid();
+        double spreadPercent = pair.getBid() > 0.0 ? (spread / pair.getBid()) * 100.0 : 0.0;
+        return String.format("%s (%.4f%%)", formatPrice(spread), spreadPercent);
+    }
+
+    private AssetClass inferAssetClass(TradePair pair) {
+        if (pair == null) {
+            return AssetClass.UNKNOWN;
+        }
+
+        String symbol = normalizeSymbol(pair.getSymbol()).toUpperCase(Locale.ROOT);
+        String base = safePairCode(pair::getBaseCode).toUpperCase(Locale.ROOT);
+        String quote = inferQuoteCode(pair).toUpperCase(Locale.ROOT);
+        String combined = symbol + " " + base + " " + quote;
+
+        if (combined.contains("PERP") || combined.contains("FUT") || combined.contains("FUTURE")) {
+            return AssetClass.FUTURE;
+        }
+        if (combined.contains("OPTION") || combined.contains("CALL") || combined.contains("PUT")) {
+            return AssetClass.OPTION;
+        }
+        if (combined.contains("CFD")) {
+            return AssetClass.CFD;
+        }
+        if (isCryptoCode(base) || isCryptoCode(symbol)) {
+            return AssetClass.CRYPTO;
+        }
+        if (isForexPair(base, quote, symbol)) {
+            return AssetClass.FOREX;
+        }
+        if (symbol.startsWith("^") || combined.contains("INDEX") || combined.contains("SPX") || combined.contains("NDX") || combined.contains("US30") || combined.contains("NAS100")) {
+            return AssetClass.INDEX;
+        }
+        if (combined.contains("ETF") || symbol.endsWith(".ETF")) {
+            return AssetClass.ETF;
+        }
+        if (isCommoditySymbol(symbol)) {
+            return AssetClass.COMMODITY;
+        }
+        if (!symbol.isBlank()) {
+            return AssetClass.STOCK;
+        }
+        return AssetClass.UNKNOWN;
+    }
+
+    private String inferQuoteCode(TradePair pair) {
+        if (pair == null) {
+            return "";
+        }
+
+        String symbol = normalizeSymbol(pair.getSymbol()).toUpperCase(Locale.ROOT);
+        String display = displaySymbol(pair).toUpperCase(Locale.ROOT);
+        String[] candidates = {display, symbol};
+
+        for (String candidate : candidates) {
+            if (candidate.contains("/")) {
+                String[] parts = candidate.split("/", 2);
+                if (parts.length == 2) {
+                    return parts[1].replaceAll("[^A-Z]", "");
+                }
+            }
+            if (candidate.contains("_")) {
+                String[] parts = candidate.split("_", 2);
+                if (parts.length == 2) {
+                    return parts[1].replaceAll("[^A-Z]", "");
+                }
+            }
+            if (candidate.contains("-")) {
+                String[] parts = candidate.split("-", 2);
+                if (parts.length == 2) {
+                    return parts[1].replaceAll("[^A-Z]", "");
+                }
+            }
+        }
+
+        String compact = symbol.replaceAll("[^A-Z]", "");
+        if (compact.length() == 6 && isFiatCode(compact.substring(3, 6))) {
+            return compact.substring(3, 6);
+        }
+        return "";
+    }
+
+    private boolean isForexPair(String base, String quote, String symbol) {
+        if (isFiatCode(base) && isFiatCode(quote)) {
+            return true;
+        }
+        String compact = symbol.replace("/", "").replace("_", "").replace("-", "");
+        return compact.length() == 6 && isFiatCode(compact.substring(0, 3)) && isFiatCode(compact.substring(3, 6));
+    }
+
+    private boolean isCryptoCode(String code) {
+        if (code == null || code.isBlank()) {
+            return false;
+        }
+        return switch (code.toUpperCase(Locale.ROOT)) {
+            case "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LTC", "BCH", "XLM", "MATIC", "LINK", "UNI", "ATOM", "BNB", "USDT", "USDC", "DAI" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isFiatCode(String code) {
+        if (code == null || code.length() != 3) {
+            return false;
+        }
+        return switch (code.toUpperCase(Locale.ROOT)) {
+            case "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK", "CNH", "CNY", "MXN", "ZAR", "TRY", "SGD", "HKD" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isCommoditySymbol(String symbol) {
+        if (symbol == null) {
+            return false;
+        }
+        String s = symbol.toUpperCase(Locale.ROOT);
+        return s.contains("XAU") || s.contains("XAG") || s.contains("WTI") || s.contains("BRENT")
+                || s.contains("OIL") || s.contains("GOLD") || s.contains("SILVER") || s.contains("COPPER")
+                || s.contains("NATGAS") || s.contains("NG=") || s.contains("CL=") || s.contains("GC=") || s.contains("SI=");
+    }
+
+    private String assetClassLabel(AssetClass assetClass) {
+        return switch (assetClass) {
+            case CRYPTO -> "Crypto";
+            case STOCK -> "Stock";
+            case ETF -> "ETF";
+            case FOREX -> "Forex";
+            case INDEX -> "Index";
+            case COMMODITY -> "Commodity";
+            case FUTURE -> "Future / Perp";
+            case OPTION -> "Option";
+            case CFD -> "CFD";
+            default -> "Market";
+        };
+    }
+
+    private String displaySymbol(TradePair pair) {
+        if (pair == null) {
+            return "N/A";
+        }
+        try {
+            String slash = pair.toSlashSymbol();
+            if (slash != null && !slash.isBlank()) {
+                return slash;
+            }
+        } catch (Exception ignored) {
+            // Some TradePair implementations may not expose toSlashSymbol.
+        }
+        return firstNonBlank(pair.getSymbol(), pair.toString());
+    }
+
+    private String normalizeSymbol(String symbol) {
+        return symbol == null ? "" : symbol.trim();
     }
 
     private String formatPrice(double value) {
         if (value <= 0.0 || !Double.isFinite(value)) {
             return "N/A";
         }
-        return value >= 100.0 ? String.format("%.2f", value) : String.format("%.6f", value);
-    }
-
-    private String valueOrNA(double value, String formatted) {
-        return value > 0.0 && Double.isFinite(value) ? formatted : "N/A";
-    }
-
-    /**
-     * Update display with market metrics (technical analysis data)
-     */
-    public void updateMetrics(MarketMetrics metrics) {
-        if (metrics == null) {
-            return;
+        if (value >= 1000.0) {
+            return String.format("%,.2f", value);
         }
-
-        // Add metrics section to main content
-        mainContent.getChildren().add(new Separator());
-        mainContent.getChildren().add(createLabel("Technical Metrics", true));
-        mainContent.getChildren().add(createMetricsGrid(metrics));
+        if (value >= 1.0) {
+            return String.format("%.5f", value);
+        }
+        return String.format("%.8f", value);
     }
 
-    /**
-     * Create a grid for displaying market metrics
-     */
-    private VBox createMetricsGrid(MarketMetrics metrics) {
-        VBox grid = new VBox(8);
-        grid.setStyle(
-                "-fx-background-color: #f9fafb; -fx-padding: 12; -fx-border-radius: 6; -fx-border-color: #e5e7eb; -fx-border-width: 1;");
+    private String formatCompact(double value) {
+        if (!Double.isFinite(value) || value <= 0.0) {
+            return "N/A";
+        }
+        double abs = Math.abs(value);
+        if (abs >= 1_000_000_000_000.0) {
+            return String.format("%.2fT", value / 1_000_000_000_000.0);
+        }
+        if (abs >= 1_000_000_000.0) {
+            return String.format("%.2fB", value / 1_000_000_000.0);
+        }
+        if (abs >= 1_000_000.0) {
+            return String.format("%.2fM", value / 1_000_000.0);
+        }
+        if (abs >= 1_000.0) {
+            return String.format("%.2fK", value / 1_000.0);
+        }
+        return String.format("%.2f", value);
+    }
 
-        grid.getChildren()
-                .add(createStatRow("Current Price", formatPrice(metrics.getCurrentPrice()), Color.web("#1f2937")));
-        grid.getChildren().add(createStatRow("Bid", formatPrice(metrics.getBid()), Color.web("#10b981")));
-        grid.getChildren().add(createStatRow("Ask", formatPrice(metrics.getAsk()), Color.web("#ef4444")));
+    private double safeDouble(double value) {
+        return Double.isFinite(value) ? value : 0.0;
+    }
 
-        String spreadText = String.format("%.6f (%.4f%%)", metrics.getSpread(), metrics.getSpreadPercent());
-        grid.getChildren().add(createStatRow("Spread", spreadText, Color.web("#6b7280")));
+    private double firstPositive(double... values) {
+        if (values == null) {
+            return 0.0;
+        }
+        for (double value : values) {
+            if (Double.isFinite(value) && value > 0.0) {
+                return value;
+            }
+        }
+        return 0.0;
+    }
 
-        grid.getChildren().add(new Separator());
-        grid.getChildren().add(createLabel("24h Range & Volume", false));
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
 
-        grid.getChildren().add(createStatRow("High (24h)", formatPrice(metrics.getHigh24h()), Color.web("#10b981")));
-        grid.getChildren().add(createStatRow("Low (24h)", formatPrice(metrics.getLow24h()), Color.web("#ef4444")));
-        grid.getChildren()
-                .add(createStatRow("Range",
-                        String.format("%.6f (%.2f%%)", metrics.getHighLowRange(), metrics.getHighLowRangePercent()),
-                        Color.web("#6b7280")));
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.trim().isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
 
-        String volume24hFormatted = metrics.getVolume24h() >= 1_000_000
-                ? String.format("$%.2fM", metrics.getVolume24h() / 1_000_000)
-                : String.format("$%.2f", metrics.getVolume24h());
-        grid.getChildren().add(createStatRow("Volume (24h)", volume24hFormatted, Color.web("#3b82f6")));
-
-        String changePercent = String.format("%+.2f%%", metrics.getChangePercent24h());
-        Color changeColor = metrics.getChangePercent24h() >= 0 ? Color.web("#10b981") : Color.web("#ef4444");
-        grid.getChildren().add(createStatRow("Change (24h)", changePercent, changeColor));
-
-        grid.getChildren().add(new Separator());
-        grid.getChildren().add(createLabel("Technical Analysis", false));
-
-        String volatilityText = String.format("%.2f%% (%s)", metrics.getVolatility(), metrics.getVolatilityLevel());
-        Color volatilityColor = getVolatilityColor(metrics.getVolatilityLevel());
-        grid.getChildren().add(createStatRow("Volatility", volatilityText, volatilityColor));
-
-        String trendText = String.format("%s (%.0f%%)", metrics.getTrend(), metrics.getTrendStrength());
-        Color trendColor = getTrendColor(metrics.getTrend());
-        grid.getChildren().add(createStatRow("Trend", trendText, trendColor));
-
-        String signalText = metrics.getTechnicalSignal();
-        Color signalColor = getTechnicalSignalColor(metrics.getTechnicalSignal());
-        grid.getChildren().add(createStatRow("Technical Signal", signalText, signalColor));
-
-        String scoreText = String.format("%+.0f", metrics.getTechnicalScore());
-        Color scoreColor = metrics.getTechnicalScore() > 0 ? Color.web("#10b981") : Color.web("#ef4444");
-        grid.getChildren().add(createStatRow("Technical Score", scoreText, scoreColor));
-
-        grid.getChildren().add(new Separator());
-        grid.getChildren().add(createLabel("Price Position", false));
-
-        String fromHighText = String.format("-%.2f%%", metrics.getPriceChangeFromHigh());
-        grid.getChildren().add(createStatRow("Below 24h High", fromHighText, Color.web("#6b7280")));
-
-        String fromLowText = String.format("+%.2f%%", metrics.getPriceChangeFromLow());
-        grid.getChildren().add(createStatRow("Above 24h Low", fromLowText, Color.web("#6b7280")));
-
-        return grid;
+    private Color colorFromWeb(String color, Color fallback) {
+        if (color == null || color.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Color.web(color);
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private Color getVolatilityColor(String level) {
-        return switch (level) {
-            case "LOW" -> Color.web("#10b981");
-            case "NORMAL" -> Color.web("#3b82f6");
-            case "HIGH" -> Color.web("#f59e0b");
-            case "EXTREME" -> Color.web("#ef4444");
-            default -> Color.web("#6b7280");
+        return switch (safe(level).toUpperCase(Locale.ROOT)) {
+            case "LOW" -> GREEN;
+            case "NORMAL" -> BLUE;
+            case "HIGH" -> AMBER;
+            case "EXTREME" -> RED;
+            default -> MUTED;
         };
     }
 
     private Color getTrendColor(String trend) {
-        return switch (trend) {
+        return switch (safe(trend).toUpperCase(Locale.ROOT)) {
             case "STRONG_UP" -> Color.web("#059669");
-            case "UP" -> Color.web("#10b981");
-            case "SIDEWAYS" -> Color.web("#3b82f6");
+            case "UP" -> GREEN;
+            case "SIDEWAYS" -> BLUE;
             case "DOWN" -> Color.web("#f97316");
             case "STRONG_DOWN" -> Color.web("#dc2626");
-            default -> Color.web("#6b7280");
+            default -> MUTED;
         };
     }
 
     private Color getTechnicalSignalColor(String signal) {
-        return switch (signal) {
+        return switch (safe(signal).toUpperCase(Locale.ROOT)) {
             case "STRONG_BUY" -> Color.web("#059669");
-            case "BUY" -> Color.web("#10b981");
-            case "NEUTRAL" -> Color.web("#3b82f6");
+            case "BUY" -> GREEN;
+            case "NEUTRAL" -> BLUE;
             case "SELL" -> Color.web("#f97316");
             case "STRONG_SELL" -> Color.web("#dc2626");
-            default -> Color.web("#6b7280");
+            default -> MUTED;
         };
+    }
+
+    private String safePairCode(CodeSupplier supplier) {
+        try {
+            return safe(supplier.get());
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private void openLink(String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        try {
+            if (!Desktop.isDesktopSupported()) {
+                log.warn("Desktop browse is not supported. URL={}", url);
+                return;
+            }
+            Desktop.getDesktop().browse(URI.create(url));
+        } catch (Exception exception) {
+            log.warn("Failed to open link: {}", url, exception);
+        }
+    }
+
+    @FunctionalInterface
+    private interface CodeSupplier {
+        String get();
+    }
+
+    private enum AssetClass {
+        CRYPTO,
+        STOCK,
+        ETF,
+        FOREX,
+        INDEX,
+        COMMODITY,
+        FUTURE,
+        OPTION,
+        CFD,
+        UNKNOWN
     }
 }

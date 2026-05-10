@@ -126,7 +126,6 @@ public class TelegramNotifier {
 
         String url = apiUrl("getUpdates");
 
-
         if (lastUpdateId >= 0) {
             url += "?offset=%d".formatted(lastUpdateId + 1);
         }

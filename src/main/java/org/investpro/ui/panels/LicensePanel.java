@@ -11,6 +11,7 @@ import javafx.scene.layout.VBox;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.licensing.LicenseManager;
 import org.investpro.licensing.LicenseStatus;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * UI Panel for displaying and managing application license.
@@ -156,6 +157,17 @@ public final class LicensePanel extends VBox {
     }
 
     private void showLicenseDetails() {
+        Label detailsLabel = getLabel();
+        detailsLabel.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-family: monospace;");
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("License Details");
+        dialog.getDialogPane().setContent(detailsLabel);
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    private @NotNull Label getLabel() {
         LicenseStatus status = licenseManager.getStatus();
         String details = "License Type: " + status.getLicenseType().getDisplayName() + "\n" +
                 "Licensee: " + status.getLicenseeName() + "\n" +
@@ -165,13 +177,7 @@ public final class LicensePanel extends VBox {
                 "Max Strategies: " + status.getMaxStrategies() + "\n";
 
         Label detailsLabel = new Label(details);
-        detailsLabel.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-family: monospace;");
-
-        Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("License Details");
-        dialog.getDialogPane().setContent(detailsLabel);
-        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
-        dialog.showAndWait();
+        return detailsLabel;
     }
 
     public void updateDisplay() {
