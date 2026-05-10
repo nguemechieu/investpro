@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * TradingView-like trade visualization overlay for charts.
- *
+ * <p>
  * Displays entry points, exit points, take-profit, stop-loss levels, and P&L zones.
  * The overlay maps trade timestamps to the visible candle index, so markers align
  * with the actual candle layout instead of being drawn at a fixed placeholder X value.

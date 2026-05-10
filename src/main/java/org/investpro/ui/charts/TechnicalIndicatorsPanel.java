@@ -80,22 +80,22 @@ public class TechnicalIndicatorsPanel extends VBox {
 
     private void initializeCommonIndicators() {
         // Moving Averages
-        addIndicator("MA(20)", "—", TEXT_SECONDARY, "Moving Average 20");
-        addIndicator("MA(50)", "—", TEXT_SECONDARY, "Moving Average 50");
-        addIndicator("MA(200)", "—", TEXT_SECONDARY, "Moving Average 200");
+        addIndicator("SMA20", "—", TEXT_SECONDARY, "Simple Moving Average 20");
+        addIndicator("SMA50", "—", TEXT_SECONDARY, "Simple Moving Average 50");
+        addIndicator("SMA200", "—", TEXT_SECONDARY, "Simple Moving Average 200");
 
         addSeparator();
 
         // Momentum Indicators
-        addIndicator("RSI(14)", "—", TEXT_SECONDARY, "Relative Strength Index");
+        addIndicator("RSI14", "—", TEXT_SECONDARY, "Relative Strength Index");
         addIndicator("MACD", "—", TEXT_SECONDARY, "Moving Average Convergence Divergence");
-        addIndicator("Stoch", "—", TEXT_SECONDARY, "Stochastic Oscillator");
+        addIndicator("Stochastic", "—", TEXT_SECONDARY, "Stochastic Oscillator");
 
         addSeparator();
 
         // Volatility Indicators
-        addIndicator("BBands", "—", TEXT_SECONDARY, "Bollinger Bands");
-        addIndicator("ATR(14)", "—", TEXT_SECONDARY, "Average True Range");
+        addIndicator("BB20", "—", TEXT_SECONDARY, "Bollinger Bands");
+        addIndicator("ATR14", "—", TEXT_SECONDARY, "Average True Range");
         addIndicator("Volatility", "—", TEXT_SECONDARY, "Price Volatility");
 
         addSeparator();

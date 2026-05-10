@@ -7,6 +7,7 @@ Successfully reconfigured Docker setup for InvestPro to use **PostgreSQL** datab
 ### Changes Made
 
 #### 1. **Dockerfile** (Completely Rewritten)
+
 - **Before**: Basic multi-stage Maven build → JRE runtime (no GUI)
 - **After**: Enhanced multi-stage build with:
   - ✅ X11 virtual display (Xvfb) support

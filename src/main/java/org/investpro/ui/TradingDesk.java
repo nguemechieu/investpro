@@ -906,7 +906,7 @@ public class TradingDesk extends BorderPane {
      * Creates a compact cell renderer for orderbook prices (one-line display).
      */
     private @NotNull javafx.scene.control.ListCell<OrderBook.PriceLevel> createCompactOrderBookCell(boolean isBids) {
-        return new javafx.scene.control.ListCell<OrderBook.PriceLevel>() {
+        return new javafx.scene.control.ListCell<>() {
             @Override
             protected void updateItem(OrderBook.PriceLevel item, boolean empty) {
                 super.updateItem(item, empty);

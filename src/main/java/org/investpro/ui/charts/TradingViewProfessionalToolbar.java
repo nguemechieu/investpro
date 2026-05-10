@@ -185,6 +185,7 @@ public class TradingViewProfessionalToolbar extends VBox {
         toolbarBottom.getChildren().add(spacer2);
 
         getChildren().add(toolbarBottom);
+        setStudiesEnabled(true);
     }
 
     private void initializeStudiesDropdown() {

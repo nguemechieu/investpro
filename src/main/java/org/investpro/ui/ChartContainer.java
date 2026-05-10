@@ -1018,34 +1018,55 @@ public class ChartContainer extends Region {
             double lastValue = lastLineValues[lastLineValues.length - 1];
             String indicatorName = indicator.getName().toUpperCase();
 
-            // RSI signal colors (0-100 scale)
+            // RSI signal colors (0-100 scale) - Overbought/Oversold
             if (indicatorName.contains("RSI")) {
-                if (lastValue >= 70) {
-                    return "#F44336"; // Red: Overbought
-                } else if (lastValue <= 30) {
-                    return "#4CAF50"; // Green: Oversold (bullish)
+                if (lastValue > 70) {
+                    return "#F44336"; // Red: Overbought (bearish)
+                } else if (lastValue < 30) {
+                    return "#4CAF50"; // Green: Oversold (bullish opportunity)
                 } else {
-                    return "#2196F3"; // Blue: Neutral
+                    return "#2196F3"; // Blue: Neutral range
                 }
             }
 
             // Stochastic signal colors (0-100 scale)
             if (indicatorName.contains("STOCH")) {
-                if (lastValue >= 80) {
+                if (lastValue > 80) {
                     return "#F44336"; // Red: Overbought
-                } else if (lastValue <= 20) {
+                } else if (lastValue < 20) {
                     return "#4CAF50"; // Green: Oversold
                 } else {
                     return "#2196F3"; // Blue: Neutral
                 }
             }
 
-            // MACD colors (positive/negative)
+            // MACD histogram colors (positive = bullish, negative = bearish)
             if (indicatorName.contains("MACD")) {
                 return lastValue > 0 ? "#4CAF50" : "#F44336"; // Green if positive, red if negative
             }
 
-            // Default color based on positive/negative
+            // Bollinger Bands colors - typically used for volatility indication
+            if (indicatorName.contains("BB")) {
+                return "#2196F3"; // Blue for volatility bands (informational)
+            }
+
+            // ATR colors - positive values, green for stable, yellow/red for high volatility
+            if (indicatorName.contains("ATR")) {
+                return "#4CAF50"; // Green - ATR is always positive, just shows volatility level
+            }
+
+            // Moving Average colors - neutral informational color
+            if (indicatorName.contains("SMA") || indicatorName.contains("EMA") || 
+                    indicatorName.contains("MA") || indicatorName.contains("VWAP")) {
+                return "#2196F3"; // Blue - moving averages are trend/price reference lines
+            }
+
+            // Volume colors - neutral informational
+            if (indicatorName.contains("VOLUME") || indicatorName.contains("OBV")) {
+                return "#FFC107"; // Yellow/Amber for volume information
+            }
+
+            // Default color based on positive/negative for unknown indicators
             if (lastValue > 0) {
                 return "#4CAF50"; // Green for positive
             } else if (lastValue < 0) {

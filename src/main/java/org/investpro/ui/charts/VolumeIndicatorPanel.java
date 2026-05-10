@@ -85,6 +85,7 @@ public class VolumeIndicatorPanel extends StackPane {
     public void addVolumeBar(@NotNull VolumeBar bar) {
         volumeBars.add(bar);
         updateMaxVolume();
+        redraw();
     }
 
     /**
@@ -93,6 +94,7 @@ public class VolumeIndicatorPanel extends StackPane {
     public void addVolumeBars(@NotNull List<VolumeBar> bars) {
         volumeBars.addAll(bars);
         updateMaxVolume();
+        redraw();
     }
 
     /**
