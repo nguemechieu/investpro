@@ -1,12 +1,10 @@
 package org.investpro.ui.charts;
 
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +48,7 @@ public class TradingViewEnhancedChart extends BorderPane {
     private final TradeVisualizationOverlay tradeOverlay;
 
     private final VBox chartContainer;
-    private final HBox mainLayout;
+    private final VBox mainLayout;
 
     public TradingViewEnhancedChart(
             @NotNull Exchange exchange,
@@ -76,7 +74,7 @@ public class TradingViewEnhancedChart extends BorderPane {
 
         // Initialize UI
         this.chartContainer = new VBox(8);
-        this.mainLayout = new HBox(0);
+        this.mainLayout = new VBox(0);
 
         initializeUI();
     }

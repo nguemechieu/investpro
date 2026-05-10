@@ -2,6 +2,7 @@ package org.investpro.strategy.lab;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import org.investpro.utils.Side;
 import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
@@ -11,10 +12,11 @@ import java.time.Instant;
 
 /**
  * Represents a single trade executed during a backtest.
- *
+ * <p>
  * Records entry and exit prices, P&L, confidence, and reasons for both entry
  * and exit.
  */
+@Setter
 @Getter
 @Builder(toBuilder = true)
 public class StrategyBacktestTrade {
@@ -83,7 +85,7 @@ public class StrategyBacktestTrade {
     /**
      * Reason for exit (hit stop, hit target, timeout, etc.).
      */
-    @Nullable
+
     private final String exitReason;
 
     /**
@@ -95,8 +97,9 @@ public class StrategyBacktestTrade {
     /**
      * When this trade was exited (null until trade is closed).
      */
-    @Nullable
-    private final Instant exitTime;
+
+
+    private  Instant exitTime;
 
     /**
      * Number of candles held (set when trade is closed).
