@@ -1,5 +1,6 @@
 package org.investpro.ui;
 
+import javafx.scene.control.*;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.exchange.*;
@@ -16,20 +17,6 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.Label;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.RadioButton;
-import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -287,11 +274,14 @@ public class OnboardingView extends StackPane {
         pane.setTop(loadMarketButton);
         fadeTo(pane);
     }
-
+    final ChoiceBox<String>selectedTradingModeChoiseBox = new ChoiceBox<>();
     private void showExchangeCredentialsStep() {
         String selectedExchangeName = exchangeBox.getValue();
         SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
+        selectedTradingModeChoiseBox.getItems().addAll(
+                "LIVE","PAPER TRADING"
+        );
         TextField apiKeyField = new TextField();
         apiKeyField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
@@ -320,18 +310,10 @@ public class OnboardingView extends StackPane {
         // Load remembered credentials for this exchange if they exist
         loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
 
-        // Trading mode selection
-        ToggleGroup tradingModeGroup = new ToggleGroup();
-        RadioButton liveRadioButton = new RadioButton("Live Trading");
-        liveRadioButton.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 12;");
-        liveRadioButton.setToggleGroup(tradingModeGroup);
-        liveRadioButton.setSelected(true); // Default to Live Trading
 
-        RadioButton paperRadioButton = new RadioButton("Paper Trading");
-        paperRadioButton.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 12;");
-        paperRadioButton.setToggleGroup(tradingModeGroup);
 
-        HBox tradingModeBox = new HBox(20, liveRadioButton, paperRadioButton);
+
+        HBox tradingModeBox = new HBox(20, selectedTradingModeChoiseBox);
         tradingModeBox.setAlignment(Pos.CENTER_LEFT);
         tradingModeBox.setStyle("-fx-padding: 8 0 0 0;");
 
@@ -356,8 +338,10 @@ public class OnboardingView extends StackPane {
 
         CheckBox rememberCredentialsCheckBox = new CheckBox("Remember these credentials");
         rememberCredentialsCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
+        rememberCredentialsCheckBox.setPrefSize(40,40);
 
-        HBox rememberBox = new HBox(10, rememberCredentialsCheckBox);
+
+        HBox rememberBox = new HBox(20, rememberCredentialsCheckBox);
         rememberBox.setAlignment(Pos.CENTER);
 
         Button continueButton = new Button("Continue");
@@ -374,7 +358,6 @@ public class OnboardingView extends StackPane {
 
         continueButton.setOnAction(event -> {
             // Determine trading mode from radio button selection
-            String selectedTradingMode = paperRadioButton.isSelected() ? "PAPER" : "LIVE";
 
             // For OANDA, only token is required (Account ID is optional - can be
             // auto-detected)
@@ -392,11 +375,10 @@ public class OnboardingView extends StackPane {
                         apiKeyField.getText().trim(),
                         accountIdField.getText().trim(), // Use account ID as apiSecret
                         accountIdField.getText().trim(),
-                        telegramToken.getText().trim(),
-                        null, // openaiApiKey - optional
+                        telegramToken.getText().trim(),null, // openaiApiKey - optional
                         null, // openaiModel - optional
                         null, // openaiOrgId - optional
-                        selectedTradingMode // Trading mode
+                        selectedTradingModeChoiseBox.getValue()// Trading mode
                 );
             } else {
                 // For other exchanges, require both API Key and API Secret
@@ -416,7 +398,7 @@ public class OnboardingView extends StackPane {
                         null, // openaiApiKey - optional
                         null, // openaiModel - optional
                         null, // openaiOrgId - optional
-                        selectedTradingMode // Trading mode
+                        selectedTradingModeChoiseBox.getValue() // Trading mode
                 );
             }
 
@@ -434,7 +416,7 @@ public class OnboardingView extends StackPane {
                     apiKey,
                     apiSecret,
                     accountIdField.getText(),
-                    selectedTradingMode);
+                    selectedTradingModeChoiseBox.getValue());
 
             if (!authResult.success()) {
                 validation.setStyle("-fx-text-fill: #ef4444;");

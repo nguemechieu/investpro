@@ -82,7 +82,7 @@ public class MarketWatchPanel extends BorderPane {
                         "-fx-text-fill: #e0e7ff;");
 
         // Add alternating row colors for better readability
-        table.setRowFactory(tv -> new TableRow<MarketWatchRow>() {
+        table.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(MarketWatchRow item, boolean empty) {
                 super.updateItem(item, empty);
@@ -414,16 +414,14 @@ public class MarketWatchPanel extends BorderPane {
                 for (SymbolAgentState state : allStates) {
                     if (state != null) {
                         TradePair symbol = state.getSymbol();
-                        if (symbol != null) {
-                            MarketWatchRow row = rowCache.computeIfAbsent(
-                                    symbol,
-                                    key -> MarketWatchRow.builder()
-                                            .symbol(symbol)
-                                            .build());
+                        MarketWatchRow row = rowCache.computeIfAbsent(
+                                symbol,
+                                key -> MarketWatchRow.builder()
+                                        .symbol(symbol)
+                                        .build());
 
-                            // Update the row with symbol state
-                            row.updateSymbolState(state);
-                        }
+                        // Update the row with symbol state
+                        row.updateSymbolState(state);
                     }
                 }
 
