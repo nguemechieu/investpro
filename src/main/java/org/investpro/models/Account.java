@@ -1,5 +1,7 @@
 package org.investpro.models;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import lombok.Data;
@@ -7,10 +9,7 @@ import org.investpro.exchange.Exchange;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Broker-neutral account snapshot for InvestPro.
@@ -41,7 +40,8 @@ import java.util.Objects;
 // “How much capital can be exposed?”
 // “What protection system should be active?”
 // “Is this trade worth taking probabilistically?”
-
+@Getter
+@Setter
 @Data
 @Slf4j
 public class Account {
@@ -667,4 +667,15 @@ public class Account {
 
     private double leverage;
 
+    public Map<String,Double> getBalance() {
+        return balances;
+    }
+
+    public double getRealizedPnlToday() {
+        return  realizedPnl;
+    }
+
+    public double dailyLoss;
+
+    public double maxDailyLoss;
 }
