@@ -21,7 +21,7 @@ import java.util.*;
 @Getter
 @Setter
 @ToString
-public class BacktestingService {
+public class BacktestingService  {
     private BackTesting backtestEngine;
     private Map<String, List<CandleData>> historicalDataCache;
     private HistoricalDataRepository historicalDataRepository;

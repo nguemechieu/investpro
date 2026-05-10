@@ -6,8 +6,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import lombok.Data;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.trading.Position;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import java.time.Instant;
 import java.util.*;
 
@@ -667,15 +669,103 @@ public class Account {
 
     private double leverage;
 
-    public Map<String,Double> getBalance() {
+    public Map<String, Double> getBalance() {
         return balances;
     }
 
     public double getRealizedPnlToday() {
-        return  realizedPnl;
+        return realizedPnl;
     }
 
     public double dailyLoss;
 
     public double maxDailyLoss;
+
+    /**
+     * Open positions in this account.
+     * Maps symbol/pair to Position.
+     */
+    private Map<String, Position> positions = new LinkedHashMap<>();
+
+    // =====================================================================
+    // Trading capability methods (for PreTradeValidationEngine)
+    // =====================================================================
+
+    /**
+     * Check if trading is enabled on this account.
+     * Returns true if account is connected and trading is not explicitly disabled.
+     * Paper trading and sandbox accounts are considered trading-enabled.
+     *
+     * @return true if account can submit trades
+     */
+    public boolean isTradingEnabled() {
+        // Account can trade if connected and not explicitly disabled
+        // Paper trading and sandbox accounts can trade
+        return connected;
+    }
+
+    /**
+     * Get open positions in this account.
+     * Returns an immutable collection of Position objects.
+     *
+     * @return Collection of open positions, never null (empty if no positions)
+     */
+    @NotNull
+    public Collection<Position> getOpenPositions() {
+        return positions == null ? Collections.emptyList() : Collections.unmodifiableCollection(positions.values());
+    }
+
+    /**
+     * Add or update a position in this account.
+     *
+     * @param symbol   the symbol/pair
+     * @param position the position
+     */
+    public void setPosition(@NotNull String symbol, @NotNull Position position) {
+        Objects.requireNonNull(symbol, "symbol cannot be null");
+        Objects.requireNonNull(position, "position cannot be null");
+
+        if (positions == null) {
+            positions = new LinkedHashMap<>();
+        }
+
+        positions.put(symbol, position);
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Get a specific position by symbol.
+     *
+     * @param symbol the symbol/pair
+     * @return the position or null if not found
+     */
+    @Nullable
+    public Position getPosition(@NotNull String symbol) {
+        Objects.requireNonNull(symbol, "symbol cannot be null");
+        return positions == null ? null : positions.get(symbol);
+    }
+
+    /**
+     * Remove a position from this account.
+     *
+     * @param symbol the symbol/pair
+     */
+    public void removePosition(@NotNull String symbol) {
+        Objects.requireNonNull(symbol, "symbol cannot be null");
+
+        if (positions != null) {
+            positions.remove(symbol);
+            this.updatedAt = Instant.now();
+        }
+    }
+
+    /**
+     * Clear all positions from this account.
+     */
+    public void clearPositions() {
+        if (positions != null) {
+            positions.clear();
+            this.updatedAt = Instant.now();
+        }
+    }
 }

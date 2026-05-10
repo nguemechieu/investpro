@@ -2,6 +2,7 @@ package org.investpro.market;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.TradingSessionStatus;
 
 import java.time.DayOfWeek;
@@ -12,6 +13,7 @@ import java.util.Set;
 
 @Getter
 @Builder
+@Slf4j
 public class InstrumentTradingSession {
 
     private final String instrument;

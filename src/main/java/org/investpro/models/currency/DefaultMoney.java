@@ -17,6 +17,7 @@ import java.sql.SQLException;
  *
  * @author NOEL NGUEMECHIEU
  */
+
 public record DefaultMoney(BigDecimal amount, Currency currency) implements Money, Comparable<DefaultMoney> {
     public static final Money NULL_MONEY = DefaultMoney.ofFiat(BigDecimal.ZERO, Currency.NULL_FIAT_CURRENCY);
 
@@ -60,7 +61,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(new BigDecimal(amount), currencyType, currencyCode);
     }
 
-    public static @NotNull Money of(BigDecimal amount, @NotNull CurrencyType currencyType, String currencyCode) throws SQLException {
+    public static @NotNull Money of(BigDecimal amount, @NotNull CurrencyType currencyType, String currencyCode)
+            throws SQLException {
         return switch (currencyType) {
             case FIAT, CRYPTO -> new DefaultMoney(amount, Currency.of(currencyCode));
             default -> throw new IllegalArgumentException("unknown currency type: " + currencyType);
@@ -303,7 +305,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     private void checkCurrenciesEqual(DefaultMoney defaultMoney) {
         if (!currency.equals(defaultMoney.currency)) {
-            throw new IllegalArgumentException("currencies are not equal: first currency: " + currency + " second currency: " + defaultMoney.currency);
+            throw new IllegalArgumentException("currencies are not equal: first currency: " + currency
+                    + " second currency: " + defaultMoney.currency);
         }
     }
 
@@ -336,10 +339,12 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         return switch (currency.getCurrencyType()) {
+            case CRYPTO -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+
             case FIAT -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-            default -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+            default -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
         };
     }
 }

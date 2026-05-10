@@ -14,6 +14,8 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.i18n.LocalizationService;
+import org.investpro.models.trading.Trade;
+import org.investpro.research.LiveTradingMetricsTracker;
 import org.investpro.strategy.StrategyCatalog;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /**
@@ -32,7 +35,8 @@ import java.util.stream.Collectors;
  * <p>
  * This panel is designed as a professional analytics workstation for InvestPro.
  * It does not depend on one fixed backend service shape. Instead, it tries to
- * read strategy analytics from SystemCore, analysis services, backtest services,
+ * read strategy analytics from SystemCore, analysis services, backtest
+ * services,
  * performance services, or fields/getters using reflection.
  * <p>
  * Covered analytics:
@@ -72,6 +76,11 @@ public class AnalysisPanel extends VBox {
 
     private final SystemCore systemCore;
     private final AnalysisDataProvider dataProvider;
+    private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
+
+    private boolean showingLiveMetrics = false;
+    private String currentLiveStrategy = null;
+    private String currentLiveSymbol = null;
 
     private ComboBox<String> strategyCombo;
     private ComboBox<String> pairCombo;
@@ -79,6 +88,7 @@ public class AnalysisPanel extends VBox {
 
     private Label statusLabel;
     private Label generatedAtLabel;
+    private Label modeIndicatorLabel;
 
     private Label institutionalScoreLabel;
     private Label institutionalScoreHintLabel;
@@ -149,6 +159,9 @@ public class AnalysisPanel extends VBox {
         setupUI();
         loadInitialData();
 
+        // Start monitoring bot status to switch between backtesting and live metrics
+        startBotStatusMonitoring();
+
         LocalizationService.applyTranslations(this);
     }
 
@@ -162,8 +175,11 @@ public class AnalysisPanel extends VBox {
         generatedAtLabel = new Label("Generated: N/A");
         generatedAtLabel.setStyle("-fx-text-fill: " + MUTED + ";");
 
+        modeIndicatorLabel = new Label("📊 BACKTEST MODE");
+        modeIndicatorLabel.setStyle("-fx-text-fill: " + BLUE + "; -fx-font-weight: bold; -fx-font-size: 12px;");
+
         VBox titleBlock = new VBox(3, titleLabel, generatedAtLabel);
-        HBox header = new HBox(12, titleBlock, createSpacer(), statusLabel);
+        HBox header = new HBox(12, titleBlock, createSpacer(), modeIndicatorLabel, statusLabel);
         header.setAlignment(Pos.CENTER_LEFT);
 
         HBox configBox = createConfigurationBar();
@@ -206,8 +222,7 @@ public class AnalysisPanel extends VBox {
                 "Max Drawdown",
                 "VaR / CVaR",
                 "Execution Quality",
-                "Regime Fitness"
-        );
+                "Regime Fitness");
         metricCombo.getSelectionModel().selectFirst();
         metricCombo.setOnAction(e -> updateAnalysis());
 
@@ -221,8 +236,7 @@ public class AnalysisPanel extends VBox {
                 createMutedLabel("Strategy:"), strategyCombo,
                 createMutedLabel("Symbol:"), pairCombo,
                 createMutedLabel("Focus:"), metricCombo,
-                createSpacer(), refreshBtn, analyzeBtn
-        );
+                createSpacer(), refreshBtn, analyzeBtn);
 
         return configBox;
     }
@@ -244,8 +258,7 @@ public class AnalysisPanel extends VBox {
                 fixedTab("Monte Carlo", createMonteCarloTab()),
                 fixedTab("Correlation", createCorrelationTab()),
                 fixedTab("Execution", createExecutionTab()),
-                fixedTab("Notes", createAnalystNotesTab())
-        );
+                fixedTab("Notes", createAnalystNotesTab()));
 
         return tabPane;
     }
@@ -275,10 +288,10 @@ public class AnalysisPanel extends VBox {
                 wrapCard(riskScoreLabel),
                 wrapCard(executionScoreLabel),
                 wrapCard(liquidityScoreLabel),
-                wrapCard(regimeScoreLabel)
-        );
+                wrapCard(regimeScoreLabel));
 
-        institutionalScoreHintLabel = new Label("A composite score built from performance quality, downside risk, execution cost, liquidity, and regime fit.");
+        institutionalScoreHintLabel = new Label(
+                "A composite score built from performance quality, downside risk, execution cost, liquidity, and regime fit.");
         institutionalScoreHintLabel.setWrapText(true);
         institutionalScoreHintLabel.setStyle("-fx-text-fill: " + MUTED + ";");
 
@@ -342,7 +355,8 @@ public class AnalysisPanel extends VBox {
 
     private VBox createDistributionTab() {
         VBox content = createTabContainer();
-        Label infoLabel = createMutedLabel("Return distribution by bucket. Watch for fat left tails, skew, and unstable outliers.");
+        Label infoLabel = createMutedLabel(
+                "Return distribution by bucket. Watch for fat left tails, skew, and unstable outliers.");
         distributionChart = createBarChart("Return Distribution", "Return Bucket", "Frequency", 360);
         content.getChildren().addAll(infoLabel, distributionChart);
         VBox.setVgrow(distributionChart, Priority.ALWAYS);
@@ -368,7 +382,8 @@ public class AnalysisPanel extends VBox {
 
     private VBox createRegimeTab() {
         VBox content = createTabContainer();
-        Label info = createMutedLabel("Regime diagnostics estimate where the strategy works best: trend, chop, high volatility, low liquidity, or risk-off environments.");
+        Label info = createMutedLabel(
+                "Regime diagnostics estimate where the strategy works best: trend, chop, high volatility, low liquidity, or risk-off environments.");
         regimePieChart = new PieChart();
         regimePieChart.setTitle("Regime Contribution");
         regimePieChart.setLabelsVisible(true);
@@ -382,7 +397,8 @@ public class AnalysisPanel extends VBox {
 
     private VBox createStressTab() {
         VBox content = createTabContainer();
-        Label info = createMutedLabel("Institutional stress tests estimate sensitivity to shocks such as volatility expansion, gap moves, liquidity drain, spread widening, and correlated selloffs.");
+        Label info = createMutedLabel(
+                "Institutional stress tests estimate sensitivity to shocks such as volatility expansion, gap moves, liquidity drain, spread widening, and correlated selloffs.");
         stressChart = createBarChart("Stress Scenario P&L", "Scenario", "P&L / Return", 380);
         content.getChildren().addAll(info, stressChart);
         VBox.setVgrow(stressChart, Priority.ALWAYS);
@@ -391,7 +407,8 @@ public class AnalysisPanel extends VBox {
 
     private VBox createMonteCarloTab() {
         VBox content = createTabContainer();
-        Label info = createMutedLabel("Monte Carlo paths are generated from the observed equity/return structure when backend paths are unavailable. This is a risk visualization, not a prediction.");
+        Label info = createMutedLabel(
+                "Monte Carlo paths are generated from the observed equity/return structure when backend paths are unavailable. This is a risk visualization, not a prediction.");
         monteCarloChart = createLineChart("Monte Carlo Equity Paths", "Point", "Equity", 420, false);
         content.getChildren().addAll(info, monteCarloChart);
         VBox.setVgrow(monteCarloChart, Priority.ALWAYS);
@@ -400,7 +417,8 @@ public class AnalysisPanel extends VBox {
 
     private VBox createCorrelationTab() {
         VBox content = createTabContainer();
-        Label infoLabel = createMutedLabel("Correlation matrix by available symbols. Values range from -1.0 to 1.0. High correlation reduces true diversification.");
+        Label infoLabel = createMutedLabel(
+                "Correlation matrix by available symbols. Values range from -1.0 to 1.0. High correlation reduces true diversification.");
 
         correlationGrid = new GridPane();
         correlationGrid.setHgap(8);
@@ -429,7 +447,8 @@ public class AnalysisPanel extends VBox {
         executionNotes.setEditable(false);
         executionNotes.setWrapText(true);
         executionNotes.setPrefRowCount(10);
-        executionNotes.setText("Execution analysis estimates the hidden drag from spread, slippage, latency, liquidity, and market impact. Institutional desks treat execution quality as part of alpha preservation.");
+        executionNotes.setText(
+                "Execution analysis estimates the hidden drag from spread, slippage, latency, liquidity, and market impact. Institutional desks treat execution quality as part of alpha preservation.");
         executionNotes.setStyle(textAreaStyle());
 
         content.getChildren().addAll(executionGrid, executionNotes);
@@ -494,7 +513,15 @@ public class AnalysisPanel extends VBox {
         setStatus("Loading analysis for " + strategy + " / " + pair + "...");
 
         CompletableFuture
-                .supplyAsync(() -> dataProvider.loadAnalysis(strategy, pair))
+                .supplyAsync(() -> {
+                    // Load live metrics if bot is currently trading, otherwise load backtesting
+                    // results
+                    if (showingLiveMetrics && strategy.equals(currentLiveStrategy) && pair.equals(currentLiveSymbol)) {
+                        return liveMetricsToAnalysisSnapshot(strategy, pair);
+                    } else {
+                        return dataProvider.loadAnalysis(strategy, pair);
+                    }
+                })
                 .whenComplete((snapshot, error) -> Platform.runLater(() -> {
                     if (error != null) {
                         log.error("Failed to update analysis", error);
@@ -506,7 +533,7 @@ public class AnalysisPanel extends VBox {
                     currentSnapshot = snapshot == null ? AnalysisSnapshot.empty() : snapshot;
                     renderSnapshot(currentSnapshot);
                     setStatus(currentSnapshot.hasRealData()
-                            ? "Institutional analysis loaded"
+                            ? (showingLiveMetrics ? "Live trading metrics loaded" : "Institutional analysis loaded")
                             : "No completed institutional analysis data found yet");
                 }));
     }
@@ -534,15 +561,15 @@ public class AnalysisPanel extends VBox {
                             + strategy
                             + "\nSymbol: "
                             + pair
-                            + "\n\nRun a backtest, paper-trading evaluation, or strategy lab analysis first. This panel will then display computed institutional metrics."
-            );
+                            + "\n\nRun a backtest, paper-trading evaluation, or strategy lab analysis first. This panel will then display computed institutional metrics.");
         } else {
             showAlert("Analysis Complete", "Institutional analysis loaded for " + strategy + " on " + pair + ".");
         }
     }
 
     private void renderSnapshot(@NotNull AnalysisSnapshot snapshot) {
-        generatedAtLabel.setText("Generated: " + (snapshot.generatedAt() == null ? "N/A" : DATE_TIME_FORMATTER.format(snapshot.generatedAt())));
+        generatedAtLabel.setText("Generated: "
+                + (snapshot.generatedAt() == null ? "N/A" : DATE_TIME_FORMATTER.format(snapshot.generatedAt())));
 
         institutionalScoreLabel.setText(scoreText("Institutional Score", snapshot.institutionalScore()));
         performanceScoreLabel.setText(scoreText("Performance", snapshot.performanceScore()));
@@ -606,14 +633,15 @@ public class AnalysisPanel extends VBox {
                 safeLabel(sharpeValueLabel), safeLabel(sortinoValueLabel), safeLabel(calmarValueLabel),
                 safeLabel(profitFactorValueLabel), safeLabel(recoveryFactorValueLabel), safeLabel(expectancyValueLabel),
                 safeLabel(winRateValueLabel), safeLabel(totalTradesValueLabel), safeLabel(maxDrawdownValueLabel),
-                safeLabel(volatilityValueLabel), safeLabel(valueAtRiskValueLabel), safeLabel(conditionalValueAtRiskValueLabel),
-                safeLabel(maxConsecutiveLossValueLabel), safeLabel(recoveryTimeValueLabel), safeLabel(tailRatioValueLabel),
+                safeLabel(volatilityValueLabel), safeLabel(valueAtRiskValueLabel),
+                safeLabel(conditionalValueAtRiskValueLabel),
+                safeLabel(maxConsecutiveLossValueLabel), safeLabel(recoveryTimeValueLabel),
+                safeLabel(tailRatioValueLabel),
                 safeLabel(ulcerIndexValueLabel), safeLabel(kellyValueLabel), safeLabel(alphaValueLabel),
                 safeLabel(betaValueLabel), safeLabel(informationRatioValueLabel), safeLabel(skewnessValueLabel),
                 safeLabel(kurtosisValueLabel), safeLabel(exposureValueLabel), safeLabel(turnoverValueLabel),
                 safeLabel(avgSlippageValueLabel), safeLabel(spreadCostValueLabel), safeLabel(marketImpactValueLabel),
-                safeLabel(fillQualityValueLabel)
-        );
+                safeLabel(fillQualityValueLabel));
 
         for (Label label : labels) {
             label.setText("N/A");
@@ -627,17 +655,19 @@ public class AnalysisPanel extends VBox {
     }
 
     private void clearCharts() {
-        Arrays.asList(scoreChart, performanceChart, distributionChart, factorExposureChart, stressChart).forEach(chart -> {
-            if (chart != null) {
-                chart.getData().clear();
-            }
-        });
+        Arrays.asList(scoreChart, performanceChart, distributionChart, factorExposureChart, stressChart)
+                .forEach(chart -> {
+                    if (chart != null) {
+                        chart.getData().clear();
+                    }
+                });
 
-        Arrays.asList(drawdownChart, equityCurveChart, monteCarloChart, rollingSharpeChart, rollingVolatilityChart).forEach(chart -> {
-            if (chart != null) {
-                chart.getData().clear();
-            }
-        });
+        Arrays.asList(drawdownChart, equityCurveChart, monteCarloChart, rollingSharpeChart, rollingVolatilityChart)
+                .forEach(chart -> {
+                    if (chart != null) {
+                        chart.getData().clear();
+                    }
+                });
 
         if (regimePieChart != null) {
             regimePieChart.getData().clear();
@@ -767,7 +797,8 @@ public class AnalysisPanel extends VBox {
                 Label cell = new Label(value == null ? "N/A" : String.format(Locale.US, "%.2f", value));
                 cell.setMinWidth(74);
                 cell.setAlignment(Pos.CENTER);
-                cell.setStyle("-fx-padding: 8; -fx-border-color: " + BORDER + "; -fx-text-fill: " + TEXT + "; -fx-font-weight: bold;");
+                cell.setStyle("-fx-padding: 8; -fx-border-color: " + BORDER + "; -fx-text-fill: " + TEXT
+                        + "; -fx-font-weight: bold;");
                 correlationGrid.add(cell, col + 1, row + 1);
             }
         }
@@ -848,7 +879,7 @@ public class AnalysisPanel extends VBox {
         if (!snapshot.hasRealData()) {
             return """
                     No real analysis data is loaded yet. Run a backtest or paper-trading evaluation first.
-                    
+
                     Institutional workflow suggestion:
                     1. Run multi-period backtests.
                     2. Split results by market regime.
@@ -858,30 +889,31 @@ public class AnalysisPanel extends VBox {
         }
 
         return "Institutional Analysis Notes\n" +
-               "============================\n\n" +
-               "Strategy: " + nullSafe(snapshot.strategyName()) + '\n' +
-               "Symbol: " + nullSafe(snapshot.pairSymbol()) + '\n' +
-               "Composite Score: " + formatScore(snapshot.institutionalScore()) + "\n\n" +
-               "Performance Quality\n" +
-               "- Sharpe: " + formatNumber(snapshot.sharpeRatio()) + '\n' +
-               "- Sortino: " + formatNumber(snapshot.sortinoRatio()) + '\n' +
-               "- Profit Factor: " + formatNumber(snapshot.profitFactor()) + '\n' +
-               "- Expected Value / Trade: " + formatCurrency(snapshot.expectancyPerTrade()) + "\n\n" +
-               "Risk Profile\n" +
-               "- Max Drawdown: " + formatPercent(snapshot.maxDrawdown()) + '\n' +
-               "- VaR 95%: " + formatPercent(snapshot.valueAtRisk95()) + '\n' +
-               "- CVaR: " + formatPercent(snapshot.conditionalValueAtRisk()) + '\n' +
-               "- Recovery Time: " + formatDays(snapshot.recoveryDays()) + "\n\n" +
-               "Execution / Capacity\n" +
-               "- Avg Slippage: " + formatBps(snapshot.averageSlippageBps()) + '\n' +
-               "- Spread Cost: " + formatBps(snapshot.spreadCostBps()) + '\n' +
-               "- Market Impact: " + formatBps(snapshot.marketImpactBps()) + '\n' +
-               "- Liquidity Score: " + formatScore(snapshot.liquidityScore()) + "\n\n" +
-               "Interpretation\n" +
-               "- A strong strategy is not only profitable; it must survive costs, adverse regimes, fat tails, and correlated risk.\n" +
-               "- Watch for high profit factor with low trade count; that can be fragile.\n" +
-               "- Watch for high Sharpe but weak CVaR; that may hide tail risk.\n" +
-               "- Watch for high returns with poor execution score; alpha may disappear live.\n";
+                "============================\n\n" +
+                "Strategy: " + nullSafe(snapshot.strategyName()) + '\n' +
+                "Symbol: " + nullSafe(snapshot.pairSymbol()) + '\n' +
+                "Composite Score: " + formatScore(snapshot.institutionalScore()) + "\n\n" +
+                "Performance Quality\n" +
+                "- Sharpe: " + formatNumber(snapshot.sharpeRatio()) + '\n' +
+                "- Sortino: " + formatNumber(snapshot.sortinoRatio()) + '\n' +
+                "- Profit Factor: " + formatNumber(snapshot.profitFactor()) + '\n' +
+                "- Expected Value / Trade: " + formatCurrency(snapshot.expectancyPerTrade()) + "\n\n" +
+                "Risk Profile\n" +
+                "- Max Drawdown: " + formatPercent(snapshot.maxDrawdown()) + '\n' +
+                "- VaR 95%: " + formatPercent(snapshot.valueAtRisk95()) + '\n' +
+                "- CVaR: " + formatPercent(snapshot.conditionalValueAtRisk()) + '\n' +
+                "- Recovery Time: " + formatDays(snapshot.recoveryDays()) + "\n\n" +
+                "Execution / Capacity\n" +
+                "- Avg Slippage: " + formatBps(snapshot.averageSlippageBps()) + '\n' +
+                "- Spread Cost: " + formatBps(snapshot.spreadCostBps()) + '\n' +
+                "- Market Impact: " + formatBps(snapshot.marketImpactBps()) + '\n' +
+                "- Liquidity Score: " + formatScore(snapshot.liquidityScore()) + "\n\n" +
+                "Interpretation\n" +
+                "- A strong strategy is not only profitable; it must survive costs, adverse regimes, fat tails, and correlated risk.\n"
+                +
+                "- Watch for high profit factor with low trade count; that can be fragile.\n" +
+                "- Watch for high Sharpe but weak CVaR; that may hide tail risk.\n" +
+                "- Watch for high returns with poor execution score; alpha may disappear live.\n";
     }
 
     private BarChart<String, Number> createBarChart(String title, String xLabel, String yLabel, double minHeight) {
@@ -898,7 +930,8 @@ public class AnalysisPanel extends VBox {
         return chart;
     }
 
-    private LineChart<Number, Number> createLineChart(String title, String xLabel, String yLabel, double minHeight, boolean negativeFriendly) {
+    private LineChart<Number, Number> createLineChart(String title, String xLabel, String yLabel, double minHeight,
+            boolean negativeFriendly) {
         NumberAxis xAxis = new NumberAxis();
         xAxis.setLabel(xLabel);
         NumberAxis yAxis = new NumberAxis();
@@ -966,7 +999,8 @@ public class AnalysisPanel extends VBox {
 
     private Button actionButton(String text, String color) {
         Button button = new Button(text);
-        button.setStyle("-fx-padding: 8px 16px; -fx-font-size: 12px; -fx-background-color: " + color + "; -fx-text-fill: white; -fx-background-radius: 6;");
+        button.setStyle("-fx-padding: 8px 16px; -fx-font-size: 12px; -fx-background-color: " + color
+                + "; -fx-text-fill: white; -fx-background-radius: 6;");
         return button;
     }
 
@@ -1069,8 +1103,7 @@ public class AnalysisPanel extends VBox {
                 "#%02X%02X%02X",
                 (int) Math.round(color.getRed() * 255),
                 (int) Math.round(color.getGreen() * 255),
-                (int) Math.round(color.getBlue() * 255)
-        );
+                (int) Math.round(color.getBlue() * 255));
     }
 
     private static boolean isFinite(Double value) {
@@ -1163,8 +1196,7 @@ public class AnalysisPanel extends VBox {
             Map<String, Double> factorExposures,
             Map<String, Double> regimeWeights,
             Map<String, Double> stressScenarios,
-            boolean realData
-    ) {
+            boolean realData) {
         public static AnalysisSnapshot empty() {
             return new AnalysisSnapshot(
                     null, null, null,
@@ -1174,8 +1206,7 @@ public class AnalysisPanel extends VBox {
                     null, null, null, null, null, null, null,
                     null, null, null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), false
-            );
+                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), false);
         }
 
         public boolean hasRealData() {
@@ -1212,6 +1243,153 @@ public class AnalysisPanel extends VBox {
     }
 
     /**
+     * Convert live trading metrics to AnalysisSnapshot for display.
+     */
+    private AnalysisSnapshot liveMetricsToAnalysisSnapshot(String strategy, String pair) {
+        // For now, return basic snapshot with live metrics
+        // Full computation would be complex; this is a placeholder for real-time
+        // display
+        return AnalysisSnapshot.empty();
+    }
+
+    /**
+     * Monitor bot status and automatically switch between backtesting and live
+     * metrics.
+     * - Shows backtesting metrics by default
+     * - When bot starts trading (autoTradingEnabled = true), switches to live
+     * metrics
+     * - When bot stops, reverts back to backtesting metrics
+     */
+    private void startBotStatusMonitoring() {
+        CompletableFuture.runAsync(() -> {
+            boolean wasBotRunning = false;
+
+            while (isVisible()) {
+                try {
+                    boolean isBotRunning = systemCore != null && systemCore.isAutoTradingEnabled();
+
+                    // Bot transitioned from stopped to running
+                    if (isBotRunning && !wasBotRunning) {
+                        Platform.runLater(this::switchToLiveMetrics);
+                        wasBotRunning = true;
+                        log.info("Bot started - switching to LIVE trading metrics");
+                    }
+                    // Bot transitioned from running to stopped
+                    else if (!isBotRunning && wasBotRunning) {
+                        Platform.runLater(this::switchToBacktestMetrics);
+                        wasBotRunning = false;
+                        log.info("Bot stopped - switching back to BACKTEST metrics");
+                    }
+
+                    Thread.sleep(1000); // Check every 1 second
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+    }
+
+    /**
+     * Switch to showing LIVE bot trading metrics.
+     */
+    private void switchToLiveMetrics() {
+        if (showingLiveMetrics)
+            return;
+
+        showingLiveMetrics = true;
+
+        // Get currently selected strategy and symbol
+        String strategy = strategyCombo.getValue();
+        String symbol = pairCombo.getValue();
+
+        if (strategy != null && symbol != null) {
+            currentLiveStrategy = strategy;
+            currentLiveSymbol = symbol;
+
+            // Initialize live tracking
+            try {
+                liveMetricsTracker.startTracking(
+                        systemCore != null && systemCore.getExchange().fetchAccount()!= null
+                                ? systemCore.getExchange().getUserAccountDetails().getAvailableBalance()
+                                : 0.0);
+            } catch (ExecutionException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Update UI to show live mode
+            modeIndicatorLabel.setText("🤖 LIVE TRADING MODE");
+            modeIndicatorLabel.setStyle("-fx-text-fill: " + GREEN + "; -fx-font-weight: bold; -fx-font-size: 12px;");
+            statusLabel.setText("Live Trading Active");
+
+            // Refresh analysis to show live metrics
+            updateAnalysis();
+
+            log.info("Switched to LIVE metrics for {} / {}", strategy, symbol);
+        }
+    }
+
+    /**
+     * Switch back to showing BACKTEST metrics.
+     */
+    private void switchToBacktestMetrics() {
+        if (!showingLiveMetrics)
+            return;
+
+        showingLiveMetrics = false;
+
+        // Stop live tracking
+        liveMetricsTracker.stopTracking();
+
+        // Update UI to show backtest mode
+        modeIndicatorLabel.setText("📊 BACKTEST MODE");
+        modeIndicatorLabel.setStyle("-fx-text-fill: " + BLUE + "; -fx-font-weight: bold; -fx-font-size: 12px;");
+        statusLabel.setText("Ready");
+
+        // Keep the previously selected live strategy/symbol in dropdown
+        // but now display historical backtest results
+        if (currentLiveStrategy != null && currentLiveSymbol != null) {
+            strategyCombo.setValue(currentLiveStrategy);
+            pairCombo.setValue(currentLiveSymbol);
+        }
+
+        // Refresh analysis to show backtest metrics
+        updateAnalysis();
+
+        log.info("Switched back to BACKTEST metrics");
+    }
+
+    /**
+     * Set selected strategy and symbol for analysis.
+     */
+    public void selectStrategyAndSymbol(String strategy, String symbol) {
+        if (strategyCombo != null && strategy != null && !strategy.isBlank()) {
+            strategyCombo.setValue(strategy);
+        }
+        if (pairCombo != null && symbol != null && !symbol.isBlank()) {
+            pairCombo.setValue(symbol);
+        }
+    }
+
+    /**
+     * Get live metrics tracker for recording trades.
+     */
+    public LiveTradingMetricsTracker getLiveMetricsTracker() {
+        return liveMetricsTracker;
+    }
+
+    /**
+     * Record a trade in live metrics tracking.
+     */
+    public void recordLiveTrading(String strategy, String symbol, Trade trade) {
+        if (showingLiveMetrics && strategy.equals(currentLiveStrategy) && symbol.equals(currentLiveSymbol)) {
+            liveMetricsTracker.recordTrade(trade);
+            // Refresh to show updated metrics
+            Platform.runLater(this::updateAnalysis);
+        }
+    }
+
+    /**
      * Reflection-based bridge to the evolving backend.
      */
     private record AnalysisDataProvider(SystemCore systemCore) {
@@ -1242,8 +1420,7 @@ public class AnalysisPanel extends VBox {
                         () -> invokeNoArg(exchange, "getTradePairSymbol"),
                         () -> invokeNoArg(exchange, "getTradePairs"),
                         () -> invokeNoArg(exchange, "getSymbols"),
-                        () -> invokeNoArg(exchange, "getAvailablePairs")
-                );
+                        () -> invokeNoArg(exchange, "getAvailablePairs"));
 
                 return normalizePairList(rawPairs);
             } catch (Exception e) {
@@ -1278,7 +1455,8 @@ public class AnalysisPanel extends VBox {
             Double institutionalScore = readDouble(analysis, "institutionalScore", "compositeScore", "deskScore");
 
             if (institutionalScore == null) {
-                institutionalScore = compositeScore(performanceScore, riskScore, executionScore, liquidityScore, regimeScore);
+                institutionalScore = compositeScore(performanceScore, riskScore, executionScore, liquidityScore,
+                        regimeScore);
             }
 
             return new AnalysisSnapshot(
@@ -1336,8 +1514,7 @@ public class AnalysisPanel extends VBox {
                     readStringDoubleMap(analysis, "factorExposures", "factorLoadings", "exposures"),
                     readStringDoubleMap(analysis, "regimeWeights", "regimeDistribution", "regimes"),
                     readStringDoubleMap(analysis, "stressScenarios", "stressResults", "scenarioPnl"),
-                    true
-            );
+                    true);
         }
 
         private Object findAnalysisObject(String strategyName, String pairSymbol) {
@@ -1345,8 +1522,7 @@ public class AnalysisPanel extends VBox {
                     () -> invoke(systemCore, "analyzeStrategy", strategyName, pairSymbol),
                     () -> invoke(systemCore, "getStrategyAnalysis", strategyName, pairSymbol),
                     () -> invoke(systemCore, "getAnalysisSnapshot", strategyName, pairSymbol),
-                    () -> invoke(systemCore, "getInstitutionalAnalysis", strategyName, pairSymbol)
-            );
+                    () -> invoke(systemCore, "getInstitutionalAnalysis", strategyName, pairSymbol));
 
             if (direct != null) {
                 return direct;
@@ -1357,8 +1533,7 @@ public class AnalysisPanel extends VBox {
                     () -> invokeNoArg(systemCore, "getAnalysisService"),
                     () -> invokeNoArg(systemCore, "getBacktestAnalysisService"),
                     () -> invokeNoArg(systemCore, "getPerformanceAnalytics"),
-                    () -> invokeNoArg(systemCore, "getInstitutionalAnalyticsService")
-            );
+                    () -> invokeNoArg(systemCore, "getInstitutionalAnalyticsService"));
 
             if (service == null) {
                 return null;
@@ -1370,8 +1545,7 @@ public class AnalysisPanel extends VBox {
                     () -> invoke(service, "getAnalysis", strategyName, pairSymbol),
                     () -> invoke(service, "getSnapshot", strategyName, pairSymbol),
                     () -> invoke(service, "latest", strategyName, pairSymbol),
-                    () -> invoke(service, "institutionalReport", strategyName, pairSymbol)
-            );
+                    () -> invoke(service, "institutionalReport", strategyName, pairSymbol));
         }
 
         private List<String> normalizePairList(Object rawPairs) {
@@ -1602,8 +1776,7 @@ public class AnalysisPanel extends VBox {
                         () -> invokeNoArg(target, "get" + capitalize(name)),
                         () -> invokeNoArg(target, "is" + capitalize(name)),
                         () -> invokeNoArg(target, name),
-                        () -> readField(target, name)
-                );
+                        () -> readField(target, name));
                 if (value != null) {
                     return value;
                 }

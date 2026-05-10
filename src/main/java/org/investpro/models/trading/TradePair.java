@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.data.CandleData;
+
 import org.investpro.enums.LiquidityProfile;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
@@ -29,6 +29,7 @@ import org.investpro.market.InstrumentTradingSession;
 import org.investpro.enums.TradingSessionStatus;
 
 import java.time.ZonedDateTime;
+
 /**
  * Represents a tradable market pair such as:
  * BTC/USD, EUR/USD, ETH/USDT.
@@ -460,13 +461,19 @@ public class TradePair extends Pair<Currency, Currency> {
         this.changePercent = sanitizeFinite(change);
     }
 
-    public AssetClass getAssetClass() {
-        return null;
-    }
+    /**
+     * Real asset class for this pair (set by InstrumentMetadataService or exchange
+     * adapter).
+     * Defaults to DERIVATIVE if not set.
+     */
+    private AssetClass assetClass = AssetClass.DERIVATIVE;
 
-    public ContractType getContractType() {
-        return null;
-    }
+    /**
+     * Real contract type for this pair (set by InstrumentMetadataService or
+     * exchange adapter).
+     * Defaults to SPOT if not set.
+     */
+    private ContractType contractType = ContractType.SPOT;
 
     private LiquidityProfile liquidityProfile = LiquidityProfile.NORMAL;
 
@@ -475,13 +482,11 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
     public double liquidityAdjustedSize(double requestedSize) {
-        return requestedSize * Objects.requireNonNullElse(liquidityProfile, LiquidityProfile.NORMAL).getSizeMultiplier();
-
+        return requestedSize
+                * Objects.requireNonNullElse(liquidityProfile, LiquidityProfile.NORMAL).getSizeMultiplier();
     }
 
     private InstrumentTradingSession tradingSession;
-
-
 
     public TradingSessionStatus getTradingSessionStatus() {
         if (tradingSession == null) {
@@ -491,11 +496,60 @@ public class TradePair extends Pair<Currency, Currency> {
         return tradingSession.getStatus(ZonedDateTime.now());
     }
 
+    /**
+     * Check if instrument is tradable during its market session.
+     * Returns true if no session is defined (assume tradable).
+     */
     public boolean isTradableNow() {
-        return tradingSession == null || !tradingSession.isTradableNow(ZonedDateTime.now());
+        if (tradingSession == null) {
+            return true; // Assume tradable if no session rules defined
+        }
+
+        return tradingSession.isTradableNow(ZonedDateTime.now());
     }
 
-   private Timeframe timeFrame;
-    private OrderBook orderBook;
-    private CandleData candleData;
+    /**
+     * Set the asset class for this pair.
+     * Used by InstrumentMetadataService to enrich data.
+     */
+    public void setAssetClass(AssetClass assetClass) {
+        this.assetClass = assetClass != null ? assetClass : AssetClass.DERIVATIVE;
+    }
+
+    /**
+     * Set the contract type for this pair.
+     * Used by InstrumentMetadataService to enrich data.
+     */
+    public void setContractType(ContractType contractType) {
+        this.contractType = contractType != null ? contractType : ContractType.SPOT;
+    }
+
+    /**
+     * Note: CandleData, OrderBook, and Timeframe should NOT be stored in TradePair.
+     * Use MarketDataCache and InstrumentMarketState instead.
+     * These are managed by MarketDataEngine and accessed via MarketDataCache.
+     */
+
+    /**
+     * Deprecated: Use InstrumentMarketState and MarketDataCache instead.
+     * Timeframe is now managed by MarketDataEngine.
+     */
+    @Deprecated
+    private Timeframe timeFrame;
+
+    /**
+     * Deprecated: Use getters from InstrumentMarketState instead.
+     */
+    @Deprecated
+    public Timeframe getTimeFrame() {
+        return timeFrame;
+    }
+
+    /**
+     * Deprecated: Use InstrumentMarketState#updateCandles() instead.
+     */
+    @Deprecated
+    public void setTimeFrame(Timeframe timeFrame) {
+        this.timeFrame = timeFrame;
+    }
 }

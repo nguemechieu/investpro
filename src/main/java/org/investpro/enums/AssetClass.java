@@ -34,7 +34,7 @@ public enum AssetClass {
     SYNTHETIC("Synthetic"),
 
     /** Unknown asset class */
-    UNKNOWN("Unknown");
+    UNKNOWN("Unknown"), CRYPTO("Crypto Currency");
 
     private final String displayName;
 

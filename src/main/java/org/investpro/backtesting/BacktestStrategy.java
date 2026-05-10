@@ -1,12 +1,20 @@
 package org.investpro.backtesting;
 
+import lombok.Getter;
 import org.investpro.data.CandleData;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 
 /**
  * Abstract base class for trading strategies used in backtesting
  */
 public abstract class BacktestStrategy {
+    /**
+     * -- GETTER --
+     *  Get strategy name
+     */
+    @Getter
     protected String strategyName;
     protected BacktestConfig config;
     protected List<CandleData> candleHistory;
@@ -89,13 +97,6 @@ public abstract class BacktestStrategy {
     }
 
     /**
-     * Get strategy name
-     */
-    public String getStrategyName() {
-        return strategyName;
-    }
-
-    /**
      * Get historical candle data
      */
     public List<CandleData> getCandleHistory() {
@@ -123,46 +124,27 @@ public abstract class BacktestStrategy {
 
     /**
      * Trading signal event
+     *
+     * @param strength 0.0 to 1.0
      */
-    public static class SignalEvent {
-        public enum Type { BUY, SELL, HOLD }
-        
-        private final int candleIndex;
-        private final Type type;
-        private final String reason;
-        private final double strength; // 0.0 to 1.0
+        public record SignalEvent(int candleIndex, Type type, String reason, double strength) {
+            public enum Type {BUY, SELL, HOLD}
 
         public SignalEvent(int candleIndex, Type type, String reason) {
-            this(candleIndex, type, reason, 1.0);
-        }
+                this(candleIndex, type, reason, 1.0);
+            }
 
-        public SignalEvent(int candleIndex, Type type, String reason, double strength) {
-            this.candleIndex = candleIndex;
-            this.type = type;
-            this.reason = reason;
-            this.strength = Math.min(1.0, Math.max(0.0, strength));
-        }
+            public SignalEvent(int candleIndex, Type type, String reason, double strength) {
+                this.candleIndex = candleIndex;
+                this.type = type;
+                this.reason = reason;
+                this.strength = Math.min(1.0, Math.max(0.0, strength));
+            }
 
-        public int getCandleIndex() {
-            return candleIndex;
+            @Override
+            public @NotNull String toString() {
+                return String.format("Signal[idx=%d, type=%s, reason='%s', strength=%.2f]",
+                        candleIndex, type, reason, strength);
+            }
         }
-
-        public Type getType() {
-            return type;
-        }
-
-        public String getReason() {
-            return reason;
-        }
-
-        public double getStrength() {
-            return strength;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("Signal[idx=%d, type=%s, reason='%s', strength=%.2f]",
-                    candleIndex, type, reason, strength);
-        }
-    }
 }

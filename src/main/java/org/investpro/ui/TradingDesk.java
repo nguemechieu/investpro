@@ -64,6 +64,7 @@ import org.investpro.models.Account;
 import org.investpro.exchange.*;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.models.trading.*;
+import org.investpro.market.MarketDataEngine;
 import org.investpro.repository.CurrencyRepository;
 import org.investpro.repository.OrderRepository;
 
@@ -112,6 +113,8 @@ import java.util.function.Function;
 import java.util.prefs.Preferences;
 
 import javafx.embed.swing.SwingFXUtils;
+import org.jetbrains.annotations.Nullable;
+
 import static org.investpro.utils.Side.BUY;
 import static org.investpro.utils.Side.SELL;
 import static org.investpro.i18n.LocalizationService.t;
@@ -245,6 +248,7 @@ public class TradingDesk extends BorderPane {
     private boolean orderBookVisible = true;
 
     private Exchange exchange;
+    private MarketDataEngine marketDataEngine;
     private MarketSnapshot cachedMarketSnapshot = MarketSnapshot.empty();
     private Instant cachedMarketSnapshotAt = Instant.EPOCH;
     private StrategyStats cachedStrategyStats = StrategyStats.empty();
@@ -272,6 +276,7 @@ public class TradingDesk extends BorderPane {
     private MarketWatchPanel symbolAgentMarketWatch; // Symbol-level trading status (from SymbolAgentManager)
     private Navigation navigationPanel; // Exchange navigator
     private DataWindow dataWindow; // Data window for OHLCV display
+    private AnalysisPanel analysisPanel; // Institutional analysis with backtesting/live metrics switching
     private TradePair activeOrderBookPair;
 
     // Track open independent windows to prevent duplicate Scene root assignments
@@ -297,6 +302,9 @@ public class TradingDesk extends BorderPane {
         // Initialize NotificationService (disabled by default, can be enabled via
         // settings)
         this.notificationService = NotificationService.disabled();
+
+        // Initialize MarketDataEngine (central market data cache and services)
+        this.marketDataEngine = new MarketDataEngine();
 
         initialize(configuration);
         initializeUiStreamConsumer();
@@ -441,9 +449,6 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.saveChart"), new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN),
                         this::saveActiveChartSnapshot),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.applicationSettings"), null, this::showSettingsDialog),
-                menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
-                new SeparatorMenuItem(),
                 menuItem(t("menu.exit"), new KeyCodeCombination(KeyCode.Q, KeyCombination.CONTROL_DOWN), () -> {
                     shutdown();
                     Platform.exit();
@@ -544,11 +549,17 @@ public class TradingDesk extends BorderPane {
 
         Menu settingsMenu = new Menu(t("menu.settings"));
         settingsMenu.getItems().setAll(List.of(
+                // Trading & Broker Settings
                 menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
-                menuItem(t("menu.resetPassword"), null, this::openPasswordReset),
+                menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
+                menuItem(t("menu.applicationSettings"), null, this::showSettingsDialog),
                 new SeparatorMenuItem(),
+                // Appearance & UI Settings
                 menuItem("Theme Settings", null, this::showThemeSettingsDialog),
-                menuItem("Visibility & Layout", null, this::showVisibilitySettingsDialog)));
+                menuItem("Visibility & Layout", null, this::showVisibilitySettingsDialog),
+                new SeparatorMenuItem(),
+                // Account & Security Settings
+                menuItem(t("menu.resetPassword"), null, this::openPasswordReset)));
 
         Menu windowMenu = new Menu(t("menu.window"));
         windowMenu.getItems().setAll(List.of(
@@ -570,7 +581,7 @@ public class TradingDesk extends BorderPane {
                         "InvestPro ----------------------------------------------------------- Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
 
         return new MenuBar(fileMenu, editMenu, insertMenu, viewMenu, chartsMenu, toolsMenu, strategyMenu, researchMenu,
-                settingsMenu, licenseMenu, languageMenu, windowMenu, helpMenu);
+                settingsMenu, windowMenu, languageMenu, licenseMenu, helpMenu);
     }
 
     private void openLicenseManagement() {
@@ -1880,6 +1891,35 @@ public class TradingDesk extends BorderPane {
                 loadOrderBook(newVal);
             }
         });
+
+        // Start periodic refresh of market watch data from cache
+        startMarketWatchRefresh();
+    }
+
+    /**
+     * Periodically refresh market watch table with live quotes from
+     * MarketDataEngine cache.
+     */
+    private void startMarketWatchRefresh() {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
+            Thread t = new Thread(r, "MarketWatchRefresh");
+            t.setDaemon(true);
+            return t;
+        });
+
+        scheduler.scheduleAtFixedRate(() -> {
+            if (marketDataEngine != null && !marketWatchItems.isEmpty()) {
+                Platform.runLater(() -> {
+                    for (TradePair pair : marketWatchItems) {
+                        MarketQuote quote = marketDataEngine.getQuote(pair);
+                        if (quote != null) {
+                            pair.updateQuote(quote.getBid(), quote.getAsk());
+                        }
+                    }
+                    marketWatchTable.refresh();
+                });
+            }
+        }, 1, 5, TimeUnit.SECONDS); // Refresh every 5 seconds after 1 second initial delay
     }
 
     private void configureMarketWatchTableView(@NotNull TableView<TradePair> table) {
@@ -2397,6 +2437,16 @@ public class TradingDesk extends BorderPane {
             systemCoreEventsSubscribed = false;
         }
 
+        // Properly disconnect and dispose of old exchange before switching
+        if (exchange != null) {
+            try {
+                exchange.disconnectStream();
+                exchange.disconnect();
+            } catch (Exception exception) {
+                log.debug("Failed to disconnect old exchange", exception);
+            }
+        }
+
         disablePositionAutoRefresh();
 
         BrokerSession existingSession = brokerSessions.get(safe(selectedExchange));
@@ -2517,6 +2567,9 @@ public class TradingDesk extends BorderPane {
 
         brokerAccessGranted = true;
         brokerSessions.put(safe(exchangeSelector.getValue()), new BrokerSession(exchange, true, account));
+
+        // Bootstrap instruments into MarketDataEngine
+        bootstrapInstrumentsForExchange();
 
         try {
             systemCore = createSystemCore(exchange);
@@ -2732,6 +2785,14 @@ public class TradingDesk extends BorderPane {
 
     private void submitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
             double amount) {
+        // Check if pair is tradable now using MarketDataEngine
+        if (marketDataEngine != null && !marketDataEngine.isTradableNow(tradePair)) {
+            String hours = marketDataEngine.getTradingHours(tradePair);
+            showWarning("Trading Unavailable", "%s is not tradable now. Trading hours: %s".formatted(
+                    tradePair.toString('/'), hours));
+            return;
+        }
+
         switch (orderType) {
             case "MARKET" -> submitMarketOrderInternal(tradePair, side, amount);
             case "LIMIT" -> showLimitOrderDialog(tradePair, side, amount);
@@ -3346,6 +3407,33 @@ public class TradingDesk extends BorderPane {
         saveAppState();
     }
 
+    /**
+     * Load tradable pairs from the connected exchange and bootstrap them into
+     * MarketDataEngine.
+     * This pre-populates the market data cache with instrument metadata.
+     */
+    private void bootstrapInstrumentsForExchange() {
+        if (exchange == null || marketDataEngine == null) {
+            log.warn("Cannot bootstrap instruments: exchange={}, engine={}", exchange, marketDataEngine);
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                List<TradePair> tradablePairs = exchange.getTradablePairs();
+                if (tradablePairs != null && !tradablePairs.isEmpty()) {
+                    marketDataEngine.bootstrapInstruments(exchange.getName(), tradablePairs);
+                    log.info("Bootstrapped {} instruments from {} into MarketDataEngine",
+                            tradablePairs.size(), exchange.getName());
+                } else {
+                    log.debug("No tradable pairs returned from {}", exchange.getName());
+                }
+            } catch (Exception e) {
+                log.error("Failed to bootstrap instruments from {}", exchange.getName(), e);
+            }
+        }, "InstrumentBootstrapper-" + exchange.getName()).start();
+    }
+
     private void loadSymbolsForSelectedExchange() {
         marketWatchItems.clear();
         symbolSelector.getItems().clear();
@@ -3378,6 +3466,17 @@ public class TradingDesk extends BorderPane {
 
         marketWatchItems.setAll(tradePairs);
         symbolSelector.getItems().setAll(tradePairs);
+
+        // Enrich market watch items with current quotes from MarketDataEngine cache
+        if (marketDataEngine != null) {
+            for (TradePair pair : tradePairs) {
+                MarketQuote quote = marketDataEngine.getQuote(pair);
+                if (quote != null) {
+                    pair.updateQuote(quote.getBid(), quote.getAsk());
+                }
+            }
+        }
+
         if (systemCore != null && systemCore.getSymbolAgentManager() != null) {
             systemCore.getSymbolAgentManager().initializeSymbols(tradePairs);
         }
@@ -3403,6 +3502,12 @@ public class TradingDesk extends BorderPane {
             marketInfoPanel.setExchange(exchange);
         }
         marketInfoPanel.updateForPair(selected);
+
+        // Display trading hours for selected pair
+        if (marketDataEngine != null) {
+            String tradingHours = marketDataEngine.getTradingHours(selected);
+            journal("Trading hours for %s: %s".formatted(selected.toString('/'), tradingHours));
+        }
 
         // Load orderbook data for the selected symbol
         loadOrderBook(selected);
@@ -3512,6 +3617,24 @@ public class TradingDesk extends BorderPane {
             }
 
             ensureSystemCoreStarted(selected);
+
+            // Initialize analysis panel if not already done
+            if (analysisPanel == null) {
+                analysisPanel = new AnalysisPanel(systemCore);
+            }
+
+            // Set selected strategy/symbol for analysis metrics
+            String activeStrategy = systemCore.getActiveStrategyName();
+            if (activeStrategy != null && !activeStrategy.isBlank()) {
+                analysisPanel.selectStrategyAndSymbol(activeStrategy, selected.toString('/'));
+            }
+
+            // Start recording trades when bot starts
+            if (systemCore.getExchange().fetchAccount() != null) {
+                analysisPanel.getLiveMetricsTracker()
+                        .startTracking(systemCore.getExchange().fetchAccount().get().getAvailableBalance());
+            }
+
             systemCore.setAutoTradingEnabled(true);
             systemCore.startStreaming(selected, SystemCore.StreamingMode.EVERYTHING);
 
@@ -3530,7 +3653,7 @@ public class TradingDesk extends BorderPane {
         }
     }
 
-    private CandleStickChart getActiveChart() {
+    private @Nullable CandleStickChart getActiveChart() {
         Tab selected = chartTabPane.getSelectionModel().getSelectedItem();
         if (selected == null || selected.getContent() == null) {
             return null;
@@ -4837,6 +4960,12 @@ public class TradingDesk extends BorderPane {
         };
 
         createdExchange.setUserSelectedTradingMode(safe(tradingMode).isBlank() ? "LIVE" : safe(tradingMode));
+
+        // Wire the exchange to the central MarketDataEngine
+        if (marketDataEngine != null) {
+            createdExchange.setMarketDataEngine(marketDataEngine);
+        }
+
         return createdExchange;
     }
 
@@ -5444,10 +5573,13 @@ public class TradingDesk extends BorderPane {
     }
 
     private void openAnalysis() {
-        AnalysisPanel analysisPanel = new AnalysisPanel(systemCore);
+        // Reuse analysisPanel instance if already created, otherwise create it now
+        if (analysisPanel == null) {
+            analysisPanel = new AnalysisPanel(systemCore);
+        }
         createIndependentWindow("Analysis", analysisPanel, 1000, 700);
-        journal("Analysis panel opened");
-        log.info("Analysis panel opened");
+        journal("Analysis panel opened (backtesting metrics by default, will switch to live when bot starts)");
+        log.info("Analysis panel opened - backtesting metrics by default, switching to live when bot starts");
     }
 
     private void openAllStrategies() {

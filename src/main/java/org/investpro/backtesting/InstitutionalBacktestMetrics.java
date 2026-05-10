@@ -1,6 +1,7 @@
 package org.investpro.backtesting;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ui.panels.BacktestingPanel.BacktestTrade;
 
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Getter
+@Setter
 public class InstitutionalBacktestMetrics {
 
     // Core metrics

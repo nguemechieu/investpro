@@ -391,7 +391,11 @@ public class Coinbase extends Exchange {
             log.info("Coinbase connect() called. websocketClient={}, isOpen={}",
                     websocketClient, websocketClient != null ? websocketClient.isOpen() : "null");
 
-            if (websocketClient != null && !websocketClient.isOpen()) {
+            if (websocketClient == null) {
+                websocketClient = createWebSocketClient();
+            }
+
+            if (!websocketClient.isOpen()) {
                 log.info("Attempting to establish WebSocket connection to Coinbase...");
                 // Use connectBlocking() to wait for actual connection establishment
                 // with timeout to prevent hanging on stuck connections
@@ -2495,8 +2499,7 @@ public class Coinbase extends Exchange {
                 Timeframe.M30,
                 Timeframe.H1,
                 Timeframe.H4,
-                Timeframe.D1
-                );
+                Timeframe.D1);
     }
 
     @Override

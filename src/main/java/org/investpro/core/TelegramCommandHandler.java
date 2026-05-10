@@ -57,11 +57,10 @@ public class TelegramCommandHandler {
     private final SystemCore systemCore;
 
     private final HttpClient httpClient;
-    private final Stage primaryStage= new Stage();
+    private final Stage primaryStage = new Stage();
 
     private final long lastUpdateId = -1L;
     private final boolean polling = false;
-
 
     public TelegramCommandHandler(@NotNull SystemCore systemCore, @NotNull TelegramNotifier telegramNotifier) {
         this.systemCore = systemCore;
@@ -72,7 +71,6 @@ public class TelegramCommandHandler {
 
     }
 
-
     /**
      * Process a Telegram command and return response text
      */
@@ -81,14 +79,16 @@ public class TelegramCommandHandler {
             return "❌ No command provided";
         }
 
-        String[] parts = command.trim().split("\\s+");
+        // Strip leading slashes from command
+        String cleanCommand = command.trim().replaceAll("^/+", "");
+
+        // Debug logging to track command parsing
+        log.debug("Original command: '{}' | Cleaned command: '{}'", command, cleanCommand);
+
+        String[] parts = cleanCommand.split("\\s+");
         String cmd = parts[0].toLowerCase();
-        TradePair pair;
-        try {
-            pair = new TradePair(parts[0].split("/")[0],parts[0].split("/")[1]);
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+
+        log.debug("Parsed command: '{}' | Parts count: {}", cmd, parts.length);
 
         try {
             return switch (cmd) {
@@ -98,7 +98,25 @@ public class TelegramCommandHandler {
                 case "positions" -> getPositionsReport();
                 case "orders" -> getOrdersReport();
                 case "screenshot" -> captureAndSendScreenshot(chatId);
-                case "market" -> getMarketReport(parts.length > 1 ? pair: null);
+                case "market" -> {
+                    // Parse symbol for market command (e.g., "market BTC/USD")
+                    if (parts.length > 1) {
+                        try {
+                            String symbol = parts[1];
+                            String[] currencyPair = symbol.split("/");
+                            if (currencyPair.length == 2) {
+                                TradePair pair = new TradePair(currencyPair[0], currencyPair[1]);
+                                yield getMarketReport(pair);
+                            } else {
+                                yield "❌ Invalid symbol format. Use /market BTC/USD";
+                            }
+                        } catch (SQLException | ClassNotFoundException e) {
+                            yield "❌ Error parsing symbol: " + e.getMessage();
+                        }
+                    } else {
+                        yield "❌ Please specify a symbol. Usage: /market BTC/USD";
+                    }
+                }
                 case "risk" -> getRiskReport();
                 case "strategy" -> getStrategyReport();
                 case "health" -> getHealthReport();
@@ -236,7 +254,8 @@ public class TelegramCommandHandler {
             StringBuilder report = new StringBuilder("*Open Orders (" + orders.size() + ")*\\n\\n");
 
             for (OpenOrder order : orders) {
-                report.append("🔔 *").append(order.getTradePair().toString()).append(" / ").append(order.getSide()).append("*\\n");
+                report.append("🔔 *").append(order.getTradePair().toString()).append(" / ").append(order.getSide())
+                        .append("*\\n");
                 report.append("   Side: ").append(order.getSide()).append("\\n");
                 report.append("   Amount: ").append(order.getSize()).append(" units\\n");
                 report.append("   Price: $").append(formatPrice(order.getPrice())).append("\\n");
@@ -255,7 +274,7 @@ public class TelegramCommandHandler {
 
     private String getMarketReport(TradePair symbol) {
         try {
-            if (symbol == null ) {
+            if (symbol == null) {
                 symbol = systemCore.getSelectedTradePair() != null ? systemCore.getSelectedTradePair()
                         : null;
             }
@@ -267,8 +286,6 @@ public class TelegramCommandHandler {
             }
 
             StringBuilder report = new StringBuilder("*Market Info - ").append(symbol).append("*\\n\\n");
-
-
 
             report.append("📊 Bid: $").append(formatPrice(ticker.getBidPrice())).append("\\n");
             report.append("🎯 Ask: $").append(formatPrice(ticker.getAskPrice())).append("\\n");
@@ -357,7 +374,6 @@ public class TelegramCommandHandler {
         }
     }
 
-
     private String formatPrice(double price) {
         return String.format("%.2f", Math.abs(price));
     }
@@ -426,7 +442,6 @@ public class TelegramCommandHandler {
                 BufferedImage.TYPE_INT_RGB);
 
         PixelReader pixelReader = snapshot.getPixelReader();
-
 
         // Copy pixels from snapshot to buffered image
         for (int y = 0; y < (int) snapshot.getHeight(); y++) {

@@ -8,10 +8,13 @@ import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.models.trading.Order;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.TradePair;
+import org.investpro.market.MarketDataEngine;
+import org.investpro.market.ExchangeMarketDataAdapter;
 import org.investpro.service.AuthResult;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Date;
@@ -38,11 +41,24 @@ public abstract class Exchange implements
     private String userSelectedTradingMode;
     private ExchangeCredentials credentials;
 
+    protected @Nullable MarketDataEngine marketDataEngine;
+    protected @Nullable ExchangeMarketDataAdapter marketDataAdapter;
+
     protected Exchange(@NotNull ExchangeCredentials credentials) {
         this.credentials = credentials;
 
         this.userSelectedTradingMode = credentials.sandbox() ? "PAPER" : "LIVE";
         log.debug(this.getClass().getSimpleName() + " created ", this);
+    }
+
+    /**
+     * Wire this exchange to a MarketDataEngine for central market data management.
+     * Call this from TradingDesk or exchange initialization code.
+     */
+    public void setMarketDataEngine(@NotNull MarketDataEngine engine) {
+        this.marketDataEngine = engine;
+        this.marketDataAdapter = new ExchangeMarketDataAdapter(engine, getName());
+        log.info("{} connected to MarketDataEngine", getName());
     }
 
     public void setTokens(String telegramToken) {

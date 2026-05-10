@@ -19,6 +19,7 @@ import org.investpro.exchange.Exchange;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.market.InstrumentRegistry;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
@@ -188,7 +189,7 @@ public class SystemCore {
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
         this.labService = new StrategyLabService();
-         // Initialize the system event recorder and monitor service after all components
+        // Initialize the system event recorder and monitor service after all components
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();
         this.systemMonitorService = new SystemMonitorService(this);
@@ -1699,6 +1700,195 @@ public class SystemCore {
      */
     public boolean canTradeNow() {
         return systemMonitorService.checkNow().isCanTrade();
+    }
+
+    // =====================================================================
+    // Pre-Trade Validation APIs (for PreTradeValidationEngine)
+    // =====================================================================
+
+    /**
+     * Get the current system state as a string.
+     * Possible values: READY, PAPER_TRADING, LIVE_TRADING, STOPPED, ERROR
+     *
+     * @return the current system state
+     */
+    @NotNull
+    public String getSystemState() {
+        if (!isReady()) {
+            return "ERROR";
+        }
+
+        if (!smartBot.isAutoTradingEnabled()) {
+            return "STOPPED";
+        }
+
+        Account account = getAccount();
+        if (account != null) {
+            if (account.isPaperTrading()) {
+                return "PAPER_TRADING";
+            }
+            if (account.isSandbox()) {
+                return "SANDBOX";
+            }
+            if (account.isConnected()) {
+                return "LIVE_TRADING";
+            }
+        }
+
+        return "READY";
+    }
+
+    /**
+     * Check if the system kill switch is triggered.
+     * When triggered, no trading is allowed.
+     *
+     * @return true if kill switch is triggered, false otherwise
+     */
+    public boolean isKillSwitchTriggered() {
+        // Check system health for critical blockers
+        SystemHealthSnapshot health = getSystemHealth();
+        if (health != null && !health.getBlockers().isEmpty()) {
+            // Any critical blocker acts as a kill switch
+            return !health.isCanTrade();
+        }
+
+        // Check if auto trading is explicitly disabled as a form of "kill switch"
+        return !isAutoTradingEnabled();
+    }
+
+    /**
+     * Get the trading account associated with this system.
+     *
+     * @return the Account object if available, null if not yet initialized
+     */
+    @Nullable
+    public Account getAccount() {
+        // Try to get from exchange (if exchange has account info)
+        if (exchange != null) {
+            try {
+                Object account = null;
+                try {
+                    // Use reflection to try getAccount method
+                    java.lang.reflect.Method method = exchange.getClass().getMethod("getAccount");
+                    account = method.invoke(exchange);
+                } catch (NoSuchMethodException ignored) {
+                    // Exchange doesn't have getAccount
+                }
+
+                if (account instanceof Account) {
+                    return (Account) account;
+                }
+            } catch (Exception e) {
+                log.debug("Failed to retrieve account from exchange", e);
+            }
+        }
+
+        // TODO: Once Exchange provides Account access, implement proper retrieval
+        return null;
+    }
+
+    /**
+     * Check if the broker is currently connected.
+     * Returns false if exchange is not ready or disconnected.
+     *
+     * @return true if broker is connected and ready, false otherwise
+     */
+    public boolean isBrokerConnected() {
+        if (exchange == null) {
+            return false;
+        }
+
+        try {
+            return exchange.isConnected();
+        } catch (Exception e) {
+            log.debug("Failed to check broker connection", e);
+            return false;
+        }
+    }
+
+    /**
+     * Get the name of the selected venue (exchange).
+     * Returns the exchange name or "UNKNOWN" if not available.
+     *
+     * @return the venue name (exchange name)
+     */
+    @NotNull
+    public String getSelectedVenue() {
+        if (exchange == null) {
+            return "UNKNOWN";
+        }
+
+        try {
+            String displayName = exchange.getDisplayName();
+            if (displayName != null && !displayName.isBlank()) {
+                return displayName;
+            }
+
+            String name = exchange.getName();
+            return name != null ? name : "UNKNOWN";
+        } catch (Exception e) {
+            log.debug("Failed to get venue name", e);
+            return "UNKNOWN";
+        }
+    }
+
+    /**
+     * Get the instrument registry for the system.
+     * The registry contains all available trading instruments/pairs.
+     *
+     * @return an InstrumentRegistry instance, never null
+     */
+    @NotNull
+    public InstrumentRegistry getInstrumentRegistry() {
+        // Check if exchange has instrument registry
+        if (exchange != null) {
+            try {
+                // Try to get registry from exchange if it supports it
+                Object registry = null;
+                try {
+                    // Use reflection to check for getInstrumentRegistry method
+                    java.lang.reflect.Method method = exchange.getClass().getMethod("getInstrumentRegistry");
+                    registry = method.invoke(exchange);
+                } catch (NoSuchMethodException ignored) {
+                    // Exchange doesn't have getInstrumentRegistry
+                }
+
+                if (registry instanceof InstrumentRegistry) {
+                    return (InstrumentRegistry) registry;
+                }
+            } catch (Exception e) {
+                log.debug("Failed to get instrument registry from exchange", e);
+            }
+        }
+
+        // Return new empty registry as fallback
+        return new InstrumentRegistry();
+    }
+
+    /**
+     * Check if AI review is enabled for trade validation.
+     * When enabled, trades may be reviewed by AI before execution.
+     *
+     * @return true if AI review is enabled, false otherwise
+     */
+    public boolean isAiReviewEnabled() {
+        return isAiReasoningEnabled();
+    }
+
+    /**
+     * Check if the system is in live trading mode.
+     * Returns true only if trading is not in paper/sandbox mode and is live.
+     *
+     * @return true if in live trading mode, false if in paper/sandbox mode
+     */
+    public boolean isLiveTrading() {
+        Account account = getAccount();
+        if (account == null) {
+            return false;
+        }
+
+        // Live trading only if not paper and not sandbox
+        return !account.isPaperTrading() && !account.isSandbox() && account.isConnected();
     }
 
 }

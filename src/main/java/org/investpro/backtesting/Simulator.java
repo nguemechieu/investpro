@@ -2,6 +2,7 @@ package org.investpro.backtesting;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import java.util.*;
 
@@ -48,13 +49,13 @@ public class Simulator {
 
         // Execute trades based on signals
         for (BacktestStrategy.SignalEvent signal : signals) {
-            int idx = signal.getCandleIndex();
+            int idx = signal.candleIndex();
             if (idx < 0 || idx >= historicalData.size()) continue;
 
             CandleData candle = historicalData.get(idx);
             double price = candle.closePrice();
 
-            switch (signal.getType()) {
+            switch (signal.type()) {
                 case BUY:
                     if (portfolioState.getCash() > 0 && !portfolioState.hasPosition()) {
                         executeBuy(idx, candle, price, signal);
@@ -94,7 +95,7 @@ public class Simulator {
         BacktestResult.TradeRecord trade = new BacktestResult.TradeRecord(
                 candleIndex, price, quantity
         );
-        trade.setEntrySignal(signal != null ? signal.getReason() : "BUY");
+        trade.setEntrySignal(signal != null ? signal.reason() : "BUY");
         trade.setFee(commission);
         executedTrades.add(trade);
     }
@@ -112,7 +113,7 @@ public class Simulator {
 
             trade.setExitTime(candleIndex);
             trade.setExitPrice(price);
-            trade.setExitSignal(signal != null ? signal.getReason() : "SELL");
+            trade.setExitSignal(signal != null ? signal.reason() : "SELL");
             trade.setProfit(profit);
             trade.setProfitPercent((profit / (trade.getEntryPrice() * portfolioState.getQuantity())) * 100.0);
             trade.setFee(trade.getFee() + exitCommission);
@@ -236,8 +237,12 @@ public class Simulator {
     /**
      * Internal portfolio state management
      */
+    @Getter
+    @Setter
+    @Slf4j
     private static class PortfolioState {
         private double cash;
+
         private double quantity;
         private double entryPrice;
         private double initialBalance;
@@ -270,14 +275,6 @@ public class Simulator {
 
         public boolean hasPosition() {
             return quantity > 0;
-        }
-
-        public double getCash() {
-            return cash;
-        }
-
-        public double getQuantity() {
-            return quantity;
         }
 
         public double getTotalEquity(double currentPrice) {

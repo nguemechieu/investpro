@@ -40,8 +40,7 @@ import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.io.FileWriter;
-import java.net.InetAddress;
-import java.net.URL;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -625,9 +624,9 @@ public final class SystemMonitorPanel extends BorderPane {
      */
     private long measureLatency(String endpoint) {
         try {
-            HttpClient httpClient = HttpClient.newHttpClient();
+            HttpClient httpClient = HttpClient.newBuilder().build();
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URL(endpoint).toURI())
+                    .uri(URI.create(endpoint).toURL().toURI())
                     .timeout(java.time.Duration.ofSeconds(5))
                     .GET()
                     .build();

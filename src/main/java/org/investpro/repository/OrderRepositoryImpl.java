@@ -105,14 +105,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     public void deleteAll() throws SQLException {
         // Dangerous operation - would delete all orders
         // Consider implementing this only if necessary
-        try {
-            List<Order> allOrders = db1.getOpenOrders();
-            for (Order order : allOrders) {
-                // Can't delete all without knowing IDs, so we mark as cancelled instead
-                db1.updateOrderStatus(order.getSymbol(), CANCELLED_STATUS);
-            }
-        } catch (SQLException e) {
-            throw e;
+        List<Order> allOrders = db1.getOpenOrders();
+        for (Order order : allOrders) {
+            // Can't delete all without knowing IDs, so we mark as cancelled instead
+            db1.updateOrderStatus(order.getSymbol(), CANCELLED_STATUS);
         }
     }
     

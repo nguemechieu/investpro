@@ -1,6 +1,8 @@
 package org.investpro.ui;
 
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.exchange.*;
@@ -20,6 +22,8 @@ import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.Cursor;
@@ -39,10 +43,10 @@ import java.util.prefs.Preferences;
 import static org.investpro.i18n.LocalizationService.t;
 
 /**
- * Onboarding view for InvestPro application.
+ * Professional onboarding view for InvestPro application with modern UI design.
+ * Features split-pane layout with background image and card-based form design.
  * Guides users through login, market configuration, and exchange credential
  * setup.
- * Uses centralized styling configuration from OnboardingStyles.
  *
  * @author NOEL NGUEMECHIEU
  */
@@ -63,6 +67,21 @@ public class OnboardingView extends StackPane {
     private final TextField telegramToken = new TextField();
     private final TextField openAiField = new TextField();
     private final ChoiceBox<String> selectedTradingModeChoiceBox = new ChoiceBox<>();
+    private static final String CARD_STYLE = "-fx-background-color: rgba(30, 41, 59, 0.95); " +
+            "-fx-border-color: #475569; -fx-border-width: 1; -fx-border-radius: 8; " +
+            "-fx-background-radius: 8; -fx-padding: 32; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 8, 0, 0, 2);";
+    private static final String INPUT_STYLE = "-fx-control-inner-background: #0f172a; -fx-text-fill: #f1f5f9; " +
+            "-fx-prompt-text-fill: #64748b; -fx-border-color: #334155; -fx-border-width: 1; -fx-padding: 10 12; " +
+            "-fx-border-radius: 4; -fx-background-radius: 4; -fx-font-size: 11;";
+    private static final String BUTTON_PRIMARY = "-fx-padding: 12 24; -fx-background-color: #3b82f6; " +
+            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 11; -fx-border-radius: 4; " +
+            "-fx-background-radius: 4; -fx-cursor: hand;";
+    private static final String BUTTON_SECONDARY = "-fx-padding: 12 24; -fx-background-color: #1e40af; " +
+            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 11; -fx-border-radius: 4; " +
+            "-fx-background-radius: 4; -fx-cursor: hand;";
+    private static final String BUTTON_SUCCESS = "-fx-padding: 12 24; -fx-background-color: #10b981; " +
+            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 11; -fx-border-radius: 4; " +
+            "-fx-background-radius: 4; -fx-cursor: hand;";
 
     public OnboardingView(Consumer<MarketConfiguration> onReady) {
         this.onReady = Objects.requireNonNull(onReady);
@@ -77,115 +96,178 @@ public class OnboardingView extends StackPane {
     private @NotNull BorderPane createLoginStep() {
         rememberMeCheckBox.setText(t("onboarding.rememberMe"));
 
+        // Create background with image
+        BorderPane pane = new BorderPane();
+        pane.setStyle("-fx-background-color: #0f172a;");
+
+        // Add background image on the left side
+        VBox leftPanel = createBackgroundPanel();
+        pane.setLeft(leftPanel);
+
+        // Create card-based form on the right
         Label appName = new Label(t("onboarding.loginTitle"));
-        appName.setStyle("-fx-font-size: 44px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
+        appName.setStyle("-fx-font-size: 36px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
 
         Label prompt = new Label(t("onboarding.loginPrompt"));
-        prompt.setStyle("-fx-font-size: 16px; -fx-text-fill: #cbd5e1;");
+        prompt.setStyle("-fx-font-size: 14px; -fx-text-fill: #cbd5e1; -fx-wrap-text: true;");
 
-        usernameField.setPromptText(t("onboarding.username"));
-        usernameField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        passwordField.setPromptText(t("onboarding.password"));
-        passwordField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        emailField.setPromptText(t("onboarding.email"));
-        emailField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        // Styled input fields
+        styleInputField(usernameField, t("onboarding.username"));
+        styleInputField(passwordField, t("onboarding.password"));
+        styleInputField(emailField, t("onboarding.email"));
         emailField.setVisible(false);
         emailField.setManaged(false);
 
-        rememberMeCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
-        rememberMeCheckBox.setVisible(true);
-        rememberMeCheckBox.setManaged(true);
+        rememberMeCheckBox.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 11;");
 
-        Button forgetButton = new Button(t("onboarding.forget"));
-        forgetButton.setStyle("-fx-padding: 4 12; -fx-background-color: #1e40af; -fx-text-fill: white;");
+        Button forgetButton = createButton("Forget", BUTTON_SECONDARY);
         forgetButton.setOnAction(event -> forgetCredentials());
 
-        Button forgotPasswordButton = new Button(t("onboarding.forgotPassword"));
-        forgotPasswordButton.setStyle(
-                "-fx-padding: 4 12; -fx-background-color: transparent; -fx-border-color: #475569; -fx-text-fill: #bfdbfe;");
+        Button forgotPasswordButton = createButton("Forgot Password?", BUTTON_SECONDARY);
+        HBox rememberBox = createControlsRow(rememberMeCheckBox, forgetButton, forgotPasswordButton);
 
-        HBox rememberBox = new HBox(10, rememberMeCheckBox, forgetButton, forgotPasswordButton);
-        rememberBox.setAlignment(Pos.CENTER);
-
-        Button loginButton = new Button(t("onboarding.logIn"));
-        loginButton.setStyle(
-                "-fx-padding: 10 20; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
-
-        Button createButton = new Button(t("onboarding.createAccount"));
-        createButton.setStyle(
-                "-fx-padding: 10 20; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
-
-        HBox buttonBox = new HBox(10, loginButton, createButton);
+        Button loginButton = createButton(t("onboarding.logIn"), BUTTON_PRIMARY);
+        Button createButton = createButton(t("onboarding.createAccount"), BUTTON_SUCCESS);
+        HBox buttonBox = new HBox(12, loginButton, createButton);
         buttonBox.setAlignment(Pos.CENTER);
+        buttonBox.setSpacing(12);
 
         Label validation = new Label();
-        validation.setStyle("-fx-text-fill: #ef4444;");
+        validation.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
         validation.setAlignment(Pos.CENTER);
+        validation.setWrapText(true);
+
         forgotPasswordButton.setOnAction(event -> showForgotPasswordDialog(validation));
 
-        createButton.setOnAction(event -> {
-            if (!emailField.isVisible()) {
-                emailField.setVisible(true);
-                emailField.setManaged(true);
-                validation.setStyle("-fx-text-fill: #fbbf24;");
-                validation.setText(t("onboarding.createHint"));
-                return;
-            }
+        createButton.setOnAction(event -> handleCreateAccount(validation, emailField));
+        loginButton.setOnAction(event -> handleLogin(validation));
 
-            char[] password = passwordField.getText().toCharArray();
-            AuthResult result = authService.register(
-                    usernameField.getText(),
-                    emailField.getText(),
-                    password);
-            Arrays.fill(password, '\0');
-            validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
-            validation.setText(result.message());
-            if (result.success()) {
-                if (rememberMeCheckBox.isSelected()) {
-                    authService.rememberUser(usernameField.getText());
-                }
-                showConfigurationStep();
-            }
-        });
+        VBox form = new VBox(14, usernameField, passwordField, emailField, rememberBox, buttonBox, validation);
+        form.setAlignment(Pos.TOP_CENTER);
+        form.setStyle("-fx-padding: 0;");
 
-        loginButton.setOnAction(event -> {
-            char[] password = passwordField.getText().toCharArray();
-            AuthResult result = authService.signIn(usernameField.getText(), password);
-            Arrays.fill(password, '\0');
-            validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
-            validation.setText(result.message());
-            if (!result.success()) {
-                return;
-            }
+        VBox content = new VBox(20, appName, prompt, form);
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setMaxWidth(420);
+        content.setStyle(CARD_STYLE);
+
+        VBox rightPanel = new VBox(content);
+        rightPanel.setAlignment(Pos.CENTER);
+        rightPanel.setPadding(new Insets(48));
+        rightPanel.setStyle("-fx-background-color: rgba(15, 23, 42, 0.5);");
+        HBox.setHgrow(rightPanel, Priority.ALWAYS);
+
+        HBox mainContent = new HBox(leftPanel, rightPanel);
+        mainContent.setPrefWidth(1540);
+        mainContent.setStyle("-fx-background-color: #0f172a;");
+
+        pane.setCenter(mainContent);
+        pane.setTop(createLanguageSelector(() -> getChildren().setAll(createLoginStep())));
+        return pane;
+    }
+
+    private @NotNull VBox createBackgroundPanel() {
+        VBox leftPanel = new VBox();
+        leftPanel.setPrefWidth(540);
+        leftPanel.setMinWidth(420);
+        leftPanel.setStyle("-fx-background-color: #1e293b;");
+        leftPanel.setAlignment(Pos.CENTER);
+        leftPanel.setPadding(new Insets(40));
+
+        try {
+            Image backgroundImage = new Image(getClass().getResourceAsStream("/images/Invest.png"));
+            ImageView imageView = new ImageView(backgroundImage);
+            imageView.setFitWidth(420);
+            imageView.setFitHeight(500);
+            imageView.setPreserveRatio(true);
+            imageView.setSmooth(true);
+
+            VBox imageContainer = new VBox(imageView);
+            imageContainer.setAlignment(Pos.CENTER);
+            imageContainer.setStyle("-fx-padding: 20;");
+            leftPanel.getChildren().add(imageContainer);
+
+            Label branding = new Label("InvestPro Trading");
+            branding.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
+
+            Label tagline = new Label("Advanced Multi-Venue Trading Terminal");
+            tagline.setStyle("-fx-font-size: 13px; -fx-text-fill: #94a3b8;");
+
+            VBox brandingBox = new VBox(8, branding, tagline);
+            brandingBox.setAlignment(Pos.CENTER);
+            brandingBox.setStyle("-fx-padding: 20 0 0 0;");
+            leftPanel.getChildren().add(brandingBox);
+        } catch (Exception e) {
+            log.warn("Failed to load background image", e);
+            Label fallbackLabel = new Label("InvestPro");
+            fallbackLabel.setStyle("-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
+            leftPanel.getChildren().add(fallbackLabel);
+        }
+
+        return leftPanel;
+    }
+
+    private void styleInputField(TextField field, String prompt) {
+        field.setPromptText(prompt);
+        field.setStyle(INPUT_STYLE);
+        field.setPrefHeight(40);
+    }
+
+    private @NotNull Button createButton(String text, String style) {
+        Button button = new Button(text);
+        button.setStyle(style);
+        button.setPrefHeight(40);
+        button.setMinWidth(100);
+        return button;
+    }
+
+    private @NotNull HBox createControlsRow(Control... controls) {
+        HBox box = new HBox(12, controls);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
+    }
+
+    private void handleCreateAccount(Label validation, TextField emailField) {
+        if (!emailField.isVisible()) {
+            emailField.setVisible(true);
+            emailField.setManaged(true);
+            validation.setStyle("-fx-text-fill: #fbbf24; -fx-font-size: 11;");
+            validation.setText(t("onboarding.createHint"));
+            return;
+        }
+
+        char[] password = passwordField.getText().toCharArray();
+        AuthResult result = authService.register(
+                usernameField.getText(),
+                emailField.getText(),
+                password);
+        Arrays.fill(password, '\0');
+        validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
+        validation.setText(result.message());
+        if (result.success()) {
             if (rememberMeCheckBox.isSelected()) {
                 authService.rememberUser(usernameField.getText());
-            } else {
-                authService.forgetRememberedUser();
             }
-            passwordField.clear();
             showConfigurationStep();
-        });
+        }
+    }
 
-        VBox form = new VBox(12, usernameField, passwordField, emailField, rememberBox, buttonBox, validation);
-        form.setAlignment(Pos.CENTER);
-        form.setMaxWidth(360);
-
-        VBox content = new VBox(18, appName, prompt, form);
-        content.setAlignment(Pos.CENTER);
-        content.setMaxWidth(500);
-
-        StackPane centerPane = new StackPane(content);
-        centerPane.setAlignment(Pos.CENTER);
-
-        BorderPane pane = new BorderPane(centerPane);
-        pane.setTop(createLanguageSelector(() -> getChildren().setAll(createLoginStep())));
-        pane.setStyle("-fx-background-color: #0f172a;");
-        return pane;
+    private void handleLogin(Label validation) {
+        char[] password = passwordField.getText().toCharArray();
+        AuthResult result = authService.signIn(usernameField.getText(), password);
+        Arrays.fill(password, '\0');
+        validation.setStyle("-fx-text-fill: %s;".formatted(result.success() ? "#22c55e" : "#ef4444"));
+        validation.setText(result.message());
+        if (!result.success()) {
+            return;
+        }
+        if (rememberMeCheckBox.isSelected()) {
+            authService.rememberUser(usernameField.getText());
+        } else {
+            authService.forgetRememberedUser();
+        }
+        passwordField.clear();
+        showConfigurationStep();
     }
 
     private HBox createLanguageSelector(Runnable onChanged) {
@@ -216,7 +298,7 @@ public class OnboardingView extends StackPane {
         marketTypeBox.getItems().setAll("Forex", "Crypto", "Stocks", "Futures", "Options", "ETFs", "Bonds");
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
 
-        // Dynamically populate exchanges from SupportedExchange enum
+        // Dynamically populate exchanges
         java.util.Arrays.stream(SupportedExchange.values())
                 .map(SupportedExchange::getDisplayName)
                 .forEach(exchangeBox.getItems()::add);
@@ -225,7 +307,10 @@ public class OnboardingView extends StackPane {
         venueBox.getSelectionModel().select("US");
         exchangeBox.getSelectionModel().select(SupportedExchange.COINBASE.getDisplayName());
 
-        // Autoload credentials when exchange changes
+        styleComboBox(marketTypeBox);
+        styleComboBox(venueBox);
+        styleComboBox(exchangeBox);
+
         exchangeBox.setOnAction(event -> {
             if (marketTypeBox.getValue() != null && venueBox.getValue() != null && exchangeBox.getValue() != null) {
                 showExchangeCredentialsStep();
@@ -233,23 +318,28 @@ public class OnboardingView extends StackPane {
         });
 
         GridPane grid = new GridPane();
-        grid.setHgap(14);
-        grid.setVgap(14);
+        grid.setHgap(16);
+        grid.setVgap(16);
         grid.setAlignment(Pos.CENTER);
-        grid.addRow(0, new Label("Market Type"), marketTypeBox);
-        grid.addRow(1, new Label("Venue"), venueBox);
-        grid.addRow(2, new Label("Exchange"), exchangeBox);
 
-        Button loadMarketButton = new Button("Load Market");
-        loadMarketButton.setStyle(
-                "-fx-padding: 10 20; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
+        Label marketTypeLabel = createLabel("Market Type");
+        Label venueLabel = createLabel("Venue");
+        Label exchangeLabel = createLabel("Exchange");
 
+        grid.addRow(0, marketTypeLabel, marketTypeBox);
+        grid.addRow(1, venueLabel, venueBox);
+        grid.addRow(2, exchangeLabel, exchangeBox);
+
+        Button loadMarketButton = createButton("Load Market", BUTTON_PRIMARY);
+        loadMarketButton.setPrefWidth(180);
         HBox loadButtonBox = new HBox(loadMarketButton);
         loadButtonBox.setAlignment(Pos.CENTER);
 
         Label validation = new Label();
-        validation.setStyle("-fx-text-fill: #ef4444;");
+        validation.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
         validation.setAlignment(Pos.CENTER);
+        validation.setWrapText(true);
+
         loadMarketButton.setOnAction(event -> {
             if (marketTypeBox.getValue() == null || venueBox.getValue() == null || exchangeBox.getValue() == null) {
                 validation.setText("Select a market type, venue, and exchange.");
@@ -262,19 +352,38 @@ public class OnboardingView extends StackPane {
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
 
         Label subtitle = new Label("Choose what you want to trade and where the terminal should connect.");
-        subtitle.setStyle("-fx-font-size: 15px; -fx-text-fill: #cbd5e1;");
+        subtitle.setStyle("-fx-font-size: 12px; -fx-text-fill: #cbd5e1; -fx-wrap-text: true;");
 
-        VBox content = new VBox(18, title, subtitle, grid, loadButtonBox, validation);
-        content.setAlignment(Pos.CENTER);
-        content.setMaxWidth(500);
+        VBox content = new VBox(20, title, subtitle, grid, loadButtonBox, validation);
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setMaxWidth(420);
+        content.setStyle(CARD_STYLE);
 
-        StackPane centerPane = new StackPane(content);
-        centerPane.setAlignment(Pos.CENTER);
+        VBox rightPanel = new VBox(content);
+        rightPanel.setAlignment(Pos.CENTER);
+        rightPanel.setPadding(new Insets(48));
+        rightPanel.setStyle("-fx-background-color: rgba(15, 23, 42, 0.5);");
+        HBox.setHgrow(rightPanel, Priority.ALWAYS);
 
-        BorderPane pane = new BorderPane(centerPane);
+        BorderPane pane = new BorderPane();
         pane.setStyle("-fx-background-color: #0f172a;");
-        pane.setTop(loadMarketButton);
+        pane.setLeft(createBackgroundPanel());
+        HBox mainContent = new HBox(pane.getLeft(), rightPanel);
+        pane.setCenter(mainContent);
         fadeTo(pane);
+    }
+
+    private void styleComboBox(ComboBox<?> comboBox) {
+        comboBox.setPrefHeight(40);
+        comboBox.setStyle("-fx-control-inner-background: #0f172a; -fx-text-fill: #f1f5f9; " +
+                "-fx-border-color: #334155; -fx-border-width: 1; -fx-border-radius: 4; " +
+                "-fx-background-radius: 4; -fx-font-size: 11;");
+    }
+
+    private @NotNull Label createLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-text-fill: #cbd5e1; -fx-font-size: 12; -fx-font-weight: bold;");
+        return label;
     }
 
     final ChoiceBox<String> selectedTradingModeChoiseBox = new ChoiceBox<>();
@@ -286,166 +395,65 @@ public class OnboardingView extends StackPane {
         selectedTradingModeChoiceBox.getItems().clear();
         selectedTradingModeChoiceBox.getItems().addAll("LIVE", "PAPER TRADING");
         selectedTradingModeChoiceBox.setValue("PAPER TRADING");
-        TextField apiKeyField = new TextField();
-        apiKeyField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        selectedTradingModeChoiceBox.setStyle("-fx-font-size: 11;");
 
-        if (selectedExchange == SupportedExchange.OANDA) {
-            apiKeyField.setPromptText("OANDA Token (Bearer Token)");
-        } else {
-            apiKeyField.setPromptText("API Key");
-        }
+        TextField apiKeyField = new TextField();
+        styleInputField(apiKeyField,
+                selectedExchange == SupportedExchange.OANDA ? "OANDA Token (Bearer Token)" : "API Key");
 
         PasswordField apiSecretField = getPasswordField(selectedExchange);
 
         TextField accountIdField = new TextField();
         accountIdField.setPromptText("Account ID (auto-detected if blank)");
-        accountIdField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        styleInputField(accountIdField, "");
         accountIdField.setVisible(selectedExchange == SupportedExchange.OANDA);
         accountIdField.setManaged(selectedExchange == SupportedExchange.OANDA);
 
-        // Telegram Token field (optional)
-        telegramToken.setPromptText("Telegram Bot Token (optional)");
-        telegramToken.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+        styleInputField(telegramToken, "Telegram Bot Token (optional)");
+        styleInputField(openAiField, "OpenAI API Key (optional)");
 
-        // OpenAI field (optional)
-        openAiField.setPromptText("OpenAI API Key (optional)");
-        openAiField.setStyle(
-                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
-
-        // Load remembered credentials for this exchange if they exist
         loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
 
-        HBox tradingModeBox = new HBox(20, selectedTradingModeChoiceBox);
-        tradingModeBox.setAlignment(Pos.CENTER_LEFT);
-        tradingModeBox.setStyle("-fx-padding: 8 0 0 0;");
-
         GridPane credGrid = new GridPane();
-        credGrid.setHgap(14);
-        credGrid.setVgap(14);
+        credGrid.setHgap(16);
+        credGrid.setVgap(12);
         credGrid.setAlignment(Pos.CENTER);
 
-        Label apiKeyLabel = new Label(selectedExchange == SupportedExchange.OANDA ? "Token" : "API Key");
+        Label apiKeyLabel = createLabel(selectedExchange == SupportedExchange.OANDA ? "Token" : "API Key");
         credGrid.addRow(0, apiKeyLabel, apiKeyField);
 
         if (selectedExchange != SupportedExchange.OANDA) {
-            credGrid.addRow(1, new Label("API Secret"), apiSecretField);
+            credGrid.addRow(1, createLabel("API Secret"), apiSecretField);
         }
 
         if (selectedExchange == SupportedExchange.OANDA) {
-            credGrid.addRow(1, new Label("Account ID"), accountIdField);
+            credGrid.addRow(1, createLabel("Account ID"), accountIdField);
         }
 
-        credGrid.addRow(2, new Label("Telegram Token"), telegramToken);
-        credGrid.addRow(3, new Label("OpenAI Key"), openAiField);
-        credGrid.addRow(4, new Label("Mode"), tradingModeBox);
+        credGrid.addRow(2, createLabel("Telegram"), telegramToken);
+        credGrid.addRow(3, createLabel("OpenAI"), openAiField);
 
-        CheckBox rememberCredentialsCheckBox = new CheckBox("Remember these credentials");
-        rememberCredentialsCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
-        rememberCredentialsCheckBox.setPrefSize(40, 40);
+        HBox modeBox = new HBox(10, createLabel("Trading Mode"), selectedTradingModeChoiceBox);
+        modeBox.setAlignment(Pos.CENTER_LEFT);
+        credGrid.addRow(4, new Label(""), modeBox);
 
-        HBox rememberBox = new HBox(20, rememberCredentialsCheckBox);
-        rememberBox.setAlignment(Pos.CENTER);
+        CheckBox rememberCredentialsCheckBox = new CheckBox("Remember credentials");
+        rememberCredentialsCheckBox.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 11;");
 
-        Button continueButton = new Button("Continue");
-        continueButton.setStyle(
-                "-fx-padding: 20 30; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
+        Button continueButton = createButton("Continue", BUTTON_PRIMARY);
+        continueButton.setPrefWidth(140);
 
-        Button backButton = new Button("Back");
-        backButton.setStyle(
-                "-fx-padding: 20 30; -fx-background-color: #1e40af; -fx-text-fill: white; -fx-font-weight: bold;");
+        Button backButton = createButton("Back", BUTTON_SECONDARY);
+        backButton.setPrefWidth(140);
 
         Label validation = new Label();
-        validation.setStyle("-fx-text-fill: #ef4444;");
+        validation.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
         validation.setAlignment(Pos.CENTER);
+        validation.setWrapText(true);
 
-        continueButton.setOnAction(event -> {
-            // Determine trading mode from radio button selection
-
-            // For OANDA, only token is required (Account ID is optional - can be
-            // auto-detected)
-            if (selectedExchange == SupportedExchange.OANDA) {
-                if (apiKeyField.getText().isBlank()) {
-                    validation.setText(" Token is required.");
-                    return;
-                }
-                // For OANDA, pass token as apiKey and accountId as apiSecret
-                configuration = new MarketConfiguration(
-                        usernameField.getText().trim(),
-                        marketTypeBox.getValue(),
-                        venueBox.getValue(),
-                        selectedExchange.getFactoryKey(),
-                        apiKeyField.getText().trim(),
-                        accountIdField.getText().trim(), // Use account ID as apiSecret
-                        accountIdField.getText().trim(),
-                        telegramToken.getText().trim(),
-                        openAiField.getText().trim(), // openaiApiKey - optional
-                        null, // openaiModel - optional
-                        null, // openaiOrgId - optional
-                        selectedTradingModeChoiceBox.getValue() // Trading mode
-                );
-            } else {
-                // For other exchanges, require both API Key and API Secret
-                if (apiKeyField.getText().isBlank() || apiSecretField.getText().isBlank()) {
-                    validation.setText("API Key and API Secret are required.");
-                    return;
-                }
-                configuration = new MarketConfiguration(
-                        usernameField.getText().trim(),
-                        marketTypeBox.getValue(),
-                        venueBox.getValue(),
-                        selectedExchange.getFactoryKey(),
-                        apiKeyField.getText().trim(),
-                        apiSecretField.getText().trim(),
-                        accountIdField.getText().trim(),
-                        telegramToken.getText().trim(),
-                        openAiField.getText().trim(), // openaiApiKey - optional
-                        null, // openaiModel - optional
-                        null, // openaiOrgId - optional
-                        selectedTradingModeChoiceBox.getValue() // Trading mode
-                );
-            }
-
-            // Authenticate with broker before proceeding
-            validation.setStyle("-fx-text-fill: #fbbf24;");
-            validation.setText("Authenticating with %s...".formatted(selectedExchange.getDisplayName()));
-
-            String apiKey;
-            apiKey = apiKeyField.getText().trim();
-            String apiSecret = selectedExchange == SupportedExchange.OANDA ? accountIdField.getText().trim()
-                    : apiSecretField.getText().trim();
-
-            AuthResult authResult = authenticateExchange(
-                    selectedExchange.getFactoryKey(),
-                    apiKey,
-                    apiSecret,
-                    accountIdField.getText(),
-                    selectedTradingModeChoiseBox.getValue());
-
-            if (!authResult.success()) {
-                validation.setStyle("-fx-text-fill: #ef4444;");
-                validation.setText(authResult.message());
-                return;
-            }
-
-            // Authentication successful - proceed with configuration
-            validation.setStyle("-fx-text-fill: #22c55e;");
-            validation.setText("Authentication successful!");
-
-            // Save exchange credentials if checkbox is selected
-            if (rememberCredentialsCheckBox.isSelected()) {
-                saveRememberedExchangeCredentials(selectedExchangeName,
-                        apiKeyField.getText().trim(),
-                        apiSecretField.getText().trim(),
-                        accountIdField.getText().trim(),
-                        telegramToken.getText().trim());
-            }
-
-            saveConfiguration(configuration);
-            showLoadingOverlay();
-        });
+        continueButton.setOnAction(event -> handleExchangeCredentials(
+                selectedExchange, apiKeyField, apiSecretField, accountIdField,
+                rememberCredentialsCheckBox, selectedExchangeName, validation));
 
         backButton.setOnAction(event -> showConfigurationStep());
 
@@ -453,75 +461,145 @@ public class OnboardingView extends StackPane {
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: 700; -fx-text-fill: #3b82f6;");
 
         Label subtitle = new Label("Enter your exchange API credentials to connect your account.");
-        subtitle.setStyle("-fx-font-size: 15px; -fx-text-fill: #cbd5e1;");
+        subtitle.setStyle("-fx-font-size: 12px; -fx-text-fill: #cbd5e1; -fx-wrap-text: true;");
 
-        Label info = new Label();
-        info.setStyle("-fx-font-size: 12px; -fx-text-fill: #94a3b8;");
-        info.setWrapText(true);
-        info.setMaxWidth(500);
+        Label info = createExchangeInfo(selectedExchange);
 
-        Button helpButton = new Button("? Format Help");
-        helpButton.setStyle(
-                "-fx-padding: 4 12; -fx-background-color: #1e40af; -fx-text-fill: #bfdbfe; -fx-border-color: #3b82f6; -fx-border-width: 1;");
+        Button helpButton = createButton("? Format Help", BUTTON_SECONDARY);
+        helpButton.setPrefWidth(140);
         helpButton.setCursor(Cursor.HAND);
 
-        String infoText = switch (selectedExchange) {
-            case COINBASE -> """
-                    Coinbase Advanced Trade API:
-                    • API Key: Organization ID format (organizations/xxxxx/apiKeys/xxxxx)
-                    • API Secret: EC Private Key in PEM format (-----BEGIN EC PRIVATE KEY-----)
-                    Generate at: https://coinbase.com/settings/api""";
-            case OANDA -> """
-                    OANDA v3 API:
-                    • Token: Bearer token from Account Settings
-                    • Account ID: Optional (auto-detected if left blank)
-                    Generate at: https://www.oanda.com/account/tpa/personal-token""";
-            case BINANCE, BINANCE_US -> """
-                    Binance API:
-                    • API Key: Public key from API Management
-                    • API Secret: Secret key from API Management
-                    Generate at: https://www.binance.com/en/user/settings/api-management""";
-            case BITFINEX -> """
-                    Bitfinex API:
-                    • API Key: Public key from Settings → API
-                    • API Secret: Secret key from Settings → API
-                    Generate at: https://www.bitfinex.com/api""";
-            case ALPACA -> """
-                    Alpaca Trading API:
-                    • API Key: From Dashboard → API Keys
-                    • API Secret: From Dashboard → API Keys
-                    Generate at: https://app.alpaca.markets/""";
-            case INTERACTIVE_BROKERS -> """
-                    Interactive Brokers:
-                    • API Key: Your IB account username or API key
-                    • API Secret: Your IB account password or secret
-                    Setup: Enable API at Account Management""";
-            default -> "Enter your API Key and API Secret for " + selectedExchange.getDisplayName();
-        };
+        String infoText = getExchangeInfoText(selectedExchange);
+        helpButton.setOnAction(event -> showHelpDialog(selectedExchange, infoText));
 
-        info.setText(infoText);
-
-        helpButton.setOnAction(event -> {
-            Alert helpDialog = new Alert(Alert.AlertType.INFORMATION);
-            helpDialog.setTitle("Credential Format Help - " + selectedExchange);
-            helpDialog.setHeaderText("How to find your " + selectedExchange + " credentials");
-            helpDialog.setContentText(infoText);
-            helpDialog.showAndWait();
-        });
-
-        HBox buttonBox = new HBox(10, backButton, continueButton, helpButton);
+        HBox buttonBox = new HBox(12, backButton, continueButton, helpButton);
         buttonBox.setAlignment(Pos.CENTER);
 
-        VBox content = new VBox(18, title, subtitle, info, credGrid, rememberBox, buttonBox, validation);
-        content.setAlignment(Pos.CENTER);
+        VBox content = new VBox(18, title, subtitle, info, credGrid, rememberCredentialsCheckBox, buttonBox,
+                validation);
+        content.setAlignment(Pos.TOP_CENTER);
         content.setMaxWidth(500);
+        content.setStyle(CARD_STYLE);
 
-        StackPane centerPane = new StackPane(content);
-        centerPane.setAlignment(Pos.CENTER);
+        VBox rightPanel = new VBox(content);
+        rightPanel.setAlignment(Pos.CENTER);
+        rightPanel.setPadding(new Insets(48));
+        rightPanel.setStyle("-fx-background-color: rgba(15, 23, 42, 0.5);");
+        HBox.setHgrow(rightPanel, Priority.ALWAYS);
 
-        BorderPane pane = new BorderPane(centerPane);
+        BorderPane pane = new BorderPane();
         pane.setStyle("-fx-background-color: #0f172a;");
+        pane.setLeft(createBackgroundPanel());
+        HBox mainContent = new HBox(pane.getLeft(), rightPanel);
+        pane.setCenter(mainContent);
         fadeTo(pane);
+    }
+
+    private void handleExchangeCredentials(SupportedExchange selectedExchange, TextField apiKeyField,
+            PasswordField apiSecretField, TextField accountIdField, CheckBox rememberCheckBox,
+            String selectedExchangeName, Label validation) {
+        // Validate inputs
+        if (selectedExchange == SupportedExchange.OANDA) {
+            if (apiKeyField.getText().isBlank()) {
+                validation.setText("Token is required.");
+                return;
+            }
+            configuration = new MarketConfiguration(
+                    usernameField.getText().trim(),
+                    marketTypeBox.getValue(),
+                    venueBox.getValue(),
+                    selectedExchange.getFactoryKey(),
+                    apiKeyField.getText().trim(),
+                    accountIdField.getText().trim(),
+                    accountIdField.getText().trim(),
+                    telegramToken.getText().trim(),
+                    openAiField.getText().trim(),
+                    null, null,
+                    selectedTradingModeChoiceBox.getValue());
+        } else {
+            if (apiKeyField.getText().isBlank() || apiSecretField.getText().isBlank()) {
+                validation.setText("API Key and API Secret are required.");
+                return;
+            }
+            configuration = new MarketConfiguration(
+                    usernameField.getText().trim(),
+                    marketTypeBox.getValue(),
+                    venueBox.getValue(),
+                    selectedExchange.getFactoryKey(),
+                    apiKeyField.getText().trim(),
+                    apiSecretField.getText().trim(),
+                    accountIdField.getText().trim(),
+                    telegramToken.getText().trim(),
+                    openAiField.getText().trim(),
+                    null, null,
+                    selectedTradingModeChoiceBox.getValue());
+        }
+
+        validation.setStyle("-fx-text-fill: #fbbf24; -fx-font-size: 11;");
+        validation.setText("Authenticating with %s...".formatted(selectedExchange.getDisplayName()));
+
+        AuthResult authResult = authenticateExchange(
+                selectedExchange.getFactoryKey(),
+                apiKeyField.getText().trim(),
+                selectedExchange == SupportedExchange.OANDA ? accountIdField.getText().trim()
+                        : apiSecretField.getText().trim(),
+                accountIdField.getText().trim(),
+                selectedTradingModeChoiceBox.getValue());
+
+        if (!authResult.success()) {
+            validation.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            validation.setText(authResult.message());
+            return;
+        }
+
+        validation.setStyle("-fx-text-fill: #22c55e; -fx-font-size: 11;");
+        validation.setText("Authentication successful!");
+
+        if (rememberCheckBox.isSelected()) {
+            saveRememberedExchangeCredentials(selectedExchangeName,
+                    apiKeyField.getText().trim(),
+                    apiSecretField.getText().trim(),
+                    accountIdField.getText().trim(),
+                    telegramToken.getText().trim());
+        }
+
+        saveConfiguration(configuration);
+        showLoadingOverlay();
+    }
+
+    private @NotNull Label createExchangeInfo(SupportedExchange exchange) {
+        Label info = new Label(getExchangeInfoText(exchange));
+        info.setStyle("-fx-font-size: 10px; -fx-text-fill: #94a3b8; -fx-wrap-text: true;");
+        info.setMaxWidth(500);
+        return info;
+    }
+
+    private @NotNull String getExchangeInfoText(SupportedExchange selectedExchange) {
+        return switch (selectedExchange) {
+            case COINBASE -> "API Key: Organization ID format (organizations/xxxxx/apiKeys/xxxxx)\n" +
+                    "API Secret: EC Private Key in PEM format\nGet credentials at: https://coinbase.com/settings/api";
+            case OANDA -> "Token: Bearer token from Account Settings\n" +
+                    "Account ID: Optional (auto-detected if left blank)\n" +
+                    "Get credentials at: https://www.oanda.com/account/tpa/personal-token";
+            case BINANCE, BINANCE_US -> "API Key: Public key from API Management\n" +
+                    "API Secret: Secret key from API Management\n" +
+                    "Get credentials at: https://www.binance.com/en/user/settings/api-management";
+            case BITFINEX -> "API Key: Public key from Settings → API\n" +
+                    "API Secret: Secret key from Settings → API\n" +
+                    "Get credentials at: https://www.bitfinex.com/api";
+            case ALPACA -> "API Key: From Dashboard → API Keys\n" +
+                    "API Secret: From Dashboard → API Keys\n" +
+                    "Get credentials at: https://app.alpaca.markets/";
+            default -> "Enter your API Key and API Secret for " + selectedExchange.getDisplayName();
+        };
+    }
+
+    private void showHelpDialog(SupportedExchange exchange, String infoText) {
+        Alert helpDialog = new Alert(Alert.AlertType.INFORMATION);
+        helpDialog.setTitle("Credential Format Help - " + exchange);
+        helpDialog.setHeaderText("How to find your " + exchange + " credentials");
+        helpDialog.setContentText(infoText);
+        helpDialog.showAndWait();
     }
 
     private @NotNull PasswordField getPasswordField(SupportedExchange selectedExchange) {
