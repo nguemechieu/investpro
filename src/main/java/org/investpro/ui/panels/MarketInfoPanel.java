@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.market.MarketStats;
+import org.investpro.market.MarketMetrics;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.MarketInfoDataProvider;
 import org.investpro.service.NewsDataProvider;
@@ -351,8 +352,6 @@ public class MarketInfoPanel extends ScrollPane {
         mainContent.getChildren().add(createHeaderBox());
     }
 
-
-
     /**
      * Update market info panel for a trading pair
      * Currently displays sample data - will be enhanced with real API data
@@ -386,5 +385,117 @@ public class MarketInfoPanel extends ScrollPane {
 
     private String valueOrNA(double value, String formatted) {
         return value > 0.0 && Double.isFinite(value) ? formatted : "N/A";
+    }
+
+    /**
+     * Update display with market metrics (technical analysis data)
+     */
+    public void updateMetrics(MarketMetrics metrics) {
+        if (metrics == null) {
+            return;
+        }
+
+        // Add metrics section to main content
+        mainContent.getChildren().add(new Separator());
+        mainContent.getChildren().add(createLabel("Technical Metrics", true));
+        mainContent.getChildren().add(createMetricsGrid(metrics));
+    }
+
+    /**
+     * Create a grid for displaying market metrics
+     */
+    private VBox createMetricsGrid(MarketMetrics metrics) {
+        VBox grid = new VBox(8);
+        grid.setStyle(
+                "-fx-background-color: #f9fafb; -fx-padding: 12; -fx-border-radius: 6; -fx-border-color: #e5e7eb; -fx-border-width: 1;");
+
+        grid.getChildren()
+                .add(createStatRow("Current Price", formatPrice(metrics.getCurrentPrice()), Color.web("#1f2937")));
+        grid.getChildren().add(createStatRow("Bid", formatPrice(metrics.getBid()), Color.web("#10b981")));
+        grid.getChildren().add(createStatRow("Ask", formatPrice(metrics.getAsk()), Color.web("#ef4444")));
+
+        String spreadText = String.format("%.6f (%.4f%%)", metrics.getSpread(), metrics.getSpreadPercent());
+        grid.getChildren().add(createStatRow("Spread", spreadText, Color.web("#6b7280")));
+
+        grid.getChildren().add(new Separator());
+        grid.getChildren().add(createLabel("24h Range & Volume", false));
+
+        grid.getChildren().add(createStatRow("High (24h)", formatPrice(metrics.getHigh24h()), Color.web("#10b981")));
+        grid.getChildren().add(createStatRow("Low (24h)", formatPrice(metrics.getLow24h()), Color.web("#ef4444")));
+        grid.getChildren()
+                .add(createStatRow("Range",
+                        String.format("%.6f (%.2f%%)", metrics.getHighLowRange(), metrics.getHighLowRangePercent()),
+                        Color.web("#6b7280")));
+
+        String volume24hFormatted = metrics.getVolume24h() >= 1_000_000
+                ? String.format("$%.2fM", metrics.getVolume24h() / 1_000_000)
+                : String.format("$%.2f", metrics.getVolume24h());
+        grid.getChildren().add(createStatRow("Volume (24h)", volume24hFormatted, Color.web("#3b82f6")));
+
+        String changePercent = String.format("%+.2f%%", metrics.getChangePercent24h());
+        Color changeColor = metrics.getChangePercent24h() >= 0 ? Color.web("#10b981") : Color.web("#ef4444");
+        grid.getChildren().add(createStatRow("Change (24h)", changePercent, changeColor));
+
+        grid.getChildren().add(new Separator());
+        grid.getChildren().add(createLabel("Technical Analysis", false));
+
+        String volatilityText = String.format("%.2f%% (%s)", metrics.getVolatility(), metrics.getVolatilityLevel());
+        Color volatilityColor = getVolatilityColor(metrics.getVolatilityLevel());
+        grid.getChildren().add(createStatRow("Volatility", volatilityText, volatilityColor));
+
+        String trendText = String.format("%s (%.0f%%)", metrics.getTrend(), metrics.getTrendStrength());
+        Color trendColor = getTrendColor(metrics.getTrend());
+        grid.getChildren().add(createStatRow("Trend", trendText, trendColor));
+
+        String signalText = metrics.getTechnicalSignal();
+        Color signalColor = getTechnicalSignalColor(metrics.getTechnicalSignal());
+        grid.getChildren().add(createStatRow("Technical Signal", signalText, signalColor));
+
+        String scoreText = String.format("%+.0f", metrics.getTechnicalScore());
+        Color scoreColor = metrics.getTechnicalScore() > 0 ? Color.web("#10b981") : Color.web("#ef4444");
+        grid.getChildren().add(createStatRow("Technical Score", scoreText, scoreColor));
+
+        grid.getChildren().add(new Separator());
+        grid.getChildren().add(createLabel("Price Position", false));
+
+        String fromHighText = String.format("-%.2f%%", metrics.getPriceChangeFromHigh());
+        grid.getChildren().add(createStatRow("Below 24h High", fromHighText, Color.web("#6b7280")));
+
+        String fromLowText = String.format("+%.2f%%", metrics.getPriceChangeFromLow());
+        grid.getChildren().add(createStatRow("Above 24h Low", fromLowText, Color.web("#6b7280")));
+
+        return grid;
+    }
+
+    private Color getVolatilityColor(String level) {
+        return switch (level) {
+            case "LOW" -> Color.web("#10b981");
+            case "NORMAL" -> Color.web("#3b82f6");
+            case "HIGH" -> Color.web("#f59e0b");
+            case "EXTREME" -> Color.web("#ef4444");
+            default -> Color.web("#6b7280");
+        };
+    }
+
+    private Color getTrendColor(String trend) {
+        return switch (trend) {
+            case "STRONG_UP" -> Color.web("#059669");
+            case "UP" -> Color.web("#10b981");
+            case "SIDEWAYS" -> Color.web("#3b82f6");
+            case "DOWN" -> Color.web("#f97316");
+            case "STRONG_DOWN" -> Color.web("#dc2626");
+            default -> Color.web("#6b7280");
+        };
+    }
+
+    private Color getTechnicalSignalColor(String signal) {
+        return switch (signal) {
+            case "STRONG_BUY" -> Color.web("#059669");
+            case "BUY" -> Color.web("#10b981");
+            case "NEUTRAL" -> Color.web("#3b82f6");
+            case "SELL" -> Color.web("#f97316");
+            case "STRONG_SELL" -> Color.web("#dc2626");
+            default -> Color.web("#6b7280");
+        };
     }
 }
