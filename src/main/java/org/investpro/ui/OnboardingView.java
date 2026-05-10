@@ -61,6 +61,8 @@ public class OnboardingView extends StackPane {
     private final UserAuthService authService = new UserAuthService();
     private MarketConfiguration configuration;
     private final TextField telegramToken = new TextField();
+    private final TextField openAiField = new TextField();
+    private final ChoiceBox<String> selectedTradingModeChoiceBox = new ChoiceBox<>();
 
     public OnboardingView(Consumer<MarketConfiguration> onReady) {
         this.onReady = Objects.requireNonNull(onReady);
@@ -211,7 +213,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void showConfigurationStep() {
-        marketTypeBox.getItems().setAll( "Forex","Crypto", "Stocks", "Futures", "Options", "ETFs", "Bonds");
+        marketTypeBox.getItems().setAll("Forex", "Crypto", "Stocks", "Futures", "Options", "ETFs", "Bonds");
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
 
         // Dynamically populate exchanges from SupportedExchange enum
@@ -274,14 +276,16 @@ public class OnboardingView extends StackPane {
         pane.setTop(loadMarketButton);
         fadeTo(pane);
     }
-    final ChoiceBox<String>selectedTradingModeChoiseBox = new ChoiceBox<>();
+
+    final ChoiceBox<String> selectedTradingModeChoiseBox = new ChoiceBox<>();
+
     private void showExchangeCredentialsStep() {
         String selectedExchangeName = exchangeBox.getValue();
         SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
-        selectedTradingModeChoiseBox.getItems().addAll(
-                "LIVE","PAPER TRADING"
-        );
+        selectedTradingModeChoiceBox.getItems().clear();
+        selectedTradingModeChoiceBox.getItems().addAll("LIVE", "PAPER TRADING");
+        selectedTradingModeChoiceBox.setValue("PAPER TRADING");
         TextField apiKeyField = new TextField();
         apiKeyField.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
@@ -291,7 +295,6 @@ public class OnboardingView extends StackPane {
         } else {
             apiKeyField.setPromptText("API Key");
         }
-
 
         PasswordField apiSecretField = getPasswordField(selectedExchange);
 
@@ -307,13 +310,15 @@ public class OnboardingView extends StackPane {
         telegramToken.setStyle(
                 "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
 
+        // OpenAI field (optional)
+        openAiField.setPromptText("OpenAI API Key (optional)");
+        openAiField.setStyle(
+                "-fx-control-inner-background: #1e293b; -fx-text-fill: #f1f5f9; -fx-prompt-text-fill: #94a3b8; -fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 8;");
+
         // Load remembered credentials for this exchange if they exist
         loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
 
-
-
-
-        HBox tradingModeBox = new HBox(20, selectedTradingModeChoiseBox);
+        HBox tradingModeBox = new HBox(20, selectedTradingModeChoiceBox);
         tradingModeBox.setAlignment(Pos.CENTER_LEFT);
         tradingModeBox.setStyle("-fx-padding: 8 0 0 0;");
 
@@ -334,12 +339,12 @@ public class OnboardingView extends StackPane {
         }
 
         credGrid.addRow(2, new Label("Telegram Token"), telegramToken);
-        credGrid.addRow(3, new Label("Mode "), tradingModeBox);
+        credGrid.addRow(3, new Label("OpenAI Key"), openAiField);
+        credGrid.addRow(4, new Label("Mode"), tradingModeBox);
 
         CheckBox rememberCredentialsCheckBox = new CheckBox("Remember these credentials");
         rememberCredentialsCheckBox.setStyle("-fx-text-fill: #f1f5f9;");
-        rememberCredentialsCheckBox.setPrefSize(40,40);
-
+        rememberCredentialsCheckBox.setPrefSize(40, 40);
 
         HBox rememberBox = new HBox(20, rememberCredentialsCheckBox);
         rememberBox.setAlignment(Pos.CENTER);
@@ -363,7 +368,7 @@ public class OnboardingView extends StackPane {
             // auto-detected)
             if (selectedExchange == SupportedExchange.OANDA) {
                 if (apiKeyField.getText().isBlank()) {
-                    validation.setText( " Token is required.");
+                    validation.setText(" Token is required.");
                     return;
                 }
                 // For OANDA, pass token as apiKey and accountId as apiSecret
@@ -375,10 +380,11 @@ public class OnboardingView extends StackPane {
                         apiKeyField.getText().trim(),
                         accountIdField.getText().trim(), // Use account ID as apiSecret
                         accountIdField.getText().trim(),
-                        telegramToken.getText().trim(),null, // openaiApiKey - optional
+                        telegramToken.getText().trim(),
+                        openAiField.getText().trim(), // openaiApiKey - optional
                         null, // openaiModel - optional
                         null, // openaiOrgId - optional
-                        selectedTradingModeChoiseBox.getValue()// Trading mode
+                        selectedTradingModeChoiceBox.getValue() // Trading mode
                 );
             } else {
                 // For other exchanges, require both API Key and API Secret
@@ -395,10 +401,10 @@ public class OnboardingView extends StackPane {
                         apiSecretField.getText().trim(),
                         accountIdField.getText().trim(),
                         telegramToken.getText().trim(),
-                        null, // openaiApiKey - optional
+                        openAiField.getText().trim(), // openaiApiKey - optional
                         null, // openaiModel - optional
                         null, // openaiOrgId - optional
-                        selectedTradingModeChoiseBox.getValue() // Trading mode
+                        selectedTradingModeChoiceBox.getValue() // Trading mode
                 );
             }
 
@@ -679,7 +685,7 @@ public class OnboardingView extends StackPane {
         authService.forgetRememberedUser();
         // Clear all exchange credentials
         for (String exchange : new String[] { "COINBASE", "BINANCE", "BINANCE US", "OANDA", "BITFINEX", "ALPACA",
-                "INTERACTIVE BROKERS", "BITMEX","STELLAR-NETWORK", "BITSTAMP", "BITTREX" }) {
+                "INTERACTIVE BROKERS", "BITMEX", "STELLAR-NETWORK", "BITSTAMP", "BITTREX" }) {
             preferences.remove("exchange_api_key_%s".formatted(exchange));
             preferences.remove("exchange_api_secret_%s".formatted(exchange));
             preferences.remove("exchange_account_id_%s".formatted(exchange));

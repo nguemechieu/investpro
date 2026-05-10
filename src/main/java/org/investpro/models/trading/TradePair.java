@@ -7,6 +7,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.data.CandleData;
 import org.investpro.enums.LiquidityProfile;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
@@ -495,4 +496,6 @@ public class TradePair extends Pair<Currency, Currency> {
     }
 
    private Timeframe timeFrame;
+    private OrderBook orderBook;
+    private CandleData candleData;
 }

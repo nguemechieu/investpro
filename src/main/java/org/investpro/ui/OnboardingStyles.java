@@ -2,7 +2,7 @@ package org.investpro.ui;
 
 /**
  * Centralized styling configuration for OnboardingView.
- *
+ * <p>
  * This class defines shared colors, fonts, layouts, and reusable JavaFX inline
  * styles used by the onboarding screen.
  *

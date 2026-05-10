@@ -131,6 +131,7 @@ public class DataWindow extends VBox {
 
             setRows(values);
         });
+        updateQuote(tradePair,tradePair.getO(););
     }
 
     public void updateQuote(
