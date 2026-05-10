@@ -148,7 +148,7 @@ public class TradeExecutionCoordinator {
 
             if (riskContext.getSymbol() != null
                     && riskContext.getSymbol().getTradingSession() != null
-                    && !riskContext.getSymbol().isTradableNow()) {
+                    && riskContext.getSymbol().isTradableNow()) {
                 String message = "Trading session is not open: " + riskContext.getSymbol().getTradingSessionStatus();
                 log.warn("TradeExecutionCoordinator: Rejecting locally before live order. symbol={} {}",
                         riskContext.getSymbol(), message);

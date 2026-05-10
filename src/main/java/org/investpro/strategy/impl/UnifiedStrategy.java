@@ -17,12 +17,12 @@ import static org.investpro.utils.Side.*;
 
 /**
  * Unified Strategy Engine - Catalog-driven multi-strategy support.
- *
+ * <p>
  * Implements 17+ core strategies with variant support through parameter
  * profiles.
  * Uses a feature pipeline to compute technical indicators and selects strategy
  * logic based on catalog definition.
- *
+ * <p>
  * Inspired by Python strategy.py design but unified into single engine.
  */
 @Slf4j
@@ -489,9 +489,8 @@ public class UnifiedStrategy extends BaseStrategy {
         for (int i = 0; i < period; i++) {
             sum += candles.get(endIdx - period + i).closePrice();
         }
-        double sma = sum / period;
 
-        double ema = sma;
+        double ema = sum / period;
         double multiplier = 2.0 / (period + 1);
 
         int maxIdx = offset < 0 ? candles.size() + offset : offset;

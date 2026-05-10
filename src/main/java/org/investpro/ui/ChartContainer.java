@@ -10,6 +10,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
@@ -30,7 +31,19 @@ import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.VolumeIndicatorPanel;
 import org.investpro.indicators.ChartIndicator;
-import org.investpro.ui.theme.MonitoringTheme;
+import org.investpro.indicators.SimpleMovingAverageIndicator;
+import org.investpro.indicators.ExponentialMovingAverageIndicator;
+import org.investpro.indicators.RSIIndicator;
+import org.investpro.indicators.MACDIndicator;
+import org.investpro.indicators.BollingerBandsIndicator;
+import org.investpro.indicators.StochasticIndicator;
+import org.investpro.indicators.ATRIndicator;
+import org.investpro.indicators.VWAPIndicator;
+import org.investpro.indicators.ADXIndicator;
+import org.investpro.indicators.OBVIndicator;
+import org.investpro.indicators.VolatilityIndicator;
+import org.investpro.indicators.VolumeIndicator;
+
 import org.investpro.utils.CandleAggregator;
 import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.PopOver;
@@ -214,7 +227,7 @@ public class ChartContainer extends Region {
 
             Separator functionOptionsSeparator = new Separator(Orientation.VERTICAL);
             PopOver optionsPopOver = new PopOver();
-            optionsPopOver.setTitle("Options");
+            optionsPopOver.setTitle("Chart Options");
             optionsPopOver.setHeaderAlwaysVisible(true);
 
             toolbar = new ChartToolbar(
@@ -234,7 +247,7 @@ public class ChartContainer extends Region {
                     spacer());
 
         } catch (Exception exception) {
-            log.warn("Failed to configure full toolbar, using fallback", exception);
+            log.warn("Failed to configure full toolbar with ChartToolbar: {}", exception.getMessage(), exception);
             toolbarContainer.getChildren().setAll(
                     timeframeLabel(),
                     configuredTimeframeSelector(),
@@ -263,6 +276,7 @@ public class ChartContainer extends Region {
         timeframeSelector.setMinWidth(90);
         timeframeSelector.getStyleClass().add(TIMEFRAME_SELECTOR_CLASS);
         timeframeSelector.setStyle(TIMEFRAME_SELECTOR_STYLE);
+        timeframeSelector.setTooltip(new Tooltip("Select timeframe for candles"));
 
         timeframeSelector.valueProperty().addListener((observable, oldValue, newValue) -> {
             if (!disposed && newValue != null && !Objects.equals(oldValue, newValue)) {
@@ -1050,13 +1064,14 @@ public class ChartContainer extends Region {
                 return "#2196F3"; // Blue for volatility bands (informational)
             }
 
-            // ATR colors - positive values, green for stable, yellow/red for high volatility
+            // ATR colors - positive values, green for stable, yellow/red for high
+            // volatility
             if (indicatorName.contains("ATR")) {
                 return "#4CAF50"; // Green - ATR is always positive, just shows volatility level
             }
 
             // Moving Average colors - neutral informational color
-            if (indicatorName.contains("SMA") || indicatorName.contains("EMA") || 
+            if (indicatorName.contains("SMA") || indicatorName.contains("EMA") ||
                     indicatorName.contains("MA") || indicatorName.contains("VWAP")) {
                 return "#2196F3"; // Blue - moving averages are trend/price reference lines
             }
@@ -1077,6 +1092,293 @@ public class ChartContainer extends Region {
         } catch (Exception exception) {
             log.debug("Failed to determine signal color for {}", indicator.getName(), exception);
             return "#9ca3af";
+        }
+    }
+
+    /*
+     * ============================================================================
+     * INDICATOR MANAGEMENT & DATA ACCESS METHODS
+     * ============================================================================
+     */
+
+    /**
+     * Add a technical indicator to the active chart
+     */
+    public void addIndicator(@NotNull ChartIndicator indicator) {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            candleStickChart.addIndicator(indicator);
+            log.info("Added indicator: {}", indicator.getName());
+
+            // If using enhanced display, update it with the new indicator
+            if (enhancedChartDisplay != null && indicator.isCalculated()) {
+                String formattedValue = formatIndicatorValue(indicator);
+                String signalColor = getIndicatorSignalColor(indicator);
+                enhancedChartDisplay.updateIndicator(indicator.getName(), formattedValue, signalColor);
+            }
+        } catch (Exception e) {
+            log.error("Error adding indicator: {}", indicator.getName(), e);
+        }
+    }
+
+    /**
+     * Add multiple indicators at once
+     */
+    public void addIndicators(@NotNull List<ChartIndicator> indicators) {
+        if (indicators.isEmpty()) {
+            return;
+        }
+
+        for (ChartIndicator indicator : indicators) {
+            addIndicator(indicator);
+        }
+    }
+
+    /**
+     * Remove an indicator from the chart
+     */
+    public void removeIndicator(@NotNull String indicatorName) {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            List<ChartIndicator> indicators = candleStickChart.getIndicators();
+            if (indicators != null) {
+                indicators.removeIf(ind -> ind.getName().equals(indicatorName));
+                log.info("Removed indicator: {}", indicatorName);
+            }
+        } catch (Exception e) {
+            log.error("Error removing indicator: {}", indicatorName, e);
+        }
+    }
+
+    /**
+     * Clear all indicators from the chart
+     */
+    public void clearIndicators() {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            candleStickChart.clearIndicators();
+            if (enhancedChartDisplay != null) {
+                enhancedChartDisplay.reset();
+            }
+            log.info("Cleared all indicators");
+        } catch (Exception e) {
+            log.error("Error clearing indicators", e);
+        }
+    }
+
+    /**
+     * Get all active indicators
+     */
+    public List<ChartIndicator> getIndicators() {
+        if (candleStickChart != null) {
+            return candleStickChart.getIndicators();
+        }
+        return List.of();
+    }
+
+    /**
+     * Initialize default indicators for technical analysis
+     */
+    public void initializeDefaultIndicators() {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            clearIndicators();
+
+            // Add standard technical analysis indicators
+            addIndicator(new SimpleMovingAverageIndicator(20));
+            addIndicator(new SimpleMovingAverageIndicator(50));
+            addIndicator(new SimpleMovingAverageIndicator(200));
+            addIndicator(new RSIIndicator(14));
+            addIndicator(new MACDIndicator());
+            addIndicator(new BollingerBandsIndicator(20, 2.0));
+
+            log.info("Default indicators initialized");
+        } catch (Exception e) {
+            log.error("Error initializing default indicators", e);
+        }
+    }
+
+    /**
+     * Initialize momentum indicators (RSI, Stochastic, MACD)
+     */
+    public void initializeMomentumIndicators() {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            addIndicator(new RSIIndicator(14));
+            addIndicator(new StochasticIndicator(14, 3, 3));
+            addIndicator(new MACDIndicator(12, 26, 9));
+            log.info("Momentum indicators initialized");
+        } catch (Exception e) {
+            log.error("Error initializing momentum indicators", e);
+        }
+    }
+
+    /**
+     * Initialize trend indicators (Moving Averages, ADX)
+     */
+    public void initializeTrendIndicators() {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            addIndicator(new ExponentialMovingAverageIndicator(12));
+            addIndicator(new ExponentialMovingAverageIndicator(26));
+            addIndicator(new SimpleMovingAverageIndicator(200));
+            addIndicator(new ADXIndicator(14));
+            log.info("Trend indicators initialized");
+        } catch (Exception e) {
+            log.error("Error initializing trend indicators", e);
+        }
+    }
+
+    /**
+     * Initialize volatility indicators (Bollinger Bands, ATR)
+     */
+    public void initializeVolatilityIndicators() {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            addIndicator(new BollingerBandsIndicator(20, 2.0));
+            addIndicator(new ATRIndicator(14));
+            addIndicator(new VolatilityIndicator(20));
+            log.info("Volatility indicators initialized");
+        } catch (Exception e) {
+            log.error("Error initializing volatility indicators", e);
+        }
+    }
+
+    /**
+     * Initialize volume indicators (OBV, Volume, VWAP)
+     */
+    public void initializeVolumeIndicators() {
+        if (disposed || candleStickChart == null) {
+            return;
+        }
+
+        try {
+            addIndicator(new VolumeIndicator());
+            addIndicator(new OBVIndicator());
+            addIndicator(new VWAPIndicator());
+            log.info("Volume indicators initialized");
+        } catch (Exception e) {
+            log.error("Error initializing volume indicators", e);
+        }
+    }
+
+    /**
+     * Get chart data access object
+     */
+    public ChartDataAccess getChartData() {
+        return new ChartDataAccess(candleStickChart, enhancedChartDisplay);
+    }
+
+    /**
+     * Inner class for comprehensive chart data access
+     */
+    @Getter
+    public static class ChartDataAccess {
+        private final CandleStickChart chart;
+        private final EnhancedChartDisplay display;
+
+        public ChartDataAccess(CandleStickChart chart, EnhancedChartDisplay display) {
+            this.chart = chart;
+            this.display = display;
+        }
+
+        /**
+         * Get all candle data
+         */
+        public List<CandleData> getAllCandles() {
+            return chart != null ? chart.getAllCandleData() : List.of();
+        }
+
+        /**
+         * Get all candles (limited to visible area on screen)
+         */
+        public List<CandleData> getVisibleCandles() {
+            return chart != null ? chart.getAllCandleData() : List.of();
+        }
+
+        /**
+         * Get latest candle
+         */
+        public CandleData getLatestCandle() {
+            List<CandleData> candles = getAllCandles();
+            return !candles.isEmpty() ? candles.getLast() : null;
+        }
+
+        /**
+         * Get price at specific index
+         */
+        public double getPriceAtIndex(int index) {
+            List<CandleData> candles = getAllCandles();
+            if (index >= 0 && index < candles.size()) {
+                return candles.get(index).closePrice();
+            }
+            return 0;
+        }
+
+        /**
+         * Get volume at specific index
+         */
+        public double getVolumeAtIndex(int index) {
+            List<CandleData> candles = getAllCandles();
+            if (index >= 0 && index < candles.size()) {
+                return candles.get(index).volume();
+            }
+            return 0;
+        }
+
+        /**
+         * Get indicator values
+         */
+        public Map<String, double[]> getIndicatorValues(String indicatorName) {
+            if (chart == null) {
+                return Map.of();
+            }
+
+            for (ChartIndicator indicator : chart.getIndicators()) {
+                if (indicator.getName().equals(indicatorName)) {
+                    return indicator.getValues();
+                }
+            }
+            return Map.of();
+        }
+
+        /**
+         * Get chart dimensions
+         */
+        public double getChartWidth() {
+            return chart != null ? chart.getWidth() : 0;
+        }
+
+        public double getChartHeight() {
+            return chart != null ? chart.getHeight() : 0;
+        }
+
+        /**
+         * Check if enhanced display is available
+         */
+        public boolean hasEnhancedDisplay() {
+            return display != null;
         }
     }
 }

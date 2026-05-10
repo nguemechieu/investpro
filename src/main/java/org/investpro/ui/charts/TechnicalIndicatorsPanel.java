@@ -1,21 +1,16 @@
 package org.investpro.ui.charts;
 
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,8 +35,10 @@ public class TechnicalIndicatorsPanel extends VBox {
     private ScrollPane scrollPane;
     private VBox indicatorsContainer;
     private final Map<String, IndicatorValueBox> indicatorBoxes = new LinkedHashMap<>();
+    private CandleStickChart candleStickChart;
 
-    public TechnicalIndicatorsPanel() {
+    public TechnicalIndicatorsPanel(@NotNull CandleStickChart candleStickChart) {
+        this.candleStickChart = candleStickChart;
         initializeUI();
     }
 

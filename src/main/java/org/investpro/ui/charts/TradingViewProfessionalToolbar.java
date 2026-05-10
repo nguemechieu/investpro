@@ -8,17 +8,15 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -35,6 +33,8 @@ import java.util.function.Consumer;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Getter
+@Setter
 @Slf4j
 public class TradingViewProfessionalToolbar extends VBox {
     private static final String BG_PRIMARY = "#101827";
@@ -72,12 +72,13 @@ public class TradingViewProfessionalToolbar extends VBox {
     private Runnable onZoomReset;
     private Runnable onZoomIn;
     private Runnable onZoomOut;
-
-    public TradingViewProfessionalToolbar() {
+private   CandleStickChart candleStickChart;
+    public TradingViewProfessionalToolbar(@NotNull CandleStickChart candleStickChart) {
         studiesDropdown = new ComboBox<>();
         drawingToolsDropdown = new ComboBox<>();
         timeframeSelector = new ComboBox<>();
         chartTypeGroup = new ToggleGroup();
+        this.candleStickChart=candleStickChart;
 
         candleTypeBtn = new ToggleButton("📊 Candle");
         barTypeBtn = new ToggleButton("📈 Bar");

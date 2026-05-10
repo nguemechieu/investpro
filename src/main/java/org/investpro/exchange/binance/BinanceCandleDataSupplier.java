@@ -83,7 +83,7 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
                 .GET()
                 .build();
 
-        return HttpClient.newHttpClient().sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return HttpClient.newBuilder().build().sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(HttpResponse::body)
                 .thenApply(this::parseCandleData)
                 .toCompletableFuture();

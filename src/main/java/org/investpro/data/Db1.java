@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyType;
+import org.investpro.models.currency.FiatCurrency;
 
 import org.investpro.models.trading.Order;
 
@@ -459,26 +460,28 @@ public class Db1 implements Db {
 
     public Currency getCurrency(String code) throws SQLException {
         createTables();
-        // Get currency from database
         Currency newCurrency;
 
         PreparedStatement statement = conn.prepareStatement("SELECT * FROM currencies WHERE code = ?");
         statement.setString(1, code);
         ResultSet check = statement.executeQuery();
+
         if (!check.next()) {
-            log.info("Currency not found with code: %s".formatted(code));
+            log.info("Currency not found with code: %s, determining type...", code);
 
             try {
+                // Determine currency type and fractional digits based on code
+                CurrencyType type = determineCurrencyType(code);
+                int fractionalDigits = determineFractionalDigits(code, type);
 
-                CryptoCurrency cur = new CryptoCurrency(code, code, code, 0, code, code);
+                newCurrency = createCurrencyByType(type, code, fractionalDigits);
+                save(newCurrency);
+                log.info("Created new currency: {} (type: {}, fractional_digits: {})", code, type, fractionalDigits);
 
-                save(cur);
-
-                return cur;
+                return newCurrency;
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
-
         } else {
             code = check.getString("code");
             String fullDisplayName = check.getString("full_display_name");
@@ -487,32 +490,86 @@ public class Db1 implements Db {
             String symbol = check.getString("symbol");
             String image = check.getString("image");
             String currencyType = check.getString("currency_type");
-            log.info("Currency found with code: %s ".formatted(code));
-            String format = String.format(
-                    "Currency with code: %s, full_display_name: %s,  short_display_name: %s, fractional_digits: %s, symbol: %s, image: %s, currency_type: %s",
-                    code,
-                    fullDisplayName,
-                    shortDisplayName,
-                    fractionalDigits,
-                    symbol,
-                    image,
-                    currencyType);
-            log.info(format);
-            CurrencyType type = CurrencyType.valueOf(currencyType);
-            log.info("Currency Type: %s".formatted(type));
-            newCurrency = new Currency(
-                    type,
-                    fullDisplayName,
-                    shortDisplayName,
-                    code,
-                    fractionalDigits,
-                    symbol,
-                    image) {
 
+            log.info("Currency found with code: %s", code);
+            log.info("Currency: code=%s, name=%s, type=%s, fractional_digits=%d",
+                    code, fullDisplayName, currencyType, fractionalDigits);
+
+            CurrencyType type = CurrencyType.valueOf(currencyType);
+            newCurrency = new Currency(type, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image) {
             };
-            log.info("New Currency: %s".formatted(newCurrency));
         }
         return newCurrency;
+    }
+
+    /**
+     * Determine currency type based on currency code
+     */
+    private CurrencyType determineCurrencyType(String code) {
+        if (code == null || code.isEmpty()) {
+            return CurrencyType.CRYPTO;
+        }
+
+        String upperCode = code.toUpperCase();
+
+        // FIAT currencies (forex)
+        if (isFiatCurrency(upperCode)) {
+            return CurrencyType.FIAT;
+        }
+
+        // Default to crypto for other codes (including stocks, since STOCK type doesn't
+        // exist)
+        return CurrencyType.CRYPTO;
+    }
+
+    /**
+     * Check if code is a FIAT currency
+     */
+    private boolean isFiatCurrency(String code) {
+        return switch (code) {
+            // Major currencies
+            case "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD" -> true;
+            // Other major fiat
+            case "SGD", "HKD", "CNY", "INR", "BRL", "MXN", "ZAR", "RUB" -> true;
+            // Additional fiat
+            case "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN" -> true;
+            // More fiat
+            case "TRY", "THB", "MYR", "PHP", "IDR", "KRW" -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * Determine fractional digits based on currency code and type
+     */
+    private int determineFractionalDigits(String code, CurrencyType type) {
+        if (code == null) {
+            return 0;
+        }
+
+        return switch (type) {
+            case FIAT -> {
+                // Most fiat currencies have 2 decimal places
+                // except JPY (0) and some crypto-fiat pairs
+                String upper = code.toUpperCase();
+                yield "JPY".equals(upper) ? 0 : 2;
+            }
+            case CRYPTO -> 8; // Crypto and stocks typically have 8 decimal places
+            case NULL -> 0; // Default to 0 for NULL type
+        };
+    }
+
+    /**
+     * Create appropriate currency object based on type
+     */
+    private Currency createCurrencyByType(CurrencyType type, String code, int fractionalDigits)
+            throws ClassNotFoundException, SQLException {
+        return switch (type) {
+            case FIAT -> new FiatCurrency(code, code, code, fractionalDigits, code, code);
+            case CRYPTO -> new CryptoCurrency(code, code, code, fractionalDigits, code, code);
+            // Default to CRYPTO for NULL type
+            case NULL -> new CryptoCurrency(code, code, code, fractionalDigits, code, code);
+        };
     }
 
     private void ensureCurrencyColumns() throws SQLException {

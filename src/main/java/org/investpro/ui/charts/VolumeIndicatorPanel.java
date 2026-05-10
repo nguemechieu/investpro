@@ -9,6 +9,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.data.CandleData;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -47,10 +48,20 @@ public class VolumeIndicatorPanel extends StackPane {
     private double chartWidth = 600;
     private int candleWidth = 6;
 
-    public VolumeIndicatorPanel() {
+    public VolumeIndicatorPanel(List<CandleData> candleDataList) {
         canvas = new Canvas();
         canvas.setStyle("-fx-background-color: " + BG_COLOR + ";");
         canvas.setHeight(DEFAULT_HEIGHT);
+
+        // Initialize with first candle's volume data if available
+        if (candleDataList != null && !candleDataList.isEmpty()) {
+            CandleData firstCandle = candleDataList.get(0);
+            double initialVolume = firstCandle.volume();
+            long initialTimestamp = firstCandle.openTime() * 1000L;
+            boolean isUpCandle = firstCandle.closePrice() >= firstCandle.openPrice();
+            volumeBars.add(new VolumeBar(initialVolume, isUpCandle, 0, initialTimestamp, "Initial Volume"));
+            maxVolume = Math.max(maxVolume, initialVolume);
+        }
 
         // Redraw on resize
         canvas.widthProperty().addListener((obs, oldVal, newVal) -> {
@@ -75,8 +86,8 @@ public class VolumeIndicatorPanel extends StackPane {
      * @param isUpCandle true for close > open, false for close <= open
      * @param index      Position in the chart
      */
-        @Builder
-        public record VolumeBar(double volume, boolean isUpCandle, int index, long timestamp, String label) {
+    @Builder
+    public record VolumeBar(double volume, boolean isUpCandle, int index, long timestamp, String label) {
     }
 
     /**

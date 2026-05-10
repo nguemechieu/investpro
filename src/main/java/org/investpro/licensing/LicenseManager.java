@@ -1,6 +1,9 @@
 package org.investpro.licensing;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.core.SystemCore;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -22,6 +25,9 @@ import java.util.prefs.Preferences;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Getter
+
+@Setter
 @Slf4j
 public final class LicenseManager {
     private static final String LICENSE_PREFS_KEY = "investpro.license";
@@ -30,6 +36,12 @@ public final class LicenseManager {
 
     private volatile License currentLicense;
     private final Object licenseLock = new Object();
+    private  SystemCore systemCore;
+
+    public LicenseManager(SystemCore systemCore) {
+
+        this .systemCore=systemCore;
+    }
 
     /**
      * Load or create a default trial license
@@ -41,6 +53,7 @@ public final class LicenseManager {
             if (loaded != null && loaded.isValid()) {
                 currentLicense = loaded;
                 log.info("Loaded valid license for: {}", loaded.getLicenseeName());
+               // systemCore.authorize_license();
                 return;
             }
 
@@ -144,7 +157,7 @@ public final class LicenseManager {
                     license.getIssuedDate().toEpochMilli(),
                     license.getExpirationDate() != null ? license.getExpirationDate().toEpochMilli() : 0);
 
-            byte[] signature = generateSignature(licenseData, "investpro-secret-key");
+            byte[] signature = generateSignature(licenseData);
             String encoded = Base64.getEncoder().encodeToString(signature);
             return license.getLicenseKey() + "|" + encoded;
         } catch (Exception e) {
@@ -270,9 +283,9 @@ public final class LicenseManager {
     /**
      * Generate cryptographic signature
      */
-    private byte[] generateSignature(String data, String secret) throws Exception {
+    private byte[] generateSignature(String data) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        digest.update(secret.getBytes(StandardCharsets.UTF_8));
+        digest.update("investpro-secret-key".getBytes(StandardCharsets.UTF_8));
         digest.update(data.getBytes(StandardCharsets.UTF_8));
         return digest.digest();
     }

@@ -138,7 +138,7 @@ public class StrategyDecisionService {
             }
 
             if (resolvedTradePair != null && resolvedTradePair.getTradingSession() != null
-                    && !resolvedTradePair.isTradableNow()) {
+                    && resolvedTradePair.isTradableNow()) {
                 String reason = "Trading session is not open: " + resolvedTradePair.getTradingSessionStatus();
                 log.debug("Rejecting strategy decision for {} {}: {}", symbol, timeframe, reason);
                 return StrategyDecisionResult.rejected(reason, warnings);

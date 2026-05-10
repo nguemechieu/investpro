@@ -66,10 +66,10 @@ public class EnhancedChartDisplay extends BorderPane {
         this.tradingService = tradingService;
 
         // Initialize components
-        this.chartHeader = new ChartHeaderTradingView();
-        this.indicatorsPanel = new TechnicalIndicatorsPanel();
-        this.volumePanel = new VolumeIndicatorPanel();
-        this.professionalToolbar = new TradingViewProfessionalToolbar();
+        this.chartHeader = new ChartHeaderTradingView(candleStickChart);
+        this.indicatorsPanel = new TechnicalIndicatorsPanel(candleStickChart);
+        this.volumePanel = new VolumeIndicatorPanel(candleStickChart.getAllCandleData());
+        this.professionalToolbar = new TradingViewProfessionalToolbar(candleStickChart);
         this.tradeOverlay = new TradeVisualizationOverlay();
 
         // Initialize layout containers

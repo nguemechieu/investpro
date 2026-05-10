@@ -374,7 +374,9 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
                 sb.append("  → %s".formatted(re)).append(rec).append("\n");
             }
         }
+        RiskReport report = generateRiskReport(context, RiskDecision.builder().build());
 
+        log.info(report.toString());
         return sb.toString();
     }
 

@@ -22,9 +22,7 @@ import org.investpro.ui.OnboardingView;
 import org.investpro.ui.TradingDesk;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.net.URL;
-import java.text.ParseException;
 import java.util.Objects;
 
 /**

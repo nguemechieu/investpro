@@ -188,8 +188,7 @@ public class SystemCore {
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
         this.labService = new StrategyLabService();
-        labService.testAllStrategies(exchange.getSelectedTradePair().toString('/'), exchange.getSupportedTimeframes());
-        // Initialize the system event recorder and monitor service after all components
+         // Initialize the system event recorder and monitor service after all components
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();
         this.systemMonitorService = new SystemMonitorService(this);
@@ -1318,7 +1317,7 @@ public class SystemCore {
                 .orElse(null);
     }
 
-    private String safeSignalReason(StrategySignal signal) {
+    private @NotNull String safeSignalReason(StrategySignal signal) {
         if (signal == null) {
             return "";
         }

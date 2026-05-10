@@ -26,6 +26,7 @@ import lombok.Setter;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.consumers.DesktopExchangeStreamBridge;
 import org.investpro.exchange.credentials.ExchangeCredentials;
@@ -39,6 +40,20 @@ import org.investpro.indicators.MACDIndicator;
 import org.investpro.indicators.RSIIndicator;
 import org.investpro.indicators.SimpleMovingAverageIndicator;
 import org.investpro.indicators.VWAPIndicator;
+import org.investpro.indicators.StochasticIndicator;
+import org.investpro.indicators.CCIIndicator;
+import org.investpro.indicators.ATRIndicator;
+import org.investpro.indicators.VolatilityIndicator;
+import org.investpro.indicators.OBVIndicator;
+import org.investpro.indicators.VolumeIndicator;
+import org.investpro.indicators.ADXIndicator;
+import org.investpro.indicators.IchimokuIndicator;
+import org.investpro.indicators.ParabolicSARIndicator;
+import org.investpro.indicators.FibonacciRetracementIndicator;
+import org.investpro.indicators.ZigzagIndicator;
+import org.investpro.indicators.FractalIndicator;
+import org.investpro.licensing.LicenseManager;
+import org.investpro.ui.theme.ThemeManager;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
 import org.investpro.data.Account;
@@ -69,6 +84,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
 import java.awt.Desktop;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -288,6 +304,11 @@ public class TradingDesk extends BorderPane {
         }
         initialized = true;
 
+        // Load and apply saved theme configuration at startup
+        ThemeManager themeManager = ThemeManager.getInstance();
+        themeManager.loadConfiguration();
+        themeManager.applyTheme(this);
+
         setPrefSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
         setMinSize(1200, 690);
         setFocusTraversable(true);
@@ -402,17 +423,19 @@ public class TradingDesk extends BorderPane {
         Menu fileMenu = new Menu(t("menu.file"));
 
         fileMenu.getItems().setAll(List.of(
-                // menuItem(t("Open Strategy"),new KeyCodeCombination(KeyCode.O,
-                // KeyCombination.CONTROL_O)),
                 menuItem(t("menu.newChart"), new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN),
                         this::openSelectedSymbolChart),
+                new SeparatorMenuItem(),
                 menuItem(t("menu.refreshSymbols"), new KeyCodeCombination(KeyCode.F5),
                         this::loadSymbolsForSelectedExchange),
+                menuItem(t("menu.refreshAccount"), new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
+                        this::refreshAccountWorkspace),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.saveChart"), new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN),
                         this::saveActiveChartSnapshot),
-                menuItem(t("menu.exportChart"), new KeyCodeCombination(KeyCode.E, KeyCombination.CONTROL_DOWN),
-                        this::saveActiveChartSnapshot),
+                new SeparatorMenuItem(),
+                menuItem(t("menu.applicationSettings"), null, this::showSettingsDialog),
+                menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.exit"), new KeyCodeCombination(KeyCode.Q, KeyCombination.CONTROL_DOWN), () -> {
                     shutdown();
@@ -443,16 +466,19 @@ public class TradingDesk extends BorderPane {
         Menu viewMenu = new Menu(t("menu.view"));
         viewMenu.getItems().setAll(List.of(
                 menuItem(t("menu.showCharts"), null, chartTabPane::requestFocus),
-                menuItem(t("menu.toggleMarketWatch"), null, this::toggleMarketWatchVisibility),
-                menuItem(t("menu.toggleOrderBook"), null, this::toggleOrderBookVisibility),
-                menuItem(t("menu.toggleTerminal"), null, this::toggleConsoleVisibility),
+                new SeparatorMenuItem(),
+                menuItem(t("menu.toggleMarketWatch"), new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN),
+                        this::toggleMarketWatchVisibility),
+                menuItem(t("menu.toggleOrderBook"), new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN),
+                        this::toggleOrderBookVisibility),
+                menuItem(t("menu.toggleTerminal"),
+                        new KeyCodeCombination(KeyCode.BACK_QUOTE, KeyCombination.CONTROL_DOWN),
+                        this::toggleConsoleVisibility),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.dataWindow"), null, this::openDataWindow),
                 menuItem(t("menu.marketInfoPanel"), null, this::openMarketInfoPanel),
                 menuItem(t("menu.symbolAgentWatch"), null, this::openSymbolAgentMarketWatch),
                 menuItem(t("menu.navigationPanel"), null, this::openNavigationPanel),
-                new SeparatorMenuItem(),
-                menuItem(t("menu.detachTerminal"), null, this::detachConsoleWindow),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.zoomIn"), new KeyCodeCombination(KeyCode.PLUS, KeyCombination.CONTROL_DOWN),
                         () -> withActiveChart(chart -> chart.changeZoom(ZoomDirection.IN))),
@@ -468,14 +494,14 @@ public class TradingDesk extends BorderPane {
 
         Menu toolsMenu = new Menu(t("menu.tools"));
         toolsMenu.getItems().setAll(List.of(
-                menuItem(t("menu.order"), null, this::openOrderPanel),
+                menuItem(t("menu.order"), new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN),
+                        this::openOrderPanel),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.connectExchange"), null, this::connectSelectedExchange),
-                menuItem(t("menu.toggleBotTrading"), null, this::toggleBotTrading),
+                menuItem(t("menu.toggleBotTrading"), new KeyCodeCombination(KeyCode.T, KeyCombination.CONTROL_DOWN),
+                        this::toggleBotTrading),
                 menuItem(t("menu.systemMonitor"), null, this::openSystemMonitorWindow),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.refreshMarketData"), null, this::loadSymbolsForSelectedExchange),
-                menuItem(t("menu.refreshAccount"), null, this::refreshAccountWorkspace),
                 menuItem(t("menu.refreshLocalPositions"), null, this::refreshPositions),
                 menuItem(t("menu.cancelAllOrders"), null, this::cancelAllOrders)));
 
@@ -508,13 +534,11 @@ public class TradingDesk extends BorderPane {
 
         Menu settingsMenu = new Menu(t("menu.settings"));
         settingsMenu.getItems().setAll(List.of(
-                menuItem(t("menu.applicationSettings"), null, this::showSettingsDialog),
                 menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
+                menuItem(t("menu.resetPassword"), null, this::openPasswordReset),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
-
-                new SeparatorMenuItem(),
-                menuItem(t("menu.resetPassword"), null, this::openPasswordReset)));
+                menuItem("Theme Settings", null, this::showThemeSettingsDialog),
+                menuItem("Visibility & Layout", null, this::showVisibilitySettingsDialog)));
 
         Menu windowMenu = new Menu(t("menu.window"));
         windowMenu.getItems().setAll(List.of(
@@ -522,6 +546,10 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.detachConsole"), null, this::detachConsoleWindow)));
 
         Menu languageMenu = createLanguageMenu();
+
+        Menu licenseMenu = new Menu("License");
+        licenseMenu.getItems().setAll(List.of(
+                menuItem("License Management", null, this::openLicenseManagement)));
 
         Menu helpMenu = new Menu(t("menu.help"));
         helpMenu.getItems().addAll(
@@ -532,8 +560,18 @@ public class TradingDesk extends BorderPane {
                         "InvestPro ----------------------------------------------------------- Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
 
         return new MenuBar(fileMenu, editMenu, insertMenu, viewMenu, chartsMenu, toolsMenu, strategyMenu, researchMenu,
-                settingsMenu, languageMenu, windowMenu,
-                helpMenu);
+                settingsMenu, licenseMenu, languageMenu, windowMenu, helpMenu);
+    }
+
+    private void openLicenseManagement() {
+        try {
+            LicensePanel licensePanel = new LicensePanel(new LicenseManager(systemCore));
+            licensePanel.updateDisplay();
+            createIndependentWindow("License Management", licensePanel, 500, 400);
+        } catch (Exception ex) {
+            log.error("Error opening license management", ex);
+            showWarning("License Management", "Unable to open license management: " + ex.getMessage());
+        }
     }
 
     private Menu createLanguageMenu() {
@@ -1519,16 +1557,16 @@ public class TradingDesk extends BorderPane {
         saveAppState();
     }
 
-    private DraggableTab createDetachableTerminalTab(TabName tabName, Node content) {
+    private @NotNull DraggableTab createDetachableTerminalTab(TabName tabName, Node content) {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
         tab.setClosable(true);
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
         return tab;
     }
 
-    private Tab createFixedTab(TabName tabName, Node content) {
+    private @NotNull Tab createFixedTab(TabName tabName, Node content) {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
-        tab.setClosable(false);
+        tab.setClosable(true);
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
         return tab;
     }
@@ -1816,11 +1854,14 @@ public class TradingDesk extends BorderPane {
         table.setPlaceholder(new Label("No symbols loaded"));
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         table.getColumns().addAll(
+                tableColumn("Session", pair -> pair == null ? "" : getTradingSessionStatus(pair), 80),
+                tableColumn("%Last Price", pair -> pair == null ? "" : String.valueOf(pair.getLastPrice()), 80),
                 tableColumn("Symbol", pair -> pair == null ? "" : pair.toString('/'), 100),
-                tableColumn("Bid", pair -> pair == null ? "" : marketPrice(pair.getBid()), 80),
-                tableColumn("Ask", pair -> pair == null ? "" : marketPrice(pair.getAsk()), 80),
                 tableColumn("Spread %", pair -> pair == null ? "" : formatSpreadPercent(pair), 75),
-                tableColumn("Session", pair -> pair == null ? "" : getTradingSessionStatus(pair), 80));
+                tableColumn("%Change", pair -> pair == null ? "" : String.valueOf(pair.getChangePercent()), 80),
+
+                tableColumn("volume", pair -> pair == null ? "" : marketPrice(pair.getVolume()), 80),
+                tableColumn("24hrHigh", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80));
 
         table.setRowFactory(view -> {
             TableRow<TradePair> row = new TableRow<>() {
@@ -1856,7 +1897,7 @@ public class TradingDesk extends BorderPane {
         return pair.getLast();
     }
 
-    private String getTradingSessionStatus(TradePair pair) {
+    private @NotNull String getTradingSessionStatus(TradePair pair) {
         return pair == null ? "UNKNOWN" : pair.getTradingSessionStatus().name();
     }
 
@@ -2475,10 +2516,9 @@ public class TradingDesk extends BorderPane {
         refreshAccountWorkspace();
 
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            loadOrderBook(selected);
-            startDesktopStream(selected);
-        }
+        selected.setTimeFrame(Timeframe.fromCode(timeframeSelector.getValue()));
+        loadOrderBook(selected);
+        startDesktopStream(selected);
 
         updateConnectionStatus();
         updateExchangeVenueLabel();
@@ -3486,12 +3526,35 @@ public class TradingDesk extends BorderPane {
         }
 
         List<String> choices = List.of(
+                // Moving Averages
                 "SMA 20",
+                "SMA 50",
+                "SMA 200",
                 "EMA 12",
+                "EMA 26",
+                // Momentum Indicators
                 "RSI 14",
+                "Stochastic",
+                "CCI 20",
                 "MACD",
+                // Volatility Indicators
                 "Bollinger Bands",
+                "ATR 14",
+                "Volatility",
+                // Volume Indicators
                 "VWAP",
+                "OBV",
+                "Volume",
+                // Trend Indicators
+                "ADX 14",
+                "Ichimoku",
+                "Parabolic SAR",
+                // Retracement Levels
+                "Fibonacci Retracement",
+                "Zigzag",
+                // Pattern Recognition
+                "Fractal",
+                // Utility
                 "Clear Indicators");
         ChoiceDialog<String> dialog = new ChoiceDialog<>("SMA 20", choices);
         dialog.setTitle(t("dialog.indicators.title"));
@@ -3518,12 +3581,44 @@ public class TradingDesk extends BorderPane {
 
     private ChartIndicator createChartIndicator(String choice) {
         return switch (safe(choice)) {
+            // Moving Averages
             case "SMA 20" -> new SimpleMovingAverageIndicator(20);
+            case "SMA 50" -> new SimpleMovingAverageIndicator(50);
+            case "SMA 200" -> new SimpleMovingAverageIndicator(200);
             case "EMA 12" -> new ExponentialMovingAverageIndicator(12);
+            case "EMA 26" -> new ExponentialMovingAverageIndicator(26);
+            
+            // Momentum Indicators
             case "RSI 14" -> new RSIIndicator(14);
+            case "Stochastic" -> new StochasticIndicator();
+            case "CCI 20" -> new CCIIndicator(20);
             case "MACD" -> new MACDIndicator();
+            
+            // Volatility Indicators
             case "Bollinger Bands" -> new BollingerBandsIndicator();
+            case "ATR 14" -> new ATRIndicator(14);
+            case "Volatility" -> new VolatilityIndicator();
+            
+            // Volume Indicators
             case "VWAP" -> new VWAPIndicator();
+            case "OBV" -> new OBVIndicator();
+            case "Volume" -> new VolumeIndicator();
+            
+            // Trend Indicators
+            case "ADX 14" -> new ADXIndicator(14);
+            case "Ichimoku" -> new IchimokuIndicator(9, 26, 52);  // Standard periods: conversion 9, base 26, span 52
+            case "Parabolic SAR" -> new ParabolicSARIndicator(0.02, 0.2);  // Standard AF: initial 0.02, max 0.2
+            
+            // Retracement Levels
+            case "Fibonacci Retracement" -> new FibonacciRetracementIndicator(20);  // 20-period lookback
+            case "Zigzag" -> new ZigzagIndicator(5.0);  // 5% threshold
+            
+            // Pattern Recognition
+            case "Fractal" -> new FractalIndicator(5);  // 5-bar fractal pattern
+            
+            // Utility
+            case "Clear Indicators" -> null;
+            
             default -> null;
         };
     }
@@ -4273,6 +4368,233 @@ public class TradingDesk extends BorderPane {
 
     private void openPasswordReset() {
         new PasswordReset();
+    }
+
+    /**
+     * Display theme settings dialog for dark/light mode and customization
+     */
+    private void showThemeSettingsDialog() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Theme Settings");
+        dialog.setHeaderText("Customize application appearance and theme");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        ThemeManager themeManager = ThemeManager.getInstance();
+        ThemeManager.ThemeConfig config = themeManager.getConfig();
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(20));
+
+        // Theme selection
+        ComboBox<ThemeManager.Theme> themeCombo = new ComboBox<>();
+        themeCombo.getItems().addAll(themeManager.getAvailableThemes());
+        themeCombo.setValue(config.getTheme());
+        themeCombo.setPrefWidth(200);
+
+        // Opacity slider (transparency control)
+        Label opacityLabel = new Label(String.format("Opacity: %.0f%%", config.getOpacity() * 100));
+        Slider opacitySlider = new Slider(0.3, 1.0, config.getOpacity());
+        opacitySlider.setPrefWidth(200);
+        opacitySlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            opacityLabel.setText(String.format("Opacity: %.0f%%", newVal.doubleValue() * 100));
+        });
+
+        // High contrast checkbox
+        CheckBox highContrastCheckBox = new CheckBox("High Contrast Mode");
+        highContrastCheckBox.setSelected(config.isUseHighContrast());
+
+        // Compact layout checkbox
+        CheckBox compactLayoutCheckBox = new CheckBox("Compact Layout");
+        compactLayoutCheckBox.setSelected(config.isUseCompactLayout());
+
+        // Accent color picker
+        ColorPicker accentColorPicker = new ColorPicker();
+        try {
+            accentColorPicker.setValue(Color.web(config.getAccentColor()));
+        } catch (Exception e) {
+            accentColorPicker.setValue(Color.web("#1e90ff"));
+        }
+
+        // Add components to grid
+        grid.addRow(0, new Label("Theme:"), themeCombo);
+        grid.addRow(1, opacityLabel, opacitySlider);
+        grid.addRow(2, new Label("Accent Color:"), accentColorPicker);
+        grid.addRow(3, highContrastCheckBox);
+        grid.addRow(4, compactLayoutCheckBox);
+
+        // Add info section
+        VBox infoBox = new VBox(10);
+        infoBox.setStyle("-fx-border-color: #d1d5db; -fx-border-width: 1; -fx-padding: 10;");
+        Label infoLabel = new Label(
+                "• Dark Mode: Reduces eye strain in low-light environments\n" +
+                        "• Light Mode: Better readability in bright environments\n" +
+                        "• Opacity: Control window transparency (0.3 - 1.0)\n" +
+                        "• High Contrast: Enhance visibility with bold fonts\n" +
+                        "• Accent Color: Customize primary color scheme");
+        infoLabel.setWrapText(true);
+        infoBox.getChildren().add(infoLabel);
+
+        VBox content = new VBox(15, grid, infoBox);
+        content.setPadding(new Insets(10));
+        dialog.getDialogPane().setContent(new ScrollPane(content));
+
+        // Handle OK button
+        Optional<Void> result = dialog.showAndWait();
+        if (result.isPresent() || dialog.getResult() != null) {
+            try {
+                config.setTheme(themeCombo.getValue());
+                config.setOpacity(opacitySlider.getValue());
+                config.setHighContrast(highContrastCheckBox.isSelected());
+                config.setCompactLayout(compactLayoutCheckBox.isSelected());
+                config.setAccentColor(accentColorPicker.getValue().toString().replace("0x", "#").toUpperCase());
+
+                // Apply theme to main window if possible
+                themeManager.saveConfiguration();
+                journal("Theme settings applied and saved.");
+            } catch (Exception ex) {
+                log.error("Error applying theme settings", ex);
+            }
+        }
+    }
+
+    /**
+     * Display visibility and layout settings dialog
+     */
+    private void showVisibilitySettingsDialog() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Visibility & Layout Settings");
+        dialog.setHeaderText("Configure panel visibility and layout preferences");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(20));
+
+        // Panel visibility toggles - read current preferences
+        CheckBox showMarketWatchCheckBox = new CheckBox("Show Market Watch Panel");
+        showMarketWatchCheckBox.setSelected(preferences.getBoolean("visibility_market_watch", true));
+
+        CheckBox showOrderBookCheckBox = new CheckBox("Show Order Book Panel");
+        showOrderBookCheckBox.setSelected(preferences.getBoolean("visibility_order_book", true));
+
+        CheckBox showTerminalCheckBox = new CheckBox("Show Terminal Panel");
+        showTerminalCheckBox.setSelected(preferences.getBoolean("visibility_terminal", true));
+
+        CheckBox showChartsCheckBox = new CheckBox("Show Charts Tab");
+        showChartsCheckBox.setSelected(preferences.getBoolean("visibility_charts", true));
+
+        CheckBox showPositionsCheckBox = new CheckBox("Show Positions Panel");
+        showPositionsCheckBox.setSelected(preferences.getBoolean("visibility_positions", true));
+
+        // Layout preferences
+        ComboBox<String> layoutCombo = new ComboBox<>();
+        layoutCombo.getItems().addAll("Compact", "Standard", "Wide");
+        String savedLayout = preferences.get("layout_preference", "Standard");
+        layoutCombo.setValue(savedLayout);
+        layoutCombo.setPrefWidth(150);
+
+        // Font size slider
+        int savedFontSize = preferences.getInt("font_size", 12);
+        Label fontSizeLabel = new Label("Font Size: " + savedFontSize + "px");
+        Slider fontSizeSlider = new Slider(10, 16, savedFontSize);
+        fontSizeSlider.setPrefWidth(200);
+        fontSizeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            fontSizeLabel.setText(String.format("Font Size: %.0fpx", newVal.doubleValue()));
+        });
+
+        // Add components to grid
+        grid.addRow(0, new Label("Panel Visibility:"));
+        grid.addRow(1, showMarketWatchCheckBox);
+        grid.addRow(2, showOrderBookCheckBox);
+        grid.addRow(3, showTerminalCheckBox);
+        grid.addRow(4, showChartsCheckBox);
+        grid.addRow(5, showPositionsCheckBox);
+
+        grid.addRow(7, new Label("Layout Preference:"), layoutCombo);
+        grid.addRow(8, fontSizeLabel);
+        grid.addRow(9, new Label("Font Size:"), fontSizeSlider);
+
+        VBox content = new VBox(10, grid);
+        content.setPadding(new Insets(10));
+        dialog.getDialogPane().setContent(new ScrollPane(content));
+
+        Optional<Void> result = dialog.showAndWait();
+        if (result.isPresent() || dialog.getResult() != null) {
+            // Save visibility preferences
+            preferences.putBoolean("visibility_market_watch", showMarketWatchCheckBox.isSelected());
+            preferences.putBoolean("visibility_order_book", showOrderBookCheckBox.isSelected());
+            preferences.putBoolean("visibility_terminal", showTerminalCheckBox.isSelected());
+            preferences.putBoolean("visibility_charts", showChartsCheckBox.isSelected());
+            preferences.putBoolean("visibility_positions", showPositionsCheckBox.isSelected());
+
+            // Save layout preferences
+            preferences.put("layout_preference", layoutCombo.getValue());
+            preferences.putInt("font_size", (int) fontSizeSlider.getValue());
+
+            // Apply panel visibility changes
+            applyVisibilitySettings(showMarketWatchCheckBox.isSelected(), showOrderBookCheckBox.isSelected(),
+                    showTerminalCheckBox.isSelected(), showChartsCheckBox.isSelected(),
+                    showPositionsCheckBox.isSelected());
+
+            // Apply font size
+            applyFontSize((int) fontSizeSlider.getValue());
+
+            journal("✓ Visibility and layout settings applied and saved.");
+        }
+    }
+
+    /**
+     * Apply visibility settings to panels
+     */
+    private void applyVisibilitySettings(boolean showMarketWatch, boolean showOrderBook, boolean showTerminal,
+            boolean showCharts, boolean showPositions) {
+        // Market Watch visibility
+        if (marketWatchWrapper != null) {
+            marketWatchWrapper.setVisible(showMarketWatch);
+            marketWatchWrapper.setManaged(showMarketWatch);
+        }
+        if (marketWatchTable != null) {
+            marketWatchTable.setVisible(showMarketWatch);
+            marketWatchTable.setManaged(showMarketWatch);
+        }
+
+        // Order Book visibility
+        if (orderBookWrapper != null) {
+            orderBookWrapper.setVisible(showOrderBook);
+            orderBookWrapper.setManaged(showOrderBook);
+        }
+        if (orderBookBidsTable != null) {
+            orderBookBidsTable.setVisible(showOrderBook);
+            orderBookBidsTable.setManaged(showOrderBook);
+        }
+        if (orderBookAsksTable != null) {
+            orderBookAsksTable.setVisible(showOrderBook);
+            orderBookAsksTable.setManaged(showOrderBook);
+        }
+
+        // Terminal visibility
+        if (terminalTabPane != null) {
+            terminalTabPane.setVisible(showTerminal);
+            terminalTabPane.setManaged(showTerminal);
+        }
+
+        // Charts tab visibility
+        if (chartTabPane != null) {
+            chartTabPane.setVisible(showCharts);
+            chartTabPane.setManaged(showCharts);
+        }
+    }
+
+    /**
+     * Apply font size to all text elements
+     */
+    private void applyFontSize(int fontSize) {
+        String fontStyle = "-fx-font-size: " + fontSize + "px;";
+        this.setStyle(this.getStyle() + fontStyle);
+        journal("Font size changed to " + fontSize + "px");
     }
 
     private void showExchangeCredentialDialog(String selectedExchange) {

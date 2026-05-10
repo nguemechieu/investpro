@@ -7,6 +7,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import lombok.Getter;
+import org.investpro.data.CandleData;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * TradingView-like professional chart header displaying key metrics.
@@ -34,11 +41,25 @@ public class ChartHeaderTradingView extends VBox {
     private final Label closeLabel = new Label();
     private final Label volumeLabel = new Label();
 
-    public ChartHeaderTradingView() {
+    public ChartHeaderTradingView(@NotNull CandleStickChart candleStickChart) {
+
+        this.candleStickChart = candleStickChart;
         initializeUI();
     }
 
+    List<CandleData> candleDataList= Collections.synchronizedList(new ArrayList<>());
+private final CandleStickChart candleStickChart;
     private void initializeUI() {
+        CompletableFuture.runAsync(()->{
+            candleDataList.addAll(candleStickChart.getAllCandleData());
+            for (CandleData candleData : candleDataList) {
+                updateWithCandle(candleStickChart.getTradePair().toString('/'),candleStickChart.getTradePair().getLastPrice()
+                        ,candleStickChart.getTradePair().getChange(),candleStickChart.getTradePair().getChangePercent(),
+                        candleData.openPrice(),candleData.highPrice(),candleData.lowPrice(),candleData.closePrice(),candleData.volume(),
+                        candleStickChart.getTradePair().getTimeFrame().getCode());
+
+
+            }});
         setPrefHeight(70);
         setStyle("-fx-background-color: " + SECONDARY_BG + "; "
                 + "-fx-border-color: #263246; "
@@ -53,9 +74,10 @@ public class ChartHeaderTradingView extends VBox {
         // Bottom row: OHLCV values
         HBox bottomRow = createBottomRow();
         getChildren().add(bottomRow);
+
     }
 
-    private HBox createTopRow() {
+    private @NotNull HBox createTopRow() {
         HBox row = new HBox(16);
         row.setAlignment(Pos.CENTER_LEFT);
 

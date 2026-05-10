@@ -1,6 +1,7 @@
 package org.investpro.strategy;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
@@ -23,6 +24,8 @@ import org.jetbrains.annotations.NotNull;
  * }
  * </pre>
  */
+@Getter
+@Setter
 @Slf4j
 public final class StrategyBootstrapper {
 
@@ -30,14 +33,14 @@ public final class StrategyBootstrapper {
      * -- GETTER --
      * Check if strategies have been successfully initialized.
      */
-    @Getter
+
     private static volatile boolean initialized = false;
     private static volatile boolean initializationAttempted = false;
     /**
      * -- GETTER --
      * Get the error that occurred during initialization, if any.
      */
-    @Getter
+
     private static volatile Exception initializationError = null;
 
     private StrategyBootstrapper() {
@@ -46,7 +49,7 @@ public final class StrategyBootstrapper {
 
     /**
      * Initialize strategies once during application startup.
-     *
+     * <p>
      * Thread-safe: only executes once. Subsequent calls are no-ops.
      */
     public static synchronized void initialize() {

@@ -98,7 +98,6 @@ public class TelegramNotifier {
         return chatId != null && !chatId.isBlank();
     }
 
-
     public void setChatId(String chatIdOrChannelId) {
         this.chatId = normalizeChatId(chatIdOrChannelId);
     }
@@ -687,17 +686,21 @@ public class TelegramNotifier {
             return;
         }
 
+        // Don't call detectChatIds() here - it's already called once during
+        // initialization in detectAndUseLatestChatId()
+        // Multiple getUpdates calls cause HTTP 409 conflicts in Telegram Bot API
+        if (chatId == null || chatId.isBlank()) {
+            log.debug("No target chat ID set. Skipping message polling until chat ID is detected.");
+            return;
+        }
+
         try {
-            Set<String> chatIds = detectChatIds();
+            Optional<UserMessage> message = getLatestUserMessage(chatId);
 
-            for (String cid : chatIds) {
-                Optional<UserMessage> message = getLatestUserMessage(cid);
-
-                message.ifPresent(msg -> {
-                    UserContext context = userContexts.computeIfAbsent(cid, k -> new UserContext(cid));
-                    processUserMessage(context, msg);
-                });
-            }
+            message.ifPresent(msg -> {
+                UserContext context = userContexts.computeIfAbsent(chatId, k -> new UserContext(chatId));
+                processUserMessage(context, msg);
+            });
         } catch (Exception e) {
             log.warn("Error processing user messages", e);
         }

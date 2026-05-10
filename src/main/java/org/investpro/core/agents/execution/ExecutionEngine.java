@@ -517,7 +517,7 @@ public class ExecutionEngine {
             return PositionExecutionResult.failed("Symbol is missing");
         }
 
-        if (symbol.getTradingSession() != null && !symbol.isTradableNow()) {
+        if (symbol.getTradingSession() != null && symbol.isTradableNow()) {
             return PositionExecutionResult.failed(
                     "Trading session is not open: " + symbol.getTradingSessionStatus()
             );
