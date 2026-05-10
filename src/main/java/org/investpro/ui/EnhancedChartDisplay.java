@@ -208,18 +208,18 @@ public class EnhancedChartDisplay extends BorderPane {
             return;
         }
 
-        double change = candle.close() - candle.open();
-        double changePercent = (change / candle.open()) * 100;
+        double change = candle.closePrice() - candle.openPrice();
+        double changePercent = (change / candle.openPrice()) * 100;
 
         chartHeader.updateWithCandle(
                 tradePair.toString(),
-                candle.close(),
+                candle.closePrice(),
                 change,
                 changePercent,
-                candle.open(),
-                candle.high(),
-                candle.low(),
-                candle.close(),
+                candle.openPrice(),
+                candle.highPrice(),
+                candle.lowPrice(),
+                candle.closePrice(),
                 candle.volume(),
                 professionalToolbar.getSelectedTimeframe());
     }

@@ -49,7 +49,7 @@ public class StrategyBacktestTrade {
     private final double entryPrice;
 
     /**
-     * Exit price.
+     * Exit price (set when trade is closed).
      */
     private final double exitPrice;
 
@@ -59,12 +59,12 @@ public class StrategyBacktestTrade {
     private final double quantity;
 
     /**
-     * Profit/loss in absolute units.
+     * Profit/loss in absolute units (set when trade is closed).
      */
     private final double profitLoss;
 
     /**
-     * Profit/loss as percentage.
+     * Profit/loss as percentage (set when trade is closed).
      */
     private final double profitLossPercent;
 
@@ -93,13 +93,13 @@ public class StrategyBacktestTrade {
     private final Instant entryTime;
 
     /**
-     * When this trade was exited.
+     * When this trade was exited (null until trade is closed).
      */
-    @NotNull
+    @Nullable
     private final Instant exitTime;
 
     /**
-     * Number of candles held.
+     * Number of candles held (set when trade is closed).
      */
     private final int barsHeld;
 

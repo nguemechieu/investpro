@@ -51,20 +51,12 @@ public class TradeVisualizationOverlay {
 
     /**
      * Trade marker (entry/exit point)
+     *
+     * @param type LONG_ENTRY, SHORT_ENTRY, EXIT
      */
-    @Getter
-    @Builder
-    @ToString
-    @AllArgsConstructor
-    public static class TradeMarker {
-        @NotNull
-        private final TradeType type; // LONG_ENTRY, SHORT_ENTRY, EXIT
-        private final double price;
-        private final long timestamp;
-        private final String label;
-        private final double quantity;
-        private final Double takeProfit;
-        private final Double stopLoss;
+        @Builder
+        public record TradeMarker(@NotNull TradeType type, double price, long timestamp, String label, double quantity,
+                                  Double takeProfit, Double stopLoss) {
     }
 
     /**

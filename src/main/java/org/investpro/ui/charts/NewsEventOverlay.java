@@ -6,6 +6,8 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
@@ -18,6 +20,8 @@ import java.util.List;
  * Displays markers, lines, and labels for economic events to help traders
  * correlate news with price movements.
  */
+@Getter
+@Setter
 @Slf4j
 public class NewsEventOverlay extends Canvas {
     private final NewsDataProvider newsDataProvider;

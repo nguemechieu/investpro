@@ -597,7 +597,7 @@ public class CandleStickChart extends Region {
                                     throwable == null ? "unknown" : throwable.getMessage(),
                                     throwable));
 
-                    websocketClient.streamLiveTrades(tradePair,exchangeS);
+                    websocketClient.streamLiveTrades(tradePair, exchangeS);
                     streamingStarted = true;
 
                     log.info("Live trade WebSocket stream started for {}", tradePair);
