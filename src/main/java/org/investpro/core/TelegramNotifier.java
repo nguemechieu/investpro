@@ -98,10 +98,6 @@ public class TelegramNotifier {
         return chatId != null && !chatId.isBlank();
     }
 
-    public void setChatId(String chatIdOrChannelId) {
-        this.chatId = normalizeChatId(chatIdOrChannelId);
-    }
-
     /**
      * Detect the latest chat/channel ID from getUpdates and use it as target.
      *
@@ -127,14 +123,9 @@ public class TelegramNotifier {
      * Detect all chat IDs visible to this bot from getUpdates.
      */
     public Set<String> detectChatIds() {
-        Set<String> chatIds = new LinkedHashSet<>();
-
-        if (!isEnabled()) {
-            log.warn("Telegram bot token is empty. Cannot detect chat IDs.");
-            return chatIds;
-        }
 
         String url = apiUrl("getUpdates");
+
 
         if (lastUpdateId >= 0) {
             url += "?offset=%d".formatted(lastUpdateId + 1);
@@ -145,6 +136,13 @@ public class TelegramNotifier {
                 .timeout(Duration.ofSeconds(30))
                 .GET()
                 .build();
+
+        Set<String> chatIds = new LinkedHashSet<>();
+
+        if (!isEnabled()) {
+            log.warn("Telegram bot token is empty. Cannot detect chat IDs.");
+            return chatIds;
+        }
 
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -754,7 +752,7 @@ public class TelegramNotifier {
         log.info("Processing message from user {} ({}): {}", message.userId, message.userName, message.text);
 
         // Show typing indicator while processing
-        sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
+        boolean typingIndicatorSent = sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
 
         String response;
 
@@ -825,7 +823,7 @@ public class TelegramNotifier {
     /**
      * Handle order comment from user - /comment orderId some comment text.
      */
-    private String handleOrderComment(UserMessage message) {
+    private @NotNull String handleOrderComment(UserMessage message) {
         String[] parts = message.text.split(" ", 3);
 
         if (parts.length < 3) {
@@ -1015,14 +1013,6 @@ public class TelegramNotifier {
      */
     private boolean isLotQuery(String text) {
         return text.toLowerCase().matches(".*(lot|size|volume|quantity|units).*");
-    }
-
-    /**
-     * Set handler for order comments from users.
-     * Example: (orderId, comment) -> db.updateOrderComment(orderId, comment)
-     */
-    public void setOrderCommentHandler(BiConsumer<String, String> handler) {
-        this.orderCommentHandler = handler;
     }
 
     /**

@@ -3,7 +3,7 @@ package org.investpro.models;
 import lombok.extern.slf4j.Slf4j;
 
 import lombok.Data;
-import  org.investpro.exchange.Exchange;
+import org.investpro.exchange.Exchange;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import java.time.Instant;
@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Broker-neutral account snapshot for InvestPro.
@@ -24,23 +23,24 @@ import java.util.concurrent.ExecutionException;
  * <p>
  * Important:
  * This class is a data model. It can safely hold normalized account values
- * from different brokers without forcing every exchange to return the same fields.
+ * from different brokers without forcing every exchange to return the same
+ * fields.
  */
 
 //
-//Instead of TradeAdviser only asking:
+// Instead of TradeAdviser only asking:
 //
-//        “Should I buy or sell?”
+// “Should I buy or sell?”
 //
-//It can now ask:
+// It can now ask:
 //
-//        “What kind of market is this?”
-//        “What kind of trader/user is operating?”
-//        “What risk profile is allowed?”
-//        “What execution style fits liquidity?”
-//        “How much capital can be exposed?”
-//        “What protection system should be active?”
-//        “Is this trade worth taking probabilistically?”
+// “What kind of market is this?”
+// “What kind of trader/user is operating?”
+// “What risk profile is allowed?”
+// “What execution style fits liquidity?”
+// “How much capital can be exposed?”
+// “What protection system should be active?”
+// “Is this trade worth taking probabilistically?”
 
 @Data
 @Slf4j
@@ -48,14 +48,14 @@ public class Account {
     // ---------------------------------------------------------------------
     // Identity
     // ---------------------------------------------------------------------
-private String createdBy="";
+    private String createdBy = "";
     private String username = "";
     private String accountId = "";
     private String account = "";
     private String brokerName = "";
     private String exchangeId = "";
-private  String [] source ;
-private String destination = "";
+    private String[] source;
+    private String destination = "";
     /**
      * Optional exchange reference.
      * Useful in desktop runtime, but avoid serializing it directly.
@@ -164,8 +164,7 @@ private String destination = "";
                 "Account created broker={} username={} accountId={}",
                 brokerName,
                 this.username,
-                accountId
-        );
+                accountId);
     }
 
     /**
@@ -197,8 +196,6 @@ private String destination = "";
         account.setBaseCurrency(baseCurrency);
         return account;
     }
-
-
 
     public static @NotNull Account oanda(String accountId, String baseCurrency) {
         Account account = new Account();
@@ -258,34 +255,6 @@ private String destination = "";
         }
 
         this.updatedAt = Instant.now();
-    }
-
-    /**
-     * Optional blocking populate method.
-     * Use carefully. Prefer exchange.fetchAccount() in UI/service code.
-     */
-    public void populateFromExchangeDetails() {
-        if (exchange == null) {
-            return;
-        }
-
-        try {
-            Account userDetails = exchange.getUserAccountDetails();
-
-            if (userDetails != null) {
-                copyFrom(userDetails);
-                log.info("Account details populated from exchange for account={}", accountId);
-            } else {
-                log.warn("No account details returned by exchange={}", brokerName);
-            }
-        } catch (ExecutionException exception) {
-            log.error("Failed to fetch account details from {}", brokerName, exception);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            log.error("Interrupted while fetching account details from {}", brokerName, exception);
-        } catch (Exception exception) {
-            log.error("Unexpected account details error from {}", brokerName, exception);
-        }
     }
 
     public void copyFrom(Account source) {
@@ -357,23 +326,9 @@ private String destination = "";
         recalculateBalanceTotals();
     }
 
-
-
-
-
-
-
-
-
-
-
     public Map<String, Double> balancesView() {
         return Collections.unmodifiableMap(balances);
     }
-
-
-
-
 
     public void recalculateBalanceTotals() {
         this.totalBalance = balances.values()
@@ -416,11 +371,6 @@ private String destination = "";
     /**
      * Useful for Coinbase/Binance US.
      */
-
-
-
-
-
 
     public Object getMetadata(String key) {
         return metadata.get(safe(key));
@@ -466,23 +416,13 @@ private String destination = "";
         this.email = safe(email);
     }
 
-
-
-
-
-
-
     public void setAddress(String address) {
         this.address = safe(address);
     }
 
-
-
     public void setTelegramToken(String telegramToken) {
         this.telegramToken = safe(telegramToken);
     }
-
-
 
     public void setBaseCurrency(String baseCurrency) {
         String code = normalizeCurrency(baseCurrency);
@@ -498,8 +438,6 @@ private String destination = "";
         this.availableBalance = sanitize(availableBalance);
         this.updatedAt = Instant.now();
     }
-
-
 
     public void setEquity(double equity) {
         this.equity = sanitize(equity);
@@ -545,8 +483,6 @@ private String destination = "";
         this.cash = sanitize(cash);
         this.updatedAt = Instant.now();
     }
-
-
 
     public void setOpenPositionCount(int openPositionCount) {
         this.openPositionCount = Math.max(0, openPositionCount);
@@ -672,8 +608,7 @@ private String destination = "";
                 balances,
                 availableBalances,
                 lockedBalances,
-                updatedAt
-        );
+                updatedAt);
     }
 
     @Override
