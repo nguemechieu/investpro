@@ -1111,6 +1111,16 @@ public class SystemCore {
             this.telegramNotifier.setCommandHandler(telegramCommandHandler);
             // Create event listener - will be wired to SmartBot in start()
             this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
+
+            // Initialize ChatGPT integration if OpenAI API key is configured
+            String openaiApiKey = firstNonBlank(
+                    config.getProperty("openai.api_key"),
+                    System.getenv("OPENAI_API_KEY"));
+            if (!openaiApiKey.isBlank()) {
+                telegramNotifier.initializeChatGPT(openaiApiKey);
+                log.info("✅ ChatGPT integration initialized for Telegram bot");
+            }
+
             log.info("✅ Telegram notifier configured");
         }
 
