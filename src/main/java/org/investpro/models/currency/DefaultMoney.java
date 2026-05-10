@@ -19,7 +19,6 @@ import java.sql.SQLException;
  */
 
 public record DefaultMoney(BigDecimal amount, Currency currency) implements Money, Comparable<DefaultMoney> {
-    public static final Money NULL_MONEY = DefaultMoney.ofFiat(BigDecimal.ZERO, Currency.NULL_FIAT_CURRENCY);
 
     @Contract("_, _ -> new")
     public static @NotNull Money of(int amount, Currency currency) {
@@ -98,7 +97,8 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(amount, CurrencyType.FIAT, currencyCode);
     }
 
-    public static Money ofFiat(BigDecimal amount, Currency currency) {
+    @Contract(value = "_, _ -> new", pure = true)
+    public static @NotNull Money ofFiat(BigDecimal amount, Currency currency) {
         return of(amount, currency);
     }
 
@@ -107,11 +107,11 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
         return of(new BigDecimal(amount), currency);
     }
 
-    public static Money ofCrypto(int amount, String currencyCode) throws SQLException {
+    public static @NotNull Money ofCrypto(int amount, String currencyCode) throws SQLException {
         return of(amount, CurrencyType.CRYPTO, currencyCode);
     }
 
-    public static Money ofCrypto(long amount, String currencyCode) throws SQLException {
+    public static @NotNull Money ofCrypto(long amount, String currencyCode) throws SQLException {
         return of(amount, CurrencyType.CRYPTO, currencyCode);
     }
 
@@ -340,11 +340,9 @@ public record DefaultMoney(BigDecimal amount, Currency currency) implements Mone
 
     @Override
     public @NotNull String toString() {
-        return switch (currency.getCurrencyType()) {
-            case CRYPTO -> DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
-
-            case FIAT -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-            default -> DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
-        };
-    }
+        if (currency.getCurrencyType()==CurrencyType.CRYPTO)
+            return DefaultMoneyFormatter.DEFAULT_CRYPTO_FORMATTER.format(this);
+        else
+            return DefaultMoneyFormatter.DEFAULT_FIAT_FORMATTER.format(this);
+        }
 }

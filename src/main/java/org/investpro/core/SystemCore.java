@@ -13,6 +13,8 @@ import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.bot.SmartBot;
+import org.investpro.decision.BotTradeDecisionEngine;
+import org.investpro.decision.SignalToDecisionFilter;
 import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.Exchange;
@@ -49,6 +51,7 @@ import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -103,6 +106,8 @@ public class SystemCore {
     private final RiskManagementSystem riskManagementSystem;
     private final AiReasoningService aiReasoningService;
     private final TradeExecutionCoordinator tradeExecutionCoordinator;
+    private final BotTradeDecisionEngine botTradeDecisionEngine;
+    private final SignalToDecisionFilter signalToDecisionFilter;
     private SystemMonitorService systemMonitorService;
     /**
      * -- GETTER --
@@ -183,7 +188,25 @@ public class SystemCore {
                 aiReasoningService,
                 executionEngine);
 
+        // Initialize StrategyEngine with TradeExecutionCoordinator
         this.strategyEngine = new StrategyEngine(tradeExecutionCoordinator);
+
+        // Initialize BotTradeDecisionEngine for institutional-grade trade decisions
+        Account currentAccount ;
+        try {
+            currentAccount = exchange.fetchAccount().get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        this.botTradeDecisionEngine = new BotTradeDecisionEngine(
+                null, // Use static StrategyCatalog.STRATEGY_DEFINITIONS internally
+                strategyEngine,
+                currentAccount);
+
+        // Initialize SignalToDecisionFilter to intercept and validate all signals
+        this.signalToDecisionFilter = new SignalToDecisionFilter(
+                botTradeDecisionEngine,
+                tradeExecutionCoordinator);
 
         this.systemCoreDependencies = new SystemCoreDependencies(exchange, tradingService, strategyEngine,
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);

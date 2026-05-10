@@ -2493,6 +2493,12 @@ public class TradingDesk extends BorderPane {
             }
             try {
                 systemCore = createSystemCore(exchange);
+                // Wire up the primary stage to the Telegram command handler for screenshot
+                // capability
+                if (systemCore.getTelegramCommandHandler() != null && getScene() != null
+                        && getScene().getWindow() instanceof Stage) {
+                    systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+                }
             } catch (SQLException | ClassNotFoundException e) {
                 log.error("Failed to create SystemCore", e);
                 showAlert("Failed to initialize trading system: " + e.getMessage());
@@ -2573,6 +2579,12 @@ public class TradingDesk extends BorderPane {
 
         try {
             systemCore = createSystemCore(exchange);
+            // Wire up the primary stage to the Telegram command handler for screenshot
+            // capability
+            if (systemCore.getTelegramCommandHandler() != null && getScene() != null
+                    && getScene().getWindow() instanceof Stage) {
+                systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+            }
         } catch (SQLException | ClassNotFoundException e) {
             log.error("Failed to create SystemCore", e);
             rejectConnectionValidation(e);
@@ -2602,7 +2614,7 @@ public class TradingDesk extends BorderPane {
         refreshAccountWorkspace();
 
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
-        selected.setTimeFrame(Timeframe.fromCode(timeframeSelector.getValue()));
+
         loadOrderBook(selected);
         startDesktopStream(selected);
 
@@ -3252,6 +3264,12 @@ public class TradingDesk extends BorderPane {
         if (coreMissing || botMissing || botNotStarted) {
             try {
                 systemCore = createSystemCore(exchange);
+                // Wire up the primary stage to the Telegram command handler for screenshot
+                // capability
+                if (systemCore.getTelegramCommandHandler() != null && getScene() != null
+                        && getScene().getWindow() instanceof Stage) {
+                    systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+                }
             } catch (SQLException | ClassNotFoundException e) {
                 log.error("Failed to create SystemCore", e);
                 throw new RuntimeException("Failed to initialize trading system", e);

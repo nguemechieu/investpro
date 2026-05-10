@@ -57,7 +57,7 @@ public class TelegramCommandHandler {
     private final SystemCore systemCore;
 
     private final HttpClient httpClient;
-    private final Stage primaryStage = new Stage();
+    private Stage primaryStage = null;
 
     private final long lastUpdateId = -1L;
     private final boolean polling = false;
@@ -69,6 +69,15 @@ public class TelegramCommandHandler {
                 .connectTimeout(Duration.ofSeconds(15))
                 .build();
 
+    }
+
+    /**
+     * Set the primary application stage for screenshot functionality
+     * Must be called after the JavaFX application is initialized
+     */
+    public void setPrimaryStage(@NotNull Stage stage) {
+        this.primaryStage = stage;
+        log.debug("Primary stage set for Telegram screenshot commands");
     }
 
     /**
@@ -99,19 +108,27 @@ public class TelegramCommandHandler {
                 case "orders" -> getOrdersReport();
                 case "screenshot" -> captureAndSendScreenshot(chatId);
                 case "market" -> {
-                    // Parse symbol for market command (e.g., "market BTC/USD")
+                    // Parse symbol for market command (e.g., "market BTC/USD" or "market EUR/USD")
                     if (parts.length > 1) {
-                        try {
-                            String symbol = parts[1];
-                            String[] currencyPair = symbol.split("/");
-                            if (currencyPair.length == 2) {
-                                TradePair pair = new TradePair(currencyPair[0], currencyPair[1]);
+                        String symbol = parts[1].trim();
+
+                        // Validate symbol format (must contain /)
+                        if (!symbol.contains("/")) {
+                            yield "❌ Invalid symbol format. Use /market BTC/USD";
+                        }
+
+                        String[] currencyPair = symbol.split("/", -1); // -1 keeps trailing empty strings
+
+                        if (currencyPair.length == 2 && !currencyPair[0].isBlank() && !currencyPair[1].isBlank()) {
+                            try {
+                                TradePair pair = new TradePair(currencyPair[0].trim(), currencyPair[1].trim());
                                 yield getMarketReport(pair);
-                            } else {
-                                yield "❌ Invalid symbol format. Use /market BTC/USD";
+                            } catch (SQLException | ClassNotFoundException e) {
+                                log.warn("Error creating TradePair for {}: {}", symbol, e.getMessage());
+                                yield "❌ Error: Could not fetch data for " + symbol;
                             }
-                        } catch (SQLException | ClassNotFoundException e) {
-                            yield "❌ Error parsing symbol: " + e.getMessage();
+                        } else {
+                            yield "❌ Invalid symbol format. Use /market BTC/USD";
                         }
                     } else {
                         yield "❌ Please specify a symbol. Usage: /market BTC/USD";
@@ -387,8 +404,12 @@ public class TelegramCommandHandler {
      * Returns message text to be sent to user.
      */
     private @NotNull String captureAndSendScreenshot(String chatId) {
+        if (primaryStage == null) {
+            return "❌ UI is not initialized yet. Please start the trading application.";
+        }
+
         if (primaryStage.getScene() == null) {
-            return "❌ No UI stage available for screenshot. Please initialize the application first.";
+            return "❌ No UI scene available for screenshot. Please initialize the application first.";
         }
 
         try {

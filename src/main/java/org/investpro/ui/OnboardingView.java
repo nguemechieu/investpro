@@ -118,13 +118,15 @@ public class OnboardingView extends StackPane {
         emailField.setVisible(false);
         emailField.setManaged(false);
 
-        rememberMeCheckBox.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 11;");
-
-        Button forgetButton = createButton("Forget", BUTTON_SECONDARY);
-        forgetButton.setOnAction(event -> forgetCredentials());
+        rememberMeCheckBox.setStyle("-fx-text-fill: #f1f5f9; -fx-font-size: 11; -fx-padding: 4 0 4 0; " +
+                "-fx-border-color: #475569; -fx-border-radius: 3; -fx-padding: 4 8 4 4;");
+        rememberMeCheckBox.setPrefHeight(32);
+        rememberMeCheckBox.setMinWidth(140);
+        rememberMeCheckBox.setWrapText(false);
 
         Button forgotPasswordButton = createButton("Forgot Password?", BUTTON_SECONDARY);
-        HBox rememberBox = createControlsRow(rememberMeCheckBox, forgetButton, forgotPasswordButton);
+        HBox rememberBox = createControlsRow(rememberMeCheckBox, forgotPasswordButton);
+        rememberBox.setSpacing(14);
 
         Button loginButton = createButton(t("onboarding.logIn"), BUTTON_PRIMARY);
         Button createButton = createButton(t("onboarding.createAccount"), BUTTON_SUCCESS);

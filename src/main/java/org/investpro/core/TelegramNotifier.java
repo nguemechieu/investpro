@@ -704,7 +704,9 @@ public class TelegramNotifier {
     }
 
     /**
-     * Get latest message from a specific user/chat.
+     * Get latest unprocessed message from a specific user/chat.
+     * Only returns messages with update_id > lastUpdateId to avoid processing the
+     * same message twice.
      */
     private Optional<UserMessage> getLatestUserMessage(String chatId) {
         try {
@@ -722,17 +724,30 @@ public class TelegramNotifier {
                 ArrayNode updates = root.withArray("result");
 
                 if (!updates.isEmpty()) {
-                    JsonNode latestUpdate = updates.get(updates.size() - 1);
-                    JsonNode messageNode = latestUpdate.path("message");
+                    // Find the latest unprocessed update (with update_id > lastUpdateId)
+                    JsonNode latestUpdate = null;
+                    for (JsonNode update : updates) {
+                        long updateId = update.path("update_id").asLong(-1);
+                        if (updateId > lastUpdateId) {
+                            latestUpdate = update;
+                            // Update lastUpdateId to prevent reprocessing
+                            lastUpdateId = updateId;
+                        }
+                    }
 
-                    if (!messageNode.isMissingNode()) {
-                        String text = messageNode.path("text").asText("");
-                        String userId = messageNode.path("from").path("id").asText("");
-                        String userName = messageNode.path("from").path("username").asText("User");
-                        long msgTime = messageNode.path("date").asLong(0);
+                    if (latestUpdate != null) {
+                        JsonNode messageNode = latestUpdate.path("message");
 
-                        if (!text.isBlank() && !userId.isBlank()) {
-                            return Optional.of(new UserMessage(userId, userName, chatId, text, msgTime));
+                        if (!messageNode.isMissingNode()) {
+                            String text = messageNode.path("text").asText("");
+                            String userId = messageNode.path("from").path("id").asText("");
+                            String userName = messageNode.path("from").path("username").asText("User");
+                            long msgTime = messageNode.path("date").asLong(0);
+
+                            if (!text.isBlank() && !userId.isBlank()) {
+                                log.debug("Found new message (update_id: {}): {}", lastUpdateId, text);
+                                return Optional.of(new UserMessage(userId, userName, chatId, text, msgTime));
+                            }
                         }
                     }
                 }
