@@ -224,7 +224,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void showConfigurationStep() {
-        marketTypeBox.getItems().setAll("Crypto", "Stocks", "Futures", "Forex", "Options", "ETFs", "Bonds");
+        marketTypeBox.getItems().setAll( "Forex","Crypto", "Stocks", "Futures", "Options", "ETFs", "Bonds");
         venueBox.getItems().setAll("US", "Global", "Spot", "Derivatives", "Paper Trading");
 
         // Dynamically populate exchanges from SupportedExchange enum
@@ -362,11 +362,11 @@ public class OnboardingView extends StackPane {
 
         Button continueButton = new Button("Continue");
         continueButton.setStyle(
-                "-fx-padding: 10 20; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
+                "-fx-padding: 20 30; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold;");
 
         Button backButton = new Button("Back");
         backButton.setStyle(
-                "-fx-padding: 10 20; -fx-background-color: #1e40af; -fx-text-fill: white; -fx-font-weight: bold;");
+                "-fx-padding: 20 30; -fx-background-color: #1e40af; -fx-text-fill: white; -fx-font-weight: bold;");
 
         Label validation = new Label();
         validation.setStyle("-fx-text-fill: #ef4444;");

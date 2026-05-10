@@ -270,6 +270,9 @@ public class TradingDesk extends BorderPane {
     private DataWindow dataWindow; // Data window for OHLCV display
     private TradePair activeOrderBookPair;
 
+    // Track open independent windows to prevent duplicate Scene root assignments
+    private final Map<String, Stage> openIndependentWindows = new java.util.HashMap<>();
+
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
     }
 
@@ -1578,6 +1581,21 @@ public class TradingDesk extends BorderPane {
      * independently.
      */
     private void createIndependentWindow(String title, Node content, double width, double height) {
+        // Check if window with this title is already open
+        if (openIndependentWindows.containsKey(title)) {
+            Stage existingStage = openIndependentWindows.get(title);
+            if (existingStage != null && existingStage.isShowing()) {
+                // Window already open, bring it to front
+                existingStage.toFront();
+                existingStage.requestFocus();
+                log.info("Brought independent window to front: {}", title);
+                return;
+            } else {
+                // Window was closed, remove from tracking
+                openIndependentWindows.remove(title);
+            }
+        }
+
         Stage stage = new Stage();
         stage.setTitle(title);
         stage.setWidth(width);
@@ -1590,7 +1608,15 @@ public class TradingDesk extends BorderPane {
         Scene scene = getScene(content, width, height);
         scene.setFill(Color.web("#1a1a2e"));
         stage.setScene(scene);
+
+        // Track window and remove from tracking when closed
+        stage.setOnCloseRequest(e -> {
+            openIndependentWindows.remove(title);
+            log.info("Independent window closed: {}", title);
+        });
+
         stage.show();
+        openIndependentWindows.put(title, stage);
 
         log.info("Independent window opened: {}", title);
     }
@@ -3587,38 +3613,38 @@ public class TradingDesk extends BorderPane {
             case "SMA 200" -> new SimpleMovingAverageIndicator(200);
             case "EMA 12" -> new ExponentialMovingAverageIndicator(12);
             case "EMA 26" -> new ExponentialMovingAverageIndicator(26);
-            
+
             // Momentum Indicators
             case "RSI 14" -> new RSIIndicator(14);
             case "Stochastic" -> new StochasticIndicator();
             case "CCI 20" -> new CCIIndicator(20);
             case "MACD" -> new MACDIndicator();
-            
+
             // Volatility Indicators
             case "Bollinger Bands" -> new BollingerBandsIndicator();
             case "ATR 14" -> new ATRIndicator(14);
             case "Volatility" -> new VolatilityIndicator();
-            
+
             // Volume Indicators
             case "VWAP" -> new VWAPIndicator();
             case "OBV" -> new OBVIndicator();
             case "Volume" -> new VolumeIndicator();
-            
+
             // Trend Indicators
             case "ADX 14" -> new ADXIndicator(14);
-            case "Ichimoku" -> new IchimokuIndicator(9, 26, 52);  // Standard periods: conversion 9, base 26, span 52
-            case "Parabolic SAR" -> new ParabolicSARIndicator(0.02, 0.2);  // Standard AF: initial 0.02, max 0.2
-            
+            case "Ichimoku" -> new IchimokuIndicator(9, 26, 52); // Standard periods: conversion 9, base 26, span 52
+            case "Parabolic SAR" -> new ParabolicSARIndicator(0.02, 0.2); // Standard AF: initial 0.02, max 0.2
+
             // Retracement Levels
-            case "Fibonacci Retracement" -> new FibonacciRetracementIndicator(20);  // 20-period lookback
-            case "Zigzag" -> new ZigzagIndicator(5.0);  // 5% threshold
-            
+            case "Fibonacci Retracement" -> new FibonacciRetracementIndicator(20); // 20-period lookback
+            case "Zigzag" -> new ZigzagIndicator(5.0); // 5% threshold
+
             // Pattern Recognition
-            case "Fractal" -> new FractalIndicator(5);  // 5-bar fractal pattern
-            
+            case "Fractal" -> new FractalIndicator(5); // 5-bar fractal pattern
+
             // Utility
             case "Clear Indicators" -> null;
-            
+
             default -> null;
         };
     }
@@ -4397,9 +4423,8 @@ public class TradingDesk extends BorderPane {
         Label opacityLabel = new Label(String.format("Opacity: %.0f%%", config.getOpacity() * 100));
         Slider opacitySlider = new Slider(0.3, 1.0, config.getOpacity());
         opacitySlider.setPrefWidth(200);
-        opacitySlider.valueProperty().addListener((obs, oldVal, newVal) -> {
-            opacityLabel.setText(String.format("Opacity: %.0f%%", newVal.doubleValue() * 100));
-        });
+        opacitySlider.valueProperty().addListener((obs, oldVal, newVal) -> opacityLabel
+                .setText(String.format("Opacity: %.0f%%", newVal.doubleValue() * 100)));
 
         // High contrast checkbox
         CheckBox highContrastCheckBox = new CheckBox("High Contrast Mode");
@@ -4428,11 +4453,12 @@ public class TradingDesk extends BorderPane {
         VBox infoBox = new VBox(10);
         infoBox.setStyle("-fx-border-color: #d1d5db; -fx-border-width: 1; -fx-padding: 10;");
         Label infoLabel = new Label(
-                "• Dark Mode: Reduces eye strain in low-light environments\n" +
-                        "• Light Mode: Better readability in bright environments\n" +
-                        "• Opacity: Control window transparency (0.3 - 1.0)\n" +
-                        "• High Contrast: Enhance visibility with bold fonts\n" +
-                        "• Accent Color: Customize primary color scheme");
+                """
+                        • Dark Mode: Reduces eye strain in low-light environments
+                        • Light Mode: Better readability in bright environments
+                        • Opacity: Control window transparency (0.3 - 1.0)
+                        • High Contrast: Enhance visibility with bold fonts
+                        • Accent Color: Customize primary color scheme""");
         infoLabel.setWrapText(true);
         infoBox.getChildren().add(infoLabel);
 
@@ -4442,7 +4468,7 @@ public class TradingDesk extends BorderPane {
 
         // Handle OK button
         Optional<Void> result = dialog.showAndWait();
-        if (result.isPresent() || dialog.getResult() != null) {
+        if (result.isPresent()) {
             try {
                 config.setTheme(themeCombo.getValue());
                 config.setOpacity(opacitySlider.getValue());
@@ -4501,9 +4527,8 @@ public class TradingDesk extends BorderPane {
         Label fontSizeLabel = new Label("Font Size: " + savedFontSize + "px");
         Slider fontSizeSlider = new Slider(10, 16, savedFontSize);
         fontSizeSlider.setPrefWidth(200);
-        fontSizeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
-            fontSizeLabel.setText(String.format("Font Size: %.0fpx", newVal.doubleValue()));
-        });
+        fontSizeSlider.valueProperty().addListener((obs, oldVal, newVal) -> fontSizeLabel
+                .setText(String.format("Font Size: %.0fpx", newVal.doubleValue())));
 
         // Add components to grid
         grid.addRow(0, new Label("Panel Visibility:"));
@@ -4522,7 +4547,7 @@ public class TradingDesk extends BorderPane {
         dialog.getDialogPane().setContent(new ScrollPane(content));
 
         Optional<Void> result = dialog.showAndWait();
-        if (result.isPresent() || dialog.getResult() != null) {
+        if (result.isPresent()) {
             // Save visibility preferences
             preferences.putBoolean("visibility_market_watch", showMarketWatchCheckBox.isSelected());
             preferences.putBoolean("visibility_order_book", showOrderBookCheckBox.isSelected());
