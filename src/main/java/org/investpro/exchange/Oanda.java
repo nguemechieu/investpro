@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
@@ -61,12 +61,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Random;
 
@@ -757,48 +753,93 @@ public class Oanda extends Exchange {
      */
     @Contract("_, _ -> new")
     private @NotNull OrderBook parseOandaOrderBook(String body, TradePair tradePair) {
+        OrderBook orderBook = new OrderBook(tradePair);
+
         try {
             JsonNode root = OBJECT_MAPPER.readTree(body);
-            JsonNode bucketsNode = root.path("orderBook").path("buckets");
+            JsonNode orderBookNode = root.path("orderBook");
+            JsonNode bucketsNode = orderBookNode.path("buckets");
 
-            OrderBook orderBook = new OrderBook(tradePair);
-
-            // Parse bids and asks from buckets array
             List<OrderBook.PriceLevel> bids = new ArrayList<>();
             List<OrderBook.PriceLevel> asks = new ArrayList<>();
-            if (bucketsNode.isArray()) {
-                for (JsonNode bucket : bucketsNode) {
-                    if (bucket.isObject()) {
-                        double price = bucket.path("price").asDouble();
-                        long bidCount = bucket.path("bidCount").asLong(0);
-                        long askCount = bucket.path("askCount").asLong(0);
 
+            if (!bucketsNode.isArray()) {
+                log.warn("OANDA orderBook response for {} does not contain buckets array", tradePair);
+                return orderBook;
+            }
 
-                        // Create price levels for bids and asks based on counts
-                        if (bidCount > 0) {
-                            bids.add(new OrderBook.PriceLevel(price, bidCount));
-
-                        }
-                        if (askCount > 0) {
-                            asks.add(new OrderBook.PriceLevel(price, askCount));
-                        }
-                    }
+            for (JsonNode bucket : bucketsNode) {
+                if (bucket == null || !bucket.isObject()) {
+                    continue;
                 }
 
+                double price = bucket.path("price").asDouble(0.0);
 
-                orderBook.setBids(bids);
-                orderBook.setAsks(asks);
+                /*
+                 * OANDA orderBook bucket fields:
+                 * - longCountPercent  = long-side order distribution at this price
+                 * - shortCountPercent = short-side order distribution at this price
+                 *
+                 * They are not real bid/ask sizes like Binance/Coinbase order books.
+                 * We map them into PriceLevel.size so DepthChart can still visualize them.
+                 */
+                double longCountPercent = bucket.path("longCountPercent").asDouble(0.0);
+                double shortCountPercent = bucket.path("shortCountPercent").asDouble(0.0);
+
+                if (price <= 0.0) {
+                    continue;
+                }
+
+                if (longCountPercent > 0.0) {
+                    bids.add(new OrderBook.PriceLevel(price, longCountPercent));
+                }
+
+                if (shortCountPercent > 0.0) {
+                    asks.add(new OrderBook.PriceLevel(price, shortCountPercent));
+                }
+            }
+
+            /*
+             * For display:
+             * - bids should show highest price first
+             * - asks should show lowest price first
+             */
+            bids.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice).reversed());
+            asks.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice));
+
+            orderBook.setBids(bids);
+            orderBook.setAsks(asks);
+
+            String time = orderBookNode.path("time").asText("");
+            if (!time.isBlank()) {
+                try {
+                    orderBook.setTimestamp(Instant.parse(time));
+                } catch (Exception parseTimeException) {
+                    orderBook.setTimestamp(Instant.now());
+                }
+            } else {
                 orderBook.setTimestamp(Instant.now());
             }
-            log.debug("Parsed OANDA orderBook for {} with {} bids and {} asks", tradePair, bids.size(), asks.size());
+
+            log.debug(
+                    "Parsed OANDA orderBook for {} with {} bid buckets and {} ask buckets",
+                    tradePair,
+                    bids.size(),
+                    asks.size()
+            );
 
             return orderBook;
-        } catch (Exception e) {
-            log.warn("Failed to parse OANDA orderBook response: {}", e.getMessage());
-            return new OrderBook(tradePair);
+
+        } catch (Exception exception) {
+            log.warn(
+                    "Failed to parse OANDA orderBook response for {}: {}",
+                    tradePair,
+                    exception.getMessage()
+            );
+            orderBook.setTimestamp(Instant.now());
+            return orderBook;
         }
     }
-
     /**
      * Parse OANDA position book (distribution) response.
      *
@@ -842,53 +883,128 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(new OrderBook(tradePair));
         }
 
-        String url = "%s/v3/accounts/%s/pricing?instruments=%s".formatted(OANDA_API_URL, account,
-                toInstrument(tradePair));
+        String instrument = toInstrument(tradePair);
+        String url = "%s/v3/accounts/%s/pricing?instruments=%s"
+                .formatted(OANDA_API_URL, account, instrument);
 
         HttpRequest request = requestBuilder(url).GET().build();
 
         return sendWithExponentialBackoff(request)
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        log.debug("OANDA pricing fallback failed HTTP {}", response.statusCode());
-                        return new OrderBook(tradePair);
+                        log.debug(
+                                "OANDA pricing fallback failed for {}. HTTP {}: {}",
+                                tradePair,
+                                response.statusCode(),
+                                response.body()
+                        );
+                        return emptyOrderBook(tradePair);
                     }
 
                     try {
-                        JsonNode prices = OBJECT_MAPPER.readTree(response.body()).path("prices");
+                        JsonNode root = OBJECT_MAPPER.readTree(response.body());
+                        JsonNode prices = root.path("prices");
 
                         if (!prices.isArray() || prices.isEmpty()) {
-                            log.debug("OANDA pricing response empty");
-                            return new OrderBook(tradePair);
+                            log.debug("OANDA pricing response empty for {}", tradePair);
+                            return emptyOrderBook(tradePair);
                         }
 
-                        JsonNode price = prices.get(0);
+                        JsonNode priceNode = prices.get(0);
 
-                        double bid = firstPrice(price.path("bids"));
-                        double ask = firstPrice(price.path("asks"));
+                        List<OrderBook.PriceLevel> bids = parseOandaPricingLevels(priceNode.path("bids"));
+                        List<OrderBook.PriceLevel> asks = parseOandaPricingLevels(priceNode.path("asks"));
 
-                        if (bid <= 0 || ask <= 0) {
-                            log.debug("OANDA pricing fallback: no valid bid/ask");
-                            return new OrderBook(tradePair);
+                        if (bids.isEmpty() || asks.isEmpty()) {
+                            log.debug("OANDA pricing fallback has no valid bid/ask levels for {}", tradePair);
+                            return emptyOrderBook(tradePair);
                         }
 
-                        // Create synthetic top-of-book with single price level
+                        bids.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice).reversed());
+                        asks.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice));
+
                         OrderBook orderBook = new OrderBook(tradePair);
-                        orderBook.getBids().add(new OrderBook.PriceLevel(bid, 0));
-                        orderBook.getAsks().add(new OrderBook.PriceLevel(ask, 0));
-                        orderBook.setTimestamp(Instant.now());
+                        orderBook.setBids(bids);
+                        orderBook.setAsks(asks);
 
-                        log.info("OANDA pricing fallback succeeded for {}: bid={}, ask={}", tradePair, bid, ask);
+                        String time = priceNode.path("time").asText("");
+                        orderBook.setTimestamp(parseInstantOrNow(time));
+
+                        log.info(
+                                "OANDA synthetic order book from pricing succeeded for {}: bestBid={}, bestAsk={}, bidLevels={}, askLevels={}",
+                                tradePair,
+                                bids.get(0).getPrice(),
+                                asks.get(0).getPrice(),
+                                bids.size(),
+                                asks.size()
+                        );
 
                         return orderBook;
 
-                    } catch (Exception e) {
-                        log.warn("Failed to parse OANDA pricing for fallback: {}", e.getMessage());
-                        return new OrderBook(tradePair);
+                    } catch (Exception exception) {
+                        log.warn(
+                                "Failed to parse OANDA pricing fallback for {}: {}",
+                                tradePair,
+                                exception.getMessage()
+                        );
+                        return emptyOrderBook(tradePair);
                     }
                 });
     }
 
+
+    private List<OrderBook.PriceLevel> parseOandaPricingLevels(JsonNode levelsNode) {
+        List<OrderBook.PriceLevel> levels = new ArrayList<>();
+
+        if (levelsNode == null || !levelsNode.isArray()) {
+            return levels;
+        }
+
+        for (JsonNode levelNode : levelsNode) {
+            if (levelNode == null || !levelNode.isObject()) {
+                continue;
+            }
+
+            double price = levelNode.path("price").asDouble(0.0);
+
+            /*
+             * OANDA pricing levels usually expose liquidity.
+             * This is not a real centralized exchange order-book size,
+             * but it is better than zero for UI visualization.
+             */
+            double liquidity = levelNode.path("liquidity").asDouble(0.0);
+
+            if (price <= 0.0) {
+                continue;
+            }
+
+            if (liquidity <= 0.0) {
+                liquidity = 1.0;
+            }
+
+            levels.add(new OrderBook.PriceLevel(price, liquidity));
+        }
+
+        return levels;
+    }
+
+    private OrderBook emptyOrderBook(TradePair tradePair) {
+        OrderBook orderBook = new OrderBook(tradePair);
+        orderBook.setTimestamp(Instant.now());
+        return orderBook;
+    }
+
+    private Instant parseInstantOrNow(String value) {
+        if (value == null || value.isBlank()) {
+            return Instant.now();
+        }
+
+        try {
+            return Instant.parse(value);
+        } catch (Exception ignored) {
+            return Instant.now();
+        }
+    }
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
         try {
@@ -905,8 +1021,12 @@ public class Oanda extends Exchange {
             return 0.0;
         }
 
-        Ticker ticker = getLivePrice(tradePair);
-
+        Ticker ticker ;
+        try {
+            ticker = fetchTicker(tradePair).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
         double bid = ticker.getBidPrice();
         double ask = ticker.getAskPrice();
 
@@ -1028,7 +1148,7 @@ public class Oanda extends Exchange {
             userAccount.setUpdatedAt(Instant.now());
             userAccount.setConnected(true);
             userAccount.setSandbox(accountNode.path("id").asText("").startsWith("101-")); // OANDA sandbox accounts
-                                                                                          // start with 101-
+            userAccount.setCreatedBy(createdByUserAtStr);                                                                                          // start with 101-
             userAccount.setPaperTrading(userAccount.isSandbox());
 
             // Cache the account

@@ -1,4 +1,4 @@
-package org.investpro.data;
+package org.investpro.models;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -48,7 +48,7 @@ public class Account {
     // ---------------------------------------------------------------------
     // Identity
     // ---------------------------------------------------------------------
-
+private String createdBy="";
     private String username = "";
     private String accountId = "";
     private String account = "";
@@ -158,7 +158,7 @@ private String destination = "";
         this.password = safe(password);
         this.account = this.username;
 
-        hydrateFromExchange(exchange, false);
+        hydrateFromExchange(exchange);
 
         log.info(
                 "Account created broker={} username={} accountId={}",
@@ -176,7 +176,7 @@ private String destination = "";
 
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
 
-        hydrateFromExchange(exchange, false);
+        hydrateFromExchange(exchange);
 
         if (source != null) {
             copyFrom(source);
@@ -198,15 +198,7 @@ private String destination = "";
         return account;
     }
 
-    public static @NotNull Account binanceUs(String accountId, String baseCurrency) {
-        Account account = new Account();
-        account.setBrokerName("Binance US");
-        account.setExchangeId("binance_us");
-        account.setAccountId(accountId);
-        account.setAccount(accountId);
-        account.setBaseCurrency(baseCurrency);
-        return account;
-    }
+
 
     public static @NotNull Account oanda(String accountId, String baseCurrency) {
         Account account = new Account();
@@ -218,7 +210,7 @@ private String destination = "";
         return account;
     }
 
-    private void hydrateFromExchange(@NotNull Exchange exchange, boolean populateDetails) {
+    private void hydrateFromExchange(@NotNull Exchange exchange) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
 
         try {
@@ -266,9 +258,6 @@ private String destination = "";
         }
 
         this.updatedAt = Instant.now();
-        if (populateDetails) {
-            populateFromExchangeDetails();
-        }
     }
 
     /**
@@ -368,51 +357,23 @@ private String destination = "";
         recalculateBalanceTotals();
     }
 
-    public void setAvailableBalance(String currencyCode, double amount) {
-        String code = normalizeCurrency(currencyCode);
 
-        if (code.isBlank()) {
-            return;
-        }
 
-        availableBalances.put(code, sanitize(amount));
-        recalculateBalanceTotals();
-    }
 
-    public void setLockedBalance(String currencyCode, double amount) {
-        String code = normalizeCurrency(currencyCode);
 
-        if (code.isBlank()) {
-            return;
-        }
 
-        lockedBalances.put(code, sanitize(amount));
-        recalculateBalanceTotals();
-    }
 
-    public double getBalance(String currencyCode) {
-        return balances.getOrDefault(normalizeCurrency(currencyCode), 0.0);
-    }
 
-    public double getAvailableBalance(String currencyCode) {
-        return availableBalances.getOrDefault(normalizeCurrency(currencyCode), 0.0);
-    }
 
-    public double getLockedBalance(String currencyCode) {
-        return lockedBalances.getOrDefault(normalizeCurrency(currencyCode), 0.0);
-    }
+
 
     public Map<String, Double> balancesView() {
         return Collections.unmodifiableMap(balances);
     }
 
-    public Map<String, Double> availableBalancesView() {
-        return Collections.unmodifiableMap(availableBalances);
-    }
 
-    public Map<String, Double> lockedBalancesView() {
-        return Collections.unmodifiableMap(lockedBalances);
-    }
+
+
 
     public void recalculateBalanceTotals() {
         this.totalBalance = balances.values()
@@ -455,56 +416,11 @@ private String destination = "";
     /**
      * Useful for Coinbase/Binance US.
      */
-    public void applySpotBalances(
-            Map<String, Double> total,
-            Map<String, Double> available,
-            Map<String, Double> locked
-    ) {
-        setBalances(total);
-        setAvailableBalances(available);
-        setLockedBalances(locked);
-        recalculateBalanceTotals();
-    }
 
-    /**
-     * Useful for OANDA.
-     */
-    public void applyMarginSnapshot(
-            double nav,
-            double equity,
-            double marginUsed,
-            double marginAvailable,
-            double unrealizedPnl,
-            double realizedPnl,
-            int openPositionCount,
-            int openOrderCount
-    ) {
-        this.nav = sanitize(nav);
-        this.equity = sanitize(equity);
-        this.marginUsed = sanitize(marginUsed);
-        this.marginAvailable = sanitize(marginAvailable);
-        this.freeMargin = sanitize(marginAvailable);
-        this.unrealizedPnl = sanitizeSigned(unrealizedPnl);
-        this.realizedPnl = sanitizeSigned(realizedPnl);
-        this.openPositionCount = Math.max(0, openPositionCount);
-        this.openOrderCount = Math.max(0, openOrderCount);
 
-        this.totalBalance = this.nav > 0 ? this.nav : this.equity;
-        this.availableBalance = this.marginAvailable;
 
-        this.updatedAt = Instant.now();
-    }
 
-    public void putMetadata(String key, Object value) {
-        String safeKey = safe(key);
 
-        if (safeKey.isBlank()) {
-            return;
-        }
-
-        metadata.put(safeKey, value);
-        updatedAt = Instant.now();
-    }
 
     public Object getMetadata(String key) {
         return metadata.get(safe(key));
@@ -550,33 +466,23 @@ private String destination = "";
         this.email = safe(email);
     }
 
-    public void setFirstName(String firstName) {
-        this.firstName = safe(firstName);
-    }
 
-    public void setLastName(String lastName) {
-        this.lastName = safe(lastName);
-    }
 
-    public void setPhone(String phone) {
-        this.phone = safe(phone);
-    }
+
+
+
 
     public void setAddress(String address) {
         this.address = safe(address);
     }
 
-    public void setCity(String city) {
-        this.city = safe(city);
-    }
+
 
     public void setTelegramToken(String telegramToken) {
         this.telegramToken = safe(telegramToken);
     }
 
-    public void setEmailNotification(String emailNotification) {
-        this.emailNotification = safe(emailNotification);
-    }
+
 
     public void setBaseCurrency(String baseCurrency) {
         String code = normalizeCurrency(baseCurrency);
@@ -593,10 +499,7 @@ private String destination = "";
         this.updatedAt = Instant.now();
     }
 
-    public void setLockedBalance(double lockedBalance) {
-        this.lockedBalance = sanitize(lockedBalance);
-        this.updatedAt = Instant.now();
-    }
+
 
     public void setEquity(double equity) {
         this.equity = sanitize(equity);
@@ -643,10 +546,7 @@ private String destination = "";
         this.updatedAt = Instant.now();
     }
 
-    public void setPortfolioValue(double portfolioValue) {
-        this.portfolioValue = sanitize(portfolioValue);
-        this.updatedAt = Instant.now();
-    }
+
 
     public void setOpenPositionCount(int openPositionCount) {
         this.openPositionCount = Math.max(0, openPositionCount);

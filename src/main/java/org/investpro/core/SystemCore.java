@@ -13,7 +13,7 @@ import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.bot.SmartBot;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;

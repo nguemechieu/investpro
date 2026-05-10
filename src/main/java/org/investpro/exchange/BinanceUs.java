@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.data.InProgressCandleData;
 

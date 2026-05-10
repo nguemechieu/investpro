@@ -4,7 +4,7 @@ import javafx.application.Platform;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.models.trading.OpenOrder;

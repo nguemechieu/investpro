@@ -15,7 +15,7 @@ import org.investpro.exchange.websocket.CoinbaseWebSocketClient;
 import org.investpro.models.trading.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.OrderBook;

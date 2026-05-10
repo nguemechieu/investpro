@@ -2,7 +2,7 @@ package org.investpro.exchange.contracts;
 
 
 
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

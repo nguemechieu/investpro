@@ -1,6 +1,6 @@
 package org.investpro.exchange.infrastructure;
 
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.models.trading.*;

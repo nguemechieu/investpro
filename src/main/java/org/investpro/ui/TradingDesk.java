@@ -56,7 +56,7 @@ import org.investpro.licensing.LicenseManager;
 import org.investpro.ui.theme.ThemeManager;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.exchange.*;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.models.trading.*;
@@ -2572,7 +2572,7 @@ public class TradingDesk extends BorderPane {
 
         String exchangeName = exchange.getClass().getSimpleName();
 
-        if (!"Oanda".equalsIgnoreCase(exchangeName)) {
+        if (!"OANDA".equalsIgnoreCase(exchangeName)) {
             log.debug("Skipping OANDA email notifications because active exchange is {}", exchangeName);
             return;
         }

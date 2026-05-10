@@ -1,13 +1,12 @@
 package org.investpro.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.scene.Scene;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.PixelReader;
 import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;

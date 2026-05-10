@@ -1,7 +1,7 @@
 package org.investpro.exchange.infrastructure;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import  org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import  org.investpro.models.trading.Order;

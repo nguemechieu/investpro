@@ -7,7 +7,7 @@ import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.AiTradeReviewRequest;
 import org.investpro.ai.AiTradeReviewResponse;
 import org.investpro.ai.FinalRiskGate;
-import org.investpro.data.Account;
+import org.investpro.models.Account;
 import org.investpro.core.execution.ExecutionIntent;
 import org.investpro.core.execution.PositionTransitionPolicy;
 import org.investpro.core.execution.SymbolTradeLockManager;
