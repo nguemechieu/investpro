@@ -1,8 +1,6 @@
 package org.investpro.decision;
 
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.enums.AssetClass;
-import org.investpro.enums.ContractType;
 import org.investpro.models.Account;
 import org.investpro.models.trading.TradePair;
 import org.investpro.models.trading.Ticker;
@@ -307,38 +305,36 @@ public class BotTradeDecisionEngine {
 
     /**
      * REQUIREMENT 4: Improved asset type detection
-     * 1. Use TradePair.assetClass if available
-     * 2. Use TradePair.contractType if available
-     * 3. Fall back to symbol parsing
+     * 1. Use TradePair currency types to detect asset class
+     * 2. Use symbol parsing for market categorization
+     * 3. Fall back to heuristic detection
      */
     @NotNull
     private AssetMarketType detectAssetMarketTypeImproved(@NotNull TradePair tradePair) {
-        // Step 1: Check TradePair.assetClass
-        AssetClass assetClass = tradePair.getAssetClass();
-        ContractType contractType = tradePair.getContractType();
+        String symbol = tradePair.getSymbol().toUpperCase();
+        String baseCode = tradePair.getBaseCode();
+        String counterCode = tradePair.getCounterCode();
 
-        if (assetClass != null && !assetClass.equals(AssetClass.UNKNOWN)) {
-            // Map AssetClass + ContractType to AssetMarketType
-            if (assetClass == AssetClass.CRYPTO) {
-                return contractType == ContractType.FUTURES || contractType == ContractType.PERPETUAL
-                        ? AssetMarketType.CRYPTO_DERIVATIVES
-                        : AssetMarketType.CRYPTO_SPOT;
-            } else if (assetClass == AssetClass.FOREX) {
-                return AssetMarketType.FOREX;
-            } else if (assetClass == AssetClass.EQUITY) {
-                return contractType == ContractType.FUTURES
-                        ? AssetMarketType.EQUITY_DERIVATIVES
-                        : AssetMarketType.EQUITIES;
-            } else if (assetClass == AssetClass.COMMODITY) {
-                return AssetMarketType.COMMODITIES;
-            } else if (assetClass == AssetClass.FIXED_INCOME) {
-                return AssetMarketType.FIXED_INCOME;
-            }
+        // Step 1: Check currency types (CryptoCurrency vs FiatCurrency)
+        var baseCurrency = tradePair.getKey();
+        var counterCurrency = tradePair.getValue();
+
+        boolean baseIsCrypto = baseCurrency instanceof org.investpro.models.currency.CryptoCurrency;
+        boolean counterIsCrypto = counterCurrency instanceof org.investpro.models.currency.CryptoCurrency;
+        boolean baseIsFiat = baseCurrency instanceof org.investpro.models.currency.FiatCurrency;
+        boolean counterIsFiat = counterCurrency instanceof org.investpro.models.currency.FiatCurrency;
+
+        // Crypto spot (crypto/crypto or crypto/fiat)
+        if (baseIsCrypto && (counterIsCrypto || counterIsFiat)) {
+            return AssetMarketType.CRYPTO_SPOT;
         }
 
-        // Step 3: Fall back to symbol parsing
-        String symbol = tradePair.getSymbol().toUpperCase();
+        // Forex (fiat/fiat)
+        if (baseIsFiat && counterIsFiat) {
+            return AssetMarketType.FOREX;
+        }
 
+        // Step 2: Fall back to symbol parsing
         // Crypto detection
         if (symbol.contains("USDT") || symbol.contains("USDC") || symbol.contains("BUSD") ||
                 symbol.contains("BTC") || symbol.contains("ETH")) {
@@ -350,7 +346,7 @@ public class BotTradeDecisionEngine {
             return AssetMarketType.FOREX;
         }
 
-        // Stock detection (single symbol)
+        // Step 3: Heuristic - if symbol doesn't contain separator, likely equity
         if (!symbol.contains("/") && !symbol.contains("_")) {
             return AssetMarketType.EQUITIES;
         }

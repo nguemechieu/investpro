@@ -896,16 +896,31 @@ public class BinanceUs extends Exchange {
                 // Add significant delay to avoid rate limiting
                 Thread.sleep(1000);
 
+                // Validate symbol before building URL
+                String symbol = binanceSymbol(tradePair);
+                if (symbol == null || symbol.isBlank()) {
+                    throw new IllegalArgumentException("Failed to generate valid Binance symbol for " + tradePair);
+                }
+
                 Map<String, String> params = new LinkedHashMap<>();
-                params.put("symbol", binanceSymbol(tradePair));
+                params.put("symbol", symbol);
                 // /api/v3/trades is a PUBLIC endpoint that only accepts symbol and limit
                 // Do NOT use sendSignedBinanceUsRequest for this endpoint
                 params.put("limit", "500"); // Binance max per request
 
                 // Build unsigned request (public endpoint)
                 String query = formEncode(params);
+                if (query == null || query.isBlank()) {
+                    throw new IllegalArgumentException("Failed to generate valid query string for recent trades");
+                }
+
+                String url = BINANCE_US_REST_URL + "/api/v3/trades?" + query;
+                if (url == null || url.isBlank()) {
+                    throw new IllegalArgumentException("Failed to construct valid URL: " + url);
+                }
+
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(BINANCE_US_REST_URL + "/api/v3/trades?" + query))
+                        .uri(URI.create(url))
                         .header("User-Agent", "InvestPro/1.0")
                         .timeout(java.time.Duration.ofSeconds(10))
                         .GET()
@@ -1658,14 +1673,30 @@ public class BinanceUs extends Exchange {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 waitForOrderBookSlot();
+
+                // Validate symbol before building URL
+                String symbol = binanceSymbol(tradePair);
+                if (symbol == null || symbol.isBlank()) {
+                    throw new IllegalArgumentException("Failed to generate valid Binance symbol for " + tradePair);
+                }
+
                 Map<String, String> params = new LinkedHashMap<>();
-                params.put("symbol", binanceSymbol(tradePair));
+                params.put("symbol", symbol);
                 params.put("limit", "20");
 
                 // OrderBook endpoint doesn't require signing
                 String query = formEncode(params);
+                if (query == null || query.isBlank()) {
+                    throw new IllegalArgumentException("Failed to generate valid query string for order book");
+                }
+
+                String url = BINANCE_US_REST_URL + "/api/v3/depth?" + query;
+                if (url == null || url.isBlank()) {
+                    throw new IllegalArgumentException("Failed to construct valid URL: " + url);
+                }
+
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(BINANCE_US_REST_URL + "/api/v3/depth?" + query))
+                        .uri(URI.create(url))
                         .header("User-Agent", "InvestPro/1.0")
                         .timeout(java.time.Duration.ofSeconds(10))
                         .GET()
@@ -2127,7 +2158,17 @@ public class BinanceUs extends Exchange {
         if (tradePair == null) {
             throw new IllegalArgumentException("tradePair must not be null");
         }
-        return (tradePair.getBaseCode() + tradePair.getCounterCode()).toUpperCase(Locale.ROOT);
+        String baseCode = tradePair.getBaseCode();
+        String counterCode = tradePair.getCounterCode();
+
+        if (baseCode == null || baseCode.isBlank()) {
+            throw new IllegalArgumentException("TradePair base code is null or blank for " + tradePair);
+        }
+        if (counterCode == null || counterCode.isBlank()) {
+            throw new IllegalArgumentException("TradePair counter code is null or blank for " + tradePair);
+        }
+
+        return (baseCode + counterCode).toUpperCase(Locale.ROOT);
     }
 
     private static TradePair tradePairFromSymbol(String symbol) {
@@ -2160,11 +2201,25 @@ public class BinanceUs extends Exchange {
      * Execute HTTP request with exponential backoff retry on transient failures
      */
     private static HttpResponse<String> sendWithRetry(HttpRequest request) throws Exception {
+        if (request == null) {
+            throw new IllegalArgumentException("HttpRequest cannot be null");
+        }
+
         long delayMs = INITIAL_RETRY_DELAY_MS;
         Exception lastException = null;
 
         for (int attempt = 0; true; attempt++) {
             try {
+                // Validate request URI before sending
+                if (request.uri() == null) {
+                    throw new IllegalArgumentException("HttpRequest URI is null");
+                }
+
+                String uriStr = request.uri().toString();
+                if (uriStr == null || uriStr.isBlank() || !uriStr.startsWith("https://")) {
+                    throw new IllegalArgumentException("Invalid URI format: " + uriStr);
+                }
+
                 HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
                 // Don't retry on rate limit or auth errors
@@ -2186,6 +2241,24 @@ public class BinanceUs extends Exchange {
                 }
 
                 return response;
+            } catch (java.nio.channels.UnresolvedAddressException e) {
+                lastException = e;
+                logger.error("DNS resolution failed for URI: {}. Attempt {}/{}: {}",
+                        request.uri(), attempt + 1, MAX_RETRIES + 1, e.getMessage());
+
+                if (attempt < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(delayMs);
+                        delayMs = (long) (delayMs * RETRY_BACKOFF_MULTIPLIER);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw ie;
+                    }
+                } else {
+                    throw new RuntimeException(
+                            "Failed to resolve DNS for " + request.uri() + " after " + (MAX_RETRIES + 1) + " attempts",
+                            e);
+                }
             } catch (java.io.IOException e) {
                 lastException = e;
 
@@ -2218,9 +2291,22 @@ public class BinanceUs extends Exchange {
 
     private static String formEncode(Map<String, String> params) {
         return params.entrySet().stream()
-                .map(entry -> URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8)
-                        + "="
-                        + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
+                .map(entry -> {
+                    String key = entry.getKey();
+                    String value = entry.getValue();
+
+                    if (key == null || key.isBlank()) {
+                        throw new IllegalArgumentException("URL parameter key cannot be null or blank");
+                    }
+                    if (value == null || value.isBlank()) {
+                        throw new IllegalArgumentException(
+                                "URL parameter value cannot be null or blank for key: " + key);
+                    }
+
+                    return URLEncoder.encode(key, StandardCharsets.UTF_8)
+                            + "="
+                            + URLEncoder.encode(value, StandardCharsets.UTF_8);
+                })
                 .collect(Collectors.joining("&"));
     }
 

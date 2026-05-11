@@ -189,17 +189,16 @@ public class SystemCore {
         this.strategyEngine = new StrategyEngine(tradeExecutionCoordinator);
 
         // Initialize BotTradeDecisionEngine for institutional-grade trade decisions
-        Account currentAccount ;
+        Account currentAccount;
         try {
             currentAccount = exchange.fetchAccount().get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
 
-        @Nullable StrategyCatalog strategyCatalogue;
-        this.botTradeDecisionEngine = new BotTradeDecisionEngine(strategyCatalogue,
-                strategyEngine,
-                currentAccount);
+        @Nullable
+        StrategyCatalog strategyCatalogue;
+        this.botTradeDecisionEngine = new BotTradeDecisionEngine(currentAccount);
 
         // Initialize SignalToDecisionFilter to intercept and validate all signals
         this.signalToDecisionFilter = new SignalToDecisionFilter(
