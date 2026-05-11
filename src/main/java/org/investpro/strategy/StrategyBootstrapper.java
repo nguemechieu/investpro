@@ -43,9 +43,6 @@ public final class StrategyBootstrapper {
 
     private static volatile Exception initializationError = null;
 
-    private StrategyBootstrapper() {
-        // Utility class.
-    }
 
     /**
      * Initialize strategies once during application startup.

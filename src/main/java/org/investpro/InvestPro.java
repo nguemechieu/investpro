@@ -55,6 +55,11 @@ public class InvestPro extends Application {
 
     private TradingDesk tradingDesk;
 
+    // Repository dependencies
+    private TradeRepository tradeRepository;
+    private OrderRepository orderRepository;
+    private CurrencyRepository currencyRepository;
+
     public static void main(String[] args) {
         launch(args);
     }
@@ -125,10 +130,6 @@ public class InvestPro extends Application {
         setRootContent(onboardingView);
         primaryStage.setTitle("%s - Onboarding".formatted(buildWindowTitle()));
     }
-
-    private TradeRepository tradeRepository;
-    private OrderRepository orderRepository;
-    private CurrencyRepository currencyRepository;
 
     private void showTradingTerminal(MarketConfiguration configuration) {
         try {
