@@ -590,12 +590,17 @@ public class EnhancedChartDisplay extends BorderPane {
 
             // Clear and repopulate volume bars
             volumePanel.clear();
+            int index = 0;
             for (CandleData candle : candles) {
-                var volumeBar = new VolumeIndicatorPanel.VolumeBar(
-                        candle.timestamp().toEpochMilli(),
+                boolean isUpCandle = candle.closePrice() >= candle.openPrice();
+                VolumeIndicatorPanel.VolumeBar volumeBar = new VolumeIndicatorPanel.VolumeBar(
                         candle.volume(),
-                        candle.closePrice() >= candle.openPrice());
+                        isUpCandle,
+                        index,
+                        candle.timestamp().toEpochMilli(),
+                        "");
                 volumePanel.addVolumeBar(volumeBar);
+                index++;
             }
 
             // Update volume MA20
