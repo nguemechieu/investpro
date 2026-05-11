@@ -64,7 +64,7 @@ public class SystemEventRecorder {
     /**
      * Record an accepted order event.
      */
-    public void recordOrderAccepted(String orderId) {
+    public void recordOrderAccepted() {
         this.lastOrderAcceptedAt = Instant.now();
         this.lastOrderRejectionReason = null;
     }
@@ -72,7 +72,7 @@ public class SystemEventRecorder {
     /**
      * Record a rejected order event.
      */
-    public void recordOrderRejected(String orderId, String reason) {
+    public void recordOrderRejected(String reason) {
         this.lastOrderRejectedAt = Instant.now();
         this.lastOrderRejectionReason = reason;
     }
@@ -88,6 +88,7 @@ public class SystemEventRecorder {
     /**
      * Record a rate limit event.
      */
+    @SuppressWarnings("unused")
     public void recordRateLimit(String exchange) {
         this.lastRateLimitAt = Instant.now();
         this.lastRateLimitExchange = exchange;
@@ -97,6 +98,7 @@ public class SystemEventRecorder {
     /**
      * Record HTTP status code from an exchange.
      */
+    @SuppressWarnings("unused")
     public void recordHttpStatus(String exchange, int statusCode) {
         this.lastHttpStatusByExchange.put(exchange, statusCode);
     }
@@ -104,7 +106,8 @@ public class SystemEventRecorder {
     /**
      * Record a WebSocket disconnection.
      */
-    public void recordWebSocketDisconnect(String reason) {
+    @SuppressWarnings("unused")
+    public void recordWebSocketDisconnect() {
         this.lastWebSocketDisconnectAt = Instant.now();
     }
 
@@ -119,6 +122,7 @@ public class SystemEventRecorder {
     /**
      * Record an account error.
      */
+    @SuppressWarnings("unused")
     public void recordAccountError(String error) {
         this.lastAccountErrorAt = Instant.now();
         this.lastAccountError = error;
@@ -127,6 +131,7 @@ public class SystemEventRecorder {
     /**
      * Record trading session status change.
      */
+    @SuppressWarnings("unused")
     public void recordTradingSessionStatus(String status) {
         this.lastTradingSessionStatus = status;
     }
@@ -134,6 +139,7 @@ public class SystemEventRecorder {
     /**
      * Get seconds since last market tick.
      */
+    @SuppressWarnings("unused")
     public long getSecondsSinceLastTick() {
         if (lastMarketTickAt == null) {
             return Long.MAX_VALUE;
@@ -144,6 +150,7 @@ public class SystemEventRecorder {
     /**
      * Get seconds since last rate limit.
      */
+    @SuppressWarnings("unused")
     public long getSecondsSinceLastRateLimit() {
         if (lastRateLimitAt == null) {
             return Long.MAX_VALUE;

@@ -37,6 +37,7 @@ public class StrategyRankingEngine {
                 .totalScore(totalScore)
                 .profitabilityScore(profitabilityScore)
                 .riskScore(riskScore)
+
                 .consistencyScore(consistencyScore)
                 .executionScore(executionScore)
                 .stabilityScore(stabilityScore)
@@ -44,6 +45,8 @@ public class StrategyRankingEngine {
                 .reasons(reasons)
                 .warnings(warnings)
                 .build();
+
+
     }
 
     /**

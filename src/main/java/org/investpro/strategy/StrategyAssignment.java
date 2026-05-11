@@ -63,7 +63,7 @@ public class StrategyAssignment {
      * Assignment mode.
      */
     @Builder.Default
-    private final StrategyAssignmentMode mode = StrategyAssignmentMode.AUTO;
+    private final StrategyAssignmentMode mode = StrategyAssignmentMode.AI_ASSISTED;
 
     /**
      * Who created this assignment.

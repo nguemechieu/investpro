@@ -1,5 +1,7 @@
 package org.investpro.strategy.user;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategySignal;
@@ -28,6 +30,8 @@ import java.util.List;
  * - Assigned to live trading
  */
 @Slf4j
+@Getter
+@Setter
 public class UserStrategyValidator {
 
     private UserStrategyValidator() {

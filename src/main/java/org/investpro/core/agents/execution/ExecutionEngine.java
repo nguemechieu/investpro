@@ -5,6 +5,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.ai.FinalRiskGate;
 import org.investpro.ai.PositionActionIntent;
+import org.investpro.core.SystemCore;
 import org.investpro.data.Db1;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
@@ -64,29 +65,24 @@ public class ExecutionEngine {
     private BehaviourGuardService behaviourGuardService;
     private BehaviourGuardConfig behaviourGuardConfig;
 
-    public ExecutionEngine() {
-        this(null, new SymbolExecutionFilter(true), null);
-    }
 
-    public ExecutionEngine(@Nullable Exchange exchange) {
-        this(exchange, new SymbolExecutionFilter(true), null);
-    }
 
     public ExecutionEngine(
             @Nullable Exchange exchange,
             @Nullable SymbolExecutionFilter symbolFilter,
-            @Nullable Db1 db
+            @Nullable Db1 db,
+            SystemCore systemCore
     ) {
         this.exchange = exchange;
         this.symbolFilter = symbolFilter == null ? new SymbolExecutionFilter(true) : symbolFilter;
-        initializeServices(db);
+        initializeServices(db,systemCore);
     }
-    private void initializeServices(@Nullable Db1 db) {
+    private void initializeServices(@Nullable Db1 db, SystemCore systemCore) {
         this.tradeRepository = new TradeRepositoryImpl(db);
         this.orderRepository = new OrderRepositoryImpl(db);
         this.currencyRepository = new CurrencyRepositoryImpl(db);
 
-        this.tradingService = new TradingService(
+        this.tradingService = new TradingService(systemCore,
                 new TradeService(tradeRepository),
                 new OrderService(orderRepository),
                 new CurrencyService(currencyRepository)

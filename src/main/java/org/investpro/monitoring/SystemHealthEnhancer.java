@@ -15,6 +15,7 @@ import java.lang.management.ThreadMXBean;
  * @author NOEL NGUEMECHIEU
  */
 @Slf4j
+@SuppressWarnings("unused")
 public final class SystemHealthEnhancer {
 
     /**

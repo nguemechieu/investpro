@@ -1,11 +1,16 @@
 package org.investpro.trading.validation;
 
+import lombok.Getter;
+import lombok.Setter;
+
 /**
  * Enumeration of all pre-trade validation checks.
  * Each gate must pass before a signal can become an executable order.
  *
- * @author InvestPro Trading System
+ * @author InvestPro Trading System noel nguemechieu
  */
+@Getter
+
 public enum PreTradeCheck {
     // Gate 1: System Health
     SYSTEM_HEALTH("System Health Gate", "Verify InvestPro system state, heartbeat, and critical services"),

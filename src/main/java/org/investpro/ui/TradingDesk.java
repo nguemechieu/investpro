@@ -27,7 +27,6 @@ import org.investpro.core.SystemCore;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
 import org.investpro.data.CandleData;
-import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.enums.SystemState;
 import org.investpro.enums.RiskStatus;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
@@ -56,7 +55,7 @@ import org.investpro.indicators.FibonacciRetracementIndicator;
 import org.investpro.indicators.ZigzagIndicator;
 import org.investpro.indicators.FractalIndicator;
 import org.investpro.licensing.LicenseManager;
-import org.investpro.models.TradingSystemStatusSnapshot;
+import org.investpro.monitoring.TradingSystemStatusSnapshot;
 import org.investpro.ui.theme.ThemeManager;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
@@ -297,7 +296,7 @@ public class TradingDesk extends BorderPane {
         this.tradeService = new TradeService(this.tradeRepository);
         this.orderService = new OrderService(this.orderRepository);
         this.currencyService = new CurrencyService(this.currencyRepository);
-        this.tradingService = new TradingService(this.tradeService, this.orderService, this.currencyService);
+        this.tradingService = new TradingService(systemCore,this.tradeService, this.orderService, this.currencyService);
 
         // Initialize NotificationService (disabled by default, can be enabled via
         // settings)
@@ -1934,7 +1933,9 @@ public class TradingDesk extends BorderPane {
                 tableColumn("%Change", pair -> pair == null ? "" : String.valueOf(pair.getChangePercent()), 80),
 
                 tableColumn("volume", pair -> pair == null ? "" : marketPrice(pair.getVolume()), 80),
-                tableColumn("24hrHigh", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80));
+                tableColumn("24/High", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80),
+                tableColumn("24/Low", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80));
+
 
         table.setRowFactory(view -> {
             TableRow<TradePair> row = new TableRow<>() {
@@ -3234,7 +3235,7 @@ public class TradingDesk extends BorderPane {
             config.setProperty("ai.provider", "local");
         }
 
-        return new SystemCore(exchange, config);
+        return new SystemCore(exchange, config, openAiKey);
     }
 
     /**

@@ -1,4 +1,4 @@
-package org.investpro.models;
+package org.investpro.monitoring;
 
 import org.investpro.enums.RiskStatus;
 import org.investpro.enums.SystemState;

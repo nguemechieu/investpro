@@ -25,7 +25,7 @@ public class StrategyRankingEngine {
      * Rank reports by score, highest first.
      */
     public List<StrategyPerformanceReport> rank(@NotNull List<StrategyPerformanceReport> reports) {
-        if (reports == null || reports.isEmpty()) {
+        if (reports.isEmpty()) {
             return List.of();
         }
 

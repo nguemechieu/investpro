@@ -1,22 +1,26 @@
 package org.investpro.service;
 
+import org.investpro.core.SystemCore;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.Account;
 import org.investpro.models.trading.Order;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
+import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Domain service for trading operations.
  * Coordinates between Trade, Order, and Currency services to handle complex trading scenarios.
  */
 
-public record TradingService(TradeService tradeService, OrderService orderService, CurrencyService currencyService) {
+public record TradingService(SystemCore systemCore,TradeService tradeService, OrderService orderService, CurrencyService currencyService) {
 
     /**
      * Initialize the trading service with required dependencies.
@@ -104,6 +108,14 @@ public record TradingService(TradeService tradeService, OrderService orderServic
             total += order.getQuantity();
         }
         return total;
+    }
+
+    public @NotNull Account getAccount() {
+        try {
+            return   systemCore.getExchange().fetchAccount().get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

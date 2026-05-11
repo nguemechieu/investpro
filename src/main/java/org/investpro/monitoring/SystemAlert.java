@@ -1,4 +1,6 @@
-package org.investpro.models;
+package org.investpro.monitoring;
+
+import lombok.Getter;
 
 import java.time.Instant;
 
@@ -10,6 +12,7 @@ public record SystemAlert(
         String source,
         String message,
         Instant timestamp) {
+    @Getter
     public enum AlertSeverity {
         DEBUG("#94a3b8"), // Gray
         INFO("#38bdf8"), // Blue
@@ -22,9 +25,6 @@ public record SystemAlert(
             this.colorHex = colorHex;
         }
 
-        public String getColorHex() {
-            return colorHex;
-        }
     }
 
     public static SystemAlert debug(String source, String message) {

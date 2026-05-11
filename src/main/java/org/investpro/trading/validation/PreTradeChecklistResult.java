@@ -1,5 +1,6 @@
 package org.investpro.trading.validation;
 
+import lombok.Getter;
 import org.investpro.utils.Side;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;

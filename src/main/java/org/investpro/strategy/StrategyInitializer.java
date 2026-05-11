@@ -42,23 +42,50 @@ public final class StrategyInitializer {
         registerCatalogDefinitions(registry);
         registerDefaultUnifiedStrategy(registry);
 
-        // Wire all strategies for multi-strategy consensus
-        instantiateAllStrategies(registry);
+        // OPTIMIZATION: Use tiered strategy selection instead of instantiating all
+        // ~6,563 strategies upfront.
+        // This avoids startup delays:
+        // - Stage 1: Generate 3000 candidate strategies
+        // - Stage 2: Backtest filter → top 100 by profit factor
+        // - Stage 3: Paper trade filter → top 20
+        // - Stage 4: Live eligible → top 3 per symbol/timeframe
+        //
+        // Strategies are progressively instantiated only as they pass each filter.
+        // Selection runs asynchronously in background during startup.
+        startTieredStrategySelection(registry);
 
         initialized = true;
 
         log.info(
-                "Strategy initialization complete. instantiatedStrategies={}, definitions={}",
-                registry.instantiatedCount(),
+                "Strategy initialization complete. definitions={} (tiered selection in progress)",
                 registry.definitionCount());
     }
 
-    private static void instantiateAllStrategies(@NotNull StrategyRegistry registry) {
+    /**
+     * Start tiered strategy selection process asynchronously.
+     *
+     * Avoids blocking startup by running selection in background thread.
+     * Only highest-performing strategies are instantiated.
+     */
+    private static void startTieredStrategySelection(@NotNull StrategyRegistry registry) {
         try {
-            int instantiatedCount = registry.instantiateAllStrategies();
-            log.info("Wired {} strategies for use in multi-strategy consensus engine", instantiatedCount);
+            log.info("Starting tiered strategy selection (3000 → 100 → 20 → 3+)...");
+
+            // Get Strategy Lab service for backtesting
+            org.investpro.strategy.lab.StrategyLabService strategyLabService = org.investpro.strategy.lab.StrategyLabService
+                    .getInstance();
+
+            // Create and start selection service
+            StrategySelectionService selectionService = StrategySelectionService.getInstance(registry,
+                    strategyLabService);
+            selectionService.startTieredSelection();
+
+            log.info("Tiered strategy selection started (running asynchronously)");
+
         } catch (Exception exception) {
-            log.warn("Failed to instantiate all strategies: {}", exception.getMessage(), exception);
+            log.warn("Failed to start tiered strategy selection: {}. Continuing with lazy strategy loading.",
+                    exception.getMessage());
+            // Non-fatal: strategies will be loaded lazily on demand
         }
     }
 

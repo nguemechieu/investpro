@@ -5,18 +5,18 @@ import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.exchange.services.ExchangeService;
+import org.investpro.utils.MARKET_TYPES;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -29,257 +29,323 @@ import static org.mockito.Mockito.when;
 @DisplayName("ExchangeDiagnosticsService Integration Tests")
 class ExchangeDiagnosticsServiceTest {
 
-    private ExchangeService exchangeService;
-    private ExchangeDiagnosticsService diagnosticsService;
+        private ExchangeService exchangeService;
+        private ExchangeDiagnosticsService diagnosticsService;
+        private ExchangeIdentity spyAdapter;
 
-    @Mock
-    private ExchangeIdentity mockAdapter;
+        @BeforeEach
+        void setUp() {
+                // Use configurable stub to avoid Mockito inline mocking issues
+                spyAdapter = new ConfigurableExchangeAdapter("TestExchange");
+                exchangeService = new ExchangeService();
+                diagnosticsService = new ExchangeDiagnosticsService(exchangeService);
+        }
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        exchangeService = new ExchangeService();
-        diagnosticsService = new ExchangeDiagnosticsService(exchangeService);
-    }
+        @Test
+        @DisplayName("ExchangeDiagnosticsService captures auth snapshots")
+        void testCaptureAuthSnapshot() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .supportsTopOfBook(true)
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                adapter.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("TestExchange")
+                                .success(true)
+                                .credentialSource("ENV_VAR")
+                                .endpointTested("/api/accounts")
+                                .httpStatus(200)
+                                .message("OK")
+                                .checkedAt(Instant.now())
+                                .build());
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService captures auth snapshots")
-    void testCaptureAuthSnapshot() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .supportsTopOfBook(true)
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+                exchangeService.register("TestExchange", spyAdapter);
 
-        AuthCheckResult authResult = AuthCheckResult.builder()
-                .exchangeName("TestExchange")
-                .success(true)
-                .credentialSource("ENV_VAR")
-                .endpointTested("/api/accounts")
-                .httpStatus(200)
-                .message("OK")
-                .checkedAt(Instant.now())
-                .build();
+                ExchangeDiagnosticSnapshot snapshot = diagnosticsService.runDiagnostics("TestExchange");
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        when(mockAdapter.checkAuthentication()).thenReturn(authResult);
+                assertThat(snapshot)
+                                .isNotNull()
+                                .extracting("exchangeName").isEqualTo("TestExchange");
+                assertThat(snapshot.isAuthSuccess()).isTrue();
+                assertThat(snapshot.getCredentialSource()).isEqualTo("ENV_VAR");
+        }
 
-        exchangeService.register("TestExchange", mockAdapter);
+        @Test
+        @DisplayName("ExchangeDiagnosticsService caches snapshots")
+        void testSnapshotCaching() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                adapter.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("TestExchange")
+                                .success(true)
+                                .httpStatus(200)
+                                .build());
 
-        ExchangeDiagnosticSnapshot snapshot = diagnosticsService.runDiagnostics("TestExchange");
+                exchangeService.register("TestExchange", spyAdapter);
 
-        assertThat(snapshot)
-                .isNotNull()
-                .extracting("exchangeName").isEqualTo("TestExchange");
-        assertThat(snapshot.isAuthSuccess()).isTrue();
-        assertThat(snapshot.getCredentialSource()).isEqualTo("ENV_VAR");
-    }
+                // Run diagnostics
+                ExchangeDiagnosticSnapshot snapshot1 = diagnosticsService.runDiagnostics("TestExchange");
+                assertThat(snapshot1).isNotNull();
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService caches snapshots")
-    void testSnapshotCaching() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+                // Get cached snapshot
+                Optional<ExchangeDiagnosticSnapshot> cached = diagnosticsService.getSnapshot("TestExchange");
+                assertThat(cached).isPresent();
+                assertThat(cached.get().getExchangeName()).isEqualTo("TestExchange");
+        }
 
-        AuthCheckResult authResult = AuthCheckResult.builder()
-                .exchangeName("TestExchange")
-                .success(true)
-                .httpStatus(200)
-                .build();
+        @Test
+        @DisplayName("ExchangeDiagnosticsService tracks credential source")
+        void testCredentialSourceTracking() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                adapter.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("TestExchange")
+                                .success(true)
+                                .credentialSource("CONFIG_FILE")
+                                .httpStatus(200)
+                                .build());
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        when(mockAdapter.checkAuthentication()).thenReturn(authResult);
+                exchangeService.register("TestExchange", spyAdapter);
+                diagnosticsService.runDiagnostics("TestExchange");
 
-        exchangeService.register("TestExchange", mockAdapter);
+                Optional<String> source = diagnosticsService.getCredentialSource("TestExchange");
+                assertThat(source)
+                                .isPresent()
+                                .contains("CONFIG_FILE");
+        }
 
-        // Run diagnostics
-        ExchangeDiagnosticSnapshot snapshot1 = diagnosticsService.runDiagnostics("TestExchange");
-        assertThat(snapshot1).isNotNull();
+        @Test
+        @DisplayName("ExchangeDiagnosticsService tracks HTTP status")
+        void testHttpStatusTracking() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                adapter.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("TestExchange")
+                                .success(true)
+                                .httpStatus(200)
+                                .build());
 
-        // Get cached snapshot
-        Optional<ExchangeDiagnosticSnapshot> cached = diagnosticsService.getSnapshot("TestExchange");
-        assertThat(cached).isPresent();
-        assertThat(cached.get().getExchangeName()).isEqualTo("TestExchange");
-    }
+                exchangeService.register("TestExchange", spyAdapter);
+                diagnosticsService.runDiagnostics("TestExchange");
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService tracks credential source")
-    void testCredentialSourceTracking() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+                int status = diagnosticsService.getLastHttpStatus("TestExchange");
+                assertThat(status).isEqualTo(200);
+        }
 
-        AuthCheckResult authResult = AuthCheckResult.builder()
-                .exchangeName("TestExchange")
-                .success(true)
-                .credentialSource("CONFIG_FILE")
-                .httpStatus(200)
-                .build();
+        @Test
+        @DisplayName("ExchangeDiagnosticsService aggregates all diagnostics")
+        void testAggregateAllDiagnostics() {
+                ConfigurableExchangeAdapter spyCoinbase = new ConfigurableExchangeAdapter("Coinbase");
+                ConfigurableExchangeAdapter spyOanda = new ConfigurableExchangeAdapter("OANDA");
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        when(mockAdapter.checkAuthentication()).thenReturn(authResult);
+                spyCoinbase.setCapability(ExchangeCapability.builder()
+                                .exchangeName("Coinbase")
+                                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
+                                .build());
+                spyOanda.setCapability(ExchangeCapability.builder()
+                                .exchangeName("OANDA")
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                spyCoinbase.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("Coinbase")
+                                .success(true)
+                                .httpStatus(200)
+                                .build());
+                spyOanda.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("OANDA")
+                                .success(true)
+                                .httpStatus(200)
+                                .build());
 
-        exchangeService.register("TestExchange", mockAdapter);
-        diagnosticsService.runDiagnostics("TestExchange");
+                exchangeService.register("Coinbase", spyCoinbase);
+                exchangeService.register("OANDA", spyOanda);
 
-        Optional<String> source = diagnosticsService.getCredentialSource("TestExchange");
-        assertThat(source)
-                .isPresent()
-                .contains("CONFIG_FILE");
-    }
+                Map<String, ExchangeDiagnosticSnapshot> allSnapshots = diagnosticsService.runAllDiagnostics();
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService tracks HTTP status")
-    void testHttpStatusTracking() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+                assertThat(allSnapshots)
+                                .hasSize(2)
+                                .containsKeys("Coinbase", "OANDA");
+        }
 
-        AuthCheckResult authResult = AuthCheckResult.builder()
-                .exchangeName("TestExchange")
-                .success(true)
-                .httpStatus(200)
-                .build();
+        @Test
+        @DisplayName("ExchangeDiagnosticsService provides health summaries")
+        void testHealthSummary() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                adapter.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("TestExchange")
+                                .success(true)
+                                .endpointTested("/api/accounts")
+                                .httpStatus(200)
+                                .build());
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        when(mockAdapter.checkAuthentication()).thenReturn(authResult);
+                exchangeService.register("TestExchange", spyAdapter);
+                diagnosticsService.runDiagnostics("TestExchange");
 
-        exchangeService.register("TestExchange", mockAdapter);
-        diagnosticsService.runDiagnostics("TestExchange");
+                String summary = diagnosticsService.getHealthSummary("TestExchange");
 
-        int status = diagnosticsService.getLastHttpStatus("TestExchange");
-        assertThat(status).isEqualTo(200);
-    }
+                assertThat(summary)
+                                .contains("TestExchange")
+                                .contains("auth=OK")
+                                .contains("httpStatus=200")
+                                .contains("/api/accounts");
+        }
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService aggregates all diagnostics")
-    void testAggregateAllDiagnostics() {
-        ExchangeCapability coinbase = ExchangeCapability.builder()
-                .exchangeName("Coinbase")
-                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
-                .build();
+        @Test
+        @DisplayName("ExchangeDiagnosticsService handles auth failures")
+        void testAuthFailureDiagnostics() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                .build());
+                adapter.setAuthResult(AuthCheckResult.builder()
+                                .exchangeName("TestExchange")
+                                .success(false)
+                                .credentialIssue(true)
+                                .endpointTested("/api/accounts")
+                                .httpStatus(401)
+                                .message("Invalid API key")
+                                .build());
 
-        ExchangeCapability oanda = ExchangeCapability.builder()
-                .exchangeName("OANDA")
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+                exchangeService.register("TestExchange", spyAdapter);
+                ExchangeDiagnosticSnapshot snapshot = diagnosticsService.runDiagnostics("TestExchange");
 
-        ExchangeIdentity mockCoinbase = mock(ExchangeIdentity.class);
-        ExchangeIdentity mockOanda = mock(ExchangeIdentity.class);
+                assertThat(snapshot.isAuthSuccess()).isFalse();
+                assertThat(snapshot.getLastHttpStatus()).isEqualTo(401);
+                assertThat(diagnosticsService.isAuthSuccessful("TestExchange")).isFalse();
+        }
 
-        when(mockCoinbase.getCapability()).thenReturn(coinbase);
-        when(mockOanda.getCapability()).thenReturn(oanda);
-        when(mockCoinbase.checkAuthentication()).thenReturn(
-                AuthCheckResult.builder()
-                        .exchangeName("Coinbase")
-                        .success(true)
-                        .httpStatus(200)
-                        .build());
-        when(mockOanda.checkAuthentication()).thenReturn(
-                AuthCheckResult.builder()
-                        .exchangeName("OANDA")
-                        .success(true)
-                        .httpStatus(200)
-                        .build());
+        @Test
+        @DisplayName("ExchangeDiagnosticsService returns empty string for missing error message")
+        void testMissingErrorMessage() {
+                // No diagnostics run
+                String errorMsg = diagnosticsService.getLastErrorMessage("NonExistent");
+                assertThat(errorMsg).isEmpty();
+        }
 
-        exchangeService.register("Coinbase", mockCoinbase);
-        exchangeService.register("OANDA", mockOanda);
+        @Test
+        @DisplayName("ExchangeDiagnosticsService provides capability queries")
+        void testCapabilityQueries() {
+                ConfigurableExchangeAdapter adapter = (ConfigurableExchangeAdapter) spyAdapter;
+                adapter.setCapability(ExchangeCapability.builder()
+                                .exchangeName("TestExchange")
+                                .supportsSpot(true)
+                                .supportsForex(false)
+                                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
+                                .build());
 
-        Map<String, ExchangeDiagnosticSnapshot> allSnapshots = diagnosticsService.runAllDiagnostics();
+                exchangeService.register("TestExchange", spyAdapter);
 
-        assertThat(allSnapshots)
-                .hasSize(2)
-                .containsKeys("Coinbase", "OANDA");
-    }
+                ExchangeCapability queried = diagnosticsService.getCapability("TestExchange");
+                assertThat(queried)
+                                .isNotNull()
+                                .extracting("exchangeName").isEqualTo("TestExchange");
+                assertThat(queried.isSupportsSpot()).isTrue();
+                assertThat(queried.isSupportsForex()).isFalse();
+        }
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService provides health summaries")
-    void testHealthSummary() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+        /**
+         * Configurable exchange adapter for testing - allows setting behavior without
+         * mocking.
+         */
+        static class ConfigurableExchangeAdapter implements ExchangeIdentity {
+                private final String name;
+                private ExchangeCapability capability;
+                private AuthCheckResult authResult;
 
-        AuthCheckResult authResult = AuthCheckResult.builder()
-                .exchangeName("TestExchange")
-                .success(true)
-                .endpointTested("/api/accounts")
-                .httpStatus(200)
-                .build();
+                ConfigurableExchangeAdapter(String name) {
+                        this.name = name;
+                        this.capability = ExchangeCapability.builder()
+                                        .exchangeName(name)
+                                        .marketDepthType(MarketDepthType.TOP_OF_BOOK)
+                                        .build();
+                        this.authResult = AuthCheckResult.builder()
+                                        .exchangeName(name)
+                                        .success(true)
+                                        .httpStatus(200)
+                                        .build();
+                }
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        when(mockAdapter.checkAuthentication()).thenReturn(authResult);
+                void setCapability(ExchangeCapability capability) {
+                        this.capability = capability;
+                }
 
-        exchangeService.register("TestExchange", mockAdapter);
-        diagnosticsService.runDiagnostics("TestExchange");
+                void setAuthResult(AuthCheckResult authResult) {
+                        this.authResult = authResult;
+                }
 
-        String summary = diagnosticsService.getHealthSummary("TestExchange");
+                @Override
+                public String getName() {
+                        return name;
+                }
 
-        assertThat(summary)
-                .contains("TestExchange")
-                .contains("auth=OK")
-                .contains("httpStatus=200")
-                .contains("/api/accounts");
-    }
+                @Override
+                public String getSignal() {
+                        return "";
+                }
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService handles auth failures")
-    void testAuthFailureDiagnostics() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .marketDepthType(MarketDepthType.TOP_OF_BOOK)
-                .build();
+                @Override
+                public String getExchangeId() {
+                        return "";
+                }
 
-        AuthCheckResult authResult = AuthCheckResult.builder()
-                .exchangeName("TestExchange")
-                .success(false)
-                .credentialIssue(true)
-                .endpointTested("/api/accounts")
-                .httpStatus(401)
-                .message("Invalid API key")
-                .build();
+                @Override
+                public String getDisplayName() {
+                        return name;
+                }
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        when(mockAdapter.checkAuthentication()).thenReturn(authResult);
+                @Override
+                public boolean isSandbox() {
+                        return false;
+                }
 
-        exchangeService.register("TestExchange", mockAdapter);
-        ExchangeDiagnosticSnapshot snapshot = diagnosticsService.runDiagnostics("TestExchange");
+                @Override
+                public boolean isPaperTrading() {
+                        return false;
+                }
 
-        assertThat(snapshot.isAuthSuccess()).isFalse();
-        assertThat(snapshot.getLastHttpStatus()).isEqualTo(401);
-        assertThat(diagnosticsService.isAuthSuccessful("TestExchange")).isFalse();
-    }
+                @Override
+                public String getTimestamp() {
+                        return "";
+                }
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService returns empty string for missing error message")
-    void testMissingErrorMessage() {
-        // No diagnostics run
-        String errorMsg = diagnosticsService.getLastErrorMessage("NonExistent");
-        assertThat(errorMsg).isEmpty();
-    }
+                @Override
+                public Instant now() {
+                        return Instant.now();
+                }
 
-    @Test
-    @DisplayName("ExchangeDiagnosticsService provides capability queries")
-    void testCapabilityQueries() {
-        ExchangeCapability capability = ExchangeCapability.builder()
-                .exchangeName("TestExchange")
-                .supportsSpot(true)
-                .supportsForex(false)
-                .marketDepthType(MarketDepthType.FULL_ORDER_BOOK)
-                .build();
+                @Override
+                public boolean supportsMarketType(MARKET_TYPES marketType) {
+                        return false;
+                }
 
-        when(mockAdapter.getCapability()).thenReturn(capability);
-        exchangeService.register("TestExchange", mockAdapter);
+                @Override
+                public List<MARKET_TYPES> getSupportedMarketTypes() {
+                        return List.of();
+                }
 
-        ExchangeCapability queried = diagnosticsService.getCapability("TestExchange");
-        assertThat(queried)
-                .isNotNull()
-                .extracting("exchangeName").isEqualTo("TestExchange");
-        assertThat(queried.isSupportsSpot()).isTrue();
-        assertThat(queried.isSupportsForex()).isFalse();
-    }
+                @Override
+                public @NotNull ExchangeCapability getCapability() {
+                        return capability;
+                }
+
+                @Override
+                public AuthCheckResult checkAuthentication() {
+                        return authResult;
+                }
+        }
 }

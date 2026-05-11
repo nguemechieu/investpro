@@ -1,5 +1,6 @@
 package org.investpro.core;
 
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.PixelReader;
@@ -24,6 +25,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Telegram Command Handler for executing trading commands from Telegram.
@@ -402,6 +405,11 @@ public class TelegramCommandHandler {
     /**
      * Capture the current JavaFX scene and send as screenshot to Telegram.
      * Returns message text to be sent to user.
+     * 
+     * IMPORTANT: This method is called from TelegramPollingThread (background
+     * thread)
+     * but JavaFX operations must happen on the JavaFX Application Thread.
+     * Uses Platform.runLater() to execute screenshot capture on the correct thread.
      */
     private @NotNull String captureAndSendScreenshot(String chatId) {
         if (primaryStage == null) {
@@ -412,47 +420,80 @@ public class TelegramCommandHandler {
             return "❌ No UI scene available for screenshot. Please initialize the application first.";
         }
 
+        // Use CountDownLatch to wait for screenshot on FX thread
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> result = new AtomicReference<>("❌ Screenshot operation timed out");
+
         try {
-            // Capture the JavaFX scene
-            Scene scene = primaryStage.getScene();
-            WritableImage snapshot = scene.snapshot(null);
+            // Schedule screenshot capture on JavaFX Application Thread
+            Platform.runLater(() -> {
+                try {
+                    // Capture the JavaFX scene (must be on FX thread)
+                    Scene scene = primaryStage.getScene();
+                    if (scene == null) {
+                        result.set("❌ Scene became unavailable during screenshot");
+                        latch.countDown();
+                        return;
+                    }
 
-            if (snapshot == null) {
-                return "❌ Failed to capture screenshot";
-            }
+                    WritableImage snapshot = scene.snapshot(null);
 
-            // Convert to BufferedImage using SwingFXUtils
-            BufferedImage bufferedImage = getBufferedImage(snapshot);
+                    if (snapshot == null) {
+                        result.set("❌ Failed to capture screenshot");
+                        latch.countDown();
+                        return;
+                    }
 
-            // Save to temporary file
-            Path tempFile = Files.createTempFile("investpro_screenshot_", ".png");
-            ImageIO.write(bufferedImage, "png", tempFile.toFile());
+                    // Convert to BufferedImage using SwingFXUtils
+                    BufferedImage bufferedImage = getBufferedImage(snapshot);
 
-            log.info("Screenshot captured: {}", tempFile.getFileName());
+                    // Save to temporary file
+                    Path tempFile = Files.createTempFile("investpro_screenshot_", ".png");
+                    ImageIO.write(bufferedImage, "png", tempFile.toFile());
 
-            // Send to Telegram
-            String caption = "📸 *InvestPro UI Screenshot*\\n\\n" +
-                    "Captured: " + getCurrentTime() + "\\n" +
-                    "Resolution: " + (int) snapshot.getWidth() + "x" + (int) snapshot.getHeight();
+                    log.info("Screenshot captured: {}", tempFile.getFileName());
 
-            boolean sent = telegramNotifier.sendPhoto(tempFile, caption);
+                    // Send to Telegram
+                    String caption = "📸 *InvestPro UI Screenshot*\\n\\n" +
+                            "Captured: " + getCurrentTime() + "\\n" +
+                            "Resolution: " + (int) snapshot.getWidth() + "x" + (int) snapshot.getHeight();
 
-            // Clean up temp file
-            try {
-                Files.delete(tempFile);
-            } catch (IOException e) {
-                log.debug("Could not delete temp screenshot file: {}", tempFile);
-            }
+                    boolean sent = telegramNotifier.sendPhoto(tempFile, caption);
 
-            if (sent) {
-                return "✅ Screenshot sent successfully!";
+                    // Clean up temp file
+                    try {
+                        Files.delete(tempFile);
+                    } catch (IOException e) {
+                        log.debug("Could not delete temp screenshot file: {}", tempFile);
+                    }
+
+                    if (sent) {
+                        result.set("✅ Screenshot sent successfully!");
+                    } else {
+                        result.set("⚠️ Screenshot captured but failed to send to Telegram");
+                    }
+
+                } catch (Exception e) {
+                    log.error("Error capturing/sending screenshot", e);
+                    result.set("❌ Screenshot error: " + e.getMessage());
+                } finally {
+                    // Signal that screenshot operation is complete
+                    latch.countDown();
+                }
+            });
+
+            // Wait for screenshot capture to complete (max 10 seconds)
+            if (latch.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                return result.get();
             } else {
-                return "⚠️ Screenshot captured but failed to send to Telegram";
+                log.warn("Screenshot capture timed out");
+                return "❌ Screenshot operation timed out after 10 seconds";
             }
 
-        } catch (Exception e) {
-            log.error("Error capturing/sending screenshot", e);
-            return "❌ Screenshot error: " + e.getMessage();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Screenshot operation interrupted", e);
+            return "❌ Screenshot operation was interrupted";
         }
     }
 

@@ -141,11 +141,17 @@ public class SystemCore {
     private SystemCoreDependencies systemCoreDependencies;
     private SymbolExecutionFilter symbolExecutionFilter;
 
-    public SystemCore(@NotNull Exchange exchange, Properties config) throws SQLException, ClassNotFoundException {
+    public SystemCore(@NotNull Exchange exchange, Properties config, String open_ai_api_key)
+            throws SQLException, ClassNotFoundException {
 
         this.exchange = Objects.requireNonNull(exchange, "exchange cannot be null");
 
         this.config = config == null ? new Properties() : config;
+
+        // Store OpenAI API key if provided
+        if (open_ai_api_key != null && !open_ai_api_key.isBlank()) {
+            this.config.setProperty("openai.api_key", open_ai_api_key);
+        }
 
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
         // Create agent registry (agents will be registered when start() is called)
@@ -174,7 +180,7 @@ public class SystemCore {
         this.symbolAgentManager = new SymbolAgentManager();
         this.historicalDataRepository = HistoricalDataRepositoryImpl.getInstance();
         this.symbolExecutionFilter = new SymbolExecutionFilter();
-        this.executionEngine = new ExecutionEngine(exchange, symbolExecutionFilter, RepositoryFactory.getDatabase());
+        this.executionEngine = new ExecutionEngine(exchange, symbolExecutionFilter, RepositoryFactory.getDatabase(),this);
         this.riskManagementSystem = new RiskManagementSystem();
         this.aiReasoningService = createAiReasoningService(this.config);
 
@@ -1044,7 +1050,7 @@ public class SystemCore {
 
             @Override
             public void onOrderAccepted(String exchangeName, String orderId) {
-                systemEventRecorder.recordOrderAccepted(orderId);
+                systemEventRecorder.recordOrderAccepted();
                 eventBus.publish(event(
                         "ORDER_ACCEPTED",
                         exchangeName,
@@ -1056,7 +1062,7 @@ public class SystemCore {
 
             @Override
             public void onOrderRejected(String exchangeName, String clientOrderId, String reason) {
-                systemEventRecorder.recordOrderRejected(clientOrderId, reason);
+                systemEventRecorder.recordOrderRejected(reason);
                 eventBus.publish(event(
                         AgentEvent.ORDER_REJECTED,
                         exchangeName,

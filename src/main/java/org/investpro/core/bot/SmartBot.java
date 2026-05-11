@@ -1,13 +1,13 @@
 package org.investpro.core.bot;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
 import org.investpro.core.agents.AgentRegistry;
 import org.investpro.core.agents.AgentRuntime;
-import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
@@ -42,11 +42,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Slf4j
 @Getter
+@Setter
 public class SmartBot {
     private final AgentEventBus eventBus;
     private final AgentRuntime runtime;
     private final AgentRegistry agentRegistry;
-    private final SymbolAgentManager symbolAgentManager;
 
     private final AtomicBoolean started = new AtomicBoolean(false);
 
@@ -58,18 +58,12 @@ public class SmartBot {
 
     public SmartBot(
             @NotNull AgentRuntime runtime,
-            @NotNull AgentEventBus eventBus) {
-        this(runtime, eventBus, new AgentRegistry());
-    }
-
-    public SmartBot(
-            @NotNull AgentRuntime runtime,
             @NotNull AgentEventBus eventBus,
             @NotNull AgentRegistry agentRegistry) {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
         this.agentRegistry = Objects.requireNonNull(agentRegistry, "agentRegistry must not be null");
-        this.symbolAgentManager = new SymbolAgentManager();
+
     }
 
     /**
@@ -309,8 +303,8 @@ public class SmartBot {
     }
 
     public void publishSystemEvent(String type, String message) {
-        if (eventBusIsUsable()) {
-            log.debug("Skipping system event because event bus is not usable. type={}", type);
+        if (!eventBusIsReady()) {
+            log.debug("Skipping system event because event bus is not ready. type={}", type);
             return;
         }
 
@@ -322,8 +316,8 @@ public class SmartBot {
     }
 
     public void publishErrorEvent(String source, Throwable throwable, String message) {
-        if (eventBusIsUsable()) {
-            log.debug("Skipping error event because event bus is not usable. source={}", source);
+        if (!eventBusIsReady()) {
+            log.debug("Skipping error event because event bus is not ready. source={}", source);
             return;
         }
 
@@ -355,8 +349,8 @@ public class SmartBot {
         }
     }
 
-    private boolean eventBusIsUsable() {
-        return eventBus == null;
+    private boolean eventBusIsReady() {
+        return eventBus != null;
     }
 
     private void safeStopAgents() {

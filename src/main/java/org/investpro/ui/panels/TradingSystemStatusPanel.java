@@ -4,17 +4,13 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.models.SystemAlert;
-import org.investpro.models.TradingSystemStatusSnapshot;
+import org.investpro.monitoring.SystemAlert;
+import org.investpro.monitoring.TradingSystemStatusSnapshot;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 /**
  * Trading System Status Panel - displays comprehensive system health and

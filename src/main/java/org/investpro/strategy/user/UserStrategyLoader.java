@@ -1,5 +1,7 @@
 package org.investpro.strategy.user;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.api.UserStrategy;
@@ -43,6 +45,8 @@ import java.util.jar.JarFile;
  * - Logs detailed information for debugging
  * - Does NOT crash if one strategy fails to load
  */
+@Getter
+@Setter
 @Slf4j
 public class UserStrategyLoader {
 

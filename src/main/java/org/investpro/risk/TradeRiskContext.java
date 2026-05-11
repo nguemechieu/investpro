@@ -2,6 +2,7 @@ package org.investpro.risk;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.RiskProfile;
@@ -28,7 +29,7 @@ import org.investpro.models.trading.TradePair;
  * an
  * authoritative backend decision service.
  */
-
+@Setter
 @Getter
 @Slf4j
 @Value
@@ -797,4 +798,7 @@ public class TradeRiskContext {
 
         return Math.max(min, Math.min(max, value));
     }
+
+    double requestedSize;
+
 }

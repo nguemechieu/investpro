@@ -130,9 +130,9 @@ public class LiveTradingMetricsTracker {
      */
     public double getAverageWin() {
         List<Double> wins = executedTrades.stream()
-                .filter(t -> t.getProfit() > 0)
                 .map(Trade::getProfit)
-                .collect(Collectors.toList());
+                .filter(profit -> profit > 0)
+                .toList();
 
         if (wins.isEmpty())
             return 0.0;
@@ -144,9 +144,9 @@ public class LiveTradingMetricsTracker {
      */
     public double getAverageLoss() {
         List<Double> losses = executedTrades.stream()
-                .filter(t -> t.getProfit() < 0)
                 .map(Trade::getProfit)
-                .collect(Collectors.toList());
+                .filter(profit -> profit < 0)
+                .toList();
 
         if (losses.isEmpty())
             return 0.0;
@@ -201,7 +201,7 @@ public class LiveTradingMetricsTracker {
     public double getSharpeRatio() {
         List<Double> returns = executedTrades.stream()
                 .map(t -> (t.getProfit() / initialBalance) * 100.0)
-                .collect(Collectors.toList());
+                .toList();
 
         if (returns.size() < 2)
             return 0.0;

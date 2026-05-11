@@ -44,11 +44,13 @@ Represents the evaluation/execution state of a symbol's strategy:
 - `FAILED` - Failed
 
 Provides helper methods:
+
 - `isEvaluating()` - Returns true during evaluation phases
 - `isAssignedOrReady()` - Returns true when strategy is ready
 - `isReadyForLive()` - Returns true for live-ready states
 
 #### 3. **SymbolAgentState** (model)
+
 Location: `src/main/java/org/investpro/core/agents/symbol/SymbolAgentState.java`
 
 Holds the complete state of a symbol's strategy and trading readiness:
