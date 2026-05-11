@@ -76,8 +76,10 @@ public class SystemOperationsBoard extends BorderPane {
                 createSnapshotsTab(),
                 createErrorsTab());
 
-        setCenter(tabPane);
-        BorderPane.setGrow(tabPane, Priority.ALWAYS);
+        // Wrap tabPane in VBox to support grow
+        VBox center = new VBox(tabPane);
+        VBox.setVgrow(tabPane, Priority.ALWAYS);
+        setCenter(center);
     }
 
     private HBox createToolbar() {

@@ -7,11 +7,21 @@ package org.investpro.exchange;
  * @author NOEL NGUEMECHIEU
  */
 public enum SupportedExchange {
-    COINBASE("Coinbase", "coinbase"),
     BINANCE_US("Binance US", "binance-us"),
-    BINANCE("Binance", "binance"),
+    COINBASE("Coinbase", "coinbase"),
+    COINBASE_PRO("Coinbase Pro", "coinbase-pro"),
     OANDA("OANDA", "oanda"),
+    IG("IG", "ig"),
+    KRAKEN("Kraken", "kraken"),
+    BITTREX("Bittrex", "bittrex"),
     BITFINEX("Bitfinex", "bitfinex"),
+    BITFINEX_US("Bitfinex US", "bitfinex-us"),
+    BITMEX("BitMEX", "bitmex"),
+    KUCOIN("KuCoin", "kucoin"),
+    KUCOIN_US("KuCoin US", "kucoin-us"),
+    BITSTAMP("Bitstamp", "bitstamp"),
+    POLONIEX("Poloniex", "poloniex"),
+    BINANCE("Binance", "binance"),
     ALPACA("Alpaca", "alpaca"),
     INTERACTIVE_BROKERS("Interactive Brokers", "interactive-brokers"),
     STELLAR_NETWORK("Stellar Network", "stellar-network");

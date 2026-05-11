@@ -412,3 +412,75 @@
 .operations-separator {
     -fx-padding: 20px;
 }
+
+/* ============================================================================
+   CREDENTIAL DIALOG STYLES
+   ============================================================================ */
+
+.credential-dialog-grid {
+    -fx-hgap: 15px;
+    -fx-vgap: 12px;
+    -fx-padding: 15px;
+    -fx-background-color: -panel-bg;
+}
+
+.credential-dialog-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text-primary;
+    -fx-min-width: 120px;
+}
+
+.credential-text-field {
+    -fx-padding: 8px;
+    -fx-font-size: 12px;
+    -fx-control-inner-background: -surface-bg;
+    -fx-text-fill: -text-primary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.credential-text-field:focused {
+    -fx-border-color: -primary-color;
+    -fx-border-width: 2;
+}
+
+.credential-choice-box {
+    -fx-padding: 8px;
+    -fx-font-size: 12px;
+    -fx-control-inner-background: -surface-bg;
+    -fx-text-fill: -text-primary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.credential-choice-box:focused {
+    -fx-border-color: -primary-color;
+    -fx-border-width: 2;
+}
+
+.credential-help-area {
+    -fx-padding: 10px;
+    -fx-font-size: 11px;
+    -fx-control-inner-background: -elevated-bg;
+    -fx-text-fill: -text-secondary;
+    -fx-font-family: "Courier New", monospace;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-wrap-text: true;
+}
+
+.credential-button {
+    -fx-padding: 10px 24px;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-cursor: hand;
+}

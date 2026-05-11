@@ -150,12 +150,22 @@ public class TradingDesk extends BorderPane {
      */
     private static final String[] SUPPORTED_EXCHANGES = {
             "COINBASE",
+            "COINBASE PRO",
             "BINANCE US",
             "BINANCE",
             "OANDA",
             "BITFINEX",
+            "BITFINEX US",
             "ALPACA",
             "INTERACTIVE BROKERS",
+            "KRAKEN",
+            "BITTREX",
+            "BITMEX",
+            "BITSTAMP",
+            "KUCOIN",
+            "KUCOIN US",
+            "POLONIEX",
+            "IG",
             "STELLAR NETWORK"
     };
 
@@ -5076,21 +5086,46 @@ public class TradingDesk extends BorderPane {
         dialog.getDialogPane().getButtonTypes().setAll(connectType, ButtonType.CANCEL);
 
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
+        grid.setHgap(15);
+        grid.setVgap(12);
+        grid.setPadding(new Insets(15));
+        grid.getStyleClass().add("credential-dialog-grid");
 
         TextField apiKeyField = new TextField(configuredApiKey);
+        apiKeyField.getStyleClass().add("credential-text-field");
+
         PasswordField secretField = new PasswordField();
         secretField.setText(configuredApiSecret);
-        TextField telegramField = new TextField(telegramToken);
-        TextField emailField = new TextField(oandaEmailNotification);
+        secretField.getStyleClass().add("credential-text-field");
 
-        // Trading mode selector
-        ComboBox<String> tradingModeCombo = new ComboBox<>();
-        tradingModeCombo.getItems().addAll("LIVE", "PAPER");
-        tradingModeCombo.setValue(configuredTradingMode != null ? configuredTradingMode : "LIVE");
-        tradingModeCombo.setPrefWidth(Double.MAX_VALUE);
+        TextField telegramField = new TextField(telegramToken);
+        telegramField.getStyleClass().add("credential-text-field");
+
+        TextField emailField = new TextField(oandaEmailNotification);
+        emailField.getStyleClass().add("credential-text-field");
+
+        // Trading mode selector - using ChoiceBox (immutable) instead of ComboBox
+        ChoiceBox<String> tradingModeChoice = new ChoiceBox<>();
+        tradingModeChoice.getItems().addAll("LIVE", "PAPER");
+        tradingModeChoice.setValue(configuredTradingMode != null ? configuredTradingMode : "LIVE");
+        tradingModeChoice.setPrefWidth(Double.MAX_VALUE);
+        tradingModeChoice.getStyleClass().add("credential-choice-box");
+
+        // Style labels
+        Label apiLabel = new Label(selectedExchange.equalsIgnoreCase("OANDA") ? "Token" : "API Key");
+        apiLabel.getStyleClass().add("credential-dialog-label");
+
+        Label secretLabel = new Label(selectedExchange.equalsIgnoreCase("OANDA") ? "Account ID" : "API Secret");
+        secretLabel.getStyleClass().add("credential-dialog-label");
+
+        Label tradingLabel = new Label("Trading Mode");
+        tradingLabel.getStyleClass().add("credential-dialog-label");
+
+        Label telegramLabel = new Label("Telegram Token");
+        telegramLabel.getStyleClass().add("credential-dialog-label");
+
+        Label emailLabel = new Label("Email Notifications");
+        emailLabel.getStyleClass().add("credential-dialog-label");
 
         boolean oanda = "OANDA".equalsIgnoreCase(selectedExchange);
         apiKeyField.setPromptText(oanda ? "OANDA Token" : "API Key");
@@ -5100,12 +5135,12 @@ public class TradingDesk extends BorderPane {
         emailField.setVisible(oanda);
         emailField.setManaged(oanda);
 
-        grid.addRow(0, new Label(oanda ? "Token" : "API Key"), apiKeyField);
-        grid.addRow(1, new Label(oanda ? "Account ID" : "API Secret"), secretField);
-        grid.addRow(2, new Label("Trading Mode"), tradingModeCombo);
-        grid.addRow(3, new Label("Telegram Token"), telegramField);
+        grid.addRow(0, apiLabel, apiKeyField);
+        grid.addRow(1, secretLabel, secretField);
+        grid.addRow(2, tradingLabel, tradingModeChoice);
+        grid.addRow(3, telegramLabel, telegramField);
         if (oanda) {
-            grid.addRow(4, new Label("Email Notifications"), emailField);
+            grid.addRow(4, emailLabel, emailField);
         }
 
         // Add helpful info for Coinbase
@@ -5126,9 +5161,11 @@ public class TradingDesk extends BorderPane {
             coinbaseHelpArea.setWrapText(true);
             coinbaseHelpArea.setEditable(false);
             coinbaseHelpArea.setPrefRowCount(8);
-            coinbaseHelpArea.setStyle("-fx-control-inner-background: #f5f5f5; -fx-text-fill: #666;");
+            coinbaseHelpArea.getStyleClass().add("credential-help-area");
 
-            grid.addRow(5, new Label("Help"), coinbaseHelpArea);
+            Label helpLabel = new Label("Help");
+            helpLabel.getStyleClass().add("credential-dialog-label");
+            grid.addRow(5, helpLabel, coinbaseHelpArea);
             GridPane.setColumnSpan(coinbaseHelpArea, 1);
         }
 
@@ -5149,7 +5186,7 @@ public class TradingDesk extends BorderPane {
 
                 configuredApiKey = apiKey;
                 configuredApiSecret = apiSecret;
-                configuredTradingMode = tradingModeCombo.getValue();
+                configuredTradingMode = tradingModeChoice.getValue();
                 telegramToken = safe(telegramField.getText());
                 if (oanda) {
                     oandaEmailNotification = safe(emailField.getText());

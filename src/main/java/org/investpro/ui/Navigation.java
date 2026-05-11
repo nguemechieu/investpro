@@ -29,15 +29,23 @@ import org.investpro.i18n.LocalizationService;
 public class Navigation extends Stage {
     private static final String[] AVAILABLE_EXCHANGES = {
             "COINBASE",
+            "COINBASE PRO",
             "BINANCE US",
             "BINANCE",
             "OANDA",
             "BITFINEX",
+            "BITFINEX US",
+            "ALPACA",
             "INTERACTIVE BROKERS",
-            "SCHWAB",
+            "KRAKEN",
+            "BITTREX",
             "BITMEX",
             "BITSTAMP",
-            "BITTREX"
+            "KUCOIN",
+            "KUCOIN US",
+            "POLONIEX",
+            "IG",
+            "STELLAR NETWORK"
     };
 
     private ComboBox<String> exchangeSelector;
