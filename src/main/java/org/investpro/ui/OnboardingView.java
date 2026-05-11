@@ -213,6 +213,8 @@ public class OnboardingView extends StackPane {
         field.setPromptText(prompt);
         field.setStyle(INPUT_STYLE);
         field.setPrefHeight(40);
+        field.setEditable(true);
+        field.setFocusTraversable(true);
     }
 
     private @NotNull Button createButton(String text, String style) {
