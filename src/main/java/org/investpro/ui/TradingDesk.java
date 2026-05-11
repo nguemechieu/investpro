@@ -1458,10 +1458,11 @@ public class TradingDesk extends BorderPane {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox header = new HBox(8, titleBlock, spacer, detachButton, closeButton);
         header.setAlignment(Pos.CENTER_LEFT);
-        header.getStyleClass().add("panel-header");
+        header.getStyleClass().addAll("panel-header", "console-tab-header");
 
         terminalTabPane.setSide(Side.TOP);
         terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+        terminalTabPane.getStyleClass().add("console-tab-pane");
         DraggableTab.registerTabPane(terminalTabPane);
         terminalTabPane.getTabs().setAll(
                 createFixedTab(TabName.PORTFOLIO, buildPortfolioPane()),
@@ -1486,12 +1487,13 @@ public class TradingDesk extends BorderPane {
 
     private @NotNull Button getButton1() {
         Button closeButton = new Button("✕");
-        closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;");
-        closeButton.setOnMouseEntered(e -> closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #ef4444; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnMouseExited(e -> closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;"));
+        closeButton.getStyleClass().add("console-close-button");
+        closeButton.setOnMouseEntered(e -> {
+            // Hover effect via CSS
+        });
+        closeButton.setOnMouseExited(e -> {
+            // Unhover effect via CSS
+        });
         closeButton.setOnAction(event -> toggleConsoleVisibility());
         return closeButton;
     }

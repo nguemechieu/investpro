@@ -484,3 +484,82 @@
     -fx-border-radius: 4;
     -fx-cursor: hand;
 }
+
+/* ============================================================================
+   SYSTEM CONSOLE & TERMINAL STYLES
+   ============================================================================ */
+
+.system-console {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 8px;
+}
+
+.bottom-terminal {
+    -fx-background-color: -panel-bg;
+}
+
+.terminal-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text-primary;
+}
+
+.terminal-button {
+    -fx-padding: 8px 16px;
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-secondary;
+    -fx-background-color: -elevated-bg;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.terminal-button:hover {
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-border-color: -primary-color;
+}
+
+.console-close-button {
+    -fx-font-size: 14px;
+    -fx-padding: 2px 8px;
+    -fx-text-fill: -text-secondary;
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+}
+
+.console-close-button:hover {
+    -fx-text-fill: -sell-color;
+    -fx-background-color: transparent;
+}
+
+.console-tab-pane {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1 0 0 0;
+}
+
+.console-tab-header {
+    -fx-background-color: -elevated-bg;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 8px;
+}
+
+.console-content {
+    -fx-background-color: -panel-bg;
+    -fx-text-fill: -text-primary;
+    -fx-font-family: "Courier New", monospace;
+    -fx-font-size: 12px;
+}
+
+.console-info-label {
+    -fx-text-fill: -text-secondary;
+    -fx-font-size: 12px;
+    -fx-padding: 12px;
+}
