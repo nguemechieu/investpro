@@ -298,7 +298,8 @@ public class CandleStickChart extends Region {
     }
 
     private void configureAxes() {
-        String axisStyle = "-fx-text-fill: #cbd5e1; -fx-border-color: #273244; -fx-background-color: #0b1220;";
+        // Peach/Black theme styling
+        String axisStyle = "-fx-text-fill: #f5e6d3; -fx-border-color: #3d2817; -fx-background-color: #2a1810;";
         Font axisFont = Font.font(FXUtils.getMonospacedFont(), 12);
 
         xAxis.setManaged(false);
@@ -330,13 +331,22 @@ public class CandleStickChart extends Region {
         yAxis.setStyle(axisStyle);
         extraAxis.setStyle(axisStyle);
 
-        xAxis.setTickLabelFill(AXIS_TICK_LABEL_COLOR);
-        yAxis.setTickLabelFill(AXIS_TICK_LABEL_COLOR);
-        extraAxis.setTickLabelFill(AXIS_TICK_LABEL_COLOR);
+        xAxis.setTickLabelFill(Color.rgb(245, 230, 211));
+        yAxis.setTickLabelFill(Color.rgb(245, 230, 211));
+        extraAxis.setTickLabelFill(Color.rgb(245, 230, 211));
 
         xAxis.setTickLabelFont(axisFont);
         yAxis.setTickLabelFont(axisFont);
         extraAxis.setTickLabelFont(axisFont);
+
+        // Enable visibility for all axes
+        xAxis.setTickLabelsVisible(true);
+        xAxis.setTickMarkVisible(true);
+        xAxis.setMinorTickVisible(false);
+
+        yAxis.setTickLabelsVisible(true);
+        yAxis.setTickMarkVisible(true);
+        yAxis.setMinorTickVisible(false);
 
         extraAxis.setTickLabelsVisible(true);
         extraAxis.setTickMarkVisible(true);
@@ -1043,19 +1053,20 @@ public class CandleStickChart extends Region {
     }
 
     private void drawTradingBackground() {
-        graphicsContext.setFill(Color.rgb(10, 14, 23));
+        // Peach/Black background theme
+        graphicsContext.setFill(Color.rgb(42, 30, 20));
         graphicsContext.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
         drawBackgroundImage();
-        graphicsContext.setFill(Color.rgb(15, 20, 31, 0.90));
+        graphicsContext.setFill(Color.rgb(50, 35, 25, 0.95));
         graphicsContext.fillRect(0, 0, canvas.getWidth(), HEADER_HEIGHT);
         if (chartOptions.isShowVolume()) {
             double volumeTop = canvas.getHeight() * (1.0 - VOLUME_AREA_RATIO);
-            graphicsContext.setFill(Color.rgb(6, 10, 18, 0.54));
+            graphicsContext.setFill(Color.rgb(35, 25, 15, 0.70));
             graphicsContext.fillRect(0, volumeTop, canvas.getWidth(), canvas.getHeight() - volumeTop);
-            graphicsContext.setStroke(Color.rgb(42, 52, 68, 0.70));
+            graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.80));
             graphicsContext.strokeLine(0, volumeTop, canvas.getWidth(), volumeTop);
         }
-        graphicsContext.setStroke(Color.rgb(42, 52, 68, 0.70));
+        graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.80));
         graphicsContext.strokeLine(0, HEADER_HEIGHT, canvas.getWidth(), HEADER_HEIGHT);
     }
 
@@ -1086,14 +1097,14 @@ public class CandleStickChart extends Region {
     private void drawGridLines() {
         graphicsContext.setLineWidth(1.0);
         if (chartOptions.isHorizontalGridLinesVisible()) {
-            graphicsContext.setStroke(Color.rgb(42, 52, 68, 0.42));
+            graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.42));
             for (Axis.TickMark<Number> tick : yAxis.getTickMarks()) {
                 double y = snapPixel(priceToY(tick.getValue().doubleValue()));
                 graphicsContext.strokeLine(0, y, canvas.getWidth(), y);
             }
         }
         if (chartOptions.isVerticalGridLinesVisible()) {
-            graphicsContext.setStroke(Color.rgb(42, 52, 68, 0.25));
+            graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.25));
             int step = Math.max(1, visibleCandles / 8);
             for (int i = 0; i < visibleCandles; i += step) {
                 double x = candleCenterX(i);
@@ -2449,7 +2460,6 @@ public class CandleStickChart extends Region {
             log.error("Error resetting CandleStickChart", e);
         }
     }
-
 
     private class CandlePageConsumer implements Consumer<List<CandleData>> {
         @Override
