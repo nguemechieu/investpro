@@ -278,6 +278,7 @@ public class TradingDesk extends BorderPane {
     private MarketInfoPanel marketInfoPanel;
     private SystemMonitorPanel systemMonitorPanel;
     private ActivityMonitorPanel activityMonitorPanel;
+    private org.investpro.ui.panels.ThemeCustomizationPanel themeCustomizationPanel;
     private MarketWatchPanel symbolAgentMarketWatch; // Symbol-level trading status (from SymbolAgentManager)
     private Navigation navigationPanel; // Exchange navigator
     private DataWindow dataWindow; // Data window for OHLCV display
@@ -523,6 +524,7 @@ public class TradingDesk extends BorderPane {
                         this::toggleBotTrading),
                 menuItem(t("menu.systemMonitor"), null, this::openSystemMonitorWindow),
                 menuItem("Activity Monitor", null, this::openActivityMonitor),
+                menuItem("Theme Customization", null, this::openThemeCustomization),
                 menuItem("System & Operations Board", null, this::openSystemOperationsBoard),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.tradingSystem"), null, this::tradingSystemStatus),
@@ -1041,9 +1043,7 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        // Get best bid and ask
-        double bestBid = orderBookBids.
-                get(0).getPrice();
+        double bestBid = orderBookBids.get(0).getPrice();
         double bestAsk = orderBookAsks.get(0).getPrice();
         double midPrice = (bestBid + bestAsk) / 2.0;
         double spread = bestAsk - bestBid;
@@ -1702,6 +1702,13 @@ public class TradingDesk extends BorderPane {
         }
 
         createIndependentWindow("Activity Monitor", activityMonitorPanel, 1000, 600);
+    }
+
+    private void openThemeCustomization() {
+        if (themeCustomizationPanel == null) {
+            themeCustomizationPanel = new org.investpro.ui.panels.ThemeCustomizationPanel();
+        }
+        createIndependentWindow("Theme Customization", themeCustomizationPanel, 900, 800);
     }
 
     private void openSystemOperationsBoard() {
@@ -5034,11 +5041,6 @@ public class TradingDesk extends BorderPane {
         if (chartTabPane != null) {
             chartTabPane.setVisible(showCharts);
             chartTabPane.setManaged(showCharts);
-        }
-
-        if (showPositions){
-
-            log.info("UNIMPLEMENTED");
         }
     }
 

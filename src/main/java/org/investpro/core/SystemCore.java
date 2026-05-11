@@ -163,9 +163,6 @@ public class SystemCore {
             savePropertiesToFile();
         }
 
-
-
-
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
         // Create agent registry (agents will be registered when start() is called)
         this.agentRegistry = new AgentRegistry();
@@ -240,21 +237,16 @@ public class SystemCore {
             this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
 
             // Initialize ChatGPT integration if OpenAI API key is configured
-            String openaiApiKey=  Objects.requireNonNull(config).getProperty("OPENAI_API_KEY");
+            String openaiApiKey = Objects.requireNonNull(config).getProperty("OPENAI_API_KEY", "").trim();
             if (!openaiApiKey.isBlank()) {
                 telegramNotifier.initializeChatGPT(openaiApiKey);
                 log.info("✅ ChatGPT integration initialized for Telegram bot");
+            } else {
+                log.info("ℹ️ OpenAI API key not configured - ChatGPT features disabled");
             }
 
             log.info("✅ Telegram notifier configured");
         }
-
-
-
-
-
-
-
 
         // Initialize the system event recorder and monitor service after all components
         // are ready
