@@ -56,7 +56,7 @@ public class ChartHeaderTradingView extends VBox {
 
             // Display the latest candle data
             if (!candleDataList.isEmpty()) {
-                CandleData latestCandle = candleDataList.get(candleDataList.size() - 1);
+                CandleData latestCandle = candleDataList.getLast();
                 javafx.application.Platform.runLater(() -> updateWithCandle(
                         candleStickChart.getTradePair().toString('/'),
                         candleStickChart.getTradePair().getLastPrice(),
