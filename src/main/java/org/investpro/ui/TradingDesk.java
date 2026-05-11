@@ -1474,7 +1474,6 @@ public class TradingDesk extends BorderPane {
                 createDetachableTerminalTab(TabName.MAILBOX, createMailboxTab().getContent()),
                 createDetachableTerminalTab(TabName.CHAT, createChatTab().getContent()),
                 createDetachableTerminalTab(TabName.BROWSER, createMarketTab().getContent()),
-                createDetachableTerminalTab(TabName.AGENTS, createAgentsTab().getContent()),
                 createDetachableTerminalTab(TabName.JOURNAL, createJournalTab().getContent()));
 
         VBox console = new VBox(6, header, terminalTabPane);

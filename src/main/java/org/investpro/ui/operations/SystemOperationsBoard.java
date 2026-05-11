@@ -73,6 +73,7 @@ public class SystemOperationsBoard extends BorderPane {
                 createTradingEngineTab(),
                 createRiskTab(),
                 createActivityTab(),
+                createAgentsTab(),
                 createSnapshotsTab(),
                 createErrorsTab());
 
@@ -268,6 +269,54 @@ public class SystemOperationsBoard extends BorderPane {
 
         vbox.getChildren().addAll(filterBox, activityTableView);
         VBox.setVgrow(activityTableView, Priority.ALWAYS);
+
+        tab.setContent(vbox);
+        return tab;
+    }
+
+    /**
+     * Agents & AI tab
+     */
+    private Tab createAgentsTab() {
+        Tab tab = new Tab("Agents & AI", null);
+        tab.setClosable(false);
+
+        VBox vbox = new VBox(10);
+        vbox.setPadding(new Insets(10));
+
+        HBox filterBox = new HBox(10);
+        filterBox.getStyleClass().add("operations-filter-box");
+
+        ComboBox<String> statusFilter = new ComboBox<>();
+        statusFilter.setPromptText("Filter by Status");
+        statusFilter.getStyleClass().add("operations-combo-box");
+        statusFilter.getItems().addAll("ALL", "ACTIVE", "IDLE", "ERROR", "OFFLINE");
+        statusFilter.setValue("ALL");
+
+        Button refreshBtn = new Button("🔄 Refresh");
+        refreshBtn.getStyleClass().add("operations-button");
+
+        filterBox.getChildren().addAll(
+                new Label("Status:"), statusFilter,
+                new Region(), // spacer
+                refreshBtn);
+        HBox.setHgrow(filterBox.getChildren().get(2), Priority.ALWAYS);
+
+        ListView<String> agentListView = new ListView<>();
+        agentListView.getStyleClass().add("console-content");
+        agentListView.setPrefHeight(300);
+
+        // Placeholder items - can be updated dynamically
+        ObservableList<String> agents = FXCollections.observableArrayList(
+                "Smart Trading Bot - Status: Active",
+                "Signal Processor - Status: Active",
+                "Risk Manager AI - Status: Idle",
+                "Market Analyzer - Status: Active",
+                "Portfolio Optimizer - Status: Idle");
+        agentListView.setItems(agents);
+
+        vbox.getChildren().addAll(filterBox, agentListView);
+        VBox.setVgrow(agentListView, Priority.ALWAYS);
 
         tab.setContent(vbox);
         return tab;
