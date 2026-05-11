@@ -28,7 +28,9 @@
 - ✅ Automated trading strategies and signals
 - ✅ Backtesting and portfolio analysis
 - ✅ Telegram bot integration
-- ✅ Desktop and Docker deployment
+- ✅ **Docker containerization** (JavaFX + VNC + PostgreSQL)
+- ✅ Full VNC clipboard support (copy/paste)
+- ✅ Production-ready deployment with health checks
 
 ---
 
@@ -182,24 +184,42 @@ java -jar target/investpro-1.0-SNAPSHOT.jar
 
 ### Option 2: Docker (Recommended for Production)
 
-**Build Image:**
+**Quick Start with Docker Compose:**
 ```bash
-docker build -t investpro:latest .
-```
+# Clone and navigate
+git clone https://github.com/nguemechieu/investpro.git
+cd investpro
 
-**Run Container:**
-```bash
-docker run -it \
-  -e DISPLAY=$DISPLAY \
-  -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -v ~/.investpro:/root/.investpro \
-  investpro:latest
-```
-
-**Docker Compose:**
-```bash
+# Start all services (PostgreSQL + InvestPro app)
 docker-compose up -d
+
+# Access via web VNC
+open http://localhost:6080/vnc.html
+# Or native VNC client: localhost:5900 (password: investpro)
 ```
+
+**Features:**
+- ✅ JavaFX GUI via X11 virtual display
+- ✅ VNC access (web-based noVNC + native clients)
+- ✅ PostgreSQL database for persistence
+- ✅ Clipboard support for copy/paste
+- ✅ Automatic service startup and health checks
+
+**Docker Details:**
+- **Base Image**: Eclipse Temurin 21 JDK with Ubuntu
+- **Java Version**: 21 (Eclipse Temurin)
+- **JavaFX Version**: 21.0.6 (modular with platform-specific natives)
+- **Desktop Environment**: Xvfb + Fluxbox + x11vnc + noVNC
+- **Database**: PostgreSQL 16-Alpine
+- **Ports**: 8080 (app), 5900 (VNC), 6080 (web VNC), 5432 (DB)
+
+**Full Documentation:**
+See [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md) for comprehensive Docker deployment guide including:
+- VNC configuration (web and native clients)
+- Troubleshooting clipboard, display, and connectivity issues
+- Environment variable customization
+- Performance tuning and resource limits
+- Security best practices for production
 
 ### Option 3: Pre-built Binary (Coming Soon)
 
@@ -468,7 +488,12 @@ investpro/
 ├── pom.xml                 # Maven configuration
 └── Dockerfile              # Docker build configuration
 ```
+### Docker VNC Password=investpro
+### How it looks like
 
+- url =http://localhost:6080/vnc.html?autoconnect=1&resize=scale
+- For hosting in google ,aws ,azure ,digitalocean and more
+- ![vnc](src/main/resources/images/investpro_docker_vnc_screen.png)
 ### Build Profiles
 ```bash
 # Development build with all plugins
