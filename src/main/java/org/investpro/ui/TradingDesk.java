@@ -26,6 +26,8 @@ import lombok.Setter;
 import org.investpro.core.SystemCore;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
+import org.investpro.config.AppConfig;
+import org.investpro.config.AppConfigKeys;
 import org.investpro.data.CandleData;
 import org.investpro.enums.SystemState;
 import org.investpro.enums.RiskStatus;
@@ -2294,7 +2296,14 @@ public class TradingDesk extends BorderPane {
         if (!configuredExchange.isBlank() && exchangeSelector.getItems().contains(configuredExchange)) {
             exchangeSelector.getSelectionModel().select(configuredExchange);
         } else {
-            exchangeSelector.getSelectionModel().selectFirst();
+            // Use DEFAULT_EXCHANGE from AppConfig instead of hardcoding the first element
+            String defaultExchange = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
+            if (exchangeSelector.getItems().contains(defaultExchange)) {
+                exchangeSelector.getSelectionModel().select(defaultExchange);
+            } else {
+                // Fall back to first item only if the configured default is not supported
+                exchangeSelector.getSelectionModel().selectFirst();
+            }
         }
 
         exchangeSelector.setOnAction(event -> onExchangeChanged());

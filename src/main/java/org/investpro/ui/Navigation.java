@@ -13,10 +13,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import org.investpro.config.AppConfig;
+import org.investpro.config.AppConfigKeys;
 import org.investpro.i18n.LocalizationService;
+
 /**
- * Navigation panel for switching between exchanges and managing exchange connections.
- * Provides UI controls for selecting different crypto exchanges and viewing exchange status.
+ * Navigation panel for switching between exchanges and managing exchange
+ * connections.
+ * Provides UI controls for selecting different crypto exchanges and viewing
+ * exchange status.
  */
 @Slf4j
 @Getter
@@ -57,7 +62,8 @@ public class Navigation extends Stage {
         titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
 
         // Current Exchange Display
-        currentExchangeLabel = new Label("Current: COINBASE");
+        String defaultExchangeForLabel = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
+        currentExchangeLabel = new Label("Current: " + defaultExchangeForLabel);
         currentExchangeLabel.setStyle("-fx-font-size: 12; -fx-padding: 8; -fx-background-color: #1e293b; "
                 + "-fx-border-color: #334155; -fx-border-width: 1; -fx-border-radius: 4;");
 
@@ -71,7 +77,16 @@ public class Navigation extends Stage {
 
         exchangeSelector = new ComboBox<>();
         exchangeSelector.getItems().setAll(AVAILABLE_EXCHANGES);
-        exchangeSelector.setValue(AVAILABLE_EXCHANGES[0]);
+        // Use DEFAULT_EXCHANGE from AppConfig instead of hardcoding the first element
+        String defaultExchange = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
+        if (AVAILABLE_EXCHANGES.length > 0) {
+            if (java.util.Arrays.asList(AVAILABLE_EXCHANGES).contains(defaultExchange)) {
+                exchangeSelector.setValue(defaultExchange);
+            } else {
+                // Fall back to first element if default is not in available list
+                exchangeSelector.setValue(AVAILABLE_EXCHANGES[0]);
+            }
+        }
         exchangeSelector.setPrefWidth(200);
         exchangeSelector.setStyle("-fx-font-size: 11;");
         exchangeSelector.setOnAction(event -> handleExchangeSelection());
@@ -97,8 +112,7 @@ public class Navigation extends Stage {
                 new Label("Quick Navigation:"),
                 exchangeButtonsBox,
                 separator,
-                controlButtonsBox
-        );
+                controlButtonsBox);
 
         VBox.setVgrow(root, Priority.ALWAYS);
 
@@ -122,8 +136,7 @@ public class Navigation extends Stage {
         HBox row1 = new HBox(5);
         row1.getChildren().addAll(
                 createExchangeButton("BINANCE", "binance-btn"),
-                createExchangeButton("COINBASE", "coinbase-btn")
-        );
+                createExchangeButton("COINBASE", "coinbase-btn"));
         HBox.setHgrow(row1.getChildren().get(0), Priority.ALWAYS);
         HBox.setHgrow(row1.getChildren().get(1), Priority.ALWAYS);
 
@@ -131,8 +144,7 @@ public class Navigation extends Stage {
         HBox row2 = new HBox(5);
         row2.getChildren().addAll(
                 createExchangeButton("OANDA", "oanda-btn"),
-                createExchangeButton("BITFINEX", "bitfinex-btn")
-        );
+                createExchangeButton("BITFINEX", "bitfinex-btn"));
         HBox.setHgrow(row2.getChildren().get(0), Priority.ALWAYS);
         HBox.setHgrow(row2.getChildren().get(1), Priority.ALWAYS);
 
