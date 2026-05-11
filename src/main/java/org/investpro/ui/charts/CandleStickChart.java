@@ -1638,12 +1638,7 @@ public class CandleStickChart extends Region {
         }
     }
 
-    /**
-     * Check if chart events are visible
-     */
-    public boolean isShowChartEvents() {
-        return showChartEvents;
-    }
+
 
     private void updateLatestCandleFromTrade(@NotNull Trade trade) {
         if (data.isEmpty()) {

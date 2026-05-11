@@ -489,7 +489,9 @@ public class SettingsPanel extends VBox {
         testThread.setDaemon(true);
         testThread.start();
     }
+
     Properties props = new Properties();
+
     private void testEmailConnection() {
         String smtpServer = smtpServerField.getText().trim();
         int smtpPort = smtpPortSpinner.getValue();
@@ -900,11 +902,19 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveStreamingSettings() {
-        SystemCore.StreamingMode mode = streamingModeCombo.getValue();
-        if (mode != null) {
-            PREFS.put("streamingMode", mode.name());
+        try {
+            SystemCore.StreamingMode mode = streamingModeCombo.getValue();
+            if (mode != null) {
+                PREFS.put("streamingMode", mode.name());
+            }
+            PREFS.putBoolean("enableStreaming", enableStreamingCheckbox.isSelected());
+            // Flush preferences to disk to ensure persistence
+            PREFS.flush();
+            log.info("Streaming settings saved and flushed to disk");
+        } catch (Exception e) {
+            log.error("Error saving streaming settings", e);
+            throw new RuntimeException("Failed to save streaming settings: " + e.getMessage(), e);
         }
-        PREFS.putBoolean("enableStreaming", enableStreamingCheckbox.isSelected());
     }
 
     private void applySettings() {
@@ -1031,11 +1041,19 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveOpenAiSettings() {
-        PREFS.putBoolean("openaiEnabled", enableOpenAiCheckbox.isSelected());
-        PREFS.put("openaiApiKey", openaiApiKeyField.getText());
-        PREFS.put("openaiModel", openaiModelCombo.getValue());
-        PREFS.putDouble("openaiTemperature", temperatureSpinner.getValue());
-        PREFS.putInt("openaiMaxTokens", maxTokensSpinner.getValue());
+        try {
+            PREFS.putBoolean("openaiEnabled", enableOpenAiCheckbox.isSelected());
+            PREFS.put("openaiApiKey", openaiApiKeyField.getText());
+            PREFS.put("openaiModel", openaiModelCombo.getValue());
+            PREFS.putDouble("openaiTemperature", temperatureSpinner.getValue());
+            PREFS.putInt("openaiMaxTokens", maxTokensSpinner.getValue());
+            // Flush preferences to disk to ensure persistence
+            PREFS.flush();
+            log.info("OpenAI settings saved and flushed to disk");
+        } catch (Exception e) {
+            log.error("Error saving OpenAI settings", e);
+            throw new RuntimeException("Failed to save OpenAI settings: " + e.getMessage(), e);
+        }
     }
 
     private void loadOpenAiSettings() {
@@ -1047,9 +1065,17 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveTelegramSettings() {
-        PREFS.putBoolean("telegramEnabled", enableTelegramCheckbox.isSelected());
-        PREFS.put("telegramBotToken", telegramBotTokenField.getText());
-        PREFS.put("telegramChatId", telegramChatIdField.getText());
+        try {
+            PREFS.putBoolean("telegramEnabled", enableTelegramCheckbox.isSelected());
+            PREFS.put("telegramBotToken", telegramBotTokenField.getText());
+            PREFS.put("telegramChatId", telegramChatIdField.getText());
+            // Flush preferences to disk to ensure persistence
+            PREFS.flush();
+            log.info("Telegram settings saved and flushed to disk");
+        } catch (Exception e) {
+            log.error("Error saving Telegram settings", e);
+            throw new RuntimeException("Failed to save Telegram settings: " + e.getMessage(), e);
+        }
     }
 
     private void loadTelegramSettings() {
@@ -1059,12 +1085,20 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveEmailSettings() {
-        PREFS.putBoolean("emailEnabled", enableEmailCheckbox.isSelected());
-        PREFS.put("smtpServer", smtpServerField.getText());
-        PREFS.putInt("smtpPort", smtpPortSpinner.getValue());
-        PREFS.put("emailAddress", emailAddressField.getText());
-        PREFS.put("emailPassword", emailPasswordField.getText());
-        PREFS.putBoolean("emailUseTls", enableTlsCheckbox.isSelected());
+        try {
+            PREFS.putBoolean("emailEnabled", enableEmailCheckbox.isSelected());
+            PREFS.put("smtpServer", smtpServerField.getText());
+            PREFS.putInt("smtpPort", smtpPortSpinner.getValue());
+            PREFS.put("emailAddress", emailAddressField.getText());
+            PREFS.put("emailPassword", emailPasswordField.getText());
+            PREFS.putBoolean("emailUseTls", enableTlsCheckbox.isSelected());
+            // Flush preferences to disk to ensure persistence
+            PREFS.flush();
+            log.info("Email settings saved and flushed to disk");
+        } catch (Exception e) {
+            log.error("Error saving Email settings", e);
+            throw new RuntimeException("Failed to save Email settings: " + e.getMessage(), e);
+        }
     }
 
     private void loadEmailSettings() {

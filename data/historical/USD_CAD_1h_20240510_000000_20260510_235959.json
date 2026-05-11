@@ -70718,4 +70718,24 @@
   "averagePrice" : 1.3685674999999997,
   "volumeWeightedAveragePrice" : 1828.0,
   "placeHolder" : false
+}, {
+  "openPrice" : 1.36868,
+  "closePrice" : 1.36888,
+  "highPrice" : 1.36921,
+  "lowPrice" : 1.36865,
+  "openTime" : 1778450400,
+  "volume" : 1328.0,
+  "averagePrice" : 1.368855,
+  "volumeWeightedAveragePrice" : 1328.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 1.3689,
+  "closePrice" : 1.36836,
+  "highPrice" : 1.3689,
+  "lowPrice" : 1.36822,
+  "openTime" : 1778454000,
+  "volume" : 2108.0,
+  "averagePrice" : 1.368595,
+  "volumeWeightedAveragePrice" : 2108.0,
+  "placeHolder" : false
 } ]
