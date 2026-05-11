@@ -4529,18 +4529,18 @@ public class TradingDesk extends BorderPane {
 
     private void showTradingProfileSettings() {
         Dialog<Void> dialog = new Dialog<>();
-        dialog.setTitle("Trading Profile Settings");
-        dialog.setHeaderText("Configure your trading profile and risk parameters");
+        dialog.setTitle("Trader Profile Settings");
+        dialog.setHeaderText("Configure your trader profile and risk parameters");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
         SettingsPanel profilePanel = new SettingsPanel(systemCore);
 
         ScrollPane scrollPane = new ScrollPane(profilePanel);
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-control-inner-background: #1a1a2e;");
+        scrollPane.getStyleClass().add("dialog-scroll-pane");
 
         dialog.getDialogPane().setContent(scrollPane);
-        dialog.getDialogPane().setStyle("-fx-control-inner-background: #1a1a2e;");
+        dialog.getDialogPane().getStyleClass().add("trader-profile-dialog");
         dialog.setWidth(800);
         dialog.setHeight(700);
         dialog.showAndWait();
