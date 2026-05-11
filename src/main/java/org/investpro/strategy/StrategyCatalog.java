@@ -11,8 +11,7 @@ import java.util.Map;
 
 public final class StrategyCatalog {
 
-    private StrategyCatalog() {
-    }
+
 
     public static final List<String> CORE_STRATEGY_NAMES = List.of(
             "Trend Following",

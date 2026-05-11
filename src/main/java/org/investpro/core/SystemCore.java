@@ -37,10 +37,7 @@ import org.investpro.risk.RiskManagementSystem;
 import org.investpro.repository.RepositoryFactory;
 import org.investpro.service.TradingService;
 
-import org.investpro.strategy.StrategyAssignment;
-import org.investpro.strategy.StrategyBootstrapper;
-import org.investpro.strategy.StrategyEngine;
-import org.investpro.strategy.StrategySignal;
+import org.investpro.strategy.*;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.ui.panels.SettingsPanel;
 
@@ -198,8 +195,9 @@ public class SystemCore {
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
-        this.botTradeDecisionEngine = new BotTradeDecisionEngine(
-                null, // Use static StrategyCatalog.STRATEGY_DEFINITIONS internally
+
+        @Nullable StrategyCatalog strategyCatalogue;
+        this.botTradeDecisionEngine = new BotTradeDecisionEngine(strategyCatalogue,
                 strategyEngine,
                 currentAccount);
 
