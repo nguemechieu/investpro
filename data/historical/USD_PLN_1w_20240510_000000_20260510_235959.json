@@ -1,0 +1,1041 @@
+[ {
+  "openPrice" : 3.99297,
+  "closePrice" : 3.92005,
+  "highPrice" : 3.9977,
+  "lowPrice" : 3.91218,
+  "openTime" : 1715374800,
+  "volume" : 205906.0,
+  "averagePrice" : 3.955725,
+  "volumeWeightedAveragePrice" : 205906.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.9221,
+  "closePrice" : 3.92035,
+  "highPrice" : 3.94956,
+  "lowPrice" : 3.91096,
+  "openTime" : 1715979600,
+  "volume" : 209178.0,
+  "averagePrice" : 3.9257425,
+  "volumeWeightedAveragePrice" : 209178.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.92005,
+  "closePrice" : 3.9398,
+  "highPrice" : 3.97744,
+  "lowPrice" : 3.90045,
+  "openTime" : 1716584400,
+  "volume" : 273442.0,
+  "averagePrice" : 3.934435,
+  "volumeWeightedAveragePrice" : 273442.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.93888,
+  "closePrice" : 3.9939,
+  "highPrice" : 3.99666,
+  "lowPrice" : 3.914,
+  "openTime" : 1717189200,
+  "volume" : 253356.0,
+  "averagePrice" : 3.9608600000000003,
+  "volumeWeightedAveragePrice" : 253356.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.99776,
+  "closePrice" : 4.09144,
+  "highPrice" : 4.10362,
+  "lowPrice" : 3.98644,
+  "openTime" : 1717794000,
+  "volume" : 266155.0,
+  "averagePrice" : 4.044815,
+  "volumeWeightedAveragePrice" : 266155.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.0889,
+  "closePrice" : 4.0448,
+  "highPrice" : 4.09817,
+  "lowPrice" : 4.02006,
+  "openTime" : 1718398800,
+  "volume" : 279379.0,
+  "averagePrice" : 4.0629825,
+  "volumeWeightedAveragePrice" : 279379.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.04528,
+  "closePrice" : 4.02436,
+  "highPrice" : 4.05134,
+  "lowPrice" : 3.99202,
+  "openTime" : 1719003600,
+  "volume" : 232961.0,
+  "averagePrice" : 4.02825,
+  "volumeWeightedAveragePrice" : 232961.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.02436,
+  "closePrice" : 3.9523,
+  "highPrice" : 4.0431,
+  "lowPrice" : 3.94602,
+  "openTime" : 1719608400,
+  "volume" : 271577.0,
+  "averagePrice" : 3.9914449999999997,
+  "volumeWeightedAveragePrice" : 271577.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.9523,
+  "closePrice" : 3.90035,
+  "highPrice" : 3.9674,
+  "lowPrice" : 3.89759,
+  "openTime" : 1720213200,
+  "volume" : 241499.0,
+  "averagePrice" : 3.92941,
+  "volumeWeightedAveragePrice" : 241499.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.91093,
+  "closePrice" : 3.93825,
+  "highPrice" : 3.94716,
+  "lowPrice" : 3.8914,
+  "openTime" : 1720818000,
+  "volume" : 315443.0,
+  "averagePrice" : 3.921935,
+  "volumeWeightedAveragePrice" : 315443.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.93566,
+  "closePrice" : 3.9381,
+  "highPrice" : 3.97335,
+  "lowPrice" : 3.9253,
+  "openTime" : 1721422800,
+  "volume" : 268254.0,
+  "averagePrice" : 3.9431025,
+  "volumeWeightedAveragePrice" : 268254.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.93639,
+  "closePrice" : 3.93434,
+  "highPrice" : 3.99195,
+  "lowPrice" : 3.92556,
+  "openTime" : 1722027600,
+  "volume" : 333220.0,
+  "averagePrice" : 3.94706,
+  "volumeWeightedAveragePrice" : 333220.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.9294,
+  "closePrice" : 3.95735,
+  "highPrice" : 3.97702,
+  "lowPrice" : 3.91412,
+  "openTime" : 1722632400,
+  "volume" : 475008.0,
+  "averagePrice" : 3.9444725,
+  "volumeWeightedAveragePrice" : 475008.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.95738,
+  "closePrice" : 3.86585,
+  "highPrice" : 3.96298,
+  "lowPrice" : 3.8645,
+  "openTime" : 1723237200,
+  "volume" : 328176.0,
+  "averagePrice" : 3.9126775,
+  "volumeWeightedAveragePrice" : 328176.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.87188,
+  "closePrice" : 3.81065,
+  "highPrice" : 3.87585,
+  "lowPrice" : 3.80942,
+  "openTime" : 1723842000,
+  "volume" : 297698.0,
+  "averagePrice" : 3.8419499999999998,
+  "volumeWeightedAveragePrice" : 297698.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.81075,
+  "closePrice" : 3.87635,
+  "highPrice" : 3.87884,
+  "lowPrice" : 3.8078,
+  "openTime" : 1724446800,
+  "volume" : 264324.0,
+  "averagePrice" : 3.843435,
+  "volumeWeightedAveragePrice" : 264324.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.87368,
+  "closePrice" : 3.86315,
+  "highPrice" : 3.8848,
+  "lowPrice" : 3.8318,
+  "openTime" : 1725051600,
+  "volume" : 232690.0,
+  "averagePrice" : 3.8633575,
+  "volumeWeightedAveragePrice" : 232690.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.86235,
+  "closePrice" : 3.8649,
+  "highPrice" : 3.91021,
+  "lowPrice" : 3.85612,
+  "openTime" : 1725656400,
+  "volume" : 234011.0,
+  "averagePrice" : 3.873395,
+  "volumeWeightedAveragePrice" : 234011.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.86376,
+  "closePrice" : 3.82475,
+  "highPrice" : 3.86535,
+  "lowPrice" : 3.81206,
+  "openTime" : 1726261200,
+  "volume" : 317902.0,
+  "averagePrice" : 3.8414800000000002,
+  "volumeWeightedAveragePrice" : 317902.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.82706,
+  "closePrice" : 3.83005,
+  "highPrice" : 3.8601,
+  "lowPrice" : 3.79855,
+  "openTime" : 1726866000,
+  "volume" : 362585.0,
+  "averagePrice" : 3.82894,
+  "volumeWeightedAveragePrice" : 362585.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.8277,
+  "closePrice" : 3.93165,
+  "highPrice" : 3.9427,
+  "lowPrice" : 3.81745,
+  "openTime" : 1727470800,
+  "volume" : 319188.0,
+  "averagePrice" : 3.8798749999999997,
+  "volumeWeightedAveragePrice" : 319188.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.93155,
+  "closePrice" : 3.924,
+  "highPrice" : 3.94799,
+  "lowPrice" : 3.9128,
+  "openTime" : 1728075600,
+  "volume" : 259330.0,
+  "averagePrice" : 3.9290849999999997,
+  "volumeWeightedAveragePrice" : 259330.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.92845,
+  "closePrice" : 3.9614,
+  "highPrice" : 3.99665,
+  "lowPrice" : 3.9206,
+  "openTime" : 1728680400,
+  "volume" : 247652.0,
+  "averagePrice" : 3.9517749999999996,
+  "volumeWeightedAveragePrice" : 247652.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.96335,
+  "closePrice" : 4.0234,
+  "highPrice" : 4.03855,
+  "lowPrice" : 3.9591,
+  "openTime" : 1729285200,
+  "volume" : 361124.0,
+  "averagePrice" : 3.9961,
+  "volumeWeightedAveragePrice" : 361124.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.025,
+  "closePrice" : 4.0265,
+  "highPrice" : 4.03805,
+  "lowPrice" : 3.9864,
+  "openTime" : 1729890000,
+  "volume" : 371459.0,
+  "averagePrice" : 4.0189875,
+  "volumeWeightedAveragePrice" : 371459.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.0069,
+  "closePrice" : 4.03575,
+  "highPrice" : 4.0878,
+  "lowPrice" : 3.97378,
+  "openTime" : 1730494800,
+  "volume" : 516497.0,
+  "averagePrice" : 4.0260575,
+  "volumeWeightedAveragePrice" : 516497.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.0344,
+  "closePrice" : 4.0981,
+  "highPrice" : 4.1382,
+  "lowPrice" : 4.03405,
+  "openTime" : 1731103200,
+  "volume" : 488406.0,
+  "averagePrice" : 4.0761875,
+  "volumeWeightedAveragePrice" : 488406.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.1088,
+  "closePrice" : 4.16175,
+  "highPrice" : 4.20535,
+  "lowPrice" : 4.0658,
+  "openTime" : 1731708000,
+  "volume" : 435774.0,
+  "averagePrice" : 4.135425,
+  "volumeWeightedAveragePrice" : 435774.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.13948,
+  "closePrice" : 4.0654,
+  "highPrice" : 4.14975,
+  "lowPrice" : 4.05582,
+  "openTime" : 1732312800,
+  "volume" : 545365.0,
+  "averagePrice" : 4.1026125,
+  "volumeWeightedAveragePrice" : 545365.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.0652,
+  "closePrice" : 4.0372,
+  "highPrice" : 4.1002,
+  "lowPrice" : 4.01234,
+  "openTime" : 1732917600,
+  "volume" : 485952.0,
+  "averagePrice" : 4.053735,
+  "volumeWeightedAveragePrice" : 485952.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.04357,
+  "closePrice" : 4.05879,
+  "highPrice" : 4.09262,
+  "lowPrice" : 4.01851,
+  "openTime" : 1733522400,
+  "volume" : 377761.0,
+  "averagePrice" : 4.0533725,
+  "volumeWeightedAveragePrice" : 377761.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.06588,
+  "closePrice" : 4.08595,
+  "highPrice" : 4.1247,
+  "lowPrice" : 4.041,
+  "openTime" : 1734127200,
+  "volume" : 393466.0,
+  "averagePrice" : 4.0793825,
+  "volumeWeightedAveragePrice" : 393466.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.0881,
+  "closePrice" : 4.09748,
+  "highPrice" : 4.11688,
+  "lowPrice" : 4.07786,
+  "openTime" : 1734732000,
+  "volume" : 170032.0,
+  "averagePrice" : 4.09508,
+  "volumeWeightedAveragePrice" : 170032.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.09391,
+  "closePrice" : 4.1426,
+  "highPrice" : 4.1816,
+  "lowPrice" : 4.07703,
+  "openTime" : 1735336800,
+  "volume" : 265053.0,
+  "averagePrice" : 4.123785,
+  "volumeWeightedAveragePrice" : 265053.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.14654,
+  "closePrice" : 4.16535,
+  "highPrice" : 4.1835,
+  "lowPrice" : 4.07108,
+  "openTime" : 1735941600,
+  "volume" : 411254.0,
+  "averagePrice" : 4.141617500000001,
+  "volumeWeightedAveragePrice" : 411254.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.16618,
+  "closePrice" : 4.1498,
+  "highPrice" : 4.1954,
+  "lowPrice" : 4.11195,
+  "openTime" : 1736546400,
+  "volume" : 423274.0,
+  "averagePrice" : 4.1558325,
+  "volumeWeightedAveragePrice" : 423274.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.14152,
+  "closePrice" : 4.0138,
+  "highPrice" : 4.15122,
+  "lowPrice" : 4.00312,
+  "openTime" : 1737151200,
+  "volume" : 529985.0,
+  "averagePrice" : 4.077415,
+  "volumeWeightedAveragePrice" : 529985.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.01982,
+  "closePrice" : 4.0675,
+  "highPrice" : 4.07624,
+  "lowPrice" : 4.0058,
+  "openTime" : 1737756000,
+  "volume" : 692881.0,
+  "averagePrice" : 4.042339999999999,
+  "volumeWeightedAveragePrice" : 692881.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.06625,
+  "closePrice" : 4.0619,
+  "highPrice" : 4.1402,
+  "lowPrice" : 4.02536,
+  "openTime" : 1738360800,
+  "volume" : 671301.0,
+  "averagePrice" : 4.073427499999999,
+  "volumeWeightedAveragePrice" : 671301.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.07761,
+  "closePrice" : 3.9697,
+  "highPrice" : 4.07918,
+  "lowPrice" : 3.95605,
+  "openTime" : 1738965600,
+  "volume" : 590354.0,
+  "averagePrice" : 4.020635,
+  "volumeWeightedAveragePrice" : 590354.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.9696,
+  "closePrice" : 3.978,
+  "highPrice" : 4.01955,
+  "lowPrice" : 3.95795,
+  "openTime" : 1739570400,
+  "volume" : 465679.0,
+  "averagePrice" : 3.9812749999999997,
+  "volumeWeightedAveragePrice" : 465679.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.97706,
+  "closePrice" : 4.04305,
+  "highPrice" : 4.05182,
+  "lowPrice" : 3.92625,
+  "openTime" : 1740175200,
+  "volume" : 564973.0,
+  "averagePrice" : 3.9995450000000003,
+  "volumeWeightedAveragePrice" : 564973.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.0144,
+  "closePrice" : 3.8527,
+  "highPrice" : 4.03585,
+  "lowPrice" : 3.813,
+  "openTime" : 1740780000,
+  "volume" : 920917.0,
+  "averagePrice" : 3.9289875000000003,
+  "volumeWeightedAveragePrice" : 920917.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.84246,
+  "closePrice" : 3.8452,
+  "highPrice" : 3.8851,
+  "lowPrice" : 3.82104,
+  "openTime" : 1741384800,
+  "volume" : 980310.0,
+  "averagePrice" : 3.84845,
+  "volumeWeightedAveragePrice" : 980310.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.8452,
+  "closePrice" : 3.8766,
+  "highPrice" : 3.88756,
+  "lowPrice" : 3.81348,
+  "openTime" : 1741986000,
+  "volume" : 610156.0,
+  "averagePrice" : 3.85571,
+  "volumeWeightedAveragePrice" : 610156.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.87685,
+  "closePrice" : 3.8602,
+  "highPrice" : 3.8992,
+  "lowPrice" : 3.84367,
+  "openTime" : 1742590800,
+  "volume" : 825881.0,
+  "averagePrice" : 3.86998,
+  "volumeWeightedAveragePrice" : 825881.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.85875,
+  "closePrice" : 3.88985,
+  "highPrice" : 3.91072,
+  "lowPrice" : 3.7558,
+  "openTime" : 1743195600,
+  "volume" : 1229663.0,
+  "averagePrice" : 3.8537800000000004,
+  "volumeWeightedAveragePrice" : 1229663.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.9173,
+  "closePrice" : 3.77385,
+  "highPrice" : 3.94305,
+  "lowPrice" : 3.7443,
+  "openTime" : 1743800400,
+  "volume" : 1638287.0,
+  "averagePrice" : 3.8446249999999997,
+  "volumeWeightedAveragePrice" : 1638287.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.78779,
+  "closePrice" : 3.75985,
+  "highPrice" : 3.81148,
+  "lowPrice" : 3.74594,
+  "openTime" : 1744405200,
+  "volume" : 1853663.0,
+  "averagePrice" : 3.7762650000000004,
+  "volumeWeightedAveragePrice" : 1853663.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.75376,
+  "closePrice" : 3.7599,
+  "highPrice" : 3.79215,
+  "lowPrice" : 3.69731,
+  "openTime" : 1745010000,
+  "volume" : 1565896.0,
+  "averagePrice" : 3.75078,
+  "volumeWeightedAveragePrice" : 1565896.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.76178,
+  "closePrice" : 3.78105,
+  "highPrice" : 3.80302,
+  "lowPrice" : 3.73172,
+  "openTime" : 1745614800,
+  "volume" : 1483178.0,
+  "averagePrice" : 3.7693925000000004,
+  "volumeWeightedAveragePrice" : 1483178.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.78193,
+  "closePrice" : 3.7635,
+  "highPrice" : 3.79496,
+  "lowPrice" : 3.75165,
+  "openTime" : 1746219600,
+  "volume" : 1738924.0,
+  "averagePrice" : 3.77301,
+  "volumeWeightedAveragePrice" : 1738924.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.78658,
+  "closePrice" : 3.822,
+  "highPrice" : 3.83395,
+  "lowPrice" : 3.763,
+  "openTime" : 1746824400,
+  "volume" : 1481173.0,
+  "averagePrice" : 3.8013825,
+  "volumeWeightedAveragePrice" : 1481173.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.82495,
+  "closePrice" : 3.74656,
+  "highPrice" : 3.83735,
+  "lowPrice" : 3.734,
+  "openTime" : 1747429200,
+  "volume" : 1250845.0,
+  "averagePrice" : 3.785715,
+  "volumeWeightedAveragePrice" : 1250845.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.7432,
+  "closePrice" : 3.74711,
+  "highPrice" : 3.7805,
+  "lowPrice" : 3.71865,
+  "openTime" : 1748034000,
+  "volume" : 800365.0,
+  "averagePrice" : 3.7473650000000003,
+  "volumeWeightedAveragePrice" : 800365.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.74177,
+  "closePrice" : 3.7626,
+  "highPrice" : 3.77085,
+  "lowPrice" : 3.7119,
+  "openTime" : 1748638800,
+  "volume" : 429716.0,
+  "averagePrice" : 3.7467799999999993,
+  "volumeWeightedAveragePrice" : 429716.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.7606,
+  "closePrice" : 3.6968,
+  "highPrice" : 3.76576,
+  "lowPrice" : 3.67043,
+  "openTime" : 1749243600,
+  "volume" : 423356.0,
+  "averagePrice" : 3.7233975,
+  "volumeWeightedAveragePrice" : 423356.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.70295,
+  "closePrice" : 3.7055,
+  "highPrice" : 3.73885,
+  "lowPrice" : 3.674,
+  "openTime" : 1749848400,
+  "volume" : 410522.0,
+  "averagePrice" : 3.705325,
+  "volumeWeightedAveragePrice" : 410522.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.72788,
+  "closePrice" : 3.6205,
+  "highPrice" : 3.73665,
+  "lowPrice" : 3.6078,
+  "openTime" : 1750453200,
+  "volume" : 484042.0,
+  "averagePrice" : 3.6732075,
+  "volumeWeightedAveragePrice" : 484042.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.61455,
+  "closePrice" : 3.60085,
+  "highPrice" : 3.63157,
+  "lowPrice" : 3.58415,
+  "openTime" : 1751058000,
+  "volume" : 361829.0,
+  "averagePrice" : 3.60778,
+  "volumeWeightedAveragePrice" : 361829.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.59963,
+  "closePrice" : 3.6477,
+  "highPrice" : 3.65269,
+  "lowPrice" : 3.59824,
+  "openTime" : 1751662800,
+  "volume" : 305836.0,
+  "averagePrice" : 3.624565,
+  "volumeWeightedAveragePrice" : 305836.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.65591,
+  "closePrice" : 3.65085,
+  "highPrice" : 3.68483,
+  "lowPrice" : 3.6333,
+  "openTime" : 1752267600,
+  "volume" : 323509.0,
+  "averagePrice" : 3.6562225,
+  "volumeWeightedAveragePrice" : 323509.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.65332,
+  "closePrice" : 3.61605,
+  "highPrice" : 3.65505,
+  "lowPrice" : 3.60789,
+  "openTime" : 1752872400,
+  "volume" : 404866.0,
+  "averagePrice" : 3.6330775,
+  "volumeWeightedAveragePrice" : 404866.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.61294,
+  "closePrice" : 3.689,
+  "highPrice" : 3.75489,
+  "lowPrice" : 3.6079,
+  "openTime" : 1753477200,
+  "volume" : 425709.0,
+  "averagePrice" : 3.6661825,
+  "volumeWeightedAveragePrice" : 425709.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.68288,
+  "closePrice" : 3.64767,
+  "highPrice" : 3.70985,
+  "lowPrice" : 3.63836,
+  "openTime" : 1754082000,
+  "volume" : 226886.0,
+  "averagePrice" : 3.6696899999999997,
+  "volumeWeightedAveragePrice" : 226886.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.64716,
+  "closePrice" : 3.6389,
+  "highPrice" : 3.67546,
+  "lowPrice" : 3.62442,
+  "openTime" : 1754686800,
+  "volume" : 246379.0,
+  "averagePrice" : 3.6464849999999998,
+  "volumeWeightedAveragePrice" : 246379.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.63651,
+  "closePrice" : 3.63908,
+  "highPrice" : 3.68065,
+  "lowPrice" : 3.62482,
+  "openTime" : 1755291600,
+  "volume" : 230632.0,
+  "averagePrice" : 3.6452649999999998,
+  "volumeWeightedAveragePrice" : 230632.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.63304,
+  "closePrice" : 3.64825,
+  "highPrice" : 3.69136,
+  "lowPrice" : 3.63032,
+  "openTime" : 1755896400,
+  "volume" : 234197.0,
+  "averagePrice" : 3.6507425,
+  "volumeWeightedAveragePrice" : 234197.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.64466,
+  "closePrice" : 3.62596,
+  "highPrice" : 3.67424,
+  "lowPrice" : 3.61285,
+  "openTime" : 1756501200,
+  "volume" : 231377.0,
+  "averagePrice" : 3.6394275,
+  "volumeWeightedAveragePrice" : 231377.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.63124,
+  "closePrice" : 3.62519,
+  "highPrice" : 3.65796,
+  "lowPrice" : 3.60627,
+  "openTime" : 1757106000,
+  "volume" : 245389.0,
+  "averagePrice" : 3.630165,
+  "volumeWeightedAveragePrice" : 245389.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.62436,
+  "closePrice" : 3.62949,
+  "highPrice" : 3.63739,
+  "lowPrice" : 3.56559,
+  "openTime" : 1757710800,
+  "volume" : 255839.0,
+  "averagePrice" : 3.6142075,
+  "volumeWeightedAveragePrice" : 255839.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.6316,
+  "closePrice" : 3.64612,
+  "highPrice" : 3.66976,
+  "lowPrice" : 3.60037,
+  "openTime" : 1758315600,
+  "volume" : 230199.0,
+  "averagePrice" : 3.6369625,
+  "volumeWeightedAveragePrice" : 230199.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.64654,
+  "closePrice" : 3.6214,
+  "highPrice" : 3.64774,
+  "lowPrice" : 3.6158,
+  "openTime" : 1758920400,
+  "volume" : 243448.0,
+  "averagePrice" : 3.63287,
+  "volumeWeightedAveragePrice" : 243448.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.62756,
+  "closePrice" : 3.66938,
+  "highPrice" : 3.68762,
+  "lowPrice" : 3.62572,
+  "openTime" : 1759525200,
+  "volume" : 255660.0,
+  "averagePrice" : 3.65257,
+  "volumeWeightedAveragePrice" : 255660.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.67182,
+  "closePrice" : 3.64152,
+  "highPrice" : 3.69716,
+  "lowPrice" : 3.62592,
+  "openTime" : 1760130000,
+  "volume" : 299220.0,
+  "averagePrice" : 3.659105,
+  "volumeWeightedAveragePrice" : 299220.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.64184,
+  "closePrice" : 3.65092,
+  "highPrice" : 3.66224,
+  "lowPrice" : 3.6299,
+  "openTime" : 1760734800,
+  "volume" : 254055.0,
+  "averagePrice" : 3.6462250000000003,
+  "volumeWeightedAveragePrice" : 254055.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.64322,
+  "closePrice" : 3.68825,
+  "highPrice" : 3.69614,
+  "lowPrice" : 3.62549,
+  "openTime" : 1761339600,
+  "volume" : 236165.0,
+  "averagePrice" : 3.663275,
+  "volumeWeightedAveragePrice" : 236165.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.6894,
+  "closePrice" : 3.66516,
+  "highPrice" : 3.7141,
+  "lowPrice" : 3.66124,
+  "openTime" : 1761944400,
+  "volume" : 173405.0,
+  "averagePrice" : 3.682475,
+  "volumeWeightedAveragePrice" : 173405.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.67056,
+  "closePrice" : 3.63682,
+  "highPrice" : 3.67288,
+  "lowPrice" : 3.62648,
+  "openTime" : 1762552800,
+  "volume" : 176579.0,
+  "averagePrice" : 3.651685,
+  "volumeWeightedAveragePrice" : 176579.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.63465,
+  "closePrice" : 3.68058,
+  "highPrice" : 3.69794,
+  "lowPrice" : 3.6336,
+  "openTime" : 1763157600,
+  "volume" : 200628.0,
+  "averagePrice" : 3.6616925,
+  "volumeWeightedAveragePrice" : 200628.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.67956,
+  "closePrice" : 3.653,
+  "highPrice" : 3.68452,
+  "lowPrice" : 3.64075,
+  "openTime" : 1763762400,
+  "volume" : 218814.0,
+  "averagePrice" : 3.6644575,
+  "volumeWeightedAveragePrice" : 218814.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.65068,
+  "closePrice" : 3.63136,
+  "highPrice" : 3.65968,
+  "lowPrice" : 3.61908,
+  "openTime" : 1764367200,
+  "volume" : 176292.0,
+  "averagePrice" : 3.6402,
+  "volumeWeightedAveragePrice" : 176292.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.63346,
+  "closePrice" : 3.5975,
+  "highPrice" : 3.64962,
+  "lowPrice" : 3.59039,
+  "openTime" : 1764972000,
+  "volume" : 172100.0,
+  "averagePrice" : 3.6177425,
+  "volumeWeightedAveragePrice" : 172100.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.60053,
+  "closePrice" : 3.59275,
+  "highPrice" : 3.60301,
+  "lowPrice" : 3.57353,
+  "openTime" : 1765576800,
+  "volume" : 181125.0,
+  "averagePrice" : 3.5924549999999997,
+  "volumeWeightedAveragePrice" : 181125.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.5901,
+  "closePrice" : 3.58085,
+  "highPrice" : 3.59346,
+  "lowPrice" : 3.56934,
+  "openTime" : 1766181600,
+  "volume" : 140943.0,
+  "averagePrice" : 3.5834375,
+  "volumeWeightedAveragePrice" : 140943.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.57869,
+  "closePrice" : 3.59158,
+  "highPrice" : 3.60486,
+  "lowPrice" : 3.5759,
+  "openTime" : 1766786400,
+  "volume" : 103565.0,
+  "averagePrice" : 3.5877575,
+  "volumeWeightedAveragePrice" : 103565.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.59564,
+  "closePrice" : 3.61943,
+  "highPrice" : 3.62536,
+  "lowPrice" : 3.58708,
+  "openTime" : 1767391200,
+  "volume" : 147073.0,
+  "averagePrice" : 3.6068775,
+  "volumeWeightedAveragePrice" : 147073.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.62068,
+  "closePrice" : 3.6376,
+  "highPrice" : 3.6457,
+  "lowPrice" : 3.59858,
+  "openTime" : 1767996000,
+  "volume" : 145291.0,
+  "averagePrice" : 3.6256399999999998,
+  "volumeWeightedAveragePrice" : 145291.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.6458,
+  "closePrice" : 3.55758,
+  "highPrice" : 3.64726,
+  "lowPrice" : 3.55646,
+  "openTime" : 1768600800,
+  "volume" : 195081.0,
+  "averagePrice" : 3.601775,
+  "volumeWeightedAveragePrice" : 195081.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.54142,
+  "closePrice" : 3.55688,
+  "highPrice" : 3.55716,
+  "lowPrice" : 3.47538,
+  "openTime" : 1769205600,
+  "volume" : 314651.0,
+  "averagePrice" : 3.53271,
+  "volumeWeightedAveragePrice" : 314651.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.55321,
+  "closePrice" : 3.56902,
+  "highPrice" : 3.59065,
+  "lowPrice" : 3.54696,
+  "openTime" : 1769810400,
+  "volume" : 240309.0,
+  "averagePrice" : 3.56496,
+  "volumeWeightedAveragePrice" : 240309.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.5701,
+  "closePrice" : 3.54807,
+  "highPrice" : 3.57105,
+  "lowPrice" : 3.52938,
+  "openTime" : 1770415200,
+  "volume" : 193731.0,
+  "averagePrice" : 3.5546499999999996,
+  "volumeWeightedAveragePrice" : 193731.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.54994,
+  "closePrice" : 3.58326,
+  "highPrice" : 3.59857,
+  "lowPrice" : 3.54482,
+  "openTime" : 1771020000,
+  "volume" : 139224.0,
+  "averagePrice" : 3.5691474999999997,
+  "volumeWeightedAveragePrice" : 139224.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.57825,
+  "closePrice" : 3.57318,
+  "highPrice" : 3.58973,
+  "lowPrice" : 3.56503,
+  "openTime" : 1771624800,
+  "volume" : 149564.0,
+  "averagePrice" : 3.5765475,
+  "volumeWeightedAveragePrice" : 149564.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.59339,
+  "closePrice" : 3.67641,
+  "highPrice" : 3.73478,
+  "lowPrice" : 3.58047,
+  "openTime" : 1772229600,
+  "volume" : 327950.0,
+  "averagePrice" : 3.6462625,
+  "volumeWeightedAveragePrice" : 327950.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.70142,
+  "closePrice" : 3.74726,
+  "highPrice" : 3.75244,
+  "lowPrice" : 3.63898,
+  "openTime" : 1772834400,
+  "volume" : 340873.0,
+  "averagePrice" : 3.710025,
+  "volumeWeightedAveragePrice" : 340873.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.7376,
+  "closePrice" : 3.6962,
+  "highPrice" : 3.74458,
+  "lowPrice" : 3.67036,
+  "openTime" : 1773435600,
+  "volume" : 258257.0,
+  "averagePrice" : 3.712185,
+  "volumeWeightedAveragePrice" : 258257.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.70744,
+  "closePrice" : 3.72072,
+  "highPrice" : 3.7357,
+  "lowPrice" : 3.65366,
+  "openTime" : 1774040400,
+  "volume" : 346766.0,
+  "averagePrice" : 3.70438,
+  "volumeWeightedAveragePrice" : 346766.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.72146,
+  "closePrice" : 3.71348,
+  "highPrice" : 3.75256,
+  "lowPrice" : 3.6812,
+  "openTime" : 1774645200,
+  "volume" : 234647.0,
+  "averagePrice" : 3.717175,
+  "volumeWeightedAveragePrice" : 234647.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.71629,
+  "closePrice" : 3.62423,
+  "highPrice" : 3.71857,
+  "lowPrice" : 3.6144,
+  "openTime" : 1775250000,
+  "volume" : 238929.0,
+  "averagePrice" : 3.6683725000000003,
+  "volumeWeightedAveragePrice" : 238929.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.6456,
+  "closePrice" : 3.59308,
+  "highPrice" : 3.6524,
+  "lowPrice" : 3.56645,
+  "openTime" : 1775854800,
+  "volume" : 174649.0,
+  "averagePrice" : 3.6143825,
+  "volumeWeightedAveragePrice" : 174649.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.60216,
+  "closePrice" : 3.62033,
+  "highPrice" : 3.6411,
+  "lowPrice" : 3.58738,
+  "openTime" : 1776459600,
+  "volume" : 199752.0,
+  "averagePrice" : 3.6127424999999995,
+  "volumeWeightedAveragePrice" : 199752.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.62794,
+  "closePrice" : 3.62035,
+  "highPrice" : 3.65682,
+  "lowPrice" : 3.60308,
+  "openTime" : 1777064400,
+  "volume" : 198146.0,
+  "averagePrice" : 3.6270475,
+  "volumeWeightedAveragePrice" : 198146.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 3.61984,
+  "closePrice" : 3.59576,
+  "highPrice" : 3.64724,
+  "lowPrice" : 3.58322,
+  "openTime" : 1777669200,
+  "volume" : 177403.0,
+  "averagePrice" : 3.6115150000000003,
+  "volumeWeightedAveragePrice" : 177403.0,
+  "placeHolder" : false
+} ]

@@ -428,8 +428,7 @@ public class SystemCore {
     // ---------------------------------------------------------------------
 
     public void switchStreamingMode(StreamingMode mode) {
-        ensureBotStarted();
-
+        // Set the preferred streaming mode - bot may not be started yet
         StreamingMode safeMode = mode == null ? StreamingMode.EVERYTHING : mode;
         this.currentStreamingMode = safeMode;
 
@@ -437,10 +436,11 @@ public class SystemCore {
                 "SYSTEM_CORE_STREAMING_MODE_CHANGED",
                 "Streaming mode changed to %s".formatted(safeMode.name()));
 
-        if (streaming.get() && selectedTradePair != null) {
+        // Only start streaming if bot is already running
+        if (smartBot.isStarted() && streaming.get() && selectedTradePair != null) {
             startStreaming(selectedTradePair, safeMode);
         } else {
-            log.info("SystemCore streaming mode set to {}", safeMode);
+            log.info("SystemCore streaming mode set to {} (waiting for bot to start)", safeMode);
         }
     }
 
