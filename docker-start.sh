@@ -30,6 +30,12 @@ FLUXBOX_PID=$!
 
 sleep 1
 
+echo "Starting autocutsel (clipboard sync)..."
+autocutsel -s PRIMARY -i >/dev/null 2>&1 &
+AUTOCUTSEL_PID=$!
+
+sleep 1
+
 echo "Starting x11vnc..."
 x11vnc \
   -display "$DISPLAY" \
@@ -37,6 +43,8 @@ x11vnc \
   -shared \
   -rfbport 5900 \
   -passwd "$VNC_PASSWORD" \
+  -clipboard \
+  -noxkb \
   >/app/logs/x11vnc.log 2>/app/logs/x11vnc.err.log &
 X11VNC_PID=$!
 
@@ -71,6 +79,6 @@ APP_EXIT_CODE=${PIPESTATUS[0]}
 echo "InvestPro exited with code $APP_EXIT_CODE"
 
 echo "Stopping background services..."
-kill "$NOVNC_PID" "$X11VNC_PID" "$FLUXBOX_PID" "$XVFB_PID" 2>/dev/null || true
+kill "$NOVNC_PID" "$X11VNC_PID" "$AUTOCUTSEL_PID" "$FLUXBOX_PID" "$XVFB_PID" 2>/dev/null || true
 
 exit "$APP_EXIT_CODE"
