@@ -577,7 +577,6 @@ public class TradingDesk extends BorderPane {
                 // Trading & Broker Settings
                 menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
                 menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
-                menuItem(t("menu.applicationSettings"), null, this::showSettingsDialog),
                 new SeparatorMenuItem(),
                 // Appearance & UI Settings
                 menuItem("Theme Settings", null, this::showThemeSettingsDialog),
@@ -585,6 +584,11 @@ public class TradingDesk extends BorderPane {
                 new SeparatorMenuItem(),
                 // Account & Security Settings
                 menuItem(t("menu.resetPassword"), null, this::openPasswordReset)));
+
+        Menu reviewMenu = new Menu("Review");
+        reviewMenu.getItems().setAll(List.of(
+                menuItem("Performances", null, this::showPerformancesReview),
+                menuItem("Trades", null, this::showTradesReview)));
 
         Menu windowMenu = new Menu(t("menu.window"));
         windowMenu.getItems().setAll(List.of(
@@ -606,7 +610,7 @@ public class TradingDesk extends BorderPane {
                         "InvestPro ----------------------------------------------------------- Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
 
         return new MenuBar(fileMenu, editMenu, insertMenu, viewMenu, chartsMenu, toolsMenu, strategyMenu, researchMenu,
-                settingsMenu, windowMenu, languageMenu, licenseMenu, helpMenu);
+                reviewMenu, settingsMenu, windowMenu, languageMenu, licenseMenu, helpMenu);
     }
 
     private void openLicenseManagement() {
@@ -4806,6 +4810,83 @@ public class TradingDesk extends BorderPane {
         VBox.setVgrow(reportsList, Priority.ALWAYS);
 
         return panel;
+    }
+
+    private void showPerformancesReview() {
+        log.info("Opening Performances Review panel");
+        VBox performancesPanel = createPerformancesReviewPanel();
+        createIndependentWindow("Performances Review", performancesPanel, 900, 700);
+        journal("Performances Review panel opened");
+    }
+
+    private VBox createPerformancesReviewPanel() {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16));
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("Performance Analytics");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        TabPane performanceTabs = new TabPane();
+        performanceTabs.setStyle("-fx-control-inner-background: #0f3460;");
+        performanceTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        Tab returnTab = new Tab("Returns", createPlaceholderContent("Returns Analysis"));
+        Tab drawdownTab = new Tab("Drawdown", createPlaceholderContent("Drawdown Analysis"));
+        Tab sharpeTab = new Tab("Sharpe Ratio", createPlaceholderContent("Sharpe Ratio Metrics"));
+        Tab winRateTab = new Tab("Win Rate", createPlaceholderContent("Win Rate Statistics"));
+
+        performanceTabs.getTabs().addAll(returnTab, drawdownTab, sharpeTab, winRateTab);
+        panel.getChildren().addAll(title, performanceTabs);
+        VBox.setVgrow(performanceTabs, Priority.ALWAYS);
+
+        return panel;
+    }
+
+    private void showTradesReview() {
+        log.info("Opening Trades Review panel");
+        VBox tradesPanel = createTradesReviewPanel();
+        createIndependentWindow("Trades Review", tradesPanel, 900, 700);
+        journal("Trades Review panel opened");
+    }
+
+    private VBox createTradesReviewPanel() {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16));
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("Trades Analysis");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        TabPane tradesTabs = new TabPane();
+        tradesTabs.setStyle("-fx-control-inner-background: #0f3460;");
+        tradesTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        Tab allTradesTab = new Tab("All Trades", createPlaceholderContent("Complete Trade History"));
+        Tab closedTab = new Tab("Closed", createPlaceholderContent("Closed Trades"));
+        Tab openTab = new Tab("Open", createPlaceholderContent("Open Trades"));
+        Tab pnlTab = new Tab("P&L Analysis", createPlaceholderContent("Profit & Loss Analysis"));
+
+        tradesTabs.getTabs().addAll(allTradesTab, closedTab, openTab, pnlTab);
+        panel.getChildren().addAll(title, tradesTabs);
+        VBox.setVgrow(tradesTabs, Priority.ALWAYS);
+
+        return panel;
+    }
+
+    private VBox createPlaceholderContent(String title) {
+        VBox content = new VBox(12);
+        content.setStyle("-fx-background-color: #0f3460; -fx-padding: 20px;");
+        content.setAlignment(Pos.CENTER);
+
+        Label label = new Label(title);
+        label.setStyle("-fx-font-size: 14px; -fx-text-fill: #a0aec0;");
+
+        Label placeholder = new Label("Detailed analysis data will be displayed here");
+        placeholder.setStyle("-fx-font-size: 12px; -fx-text-fill: #718096;");
+
+        content.getChildren().addAll(label, placeholder);
+        return content;
     }
 
     private void showSettingsDialog() {
