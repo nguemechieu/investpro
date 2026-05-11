@@ -200,15 +200,25 @@ public class Coinbase extends Exchange {
 
         try {
             if (encoding != null && encoding.toLowerCase(Locale.ROOT).contains("gzip")) {
-                try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(byteArray))) {
-                    return new String(gzipInputStream.readAllBytes(), StandardCharsets.UTF_8);
-                }
+                return decompressGzip(byteArray);
             }
 
             return new String(byteArray, StandardCharsets.UTF_8);
 
-        } catch (IOException exception) {
+        } catch (Exception exception) {
+            log.error("Failed to decode HTTP response body with encoding: {}", encoding, exception);
             throw new IllegalArgumentException("Failed to decode HTTP response body", exception);
+        }
+    }
+
+    private static String decompressGzip(byte[] gzipData) throws IOException {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(gzipData);
+                GZIPInputStream gzipInputStream = new GZIPInputStream(bais)) {
+            byte[] decompressed = gzipInputStream.readAllBytes();
+            String result = new String(decompressed, StandardCharsets.UTF_8);
+            log.debug("Successfully decompressed gzip response: {} bytes -> {} chars",
+                    gzipData.length, result.length());
+            return result;
         }
     }
 
@@ -729,15 +739,15 @@ public class Coinbase extends Exchange {
             return OBJECT_MAPPER.readTree(sanitized);
         } catch (JsonProcessingException exception) {
             // Provide more detailed error information for debugging
-            String preview = body == null ? "[null]" : 
-                           body.length() > 100 ? body.substring(0, 100) + "..." : body;
+            String preview = body == null ? "[null]" : body.length() > 100 ? body.substring(0, 100) + "..." : body;
             log.error("Failed to parse Coinbase JSON response. Preview: {}", preview, exception);
             throw new RuntimeException("Unable to parse Coinbase JSON response: " + exception.getMessage(), exception);
         }
     }
 
     /**
-     * Sanitizes a JSON string by removing control characters that can break parsing.
+     * Sanitizes a JSON string by removing control characters that can break
+     * parsing.
      * Preserves valid whitespace: \n (0x0A), \r (0x0D), \t (0x09)
      *
      * @param input The raw JSON string that may contain control characters

@@ -42,8 +42,14 @@ public class ExchangeService {
      * @param adapter      The adapter implementation
      */
     public void register(@NotNull String exchangeName, @NotNull ExchangeIdentity adapter) {
+        if (exchangeName == null) {
+            throw new IllegalArgumentException("exchangeName must not be null");
+        }
         if (exchangeName.isBlank()) {
             throw new IllegalArgumentException("exchangeName must not be blank");
+        }
+        if (adapter == null) {
+            throw new IllegalArgumentException("adapter must not be null");
         }
         adapters.put(exchangeName, adapter);
         logger.info("Registered exchange adapter: {}", exchangeName);

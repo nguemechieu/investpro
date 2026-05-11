@@ -56,7 +56,7 @@ private final CandleStickChart candleStickChart;
                 updateWithCandle(candleStickChart.getTradePair().toString('/'),candleStickChart.getTradePair().getLastPrice()
                         ,candleStickChart.getTradePair().getChange(),candleStickChart.getTradePair().getChangePercent(),
                         candleData.openPrice(),candleData.highPrice(),candleData.lowPrice(),candleData.closePrice(),candleData.volume(),
-                        candleStickChart.getTradePair().getTimeFrame().getCode());
+                        "1h");
 
 
             }});

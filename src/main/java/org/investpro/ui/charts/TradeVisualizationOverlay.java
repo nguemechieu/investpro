@@ -161,6 +161,7 @@ public class TradeVisualizationOverlay {
         }
 
         recalculateCandleWidth();
+        updateVisibleRange(visibleStartIndex, visibleEndIndex);
     }
 
     /**
