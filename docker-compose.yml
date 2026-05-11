@@ -1,5 +1,7 @@
 services:
+  # ============================================================
   # PostgreSQL Database Service
+  # ============================================================
   postgres:
     image: postgres:16-alpine
     container_name: investpro-postgres
@@ -8,63 +10,138 @@ services:
       POSTGRES_USER: investpro
       POSTGRES_PASSWORD: investpro123
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+
     ports:
       - "5432:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U investpro -d investpro"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+
     networks:
       - investpro-network
 
-  # InvestPro Application with GUI and PostgreSQL
+    restart: unless-stopped
+
+
+  # ============================================================
+  # InvestPro Desktop App with JavaFX + noVNC
+  # ============================================================
   investpro-app:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: investpro-app
+
+    env_file:
+      - .env
+
     environment:
-      # Database Configuration (PostgreSQL)
-      DB_URL: jdbc:postgresql://postgres:5432/investpro
-      DB_USER: investpro
+      # ========================================================
+      # App Settings
+      # ========================================================
+      APP_NAME: InvestPro
+      APP_ENV: docker
+      APP_DEBUG: "false"
+      APP_TIMEZONE: America/New_York
+
+      # ========================================================
+      # Database Configuration
+      # Matches AppConfigKeys.java
+      # ========================================================
+      DB_DIALECT: postgresql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: investpro
+      DB_USERNAME: investpro
       DB_PASSWORD: investpro123
+      DB_CHARSET: utf8
       DB_DRIVER: org.postgresql.Driver
-      
-      # Display and VNC settings
+      DB_URL: jdbc:postgresql://postgres:5432/investpro
+
+      # Backward-compatible aliases
+      DB_USER: investpro
+
+      # ========================================================
+      # Display / VNC / noVNC
+      # ========================================================
       DISPLAY: ":0"
       VNC_PASSWORD: investpro
-      GEOMETRY: "1280x1024"
+      GEOMETRY: "1530x840"
       DEPTH: "24"
-      
-      # Application settings
+
+      # ========================================================
+      # Java / JavaFX Settings
+      # ========================================================
       JAVA_OPTS: "-Xmx2g -Xms512m -Djava.awt.headless=false"
-    
+      JAVA_TOOL_OPTIONS: "-Dprism.order=sw -Dprism.verbose=false -Djava.awt.headless=false"
+
+      # ========================================================
+      # Trading Defaults
+      # ========================================================
+      DEFAULT_EXCHANGE: OANDA
+      DEFAULT_MARKET_TYPE: FOREX
+      DEFAULT_ACCOUNT_MODE: PAPER
+      DEFAULT_TRADE_PAIR: EUR/USD
+
+      AUTO_TRADING_ENABLED: "false"
+      AI_REASONING_ENABLED: "true"
+      MAX_RISK_PER_TRADE: "0.01"
+      MAX_DAILY_LOSS: "0.03"
+      MAX_OPEN_POSITIONS: "5"
+      MAX_SYMBOL_EXPOSURE: "0.20"
+      MAX_PORTFOLIO_EXPOSURE: "0.60"
+
+      # ========================================================
+      # Strategy / Backtest / Paper Trading
+      # ========================================================
+      STRATEGY_MAX_DEFINITIONS: "3000"
+      STRATEGY_DEFAULT: "Trend Following"
+      BACKTEST_ENABLED: "true"
+      BACKTEST_INITIAL_BALANCE: "10000"
+      BACKTEST_MIN_CANDLES: "300"
+      BACKTEST_REQUIRED_CANDLES: "1000"
+      PAPER_TRADING_ENABLED: "true"
+      PAPER_TRADING_INITIAL_BALANCE: "10000"
+      PAPER_TRADING_LEARNING_ENABLED: "true"
+
     ports:
-      - "8080:8080"      # Application API port
-      - "5900:5900"      # VNC port for direct VNC clients
-      - "6080:6080"      # noVNC web port (if using built-in server)
-    
+      - "8080:8080"   # Optional app/API port
+      - "5900:5900"   # Direct VNC
+      - "6080:6080"   # noVNC browser UI
+
     depends_on:
       postgres:
         condition: service_healthy
-    
+
     volumes:
       - ./logs:/app/logs
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    
+      - ./data:/app/data
+
     networks:
       - investpro-network
-    
-    # Restart policy
+
     restart: unless-stopped
 
+
+# ============================================================
+# Volumes
+# ============================================================
 volumes:
   postgres_data:
     driver: local
 
+
+# ============================================================
+# Networks
+# ============================================================
 networks:
   investpro-network:
     driver: bridge

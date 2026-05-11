@@ -1042,7 +1042,8 @@ public class TradingDesk extends BorderPane {
         }
 
         // Get best bid and ask
-        double bestBid = orderBookBids.get(0).getPrice();
+        double bestBid = orderBookBids.
+                get(0).getPrice();
         double bestAsk = orderBookAsks.get(0).getPrice();
         double midPrice = (bestBid + bestAsk) / 2.0;
         double spread = bestAsk - bestBid;

@@ -184,7 +184,7 @@ public class IndicatorCalculator {
 
         // Pad signalLine
         while (signalLine.size() < candles.size()) {
-            signalLine.add(0, null);
+            signalLine.addFirst(null);
         }
 
         Map<String, List<Double>> result = new HashMap<>();

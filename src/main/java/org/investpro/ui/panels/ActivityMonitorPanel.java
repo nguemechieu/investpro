@@ -204,7 +204,7 @@ public class ActivityMonitorPanel extends BorderPane {
 
             // Keep only last 1000 entries to prevent memory issues
             if (allLogEntries.size() > 1000) {
-                allLogEntries.remove(0);
+                allLogEntries.removeFirst();
             }
         });
     }

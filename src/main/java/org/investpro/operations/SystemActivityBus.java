@@ -65,7 +65,7 @@ public class SystemActivityBus {
             eventHistory.add(event);
             // Remove oldest events if exceeding max size
             while (eventHistory.size() > maxHistorySize) {
-                eventHistory.remove(0);
+                eventHistory.removeFirst();
             }
         } finally {
             lock.writeLock().unlock();

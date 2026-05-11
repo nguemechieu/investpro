@@ -267,7 +267,7 @@ public class SignalAgent implements Agent {
                 candles.add(candle);
                 candles.sort(java.util.Comparator.comparingInt(CandleData::openTime));
                 while (candles.size() > MAX_CANDLES_PER_CONTEXT) {
-                    candles.remove(0);
+                    candles.removeFirst();
                 }
                 return List.copyOf(candles);
             }
