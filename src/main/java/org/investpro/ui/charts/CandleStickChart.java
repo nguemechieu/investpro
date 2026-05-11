@@ -175,6 +175,11 @@ public class CandleStickChart extends Region {
     private Image backgroundImage;
     private double backgroundImageOpacity = 0.22;
 
+    // Trade visualization overlay for displaying trade markers, order levels, and P&L zones
+    private TradeVisualizationOverlay tradeVisualizationOverlay;
+    private Canvas tradeOverlayCanvas;
+    private boolean showTradeOverlay = true; // Toggle for displaying trades
+
     /**
      * -- SETTER --
      * Sets the callback to be invoked when a candlestick is clicked.
@@ -266,6 +271,9 @@ public class CandleStickChart extends Region {
         this.chartOptions = new CandleStickChartOptions();
         this.candleDataPager = new CandleDataPager(this, candleDataSupplier);
         this.candlePageConsumer = new CandlePageConsumer();
+
+        // Initialize trade visualization overlay
+        this.tradeVisualizationOverlay = new TradeVisualizationOverlay();
 
         if (liveSyncing) {
             this.updateInProgressCandleTask = new UpdateInProgressCandleTask();
@@ -517,7 +525,11 @@ public class CandleStickChart extends Region {
                     Math.max(1, chartHeight - TIME_AXIS_HEIGHT));
             graphicsContext = canvas.getGraphicsContext2D();
 
-            chartStackPane = new StackPane(canvas, loadingIndicatorContainer);
+            // Create overlay canvas for trade visualization
+            tradeOverlayCanvas = new Canvas(Math.max(1, chartWidth - LEFT_AXIS_WIDTH - RIGHT_AXIS_WIDTH),
+                    Math.max(1, chartHeight - TIME_AXIS_HEIGHT));
+
+            chartStackPane = new StackPane(canvas, tradeOverlayCanvas, loadingIndicatorContainer);
             chartStackPane.setManaged(false);
             getChildren().addFirst(chartStackPane);
 
@@ -1045,6 +1057,12 @@ public class CandleStickChart extends Region {
             drawCrosshair();
         drawScrollbar();
         drawScrollPosition();
+        
+        // Render trade visualization overlay
+        if (showTradeOverlay && tradeOverlayCanvas != null && tradeVisualizationOverlay != null) {
+            updateTradeOverlayDimensions(visible);
+            tradeVisualizationOverlay.render(tradeOverlayCanvas, tradeOverlayCanvas.getGraphicsContext2D());
+        }
     }
 
     private void clearCanvas() {
@@ -2709,6 +2727,211 @@ public class CandleStickChart extends Region {
     public void resetZoom() {
         visibleCandles = TARGET_VISIBLE_CANDLES;
         requestChartRedraw();
+    }
+
+    // ============================================================================
+    // Trade Visualization Overlay Methods
+    // ============================================================================
+
+    /**
+     * Update trade overlay dimensions and candle data.
+     * Called before rendering the overlay each frame.
+     */
+    private void updateTradeOverlayDimensions(List<CandleData> visibleCandles) {
+        if (tradeVisualizationOverlay == null || visibleCandles.isEmpty()) {
+            return;
+        }
+
+        double chartW = canvas.getWidth();
+        double chartH = canvas.getHeight();
+        double priceMin = yAxis.getLowerBound();
+        double priceMax = yAxis.getUpperBound();
+        int visibleCount = this.visibleCandles;
+
+        tradeVisualizationOverlay.updateChartDimensions(chartW, chartH, priceMin, priceMax, visibleCount);
+        tradeVisualizationOverlay.updateCandles(getAllCandleData(), firstVisibleIndex, 
+                firstVisibleIndex + visibleCount - 1);
+    }
+
+    /**
+     * Add a trade marker (entry/exit point) to the overlay.
+     */
+    public void addTradeMarker(TradeVisualizationOverlay.TradeMarker marker) {
+        if (tradeVisualizationOverlay != null) {
+            tradeVisualizationOverlay.addTradeMarker(marker);
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Add a long entry trade marker.
+     */
+    public void addLongEntryMarker(double price, long timestamp, String label, double quantity, 
+                                    Double takeProfit, Double stopLoss) {
+        addTradeMarker(TradeVisualizationOverlay.TradeMarker.builder()
+                .type(TradeVisualizationOverlay.TradeType.LONG_ENTRY)
+                .price(price)
+                .timestamp(timestamp)
+                .label(label)
+                .quantity(quantity)
+                .takeProfit(takeProfit)
+                .stopLoss(stopLoss)
+                .build());
+    }
+
+    /**
+     * Add a short entry trade marker.
+     */
+    public void addShortEntryMarker(double price, long timestamp, String label, double quantity, 
+                                     Double takeProfit, Double stopLoss) {
+        addTradeMarker(TradeVisualizationOverlay.TradeMarker.builder()
+                .type(TradeVisualizationOverlay.TradeType.SHORT_ENTRY)
+                .price(price)
+                .timestamp(timestamp)
+                .label(label)
+                .quantity(quantity)
+                .takeProfit(takeProfit)
+                .stopLoss(stopLoss)
+                .build());
+    }
+
+    /**
+     * Add an exit trade marker.
+     */
+    public void addExitMarker(double price, long timestamp, String label, double quantity) {
+        addTradeMarker(TradeVisualizationOverlay.TradeMarker.builder()
+                .type(TradeVisualizationOverlay.TradeType.EXIT)
+                .price(price)
+                .timestamp(timestamp)
+                .label(label)
+                .quantity(quantity)
+                .build());
+    }
+
+    /**
+     * Add an order level (TP, SL, resistance, support).
+     */
+    public void addOrderLevel(TradeVisualizationOverlay.OrderLevel level) {
+        if (tradeVisualizationOverlay != null) {
+            tradeVisualizationOverlay.addOrderLevel(level);
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Add a take-profit order level.
+     */
+    public void addTakeProfitLevel(double price, String label) {
+        addOrderLevel(TradeVisualizationOverlay.OrderLevel.builder()
+                .type(TradeVisualizationOverlay.OrderLevelType.TAKE_PROFIT)
+                .price(price)
+                .label(label)
+                .build());
+    }
+
+    /**
+     * Add a stop-loss order level.
+     */
+    public void addStopLossLevel(double price, String label) {
+        addOrderLevel(TradeVisualizationOverlay.OrderLevel.builder()
+                .type(TradeVisualizationOverlay.OrderLevelType.STOP_LOSS)
+                .price(price)
+                .label(label)
+                .build());
+    }
+
+    /**
+     * Add a resistance level.
+     */
+    public void addResistanceLevel(double price, String label) {
+        addOrderLevel(TradeVisualizationOverlay.OrderLevel.builder()
+                .type(TradeVisualizationOverlay.OrderLevelType.RESISTANCE)
+                .price(price)
+                .label(label)
+                .build());
+    }
+
+    /**
+     * Add a support level.
+     */
+    public void addSupportLevel(double price, String label) {
+        addOrderLevel(TradeVisualizationOverlay.OrderLevel.builder()
+                .type(TradeVisualizationOverlay.OrderLevelType.SUPPORT)
+                .price(price)
+                .label(label)
+                .build());
+    }
+
+    /**
+     * Add a profit/loss zone.
+     */
+    public void addPnLZone(TradeVisualizationOverlay.PnLZone zone) {
+        if (tradeVisualizationOverlay != null) {
+            tradeVisualizationOverlay.addPnLZone(zone);
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Add a profit zone.
+     */
+    public void addProfitZone(double priceLow, double priceHigh, String label) {
+        addPnLZone(TradeVisualizationOverlay.PnLZone.builder()
+                .priceLow(priceLow)
+                .priceHigh(priceHigh)
+                .isProfit(true)
+                .label(label)
+                .build());
+    }
+
+    /**
+     * Add a loss zone.
+     */
+    public void addLossZone(double priceLow, double priceHigh, String label) {
+        addPnLZone(TradeVisualizationOverlay.PnLZone.builder()
+                .priceLow(priceLow)
+                .priceHigh(priceHigh)
+                .isProfit(false)
+                .label(label)
+                .build());
+    }
+
+    /**
+     * Clear all trade markers from the overlay.
+     */
+    public void clearTradeOverlay() {
+        if (tradeVisualizationOverlay != null) {
+            tradeVisualizationOverlay.clear();
+            requestChartRedraw();
+        }
+    }
+
+    /**
+     * Toggle trade overlay visibility.
+     */
+    public void toggleTradeOverlay() {
+        setShowTradeOverlay(!showTradeOverlay);
+    }
+
+    /**
+     * Set trade overlay visibility.
+     */
+    public void setShowTradeOverlay(boolean show) {
+        showTradeOverlay = show;
+        if (tradeOverlayCanvas != null) {
+            tradeOverlayCanvas.setVisible(show);
+        }
+        requestChartRedraw();
+    }
+
+    /**
+     * Get trade info at a specific price level (for tooltips).
+     */
+    public String getTradeInfoAtPrice(double price) {
+        if (tradeVisualizationOverlay == null) {
+            return "";
+        }
+        return tradeVisualizationOverlay.getTradeInfoAtPrice(price);
     }
 
 }

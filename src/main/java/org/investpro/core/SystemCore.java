@@ -248,13 +248,17 @@ public class SystemCore {
             if (Files.exists(configFile)) {
                 try (FileInputStream fis = new FileInputStream(configFile.toFile())) {
                     this.config.load(fis);
-                    log.info("Loaded configuration from {}", configFile.toAbsolutePath());
+                    String apiKeyStatus = this.config.getProperty("openai.api_key") != null ? "✅ (loaded)"
+                            : "❌ (not found)";
+                    log.info("✅ Loaded configuration from {}", configFile.toAbsolutePath());
+                    log.info("   OpenAI API key status: {}", apiKeyStatus);
                 }
             } else {
-                log.debug("Configuration file not found at {}; using defaults", configFile.toAbsolutePath());
+                log.info("ℹ️ Configuration file not found at {}; using defaults", configFile.toAbsolutePath());
+                log.info("   To persist settings, use /setapikey command or set OPENAI_API_KEY environment variable");
             }
         } catch (IOException e) {
-            log.warn("Failed to load properties from file: {}", e.getMessage());
+            log.warn("⚠️ Failed to load properties from file: {}", e.getMessage());
         }
     }
 
@@ -270,14 +274,18 @@ public class SystemCore {
             // Create directory if it doesn't exist
             if (!Files.exists(configDir)) {
                 Files.createDirectories(configDir);
+                log.info("✅ Created configuration directory: {}", configDir.toAbsolutePath());
             }
 
             try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
                 this.config.store(fos, "InvestPro Configuration - DO NOT EDIT MANUALLY");
-                log.debug("Saved configuration to {}", configFile.toAbsolutePath());
+                log.info("✅ Saved configuration to {}", configFile.toAbsolutePath());
+                log.info("   OpenAI API key: {}",
+                        this.config.getProperty("openai.api_key") != null &&
+                                !this.config.getProperty("openai.api_key").isBlank() ? "✅ Set" : "❌ Not set");
             }
         } catch (IOException e) {
-            log.warn("Failed to save properties to file: {}", e.getMessage());
+            log.warn("⚠️ Failed to save properties to file: {}", e.getMessage());
         }
     }
 
@@ -293,9 +301,14 @@ public class SystemCore {
             // Reinitialize ChatGPT with the new key
             if (this.telegramNotifier != null) {
                 this.telegramNotifier.initializeChatGPT(apiKey);
+                log.info("✅ ChatGPT reinitialized with new API key");
+            } else {
+                log.warn("⚠️ TelegramNotifier not initialized; unable to reinitialize ChatGPT");
             }
 
-            log.info("OpenAI API key configured and persisted");
+            log.info("✅ OpenAI API key configured and persisted");
+        } else {
+            log.warn("⚠️ Invalid API key provided (empty or null)");
         }
     }
 
