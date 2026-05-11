@@ -15,7 +15,12 @@ import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.repository.*;
+import org.investpro.config.AppConfig;
+import org.investpro.config.AppConfigKeys;
+import org.investpro.repository.CurrencyRepository;
+import org.investpro.repository.OrderRepository;
+import org.investpro.repository.RepositoryFactory;
+import org.investpro.repository.TradeRepository;
 import org.investpro.strategy.StrategyBootstrapper;
 import org.investpro.ui.MarketConfiguration;
 import org.investpro.ui.OnboardingView;
@@ -30,10 +35,21 @@ import java.util.Objects;
  * <p>
  * Main JavaFX entry point.
  * <p>
- * Flow:
- * - Start onboarding
- * - User chooses broker/configuration
- * - Open trading terminal
+ * Responsibilities:
+ * - start JavaFX application
+ * - load app resources
+ * - initialize strategy bootstrapper
+ * - initialize repositories
+ * - show onboarding
+ * - open trading terminal
+ * - shutdown terminal cleanly
+ *
+ * This class should NOT:
+ * - own broker logic
+ * - own strategy logic
+ * - own execution logic
+ * - own risk logic
+ * - own bot runtime logic
  */
 @Slf4j
 @Getter
@@ -46,6 +62,7 @@ public class InvestPro extends Application {
     private static final double MIN_HEIGHT = 720;
 
     private static final String APP_ICON_RESOURCE = "images/Invest.png";
+    private static final String APP_BACKGROUND_RESOURCE = "images/Invest.png";
     private static final String APP_CSS_RESOURCE = "css/app.css";
 
     private Stage primaryStage;
@@ -55,7 +72,6 @@ public class InvestPro extends Application {
 
     private TradingDesk tradingDesk;
 
-    // Repository dependencies
     private TradeRepository tradeRepository;
     private OrderRepository orderRepository;
     private CurrencyRepository currencyRepository;
@@ -66,14 +82,22 @@ public class InvestPro extends Application {
 
     public InvestPro() {
         super();
+    }
 
+    @Override
+    public void init() {
         try {
-            this.tradeRepository = RepositoryFactory.createTradeRepository();
-            this.orderRepository = RepositoryFactory.createOrderRepository();
-            this.currencyRepository = RepositoryFactory.createCurrencyRepository();
+            AppConfig.logStartupSummary();
+
+            tradeRepository = RepositoryFactory.createTradeRepository();
+            orderRepository = RepositoryFactory.createOrderRepository();
+            currencyRepository = RepositoryFactory.createCurrencyRepository();
+
+            log.info("InvestPro repositories initialized.");
 
         } catch (Exception exception) {
-            throw new RuntimeException("Failed to initialize InvestPro repositories", exception);
+            log.error("Failed to initialize InvestPro", exception);
+            throw new RuntimeException("Failed to initialize InvestPro", exception);
         }
     }
 
@@ -89,10 +113,17 @@ public class InvestPro extends Application {
 
             primaryStage.show();
 
+            log.info("InvestPro JavaFX application started.");
+
         } catch (Exception exception) {
             log.error("Failed to start InvestPro", exception);
-            showErrorAlert(exception);
+            showErrorAlert("Startup Error", "Failed to start InvestPro.", exception);
         }
+    }
+
+    @Override
+    public void stop() {
+        closeApplication(false);
     }
 
     private void configurePrimaryStage() {
@@ -104,47 +135,49 @@ public class InvestPro extends Application {
         loadWindowIcon();
         loadBackgroundImage();
 
-        primaryStage.setTitle(buildWindowTitle());
+        primaryStage.setTitle(buildWindowTitle("Onboarding"));
         primaryStage.setScene(mainScene);
 
         primaryStage.setMinWidth(MIN_WIDTH);
         primaryStage.setMinHeight(MIN_HEIGHT);
         primaryStage.setResizable(true);
-
-        /*
-         * Better than setFullScreen(true) for desktop apps:
-         * - no forced fullscreen warning
-         * - behaves like normal professional workstation software
-         * - user can still resize/minimize
-         */
         primaryStage.setMaximized(true);
+        primaryStage.centerOnScreen();
 
         primaryStage.setOnCloseRequest(event -> {
             event.consume();
-            closeApplication();
+            closeApplication(true);
         });
     }
 
     public void showOnboarding() {
         OnboardingView onboardingView = new OnboardingView(this::showTradingTerminal);
         setRootContent(onboardingView);
-        primaryStage.setTitle("%s - Onboarding".formatted(buildWindowTitle()));
+        primaryStage.setTitle(buildWindowTitle("Onboarding"));
     }
 
     private void showTradingTerminal(MarketConfiguration configuration) {
+        Objects.requireNonNull(configuration, "configuration must not be null");
+
         try {
             shutdownTradingTerminal();
 
-            tradingDesk = new TradingDesk(configuration, tradeRepository, orderRepository, currencyRepository);
+            tradingDesk = new TradingDesk(
+                    configuration,
+                    tradeRepository,
+                    orderRepository,
+                    currencyRepository
+            );
+
             setRootContent(tradingDesk);
 
-            primaryStage.setTitle("%s - Trading Desk".formatted(buildWindowTitle()));
+            primaryStage.setTitle(buildWindowTitle("Trading Desk"));
+
+            log.info("Trading desk opened. configuration={}", configuration);
 
         } catch (Exception exception) {
-
             log.error("Failed to open trading terminal", exception);
-            showErrorAlert(exception);
-
+            showErrorAlert("Trading Terminal Error", "Failed to open the trading terminal.", exception);
         }
     }
 
@@ -161,28 +194,25 @@ public class InvestPro extends Application {
 
     private void loadWindowIcon() {
         try {
-            URL iconUrl = getClass().getClassLoader().getResource(InvestPro.APP_ICON_RESOURCE);
+            URL iconUrl = getClass().getClassLoader().getResource(APP_ICON_RESOURCE);
 
             if (iconUrl == null) {
-                log.warn("Window icon not found: {}", InvestPro.APP_ICON_RESOURCE);
+                log.warn("Window icon not found: {}", APP_ICON_RESOURCE);
                 return;
             }
 
             Image icon = new Image(iconUrl.toExternalForm());
 
             if (icon.isError()) {
-                log.warn("Failed to load window icon: {}", InvestPro.APP_ICON_RESOURCE);
+                log.warn("Failed to load window icon: {}", APP_ICON_RESOURCE);
                 return;
             }
 
             primaryStage.getIcons().add(icon);
-            primaryStage.centerOnScreen();
-            primaryStage.setResizable(true);
-
-            log.info("Loaded window icon: {}", InvestPro.APP_ICON_RESOURCE);
+            log.info("Loaded window icon: {}", APP_ICON_RESOURCE);
 
         } catch (Exception exception) {
-            log.warn("Failed to load window icon: {}", InvestPro.APP_ICON_RESOURCE, exception);
+            log.warn("Failed to load window icon: {}", APP_ICON_RESOURCE, exception);
         }
     }
 
@@ -190,34 +220,34 @@ public class InvestPro extends Application {
         Objects.requireNonNull(scene, "scene must not be null");
 
         try {
-            URL cssUrl = getClass().getClassLoader().getResource(InvestPro.APP_CSS_RESOURCE);
+            URL cssUrl = getClass().getClassLoader().getResource(APP_CSS_RESOURCE);
 
             if (cssUrl == null) {
-                log.warn("Stylesheet not found: {}", InvestPro.APP_CSS_RESOURCE);
+                log.warn("Stylesheet not found: {}", APP_CSS_RESOURCE);
                 return;
             }
 
             scene.getStylesheets().setAll(cssUrl.toExternalForm());
-            log.info("Loaded stylesheet: {}", InvestPro.APP_CSS_RESOURCE);
+            log.info("Loaded stylesheet: {}", APP_CSS_RESOURCE);
 
         } catch (Exception exception) {
-            log.warn("Failed to load stylesheet: {}", InvestPro.APP_CSS_RESOURCE, exception);
+            log.warn("Failed to load stylesheet: {}", APP_CSS_RESOURCE, exception);
         }
     }
 
     private void loadBackgroundImage() {
         try {
-            URL imageUrl = getClass().getClassLoader().getResource("images/Invest.png");
+            URL imageUrl = getClass().getClassLoader().getResource(APP_BACKGROUND_RESOURCE);
 
             if (imageUrl == null) {
-                log.warn("Background image not found: images/Invest.png");
+                log.warn("Background image not found: {}", APP_BACKGROUND_RESOURCE);
                 return;
             }
 
             Image backgroundImage = new Image(imageUrl.toExternalForm());
 
             if (backgroundImage.isError()) {
-                log.warn("Failed to load background image: images/Invest.png");
+                log.warn("Failed to load background image: {}", APP_BACKGROUND_RESOURCE);
                 return;
             }
 
@@ -226,27 +256,37 @@ public class InvestPro extends Application {
                     BackgroundRepeat.NO_REPEAT,
                     BackgroundRepeat.NO_REPEAT,
                     BackgroundPosition.CENTER,
-                    new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, true, true));
+                    new BackgroundSize(
+                            BackgroundSize.AUTO,
+                            BackgroundSize.AUTO,
+                            false,
+                            false,
+                            true,
+                            true
+                    )
+            );
 
-            Background background = new Background(bgImage);
-            root.setBackground(background);
+            root.setBackground(new Background(bgImage));
 
-            log.info("Loaded background image: images/Invest.png");
+            log.info("Loaded background image: {}", APP_BACKGROUND_RESOURCE);
 
         } catch (Exception exception) {
-            log.warn("Failed to load background image", exception);
+            log.warn("Failed to load background image: {}", APP_BACKGROUND_RESOURCE, exception);
         }
     }
 
-    private void closeApplication() {
+    private void closeApplication(boolean exitPlatform) {
         try {
             shutdownTradingTerminal();
+            log.info("InvestPro shutdown completed.");
+
         } catch (Exception exception) {
-            log.warn("Error while shutting down trading terminal", exception);
-            throw new RuntimeException(exception);
+            log.warn("Error while shutting down InvestPro", exception);
+
         } finally {
-            Platform.exit();
-            System.exit(0);
+            if (exitPlatform) {
+                Platform.exit();
+            }
         }
     }
 
@@ -257,8 +297,11 @@ public class InvestPro extends Application {
 
         try {
             tryInvokeShutdown(tradingDesk);
+            log.info("Trading desk shutdown completed.");
+
         } catch (Exception exception) {
             log.error("Trading terminal shutdown failed: {}", exception.getMessage(), exception);
+
         } finally {
             tradingDesk = null;
         }
@@ -271,27 +314,58 @@ public class InvestPro extends Application {
 
         try {
             target.getClass().getMethod("shutdown").invoke(target);
+
         } catch (NoSuchMethodException ignored) {
-            log.debug("TradingDesk does not expose shutdown() yet.");
+            log.debug("{} does not expose shutdown().", target.getClass().getSimpleName());
+
         } catch (Exception exception) {
-            throw new RuntimeException("Failed to invoke shutdown on " + target.getClass().getSimpleName(), exception);
+            throw new RuntimeException(
+                    "Failed to invoke shutdown on " + target.getClass().getSimpleName(),
+                    exception
+            );
         }
     }
 
-    private @NotNull String buildWindowTitle() {
-        return "InvestPro---------------------------------------------------------------------------------------------Desk | ";
+    private @NotNull String buildWindowTitle(@NotNull String section) {
+        String appName = AppConfig.get(AppConfigKeys.APP_NAME, "InvestPro");
+        String env = AppConfig.get(AppConfigKeys.APP_ENV, "development");
+        String defaultExchange = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
+        String defaultMarket = AppConfig.get(AppConfigKeys.DEFAULT_MARKET_TYPE, "FOREX");
+
+        return "%s Desk | %s | %s/%s | %s".formatted(
+                appName,
+                section,
+                defaultExchange,
+                defaultMarket,
+                env.toUpperCase()
+        );
     }
 
-    private void showErrorAlert(Throwable throwable) {
+    private void showErrorAlert(String title, String header, Throwable throwable) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Terminal Error");
-            alert.setHeaderText("Failed to open the trading terminal.");
-            alert.setContentText(
-                    throwable == null || throwable.getMessage() == null
-                            ? "Unknown error"
-                            : throwable.getMessage());
+            alert.setTitle(title == null || title.isBlank() ? "InvestPro Error" : title);
+            alert.setHeaderText(header == null || header.isBlank() ? "An error occurred." : header);
+            alert.setContentText(errorMessage(throwable));
             alert.showAndWait();
         });
+    }
+
+    private @NotNull String errorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error";
+        }
+
+        Throwable current = throwable;
+
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+
+        String message = current.getMessage();
+
+        return message == null || message.isBlank()
+                ? current.getClass().getSimpleName()
+                : message;
     }
 }

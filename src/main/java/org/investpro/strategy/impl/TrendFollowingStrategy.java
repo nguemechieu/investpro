@@ -81,7 +81,7 @@ public class TrendFollowingStrategy extends BaseStrategy {
 
     @Override
     public StrategySignal generateSignal(@NotNull StrategyContext context) {
-        if (hasEnoughBars(context)) {
+        if (!hasEnoughBars(context)) {
             return noSignal(context, "Insufficient bars for trend analysis");
         }
 

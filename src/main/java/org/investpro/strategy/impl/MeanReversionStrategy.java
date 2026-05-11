@@ -83,7 +83,7 @@ public class MeanReversionStrategy extends BaseStrategy {
 
     @Override
     public StrategySignal generateSignal(@NotNull StrategyContext context) {
-        if (hasEnoughBars(context)) {
+        if (!hasEnoughBars(context)) {
             return noSignal(context, "Insufficient bars for mean-reversion analysis");
         }
 

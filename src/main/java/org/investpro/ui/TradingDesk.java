@@ -56,12 +56,16 @@ import org.investpro.indicators.ZigzagIndicator;
 import org.investpro.indicators.FractalIndicator;
 import org.investpro.licensing.LicenseManager;
 import org.investpro.monitoring.TradingSystemStatusSnapshot;
+import org.investpro.operations.SystemActivityEvent;
+import org.investpro.operations.SystemOperationsService;
+import org.investpro.operations.SystemSnapshot;
 import org.investpro.ui.theme.ThemeManager;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
 import org.investpro.models.Account;
 import org.investpro.exchange.*;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
+import org.investpro.exchange.services.ExchangeService;
 import org.investpro.models.trading.*;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.repository.CurrencyRepository;
@@ -256,6 +260,7 @@ public class TradingDesk extends BorderPane {
     private SystemCore systemCore;
     private boolean systemCoreEventsSubscribed;
     private final NewsDataProvider newsDataProvider = new NewsDataProvider();
+    private final ExchangeService exchangeService = new ExchangeService();
 
     private boolean botTradingEnabled;
     private boolean brokerAccessGranted;
@@ -272,6 +277,7 @@ public class TradingDesk extends BorderPane {
     private NewsCalendarPanel newsCalendarPanel;
     private MarketInfoPanel marketInfoPanel;
     private SystemMonitorPanel systemMonitorPanel;
+    private ActivityMonitorPanel activityMonitorPanel;
     private MarketWatchPanel symbolAgentMarketWatch; // Symbol-level trading status (from SymbolAgentManager)
     private Navigation navigationPanel; // Exchange navigator
     private DataWindow dataWindow; // Data window for OHLCV display
@@ -296,7 +302,8 @@ public class TradingDesk extends BorderPane {
         this.tradeService = new TradeService(this.tradeRepository);
         this.orderService = new OrderService(this.orderRepository);
         this.currencyService = new CurrencyService(this.currencyRepository);
-        this.tradingService = new TradingService(systemCore,this.tradeService, this.orderService, this.currencyService);
+        this.tradingService = new TradingService(systemCore, this.tradeService, this.orderService,
+                this.currencyService);
 
         // Initialize NotificationService (disabled by default, can be enabled via
         // settings)
@@ -304,6 +311,9 @@ public class TradingDesk extends BorderPane {
 
         // Initialize MarketDataEngine (central market data cache and services)
         this.marketDataEngine = new MarketDataEngine();
+
+        // Wire ExchangeService to SystemOperationsService for monitoring
+        SystemOperationsService.getInstance().setExchangeService(exchangeService);
 
         initialize(configuration);
         initializeUiStreamConsumer();
@@ -512,6 +522,8 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.toggleBotTrading"), new KeyCodeCombination(KeyCode.T, KeyCombination.CONTROL_DOWN),
                         this::toggleBotTrading),
                 menuItem(t("menu.systemMonitor"), null, this::openSystemMonitorWindow),
+                menuItem("Activity Monitor", null, this::openActivityMonitor),
+                menuItem("System & Operations Board", null, this::openSystemOperationsBoard),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.tradingSystem"), null, this::tradingSystemStatus),
                 new SeparatorMenuItem(),
@@ -1667,6 +1679,44 @@ public class TradingDesk extends BorderPane {
         systemMonitorPanel.show();
     }
 
+    private void openActivityMonitor() {
+        if (activityMonitorPanel == null) {
+            activityMonitorPanel = new ActivityMonitorPanel();
+
+            // Hook activity monitor into the log appender to receive real-time logs
+            org.investpro.monitoring.ActivityLogAppender appender = org.investpro.monitoring.ActivityLogAppender
+                    .getInstance();
+            appender.addListener(logEvent -> {
+                // Extract simple component name from logger name
+                String loggerName = logEvent.loggerName();
+                String component = loggerName.contains(".") ? loggerName.substring(loggerName.lastIndexOf('.') + 1)
+                        : loggerName;
+
+                activityMonitorPanel.recordActivity(
+                        logEvent.severity(),
+                        component,
+                        logEvent.message(),
+                        logEvent.timestamp());
+            });
+        }
+
+        createIndependentWindow("Activity Monitor", activityMonitorPanel, 1000, 600);
+    }
+
+    private void openSystemOperationsBoard() {
+        try {
+            var board = new org.investpro.ui.operations.SystemOperationsBoard();
+            Stage stage = new Stage();
+            stage.setTitle("InvestPro System & Operations Board");
+            stage.setScene(new Scene(board, 1400, 900));
+            stage.setOnCloseRequest(e -> board.shutdown());
+            stage.show();
+        } catch (Exception e) {
+            log.error("Error opening System Operations Board", e);
+            showWarning("System & Operations Board", "Unable to open board: " + e.getMessage());
+        }
+    }
+
     private void openDataWindow() {
         if (dataWindow == null) {
             dataWindow = new DataWindow();
@@ -1935,7 +1985,6 @@ public class TradingDesk extends BorderPane {
                 tableColumn("volume", pair -> pair == null ? "" : marketPrice(pair.getVolume()), 80),
                 tableColumn("24/High", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80),
                 tableColumn("24/Low", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80));
-
 
         table.setRowFactory(view -> {
             TableRow<TradePair> row = new TableRow<>() {
@@ -2559,8 +2608,33 @@ public class TradingDesk extends BorderPane {
 
         exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
                 configuredTradingMode);
+
+        // Record exchange connection event
+        SystemOperationsService.getInstance().recordEvent(
+                SystemActivityEvent.Component.EXCHANGE,
+                SystemActivityEvent.Severity.INFO,
+                "CONNECTION_INITIATED",
+                "Connecting to " + selectedExchange);
+
         // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
-        new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
+        new Thread(() -> {
+            try {
+                exchange.connectStream();
+                SystemOperationsService.getInstance().recordEvent(
+                        SystemActivityEvent.Component.EXCHANGE,
+                        SystemActivityEvent.Severity.INFO,
+                        "CONNECTION_SUCCESS",
+                        "Successfully connected to " + selectedExchange);
+            } catch (Exception e) {
+                log.error("Failed to connect to {}", selectedExchange, e);
+                SystemOperationsService.getInstance().recordEvent(
+                        SystemActivityEvent.Component.EXCHANGE,
+                        SystemActivityEvent.Severity.ERROR,
+                        "CONNECTION_FAILED",
+                        "Failed to connect to " + selectedExchange);
+            }
+        }, "WebSocketConnector-" + selectedExchange).start();
+
         setTelegramToken(telegramToken);
         proceedWithConnection();
     }
@@ -3235,7 +3309,180 @@ public class TradingDesk extends BorderPane {
             config.setProperty("ai.provider", "local");
         }
 
-        return new SystemCore(exchange, config, openAiKey);
+        SystemCore core = new SystemCore(exchange, config, openAiKey);
+
+        // Record SystemCore initialization
+        SystemOperationsService.getInstance().recordEvent(
+                SystemActivityEvent.Component.SYSTEM,
+                SystemActivityEvent.Severity.INFO,
+                "SYSTEM_CORE_INIT",
+                "SystemCore initialized for " + exchange.getDisplayName());
+
+        // Wire trading engine and risk providers to SystemOperationsService
+        wireSystemOperationsService(core);
+
+        return core;
+    }
+
+    /**
+     * Wire SystemCore data providers to SystemOperationsService for monitoring.
+     * This enables the System & Operations Board to display real-time trading
+     * state.
+     */
+    private void wireSystemOperationsService(SystemCore core) {
+        if (core == null) {
+            return;
+        }
+
+        SystemOperationsService operationsService = SystemOperationsService.getInstance();
+
+        // Wire trading engine state provider
+        operationsService.setTradingEngineProvider(() -> buildTradingEngineSnapshot(core));
+
+        // Wire risk status provider
+        operationsService.setRiskStatusProvider(() -> buildRiskStatusSnapshot(core));
+
+        // Record bot startup event if SmartBot starts
+        if (core.getSmartBot() != null) {
+            operationsService.recordEvent(
+                    SystemActivityEvent.Component.STRATEGY_ENGINE,
+                    SystemActivityEvent.Severity.INFO,
+                    "BOT_INITIALIZED",
+                    "SmartBot initialized and ready");
+        }
+
+        log.info("SystemOperationsService wired with real-time data providers");
+    }
+
+    /**
+     * Build TradingEngineSnapshot from SystemCore state
+     */
+    private SystemSnapshot.TradingEngineSnapshot buildTradingEngineSnapshot(SystemCore core) {
+        try {
+            return SystemSnapshot.TradingEngineSnapshot.builder()
+                    .botTradingEnabled(core.getSmartBot() != null && core.getSmartBot().isStarted())
+                    .signalProcessorState(core.getStrategyEngine() != null ? "ACTIVE" : "INACTIVE")
+                    .riskManagerState(core.getRiskManagementSystem() != null ? "ACTIVE" : "INACTIVE")
+                    .executionEngineState(core.getExecutionEngine() != null ? "ACTIVE" : "INACTIVE")
+                    .strategyEngineState(core.getStrategyEngine() != null ? "ACTIVE" : "INACTIVE")
+                    .activeStrategies(getActiveStrategies(core))
+                    .monitoredSymbols(getMonitoredSymbols(core))
+                    .lastSignal(getLastSignal(core))
+                    .lastSignalTime(Instant.now())
+                    .lastApprovedTrade(null)
+                    .lastApprovedTradeTime(null)
+                    .lastRejectedTrade(null)
+                    .lastRejectionReason(null)
+                    .signalsGeneratedToday(0)
+                    .tradesApprovedToday(0)
+                    .tradesRejectedToday(0)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Error building trading engine snapshot", e);
+            return SystemSnapshot.TradingEngineSnapshot.builder()
+                    .botTradingEnabled(false)
+                    .signalProcessorState("ERROR")
+                    .riskManagerState("ERROR")
+                    .executionEngineState("ERROR")
+                    .strategyEngineState("ERROR")
+                    .activeStrategies(Collections.emptyList())
+                    .monitoredSymbols(Collections.emptyList())
+                    .build();
+        }
+    }
+
+    /**
+     * Build RiskStatusSnapshot from SystemCore state
+     */
+    private SystemSnapshot.RiskStatusSnapshot buildRiskStatusSnapshot(SystemCore core) {
+        try {
+            double accountBalance = 0.0;
+            double portfolioExposurePercent = 0.0;
+
+            if (exchange != null) {
+                try {
+                    Account account = exchange.getUserAccountDetails();
+                    if (account != null) {
+                        accountBalance = account.getTotalBalance();
+                        double available = account.getAvailableBalance();
+                        portfolioExposurePercent = accountBalance > 0 ? (available / accountBalance * 100) : 0.0;
+                    }
+                } catch (Exception e) {
+                    log.debug("Error getting account from exchange", e);
+                }
+            }
+
+            return SystemSnapshot.RiskStatusSnapshot.builder()
+                    .accountBalance(accountBalance)
+                    .riskPerTradePercent(2.0)
+                    .maxPositionSize(accountBalance * 0.1)
+                    .maxDailyLoss(accountBalance * 0.05)
+                    .currentDailyLoss(0.0)
+                    .portfolioExposurePercent(portfolioExposurePercent)
+                    .blockedTrades(0)
+                    .riskWarnings(0)
+                    .latestRejectionReason(null)
+                    .latestRejectionTime(null)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Error building risk status snapshot", e);
+            return SystemSnapshot.RiskStatusSnapshot.builder()
+                    .accountBalance(0.0)
+                    .riskPerTradePercent(2.0)
+                    .maxPositionSize(0.0)
+                    .maxDailyLoss(null)
+                    .currentDailyLoss(null)
+                    .portfolioExposurePercent(null)
+                    .blockedTrades(0)
+                    .riskWarnings(0)
+                    .latestRejectionReason(null)
+                    .latestRejectionTime(null)
+                    .build();
+        }
+    }
+
+    /**
+     * Get list of active strategies from SystemCore
+     */
+    private List<String> getActiveStrategies(SystemCore core) {
+        List<String> strategies = new ArrayList<>();
+        try {
+            if (core.getStrategyEngine() != null) {
+                // TODO: Get actual active strategy names from StrategyEngine
+                strategies.add("Primary Strategy");
+            }
+        } catch (Exception e) {
+            log.debug("Error getting active strategies", e);
+        }
+        return strategies;
+    }
+
+    /**
+     * Get list of monitored symbols from SystemCore
+     */
+    private List<String> getMonitoredSymbols(SystemCore core) {
+        List<String> symbols = new ArrayList<>();
+        try {
+            if (core.getSelectedTradePair() != null) {
+                symbols.add(core.getSelectedTradePair().toString());
+            }
+        } catch (Exception e) {
+            log.debug("Error getting monitored symbols", e);
+        }
+        return symbols;
+    }
+
+    /**
+     * Get last signal from SystemCore
+     */
+    private String getLastSignal(SystemCore core) {
+        try {
+            // TODO: Get actual last signal from SignalProcessor
+            return null;
+        } catch (Exception e) {
+            log.debug("Error getting last signal", e);
+            return null;
+        }
     }
 
     /**
@@ -4844,11 +5091,47 @@ public class TradingDesk extends BorderPane {
             grid.addRow(4, new Label("Email Notifications"), emailField);
         }
 
+        // Add helpful info for Coinbase
+        boolean isCoinbase = "Coinbase".equalsIgnoreCase(selectedExchange);
+        if (isCoinbase) {
+            TextArea coinbaseHelpArea = new TextArea(
+                    "Coinbase Advanced Trade Setup:\n\n" +
+                            "API Key Format:\n" +
+                            "organizations/{org_id}/apiKeys/{key_id}\n\n" +
+                            "API Secret:\n" +
+                            "Complete EC private key in PEM format (from .pem file)\n\n" +
+                            "Steps:\n" +
+                            "1. Go to Coinbase → Settings → Developers → API Keys\n" +
+                            "2. Create a new API key with 'View accounts' permission\n" +
+                            "3. Copy the key name (starts with 'organizations/')\n" +
+                            "4. Download & open the private key .pem file\n" +
+                            "5. Copy entire contents (-----BEGIN...END-----)");
+            coinbaseHelpArea.setWrapText(true);
+            coinbaseHelpArea.setEditable(false);
+            coinbaseHelpArea.setPrefRowCount(8);
+            coinbaseHelpArea.setStyle("-fx-control-inner-background: #f5f5f5; -fx-text-fill: #666;");
+
+            grid.addRow(5, new Label("Help"), coinbaseHelpArea);
+            GridPane.setColumnSpan(coinbaseHelpArea, 1);
+        }
+
         dialog.getDialogPane().setContent(grid);
         dialog.setResultConverter(buttonType -> {
             if (buttonType == connectType) {
-                configuredApiKey = safe(apiKeyField.getText());
-                configuredApiSecret = safe(secretField.getText());
+                String apiKey = safe(apiKeyField.getText());
+                String apiSecret = safe(secretField.getText());
+
+                // Validate Coinbase credentials before saving
+                if ("Coinbase".equalsIgnoreCase(selectedExchange)) {
+                    String validationError = validateCoinbaseCredentials(apiKey, apiSecret);
+                    if (validationError != null && !validationError.isBlank()) {
+                        showWarning("Invalid Credentials", validationError);
+                        return false;
+                    }
+                }
+
+                configuredApiKey = apiKey;
+                configuredApiSecret = apiSecret;
                 configuredTradingMode = tradingModeCombo.getValue();
                 telegramToken = safe(telegramField.getText());
                 if (oanda) {
@@ -4870,6 +5153,53 @@ public class TradingDesk extends BorderPane {
                 proceedWithConnection();
             }
         });
+    }
+
+    private String validateCoinbaseCredentials(String apiKey, String apiSecret) {
+        // Check if both fields are provided
+        if (apiKey == null || apiKey.isBlank()) {
+            return "API Key (CDP Key Name) cannot be empty.\n\n" +
+                    "Format: organizations/{org_id}/apiKeys/{key_id}\n\n" +
+                    "Get this from Coinbase → Developer → API Keys → Copy the key name.";
+        }
+
+        if (apiSecret == null || apiSecret.isBlank()) {
+            return "API Secret (EC Private Key) cannot be empty.\n\n" +
+                    "This should be the EC private key in PEM format, starting with:\n" +
+                    "-----BEGIN EC PRIVATE KEY-----\n" +
+                    "or\n" +
+                    "-----BEGIN PRIVATE KEY-----";
+        }
+
+        // Validate API Key format
+        if (!apiKey.contains("organizations/") || !apiKey.contains("/apiKeys/")) {
+            return "Invalid API Key format.\n\n" +
+                    "Expected format: organizations/{org_id}/apiKeys/{key_id}\n\n" +
+                    "Example: organizations/12345678-1234-5678-1234-567812345678/apiKeys/87654321-4321-8765-4321-876543218765";
+        }
+
+        // Validate Private Key format
+        String keyTrimmed = apiSecret.trim();
+        if (!keyTrimmed.contains("BEGIN") || !keyTrimmed.contains("PRIVATE KEY")) {
+            return "Invalid Private Key format.\n\n" +
+                    "The private key should be in PEM format, containing:\n" +
+                    "• -----BEGIN EC PRIVATE KEY----- (or -----BEGIN PRIVATE KEY-----)\n" +
+                    "• Base64 encoded key content\n" +
+                    "• -----END EC PRIVATE KEY----- (or -----END PRIVATE KEY-----)\n\n" +
+                    "Get this from Coinbase → Developer → API Keys → Download the private key file.";
+        }
+
+        // Validate that it looks like a complete key
+        if (keyTrimmed.split("\n").length < 3) {
+            return "Private Key appears incomplete.\n\n" +
+                    "Make sure you've copied the ENTIRE private key, including:\n" +
+                    "• The BEGIN line\n" +
+                    "• All content in the middle\n" +
+                    "• The END line\n\n" +
+                    "Tip: Open the .pem file in a text editor and copy the entire contents.";
+        }
+
+        return null; // Validation passed
     }
 
     private boolean hasExchangeCredentials(String exchangeName) {
@@ -5010,6 +5340,14 @@ public class TradingDesk extends BorderPane {
         // Wire the exchange to the central MarketDataEngine
         if (marketDataEngine != null) {
             createdExchange.setMarketDataEngine(marketDataEngine);
+        }
+
+        // Register the exchange in ExchangeService for monitoring
+        try {
+            String exchangeId = normalizeExchangeName(exchangeName);
+            exchangeService.register(exchangeId, createdExchange);
+        } catch (Exception e) {
+            log.warn("Failed to register {} in ExchangeService", exchangeName, e);
         }
 
         return createdExchange;

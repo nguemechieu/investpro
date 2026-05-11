@@ -1,5 +1,6 @@
 package org.investpro.core;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
@@ -34,6 +35,11 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
     private final SymbolAgentManager symbolAgentManager;
     private final AgentEventBus eventBus;
 
+    /**
+     * -- GETTER --
+     *  Check if listener is active
+     */
+    @Getter
     private volatile boolean listening = false;
 
     public SymbolAgentUpdater(
@@ -311,10 +317,4 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
         return defaultValue;
     }
 
-    /**
-     * Check if listener is active
-     */
-    public boolean isListening() {
-        return listening;
-    }
 }

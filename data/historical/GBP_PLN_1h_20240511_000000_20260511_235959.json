@@ -71038,4 +71038,84 @@
   "averagePrice" : 4.90127,
   "volumeWeightedAveragePrice" : 201.0,
   "placeHolder" : false
+}, {
+  "openPrice" : 4.90148,
+  "closePrice" : 4.90163,
+  "highPrice" : 4.90202,
+  "lowPrice" : 4.90004,
+  "openTime" : 1778475600,
+  "volume" : 428.0,
+  "averagePrice" : 4.9012925,
+  "volumeWeightedAveragePrice" : 428.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.90168,
+  "closePrice" : 4.90007,
+  "highPrice" : 4.90226,
+  "lowPrice" : 4.89674,
+  "openTime" : 1778479200,
+  "volume" : 615.0,
+  "averagePrice" : 4.9001874999999995,
+  "volumeWeightedAveragePrice" : 615.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.90026,
+  "closePrice" : 4.8966,
+  "highPrice" : 4.90256,
+  "lowPrice" : 4.89622,
+  "openTime" : 1778482800,
+  "volume" : 688.0,
+  "averagePrice" : 4.89891,
+  "volumeWeightedAveragePrice" : 688.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.89676,
+  "closePrice" : 4.90009,
+  "highPrice" : 4.90073,
+  "lowPrice" : 4.89467,
+  "openTime" : 1778486400,
+  "volume" : 613.0,
+  "averagePrice" : 4.8980625,
+  "volumeWeightedAveragePrice" : 613.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.90002,
+  "closePrice" : 4.89956,
+  "highPrice" : 4.90176,
+  "lowPrice" : 4.89862,
+  "openTime" : 1778490000,
+  "volume" : 597.0,
+  "averagePrice" : 4.89999,
+  "volumeWeightedAveragePrice" : 597.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.89974,
+  "closePrice" : 4.89271,
+  "highPrice" : 4.90024,
+  "lowPrice" : 4.89166,
+  "openTime" : 1778493600,
+  "volume" : 963.0,
+  "averagePrice" : 4.8960875,
+  "volumeWeightedAveragePrice" : 963.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.89284,
+  "closePrice" : 4.90106,
+  "highPrice" : 4.90207,
+  "lowPrice" : 4.89274,
+  "openTime" : 1778497200,
+  "volume" : 1011.0,
+  "averagePrice" : 4.8971775,
+  "volumeWeightedAveragePrice" : 1011.0,
+  "placeHolder" : false
+}, {
+  "openPrice" : 4.90122,
+  "closePrice" : 4.90048,
+  "highPrice" : 4.90276,
+  "lowPrice" : 4.90048,
+  "openTime" : 1778500800,
+  "volume" : 1487.0,
+  "averagePrice" : 4.901235,
+  "volumeWeightedAveragePrice" : 1487.0,
+  "placeHolder" : false
 } ]

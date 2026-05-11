@@ -163,6 +163,9 @@ public class SystemCore {
             savePropertiesToFile();
         }
 
+
+
+
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
         // Create agent registry (agents will be registered when start() is called)
         this.agentRegistry = new AgentRegistry();
@@ -213,19 +216,46 @@ public class SystemCore {
             throw new RuntimeException(e);
         }
 
-        @Nullable
-        StrategyCatalog strategyCatalogue;
         this.botTradeDecisionEngine = new BotTradeDecisionEngine(currentAccount);
 
         // Initialize SignalToDecisionFilter to intercept and validate all signals
         this.signalToDecisionFilter = new SignalToDecisionFilter(
                 botTradeDecisionEngine,
+
                 tradeExecutionCoordinator);
 
         this.systemCoreDependencies = new SystemCoreDependencies(exchange, tradingService, strategyEngine,
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
         this.labService = new StrategyLabService();
+        // Wire symbol agent state updates for real-time UI
+        this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), getSymbolAgentManager());
+
+        if (!telegramToken.isBlank()) {
+            this.telegramNotifier = new TelegramNotifier(telegramToken);
+            // Initialize command handler for Telegram commands
+            this.telegramCommandHandler = new TelegramCommandHandler(this, telegramNotifier);
+            this.telegramNotifier.setCommandHandler(telegramCommandHandler);
+            // Create event listener - will be wired to SmartBot in start()
+            this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
+
+            // Initialize ChatGPT integration if OpenAI API key is configured
+            String openaiApiKey=  Objects.requireNonNull(config).getProperty("OPENAI_API_KEY");
+            if (!openaiApiKey.isBlank()) {
+                telegramNotifier.initializeChatGPT(openaiApiKey);
+                log.info("✅ ChatGPT integration initialized for Telegram bot");
+            }
+
+            log.info("✅ Telegram notifier configured");
+        }
+
+
+
+
+
+
+
+
         // Initialize the system event recorder and monitor service after all components
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();
@@ -1214,28 +1244,6 @@ public class SystemCore {
     // ---------------------------------------------------------------------
 
     private void configureNotifiers() {
-        // Wire symbol agent state updates for real-time UI
-        this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), symbolAgentManager);
-
-        if (!telegramToken.isBlank()) {
-            this.telegramNotifier = new TelegramNotifier(telegramToken);
-            // Initialize command handler for Telegram commands
-            this.telegramCommandHandler = new TelegramCommandHandler(this, telegramNotifier);
-            this.telegramNotifier.setCommandHandler(telegramCommandHandler);
-            // Create event listener - will be wired to SmartBot in start()
-            this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
-
-            // Initialize ChatGPT integration if OpenAI API key is configured
-            String openaiApiKey = firstNonBlank(
-                    config.getProperty("openai.api_key"),
-                    System.getenv("OPENAI_API_KEY"));
-            if (!openaiApiKey.isBlank()) {
-                telegramNotifier.initializeChatGPT(openaiApiKey);
-                log.info("✅ ChatGPT integration initialized for Telegram bot");
-            }
-
-            log.info("✅ Telegram notifier configured");
-        }
 
         if (!fromEmail.isBlank() && !toEmail.isBlank()) {
             this.emailNotifier = new EmailNotifier(fromEmail, toEmail);
@@ -1626,7 +1634,7 @@ public class SystemCore {
     private AiReasoningService createAiReasoningService(Properties config) {
         String provider = config.getProperty("ai.provider", "openai").trim().toLowerCase();
         String apiKey = firstNonBlank(
-                config.getProperty("openai.api_key"),
+                config.getProperty("OPENAI_API_KEY"),
                 System.getenv("OPENAI_API_KEY"));
 
         boolean openAiEnabled = "openai".equals(provider) && !apiKey.isBlank();
@@ -1704,7 +1712,7 @@ public class SystemCore {
         return value == null ? "" : value.trim();
     }
 
-    private String firstNonBlank(String first, String second) {
+    private @NotNull String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
             return first.trim();
         }

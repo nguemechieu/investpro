@@ -577,23 +577,28 @@ public class OnboardingView extends StackPane {
     }
 
     private @NotNull String getExchangeInfoText(SupportedExchange selectedExchange) {
-        return switch (selectedExchange) {
-            case COINBASE -> "API Key: Organization ID format (organizations/xxxxx/apiKeys/xxxxx)\n" +
+        if (selectedExchange == SupportedExchange.COINBASE) {
+            return "API Key: Organization ID format (organizations/xxxxx/apiKeys/xxxxx)\n" +
                     "API Secret: EC Private Key in PEM format\nGet credentials at: https://coinbase.com/settings/api";
-            case OANDA -> "Token: Bearer token from Account Settings\n" +
+        } else if (selectedExchange == SupportedExchange.OANDA) {
+            return "Token: Bearer token from Account Settings\n" +
                     "Account ID: Optional (auto-detected if left blank)\n" +
                     "Get credentials at: https://www.oanda.com/account/tpa/personal-token";
-            case BINANCE, BINANCE_US -> "API Key: Public key from API Management\n" +
+        } else if (selectedExchange == SupportedExchange.BINANCE || selectedExchange == SupportedExchange.BINANCE_US) {
+            return "API Key: Public key from API Management\n" +
                     "API Secret: Secret key from API Management\n" +
                     "Get credentials at: https://www.binance.com/en/user/settings/api-management";
-            case BITFINEX -> "API Key: Public key from Settings → API\n" +
+        } else if (selectedExchange == SupportedExchange.BITFINEX) {
+            return "API Key: Public key from Settings → API\n" +
                     "API Secret: Secret key from Settings → API\n" +
                     "Get credentials at: https://www.bitfinex.com/api";
-            case ALPACA -> "API Key: From Dashboard → API Keys\n" +
+        } else if (selectedExchange == SupportedExchange.ALPACA) {
+            return "API Key: From Dashboard → API Keys\n" +
                     "API Secret: From Dashboard → API Keys\n" +
                     "Get credentials at: https://app.alpaca.markets/";
-            default -> "Enter your API Key and API Secret for " + selectedExchange.getDisplayName();
-        };
+        } else {
+            return "Enter your API Key and API Secret for " + selectedExchange.getDisplayName();
+        }
     }
 
     private void showHelpDialog(SupportedExchange exchange, String infoText) {
@@ -876,27 +881,28 @@ public class OnboardingView extends StackPane {
                 .replace(" ", "")
                 .replace("-", "_");
 
-        return switch (normalized) {
-            case "binance", "binanceus", "binance_us", "binance_us_spot" -> "binanceus";
-
-            case "coinbase",
-                    "coinbaseadvanced",
-                    "coinbase_advanced",
-                    "coinbaseadvancedtrade",
-                    "coinbase_advanced_trade" ->
-                "coinbase";
-
-            case "oanda", "oanda_fx", "oanda_forex" -> "oanda";
-
-            case "alpaca", "alpaca_stocks", "alpaca_equities" -> "alpaca";
-
-            case "bitfinex" -> "bitfinex";
-
-            case "kraken" -> "kraken";
-
-            case "stellar", "stellar_network", "stellarnetwork" -> "stellar-network";
-
-            default -> throw new IllegalArgumentException("Unsupported exchange: " + value);
-        };
+        if (normalized.equals("binance") || normalized.equals("binanceus") ||
+                normalized.equals("binance_us") || normalized.equals("binance_us_spot")) {
+            return "binanceus";
+        } else if (normalized.equals("coinbase") || normalized.equals("coinbaseadvanced") ||
+                normalized.equals("coinbase_advanced") || normalized.equals("coinbaseadvancedtrade") ||
+                normalized.equals("coinbase_advanced_trade")) {
+            return "coinbase";
+        } else if (normalized.equals("oanda") || normalized.equals("oanda_fx") ||
+                normalized.equals("oanda_forex")) {
+            return "oanda";
+        } else if (normalized.equals("alpaca") || normalized.equals("alpaca_stocks") ||
+                normalized.equals("alpaca_equities")) {
+            return "alpaca";
+        } else if (normalized.equals("bitfinex")) {
+            return "bitfinex";
+        } else if (normalized.equals("kraken")) {
+            return "kraken";
+        } else if (normalized.equals("stellar") || normalized.equals("stellar_network") ||
+                normalized.equals("stellarnetwork")) {
+            return "stellar-network";
+        } else {
+            throw new IllegalArgumentException("Unsupported exchange: " + value);
+        }
     }
 }

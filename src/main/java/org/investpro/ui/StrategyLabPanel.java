@@ -46,8 +46,7 @@ import java.util.Objects;
 @Slf4j
 public class StrategyLabPanel extends BorderPane {
 
-    private static final DateTimeFormatter LOG_TIME_FORMAT =
-            DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter LOG_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final SystemCore systemCore;
     private final StrategyLabService labService;
@@ -103,7 +102,6 @@ public class StrategyLabPanel extends BorderPane {
         refreshUI();
     }
 
-
     private void initializeUI() throws SQLException, ClassNotFoundException {
         getStyleClass().add("strategy-lab-panel");
 
@@ -122,7 +120,6 @@ public class StrategyLabPanel extends BorderPane {
             consensusLabel.setText("Consensus: No data");
         }
     }
-   
 
     private VBox createControlsSection() throws SQLException, ClassNotFoundException {
         VBox box = new VBox(8);
@@ -191,8 +188,6 @@ public class StrategyLabPanel extends BorderPane {
             strategyCombo.getSelectionModel().selectFirst();
         }
 
-
-
         Label filterLabel = new Label("Filter:");
         strategyFilterField = new TextField();
         strategyFilterField.setPromptText("Search strategies...");
@@ -208,8 +203,7 @@ public class StrategyLabPanel extends BorderPane {
                 strategyLabel,
                 strategyCombo,
                 filterLabel,
-                strategyFilterField
-        );
+                strategyFilterField);
 
         HBox row2 = new HBox(8);
         row2.setStyle("-fx-alignment: center-left;");
@@ -223,8 +217,7 @@ public class StrategyLabPanel extends BorderPane {
                 testSelectedButton,
                 testAllStrategiesButton,
                 testAllTimeframesButton,
-                rankButton
-        );
+                rankButton);
 
         HBox row3 = new HBox(8);
         row3.setStyle("-fx-alignment: center-left;");
@@ -242,8 +235,7 @@ public class StrategyLabPanel extends BorderPane {
                 assignBestButton,
                 manualAssignButton,
                 unassignButton,
-                disableAssignmentButton
-        );
+                disableAssignmentButton);
 
         box.getChildren().setAll(row1, row2, row3);
         return box;
@@ -289,8 +281,7 @@ public class StrategyLabPanel extends BorderPane {
                 createAssignmentTab(),
                 createRankingTab(),
                 createVotingTab(),
-                createConsensusTab()
-        );
+                createConsensusTab());
 
         return tabPane;
     }
@@ -303,8 +294,7 @@ public class StrategyLabPanel extends BorderPane {
 
         box.getChildren().add(createCard(
                 "Current Strategy Assignment",
-                createAssignmentInfoContent()
-        ));
+                createAssignmentInfoContent()));
 
         ScrollPane scrollPane = new ScrollPane(box);
         scrollPane.setFitToWidth(true);
@@ -332,8 +322,7 @@ public class StrategyLabPanel extends BorderPane {
                 activeStrategyLabel,
                 activeScoreLabel,
                 activeModeLabel,
-                activeAssignedAtLabel
-        );
+                activeAssignedAtLabel);
 
         return box;
     }
@@ -347,36 +336,56 @@ public class StrategyLabPanel extends BorderPane {
 
         TableColumn<StrategyPerformanceReport, Integer> rankCol = new TableColumn<>("Rank");
         rankCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(
-                rankingTable.getItems().indexOf(cellData.getValue()) + 1
-        ));
+                rankingTable.getItems().indexOf(cellData.getValue()) + 1));
         rankCol.setPrefWidth(65);
 
         TableColumn<StrategyPerformanceReport, String> nameCol = new TableColumn<>("Strategy");
         nameCol.setCellValueFactory(cellData -> new SimpleStringProperty(
-                safe(cellData.getValue().getStrategyName())
-        ));
+                safe(cellData.getValue().getStrategyName())));
         nameCol.setPrefWidth(220);
 
-        TableColumn<StrategyPerformanceReport, Double> scoreCol =
-                doubleColumn("Score", StrategyPerformanceReport::getScore, "%.1f");
+        TableColumn<StrategyPerformanceReport, Double> scoreCol = doubleColumn("Score",
+                StrategyPerformanceReport::getScore, "%.1f");
 
-        TableColumn<StrategyPerformanceReport, Double> winRateCol =
-                doubleColumn("Win Rate", report -> report.getWinRate() * 100.0, "%.1f%%");
+        TableColumn<StrategyPerformanceReport, Double> winRateCol = doubleColumn("Win Rate",
+                report -> report.getWinRate() * 100.0, "%.1f%%");
 
-        TableColumn<StrategyPerformanceReport, Double> returnCol =
-                doubleColumn("Return", StrategyPerformanceReport::getTotalReturn, "%.2f%%");
+        TableColumn<StrategyPerformanceReport, Double> returnCol = doubleColumn("Return",
+                StrategyPerformanceReport::getTotalReturn, "%.2f%%");
 
-        TableColumn<StrategyPerformanceReport, Double> drawdownCol =
-                doubleColumn("Max DD", report -> report.getMaxDrawdown() * 100.0, "%.1f%%");
+        TableColumn<StrategyPerformanceReport, Double> drawdownCol = doubleColumn("Max DD",
+                report -> report.getMaxDrawdown() * 100.0, "%.1f%%");
 
-        TableColumn<StrategyPerformanceReport, Double> profitFactorCol =
-                doubleColumn("Profit Factor", StrategyPerformanceReport::getProfitFactor, "%.2f");
+        TableColumn<StrategyPerformanceReport, Double> profitFactorCol = doubleColumn("Profit Factor",
+                StrategyPerformanceReport::getProfitFactor, "%.2f");
 
         TableColumn<StrategyPerformanceReport, Integer> tradesCol = new TableColumn<>("Trades");
         tradesCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(
-                cellData.getValue().getTotalTrades()
-        ));
+                cellData.getValue().getTotalTrades()));
         tradesCol.setPrefWidth(80);
+
+        // Add Assign column
+        TableColumn<StrategyPerformanceReport, Void> assignCol = new TableColumn<>("Action");
+        assignCol.setPrefWidth(100);
+        assignCol.setCellFactory(col -> new javafx.scene.control.TableCell<StrategyPerformanceReport, Void>() {
+            private final Button assignButton = new Button("Assign");
+
+            {
+                assignButton.setStyle("-fx-padding: 4px 12px; -fx-font-size: 11;");
+                assignButton.setOnAction(event -> {
+                    StrategyPerformanceReport report = getTableView().getItems().get(getIndex());
+                    if (report != null) {
+                        assignStrategyFromRanking(report);
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                setGraphic(empty ? null : assignButton);
+            }
+        });
 
         rankingTable.getColumns().setAll(
                 rankCol,
@@ -386,8 +395,8 @@ public class StrategyLabPanel extends BorderPane {
                 returnCol,
                 drawdownCol,
                 profitFactorCol,
-                tradesCol
-        );
+                tradesCol,
+                assignCol);
 
         tab.setContent(rankingTable);
         return tab;
@@ -396,8 +405,7 @@ public class StrategyLabPanel extends BorderPane {
     private TableColumn<StrategyPerformanceReport, Double> doubleColumn(
             String title,
             java.util.function.Function<StrategyPerformanceReport, Double> extractor,
-            String format
-    ) {
+            String format) {
         TableColumn<StrategyPerformanceReport, Double> column = new TableColumn<>(title);
 
         column.setCellValueFactory(cellData -> {
@@ -425,27 +433,22 @@ public class StrategyLabPanel extends BorderPane {
 
         TableColumn<StrategyVote, String> strategyCol = new TableColumn<>("Strategy");
         strategyCol.setCellValueFactory(cellData -> new SimpleStringProperty(
-                safe(cellData.getValue().getStrategyName())
-        ));
+                safe(cellData.getValue().getStrategyName())));
 
         TableColumn<StrategyVote, String> sideCol = new TableColumn<>("Side");
         sideCol.setCellValueFactory(cellData -> new SimpleStringProperty(
-                cellData.getValue().getSide().toString()
-        ));
+                cellData.getValue().getSide().toString()));
 
-        TableColumn<StrategyVote, Double> confidenceCol =
-                voteDoubleColumn("Confidence", StrategyVote::getConfidence, "%.2f");
+        TableColumn<StrategyVote, Double> confidenceCol = voteDoubleColumn("Confidence", StrategyVote::getConfidence,
+                "%.2f");
 
-        TableColumn<StrategyVote, Double> scoreCol =
-                voteDoubleColumn("Score", StrategyVote::getScore, "%.1f");
+        TableColumn<StrategyVote, Double> scoreCol = voteDoubleColumn("Score", StrategyVote::getScore, "%.1f");
 
-        TableColumn<StrategyVote, Double> weightCol =
-                voteDoubleColumn("Weight", StrategyVote::getWeight, "%.2f");
+        TableColumn<StrategyVote, Double> weightCol = voteDoubleColumn("Weight", StrategyVote::getWeight, "%.2f");
 
         TableColumn<StrategyVote, String> reasonCol = new TableColumn<>("Reason");
         reasonCol.setCellValueFactory(cellData -> new SimpleStringProperty(
-                safe(cellData.getValue().getReason())
-        ));
+                safe(cellData.getValue().getReason())));
         reasonCol.setPrefWidth(320);
 
         votingTable.getColumns().setAll(
@@ -454,8 +457,7 @@ public class StrategyLabPanel extends BorderPane {
                 confidenceCol,
                 scoreCol,
                 weightCol,
-                reasonCol
-        );
+                reasonCol);
 
         tab.setContent(votingTable);
         return tab;
@@ -464,8 +466,7 @@ public class StrategyLabPanel extends BorderPane {
     private TableColumn<StrategyVote, Double> voteDoubleColumn(
             String title,
             java.util.function.Function<StrategyVote, Double> extractor,
-            String format
-    ) {
+            String format) {
         TableColumn<StrategyVote, Double> column = new TableColumn<>(title);
 
         column.setCellValueFactory(cellData -> {
@@ -526,8 +527,7 @@ public class StrategyLabPanel extends BorderPane {
                 new Separator(),
                 votesBox,
                 new Separator(),
-                consensusReasonLabel
-        );
+                consensusReasonLabel);
 
         return box;
     }
@@ -556,8 +556,7 @@ public class StrategyLabPanel extends BorderPane {
                 progressRow,
                 statusLabel,
                 new Label("Logs:"),
-                logsArea
-        );
+                logsArea);
 
         return box;
     }
@@ -569,8 +568,7 @@ public class StrategyLabPanel extends BorderPane {
         Label titleLabel = new Label(title);
         titleLabel.setMaxWidth(Double.MAX_VALUE);
         titleLabel.setStyle(
-                "-fx-padding: 10; -fx-font-size: 13; -fx-font-weight: bold; -fx-background-color: #f0f0f0;"
-        );
+                "-fx-padding: 10; -fx-font-size: 13; -fx-font-weight: bold; -fx-background-color: #f0f0f0;");
 
         card.getChildren().setAll(titleLabel, content);
         return card;
@@ -617,46 +615,36 @@ public class StrategyLabPanel extends BorderPane {
         Objects.requireNonNull(result);
         String consensusSide = result.getConsensusSide().toString();
 
-
         consensusLabel.setText(
                 snapshot.isConsensusReached()
                         ? "Consensus: " + consensusSide
-                        : "Consensus: No strong consensus"
-        );
+                        : "Consensus: No strong consensus");
 
         consensusConfidenceLabel.setText(
-                String.format("Confidence: %.1f%%", safeDouble(result.getConsensusConfidence()) * 100.0)
-        );
+                String.format("Confidence: %.1f%%", safeDouble(result.getConsensusConfidence()) * 100.0));
 
         selectedStrategyLabel.setText(
-                "Selected: " + safeText(result.getSelectedStrategyName(), "-")
-        );
+                "Selected: " + safeText(result.getSelectedStrategyName(), "-"));
 
         buyVotesLabel.setText(
-                String.format("BUY: %d votes (%.1f)", result.getBuyVotes(), safeDouble(result.getBuyScore()))
-        );
+                String.format("BUY: %d votes (%.1f)", result.getBuyVotes(), safeDouble(result.getBuyScore())));
 
         sellVotesLabel.setText(
-                String.format("SELL: %d votes (%.1f)", result.getSellVotes(), safeDouble(result.getSellScore()))
-        );
+                String.format("SELL: %d votes (%.1f)", result.getSellVotes(), safeDouble(result.getSellScore())));
 
         holdVotesLabel.setText(
-                String.format("HOLD: %d votes (%.1f)", result.getHoldVotes(), safeDouble(result.getHoldScore()))
-        );
+                String.format("HOLD: %d votes (%.1f)", result.getHoldVotes(), safeDouble(result.getHoldScore())));
 
         consensusReasonLabel.setText(
-                "Reason: " + safeText(result.getReason(), "No reason provided")
-        );
+                "Reason: " + safeText(result.getReason(), "No reason provided"));
 
         votingTable.getItems().setAll(
-                result.getVotes() == null ? List.of() : result.getVotes()
-        );
+                result.getVotes() == null ? List.of() : result.getVotes());
     }
 
     private void clearConsensusView() {
         clearSnapshotViews();
     }
-
 
     private void clearSnapshotViews() {
         consensus = null;
@@ -677,6 +665,7 @@ public class StrategyLabPanel extends BorderPane {
     private double safeDouble(double value) {
         return Double.isFinite(value) ? value : 0.0;
     }
+
     private void updateAssignmentView(@NotNull StrategyLabSnapshot snapshot) {
         if (!snapshot.hasAssignment()) {
             activeAssignmentLabel.setText("No assignment");
@@ -699,15 +688,12 @@ public class StrategyLabPanel extends BorderPane {
         }
 
         activeAssignmentLabel.setText(
-                safe(assignment.getStrategyId()) + " (" + assignment.getMode().getDisplayName() + ")"
-        );
+                safe(assignment.getStrategyId()) + " (" + assignment.getMode().getDisplayName() + ")");
         activeStrategyLabel.setText("Strategy: " + safe(assignment.getStrategyId()));
         activeScoreLabel.setText(String.format("Score: %.1f", assignment.getScoreAtAssignment()));
         activeModeLabel.setText("Mode: " + assignment.getMode().getDisplayName());
         activeAssignedAtLabel.setText("Assigned: " + assignment.getAssignedAt());
     }
-
-
 
     private void testSelectedStrategy() {
         String strategyName = strategyCombo == null ? null : strategyCombo.getValue();
@@ -717,7 +703,8 @@ public class StrategyLabPanel extends BorderPane {
             return;
         }
 
-        appendLog("Testing strategy '" + strategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
+        appendLog("Testing strategy '" + strategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode()
+                + "...");
         setRunning(true, "Testing selected strategy...");
 
         labService.testStrategies(selectedSymbol, selectedTimeframe, List.of(strategyName))
@@ -738,10 +725,9 @@ public class StrategyLabPanel extends BorderPane {
         setRunning(true, "Testing all strategies...");
 
         labService.testStrategies(
-                        selectedSymbol,
-                        selectedTimeframe,
-                        new ArrayList<>(StrategyCatalog.availableStrategyNames())
-                )
+                selectedSymbol,
+                selectedTimeframe,
+                new ArrayList<>(StrategyCatalog.availableStrategyNames()))
                 .whenComplete((ignored, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Tests failed: " + rootMessage(throwable));
@@ -759,9 +745,8 @@ public class StrategyLabPanel extends BorderPane {
         setRunning(true, "Testing all timeframes...");
 
         labService.testAllStrategies(
-                        selectedSymbol,
-                        List.of(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
-                )
+                selectedSymbol,
+                List.of(Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1))
                 .whenComplete((ignored, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Tests failed: " + rootMessage(throwable));
@@ -812,13 +797,12 @@ public class StrategyLabPanel extends BorderPane {
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 
-        dialog.setResultConverter(buttonType ->
-                buttonType == ButtonType.OK ? combo.getValue() : null
-        );
+        dialog.setResultConverter(buttonType -> buttonType == ButtonType.OK ? combo.getValue() : null);
 
         dialog.showAndWait().ifPresent(strategyName -> {
             try {
-                StrategyAssignment assignment = labService.manuallyAssign(selectedSymbol, selectedTimeframe, strategyName);
+                StrategyAssignment assignment = labService.manuallyAssign(selectedSymbol, selectedTimeframe,
+                        strategyName);
 
                 if (assignment != null) {
                     appendLog("Manually assigned: " + assignment.getStrategyId());
@@ -872,9 +856,7 @@ public class StrategyLabPanel extends BorderPane {
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 
-        dialog.setResultConverter(buttonType ->
-                buttonType == ButtonType.OK ? reasonArea.getText() : null
-        );
+        dialog.setResultConverter(buttonType -> buttonType == ButtonType.OK ? reasonArea.getText() : null);
 
         dialog.showAndWait().ifPresent(reason -> {
             try {
@@ -919,6 +901,46 @@ public class StrategyLabPanel extends BorderPane {
 
             statusLabel.setText(status == null || status.isBlank() ? "Ready" : status);
             progressBar.setProgress(running ? ProgressBar.INDETERMINATE_PROGRESS : 0.0);
+        });
+    }
+
+    private void assignStrategyFromRanking(@NotNull StrategyPerformanceReport report) {
+        String strategyName = report.getStrategyName();
+        String symbol = report.getSymbol();
+        Timeframe timeframe = report.getTimeframe();
+
+        // Confirm assignment with user
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Assign Strategy");
+        confirmAlert.setHeaderText("Assign strategy from backtesting results?");
+        confirmAlert.setContentText(
+                "Strategy: " + strategyName + "\n" +
+                        "Symbol: " + symbol + "\n" +
+                        "Timeframe: " + timeframe.getCode() + "\n" +
+                        "Score: " + String.format("%.1f", report.getScore()) + "\n" +
+                        "Win Rate: " + String.format("%.1f%%", report.getWinRate() * 100.0) + "\n" +
+                        "Return: " + String.format("%.2f%%", report.getTotalReturn()));
+
+        confirmAlert.showAndWait().ifPresent(result -> {
+            if (result != ButtonType.OK) {
+                return;
+            }
+
+            try {
+                StrategyAssignment assignment = labService.manuallyAssign(symbol, timeframe, strategyName);
+
+                if (assignment != null) {
+                    appendLog("Assigned from backtest results: " + assignment.getStrategyId() +
+                            " (Score: " + String.format("%.1f", report.getScore()) + ")");
+                    refreshUI();
+                } else {
+                    appendLog("Assignment failed for strategy: " + strategyName);
+                }
+
+            } catch (Exception exception) {
+                log.error("Assignment from ranking failed", exception);
+                appendLog("Assignment failed: " + rootMessage(exception));
+            }
         });
     }
 

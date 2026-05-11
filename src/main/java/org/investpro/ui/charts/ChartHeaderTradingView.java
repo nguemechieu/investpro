@@ -2,12 +2,23 @@ package org.investpro.ui.charts;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import lombok.Getter;
 import org.investpro.data.CandleData;
+import org.investpro.indicators.ChartIndicator;
+import org.investpro.indicators.SimpleMovingAverageIndicator;
+import org.investpro.indicators.ExponentialMovingAverageIndicator;
+import org.investpro.indicators.RSIIndicator;
+import org.investpro.indicators.MACDIndicator;
+import org.investpro.indicators.BollingerBandsIndicator;
+import org.investpro.indicators.StochasticIndicator;
+import org.investpro.indicators.ATRIndicator;
+import org.investpro.indicators.VolumeIndicator;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -40,6 +51,11 @@ public class ChartHeaderTradingView extends VBox {
     private final Label lowLabel = new Label();
     private final Label closeLabel = new Label();
     private final Label volumeLabel = new Label();
+
+    // Controls for indicators and chart type
+    private final ComboBox<String> indicatorComboBox = new ComboBox<>();
+    private final Button addIndicatorButton = new Button("+ Indicator");
+    private final ComboBox<String> chartTypeComboBox = new ComboBox<>();
 
     public ChartHeaderTradingView(@NotNull CandleStickChart candleStickChart) {
 
@@ -79,16 +95,20 @@ public class ChartHeaderTradingView extends VBox {
                         "1h"));
             }
         });
-        setPrefHeight(70);
+        setPrefHeight(120);
         setStyle("-fx-background-color: " + SECONDARY_BG + "; "
                 + "-fx-border-color: #263246; "
                 + "-fx-border-width: 0 0 1 0;");
         setPadding(new Insets(12, 16, 12, 16));
-        setSpacing(16);
+        setSpacing(8);
 
         // Top row: Symbol, Price, Change, Timeframe
         HBox topRow = createTopRow();
         getChildren().add(topRow);
+
+        // Control row: Chart Type, Indicator selector, Add button
+        HBox controlRow = createControlRow();
+        getChildren().add(controlRow);
 
         // Bottom row: OHLCV values
         HBox bottomRow = createBottomRow();
@@ -122,6 +142,167 @@ public class ChartHeaderTradingView extends VBox {
 
         row.getChildren().addAll(symbolLabel, priceLabel, changeLabel, spacer, timeframeLabel);
         return row;
+    }
+
+    private @NotNull HBox createControlRow() {
+        HBox row = new HBox(12);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(8, 0, 0, 0));
+
+        // Chart Type Selector
+        Label chartTypeLabel = new Label("Chart:");
+        chartTypeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + TEXT_SECONDARY + ";");
+
+        chartTypeComboBox.getItems().addAll("Candlestick", "Line", "Bar", "Area");
+        chartTypeComboBox.setValue("Candlestick");
+        chartTypeComboBox.setStyle("-fx-font-size: 11px; -fx-padding: 4;");
+        chartTypeComboBox.setOnAction(e -> handleChartTypeChange(chartTypeComboBox.getValue()));
+
+        // Indicator Selector
+        Label indicatorLabel = new Label("Indicator:");
+        indicatorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + TEXT_SECONDARY + ";");
+
+        indicatorComboBox.getItems().addAll(
+                "SMA (Simple MA)",
+                "EMA (Exponential MA)",
+                "RSI (Relative Strength)",
+                "MACD",
+                "Bollinger Bands",
+                "Volume",
+                "ATR (Average True Range)",
+                "Stochastic");
+        indicatorComboBox.setStyle("-fx-font-size: 11px; -fx-padding: 4;");
+        indicatorComboBox.setPromptText("Select indicator...");
+
+        // Add Indicator Button
+        addIndicatorButton.setStyle(
+                "-fx-font-size: 11px; " +
+                        "-fx-padding: 4 12; " +
+                        "-fx-background-color: #4CAF50; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-cursor: hand;");
+        addIndicatorButton.setOnAction(e -> handleAddIndicator(indicatorComboBox.getValue()));
+
+        // Spacer
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
+        row.getChildren().addAll(
+                chartTypeLabel, chartTypeComboBox,
+                new Label(" | "),
+                indicatorLabel, indicatorComboBox,
+                addIndicatorButton,
+                spacer);
+        return row;
+    }
+
+    private void handleChartTypeChange(String chartType) {
+        if (chartType == null || chartType.isEmpty()) {
+            return;
+        }
+
+        try {
+            switch (chartType.toLowerCase()) {
+                case "candlestick" -> {
+                    System.out.println("Chart type: Candlestick (current)");
+                    // Candlestick is the default chart type
+                }
+                case "line" -> {
+                    System.out.println("Chart type: Line (feature coming soon)");
+                    // Future: Implement line chart rendering
+                }
+                case "bar" -> {
+                    System.out.println("Chart type: Bar (feature coming soon)");
+                    // Future: Implement bar chart rendering
+                }
+                case "area" -> {
+                    System.out.println("Chart type: Area (feature coming soon)");
+                    // Future: Implement area chart rendering
+                }
+                default -> System.out.println("Unknown chart type: " + chartType);
+            }
+        } catch (Exception e) {
+            System.err.println("Error changing chart type: " + e.getMessage());
+        }
+    }
+
+    private void handleAddIndicator(String indicatorName) {
+        if (indicatorName == null || indicatorName.isEmpty()) {
+            System.out.println("Please select an indicator");
+            return;
+        }
+
+        try {
+            // Create appropriate indicator based on selection
+            ChartIndicator indicator = createIndicator(indicatorName);
+            if (indicator != null) {
+                // Add indicator to chart
+                candleStickChart.addIndicator(indicator);
+                System.out.println("Added indicator: " + indicatorName);
+
+                // Clear selection after adding
+                indicatorComboBox.setValue(null);
+            }
+        } catch (Exception e) {
+            System.err.println("Error adding indicator: " + e.getMessage());
+
+        }
+    }
+
+    /**
+     * Create a ChartIndicator instance based on indicator name
+     */
+    private ChartIndicator createIndicator(String indicatorName) {
+        if (indicatorName == null || indicatorName.isEmpty()) {
+            return null;
+        }
+
+        try {
+            // Parse the indicator type from the combo box value
+            String type = indicatorName.split(" ")[0].toUpperCase();
+
+            return switch (type) {
+                case "SMA" -> {
+                    System.out.println("Creating SMA20 indicator");
+                    yield new SimpleMovingAverageIndicator(20);
+                }
+                case "EMA" -> {
+                    System.out.println("Creating EMA12 indicator");
+                    yield new ExponentialMovingAverageIndicator(12);
+                }
+                case "RSI" -> {
+                    System.out.println("Creating RSI14 indicator");
+                    yield new RSIIndicator(14);
+                }
+                case "MACD" -> {
+                    System.out.println("Creating MACD indicator");
+                    yield new MACDIndicator();
+                }
+                case "BOLLINGER" -> {
+                    System.out.println("Creating Bollinger Bands indicator");
+                    yield new BollingerBandsIndicator(20, 2.0);
+                }
+                case "VOLUME" -> {
+                    System.out.println("Creating Volume indicator");
+                    yield new VolumeIndicator();
+                }
+                case "ATR" -> {
+                    System.out.println("Creating ATR14 indicator");
+                    yield new ATRIndicator(14);
+                }
+                case "STOCHASTIC" -> {
+                    System.out.println("Creating Stochastic indicator");
+                    yield new StochasticIndicator(14, 3, 3);
+                }
+                default -> {
+                    System.out.println("Unknown indicator type: " + type);
+                    yield null;
+                }
+            };
+        } catch (Exception e) {
+            System.err.println("Error creating indicator: " + e.getMessage());
+            return null;
+        }
     }
 
     private HBox createBottomRow() {
@@ -227,5 +408,80 @@ public class ChartHeaderTradingView extends VBox {
                         timeframeLabel.getText()));
             }
         });
+    }
+
+    /**
+     * Add a technical indicator to the chart.
+     * Supported indicators: SMA, EMA, RSI, MACD, Bollinger Bands, Volume, ATR,
+     * Stochastic
+     */
+    public void addIndicator(String indicatorType) {
+        if (indicatorType == null || indicatorType.isEmpty()) {
+            return;
+        }
+
+        try {
+            // Create the appropriate indicator
+            ChartIndicator indicator = createIndicator(indicatorType);
+            if (indicator != null) {
+                // Add to chart
+                candleStickChart.addIndicator(indicator);
+                System.out.println("Successfully added indicator: " + indicatorType);
+            }
+        } catch (Exception e) {
+            System.err.println("Error adding indicator: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Change the chart display type.
+     * Supported types: Candlestick, Line, Bar, Area
+     */
+    public void setChartType(String chartType) {
+        if (chartType == null || chartType.isEmpty()) {
+            return;
+        }
+
+        try {
+            switch (chartType.toLowerCase()) {
+                case "candlestick" -> {
+                    System.out.println("Chart type: Candlestick (current)");
+                    chartTypeComboBox.setValue("Candlestick");
+                }
+                case "line" -> {
+                    System.out.println("Chart type: Line (feature coming soon)");
+                    chartTypeComboBox.setValue("Line");
+                    // Future: Implement line chart rendering
+                }
+                case "bar" -> {
+                    System.out.println("Chart type: Bar (feature coming soon)");
+                    chartTypeComboBox.setValue("Bar");
+                    // Future: Implement bar chart rendering
+                }
+                case "area" -> {
+                    System.out.println("Chart type: Area (feature coming soon)");
+                    chartTypeComboBox.setValue("Area");
+                    // Future: Implement area chart rendering
+                }
+                default -> System.out.println("Unknown chart type: " + chartType);
+            }
+        } catch (Exception e) {
+            System.err.println("Error changing chart type: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get the currently selected chart type
+     */
+    public String getSelectedChartType() {
+        return chartTypeComboBox.getValue();
+    }
+
+    /**
+     * Get the list of available indicators
+     */
+    public List<String> getAvailableIndicators() {
+        return new ArrayList<>(indicatorComboBox.getItems());
     }
 }

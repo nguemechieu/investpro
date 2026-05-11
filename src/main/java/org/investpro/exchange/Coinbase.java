@@ -365,11 +365,12 @@ public class Coinbase extends Exchange {
     @Override
     public AuthCheckResult checkAuthentication() {
         if (!hasPrivateEndpointAuth()) {
+            String detailedMessage = buildCredentialErrorMessage();
             return AuthCheckResult.builder()
                     .exchangeName(getName())
                     .success(false)
                     .credentialIssue(true)
-                    .message("Coinbase Advanced Trade authentication not configured")
+                    .message(detailedMessage)
                     .checkedAt(Instant.now())
                     .build();
         }
@@ -396,10 +397,16 @@ public class Coinbase extends Exchange {
     }
 
     @Override
-    public void connect() {
+    public synchronized void connect() {
         try {
+            if (websocketClient != null && websocketClient.isOpen()) {
+                log.info("Coinbase WebSocket already connected. Skipping duplicate connect.");
+                return;
+            }
+
             log.info("Coinbase connect() called. websocketClient={}, isOpen={}",
-                    websocketClient, websocketClient != null ? websocketClient.isOpen() : "null");
+                    websocketClient,
+                    websocketClient != null ? websocketClient.isOpen() : "null");
 
             if (websocketClient == null) {
                 websocketClient = createWebSocketClient();
@@ -407,22 +414,26 @@ public class Coinbase extends Exchange {
 
             if (!websocketClient.isOpen()) {
                 log.info("Attempting to establish WebSocket connection to Coinbase...");
-                // Use connectBlocking() to wait for actual connection establishment
-                // with timeout to prevent hanging on stuck connections
-                boolean connected = websocketClient.connectBlocking(10, java.util.concurrent.TimeUnit.SECONDS);
+
+                boolean connected = websocketClient.connectBlocking(
+                        10,
+                        java.util.concurrent.TimeUnit.SECONDS);
+
                 if (!connected) {
-                    log.error("WebSocket connection timeout after 10 seconds");
                     throw new RuntimeException("WebSocket connection timeout after 10 seconds");
                 }
+
                 log.info("Successfully connected to Coinbase WebSocket");
             }
+
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            log.error("Coinbase WebSocket connection interrupted", exception);
             throw new RuntimeException("Coinbase WebSocket connection interrupted", exception);
+
         } catch (Exception exception) {
             log.error("Unable to connect Coinbase WebSocket: {}", exception.getMessage(), exception);
-            throw new RuntimeException("Unable to connect Coinbase WebSocket: %s".formatted(exception.getMessage()),
+            throw new RuntimeException(
+                    "Unable to connect Coinbase WebSocket: %s".formatted(exception.getMessage()),
                     exception);
         }
     }
@@ -661,6 +672,68 @@ public class Coinbase extends Exchange {
         return jwtSigner != null || !bearerToken().isBlank();
     }
 
+    private @NotNull String buildCredentialErrorMessage() {
+        boolean keyFormatOk = apiKey != null && apiKey.contains("organizations/") && apiKey.contains("/apiKeys/");
+        boolean secretFormatOk = apiSecret != null && apiSecret.contains("BEGIN") && apiSecret.contains("PRIVATE KEY");
+
+        if (apiKey == null || apiKey.isBlank()) {
+            return "Coinbase API Key is empty. Set apiKey to: organizations/{org_id}/apiKeys/{key_id}";
+        }
+
+        if (!keyFormatOk) {
+            return "Coinbase API Key has invalid format: " + apiKey +
+                    "\n\nExpected format: organizations/{org_id}/apiKeys/{key_id}" +
+                    "\n\nGet this from: Coinbase → Developer → API Keys";
+        }
+
+        if (apiSecret == null || apiSecret.isBlank()) {
+            return "Coinbase API Secret (Private Key) is empty. Paste the entire EC private key from the .pem file.";
+        }
+
+        if (!secretFormatOk) {
+            return """
+                    Coinbase API Secret (Private Key) has invalid format. It must be a PEM-encoded EC private key:\
+
+                    • Starting with: -----BEGIN EC PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----\
+
+                    • Containing: Base64-encoded key content (multiple lines)\
+
+                    • Ending with: -----END EC PRIVATE KEY----- or -----END PRIVATE KEY-----\
+
+
+                    Get this from: Coinbase → Developer → API Keys → Download Private Key""";
+        }
+
+        return "Coinbase Advanced Trade authentication not configured. Check API credentials format.";
+    }
+
+    private void logAuthenticationDiagnostics(String uriPath) {
+        log.error("HTTP 401 Unauthorized from Coinbase API. Diagnostics:");
+        log.error("");
+
+        if (uriPath.contains("/accounts")) {
+            log.error("Failed endpoint: Account Details API");
+            log.error("This requires the 'View accounts' and 'Edit accounts' permissions.");
+            log.error("");
+            log.error("To fix this:");
+            log.error("  1. Go to Coinbase → Settings → Developers → API Keys");
+            log.error("  2. Click your API key to view details");
+            log.error("  3. Check that 'View accounts' is enabled");
+            log.error("  4. If you see 'Pending activation', wait for Coinbase email confirmation");
+            log.error("  5. Some keys require 2 hours to activate after creation");
+            log.error("");
+        }
+
+        log.error("Common causes:");
+        log.error("  • API key format: organizations/{{org_id}}/apiKeys/{{key_id}}");
+        log.error("  • Private key: complete EC key in PEM format (copy entire .pem file)");
+        log.error("  • Permissions: 'View accounts' required for account endpoints");
+        log.error("  • Status: Key may be pending activation or revoked");
+        log.error("  • Account: Verify you're using the correct Coinbase account");
+        log.error("");
+        log.error("WebSocket still works, so JWT signing is OK. Problem is REST API permissions.");
+    }
+
     private void requirePrivateEndpointAuth(String action) {
         if (!hasPrivateEndpointAuth()) {
             throw new IllegalStateException(
@@ -669,25 +742,28 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private @NotNull HttpResponse<String> send(HttpRequest request) {
+    private @NotNull String sendWithRetry(HttpRequest request, int attempt, int maxAttempts) {
         try {
-            HttpResponse<String> httpResponse = httpClient.send(
+            HttpResponse<byte[]> httpResponse = httpClient.send(
                     request,
-                    HttpResponse.BodyHandlers.ofString());
+                    HttpResponse.BodyHandlers.ofByteArray());
+
+            String contentEncoding = httpResponse.headers()
+                    .firstValue("Content-Encoding")
+                    .orElse("");
+
+            String body = decodeBody(
+                    httpResponse.body(),
+                    contentEncoding);
 
             if (httpResponse.statusCode() >= 400) {
                 String errorMsg = "Coinbase HTTP %d for %s: %s"
-                        .formatted(httpResponse.statusCode(), request.uri(), httpResponse.body());
+                        .formatted(httpResponse.statusCode(), request.uri(), body);
 
-                // Special diagnostics for 401 Unauthorized
                 if (httpResponse.statusCode() == 401) {
                     log.error(errorMsg);
-                    log.error("HTTP 401 means your API credentials are invalid. Check:");
-                    log.error("  1. COINBASE_KEY_NAME format: organizations/{{org_id}}/apiKeys/{{key_id}}");
-                    log.error("  2. COINBASE_PRIVATE_KEY: complete EC private key in PEM format");
-                    log.error("  3. Coinbase dashboard: API key is ENABLED and has 'View accounts' permission");
-                    log.error("  4. API key is not revoked or expired");
-                    log.error("See COINBASE_401_FIX.md for detailed troubleshooting.");
+                    String uriPath = request.uri().getPath();
+                    logAuthenticationDiagnostics(uriPath);
                 } else {
                     log.error(errorMsg);
                 }
@@ -695,54 +771,111 @@ public class Coinbase extends Exchange {
                 throw new RuntimeException(errorMsg);
             }
 
-            return httpResponse;
+            return body;
+
         } catch (IOException exception) {
-            throw new RuntimeException("Coinbase HTTP request failed: %s".formatted(request.uri()), exception);
+            if (attempt < maxAttempts - 1) {
+                long backoffMs = 100L * (long) Math.pow(2, attempt);
+
+                log.warn(
+                        "Coinbase request failed attempt {}/{}, retrying in {}ms: {}",
+                        attempt + 1,
+                        maxAttempts,
+                        backoffMs,
+                        exception.getMessage());
+
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(
+                            "Coinbase retry interrupted: %s".formatted(request.uri()),
+                            interruptedException);
+                }
+
+                return sendWithRetry(request, attempt + 1, maxAttempts);
+            }
+
+            throw new RuntimeException(
+                    "Coinbase HTTP request failed after %d attempts: %s"
+                            .formatted(maxAttempts, request.uri()),
+                    exception);
+
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Coinbase HTTP request interrupted: %s".formatted(request.uri()), exception);
+            throw new RuntimeException(
+                    "Coinbase HTTP request interrupted: %s".formatted(request.uri()),
+                    exception);
         }
     }
 
     private @NotNull CompletableFuture<String> sendAsync(HttpRequest request) {
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
                 .thenApply(httpResponse -> {
+                    String contentEncoding = httpResponse.headers()
+                            .firstValue("Content-Encoding")
+                            .orElse("");
+
+                    String body = decodeBody(
+                            httpResponse.body(),
+                            contentEncoding);
+
                     if (httpResponse.statusCode() >= 400) {
                         throw new RuntimeException(
                                 "Coinbase HTTP %d for %s: %s"
-                                        .formatted(httpResponse.statusCode(), request.uri(), httpResponse.body()));
+                                        .formatted(httpResponse.statusCode(), request.uri(), body));
                     }
 
-                    return httpResponse.body();
+                    return body;
                 });
     }
 
     private static JsonNode readJson(String body) {
-        try {
-            // Handle null or empty body gracefully
-            if (body == null || body.isBlank()) {
-                return OBJECT_MAPPER.readTree("{}");
-            }
+        if (body == null || body.isBlank()) {
+            throw new IllegalArgumentException("Coinbase JSON response body is null or blank");
+        }
 
-            // Sanitize the response body by removing control characters
-            // Control characters (0x00-0x1F) can cause JSON parsing errors
-            // Valid whitespace is \n (0x0A), \r (0x0D), \t (0x09)
+        try {
             String sanitized = sanitizeJsonString(body);
 
-            // Log if sanitization removed characters
             if (!sanitized.equals(body)) {
                 int removedCount = body.length() - sanitized.length();
-                log.warn("Removed {} control/invalid characters from Coinbase response (possible network corruption)",
+                log.warn(
+                        "Removed {} control/invalid characters from Coinbase response body",
                         removedCount);
             }
 
             return OBJECT_MAPPER.readTree(sanitized);
+
         } catch (JsonProcessingException exception) {
-            // Provide more detailed error information for debugging
-            String preview = body == null ? "[null]" : body.length() > 100 ? body.substring(0, 100) + "..." : body;
-            log.error("Failed to parse Coinbase JSON response. Preview: {}", preview, exception);
-            throw new RuntimeException("Unable to parse Coinbase JSON response: " + exception.getMessage(), exception);
+            String preview = previewBody(body, 500);
+
+            log.error(
+                    "Failed to parse Coinbase JSON response. Body preview: {}",
+                    preview,
+                    exception);
+
+            throw new IllegalStateException(
+                    "Unable to parse Coinbase JSON response: " + exception.getOriginalMessage(),
+                    exception);
         }
+    }
+
+    private static @NotNull String previewBody(String body, int maxLength) {
+        if (body == null) {
+            return "[null]";
+        }
+
+        String compact = body
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+
+        if (compact.length() <= maxLength) {
+            return compact;
+        }
+
+        return compact.substring(0, maxLength) + "...";
     }
 
     /**
@@ -758,13 +891,29 @@ public class Coinbase extends Exchange {
             return input;
         }
 
+        // Detect if the input looks corrupted (contains many invalid UTF-8 sequences)
+        int invalidCharCount = 0;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            // Replacement character (\uFFFD) indicates failed UTF-8 decode
+            if (c == '\uFFFD' || (c < 32 && c != '\n' && c != '\r' && c != '\t')) {
+                invalidCharCount++;
+            }
+        }
+
+        // If too many invalid characters, the response is likely corrupted
+        if (invalidCharCount > input.length() * 0.05) { // More than 5% invalid
+            log.error(
+                    "Response appears heavily corrupted: {}% invalid UTF-8 characters. Length: {} chars, Invalid count: {}",
+                    (int) ((invalidCharCount * 100.0) / input.length()), input.length(), invalidCharCount);
+        }
+
         StringBuilder result = new StringBuilder(input.length());
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
-            int code = (int) c;
 
             // Allow regular characters and valid whitespace (\n, \r, \t)
-            if (code >= 32 || c == '\n' || c == '\r' || c == '\t') {
+            if ((int) c >= 32 || c == '\n' || c == '\r' || c == '\t') {
                 result.append(c);
             }
             // Skip control characters (0x00-0x1F except valid whitespace)
@@ -925,8 +1074,9 @@ public class Coinbase extends Exchange {
                 .GET()
                 .build();
 
-        HttpResponse<String> httpResponse = send(request);
-        JsonNode root = readJson(httpResponse.body());
+        @NotNull
+        String httpResponse = send(request);
+        JsonNode root = readJson(httpResponse);
 
         ArrayList<TradePair> tradePairs = new ArrayList<>();
 
@@ -1049,8 +1199,9 @@ public class Coinbase extends Exchange {
                 .GET()
                 .build();
 
-        HttpResponse<String> httpResponse = send(request);
-        JsonNode root = readJson(httpResponse.body());
+        @NotNull
+        String httpResponse = send(request);
+        JsonNode root = readJson(httpResponse);
 
         Ticker ticker = new Ticker();
 
@@ -1132,8 +1283,9 @@ public class Coinbase extends Exchange {
                     .GET()
                     .build();
 
-            HttpResponse<String> httpResponse = send(request);
-            JsonNode root = readJson(httpResponse.body());
+            @NotNull
+            String httpResponse = send(request);
+            JsonNode root = readJson(httpResponse);
 
             JsonNode tradesNode = root.get("trades");
 
@@ -1301,6 +1453,10 @@ public class Coinbase extends Exchange {
         }
     }
 
+    private @NotNull String send(HttpRequest request) {
+        return sendWithRetry(request, 0, 3);
+    }
+
     @Override
     public Account getUserAccountDetails() {
         requirePrivateEndpointAuth("Coinbase account details");
@@ -1309,10 +1465,11 @@ public class Coinbase extends Exchange {
                 .GET()
                 .build();
 
-        HttpResponse<String> response = send(request);
+        @NotNull
+        String response = send(request);
 
         try {
-            JsonNode root = readJson(response.body());
+            JsonNode root = readJson(response);
             JsonNode accounts = root.path("accounts");
 
             if (accounts.isArray() && !accounts.isEmpty()) {
@@ -1320,7 +1477,7 @@ public class Coinbase extends Exchange {
                 return OBJECT_MAPPER.treeToValue(first, Account.class);
             }
 
-            return OBJECT_MAPPER.readValue(response.body(), Account.class);
+            return OBJECT_MAPPER.readValue(response, Account.class);
         } catch (JsonProcessingException exception) {
             throw new RuntimeException("Unable to parse Coinbase accounts response", exception);
         }
@@ -1761,7 +1918,7 @@ public class Coinbase extends Exchange {
                 .GET()
                 .build();
 
-        return sendAsync(request).thenApply(response -> parseOpenOrders(response, tradePair));
+        return sendAsync(request).thenApply(this::parseOpenOrders);
     }
 
     @Override
@@ -2620,7 +2777,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private List<OpenOrder> parseOpenOrders(String jsonResponse, TradePair tradePair) {
+    private List<OpenOrder> parseOpenOrders(String jsonResponse) {
         List<OpenOrder> orders = new ArrayList<>();
         try {
             JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
