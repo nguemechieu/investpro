@@ -15,16 +15,14 @@ import javafx.scene.layout.VBox;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.enums.timeframe.Timeframe;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 /**
  * Professional TradingView-style toolbar for chart controls.
  * Provides tools for drawing, studies, timeframe selection, and view options.
- * <p>
+ *
  * Features:
  * - Technical study selection (Moving Averages, RSI, MACD, etc.)
  * - Drawing tools (Trend lines, Support/Resistance levels, Fibonacci, etc.)
@@ -247,8 +245,7 @@ private   CandleStickChart candleStickChart;
     }
 
     private void initializeTimeframeSelector() {
-  List<String> timeframes = (List<String>) candleStickChart.getExchange().getSupportedTimeframes().stream().
-          map(Timeframe::getCode);
+        String[] timeframes = { "1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M" };
         timeframeSelector.getItems().addAll(timeframes);
         timeframeSelector.setValue("1h");
         styleDropdown(timeframeSelector, 100);

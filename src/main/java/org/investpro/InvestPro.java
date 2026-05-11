@@ -135,7 +135,7 @@ public class InvestPro extends Application {
         try {
             shutdownTradingTerminal();
 
-            tradingDesk = new TradingDesk(configuration,tradeRepository,orderRepository,currencyRepository);
+            tradingDesk = new TradingDesk(configuration, tradeRepository, orderRepository, currencyRepository);
             setRootContent(tradingDesk);
 
             primaryStage.setTitle("%s - Trading Desk".formatted(buildWindowTitle()));
@@ -226,11 +226,10 @@ public class InvestPro extends Application {
                     BackgroundRepeat.NO_REPEAT,
                     BackgroundRepeat.NO_REPEAT,
                     BackgroundPosition.CENTER,
-                    new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false,false,true, true));
+                    new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, true, true));
 
             Background background = new Background(bgImage);
             root.setBackground(background);
-
 
             log.info("Loaded background image: images/Invest.png");
 

@@ -47,19 +47,38 @@ public class ChartHeaderTradingView extends VBox {
         initializeUI();
     }
 
-    List<CandleData> candleDataList= Collections.synchronizedList(new ArrayList<>());
-private final CandleStickChart candleStickChart;
+    List<CandleData> candleDataList = Collections.synchronizedList(new ArrayList<>());
+    private final CandleStickChart candleStickChart;
+
     private void initializeUI() {
-        CompletableFuture.runAsync(()->{
+        CompletableFuture.runAsync(() -> {
             candleDataList.addAll(candleStickChart.getAllCandleData());
-            for (CandleData candleData : candleDataList) {
-                updateWithCandle(candleStickChart.getTradePair().toString('/'),candleStickChart.getTradePair().getLastPrice()
-                        ,candleStickChart.getTradePair().getChange(),candleStickChart.getTradePair().getChangePercent(),
-                        candleData.openPrice(),candleData.highPrice(),candleData.lowPrice(),candleData.closePrice(),candleData.volume(),
-                        "1h");
 
-
-            }});
+            // Display the latest candle data
+            if (!candleDataList.isEmpty()) {
+                CandleData latestCandle = candleDataList.get(candleDataList.size() - 1);
+                javafx.application.Platform.runLater(() -> updateWithCandle(
+                        candleStickChart.getTradePair().toString('/'),
+                        candleStickChart.getTradePair().getLastPrice(),
+                        candleStickChart.getTradePair().getChange(),
+                        candleStickChart.getTradePair().getChangePercent(),
+                        latestCandle.openPrice(),
+                        latestCandle.highPrice(),
+                        latestCandle.lowPrice(),
+                        latestCandle.closePrice(),
+                        latestCandle.volume(),
+                        "1h"));
+            } else {
+                // Fallback: display trade pair price data if no candles available
+                javafx.application.Platform.runLater(() -> updateWithCandle(
+                        candleStickChart.getTradePair().toString('/'),
+                        candleStickChart.getTradePair().getLastPrice(),
+                        candleStickChart.getTradePair().getChange(),
+                        candleStickChart.getTradePair().getChangePercent(),
+                        0, 0, 0, candleStickChart.getTradePair().getLastPrice(), 0,
+                        "1h"));
+            }
+        });
         setPrefHeight(70);
         setStyle("-fx-background-color: " + SECONDARY_BG + "; "
                 + "-fx-border-color: #263246; "
@@ -83,7 +102,7 @@ private final CandleStickChart candleStickChart;
 
         // Symbol
         symbolLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + ";");
-        symbolLabel.setText("BTC/USD");
+        symbolLabel.setText(candleStickChart.getTradePair().toString('/'));
 
         // Price
         priceLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + ";");
@@ -158,7 +177,7 @@ private final CandleStickChart candleStickChart;
             volumeText = String.format("V %.0f", volume);
         }
         volumeLabel.setText(volumeText);
-        updateChange(price,changePercent);
+        updateChange(price, changePercent);
         updatePrice(price);
     }
 
@@ -183,5 +202,30 @@ private final CandleStickChart candleStickChart;
 
     public void setTimeframe(String timeframe) {
         timeframeLabel.setText(timeframe);
+    }
+
+    /**
+     * Update header with latest candle data from chart.
+     * Call this whenever chart data is updated or candles are refreshed.
+     */
+    public void updateFromChart() {
+        CompletableFuture.runAsync(() -> {
+            List<CandleData> allCandles = candleStickChart.getAllCandleData();
+
+            if (!allCandles.isEmpty()) {
+                CandleData latest = allCandles.get(allCandles.size() - 1);
+                javafx.application.Platform.runLater(() -> updateWithCandle(
+                        candleStickChart.getTradePair().toString('/'),
+                        candleStickChart.getTradePair().getLastPrice(),
+                        candleStickChart.getTradePair().getChange(),
+                        candleStickChart.getTradePair().getChangePercent(),
+                        latest.openPrice(),
+                        latest.highPrice(),
+                        latest.lowPrice(),
+                        latest.closePrice(),
+                        latest.volume(),
+                        timeframeLabel.getText()));
+            }
+        });
     }
 }

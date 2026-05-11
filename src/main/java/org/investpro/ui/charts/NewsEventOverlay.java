@@ -1,9 +1,11 @@
 package org.investpro.ui.charts;
 
+import javafx.geometry.Bounds;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.text.TextAlignment;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -128,12 +130,10 @@ public class NewsEventOverlay extends Canvas {
     private void drawEventLabel(GraphicsContext gc, double x, NewsEvent event) {
         gc.setFont(new Font("Monospace", 8));
         gc.setFill(getEventColor(event));
-        /*
-         Note: GraphicsContext doesn't support setTextAlignment; text is drawn at the
-         specified position
-         Truncate long titles
-        */
+        // Note: GraphicsContext doesn't support setTextAlignment; text is drawn at the
+        // specified position
 
+        // Truncate long titles
         String label = event.getTitle().length() > 15
                 ? event.getTitle().substring(0, 12) + "..."
                 : event.getTitle();
