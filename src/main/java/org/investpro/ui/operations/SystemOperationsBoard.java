@@ -10,6 +10,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.VPos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.layout.Priority;
 import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 
@@ -57,7 +58,7 @@ public class SystemOperationsBoard extends BorderPane {
     }
 
     private void initializeUI() {
-        setStyle("-fx-font-family: 'Segoe UI', 'Helvetica', sans-serif; -fx-font-size: 11;");
+        getStyleClass().add("system-operations-board");
 
         // Create toolbar
         HBox toolbar = createToolbar();
@@ -65,6 +66,7 @@ public class SystemOperationsBoard extends BorderPane {
 
         // Create tabs
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabPane.getStyleClass().add("operations-tab-pane");
         tabPane.getTabs().addAll(
                 createOverviewTab(),
                 createExchangesTab(),
@@ -75,30 +77,35 @@ public class SystemOperationsBoard extends BorderPane {
                 createErrorsTab());
 
         setCenter(tabPane);
+        BorderPane.setGrow(tabPane, Priority.ALWAYS);
     }
 
     private HBox createToolbar() {
         HBox toolbar = new HBox(10);
-        toolbar.setPadding(new Insets(8));
-        toolbar.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
+        toolbar.getStyleClass().add("operations-toolbar");
 
         systemHealthLabel = new Label("🟢 HEALTHY");
-        systemHealthLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12;");
+        systemHealthLabel.getStyleClass().add("system-health-label");
 
         uptimeLabel = new Label("Uptime: 0h");
+        uptimeLabel.getStyleClass().add("operations-info-label");
         memoryLabel = new Label("Memory: 0%");
+        memoryLabel.getStyleClass().add("operations-info-label");
 
         Button refreshBtn = new Button("🔄 Refresh");
+        refreshBtn.getStyleClass().add("operations-button");
         refreshBtn.setOnAction(e -> refreshAllData());
 
         Button exportBtn = new Button("💾 Export Snapshot");
+        exportBtn.getStyleClass().add("operations-button");
         exportBtn.setOnAction(e -> exportSnapshot());
 
         Button clearLogsBtn = new Button("🗑️ Clear Logs");
+        clearLogsBtn.getStyleClass().add("operations-button");
         clearLogsBtn.setOnAction(e -> clearActivityLogs());
 
         Separator sep = new Separator();
-        sep.setPrefWidth(20);
+        sep.getStyleClass().add("operations-separator");
 
         toolbar.getChildren().addAll(
                 systemHealthLabel,
@@ -122,10 +129,7 @@ public class SystemOperationsBoard extends BorderPane {
         tab.setClosable(false);
 
         GridPane grid = new GridPane();
-        grid.setHgap(15);
-        grid.setVgap(15);
-        grid.setPadding(new Insets(15));
-        grid.setStyle("-fx-background-color: #f5f5f5;");
+        grid.getStyleClass().add("operations-overview-grid");
 
         // System Card
         VBox systemCard = createCard("System", createSystemCardContent());
@@ -147,7 +151,7 @@ public class SystemOperationsBoard extends BorderPane {
 
         ScrollPane scrollPane = new ScrollPane(grid);
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: transparent;");
+        scrollPane.setStyle("-fx-background: transparent; -fx-padding: 0;");
         tab.setContent(scrollPane);
 
         return tab;
@@ -164,7 +168,7 @@ public class SystemOperationsBoard extends BorderPane {
         vbox.setPadding(new Insets(10));
 
         exchangeStatusLabel = new Label("No exchanges connected");
-        exchangeStatusLabel.setStyle("-fx-font-size: 12;");
+        exchangeStatusLabel.getStyleClass().add("operations-info-label");
 
         exchangeTableView = new TableView<>();
         setupExchangeTable();
@@ -187,12 +191,13 @@ public class SystemOperationsBoard extends BorderPane {
         vbox.setPadding(new Insets(10));
 
         Label titleLabel = new Label("Trading Engine Status");
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+        titleLabel.setStyle(
+                "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + (true ? "-text-primary" : "white") + ";");
 
         TextArea engineArea = new TextArea();
         engineArea.setEditable(false);
         engineArea.setWrapText(true);
-        engineArea.setStyle("-fx-font-family: monospace; -fx-font-size: 10;");
+        engineArea.getStyleClass().add("operations-text-area");
 
         vbox.getChildren().addAll(titleLabel, engineArea);
         VBox.setVgrow(engineArea, Priority.ALWAYS);
@@ -212,12 +217,13 @@ public class SystemOperationsBoard extends BorderPane {
         vbox.setPadding(new Insets(10));
 
         Label titleLabel = new Label("Risk Manager Status");
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+        titleLabel.setStyle(
+                "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + (true ? "-text-primary" : "white") + ";");
 
         TextArea riskArea = new TextArea();
         riskArea.setEditable(false);
         riskArea.setWrapText(true);
-        riskArea.setStyle("-fx-font-family: monospace; -fx-font-size: 10;");
+        riskArea.getStyleClass().add("operations-text-area");
 
         vbox.getChildren().addAll(titleLabel, riskArea);
         VBox.setVgrow(riskArea, Priority.ALWAYS);
@@ -237,16 +243,17 @@ public class SystemOperationsBoard extends BorderPane {
         vbox.setPadding(new Insets(10));
 
         HBox filterBox = new HBox(10);
-        filterBox.setPadding(new Insets(5));
-        filterBox.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
+        filterBox.getStyleClass().add("operations-filter-box");
 
         ComboBox<String> componentFilter = new ComboBox<>();
         componentFilter.setPromptText("Filter by Component");
+        componentFilter.getStyleClass().add("operations-combo-box");
         componentFilter.getItems().addAll("ALL", "EXCHANGE", "TRADING_ENGINE", "RISK_MANAGER", "WEBSOCKET");
         componentFilter.setValue("ALL");
 
         ComboBox<String> severityFilter = new ComboBox<>();
         severityFilter.setPromptText("Filter by Severity");
+        severityFilter.getStyleClass().add("operations-combo-box");
         severityFilter.getItems().addAll("ALL", "INFO", "WARN", "ERROR", "CRITICAL");
         severityFilter.setValue("ALL");
 
@@ -278,12 +285,15 @@ public class SystemOperationsBoard extends BorderPane {
         buttonBox.setPadding(new Insets(5));
 
         Button createBtn = new Button("📸 Create Snapshot");
+        createBtn.getStyleClass().add("operations-button");
         createBtn.setOnAction(e -> createAndDisplaySnapshot());
 
         Button copyBtn = new Button("📋 Copy JSON");
+        copyBtn.getStyleClass().add("operations-button");
         copyBtn.setOnAction(e -> copySnapshotJson());
 
         Button exportBtn = new Button("💾 Export JSON");
+        exportBtn.getStyleClass().add("operations-button");
         exportBtn.setOnAction(e -> exportSnapshotJson());
 
         buttonBox.getChildren().addAll(createBtn, copyBtn, exportBtn);
@@ -291,7 +301,7 @@ public class SystemOperationsBoard extends BorderPane {
         snapshotJsonArea = new TextArea();
         snapshotJsonArea.setEditable(false);
         snapshotJsonArea.setWrapText(true);
-        snapshotJsonArea.setStyle("-fx-font-family: monospace; -fx-font-size: 10;");
+        snapshotJsonArea.getStyleClass().add("operations-text-area");
 
         vbox.getChildren().addAll(buttonBox, snapshotJsonArea);
         VBox.setVgrow(snapshotJsonArea, Priority.ALWAYS);
@@ -311,24 +321,23 @@ public class SystemOperationsBoard extends BorderPane {
         vbox.setPadding(new Insets(10));
 
         HBox statsBox = new HBox(20);
-        statsBox.setPadding(new Insets(5));
-        statsBox.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
+        statsBox.getStyleClass().add("operations-stats-box");
 
         Label errorCountLabel = new Label("Errors: 0");
-        errorCountLabel.setStyle("-fx-text-fill: #d32f2f; -fx-font-weight: bold;");
+        errorCountLabel.getStyleClass().add("operations-error-count");
 
         Label warnCountLabel = new Label("Warnings: 0");
-        warnCountLabel.setStyle("-fx-text-fill: #ffa500; -fx-font-weight: bold;");
+        warnCountLabel.getStyleClass().add("operations-warn-count");
 
         Label criticalCountLabel = new Label("Critical: 0");
-        criticalCountLabel.setStyle("-fx-text-fill: #c41c3b; -fx-font-weight: bold;");
+        criticalCountLabel.getStyleClass().add("operations-critical-count");
 
         statsBox.getChildren().addAll(errorCountLabel, warnCountLabel, criticalCountLabel);
 
         TextArea errorArea = new TextArea();
         errorArea.setEditable(false);
         errorArea.setWrapText(true);
-        errorArea.setStyle("-fx-font-family: monospace; -fx-font-size: 10;");
+        errorArea.getStyleClass().add("operations-text-area");
 
         vbox.getChildren().addAll(statsBox, errorArea);
         VBox.setVgrow(errorArea, Priority.ALWAYS);
@@ -341,11 +350,10 @@ public class SystemOperationsBoard extends BorderPane {
 
     private VBox createCard(String title, VBox content) {
         VBox card = new VBox(10);
-        card.setStyle("-fx-border-color: #cccccc; -fx-border-radius: 5; -fx-padding: 12; " +
-                "-fx-background-color: white; -fx-border-width: 1;");
+        card.getStyleClass().add("operations-card");
 
         Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
+        titleLabel.getStyleClass().add("operations-card-title");
 
         card.getChildren().addAll(titleLabel, new Separator(), content);
         return card;
@@ -395,9 +403,11 @@ public class SystemOperationsBoard extends BorderPane {
 
     private HBox createInfoRow(String label, String value) {
         HBox hbox = new HBox(10);
+        hbox.getStyleClass().add("operations-info-row");
         Label labelLbl = new Label(label);
-        labelLbl.setStyle("-fx-font-weight: bold; -fx-min-width: 100;");
+        labelLbl.getStyleClass().add("operations-info-label-bold");
         Label valueLbl = new Label(value);
+        valueLbl.getStyleClass().add("operations-info-value");
         hbox.getChildren().addAll(labelLbl, valueLbl);
         return hbox;
     }

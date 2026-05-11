@@ -273,3 +273,142 @@
 .loading-overlay {
     -fx-background-color: rgba(15, 23, 42, 0.85);
 }
+
+/* ============================================================================
+   SYSTEM OPERATIONS BOARD STYLES
+   ============================================================================ */
+
+.system-operations-board {
+    -fx-font-family: "Segoe UI", "Helvetica", sans-serif;
+    -fx-font-size: 11px;
+}
+
+.operations-toolbar {
+    -fx-padding: 8px;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+    -fx-spacing: 10px;
+    -fx-background-color: -surface-bg;
+}
+
+.system-health-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-primary;
+}
+
+.operations-info-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-secondary;
+}
+
+.operations-tab-pane {
+    -fx-padding: 0px;
+}
+
+.operations-overview-grid {
+    -fx-background-color: #f5f5f5;
+    -fx-hgap: 15px;
+    -fx-vgap: 15px;
+    -fx-padding: 15px;
+}
+
+.operations-card {
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 5;
+    -fx-border-width: 1;
+    -fx-background-color: white;
+    -fx-padding: 12px;
+    -fx-spacing: 10px;
+}
+
+.operations-card-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text-primary;
+}
+
+.operations-info-row {
+    -fx-spacing: 10px;
+}
+
+.operations-info-label-bold {
+    -fx-font-weight: bold;
+    -fx-min-width: 100px;
+    -fx-text-fill: -text-primary;
+}
+
+.operations-info-value {
+    -fx-text-fill: -text-secondary;
+}
+
+.operations-table-view {
+    -fx-font-size: 11px;
+}
+
+.operations-table-column {
+    -fx-text-fill: -text-primary;
+}
+
+.operations-text-area {
+    -fx-font-family: monospace;
+    -fx-font-size: 10px;
+    -fx-text-fill: -text-primary;
+    -fx-background-color: -surface-bg;
+    -fx-border-color: #e0e0e0;
+    -fx-control-inner-background: -surface-bg;
+}
+
+.operations-text-area:focused {
+    -fx-text-fill: -text-primary;
+    -fx-background-color: -surface-bg;
+}
+
+.operations-filter-box {
+    -fx-padding: 5px;
+    -fx-spacing: 10px;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.operations-combo-box {
+    -fx-font-size: 11px;
+}
+
+.operations-button {
+    -fx-padding: 6px 12px;
+    -fx-font-size: 11px;
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-border-radius: 3;
+}
+
+.operations-button:hover {
+    -fx-background-color: -primary-light;
+}
+
+.operations-error-count {
+    -fx-text-fill: #d32f2f;
+    -fx-font-weight: bold;
+}
+
+.operations-warn-count {
+    -fx-text-fill: #ffa500;
+    -fx-font-weight: bold;
+}
+
+.operations-critical-count {
+    -fx-text-fill: #c41c3b;
+    -fx-font-weight: bold;
+}
+
+.operations-stats-box {
+    -fx-padding: 5px;
+    -fx-spacing: 20px;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.operations-separator {
+    -fx-padding: 20px;
+}
