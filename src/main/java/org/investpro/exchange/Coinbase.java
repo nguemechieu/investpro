@@ -709,10 +709,58 @@ public class Coinbase extends Exchange {
 
     private static JsonNode readJson(String body) {
         try {
-            return OBJECT_MAPPER.readTree(body == null ? "" : body);
+            // Handle null or empty body gracefully
+            if (body == null || body.isBlank()) {
+                return OBJECT_MAPPER.readTree("{}");
+            }
+
+            // Sanitize the response body by removing control characters
+            // Control characters (0x00-0x1F) can cause JSON parsing errors
+            // Valid whitespace is \n (0x0A), \r (0x0D), \t (0x09)
+            String sanitized = sanitizeJsonString(body);
+
+            // Log if sanitization removed characters
+            if (!sanitized.equals(body)) {
+                int removedCount = body.length() - sanitized.length();
+                log.warn("Removed {} control/invalid characters from Coinbase response (possible network corruption)",
+                        removedCount);
+            }
+
+            return OBJECT_MAPPER.readTree(sanitized);
         } catch (JsonProcessingException exception) {
-            throw new RuntimeException("Unable to parse Coinbase JSON response", exception);
+            // Provide more detailed error information for debugging
+            String preview = body == null ? "[null]" : 
+                           body.length() > 100 ? body.substring(0, 100) + "..." : body;
+            log.error("Failed to parse Coinbase JSON response. Preview: {}", preview, exception);
+            throw new RuntimeException("Unable to parse Coinbase JSON response: " + exception.getMessage(), exception);
         }
+    }
+
+    /**
+     * Sanitizes a JSON string by removing control characters that can break parsing.
+     * Preserves valid whitespace: \n (0x0A), \r (0x0D), \t (0x09)
+     *
+     * @param input The raw JSON string that may contain control characters
+     * @return A sanitized JSON string safe for parsing
+     */
+    private static String sanitizeJsonString(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        StringBuilder result = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            int code = (int) c;
+
+            // Allow regular characters and valid whitespace (\n, \r, \t)
+            if (code >= 32 || c == '\n' || c == '\r' || c == '\t') {
+                result.append(c);
+            }
+            // Skip control characters (0x00-0x1F except valid whitespace)
+        }
+
+        return result.toString();
     }
 
     private String encode(String value) {

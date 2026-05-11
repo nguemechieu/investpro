@@ -175,7 +175,8 @@ public class CandleStickChart extends Region {
     private Image backgroundImage;
     private double backgroundImageOpacity = 0.22;
 
-    // Trade visualization overlay for displaying trade markers, order levels, and P&L zones
+    // Trade visualization overlay for displaying trade markers, order levels, and
+    // P&L zones
     private TradeVisualizationOverlay tradeVisualizationOverlay;
     private Canvas tradeOverlayCanvas;
     private boolean showTradeOverlay = true; // Toggle for displaying trades
@@ -1057,7 +1058,7 @@ public class CandleStickChart extends Region {
             drawCrosshair();
         drawScrollbar();
         drawScrollPosition();
-        
+
         // Render trade visualization overlay
         if (showTradeOverlay && tradeOverlayCanvas != null && tradeVisualizationOverlay != null) {
             updateTradeOverlayDimensions(visible);
@@ -1655,8 +1656,6 @@ public class CandleStickChart extends Region {
             requestChartRedraw();
         }
     }
-
-
 
     private void updateLatestCandleFromTrade(@NotNull Trade trade) {
         if (data.isEmpty()) {
@@ -2749,7 +2748,7 @@ public class CandleStickChart extends Region {
         int visibleCount = this.visibleCandles;
 
         tradeVisualizationOverlay.updateChartDimensions(chartW, chartH, priceMin, priceMax, visibleCount);
-        tradeVisualizationOverlay.updateCandles(getAllCandleData(), firstVisibleIndex, 
+        tradeVisualizationOverlay.updateCandles(getAllCandleData(), firstVisibleIndex,
                 firstVisibleIndex + visibleCount - 1);
     }
 
@@ -2766,8 +2765,8 @@ public class CandleStickChart extends Region {
     /**
      * Add a long entry trade marker.
      */
-    public void addLongEntryMarker(double price, long timestamp, String label, double quantity, 
-                                    Double takeProfit, Double stopLoss) {
+    public void addLongEntryMarker(double price, long timestamp, String label, double quantity,
+            Double takeProfit, Double stopLoss) {
         addTradeMarker(TradeVisualizationOverlay.TradeMarker.builder()
                 .type(TradeVisualizationOverlay.TradeType.LONG_ENTRY)
                 .price(price)
@@ -2782,8 +2781,8 @@ public class CandleStickChart extends Region {
     /**
      * Add a short entry trade marker.
      */
-    public void addShortEntryMarker(double price, long timestamp, String label, double quantity, 
-                                     Double takeProfit, Double stopLoss) {
+    public void addShortEntryMarker(double price, long timestamp, String label, double quantity,
+            Double takeProfit, Double stopLoss) {
         addTradeMarker(TradeVisualizationOverlay.TradeMarker.builder()
                 .type(TradeVisualizationOverlay.TradeType.SHORT_ENTRY)
                 .price(price)
