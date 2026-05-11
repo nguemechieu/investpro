@@ -293,27 +293,13 @@ public class EnhancedChartDisplay extends BorderPane {
             }
 
             switch (study) {
-                case "Moving Averages" -> {
-                    calculateMovingAverages(candleStickChart.getAllCandleData(), values, colors);
-                }
-                case "RSI" -> {
-                    calculateRSI(candleStickChart.getAllCandleData(), values, colors);
-                }
-                case "MACD" -> {
-                    calculateMACD(candleStickChart.getAllCandleData(), values, colors);
-                }
-                case "Bollinger Bands" -> {
-                    calculateBollingerBands(candleStickChart.getAllCandleData(), values, colors);
-                }
-                case "Stochastic" -> {
-                    calculateStochastic(candleStickChart.getAllCandleData(), values, colors);
-                }
-                case "ADX" -> {
-                    calculateADX(candleStickChart.getAllCandleData(), values, colors);
-                }
-                case "Volume" -> {
-                    calculateVolume(candleStickChart.getAllCandleData(), values, colors);
-                }
+                case "Moving Averages" -> calculateMovingAverages(candleStickChart.getAllCandleData(), values, colors);
+                case "RSI" -> calculateRSI(candleStickChart.getAllCandleData(), values, colors);
+                case "MACD" -> calculateMACD(candleStickChart.getAllCandleData(), values, colors);
+                case "Bollinger Bands" -> calculateBollingerBands(candleStickChart.getAllCandleData(), values, colors);
+                case "Stochastic" -> calculateStochastic(candleStickChart.getAllCandleData(), values, colors);
+                case "ADX" -> calculateADX(candleStickChart.getAllCandleData(), values, colors);
+                case "Volume" -> calculateVolume(candleStickChart.getAllCandleData(), values, colors);
                 default -> {
                     log.warn("Unknown study: {}", study);
                     return;
@@ -838,5 +824,9 @@ public class EnhancedChartDisplay extends BorderPane {
         } catch (Exception e) {
             log.error("Error disposing chart display", e);
         }
+    }
+
+    public void reset() {
+        candleStickChart.reset();
     }
 }

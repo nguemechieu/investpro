@@ -2377,6 +2377,78 @@ public class CandleStickChart extends Region {
         }
     }
 
+    public void reset() {
+        if (disposed) {
+            log.warn("Cannot reset disposed chart");
+            return;
+        }
+
+        if (!Platform.isFxApplicationThread()) {
+            runOnFx(this::reset);
+            return;
+        }
+
+        try {
+            log.info("Resetting CandleStickChart for {}", tradePair);
+
+            // Clear all data
+            data.clear();
+
+            // Clear overlays and indicators
+            priceLines.clear();
+            indicators.clear();
+            chartEvents.clear();
+
+            // Reset chart state
+            firstVisibleIndex = 0;
+            visibleCandles = TARGET_VISIBLE_CANDLES;
+            candleBodyWidth = DEFAULT_BODY_WIDTH;
+
+            // Reset zoom and pan
+            mousePrevX = -1;
+            mousePrevY = -1;
+            scrollDeltaXSum = 0;
+
+            // Reset scroll tracking
+            lastScrollTime = 0;
+            scrollPositionText = "";
+
+            // Reset price tracking
+            visibleMinPrice = 0;
+            visibleMaxPrice = 1;
+            visibleMaxVolume = 1;
+
+            // Reset crosshair
+            crosshairMouseX = -1;
+            crosshairMouseY = -1;
+
+            // Reset hover state
+            hoveredPrice = -1;
+            hoveredTime = -1;
+
+            // Reset market regime
+            currentMarketRegime = "RANGING";
+            regimeColor = Color.rgb(148, 163, 184);
+
+            // Clear any pending operations
+            paging = false;
+            loading.set(false);
+            drawRequested.set(false);
+
+            // Clear loading timeout
+            loadingStartTime = -1L;
+
+            // Hide loading indicator
+            hideLoadingIndicator();
+
+            // Trigger redraw
+            requestChartRedraw();
+
+            log.info("CandleStickChart reset completed for {}", tradePair);
+        } catch (Exception e) {
+            log.error("Error resetting CandleStickChart", e);
+        }
+    }
 
 
     private class CandlePageConsumer implements Consumer<List<CandleData>> {
