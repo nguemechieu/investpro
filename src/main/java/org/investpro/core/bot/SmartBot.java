@@ -234,6 +234,49 @@ public class SmartBot {
         return !started.get();
     }
 
+    /**
+     * Update the bot's exchange connection without stopping trading.
+     * <p>
+     * This allows switching between exchanges while keeping the bot running
+     * and continuing to trade across different markets.
+     * <p>
+     * 
+     * @param newExchange the new exchange to use for trading
+     */
+    public void updateExchange(@NotNull Exchange newExchange) {
+        Objects.requireNonNull(newExchange, "newExchange must not be null");
+
+        if (!started.get()) {
+            log.warn("Cannot update exchange - SmartBot is not started");
+            return;
+        }
+
+        if (context == null) {
+            log.warn("Cannot update exchange - bot context is null");
+            return;
+        }
+
+        Exchange oldExchange = context.getExchange();
+        try {
+            context.setExchange(newExchange);
+            log.info("SmartBot exchange updated from {} to {}",
+                    oldExchange != null ? oldExchange.getDisplayName() : "NONE",
+                    newExchange.getDisplayName());
+
+            publishSystemEvent(
+                    "SMART_BOT_EXCHANGE_CHANGED",
+                    "Exchange changed to " + newExchange.getDisplayName() +
+                            " - bot continues trading");
+        } catch (Exception e) {
+            log.error("Error updating bot exchange", e);
+            // Restore old exchange on failure
+            if (oldExchange != null) {
+                context.setExchange(oldExchange);
+            }
+            throw new RuntimeException("Failed to update bot exchange: " + e.getMessage(), e);
+        }
+    }
+
     public boolean isAutoTradingEnabled() {
         return context != null && context.isAutoTradingEnabled();
     }

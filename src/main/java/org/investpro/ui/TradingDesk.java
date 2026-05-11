@@ -2427,23 +2427,30 @@ public class TradingDesk extends BorderPane {
         stopActiveStreaming();
         brokerAccessGranted = false;
 
+        // DO NOT stop the bot - it should continue trading across exchanges
+        // Instead, just update the exchange connection in the existing bot
         if (systemCore != null) {
             try {
-                systemCore.stop();
+                // Update bot context with new exchange instead of stopping
+                if (systemCore.getSmartBot() != null && systemCore.getSmartBot().isStarted()) {
+                    log.info("Updating bot to use new exchange: {}", selectedExchange);
+                    // Bot will be updated with new exchange below
+                } else {
+                    // Bot wasn't running, proceed normally
+                    systemCoreEventsSubscribed = false;
+                }
             } catch (Exception exception) {
-                log.debug("Failed to stop SystemCore bot during exchange change", exception);
+                log.debug("Failed to update SystemCore bot during exchange change", exception);
             }
-            systemCore = null;
-            systemCoreEventsSubscribed = false;
         }
 
-        // Properly disconnect and dispose of old exchange before switching
+        // Gracefully disconnect old exchange streams but keep bot running
         if (exchange != null) {
             try {
                 exchange.disconnectStream();
-                exchange.disconnect();
+                // Note: Don't fully disconnect - just stop streaming for graceful transition
             } catch (Exception exception) {
-                log.debug("Failed to disconnect old exchange", exception);
+                log.debug("Failed to disconnect stream from old exchange", exception);
             }
         }
 
@@ -2491,17 +2498,37 @@ public class TradingDesk extends BorderPane {
             if (existingSession != null && existingSession.account() != null) {
                 updateAccountSummary(existingSession.account());
             }
-            try {
-                systemCore = createSystemCore(exchange);
-                // Wire up the primary stage to the Telegram command handler for screenshot
-                // capability
-                if (systemCore.getTelegramCommandHandler() != null && getScene() != null
-                        && getScene().getWindow() instanceof Stage) {
-                    systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+
+            // Update existing bot with new exchange instead of recreating SystemCore
+            if (systemCore != null && systemCore.getSmartBot() != null && systemCore.getSmartBot().isStarted()) {
+                try {
+                    log.info("Updating running bot with new exchange: {}", selectedExchange);
+                    systemCore.getSmartBot().updateExchange(exchange);
+                    // Continue trading with new exchange
+                } catch (Exception e) {
+                    log.warn("Failed to update bot exchange, recreating SystemCore: {}", e.getMessage());
+                    // Fall back to recreating
+                    try {
+                        systemCore = createSystemCore(exchange);
+                    } catch (SQLException | ClassNotFoundException ex) {
+                        log.error("Failed to create SystemCore", ex);
+                        showAlert("Failed to initialize trading system: " + ex.getMessage());
+                    }
                 }
-            } catch (SQLException | ClassNotFoundException e) {
-                log.error("Failed to create SystemCore", e);
-                showAlert("Failed to initialize trading system: " + e.getMessage());
+            } else {
+                // Bot not running, create new one
+                try {
+                    systemCore = createSystemCore(exchange);
+                    // Wire up the primary stage to the Telegram command handler for screenshot
+                    // capability
+                    if (systemCore.getTelegramCommandHandler() != null && getScene() != null
+                            && getScene().getWindow() instanceof Stage) {
+                        systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+                    }
+                } catch (SQLException | ClassNotFoundException e) {
+                    log.error("Failed to create SystemCore", e);
+                    showAlert("Failed to initialize trading system: " + e.getMessage());
+                }
             }
             systemCoreEventsSubscribed = false;
             enablePositionAutoRefresh();
