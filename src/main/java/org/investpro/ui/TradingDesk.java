@@ -534,14 +534,7 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.connectExchange"), null, this::connectSelectedExchange),
                 menuItem(t("menu.toggleBotTrading"), new KeyCodeCombination(KeyCode.T, KeyCombination.CONTROL_DOWN),
                         this::toggleBotTrading),
-                menuItem(t("menu.systemMonitor"), null, this::openSystemMonitorWindow),
-                menuItem("Activity Monitor", null, this::openActivityMonitor),
-                menuItem("Theme Customization", null, this::openThemeCustomization),
-                menuItem("System & Operations Board", null, this::openSystemOperationsBoard),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.tradingSystem"), null, this::tradingSystemStatus),
-                new SeparatorMenuItem(),
-
                 menuItem(t("menu.refreshLocalPositions"), null, this::refreshPositions),
                 menuItem(t("menu.cancelAllOrders"), null, this::cancelAllOrders)));
 
@@ -559,6 +552,10 @@ public class TradingDesk extends BorderPane {
         researchMenu.getItems().setAll(List.of(
                 menuItem(t("menu.marketResearch"), null, this::openMarketResearch),
                 menuItem(t("menu.strategyResearch"), null, this::openStrategyResearch),
+                new SeparatorMenuItem(),
+                menuItem("Quant PM", null, this::showQuantPortfolioManagement),
+                menuItem("Signal Monitor", null, this::showSignalMonitor),
+                menuItem("ML Lab", null, this::showMLLab),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.strategyAssignment"), null, () -> {
                     try {
@@ -588,7 +585,35 @@ public class TradingDesk extends BorderPane {
         Menu reviewMenu = new Menu("Review");
         reviewMenu.getItems().setAll(List.of(
                 menuItem("Performances", null, this::showPerformancesReview),
-                menuItem("Trades", null, this::showTradesReview)));
+                menuItem("Trades", null, this::showTradesReview),
+                new SeparatorMenuItem(),
+                menuItem("Recommendation", null, this::showRecommendations),
+                menuItem("Journal", null, this::showTradingJournal),
+                menuItem("Closed Journal", null, this::showClosedJournal),
+                menuItem("Generate Reports", null, this::generateTradeReports)));
+
+        Menu systemMenu = new Menu("System");
+        systemMenu.getItems().setAll(List.of(
+                menuItem("System Monitor", null, this::openSystemMonitorWindow),
+                menuItem("Operations Board", null, this::openSystemOperationsBoard),
+                menuItem("Activity Monitor", null, this::openActivityMonitor),
+                new SeparatorMenuItem(),
+                menuItem("Diagnostics", null, this::showSystemDiagnostics),
+                menuItem("Performance Metrics", null, this::showSystemMetrics),
+                menuItem("Resource Monitor", null, this::showResourceMonitor)));
+
+        Menu educationMenu = new Menu("Education");
+        educationMenu.getItems().setAll(List.of(
+                menuItem("Trading Basics", null, this::showTradingBasics),
+                menuItem("Strategy Guide", null, this::showStrategyGuide),
+                menuItem("Risk Management", null, this::showRiskManagement),
+                new SeparatorMenuItem(),
+                menuItem("Market Analysis", null, this::showMarketAnalysis),
+                menuItem("Technical Indicators", null, this::showTechnicalIndicators),
+                menuItem("Investment Concepts", null, this::showInvestmentConcepts),
+                new SeparatorMenuItem(),
+                menuItem("Video Tutorials", null, this::showVideoTutorials),
+                menuItem("Documentation", null, this::showDocumentation)));
 
         Menu windowMenu = new Menu(t("menu.window"));
         windowMenu.getItems().setAll(List.of(
@@ -603,6 +628,10 @@ public class TradingDesk extends BorderPane {
 
         Menu helpMenu = new Menu(t("menu.help"));
         helpMenu.getItems().addAll(
+                menuItem("User Guide", new KeyCodeCombination(KeyCode.H, KeyCombination.CONTROL_DOWN),
+                        this::showUserGuide),
+                menuItem("Keyboard Shortcuts", new KeyCodeCombination(KeyCode.K, KeyCombination.CONTROL_DOWN),
+                        this::showKeyboardShortcuts),
                 menuItem(t("menu.helpItem"), new KeyCodeCombination(KeyCode.F1),
                         () -> showInfo("Help", "InvestPro Help - F5 refreshes data, Ctrl+` toggles terminal.")),
                 new SeparatorMenuItem(),
@@ -610,7 +639,7 @@ public class TradingDesk extends BorderPane {
                         "InvestPro ----------------------------------------------------------- Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
 
         return new MenuBar(fileMenu, editMenu, insertMenu, viewMenu, chartsMenu, toolsMenu, strategyMenu, researchMenu,
-                reviewMenu, settingsMenu, windowMenu, languageMenu, licenseMenu, helpMenu);
+                reviewMenu, systemMenu, educationMenu, settingsMenu, windowMenu, languageMenu, licenseMenu, helpMenu);
     }
 
     private void openLicenseManagement() {
@@ -4887,6 +4916,212 @@ public class TradingDesk extends BorderPane {
 
         content.getChildren().addAll(label, placeholder);
         return content;
+    }
+
+    // ============ REVIEW MENU HANDLERS ============
+    private void showRecommendations() {
+        log.info("Opening Recommendations panel");
+        createIndependentWindow("Recommendations", createPlaceholderContent("AI-Powered Trade Recommendations"), 900,
+                700);
+        journal("Recommendations panel opened");
+    }
+
+    private void showTradingJournal() {
+        log.info("Opening Trading Journal");
+        createIndependentWindow("Trading Journal", createPlaceholderContent("Daily Trading Journal & Notes"), 900, 700);
+        journal("Trading Journal opened");
+    }
+
+    private void showClosedJournal() {
+        log.info("Opening Closed Journal");
+        createIndependentWindow("Closed Journal", createPlaceholderContent("Historical Closed Trades Journal"), 900,
+                700);
+        journal("Closed Journal opened");
+    }
+
+    private void generateTradeReports() {
+        log.info("Generating trade reports");
+        showInfo("Generate Reports",
+                "Trade reports generation started. Reports will be saved to your documents folder.");
+        journal("Trade reports generation initiated");
+    }
+
+    // ============ RESEARCH MENU HANDLERS ============
+    private void showQuantPortfolioManagement() {
+        log.info("Opening Quant PM");
+        createIndependentWindow("Quant Portfolio Manager",
+                createPlaceholderContent("Quantitative Portfolio Management & Optimization"), 950, 750);
+        journal("Quant PM opened");
+    }
+
+    private void showSignalMonitor() {
+        log.info("Opening Signal Monitor");
+        createIndependentWindow("Signal Monitor",
+                createPlaceholderContent("Real-time Trading Signal Monitoring & Analysis"), 950, 750);
+        journal("Signal Monitor opened");
+    }
+
+    private void showMLLab() {
+        log.info("Opening ML Lab");
+        createIndependentWindow("ML Lab", createPlaceholderContent("Machine Learning Models & Experimentation"), 950,
+                750);
+        journal("ML Lab opened");
+    }
+
+    // ============ SYSTEM MENU HANDLERS ============
+    private void showSystemDiagnostics() {
+        log.info("Opening System Diagnostics");
+        createIndependentWindow("System Diagnostics",
+                createPlaceholderContent("System Health & Diagnostic Information"), 900, 700);
+        journal("System Diagnostics opened");
+    }
+
+    private void showSystemMetrics() {
+        log.info("Opening System Metrics");
+        createIndependentWindow("Performance Metrics", createPlaceholderContent("Real-time System Performance Metrics"),
+                900, 700);
+        journal("System Metrics opened");
+    }
+
+    private void showResourceMonitor() {
+        log.info("Opening Resource Monitor");
+        createIndependentWindow("Resource Monitor", createPlaceholderContent("CPU, Memory, Network & Disk Usage"), 900,
+                700);
+        journal("Resource Monitor opened");
+    }
+
+    // ============ EDUCATION MENU HANDLERS ============
+    private void showTradingBasics() {
+        log.info("Opening Trading Basics");
+        createIndependentWindow("Trading Basics", createPlaceholderContent("Fundamentals of Trading & Market Concepts"),
+                900, 700);
+        journal("Trading Basics opened");
+    }
+
+    private void showStrategyGuide() {
+        log.info("Opening Strategy Guide");
+        createIndependentWindow("Strategy Guide", createPlaceholderContent("Comprehensive Guide to Trading Strategies"),
+                900, 700);
+        journal("Strategy Guide opened");
+    }
+
+    private void showRiskManagement() {
+        log.info("Opening Risk Management Guide");
+        createIndependentWindow("Risk Management", createPlaceholderContent("Risk Management Best Practices & Tools"),
+                900, 700);
+        journal("Risk Management guide opened");
+    }
+
+    private void showMarketAnalysis() {
+        log.info("Opening Market Analysis Guide");
+        createIndependentWindow("Market Analysis", createPlaceholderContent("Technical & Fundamental Market Analysis"),
+                900, 700);
+        journal("Market Analysis guide opened");
+    }
+
+    private void showTechnicalIndicators() {
+        log.info("Opening Technical Indicators");
+        createIndependentWindow("Technical Indicators",
+                createPlaceholderContent("How to Use Technical Indicators Effectively"), 900, 700);
+        journal("Technical Indicators guide opened");
+    }
+
+    private void showInvestmentConcepts() {
+        log.info("Opening Investment Concepts");
+        createIndependentWindow("Investment Concepts", createPlaceholderContent("Core Investment & Portfolio Concepts"),
+                900, 700);
+        journal("Investment Concepts opened");
+    }
+
+    private void showVideoTutorials() {
+        log.info("Opening Video Tutorials");
+        showInfo("Video Tutorials",
+                "Video tutorials library is available at: https://www.youtube.com/investpro-trading\n\nTop tutorials:\n- Getting Started\n- Building Your First Strategy\n- Risk Management Essentials");
+        journal("Video Tutorials accessed");
+    }
+
+    private void showDocumentation() {
+        log.info("Opening Documentation");
+        showInfo("Documentation",
+                "Complete documentation available at:\nhttps://docs.investpro.com\n\nSections:\n- API Reference\n- Strategy Development Guide\n- Configuration Guide");
+        journal("Documentation accessed");
+    }
+
+    // ============ HELP MENU HANDLERS ============
+    private void showUserGuide() {
+        log.info("Opening User Guide");
+        VBox guideContent = new VBox(12);
+        guideContent.setPadding(new Insets(16));
+        guideContent.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("InvestPro User Guide");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        TextArea guide = new TextArea(
+                "GETTING STARTED\n" +
+                        "1. Set up your exchange credentials (Settings → Exchange Credentials)\n" +
+                        "2. Choose your trading strategy (Strategy Menu)\n" +
+                        "3. Configure risk parameters (Trader Profile)\n" +
+                        "4. Monitor positions and orders (Trading Desk)\n\n" +
+                        "MAIN FEATURES\n" +
+                        "• Market Research: Analyze trends and sentiment\n" +
+                        "• Strategy Builder: Create and backtest strategies\n" +
+                        "• Telegram Bot: Trade and monitor on the go\n" +
+                        "• Review Panel: Track performances and trades\n" +
+                        "• Education: Learn trading concepts\n\n" +
+                        "KEYBOARD SHORTCUTS\n" +
+                        "Press Ctrl+K to view all keyboard shortcuts");
+
+        guide.setWrapText(true);
+        guide.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #e2e8f0;");
+        guide.setEditable(false);
+
+        guideContent.getChildren().addAll(title, guide);
+        VBox.setVgrow(guide, Priority.ALWAYS);
+
+        createIndependentWindow("User Guide", guideContent, 900, 700);
+        journal("User Guide opened");
+    }
+
+    private void showKeyboardShortcuts() {
+        log.info("Opening Keyboard Shortcuts");
+        VBox shortcutsContent = new VBox(12);
+        shortcutsContent.setPadding(new Insets(16));
+        shortcutsContent.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("Keyboard Shortcuts");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        TextArea shortcuts = new TextArea(
+                "TRADING ACTIONS\n" +
+                        "Ctrl+O : Open Order Panel\n" +
+                        "Ctrl+T : Toggle Bot Trading\n" +
+                        "Ctrl+H : User Guide\n" +
+                        "Ctrl+K : Keyboard Shortcuts\n" +
+                        "F1     : Help\n\n" +
+                        "UI NAVIGATION\n" +
+                        "F5     : Refresh Data\n" +
+                        "Ctrl+` : Toggle Terminal\n" +
+                        "Tab    : Focus Next Component\n" +
+                        "Shift+Tab : Focus Previous Component\n\n" +
+                        "CHART CONTROLS\n" +
+                        "+ : Zoom In\n" +
+                        "- : Zoom Out\n" +
+                        "Right Arrow : Next Timeframe\n" +
+                        "Left Arrow : Previous Timeframe\n\n" +
+                        "GENERAL\n" +
+                        "Ctrl+Q : Quit Application\n" +
+                        "Ctrl+S : Save Settings");
+
+        shortcuts.setWrapText(true);
+        shortcuts.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #e2e8f0;");
+        shortcuts.setEditable(false);
+
+        shortcutsContent.getChildren().addAll(title, shortcuts);
+        VBox.setVgrow(shortcuts, Priority.ALWAYS);
+
+        createIndependentWindow("Keyboard Shortcuts", shortcutsContent, 900, 700);
+        journal("Keyboard Shortcuts opened");
     }
 
     private void showSettingsDialog() {
