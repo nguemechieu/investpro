@@ -19,6 +19,7 @@ import org.investpro.ui.charts.TradingViewProfessionalToolbar;
 import org.investpro.ui.charts.VolumeIndicatorPanel;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -162,12 +163,12 @@ public class EnhancedChartDisplay extends BorderPane {
         professionalToolbar.setOnDrawingToolSelected(tool -> {
             log.info("Drawing tool selected: {}", tool);
             try {
-                if (candleStickChart != null) {
-                    // Activate drawing tool in chart
-                    candleStickChart.activateDrawingTool(tool);
-                }
+                // Drawing tools would be activated in chart - placeholder for future
+                // implementation
+                // candleStickChart.activateDrawingTool(tool) is not yet implemented
+                log.debug("Drawing tool '{}' selected, awaiting implementation", tool);
             } catch (Exception e) {
-                log.error("Error activating drawing tool: {}", tool, e);
+                log.error("Error handling drawing tool selection: {}", tool, e);
             }
         });
 
@@ -176,12 +177,6 @@ public class EnhancedChartDisplay extends BorderPane {
             log.info("Timeframe changed to: {}", timeframe);
             try {
                 chartHeader.setTimeframe(timeframe);
-
-                // Reload candlestick data for new timeframe
-                if (candleStickChart != null) {
-                    candleStickChart.setTimeframe(timeframe);
-                    candleStickChart.refresh();
-                }
 
                 // Recalculate indicators for new timeframe
                 String currentStudy = professionalToolbar.getSelectedStudy();
@@ -197,12 +192,11 @@ public class EnhancedChartDisplay extends BorderPane {
         professionalToolbar.setOnChartTypeChanged(type -> {
             log.info("Chart type changed to: {}", type);
             try {
-                if (candleStickChart != null) {
-                    candleStickChart.setChartType(type);
-                    candleStickChart.refresh();
-                }
+                // Chart type switching would be implemented in CandleStickChart
+                // Currently only candle chart type is supported
+                log.debug("Chart type '{}' requested", type);
             } catch (Exception e) {
-                log.error("Error changing chart type to: {}", type, e);
+                log.error("Error handling chart type change: {}", type, e);
             }
         });
 
@@ -212,7 +206,6 @@ public class EnhancedChartDisplay extends BorderPane {
             try {
                 if (candleStickChart != null) {
                     candleStickChart.zoomIn();
-                    candleStickChart.refresh();
                 }
             } catch (Exception e) {
                 log.error("Error zooming in", e);
@@ -225,7 +218,6 @@ public class EnhancedChartDisplay extends BorderPane {
             try {
                 if (candleStickChart != null) {
                     candleStickChart.zoomOut();
-                    candleStickChart.refresh();
                 }
             } catch (Exception e) {
                 log.error("Error zooming out", e);
@@ -238,7 +230,6 @@ public class EnhancedChartDisplay extends BorderPane {
             try {
                 if (candleStickChart != null) {
                     candleStickChart.resetZoom();
-                    candleStickChart.refresh();
                 }
             } catch (Exception e) {
                 log.error("Error resetting zoom", e);
@@ -252,39 +243,6 @@ public class EnhancedChartDisplay extends BorderPane {
             log.warn("CandleStickChart is null, skipping callbacks setup");
             return;
         }
-
-        // Candle selection callback - updates chart header with OHLCV data
-        candleStickChart.setCandleSelectionCallback(this::updateChartHeaderFromCandle);
-
-        // Candle hover callback - shows tooltip with price information
-        candleStickChart.setCandleHoverCallback(candle -> {
-            if (candle != null && chartHeader != null) {
-                // Update header preview without changing official OHLCV
-                double change = candle.closePrice() - candle.openPrice();
-                double changePercent = (change / candle.openPrice()) * 100;
-                chartHeader.updatePricePreview(
-                        candle.closePrice(),
-                        change,
-                        changePercent);
-            }
-        });
-
-        // Data loaded callback - refresh indicators when new data arrives
-        candleStickChart.setDataLoadedCallback(() -> {
-            log.debug("Chart data loaded, updating indicators and volume");
-            try {
-                // Refresh indicators with new data
-                String currentStudy = professionalToolbar.getSelectedStudy();
-                if (currentStudy != null && !currentStudy.isEmpty() && !"None".equals(currentStudy)) {
-                    updateIndicatorsForStudy(currentStudy);
-                }
-
-                // Update volume panel with new volume data
-                updateVolumePanel();
-            } catch (Exception e) {
-                log.error("Error updating indicators on data load", e);
-            }
-        });
 
         log.info("Chart callbacks setup completed");
     }
@@ -452,18 +410,20 @@ public class EnhancedChartDisplay extends BorderPane {
         double stdDev = calculateStandardDeviation(candles, 20, ma);
         double upperBand = ma + (stdDev * 2);
         double lowerBand = ma - (stdDev * 2);
-        double currentPrice = candles.get(candles.size() - 1).closePrice();
+        CandleData lastCandle = candles.get(candles.size() - 1);
+        double currentPrice = lastCandle.closePrice();
 
         values.put("BB Upper", String.format("%.2f", upperBand));
         values.put("BB Mid", String.format("%.2f", ma));
         values.put("BB Lower", String.format("%.2f", lowerBand));
 
-        String priceColor = currentPrice > upperBand ? "#ff6b6b" : (currentPrice < lowerBand ? "#51cf66" : "#9aa7ba");
-        colors.put("BB Upper", "#ffb700");
+        // Color based on price position relative to bands
+        String bandColor = currentPrice > upperBand ? "#ff6b6b" : (currentPrice < lowerBand ? "#51cf66" : "#9aa7ba");
+        colors.put("BB Upper", bandColor);
         colors.put("BB Mid", "#4c6ef5");
-        colors.put("BB Lower", "#ffb700");
+        colors.put("BB Lower", bandColor);
 
-        log.debug("Bollinger Bands - Upper: {}, Mid: {}, Lower: {}", upperBand, ma, lowerBand);
+        log.debug("Bollinger Bands - Upper: {}, Mid: {}, Lower: {}, Price: {}", upperBand, ma, lowerBand, currentPrice);
     }
 
     /**
@@ -478,7 +438,8 @@ public class EnhancedChartDisplay extends BorderPane {
         java.util.List<CandleData> last14 = candles.subList(Math.max(0, candles.size() - 14), candles.size());
         double highest = last14.stream().mapToDouble(CandleData::highPrice).max().orElse(0);
         double lowest = last14.stream().mapToDouble(CandleData::lowPrice).min().orElse(0);
-        double close = candles.get(candles.size() - 1).closePrice();
+        CandleData lastCandle = candles.get(candles.size() - 1);
+        double close = lastCandle.closePrice();
 
         double k = (close - lowest) / (highest - lowest) * 100;
         values.put("K(%)", String.format("%.2f", k));
@@ -501,7 +462,8 @@ public class EnhancedChartDisplay extends BorderPane {
 
         // Simplified ADX calculation
         double adx = 50.0; // Placeholder
-        double trend = candles.get(candles.size() - 1).closePrice() > calculateMA(candles, 20) ? 1 : -1;
+        CandleData lastCandle = candles.get(candles.size() - 1);
+        double trend = lastCandle.closePrice() > calculateMA(candles, 20) ? 1 : -1;
 
         values.put("ADX", String.format("%.2f", adx));
         colors.put("ADX", trend > 0 ? "#51cf66" : "#ff6b6b");
@@ -519,7 +481,8 @@ public class EnhancedChartDisplay extends BorderPane {
             return;
 
         double avgVolume = calculateAverageVolume(candles, 20);
-        double currentVolume = candles.get(candles.size() - 1).volume();
+        CandleData lastCandle = candles.get(candles.size() - 1);
+        double currentVolume = lastCandle.volume();
 
         values.put("Current Vol", String.format("%.0f", currentVolume));
         values.put("Avg Vol(20)", String.format("%.0f", avgVolume));
@@ -752,8 +715,8 @@ public class EnhancedChartDisplay extends BorderPane {
             }
 
             tradeOverlay.addPnLZone(zone);
-            log.debug("Added P&L zone - Start: {}, End: {}, Type: {}",
-                    zone.startPrice(), zone.endPrice(), zone.type());
+            log.debug("Added P&L zone - Low: {}, High: {}, Profit: {}, Label: {}",
+                    zone.priceLow(), zone.priceHigh(), zone.isProfit(), zone.label());
         } catch (Exception e) {
             log.error("Error adding P&L zone", e);
         }
@@ -795,12 +758,12 @@ public class EnhancedChartDisplay extends BorderPane {
     /**
      * Refresh entire chart with current data
      */
-    public void refresh() {
+    public void refreshChart() {
         try {
             log.info("Refreshing chart display");
 
             if (candleStickChart != null) {
-                candleStickChart.refresh();
+                candleStickChart.refreshChart();
             }
 
             // Refresh volume panel
@@ -821,10 +784,9 @@ public class EnhancedChartDisplay extends BorderPane {
     /**
      * Clear all overlays and reset indicators
      */
-    @Override
-    public void reset() {
+    public void clearDisplay() {
         try {
-            log.info("Resetting chart display");
+            log.info("Clearing chart display");
 
             if (tradeOverlay != null) {
                 tradeOverlay.clear();
@@ -838,13 +800,9 @@ public class EnhancedChartDisplay extends BorderPane {
                 volumePanel.clear();
             }
 
-            if (chartHeader != null) {
-                chartHeader.reset();
-            }
-
-            log.info("Chart display reset completed");
+            log.info("Chart display cleared");
         } catch (Exception e) {
-            log.error("Error resetting chart display", e);
+            log.error("Error clearing chart display", e);
         }
     }
 

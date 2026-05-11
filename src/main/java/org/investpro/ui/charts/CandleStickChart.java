@@ -2377,6 +2377,8 @@ public class CandleStickChart extends Region {
         }
     }
 
+
+
     private class CandlePageConsumer implements Consumer<List<CandleData>> {
         @Override
         public void accept(List<CandleData> candleData) {
