@@ -45,6 +45,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
@@ -52,6 +55,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 /**
  * SystemCore is the application composition root.
@@ -148,9 +154,13 @@ public class SystemCore {
 
         this.config = config == null ? new Properties() : config;
 
+        // Load persisted configuration from disk
+        loadPropertiesFromFile();
+
         // Store OpenAI API key if provided
         if (open_ai_api_key != null && !open_ai_api_key.isBlank()) {
             this.config.setProperty("openai.api_key", open_ai_api_key);
+            savePropertiesToFile();
         }
 
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
@@ -180,7 +190,8 @@ public class SystemCore {
         this.symbolAgentManager = new SymbolAgentManager();
         this.historicalDataRepository = HistoricalDataRepositoryImpl.getInstance();
         this.symbolExecutionFilter = new SymbolExecutionFilter();
-        this.executionEngine = new ExecutionEngine(exchange, symbolExecutionFilter, RepositoryFactory.getDatabase(),this);
+        this.executionEngine = new ExecutionEngine(exchange, symbolExecutionFilter, RepositoryFactory.getDatabase(),
+                this);
         this.riskManagementSystem = new RiskManagementSystem();
         this.aiReasoningService = createAiReasoningService(this.config);
 
@@ -223,6 +234,69 @@ public class SystemCore {
 
         log.debug(this.toString());
 
+    }
+
+    /**
+     * Load configuration properties from disk (~/.investpro/config.properties).
+     * Called early in the lifecycle to restore persisted settings.
+     */
+    private void loadPropertiesFromFile() {
+        try {
+            Path configDir = Paths.get(System.getProperty("user.home"), ".investpro");
+            Path configFile = configDir.resolve("config.properties");
+
+            if (Files.exists(configFile)) {
+                try (FileInputStream fis = new FileInputStream(configFile.toFile())) {
+                    this.config.load(fis);
+                    log.info("Loaded configuration from {}", configFile.toAbsolutePath());
+                }
+            } else {
+                log.debug("Configuration file not found at {}; using defaults", configFile.toAbsolutePath());
+            }
+        } catch (IOException e) {
+            log.warn("Failed to load properties from file: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Save configuration properties to disk (~/.investpro/config.properties).
+     * Called after properties are modified to ensure persistence across restarts.
+     */
+    private void savePropertiesToFile() {
+        try {
+            Path configDir = Paths.get(System.getProperty("user.home"), ".investpro");
+            Path configFile = configDir.resolve("config.properties");
+
+            // Create directory if it doesn't exist
+            if (!Files.exists(configDir)) {
+                Files.createDirectories(configDir);
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
+                this.config.store(fos, "InvestPro Configuration - DO NOT EDIT MANUALLY");
+                log.debug("Saved configuration to {}", configFile.toAbsolutePath());
+            }
+        } catch (IOException e) {
+            log.warn("Failed to save properties to file: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Set the OpenAI API key and persist it to disk.
+     * This method allows the Telegram bot to configure the API key at runtime.
+     */
+    public void setOpenAiApiKey(String apiKey) {
+        if (apiKey != null && !apiKey.isBlank()) {
+            this.config.setProperty("openai.api_key", apiKey);
+            savePropertiesToFile();
+
+            // Reinitialize ChatGPT with the new key
+            if (this.telegramNotifier != null) {
+                this.telegramNotifier.initializeChatGPT(apiKey);
+            }
+
+            log.info("OpenAI API key configured and persisted");
+        }
     }
 
     /**
