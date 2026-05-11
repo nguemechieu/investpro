@@ -237,7 +237,12 @@ public class SystemCore {
             this.telegramEventListener = new TelegramEventListener(smartBot.getEventBus(), telegramNotifier);
 
             // Initialize ChatGPT integration if OpenAI API key is configured
-            String openaiApiKey = Objects.requireNonNull(config).getProperty("OPENAI_API_KEY", "").trim();
+            // Check three sources: config property, environment variable, or parameter
+            String openaiApiKey = Objects.requireNonNull(config).getProperty("openai.api_key", "").trim();
+            if (openaiApiKey.isBlank()) {
+                openaiApiKey = System.getenv("OPENAI_API_KEY") != null ? System.getenv("OPENAI_API_KEY").trim() : "";
+            }
+
             if (!openaiApiKey.isBlank()) {
                 telegramNotifier.initializeChatGPT(openaiApiKey);
                 log.info("✅ ChatGPT integration initialized for Telegram bot");
