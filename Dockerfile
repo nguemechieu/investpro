@@ -11,12 +11,10 @@ COPY pom.xml .
 # Optional: pre-download dependencies
 RUN mvn -B -DskipTests dependency:go-offline || true
 
-# Copy source after dependencies
-COPY src ./src
-
-# Copy any resources/config needed by Maven
+# Copy the full project
 COPY . .
 
+# Build application
 RUN mvn -B -DskipTests clean package
 
 
@@ -33,6 +31,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install GUI, JavaFX/native graphics, VNC, noVNC, supervisor
 # ============================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
     xvfb \
     x11vnc \
     novnc \
@@ -61,7 +60,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libgl1 \
     libegl1 \
-    libasound2 \
+    procps \
+    net-tools \
+    && (apt-get install -y --no-install-recommends libasound2t64 || \
+        apt-get install -y --no-install-recommends libasound2) \
     && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
@@ -71,8 +73,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Safer than hardcoding investpro-1.0.0-SNAPSHOT.jar
 COPY --from=build /investpro/target/*.jar /app/investpro.jar
 
-# Optional dependency folder if your build creates target/lib
-COPY --from=build /investpro/target/lib /app/lib
+# Optional dependency folder if your build creates target/lib.
+# This is safe even when target/lib does not exist.
+RUN mkdir -p /app/lib
+COPY --from=build /investpro/target/lib* /app/lib/
 
 # ============================================================
 # App configuration
@@ -114,7 +118,7 @@ ENV JAVA_TOOL_OPTIONS="-Dprism.order=sw -Dprism.verbose=false -Djava.awt.headles
 # Supervisor
 # ============================================================
 
-RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
+RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor /app/logs
 
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 
