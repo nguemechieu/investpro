@@ -5035,6 +5035,11 @@ public class TradingDesk extends BorderPane {
             chartTabPane.setVisible(showCharts);
             chartTabPane.setManaged(showCharts);
         }
+
+        if (showPositions){
+
+            log.info("UNIMPLEMENTED");
+        }
     }
 
     /**

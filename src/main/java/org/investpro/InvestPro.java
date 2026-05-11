@@ -64,6 +64,7 @@ public class InvestPro extends Application {
     private static final String APP_ICON_RESOURCE = "images/Invest.png";
     private static final String APP_BACKGROUND_RESOURCE = "images/Invest.png";
     private static final String APP_CSS_RESOURCE = "css/app.css";
+    private static final String COMPONENTS_CSS_RESOURCE = "css/components.css";
 
     private Stage primaryStage;
     private Scene mainScene;
@@ -166,8 +167,7 @@ public class InvestPro extends Application {
                     configuration,
                     tradeRepository,
                     orderRepository,
-                    currencyRepository
-            );
+                    currencyRepository);
 
             setRootContent(tradingDesk);
 
@@ -220,18 +220,27 @@ public class InvestPro extends Application {
         Objects.requireNonNull(scene, "scene must not be null");
 
         try {
-            URL cssUrl = getClass().getClassLoader().getResource(APP_CSS_RESOURCE);
-
-            if (cssUrl == null) {
+            // Load main stylesheet
+            URL appCssUrl = getClass().getClassLoader().getResource(APP_CSS_RESOURCE);
+            if (appCssUrl == null) {
                 log.warn("Stylesheet not found: {}", APP_CSS_RESOURCE);
                 return;
             }
 
-            scene.getStylesheets().setAll(cssUrl.toExternalForm());
+            // Load components stylesheet
+            URL componentsCssUrl = getClass().getClassLoader().getResource(COMPONENTS_CSS_RESOURCE);
+            if (componentsCssUrl != null) {
+                scene.getStylesheets().add(componentsCssUrl.toExternalForm());
+                log.info("Loaded stylesheet: {}", COMPONENTS_CSS_RESOURCE);
+            } else {
+                log.warn("Stylesheet not found: {}", COMPONENTS_CSS_RESOURCE);
+            }
+
+            scene.getStylesheets().add(appCssUrl.toExternalForm());
             log.info("Loaded stylesheet: {}", APP_CSS_RESOURCE);
 
         } catch (Exception exception) {
-            log.warn("Failed to load stylesheet: {}", APP_CSS_RESOURCE, exception);
+            log.warn("Failed to load stylesheets", exception);
         }
     }
 
@@ -262,9 +271,7 @@ public class InvestPro extends Application {
                             false,
                             false,
                             true,
-                            true
-                    )
-            );
+                            true));
 
             root.setBackground(new Background(bgImage));
 
@@ -321,8 +328,7 @@ public class InvestPro extends Application {
         } catch (Exception exception) {
             throw new RuntimeException(
                     "Failed to invoke shutdown on " + target.getClass().getSimpleName(),
-                    exception
-            );
+                    exception);
         }
     }
 
@@ -337,8 +343,7 @@ public class InvestPro extends Application {
                 section,
                 defaultExchange,
                 defaultMarket,
-                env.toUpperCase()
-        );
+                env.toUpperCase());
     }
 
     private void showErrorAlert(String title, String header, Throwable throwable) {

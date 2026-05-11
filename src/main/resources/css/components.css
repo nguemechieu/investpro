@@ -1,0 +1,275 @@
+/* ============================================================================
+   INVESTPRO COMPONENT STYLES
+   Extracted inline styles organized by component type
+   ============================================================================ */
+
+/* ============================================================================
+   CHART HEADER STYLES
+   ============================================================================ */
+
+.chart-header {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: #263246;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 12 16 12 16;
+    -fx-spacing: 8;
+}
+
+.chart-header-symbol {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text-primary;
+}
+
+.chart-header-price {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text-primary;
+}
+
+.chart-header-change {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -buy-color;
+}
+
+.chart-header-timeframe {
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-secondary;
+}
+
+.chart-header-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-secondary;
+}
+
+.chart-type-combo {
+    -fx-font-size: 11px;
+    -fx-padding: 4;
+}
+
+/* ============================================================================
+   TRADING DESK TAB CLOSE BUTTON STYLES
+   ============================================================================ */
+
+.tab-close-button {
+    -fx-font-size: 14;
+    -fx-padding: 2 8 2 8;
+    -fx-text-fill: #a0aec0;
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+    -fx-border-radius: 0;
+    -fx-background-radius: 0;
+}
+
+.tab-close-button:hover {
+    -fx-text-fill: #ef4444;
+}
+
+/* ============================================================================
+   PANEL STYLES
+   ============================================================================ */
+
+.panel-container {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.panel-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+}
+
+.panel-dark {
+    -fx-background-color: -panel-bg;
+}
+
+.panel-elevated {
+    -fx-background-color: -elevated-bg;
+}
+
+/* ============================================================================
+   ANALYSIS PANEL STYLES
+   ============================================================================ */
+
+.analysis-panel {
+    -fx-background-color: -panel-bg;
+}
+
+.analysis-text-area {
+    -fx-control-inner-background: -panel-bg;
+    -fx-text-fill: -text-primary;
+    -fx-font-family: 'Consolas', 'Monaco', monospace;
+    -fx-font-size: 12px;
+    -fx-highlight-fill: -primary-color;
+    -fx-highlight-text-fill: white;
+}
+
+.analysis-panel-success {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -buy-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.analysis-panel-error {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -sell-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.analysis-panel-info {
+    -fx-background-color: -panel-bg;
+    -fx-border-color: -primary-color;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+/* ============================================================================
+   NEWS CALENDAR PANEL STYLES
+   ============================================================================ */
+
+.news-calendar-pill-selected {
+    -fx-font-size: 10;
+    -fx-padding: 4 10 4 10;
+    -fx-background-color: #3b82f6;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-font-weight: bold;
+}
+
+.news-calendar-pill-unselected {
+    -fx-font-size: 10;
+    -fx-padding: 4 10 4 10;
+    -fx-background-color: #1e2d42;
+    -fx-text-fill: #cbd5e1;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+}
+
+/* ============================================================================
+   MARKET INFO PANEL STYLES
+   ============================================================================ */
+
+.market-info-link {
+    -fx-text-fill: #60a5fa;
+    -fx-font-size: 11;
+    -fx-font-weight: bold;
+}
+
+.market-info-badge {
+    -fx-font-size: 10;
+    -fx-font-weight: bold;
+    -fx-background-color: #0b1220;
+    -fx-background-radius: 999;
+    -fx-border-color: #263244;
+    -fx-border-radius: 999;
+}
+
+/* ============================================================================
+   TECHNICAL INDICATORS PANEL STYLES
+   ============================================================================ */
+
+.indicator-value-label {
+    -fx-font-size: 13px;
+    -fx-font-family: 'Courier New';
+    -fx-font-weight: bold;
+    /* Color will be set dynamically based on signal: -fx-text-fill */
+}
+
+.indicator-signal-positive {
+    -fx-text-fill: -buy-color;
+}
+
+.indicator-signal-negative {
+    -fx-text-fill: -sell-color;
+}
+
+.indicator-signal-neutral {
+    -fx-text-fill: -neutral-color;
+}
+
+/* ============================================================================
+   SETTINGS PANEL STYLES
+   ============================================================================ */
+
+.settings-primary-button {
+    -fx-padding: 8 24;
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.settings-success-button {
+    -fx-padding: 8 24;
+    -fx-background-color: -buy-color;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.settings-danger-button {
+    -fx-padding: 8 24;
+    -fx-background-color: -sell-color;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.settings-warning-button {
+    -fx-padding: 8 24;
+    -fx-background-color: -warning;
+    -fx-text-fill: #111827;
+    -fx-font-size: 12;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+/* ============================================================================
+   HEADER STYLES
+   ============================================================================ */
+
+.top-section {
+    -fx-background-color: #1a1a2e;
+}
+
+/* ============================================================================
+   CARD / CONTAINER STYLES
+   ============================================================================ */
+
+.card-style {
+    -fx-background-color: -surface-bg;
+    -fx-border-color: -border-color;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 18;
+}
+
+.card-dark {
+    -fx-background-color: -dark-bg;
+    -fx-border-color: -border-color;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+/* ============================================================================
+   LOADING OVERLAY STYLES
+   ============================================================================ */
+
+.loading-overlay {
+    -fx-background-color: rgba(15, 23, 42, 0.85);
+}
