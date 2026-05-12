@@ -43,8 +43,6 @@ x11vnc \
   -shared \
   -rfbport 5900 \
   -passwd "$VNC_PASSWORD" \
-  -clipboard \
-  -noxkb \
   >/app/logs/x11vnc.log 2>/app/logs/x11vnc.err.log &
 X11VNC_PID=$!
 

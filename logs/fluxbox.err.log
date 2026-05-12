@@ -209,7 +209,6 @@ Setting default value
 Failed to read: session.screen0.windowPlacement
 Setting default value
 Failed to read: session.screen0.slit.acceptKdeDockapps
-Warning: Missing charsets in String to FontSet conversion
 Setting default value
 Failed to read: session.screen0.slit.autoHide
 Setting default value
@@ -217,6 +216,7 @@ Failed to read: session.screen0.slit.maxOver
 Setting default value
 Failed to read: session.screen0.slit.placement
 Setting default value
+Warning: Missing charsets in String to FontSet conversion
 Failed to read: session.screen0.slit.alpha
 Setting default value
 Failed to read: session.screen0.slit.onhead
