@@ -21,7 +21,6 @@ import org.investpro.exchange.Exchange;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
-import org.investpro.market.InstrumentRegistry;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
@@ -31,12 +30,17 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.monitoring.SystemHealthSnapshot;
 import org.investpro.monitoring.SystemMonitorService;
 import org.investpro.monitoring.SystemEventRecorder;
+import org.investpro.monitoring.SignalMonitorService;
 import org.investpro.repository.HistoricalDataRepository;
 import org.investpro.repository.HistoricalDataRepositoryImpl;
 import org.investpro.risk.RiskManagementSystem;
 import org.investpro.repository.RepositoryFactory;
 import org.investpro.service.TradingService;
+import org.investpro.event.EventBusManager;
+import org.investpro.event.EventPersistenceListener;
+import org.investpro.persistence.repository.EventLogRepositoryImpl;
 
+import org.investpro.research.LiveTradingMetricsTracker;
 import org.investpro.strategy.*;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.ui.panels.SettingsPanel;
@@ -52,7 +56,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.io.FileInputStream;
@@ -112,8 +115,9 @@ public class SystemCore {
     private final BotTradeDecisionEngine botTradeDecisionEngine;
     private final SignalToDecisionFilter signalToDecisionFilter;
     private SystemMonitorService systemMonitorService;
+    private SignalMonitorService signalMonitorService;
     /**
-     * -- GETTER --
+     * -- GETTER - -
      * Get the system event recorder for recording important system events.
      * Used internally by stream consumers and other components to track
      * the last known occurrence of key events for diagnostic purposes.
@@ -146,6 +150,11 @@ public class SystemCore {
     private SymbolAgentManager symbolAgentManager;
     private SystemCoreDependencies systemCoreDependencies;
     private SymbolExecutionFilter symbolExecutionFilter;
+    private EventBusManager eventBusManager;
+    private final java.util.Map<TradePair, org.investpro.core.agents.symbol.SymbolAgent> symbolAgents =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
 
     public SystemCore(@NotNull Exchange exchange, Properties config, String open_ai_api_key)
             throws SQLException, ClassNotFoundException {
@@ -164,14 +173,13 @@ public class SystemCore {
         }
 
         this.telegramToken = this.config.getProperty("telegram_token", "").trim();
-        // Create agent registry (agents will be registered when start() is called)
-        this.agentRegistry = new AgentRegistry();
 
-        // Create SmartBot with the agent registry
-        this.smartBot = new SmartBot(
-                new AgentRuntime(),
-                new AgentEventBus(),
-                agentRegistry);
+        // Build AgentRuntime with all trading agents before creating SmartBot
+        AgentRuntime agentRuntime = new AgentRuntime();
+        this.agentRegistry = new AgentRegistry(); // temp registry; agents imported into runtime below
+
+        // Create Smart Bot — agents live inside the runtime, not in SmartBot
+        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus());
 
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();
@@ -245,18 +253,19 @@ public class SystemCore {
 
             if (!openaiApiKey.isBlank()) {
                 telegramNotifier.initializeChatGPT(openaiApiKey);
-                log.info("✅ ChatGPT integration initialized for Telegram bot");
+                log.info("\u2705 ChatGPT integration initialized for Telegram bot");
             } else {
-                log.info("ℹ️ OpenAI API key not configured - ChatGPT features disabled");
+                log.info("\u2139\uFE0F OpenAI API key not configured - ChatGPT features disabled");
             }
 
-            log.info("✅ Telegram notifier configured");
+            log.info("\u2705 Telegram notifier configured");
         }
 
         // Initialize the system event recorder and monitor service after all components
         // are ready
         this.systemEventRecorder = new SystemEventRecorder();
         this.systemMonitorService = new SystemMonitorService(this);
+        this.signalMonitorService = new SignalMonitorService();
         this.health = this.systemMonitorService.checkNow();
 
         log.debug(this.toString());
@@ -264,7 +273,7 @@ public class SystemCore {
     }
 
     /**
-     * Load configuration properties from disk (~/.investpro/config.properties).
+     * Load configuration properties from disk (~/.investpro/config.Properties).
      * Called early in the lifecycle to restore persisted settings.
      */
     private void loadPropertiesFromFile() {
@@ -275,17 +284,17 @@ public class SystemCore {
             if (Files.exists(configFile)) {
                 try (FileInputStream fis = new FileInputStream(configFile.toFile())) {
                     this.config.load(fis);
-                    String apiKeyStatus = this.config.getProperty("openai.api_key") != null ? "✅ (loaded)"
-                            : "❌ (not found)";
-                    log.info("✅ Loaded configuration from {}", configFile.toAbsolutePath());
+                    String apiKeyStatus = this.config.getProperty("openai.api_key") != null ? "\u2705 (loaded)"
+                            : "\u274C (not found)";
+                    log.info("\u2705 Loaded configuration from {}", configFile.toAbsolutePath());
                     log.info("   OpenAI API key status: {}", apiKeyStatus);
                 }
             } else {
-                log.info("ℹ️ Configuration file not found at {}; using defaults", configFile.toAbsolutePath());
+                log.info("\u2139\uFE0F Configuration file not found at {}; using defaults", configFile.toAbsolutePath());
                 log.info("   To persist settings, use /setapikey command or set OPENAI_API_KEY environment variable");
             }
         } catch (IOException e) {
-            log.warn("⚠️ Failed to load properties from file: {}", e.getMessage());
+            log.warn("\u26A0\uFE0F Failed to load properties from file: {}", e.getMessage());
         }
     }
 
@@ -301,18 +310,18 @@ public class SystemCore {
             // Create directory if it doesn't exist
             if (!Files.exists(configDir)) {
                 Files.createDirectories(configDir);
-                log.info("✅ Created configuration directory: {}", configDir.toAbsolutePath());
+                log.info("\u2705 Created configuration directory: {}", configDir.toAbsolutePath());
             }
 
             try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
                 this.config.store(fos, "InvestPro Configuration - DO NOT EDIT MANUALLY");
-                log.info("✅ Saved configuration to {}", configFile.toAbsolutePath());
+                log.info("\u2705 Saved configuration to {}", configFile.toAbsolutePath());
                 log.info("   OpenAI API key: {}",
                         this.config.getProperty("openai.api_key") != null &&
-                                !this.config.getProperty("openai.api_key").isBlank() ? "✅ Set" : "❌ Not set");
+                                !this.config.getProperty("openai.api_key").isBlank() ? "\u2705 Set" : "\u274C Not set");
             }
         } catch (IOException e) {
-            log.warn("⚠️ Failed to save properties to file: {}", e.getMessage());
+            log.warn("\u26A0\uFE0F Failed to save properties to file: {}", e.getMessage());
         }
     }
 
@@ -328,14 +337,14 @@ public class SystemCore {
             // Reinitialize ChatGPT with the new key
             if (this.telegramNotifier != null) {
                 this.telegramNotifier.initializeChatGPT(apiKey);
-                log.info("✅ ChatGPT reinitialized with new API key");
+                log.info("\u2705 ChatGPT reinitialized with new API key");
             } else {
-                log.warn("⚠️ TelegramNotifier not initialized; unable to reinitialize ChatGPT");
+                log.warn("\u26A0\uFE0F TelegramNotifier not initialized; unable to reinitialize ChatGPT");
             }
 
-            log.info("✅ OpenAI API key configured and persisted");
+            log.info("\u2705 OpenAI API key configured and persisted");
         } else {
-            log.warn("⚠️ Invalid API key provided (empty or null)");
+            log.warn("\u26A0\uFE0F Invalid API key provided (empty or null)");
         }
     }
 
@@ -359,6 +368,9 @@ public class SystemCore {
 
             DefaultTradingAgentModule defaultModule = new DefaultTradingAgentModule();
             defaultModule.configure(agentRegistry, systemCoreDependencies);
+
+            // Import all configured agents into AgentRuntime so SmartBot's runtime owns them
+            smartBot.getRuntime().importFrom(agentRegistry);
 
             log.debug("Default trading agents registered. count={}", agentRegistry.size());
 
@@ -428,59 +440,136 @@ public class SystemCore {
         this.tradingService = Objects.requireNonNull(tradingService, "tradingService cannot be null");
         this.selectedTradePair = selectedTradePair;
 
+        // Initialize and start EventBusManager for event-driven architecture
+        this.eventBusManager = EventBusManager.getInstance();
+        this.eventBusManager.start();
+        log.info("\u2705 EventBusManager started - Event-driven architecture active");
+
+        // Wire EventPersistenceListener to persist all events to database
+        wireEventPersistenceListener();
+
         // Register default agents now that tradingService is available
         registerDefaultAgents();
 
         smartBot.start(exchange, tradingService, selectedTradePair);
 
+        if (signalMonitorService != null) {
+            signalMonitorService.start(smartBot.getEventBus());
+            log.info("Signal monitor wired to SmartBot event bus");
+        }
+
         // Wire Symbol Agent Updater to SmartBot's event bus
         if (symbolAgentUpdater != null) {
             symbolAgentUpdater.start();
-            log.info("✅ Symbol agent updater wired to SmartBot - Real-time UI updates enabled");
+            log.info("\u2705 Symbol agent updater wired to SmartBot - Real-time UI updates enabled");
         }
 
         // Wire Telegram event listener to SmartBot's event bus
         if (telegramEventListener != null) {
             telegramEventListener.start();
-            log.info("✅ Telegram event listener wired to SmartBot");
+            log.info("\u2705 Telegram event listener wired to SmartBot");
         }
 
         // Auto-detect and set Telegram chat ID
         if (telegramNotifier != null && !telegramNotifier.hasTargetChat()) {
             telegramNotifier.detectAndUseLatestChatId()
                     .ifPresentOrElse(
-                            chatId -> log.info("📱 Telegram chat auto-detected: {}", chatId),
+                            chatId -> log.info("\uD83D\uDCF1 Telegram chat auto-detected: {}", chatId),
                             () -> log.warn(
-                                    "⚠️ No Telegram chat detected. Send /start to the bot or add it to a group."));
+                                    "\u26A0\uFE0F No Telegram chat detected. Send /start to the bot or add it to a group."));
         }
 
         // Start Telegram polling if bot token is configured
         startTelegramPolling();
 
-        notifyAllChannels("SmartBot", "🤖 SmartBot started.");
+        notifyAllChannels("SmartBot", "\uD83E\uDD16 SmartBot started.");
+    }
+
+    /**
+     * Wires EventPersistenceListener to the EventBusManager.
+     * This ensures all published events are automatically persisted to the database
+     * as part of the event processing pipeline.
+     * <p>
+     * Called during SystemCore.start() to initialize event persistence.
+     */
+    private void wireEventPersistenceListener() {
+        try {
+            // Create repository implementation
+            EventLogRepositoryImpl eventLogRepository = new EventLogRepositoryImpl();
+
+            // Create persistence listener
+            EventPersistenceListener persistenceListener = new EventPersistenceListener(eventLogRepository);
+
+            // Subscribe to ALL events (listener will receive every event type)
+            eventBusManager.subscribeToAll(persistenceListener);
+
+            log.info("\u2705 EventPersistenceListener wired - All events will be persisted to database");
+        } catch (Exception e) {
+            log.error("Failed to wire EventPersistenceListener", e);
+            // Continue execution - event persistence is important but not critical to app
+            // operation
+        }
+    }
+
+    /**
+     * Initialize per-symbol agents for all symbols in the market watch list.
+     * Safe to call multiple times — existing agents are kept, new ones added.
+     */
+    public void initializeSymbolAgents(java.util.Collection<TradePair> symbols) {
+        if (symbols == null || symbols.isEmpty() || smartBot == null) return;
+        for (TradePair symbol : symbols) {
+            symbolAgents.computeIfAbsent(symbol, s -> {
+                org.investpro.core.agents.symbol.SymbolAgent agent =
+                        new org.investpro.core.agents.symbol.SymbolAgent(s, symbolAgentManager);
+                // Register into AgentRuntime so it's properly lifecycle-managed
+                smartBot.getRuntime().registerSymbol(s, symbolAgentManager);
+                log.debug("SymbolAgent registered in runtime for {}", s.toString('/'));
+                return agent;
+            });
+        }
+        log.info("\u2705 {} symbol agents active", symbolAgents.size());
     }
 
     public void stop() {
         stopStreaming();
 
+        // Stop per-symbol agents
+        symbolAgents.values().forEach(agent -> {
+            try { agent.stop(); } catch (Exception ignored) {}
+        });
+        symbolAgents.clear();
+
+        // Stop live metrics tracking
+        liveMetricsTracker.stopTracking();
+
         // Stop symbol agent updater
         if (symbolAgentUpdater != null) {
             symbolAgentUpdater.stop();
-            log.info("✅ Symbol agent updater stopped");
+            log.info("\u2705 Symbol agent updater stopped");
         }
 
         // Stop Telegram event listener
         if (telegramEventListener != null) {
             telegramEventListener.stop();
-            log.info("✅ Telegram event listener stopped");
+            log.info("\u2705 Telegram event listener stopped");
         }
 
         // Stop Telegram polling
         stopTelegramPolling();
 
+        if (signalMonitorService != null) {
+            signalMonitorService.stop();
+        }
+
+        // Shutdown EventBusManager gracefully
+        if (eventBusManager != null) {
+            eventBusManager.shutdown();
+            log.info("\u2705 EventBusManager shutdown complete - Event-driven architecture stopped");
+        }
+
         smartBot.stop();
 
-        notifyAllChannels("SmartBot stopped", "🤖 SmartBot stopped.");
+        notifyAllChannels("SmartBot stopped", "\uD83E\uDD16 SmartBot stopped.");
     }
 
     public void connect() {
@@ -510,9 +599,29 @@ public class SystemCore {
                 && strategyEngine != null;
     }
 
+
+    /**
+     * Record a completed trade into the live metrics tracker.
+     * Called by TradingService after every executed or closed trade.
+     */
+    public void recordCompletedTrade(Trade trade) {
+        if (trade != null) {
+            liveMetricsTracker.recordTrade(trade);
+        }
+    }
+
+    /**
+     * Update the live metrics tracker with the latest account balance.
+     * Called periodically to keep drawdown and equity curve accurate.
+     */
+    public void updatePerformanceBalance(double balance) {
+        liveMetricsTracker.updateBalance(balance);
+    }
+
     // ---------------------------------------------------------------------
     // Bot flags
     // ---------------------------------------------------------------------
+
 
     public void setAutoTradingEnabled(boolean enabled) {
         // Safety gate: prevent auto trading if system health has critical blockers
@@ -521,7 +630,7 @@ public class SystemCore {
             log.warn("Cannot enable auto trading: system has critical issues. Blockers: {}", health.getBlockers());
             notifyAllChannels(
                     "Auto Trading Blocked",
-                    "🚫 Cannot enable auto trading due to system health issues:\n\n" +
+                    "\uD83D\uDEAB Cannot enable auto trading due to system health issues:\n\n" +
                             String.join("\n", health.getBlockers()) + "\n\n" +
                             "Please resolve these issues and try again.");
             return;
@@ -532,7 +641,7 @@ public class SystemCore {
 
         notifyAllChannels(
                 "Auto trading",
-                enabled ? "🟢 Auto trading enabled." : "🔴 Auto trading disabled.");
+                enabled ? "\uD83D\uDFE2 Auto trading enabled." : "\uD83D\uDD34 Auto trading disabled.");
     }
 
     public void setAiReasoningEnabled(boolean enabled) {
@@ -540,7 +649,7 @@ public class SystemCore {
 
         notifyAllChannels(
                 "AI reasoning",
-                enabled ? "🧠 AI reasoning enabled." : "🧠 AI reasoning disabled.");
+                enabled ? "\uD83E\uDDE0 AI reasoning enabled." : "\uD83E\uDDE0 AI reasoning disabled.");
     }
 
     // ---------------------------------------------------------------------
@@ -630,7 +739,7 @@ public class SystemCore {
             log.warn("Cannot start streaming: tradePair is null.");
             notifyAllChannels(
                     "Streaming not started",
-                    "⚠️ Streaming was not started because no symbol is selected.");
+                    "\u26A0\uFE0F Streaming was not started because no symbol is selected.");
             return;
         }
 
@@ -653,7 +762,7 @@ public class SystemCore {
                     tradePairText(tradePair));
 
             publishSystemEvent("SYSTEM_CORE_STREAMING_STARTED", message);
-            notifyAllChannels("Streaming started", "📡 %s".formatted(message));
+            notifyAllChannels("Streaming started", "\uD83D\uDCE1 %s".formatted(message));
 
             log.info(
                     "SystemCore streaming started. exchange={} pair={} mode={} transport={}",
@@ -689,7 +798,7 @@ public class SystemCore {
             publishErrorEvent("SystemCore", exception, "Failed to start exchange streaming.");
             notifyAllChannels(
                     "Streaming failed",
-                    "❌ Failed to start streaming: %s".formatted(rootMessage(exception)));
+                    "\u274C Failed to start streaming: %s".formatted(rootMessage(exception)));
             log.error("Failed to start streaming", exception);
         }
     }
@@ -703,7 +812,7 @@ public class SystemCore {
         try {
             exchange.stopStreaming(activeSubscription);
             publishSystemEvent("SYSTEM_CORE_STREAMING_STOPPED", "Streaming stopped.");
-            notifyAllChannels("Streaming stopped", "🛑 Streaming stopped.");
+            notifyAllChannels("Streaming stopped", "\uD83D\uDED1 Streaming stopped.");
         } catch (Exception exception) {
             log.warn("Failed to stop streaming cleanly", exception);
             publishErrorEvent("SystemCore", exception, "Failed to stop streaming cleanly.");
@@ -988,7 +1097,7 @@ public class SystemCore {
                         exchangeName,
                         Map.of()));
 
-                notifyAllChannels("Stream connected", "✅ Stream connected: " + exchangeName);
+                notifyAllChannels("Stream connected", "\u2705 Stream connected: " + exchangeName);
             }
 
             @Override
@@ -1001,7 +1110,7 @@ public class SystemCore {
 
                 notifyAllChannels(
                         "Stream disconnected",
-                        "⚠️ Stream disconnected: %s | Reason: %s".formatted(exchangeName, reason));
+                        "\u26A0\uFE0F Stream disconnected: %s | Reason: %s".formatted(exchangeName, reason));
             }
 
             @Override
@@ -1016,17 +1125,16 @@ public class SystemCore {
 
                 notifyAllChannels(
                         "Stream error",
-                        "❌ Stream error on %s: %s".formatted(exchangeName, rootMessage(throwable)));
+                        "\u274C Stream error on %s: %s".formatted(exchangeName, rootMessage(throwable)));
             }
 
             @Override
             public void onTicker(String exchangeName, TradePair tradePair, Ticker ticker) {
                 systemEventRecorder.recordMarketTick();
-                eventBus.publish(event(
-                        AgentEvent.MARKET_TICK,
-                        exchangeName,
-                        ticker,
-                        Map.of("tradePair", tradePairText(tradePair))));
+                Map<String, Object> tickMeta = new java.util.LinkedHashMap<>();
+                tickMeta.put("tradePair", tradePairText(tradePair));
+                tickMeta.put("tradePairObject", tradePair);
+                eventBus.publish(event(AgentEvent.MARKET_TICK, exchangeName, ticker, tickMeta));
             }
 
             @Override
@@ -1171,7 +1279,7 @@ public class SystemCore {
                         orderId,
                         Map.of("orderId", safe(orderId))));
 
-                notifyAllChannels("Order accepted", "✅ Order accepted: " + orderId);
+                notifyAllChannels("Order accepted", "\u2705 Order accepted: " + orderId);
             }
 
             @Override
@@ -1185,7 +1293,7 @@ public class SystemCore {
 
                 notifyAllChannels(
                         "Order rejected",
-                        "❌ Order rejected: %s | Reason: %s".formatted(clientOrderId, reason));
+                        "\u274C Order rejected: %s | Reason: %s".formatted(clientOrderId, reason));
             }
 
             @Override
@@ -1196,7 +1304,7 @@ public class SystemCore {
                         fill,
                         Map.of("orderId", safe(orderId))));
 
-                notifyAllChannels("Order filled", "💰 Order filled: " + orderId);
+                notifyAllChannels("Order filled", "\uD83D\uDCB0 Order filled: " + orderId);
             }
 
             @Override
@@ -1207,7 +1315,7 @@ public class SystemCore {
                         orderId,
                         Map.of("orderId", safe(orderId))));
 
-                notifyAllChannels("Order cancelled", "🟡 Order cancelled: " + orderId);
+                notifyAllChannels("Order cancelled", "\uD83D\uDFE1 Order cancelled: " + orderId);
             }
 
             @Override
@@ -1244,7 +1352,7 @@ public class SystemCore {
 
         if (!fromEmail.isBlank() && !toEmail.isBlank()) {
             this.emailNotifier = new EmailNotifier(fromEmail, toEmail);
-            log.info("✅ Email notifier configured");
+            log.info("\u2705 Email notifier configured");
         }
     }
 
@@ -1359,64 +1467,7 @@ public class SystemCore {
                 reason.isBlank() ? "No reason available" : reason);
     }
 
-    /**
-     * Calculate total profit/loss.
-     * <p>
-     * Attempts to read real realized PnL from TradeExecutionCoordinator trade
-     * history.
-     * Returns 0 when no real trade history/PnL source is exposed yet.
-     */
-    public double calculateTotalPnL() {
-        if (tradeExecutionCoordinator == null) {
-            return 0.0;
-        }
 
-        Object tradesObject = invokeNoArg(
-                tradeExecutionCoordinator,
-                "getClosedTrades",
-                "getCompletedTrades",
-                "getTradeHistory",
-                "getExecutedTrades",
-                "getTrades");
-
-        if (!(tradesObject instanceof Collection<?> trades) || trades.isEmpty()) {
-            return 0.0;
-        }
-
-        double totalPnl = 0.0;
-
-        for (Object trade : trades) {
-            if (trade == null) {
-                continue;
-            }
-
-            Double profit = asDouble(invokeNoArg(
-                    trade,
-                    "getProfit",
-                    "getPnl",
-                    "getPnL",
-                    "getRealizedPnl",
-                    "getRealizedPnL"));
-
-            if (profit != null && Double.isFinite(profit)) {
-                totalPnl += profit;
-            }
-        }
-
-        return totalPnl;
-    }
-
-    private List<StrategySignal> getCachedStrategySignals() {
-        if (strategyEngine == null || strategyEngine.getLastSignalCache() == null) {
-            return List.of();
-        }
-
-        return strategyEngine.getLastSignalCache()
-                .values()
-                .stream()
-                .filter(Objects::nonNull)
-                .toList();
-    }
 
     private StrategySignal getMostRecentStrategySignal() {
         if (strategyEngine == null
@@ -1436,57 +1487,6 @@ public class SystemCore {
                 .orElse(null);
     }
 
-    private @NotNull String safeSignalReason(StrategySignal signal) {
-        if (signal == null) {
-            return "";
-        }
-
-        try {
-            String reason = signal.getReason();
-            return reason == null ? "" : reason.trim();
-        } catch (Exception ignored) {
-            return "";
-        }
-    }
-
-    private double getBestAvailableAccountValue() {
-        try {
-            Account account = null;
-
-            try {
-                account = exchange.fetchAccount()
-                        .get(2, TimeUnit.SECONDS);
-            } catch (Exception ignored) {
-                // Fall back below.
-            }
-
-            if (account == null) {
-                try {
-                    account = exchange.getUserAccountDetails();
-                } catch (Exception ignored) {
-                    return 0.0;
-                }
-            }
-
-            if (account == null) {
-                return 0.0;
-            }
-
-            Double nav = asDouble(invokeNoArg(
-                    account,
-                    "getNAV",
-                    "getNav",
-                    "getEquity",
-                    "getBalance",
-                    "getAvailableBalance"));
-
-            return nav == null ? 0.0 : nav;
-
-        } catch (Exception exception) {
-            log.debug("Unable to calculate account value for return percentage: {}", exception.getMessage());
-            return 0.0;
-        }
-    }
 
     private Object invokeNoArg(Object target, String... methodNames) {
         if (target == null || methodNames == null) {
@@ -1745,57 +1745,45 @@ public class SystemCore {
     public String getSystemDiagnostics() {
 
         assert exchange != null;
-        // Exchange info
-        // Streaming info
-        // Bot state
-        // Component readiness
-        // Small account config
-        // Telegram status
-        // Exchange info
-        // Streaming info
-        // Bot state
-        // Component readiness
-        // Small account config
-        // Telegram status
-        return "📊 SystemCore Diagnostics\n\n" +
+        return "\uD83D\uDCCA SystemCore Diagnostics\n\n" +
 
         // Exchange info
                 "*Exchange*\n" +
                 "Name: " + exchange.getName() + "\n" +
                 "ID: " + exchange.getExchangeId() + "\n" +
-                exchange.getName() + " Safe Mode: " + (isOandaExchange() ? "🔴 ENABLED" : "🟢 N/A") + "\n\n" +
+                exchange.getName() + " Safe Mode: " + (isOandaExchange() ? "\uD83D\uDD34 ENABLED" : "\uD83D\uDFE2 N/A") + "\n\n" +
 
                 // Streaming info
                 "*Streaming*\n" +
                 "Mode: " + currentStreamingMode.name() + "\n" +
-                "Active: " + (streaming.get() ? "🟢 YES" : "🔴 NO") + "\n" +
+                "Active: " + (streaming.get() ? "\uD83D\uDFE2 YES" : "\uD83D\uDD34 NO") + "\n" +
                 "Summary: " + getSubscriptionSummary() + "\n\n" +
 
                 // Bot state
                 "*Bot State*\n" +
-                "Auto Trading: " + (isAutoTradingEnabled() ? "🟢 ENABLED" : "🔴 DISABLED") + "\n" +
-                "AI Reasoning: " + (isAiReasoningEnabled() ? "🟢 ENABLED" : "🔴 DISABLED") + "\n" +
+                "Auto Trading: " + (isAutoTradingEnabled() ? "\uD83D\uDFE2 ENABLED" : "\uD83D\uDD34 DISABLED") + "\n" +
+                "AI Reasoning: " + (isAiReasoningEnabled() ? "\uD83D\uDFE2 ENABLED" : "\uD83D\uDD34 DISABLED") + "\n" +
                 "Selected Pair: " + (selectedTradePair != null ? selectedTradePair : "None") + "\n\n" +
 
                 // Component readiness
                 "*Component Status*\n" +
-                "Strategy Engine: " + (strategyEngine != null ? "✅ Ready" : "❌ N/A") + "\n" +
-                "Risk System: " + (riskManagementSystem != null ? "✅ Ready" : "❌ N/A") + "\n" +
-                "Execution Coordinator: " + (tradeExecutionCoordinator != null ? "✅ Ready" : "❌ N/A") +
+                "Strategy Engine: " + (strategyEngine != null ? "\u2705 Ready" : "\u274C N/A") + "\n" +
+                "Risk System: " + (riskManagementSystem != null ? "\u2705 Ready" : "\u274C N/A") + "\n" +
+                "Execution Coordinator: " + (tradeExecutionCoordinator != null ? "\u2705 Ready" : "\u274C N/A") +
                 "\n" +
-                "  ├─ Position Transition Policy: ✅ Internal\n" +
-                "  └─ Symbol Lock Manager: ✅ Internal\n\n" +
+                "  \u251C\u2500 Position Transition Policy: \u2705 Internal\n" +
+                "  \u2514\u2500 Symbol Lock Manager: \u2705 Internal\n\n" +
 
                 // Small account config
                 "*Small Account Mode*\n" +
-                "Enabled: " + (smallAccountModeEnabled ? "🟢 YES" : "🔴 NO") + "\n" +
+                "Enabled: " + (smallAccountModeEnabled ? "\uD83D\uDFE2 YES" : "\uD83D\uDD34 NO") + "\n" +
                 "Threshold: $" + String.format("%.2f", smallAccountBalanceThreshold) + "\n" +
                 exchange.getName() + " Units: " + String.format("%.2f", smallAccountOandaUnits) + "\n\n" +
 
                 // Telegram status
                 "*Telegram*\n" +
-                "Token Configured: " + (!telegramToken.isBlank() ? "✅ YES" : "❌ NO") + "\n" +
-                "Polling Active: " + (isTelegramPollingActive() ? "🟢 YES" : "🔴 NO") + "\n";
+                "Token Configured: " + (!telegramToken.isBlank() ? "\u2705 YES" : "\u274C NO") + "\n" +
+                "Polling Active: " + (isTelegramPollingActive() ? "\uD83D\uDFE2 YES" : "\uD83D\uDD34 NO") + "\n";
     }
 
     /**
@@ -1824,55 +1812,8 @@ public class SystemCore {
     // Pre-Trade Validation APIs (for PreTradeValidationEngine)
     // =====================================================================
 
-    /**
-     * Get the current system state as a string.
-     * Possible values: READY, PAPER_TRADING, LIVE_TRADING, STOPPED, ERROR
-     *
-     * @return the current system state
-     */
-    @NotNull
-    public String getSystemState() {
-        if (!isReady()) {
-            return "ERROR";
-        }
 
-        if (!smartBot.isAutoTradingEnabled()) {
-            return "STOPPED";
-        }
 
-        Account account = getAccount();
-        if (account != null) {
-            if (account.isPaperTrading()) {
-                return "PAPER_TRADING";
-            }
-            if (account.isSandbox()) {
-                return "SANDBOX";
-            }
-            if (account.isConnected()) {
-                return "LIVE_TRADING";
-            }
-        }
-
-        return "READY";
-    }
-
-    /**
-     * Check if the system kill switch is triggered.
-     * When triggered, no trading is allowed.
-     *
-     * @return true if kill switch is triggered, false otherwise
-     */
-    public boolean isKillSwitchTriggered() {
-        // Check system health for critical blockers
-        SystemHealthSnapshot health = getSystemHealth();
-        if (health != null && !health.getBlockers().isEmpty()) {
-            // Any critical blocker acts as a kill switch
-            return !health.isCanTrade();
-        }
-
-        // Check if auto trading is explicitly disabled as a form of "kill switch"
-        return !isAutoTradingEnabled();
-    }
 
     /**
      * Get the trading account associated with this system.
@@ -1901,112 +1842,10 @@ public class SystemCore {
             }
         }
 
-        // TODO: Once Exchange provides Account access, implement proper retrieval
-        return null;
+
+        return new Account();
     }
 
-    /**
-     * Check if the broker is currently connected.
-     * Returns false if exchange is not ready or disconnected.
-     *
-     * @return true if broker is connected and ready, false otherwise
-     */
-    public boolean isBrokerConnected() {
-        if (exchange == null) {
-            return false;
-        }
 
-        try {
-            return exchange.isConnected();
-        } catch (Exception e) {
-            log.debug("Failed to check broker connection", e);
-            return false;
-        }
-    }
-
-    /**
-     * Get the name of the selected venue (exchange).
-     * Returns the exchange name or "UNKNOWN" if not available.
-     *
-     * @return the venue name (exchange name)
-     */
-    @NotNull
-    public String getSelectedVenue() {
-        if (exchange == null) {
-            return "UNKNOWN";
-        }
-
-        try {
-            String displayName = exchange.getDisplayName();
-            if (displayName != null && !displayName.isBlank()) {
-                return displayName;
-            }
-
-            String name = exchange.getName();
-            return name != null ? name : "UNKNOWN";
-        } catch (Exception e) {
-            log.debug("Failed to get venue name", e);
-            return "UNKNOWN";
-        }
-    }
-
-    /**
-     * Get the instrument registry for the system.
-     * The registry contains all available trading instruments/pairs.
-     *
-     * @return an InstrumentRegistry instance, never null
-     */
-    @NotNull
-    public InstrumentRegistry getInstrumentRegistry() {
-        // Check if exchange has instrument registry
-        if (exchange != null) {
-            try {
-                // Try to get registry from exchange if it supports it
-                Object registry = null;
-                try {
-                    // Use reflection to check for getInstrumentRegistry method
-                    java.lang.reflect.Method method = exchange.getClass().getMethod("getInstrumentRegistry");
-                    registry = method.invoke(exchange);
-                } catch (NoSuchMethodException ignored) {
-                    // Exchange doesn't have getInstrumentRegistry
-                }
-
-                if (registry instanceof InstrumentRegistry) {
-                    return (InstrumentRegistry) registry;
-                }
-            } catch (Exception e) {
-                log.debug("Failed to get instrument registry from exchange", e);
-            }
-        }
-
-        // Return new empty registry as fallback
-        return new InstrumentRegistry();
-    }
-
-    /**
-     * Check if AI review is enabled for trade validation.
-     * When enabled, trades may be reviewed by AI before execution.
-     *
-     * @return true if AI review is enabled, false otherwise
-     */
-    public boolean isAiReviewEnabled() {
-        return isAiReasoningEnabled();
-    }
-
-    /**
-     * Check if the system is in live trading mode.
-     * Returns true only if trading is not in paper/sandbox mode and is live.
-     *
-     * @return true if in live trading mode, false if in paper/sandbox mode
-     */
-    public boolean isLiveTrading() {
-        Account account = getAccount();
-        if (account == null) {
-            return false;
-        }
-
-        // Live trading only if not paper and not sandbox
-        return !account.isPaperTrading() && !account.isSandbox() && account.isConnected();
-    }
 
 }
