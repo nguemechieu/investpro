@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
-import org.investpro.core.agents.AgentRegistry;
 import org.investpro.core.agents.AgentRuntime;
 import org.investpro.exchange.Exchange;
 import org.investpro.models.trading.TradePair;
@@ -46,24 +45,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SmartBot {
     private final AgentEventBus eventBus;
     private final AgentRuntime runtime;
-    private final AgentRegistry agentRegistry;
 
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     private AgentContext context;
 
     public SmartBot() {
-        this(AgentRuntime.createDefault(), new AgentEventBus(), new AgentRegistry());
+        this(AgentRuntime.createDefault(), new AgentEventBus());
     }
 
     public SmartBot(
             @NotNull AgentRuntime runtime,
-            @NotNull AgentEventBus eventBus,
-            @NotNull AgentRegistry agentRegistry) {
+            @NotNull AgentEventBus eventBus) {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
-        this.agentRegistry = Objects.requireNonNull(agentRegistry, "agentRegistry must not be null");
-
     }
 
     /**
@@ -107,11 +102,7 @@ public class SmartBot {
         this.context = newContext;
 
         try {
-            eventBus.start();
             runtime.start(context);
-
-            // Start all registered agents
-            agentRegistry.startAll(context);
 
             publishSystemEvent("SMART_BOT_STARTED", "SmartBot started.");
 
@@ -119,10 +110,9 @@ public class SmartBot {
                     "SmartBot started. exchange={} pair={} agents={}",
                     safeExchangeName(exchange),
                     selectedTradePair,
-                    agentRegistry.size());
+                    runtime.getAgents().size());
 
         } catch (Exception exception) {
-            safeStopAgents();
             safeStopRuntime();
             safeStopEventBus();
 
@@ -144,7 +134,6 @@ public class SmartBot {
             return;
         }
 
-        safeStopAgents();
         safeStopRuntime();
         safeStopEventBus();
 
@@ -351,14 +340,6 @@ public class SmartBot {
 
     private boolean eventBusIsReady() {
         return eventBus != null;
-    }
-
-    private void safeStopAgents() {
-        try {
-            agentRegistry.stopAll();
-        } catch (Exception exception) {
-            log.warn("Failed to stop agents cleanly", exception);
-        }
     }
 
     private void safeStopRuntime() {
