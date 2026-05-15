@@ -1,0 +1,6 @@
+{
+  "name": "investpro-skills",
+  "skills": [
+    "./skills/trader"
+  ]
+}
