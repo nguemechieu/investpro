@@ -7,6 +7,7 @@ import org.investpro.core.agents.AgentEventBus;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.agents.symbol.SymbolEvaluationState;
+import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 
@@ -23,22 +24,12 @@ import java.util.function.Consumer;
  * - Listen for trading events (orders, positions)
  * - Update SymbolAgentManager with current state
  * - Enable real-time UI updates in MarketWatch panel
- * <p>
- * Features:
- * - Real-time state synchronization
- * - Symbol-based organization
- * - Evaluation state tracking
- * - Trading mode management
  */
 @Slf4j
 public class SymbolAgentUpdater implements Consumer<AgentEvent> {
     private final SymbolAgentManager symbolAgentManager;
     private final AgentEventBus eventBus;
 
-    /**
-     * -- GETTER --
-     *  Check if listener is active
-     */
     @Getter
     private volatile boolean listening = false;
 
@@ -59,10 +50,9 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
         }
 
         try {
-            // Subscribe to ALL agent events
             eventBus.subscribeAll(this);
             listening = true;
-            log.info("✅ SymbolAgentUpdater started - Real-time symbol state updates enabled");
+            log.info("\u2705 SymbolAgentUpdater started - Real-time symbol state updates enabled");
         } catch (Exception exception) {
             log.error("Failed to start SymbolAgentUpdater", exception);
         }
@@ -92,8 +82,9 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
         try {
             String eventType = event.type();
 
-            // Route to appropriate handler
             switch (eventType) {
+                case "MARKET_TICK" -> handleMarketTick(event);
+                case "SIGNAL_CREATED" -> handleSignalCreated(event);
                 case "STRATEGY_SIGNAL_APPROVED" -> handleStrategySignalApproved(event);
                 case "STRATEGY_SIGNAL_REJECTED" -> handleStrategySignalRejected(event);
                 case "ORDER_SUBMITTED" -> handleOrderSubmitted(event);
@@ -101,11 +92,56 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
                 case "PORTFOLIO_UPDATED" -> handlePortfolioUpdated(event);
                 case "RISK_ALERT" -> handleRiskAlert(event);
                 case "MARKET_ALERT" -> handleMarketAlert(event);
-                // Silently ignore other events
             }
 
         } catch (Exception exception) {
             log.error("Failed to process symbol agent event", exception);
+        }
+    }
+
+    /**
+     * Handle MARKET_TICK events - update live bid/ask/spread on symbol state.
+     */
+    private void handleMarketTick(AgentEvent event) {
+        TradePair symbol = extractTradePair(event);
+        if (symbol == null) return;
+
+        Object payload = event.payload();
+        if (!(payload instanceof Ticker ticker)) return;
+
+        SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
+        state.setBidPrice(ticker.getBidPrice());
+        state.setAskPrice(ticker.getAskPrice());
+        if (ticker.getAskPrice() > 0) {
+            state.setSpreadPercent((ticker.getAskPrice() - ticker.getBidPrice()) / ticker.getAskPrice() * 100.0);
+        }
+        symbolAgentManager.updateState(symbol, state);
+    }
+
+    /**
+     * Handle SIGNAL_CREATED events — capture signal direction and confidence for display.
+     */
+    private void handleSignalCreated(AgentEvent event) {
+        try {
+            TradePair symbol = extractTradePair(event);
+            if (symbol == null) return;
+
+            String side = getStringAttribute(event, "side", "");
+            String strategyName = getStringAttribute(event, "strategy_name", "");
+            double confidence = getDoubleAttribute(event, "confidence");
+
+            if (side.isBlank()) return;
+
+            SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
+            state.setLastSignalSide(side);
+            state.setLastSignalConfidence(confidence);
+            state.setLastSignalStrategy(strategyName.isBlank() ? null : strategyName);
+            state.setLastSignalTime(System.currentTimeMillis());
+            symbolAgentManager.updateState(symbol, state);
+            log.debug("Symbol {} signal: {} conf={}", symbol, side, confidence);
+
+        } catch (Exception exception) {
+            log.error("Failed to handle signal created", exception);
         }
     }
 
@@ -120,14 +156,22 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             }
 
             String strategyName = getStringAttribute(event, "strategy_name", "Unknown");
+            String side = getStringAttribute(event, "side", "");
+            double confidence = getDoubleAttribute(event, "confidence");
 
             SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
             state.setState(SymbolEvaluationState.ASSIGNED);
             state.setActiveStrategyName(strategyName);
             state.setCanTradeLive(true);
+            if (!side.isBlank()) {
+                state.setLastSignalSide(side);
+                state.setLastSignalConfidence(confidence);
+                state.setLastSignalStrategy(strategyName);
+                state.setLastSignalTime(System.currentTimeMillis());
+            }
 
             symbolAgentManager.updateState(symbol, state);
-            log.debug("Symbol {} assigned to strategy: {}", symbol, strategyName);
+            log.debug("Symbol {} assigned to strategy: {} signal={}", symbol, strategyName, side);
 
         } catch (Exception exception) {
             log.error("Failed to handle strategy signal approved", exception);
@@ -191,8 +235,8 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
                 return;
             }
 
-            double pnl = getDoubleAttribute(event, "pnl", 0.0);
-            double pnlPercent = getDoubleAttribute(event, "pnl_percent", 0.0);
+            double pnl = getDoubleAttribute(event, "pnl");
+            double pnlPercent = getDoubleAttribute(event, "pnl_percent");
 
             SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
             state.setState(SymbolEvaluationState.LIVE_READY);
@@ -211,7 +255,6 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
      */
     private void handlePortfolioUpdated(AgentEvent event) {
         try {
-            // Update all tracked symbols with timestamp
             for (SymbolAgentState state : symbolAgentManager.getAllStates()) {
                 if (state != null) {
                     state.updateTimestamp();
@@ -283,13 +326,11 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             return null;
         }
 
-        // Try to get TradePair object directly
         Object tradePairObj = metadata.get("tradePairObject");
         if (tradePairObj instanceof TradePair) {
             return (TradePair) tradePairObj;
         }
 
-        // Try alternative key names
         tradePairObj = metadata.get("tradePair");
         if (tradePairObj instanceof TradePair) {
             return (TradePair) tradePairObj;
@@ -315,6 +356,10 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             return ((Number) value).doubleValue();
         }
         return defaultValue;
+    }
+
+    private double getDoubleAttribute(AgentEvent event, String key) {
+        return getDoubleAttribute(event, key, 0.0);
     }
 
 }

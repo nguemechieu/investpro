@@ -48,29 +48,28 @@ public class SymbolAgentState {
 
     private long lastUpdated;
 
+    // Live market data (updated from MARKET_TICK events)
+    private double bidPrice;
+    private double askPrice;
+    private double spreadPercent;
+
+    // Last signal received (updated from SIGNAL_CREATED / STRATEGY_SIGNAL_APPROVED)
+    @Nullable
+    private String lastSignalSide;     // "BUY", "SELL", or null if no signal yet
+    private double lastSignalConfidence;
+    @Nullable
+    private String lastSignalStrategy;
+    private long lastSignalTime;
+
     /**
      * Determines the trading mode based on the current evaluation state.
-     * 
-     * Mapping:
-     * - NOT_STARTED, COLLECTING_DATA, BACKTESTING, RANKING -> TRAINING
-     * - PAPER_TRADING -> PAPER_TRADING
-     * - ASSIGNED -> LIVE_READY if assignment exists, NO_ASSIGNMENT if not
-     * - LIVE_READY -> LIVE_READY
-     * - LIVE_TRADING -> LIVE_TRADING
-     * - FAILED -> FAILED
-     * - PAUSED -> PAUSED
-     * - null -> UNKNOWN
      */
     public SymbolTradingMode getTradingMode() {
-        if (state == null) {
-            return SymbolTradingMode.UNKNOWN;
-        }
 
         return switch (state) {
             case NOT_STARTED, COLLECTING_DATA, BACKTESTING, RANKING -> SymbolTradingMode.TRAINING;
             case PAPER_TRADING -> SymbolTradingMode.PAPER_TRADING;
             case ASSIGNED -> {
-                // If assigned, check if we have a strategy name
                 if (assignedStrategyName != null && !assignedStrategyName.isBlank()) {
                     yield SymbolTradingMode.LIVE_READY;
                 } else {
@@ -86,62 +85,60 @@ public class SymbolAgentState {
 
     /**
      * Returns human-readable status text for MarketWatch display.
-     * 
-     * Examples:
-     * - "Training / Evaluating" (for TRAINING mode)
-     * - "Paper trading candidates" (for PAPER_TRADING)
-     * - "Live ready: RSI_Breakout | 1h" (for LIVE_READY with strategy/timeframe)
-     * - "Live trading: MovingAvg | 5m" (for LIVE_TRADING)
-     * - "No evaluated assignment" (for NO_ASSIGNMENT)
-     * - "Blocked: Manual pause" (for BLOCKED with reason)
-     * - "Paused" (for PAUSED)
-     * - "Failed: Insufficient data" (for FAILED with reason)
-     * - "Unknown" (for UNKNOWN)
      */
     public String getMarketWatchStatusText() {
         SymbolTradingMode mode = getTradingMode();
+        String signalSuffix = getSignalText();
 
-        switch (mode) {
-            case TRAINING:
-                return "Training / Evaluating";
-
-            case PAPER_TRADING:
-                return "Paper trading candidates";
-
-            case LIVE_READY:
+        return switch (mode) {
+            case TRAINING -> "Training / Evaluating";
+            case PAPER_TRADING -> "Paper trading candidates";
+            case LIVE_READY -> {
+                String base;
                 if (activeStrategyName != null && activeTimeframe != null) {
-                    return "Live ready: " + activeStrategyName + " | " + activeTimeframe.getCode();
+                    base = "Live ready: " + activeStrategyName + " | " + activeTimeframe.getCode();
+                } else {
+                    base = "Live ready: " + (assignedStrategyName != null ? assignedStrategyName : "Unknown");
                 }
-                return "Live ready: " + (assignedStrategyName != null ? assignedStrategyName : "Unknown");
-
-            case LIVE_TRADING:
+                yield signalSuffix.isBlank() ? base : base + " " + signalSuffix;
+            }
+            case LIVE_TRADING -> {
+                String base;
                 if (activeStrategyName != null && activeTimeframe != null) {
-                    return "Live trading: " + activeStrategyName + " | " + activeTimeframe.getCode();
+                    base = "Live trading: " + activeStrategyName + " | " + activeTimeframe.getCode();
+                } else {
+                    base = "Live trading: " + (assignedStrategyName != null ? assignedStrategyName : "Unknown");
                 }
-                return "Live trading: " + (assignedStrategyName != null ? assignedStrategyName : "Unknown");
-
-            case NO_ASSIGNMENT:
-                return "No evaluated assignment";
-
-            case BLOCKED:
+                yield signalSuffix.isBlank() ? base : base + " " + signalSuffix;
+            }
+            case NO_ASSIGNMENT -> "No evaluated assignment";
+            case BLOCKED -> {
                 if (blockReason != null && !blockReason.isBlank()) {
-                    return "Blocked: " + blockReason;
+                    yield "Blocked: " + blockReason;
                 }
-                return "Blocked";
-
-            case PAUSED:
-                return "Paused";
-
-            case FAILED:
+                yield "Blocked";
+            }
+            case PAUSED -> "Paused";
+            case FAILED -> {
                 if (lastIssue != null && !lastIssue.isBlank()) {
-                    return "Failed: " + lastIssue;
+                    yield "Failed: " + lastIssue;
                 }
-                return "Failed";
+                yield "Failed";
+            }
+            default -> "Unknown";
+        };
+    }
 
-            case UNKNOWN:
-            default:
-                return "Unknown";
+    /**
+     * Returns a compact signal text like "\u25b2 BUY 0.82" or "\u25bc SELL 0.65", empty if no signal.
+     */
+    public String getSignalText() {
+        if (lastSignalSide == null || lastSignalSide.isBlank()) return "";
+        String arrow = "BUY".equalsIgnoreCase(lastSignalSide) ? "\u25b2" : "\u25bc";
+        if (lastSignalConfidence > 0) {
+            return String.format("%s %s %.2f", arrow, lastSignalSide.toUpperCase(), lastSignalConfidence);
         }
+        return arrow + " " + lastSignalSide.toUpperCase();
     }
 
     /**
@@ -156,7 +153,7 @@ public class SymbolAgentState {
      */
     public String getLiveBlockedReason() {
         if (canTradeLive && getTradingMode().isLiveAllowed()) {
-            return null; // Not blocked
+            return null;
         }
 
         if (blockReason != null && !blockReason.isBlank()) {

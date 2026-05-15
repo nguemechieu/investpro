@@ -4,6 +4,8 @@ import javafx.beans.property.*;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.control.TableRow;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.agents.symbol.SymbolTradingMode;
@@ -19,6 +21,8 @@ import org.jetbrains.annotations.Nullable;
  * activeTimeframe, strategyScore)
  * - Live readiness (liveReady, issue)
  */
+@Getter
+@Setter
 @Slf4j
 public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
@@ -38,6 +42,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
     private final DoubleProperty strategyScore = new SimpleDoubleProperty();
     private final BooleanProperty liveReady = new SimpleBooleanProperty(false);
     private final StringProperty issue = new SimpleStringProperty();
+    private final StringProperty lastSignal = new SimpleStringProperty();
 
     // Metadata
     private long lastUpdated;
@@ -166,6 +171,14 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         return issue.get();
     }
 
+    public StringProperty lastSignalProperty() {
+        return lastSignal;
+    }
+
+    public String getLastSignal() {
+        return lastSignal.get();
+    }
+
     // ===== Setters for properties =====
 
     public void setBid(double value) {
@@ -192,8 +205,6 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
     /**
      * Update this row with data from a SymbolAgentState.
-     * 
-     * This is the key method that connects the agent state to the UI.
      */
     public void updateSymbolState(@Nullable SymbolAgentState state) {
         if (state == null) {
@@ -207,8 +218,11 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
             return;
         }
 
-        // Update from state
         agentState.set(state.getState().getDisplayName());
+
+        if (state.getBidPrice() > 0) bid.set(state.getBidPrice());
+        if (state.getAskPrice() > 0) ask.set(state.getAskPrice());
+        if (state.getSpreadPercent() > 0) spreadPercent.set(state.getSpreadPercent());
 
         SymbolTradingMode mode = state.getTradingMode();
         tradingMode.set(mode.getDisplayName());
@@ -219,7 +233,9 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         strategyScore.set(state.getStrategyScore());
         liveReady.set(state.isLiveAllowed());
 
-        // Determine issue text
+        // Show signal text (\u25b2 BUY 0.82 / \u25bc SELL 0.65)
+        lastSignal.set(state.getSignalText());
+
         if (state.isLiveAllowed()) {
             issue.set("");
         } else {

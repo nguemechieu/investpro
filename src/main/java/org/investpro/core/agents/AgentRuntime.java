@@ -11,6 +11,9 @@ import org.investpro.core.agents.portfolio.PortfolioAgent;
 import org.investpro.core.agents.reasoning.ReasoningAgent;
 import org.investpro.core.agents.modules.SignalAgent;
 import org.investpro.core.agents.strategy.StrategyAgent;
+import org.investpro.core.agents.symbol.SymbolAgent;
+import org.investpro.core.agents.symbol.SymbolAgentManager;
+import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,6 +46,41 @@ public class AgentRuntime {
 
     public void register(Agent agent) {
         agents.add(Objects.requireNonNull(agent, "agent must not be null"));
+    }
+
+    /**
+     * Bulk-import agents from an AgentRegistry into this runtime.
+     * Call before start() to load agents configured by a module.
+     */
+    public void importFrom(@NotNull AgentRegistry registry) {
+        Objects.requireNonNull(registry, "registry must not be null");
+        for (Agent agent : registry.getAgents()) {
+            agents.add(Objects.requireNonNull(agent));
+        }
+    }
+
+    /**
+     * Register and start a per-symbol SymbolAgent.
+     * If the runtime is already running the agent is started immediately;
+     * otherwise it will be started with the rest of the agents when start() is called.
+     */
+    public void registerSymbol(@NotNull TradePair symbol, @NotNull SymbolAgentManager symbolAgentManager) {
+        Objects.requireNonNull(symbol, "symbol must not be null");
+        Objects.requireNonNull(symbolAgentManager, "symbolAgentManager must not be null");
+        boolean alreadyRegistered = agents.stream()
+                .anyMatch(a -> a.name().equals("SymbolAgent[" + symbol.toString('/') + "]"));
+        if (alreadyRegistered) return;
+        SymbolAgent agent = new SymbolAgent(symbol, symbolAgentManager);
+        agents.add(agent);
+        if (running && context != null) {
+            context.getEventBus().subscribe(AgentEvent.MARKET_TICK, agent::onEvent);
+            try {
+                agent.start(context);
+                log.info("SymbolAgent started: {}", agent.name());
+            } catch (Exception e) {
+                log.error("Failed to start SymbolAgent {}", agent.name(), e);
+            }
+        }
     }
 
     public List<Agent> getAgents() {
