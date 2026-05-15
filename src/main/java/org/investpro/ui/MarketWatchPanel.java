@@ -5,6 +5,8 @@ import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -18,6 +20,7 @@ import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.models.trading.TradePair;
 import org.investpro.ui.models.MarketWatchRow;
+import org.investpro.ui.utils.CurrencyIconLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,6 +41,7 @@ import java.util.*;
 @Getter
 @Setter
 @Slf4j
+@SuppressWarnings("SpellCheckingInspection")
 public class MarketWatchPanel extends BorderPane {
 
     private final SystemCore systemCore;
@@ -117,6 +121,36 @@ public class MarketWatchPanel extends BorderPane {
     }
 
     private void setupTableColumns() {
+        // Currency Icon column
+        TableColumn<MarketWatchRow, String> iconCol = new TableColumn<>("");
+        iconCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+                cellData.getValue().getSymbol().toString()));
+        iconCol.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                } else {
+                    // Extract base currency (before underscore) for icon lookup
+                    String baseCurrency = item.split("_")[0];
+                    Image icon = CurrencyIconLoader.loadCurrencyIcon(baseCurrency);
+                    if (icon != null) {
+                        ImageView imageView = new ImageView(icon);
+                        imageView.setFitHeight(20);
+                        imageView.setFitWidth(20);
+                        imageView.setPreserveRatio(true);
+                        setGraphic(imageView);
+                    } else {
+                        setText("\uD83D\uDCB1");
+                        setGraphic(null);
+                    }
+                }
+            }
+        });
+        iconCol.setPrefWidth(32);
+        iconCol.setResizable(false);
+
         // Symbol column
         TableColumn<MarketWatchRow, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
@@ -241,6 +275,30 @@ public class MarketWatchPanel extends BorderPane {
         });
         scoreCol.setPrefWidth(60);
 
+        // Signal column — shows latest signal direction and confidence
+        TableColumn<MarketWatchRow, String> signalCol = new TableColumn<>("Signal");
+        signalCol.setCellValueFactory(cellData -> cellData.getValue().lastSignalProperty());
+        signalCol.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null || item.isBlank()) {
+                    setText("");
+                    setStyle("");
+                } else {
+                    setText(item);
+                    // Green for BUY signals, red for SELL
+                    String style = item.contains("BUY")
+                            ? "-fx-text-fill: #22c55e; -fx-font-weight: bold;"
+                            : item.contains("SELL")
+                                    ? "-fx-text-fill: #ef4444; -fx-font-weight: bold;"
+                                    : "-fx-text-fill: #94a3b8;";
+                    setStyle(style);
+                }
+            }
+        });
+        signalCol.setPrefWidth(90);
+
         // Live Ready column
         TableColumn<MarketWatchRow, Boolean> liveReadyCol = new TableColumn<>("Live Ready");
         liveReadyCol.setCellValueFactory(cellData -> cellData.getValue().liveReadyProperty());
@@ -252,7 +310,7 @@ public class MarketWatchPanel extends BorderPane {
                     setText("");
                     setStyle("");
                 } else {
-                    setText(item ? "✓ Yes" : "✗ No");
+                    setText(item ? "\u2713 Yes" : "\u2717 No");
                     String style = item ? "-fx-text-fill: #22c55e; -fx-font-weight: bold;" : "-fx-text-fill: #ef4444;";
                     setStyle(style);
                 }
@@ -281,12 +339,12 @@ public class MarketWatchPanel extends BorderPane {
 
         // Add columns to table
         table.getColumns().addAll(
-                symbolCol, bidCol, askCol, spreadCol, sessionCol, modeCol,
-                strategyCol, tfCol, scoreCol, liveReadyCol, issueCol);
+                iconCol, symbolCol, bidCol, askCol, spreadCol, sessionCol, modeCol,
+                strategyCol, tfCol, signalCol, scoreCol, liveReadyCol, issueCol);
     }
 
     private HBox createControlsBar() {
-        Label titleLabel = new Label("📊 Market Watch - Symbol Agent Status");
+        Label titleLabel = new Label("\uD83D\uDCCA Market Watch - Symbol Agent Status");
         titleLabel.setStyle(
                 "-fx-font-size: 13px; " +
                         "-fx-font-weight: bold; " +
@@ -297,7 +355,7 @@ public class MarketWatchPanel extends BorderPane {
         Label symbolCountLabel = new Label("Symbols: 0");
         symbolCountLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
 
-        Button refreshButton = new Button("⟳ Refresh");
+        Button refreshButton = new Button("\u27F3 Refresh");
         refreshButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #3b82f6; " +
@@ -309,7 +367,7 @@ public class MarketWatchPanel extends BorderPane {
             symbolCountLabel.setText("Symbols: " + rowCache.size());
         });
 
-        Button pauseButton = new Button("⏸ Pause");
+        Button pauseButton = new Button("\u23F8 Pause");
         pauseButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #8b5cf6; " +
@@ -319,7 +377,7 @@ public class MarketWatchPanel extends BorderPane {
         pauseButton.setOnAction(e -> {
             if (refreshTimer != null && refreshTimer.getStatus() == javafx.animation.Animation.Status.RUNNING) {
                 refreshTimer.stop();
-                pauseButton.setText("▶ Resume");
+                pauseButton.setText("\u25B6 Resume");
                 pauseButton.setStyle(
                         "-fx-padding: 6 12; " +
                                 "-fx-background-color: #10b981; " +
@@ -328,7 +386,7 @@ public class MarketWatchPanel extends BorderPane {
                                 "-fx-cursor: hand;");
             } else {
                 startAutoRefresh();
-                pauseButton.setText("⏸ Pause");
+                pauseButton.setText("\u23F8 Pause");
                 pauseButton.setStyle(
                         "-fx-padding: 6 12; " +
                                 "-fx-background-color: #8b5cf6; " +
@@ -338,7 +396,7 @@ public class MarketWatchPanel extends BorderPane {
             }
         });
 
-        Button exportButton = new Button("📥 Export");
+        Button exportButton = new Button("\uD83D\uDCE5 Export");
         exportButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #06b6d4; " +
