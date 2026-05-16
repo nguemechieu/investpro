@@ -41,6 +41,7 @@ import java.util.concurrent.*;
 @Getter
 @Setter
 @Slf4j
+@SuppressWarnings("SpellCheckingInspection")
 public class StellarNetwork extends Exchange {
     private static final String STELLAR_API_URL = "https://horizon.stellar.org";
     private static final String STELLAR_TEST_URL = "https://horizon-testnet.stellar.org";
@@ -1087,20 +1088,8 @@ public class StellarNetwork extends Exchange {
                         .toList());
     }
 
-    // Additional required methods
-    public List<Ticker> getTickers(MARKET_TYPES marketType) {
-        if (marketType != MARKET_TYPES.SPOT && marketType != MARKET_TYPES.MARKET) {
-            return List.of();
-        }
-        return fetchTickers(defaultPairs()).join();
-    }
-
     public Ticker getTicker(String symbol) {
         return safeTicker(parseSymbolOrDefault(symbol));
-    }
-
-    public List<Trade> getRecentTrades(TradePair tradePair, int limit) {
-        return fetchRecentTrades(tradePair, limit);
     }
 
     public void cancelOrder(TradePair tradePair) {
@@ -1108,18 +1097,6 @@ public class StellarNetwork extends Exchange {
             return;
         }
         orders.entrySet().removeIf(entry -> Objects.equals(entry.getValue().getTradePair(), tradePair));
-    }
-
-    public List<CandleData> getCandles(TradePair tradePair, Timeframe timeframe, int limit) {
-        int seconds = secondsFor(timeframe);
-        long end = Instant.now().getEpochSecond();
-        long start = end - (long) Math.max(1, limit) * seconds;
-        return getCandles(tradePair, timeframe, limit, start, end);
-    }
-
-    public List<CandleData> getCandles(TradePair tradePair, Timeframe timeframe, int limit, Long startTime,
-            Long endTime) {
-        return buildCandlesFromTrades(tradePair, secondsFor(timeframe), Math.max(1, limit), startTime, endTime);
     }
 
     public CandleDataSupplier getCandleDataSupplier(TradePair tradePair, Timeframe timeframe) {
