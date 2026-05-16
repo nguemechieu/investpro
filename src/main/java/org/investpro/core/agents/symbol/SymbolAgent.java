@@ -79,15 +79,24 @@ public class SymbolAgent implements Agent {
 
         if (!AgentEvent.MARKET_TICK.equals(event.type())) return;
 
-        // Only process events for this symbol
+        // Match by currency codes — TradePair.equals() includes mutable market-data
+        // fields (bid, ask, updatedAt) so object equality is always false for pairs
+        // arriving from the exchange stream.
         Object pairObj = event.metadata().get("tradePairObject");
-        if (!(pairObj instanceof TradePair pair) || !pair.equals(symbol)) return;
+        if (!(pairObj instanceof TradePair pair) || !sameSymbol(pair, symbol)) return;
 
         Object payload = event.payload();
         if (!(payload instanceof Ticker ticker)) return;
 
         long ticks = tickCount.incrementAndGet();
         advanceLifecycle(ticks, ticker);
+    }
+
+    /** Compare two TradePairs by base/counter currency code only (ignoring live market data). */
+    private static boolean sameSymbol(TradePair a, TradePair b) {
+        if (a == null || b == null) return false;
+        return a.getBaseCode().equalsIgnoreCase(b.getBaseCode())
+                && a.getCounterCode().equalsIgnoreCase(b.getCounterCode());
     }
 
     private void advanceLifecycle(long ticks, Ticker ticker) {
@@ -102,6 +111,13 @@ public class SymbolAgent implements Agent {
         }
 
         SymbolEvaluationState current = state.getState();
+        if (current == null) {
+            // Defensive: state field should never be null, but guard anyway
+            state.setState(SymbolEvaluationState.COLLECTING_DATA);
+            manager.updateState(symbol, state);
+            return;
+        }
+
         SymbolEvaluationState previous = current;
         switch (current) {
             case COLLECTING_DATA -> {
@@ -119,7 +135,6 @@ public class SymbolAgent implements Agent {
                 }
             }
             case RANKING -> {
-                // Immediately advance to paper trading after ranking
                 state.setState(SymbolEvaluationState.PAPER_TRADING);
                 state.setLastIssue("Paper trading in progress\u2026");
                 log.debug("{}: ranking done, advancing to PAPER_TRADING", symbol.toString('/'));
@@ -129,7 +144,7 @@ public class SymbolAgent implements Agent {
                     state.setState(SymbolEvaluationState.LIVE_READY);
                     state.setCanTradeLive(true);
                     state.setLastIssue(null);
-                    state.setStrategyScore(75.0 + (Math.random() * 20.0)); // placeholder score
+                    state.setStrategyScore(75.0 + (Math.random() * 20.0));
                     log.info("{}: evaluation complete — LIVE_READY", symbol.toString('/'));
                 }
             }
@@ -138,8 +153,8 @@ public class SymbolAgent implements Agent {
 
         manager.updateState(symbol, state);
 
-        // Publish event if state changed so UI and other agents are notified
-        if (state.getState() != previous && context != null && context.getEventBus() != null) {
+        SymbolEvaluationState newState = state.getState();
+        if (newState != null && newState != previous && context != null && context.getEventBus() != null) {
             context.getEventBus().publish(new AgentEvent(
                     "SYMBOL_STATE_CHANGED",
                     name(),
@@ -148,7 +163,7 @@ public class SymbolAgent implements Agent {
                     Map.of(
                             "tradePairObject", symbol,
                             "previousState", previous.name(),
-                            "newState", state.getState().name()
+                            "newState", newState.name()
                     )));
         }
     }

@@ -218,7 +218,12 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
             return;
         }
 
-        agentState.set(state.getState().getDisplayName());
+        // Guard against uninitialised state field (Lombok @Builder does not enforce @NotNull)
+        if (state.getState() != null) {
+            agentState.set(state.getState().getDisplayName());
+        } else {
+            agentState.set("Unknown");
+        }
 
         if (state.getBidPrice() > 0) bid.set(state.getBidPrice());
         if (state.getAskPrice() > 0) ask.set(state.getAskPrice());

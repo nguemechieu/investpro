@@ -67,8 +67,10 @@ public class AgentRuntime {
     public void registerSymbol(@NotNull TradePair symbol, @NotNull SymbolAgentManager symbolAgentManager) {
         Objects.requireNonNull(symbol, "symbol must not be null");
         Objects.requireNonNull(symbolAgentManager, "symbolAgentManager must not be null");
+        String agentName = "SymbolAgent[" + symbol.toString('/') + "]";
+        // Null-safe name check — avoids NPE if any agent returns null from name()
         boolean alreadyRegistered = agents.stream()
-                .anyMatch(a -> a.name().equals("SymbolAgent[" + symbol.toString('/') + "]"));
+                .anyMatch(a -> agentName.equals(a.name()));
         if (alreadyRegistered) return;
         SymbolAgent agent = new SymbolAgent(symbol, symbolAgentManager);
         agents.add(agent);

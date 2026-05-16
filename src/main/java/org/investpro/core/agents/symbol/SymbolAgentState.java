@@ -24,7 +24,7 @@ public class SymbolAgentState {
     @NotNull
     private TradePair symbol;
 
-    @NotNull
+    @Nullable
     private SymbolEvaluationState state;
 
     @Nullable
@@ -63,9 +63,12 @@ public class SymbolAgentState {
 
     /**
      * Determines the trading mode based on the current evaluation state.
+     * Returns UNKNOWN if the state field has not been initialised.
      */
     public SymbolTradingMode getTradingMode() {
-
+        if (state == null) {
+            return SymbolTradingMode.UNKNOWN;
+        }
         return switch (state) {
             case NOT_STARTED, COLLECTING_DATA, BACKTESTING, RANKING -> SymbolTradingMode.TRAINING;
             case PAPER_TRADING -> SymbolTradingMode.PAPER_TRADING;
