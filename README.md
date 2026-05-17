@@ -1,617 +1,618 @@
-# InvestPro
+<![CDATA[<p align="center">
+  <img src="src/main/resources/images/Invest.png" alt="InvestPro Logo" width="120" />
+</p>
 
-![InvestPro Logo](src/main/resources/images/Invest.png)
+<h1 align="center">InvestPro</h1>
 
-[![Build Status](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/maven.yml)
-[![Docker Build](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Code Coverage](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml/badge.svg)](https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml)
+<p align="center">
+  <strong>A serious, multi-asset trading workstation built on Java 21 + JavaFX.</strong><br/>
+  Strategy engine · Agent runtime · AI-assisted analysis · Risk management · Backtesting · Paper trading
+</p>
 
-## Overview
-
-
-
-**InvestPro** is a professional, multi-exchange trading platform built with Java 26 and JavaFX. It provides a comprehensive suite of tools for algorithmic trading, portfolio management, market data analysis, and automated signal generation across multiple exchanges and asset classes.
-![image](src/main/resources/images/InvestPro-USD-JPY-20260509-161851.png)
-
-
-** Trading Desk
-
-![screenshot](src/main/resources/images/Screenshot%202026-05-09%20162703.png)
-
-**Key Highlights:**
-- ✅ Real-time WebSocket streaming to avoid rate limits
-- ✅ Paper trading with $10k USD/USDT initialization
-- ✅ Live trading support for authenticated users
-- ✅ Multi-exchange support with unified API
-- ✅ Advanced charting and technical analysis
-- ✅ Automated trading strategies and signals
-- ✅ Backtesting and portfolio analysis
-- ✅ Telegram bot integration
-- ✅ **Docker containerization** (JavaFX + VNC + PostgreSQL)
-- ✅ Full VNC clipboard support (copy/paste)
-- ✅ Production-ready deployment with health checks
+<p align="center">
+  <a href="https://github.com/nguemechieu/investpro/actions/workflows/maven.yml">
+    <img src="https://github.com/nguemechieu/investpro/actions/workflows/maven.yml/badge.svg" alt="Java CI"/>
+  </a>
+  <a href="https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml">
+    <img src="https://github.com/nguemechieu/investpro/actions/workflows/docker-image.yml/badge.svg" alt="Docker Build"/>
+  </a>
+  <a href="https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml">
+    <img src="https://github.com/nguemechieu/investpro/actions/workflows/codecov.yaml/badge.svg" alt="Code Coverage"/>
+  </a>
+  <a href="https://opensource.org/licenses/Apache-2.0">
+    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"/>
+  </a>
+  <img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"/>
+  <img src="https://img.shields.io/badge/JavaFX-21.0.6-blue.svg" alt="JavaFX"/>
+  <img src="https://img.shields.io/badge/status-active%20development-yellow.svg" alt="Status"/>
+</p>
 
 ---
 
-## Supported Exchanges & Brokers
+## Overview
 
-| Exchange | Streaming | Trading | Paper Mode | Live Mode | Auth Check |
-|----------|-----------|---------|-----------|-----------|------------|
-| **Binance US** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **Binance Global** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **Coinbase** | ✅ WebSocket | ✅ Spot | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **OANDA** | ✅ WebSocket | ✅ Forex/CFD | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **Interactive Brokers** | ✅ WebSocket | ✅ Multi-Asset | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **Alpaca** | ✅ WebSocket | ✅ Stocks/Crypto | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **Bitfinex** | ✅ WebSocket | ✅ Crypto | ✅ Yes | ✅ Yes | ✅ Implemented |
-| **Stellar Network** | ✅ WebSocket | ✅ Crypto | ✅ Yes | ✅ Yes | ✅ Implemented |
+**InvestPro** is an open-source, desktop trading workstation for serious traders and developers. It provides a unified interface for multiple exchanges and brokers, a pluggable strategy engine, an AI-assisted signal pipeline, and a robust risk management layer — all wrapped in a native JavaFX UI that runs on Windows, Linux, and macOS.
+
+It is designed to be a complete trading research and execution platform: from initial idea (strategy lab, backtesting) through validation (paper trading) to live execution — with institutional-quality controls at every stage.
+
+> **InvestPro does not guarantee profits. Trading carries significant financial risk. Always validate your strategy with paper trading before committing real capital. See the [Disclaimer](#disclaimer).**
+
+---
+
+## Project Status
+
+> 🚧 **Active Development** — Core features are working. The codebase is evolving. Some modules are still being stabilised. Paper trading is fully supported; live trading is available but should be used with care.
+
+| Area | Status |
+|---|---|
+| Exchange adapters (8 venues) | ✅ Implemented |
+| Real-time WebSocket streaming | ✅ Working |
+| Strategy engine + signal pipeline | ✅ Working |
+| Agent runtime (SmartBot) | ✅ Working |
+| Paper trading | ✅ Working |
+| Backtesting (StrategyLab) | 🔄 In progress |
+| AI reasoning (OpenAI integration) | ✅ Working |
+| Risk management layer | ✅ Working |
+| Docker / VNC deployment | ✅ Working |
+| Mobile companion / web UI | 📋 Planned |
+
+---
+
+## Screenshots
+
+| Trading Desk | Market Watch + Signals |
+|---|---|
+| ![Trading Desk](src/main/resources/images/InvestPro-USD-JPY-20260509-161851.png) | ![Trading Desk 2](src/main/resources/images/Screenshot%202026-05-09%20162703.png) |
+
+> *Screenshots reflect a development build. UI continues to evolve.*
+
+**Docker VNC Access**
+
+Access the full desktop via browser at `http://localhost:6080/vnc.html?autoconnect=1&resize=scale`
+
+![VNC](src/main/resources/images/investpro_docker_vnc_screen.png)
+
+---
+
+## Why InvestPro?
+
+Most open-source trading tools are either raw algorithmic frameworks (no UI) or simple bots (single exchange, single strategy). InvestPro bridges the gap:
+
+- **Full desktop workstation** — live charts, market watch, order panel, portfolio view in one window
+- **Multi-exchange, unified API** — switch exchanges without rewriting your strategy
+- **Strategy-first architecture** — strategies and agents are first-class citizens, not afterthoughts
+- **Built-in safety layers** — signal filter → risk review → AI reasoning → execution coordinator before any order reaches the market
+- **Paper trading from day one** — validate everything before going live
+- **Extensible** — add your own exchange adapter, strategy, or agent with clean interfaces
 
 ---
 
 ## Core Features
 
-### 1. Market Data & Streaming
-- **Real-time WebSocket Streams**: Ticker, trades, order book depth, and candles
-- **Intelligent Rate Limiting**: Automatic cooldown on HTTP 429/418 errors
-- **Fallback Support**: REST API polling with proper delay handling
-- **Multiple Timeframes**: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w, 1M
+### Market Data & Streaming
+- Real-time WebSocket feeds: ticker, trades, order book depth, OHLCV candles
+- Multiple timeframes: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w, 1M
+- Intelligent HTTP rate-limit handling (auto-cooldown on 429/418 errors)
+- REST fallback when WebSocket is unavailable
 
-### 2. Trading Capabilities
-- **Order Types**: Market orders, limit orders, stop-loss, take-profit, bracket orders
-- **Paper Trading**: Fully simulated trading environment with virtual balances
-- **Live Trading**: Full API integration with credential management
-- **Risk Management**: Position sizing, leverage control, margin tracking
-- **Order Management**: Create, cancel, modify, and track orders in real-time
+### Trading Capabilities
+- Order types: market, limit, stop-loss, take-profit, bracket
+- Paper trading with configurable virtual balance
+- Live trading via authenticated exchange APIs
+- Order lifecycle management (create, cancel, track fills)
 
-### 3. Portfolio & Accounts
-- **Multi-Account Support**: Manage multiple exchange accounts
-- **Balance Tracking**: Real-time balance updates across assets
-- **Trade History**: Complete order and fill history with fees
-- **Performance Analytics**: PnL tracking, win rate, Sharpe ratio
-- **Account Validation**: Real-time account status and health checks
+### Strategy Engine
+- Pluggable `TradingStrategy` interface
+- `StrategyEngine` runs multiple strategies concurrently per symbol
+- `StrategyLab` for backtesting and forward-testing
+- `StrategyCatalog` of built-in strategies (trend-following, mean-reversion, momentum)
+- `StrategyBootstrapper` for automatic strategy initialisation at startup
+- `SignalToDecisionFilter` — all signals are reviewed before execution
 
-### 4. Charting & Analysis
-- **Interactive Charts**: Multi-timeframe candlestick charts with technical indicators
-- **Advanced Indicators**: MA, EMA, RSI, MACD, Bollinger Bands, ATR, and more
-- **Drawing Tools**: Trend lines, support/resistance, pattern recognition
-- **Zoom & Pan**: Full chart navigation with mouse wheel and keyboard controls
-- **Export**: Save charts and analysis results
+### Agent Runtime (SmartBot)
+- `AgentRuntime` manages the full lifecycle of all trading agents
+- `AgentEventBus` — publish/subscribe event system decoupling all components
+- `SymbolAgent` — per-symbol evaluation agent (analysis → signal → execution pipeline)
+- `SymbolAgentManager` — manages all active symbol agents
+- Auto-trading starts **OFF** by default; must be explicitly enabled
 
-### 5. Automated Trading
-- **Strategy Engine**: Build and backtest trading strategies
-- **Signal Generation**: Automated buy/sell signals based on user rules
-- **Backtesting**: Historical performance simulation
-- **Paper Trading Validation**: Test strategies before live deployment
-- **Multi-Strategy Support**: Run multiple strategies simultaneously
+### Risk Management
+- `RiskManagementSystem` — evaluates every signal before execution
+- Per-trade risk limits (configurable `maxRiskPerTrade`, `maxDailyLoss`)
+- `TradeExecutionCoordinator` — final execution gate combining risk + AI reasoning
+- Small-account mode with reduced position sizing
+- Symbol cooldown between open/close cycles to prevent thrashing
 
-### 6. Alerts & Notifications
-- **Price Alerts**: Notify on price targets
-- **Signal Alerts**: Immediate notification on trading signals
-- **Telegram Integration**: Real-time alerts via Telegram bot
-- **Email Notifications**: Optional email alerts (configurable)
-- **Order Status**: Alerts on order fills, cancellations, and errors
+### AI-Assisted Analysis
+- `AiReasoningService` interface — pluggable AI backend
+- `OpenAiReasoningService` — GPT integration for trade reasoning (optional)
+- `LocalAiReasoningService` — offline fallback
+- AI can approve or reject signals; **AI never executes directly**
+- Telegram ChatGPT integration when OpenAI key is configured
 
-### 7. Utilities & Tools
-- **Mini Web Browser**: Built-in browser for market research
-- **Screenshot Tool**: Capture and annotate charts
-- **Forex News**: Real-time forex economic calendar
-- **System Monitor**: CPU, memory, network connectivity, and latency tracking
-  - **Network Monitoring**: Real-time network health status
-  - **Latency Measurement**: Automatic latency measurement to major exchange endpoints
-  - **Connectivity Alerts**: Alerts when network is slow or disconnected
-  - **Multi-Endpoint Testing**: Simultaneous checks to Binance, Coinbase, and other endpoints
-- **Settings Management**: Persistent configuration storage
+### Charting & Technical Analysis
+- Interactive multi-timeframe candlestick charts
+- Technical indicators: MA, EMA, RSI, MACD, Bollinger Bands, ATR, and more
+- Zoom/pan, drawing tools, support/resistance annotation
 
----
+### Notifications
+- Telegram bot: real-time alerts, Telegram command handler (`/setapikey`, `/status`, etc.)
+- Email notifications (SMTP, configurable)
+- `SignalMonitorService` — logs every signal stage through the pipeline
 
-## Technology Stack
+### System Monitoring
+- `SystemMonitorService` — 9-subsystem health dashboard (Exchange, Market Data, Account, Strategy, Risk, Execution, Agents, AI, Notifications)
+- Real-time network latency to exchange endpoints
+- Event log (SQLite-persisted via `EventLogRepositoryImpl`)
 
-### Backend
-- **Language**: Java 26 (Eclipse Temurin JDK)
-- **Build Tool**: Maven 3.13.0+
-- **Web Framework**: No Spring dependency (lightweight core)
-- **Async**: CompletableFuture, ExecutorService, ScheduledThreadPool
-- **HTTP Client**: Java built-in HttpClient (HTTP/2 support)
-- **JSON**: Jackson ObjectMapper with Java Time support
-- **Crypto**: HMAC-SHA256 for API signatures
-
-### Frontend
-- **GUI Framework**: JavaFX 21.0.6
-- **Charts**: Custom rendering engine with touch support
-- **Threading**: Platform.runLater() for UI updates
-- **CSS Styling**: JavaFX CSS theming
-- **Responsive Design**: Adaptive layouts for different screen sizes
-
-### Data
-- **Caching**: In-memory ConcurrentHashMap for performance
-- **Persistence**: SQLite for local storage (trades, orders, settings)
-- **Serialization**: JSON and binary formats
-
-### External Services
-- **WebSocket Library**: org.java_websocket (Draft_6455 protocol)
-- **Forex News**: NewsAPI integration
-- **Telegram Bot**: Java Telegram Bot API
-- **Logging**: SLF4J with Logback
+### Deployment
+- Docker image with JavaFX + Xvfb + Fluxbox + x11vnc + noVNC
+- Web VNC access (browser-based, no client install required)
+- Native VNC for lower latency
+- PostgreSQL support for production deployments
 
 ---
 
-## System Requirements
+## Architecture Overview
 
-### Minimum
-- **OS**: Windows 10, Linux (Ubuntu 20+), macOS 10.15+
-- **Java**: JDK 21 or higher
-- **RAM**: 2GB
-- **Disk**: 500MB
-- **Internet**: Stable connection required for streaming
-
-### Recommended
-- **OS**: Windows 11 / Linux (Ubuntu 22+) / macOS 12+
-- **Java**: JDK 21 LTS
-- **RAM**: 4GB+
-- **Disk**: 1GB+ (for data caching)
-- **CPU**: Multi-core processor (4+ cores)
-- **Network**: Gigabit+ internet for low-latency trading
-
----
-
-## Installation & Setup
-
-### Option 1: Build from Source (Development)
-
-**Prerequisites:**
-```bash
-# Verify Java
-java -version  # Should be 21+
-
-# Verify Maven
-mvn -version   # Should be 3.6+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        JavaFX UI Layer                          │
+│   TradingDesk · MarketWatchPanel · ChartPanel · OrderPanel      │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│                         SystemCore                              │
+│  Application composition root — wires all components           │
+│  EventBusManager · SignalMonitorService · SystemMonitorService  │
+└──────┬──────────┬──────────┬──────────┬──────────┬─────────────┘
+       │          │          │          │          │
+  ┌────▼────┐ ┌──▼───┐ ┌────▼────┐ ┌──▼────┐ ┌──▼──────────┐
+  │SmartBot │ │Strat- │ │  Risk   │ │  AI   │ │  Exchange   │
+  │AgentRun-│ │egyEng-│ │Managmt  │ │Reason-│ │  Adapters   │
+  │time     │ │ine    │ │System   │ │ing    │ │             │
+  └────┬────┘ └──┬───┘ └────┬────┘ └──┬────┘ └──────┬──────┘
+       │         │          │         │              │
+  ┌────▼─────────▼──────────▼─────────▼──────────────▼──────┐
+  │                  TradeExecutionCoordinator                │
+  │         Signal → Risk review → AI reasoning → Execute     │
+  └───────────────────────────────────────────────────────────┘
 ```
 
-**Build Steps:**
+**Signal pipeline:**
+```
+StrategySignal
+  └─→ SignalToDecisionFilter
+        └─→ BotTradeDecisionEngine
+              └─→ RiskManagementSystem  (approve / reject)
+                    └─→ AiReasoningService  (approve / reject)
+                          └─→ TradeExecutionCoordinator
+                                └─→ ExecutionEngine  →  Exchange API
+```
+
+**Package layout:**
+```
+src/main/java/org/investpro/
+├── core/                   # SystemCore, SmartBot, agents, runtime
+│   ├── agents/             # AgentRuntime, AgentEventBus, SymbolAgent
+│   ├── bot/                # SmartBot
+│   └── agents/execution/   # ExecutionEngine, TradeExecutionCoordinator
+├── exchange/               # Exchange adapters (Binance, Coinbase, Oanda, …)
+├── strategy/               # StrategyEngine, StrategyCatalog, StrategyLab
+├── decision/               # BotTradeDecisionEngine, SignalToDecisionFilter
+├── risk/                   # RiskManagementSystem
+├── ai/                     # AiReasoningService, OpenAiReasoningService
+├── monitoring/             # SystemMonitorService, SignalMonitorService
+├── event/                  # EventBusManager, EventPersistenceListener
+├── ui/                     # JavaFX panels and windows
+├── models/                 # TradePair, Order, Account, Ticker, …
+├── repository/             # SQLite-backed repositories
+└── data/                   # CandleData, Db1
+```
+
+---
+
+## Supported Exchanges & Brokers
+
+| Venue | Asset Classes | WebSocket | Paper | Live |
+|---|---|---|---|---|
+| **Binance** (Global) | Crypto spot | ✅ | ✅ | ✅ |
+| **Binance US** | Crypto spot | ✅ | ✅ | ✅ |
+| **Coinbase** | Crypto spot | ✅ | ✅ | ✅ |
+| **OANDA** | Forex, CFD | ✅ | ✅ | ✅ |
+| **Interactive Brokers** | Stocks, Futures, Forex, Options | ✅ | ✅ | ✅ |
+| **Alpaca** | US Stocks, Crypto | ✅ | ✅ | ✅ |
+| **Bitfinex** | Crypto | ✅ | ✅ | ✅ |
+| **Stellar Network** | XLM / USDC (DEX) | ✅ | ✅ | ✅ |
+
+> Live trading requires valid API credentials. Always test with paper trading first.
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Requirement | Version |
+|---|---|
+| Java (JDK) | 21 LTS (Eclipse Temurin recommended) |
+| Maven | 3.6+ |
+| Git | Any recent version |
+| Docker (optional) | 20+ |
+
 ```bash
-# Clone repository
+java -version   # Must show 21+
+mvn -version    # Must show 3.6+
+```
+
+Download Java 21: [https://adoptium.net/](https://adoptium.net/)
+
+---
+
+### Option 1 — Build from Source
+
+```bash
+# Clone
 git clone https://github.com/nguemechieu/investpro.git
 cd investpro
 
-# Build with Maven
-mvn clean compile   # Compile only
-mvn clean package   # Compile + package + run tests
+# Build (skip tests for speed)
+mvn clean package -DskipTests
 
-# Run application
-java -jar target/investpro-1.0-SNAPSHOT.jar
+# Run
+java -jar target/investpro-1.0.0-SNAPSHOT.jar
 ```
 
-### Option 2: Docker (Recommended for Production)
-
-**Quick Start with Docker Compose:**
+To include tests:
 ```bash
-# Clone and navigate
+mvn clean package
+```
+
+---
+
+### Option 2 — Docker (recommended for headless / server deployments)
+
+```bash
 git clone https://github.com/nguemechieu/investpro.git
 cd investpro
 
-# Start all services (PostgreSQL + InvestPro app)
+# Start PostgreSQL + InvestPro with VNC
 docker-compose up -d
 
-# Access via web VNC
-open http://localhost:6080/vnc.html
-# Or native VNC client: localhost:5900 (password: investpro)
+# Open in browser
+open http://localhost:6080/vnc.html?autoconnect=1&resize=scale
+# Or connect with any VNC client to localhost:5900
+# Default VNC password: investpro
 ```
 
-**Features:**
-- ✅ JavaFX GUI via X11 virtual display
-- ✅ VNC access (web-based noVNC + native clients)
-- ✅ PostgreSQL database for persistence
-- ✅ Clipboard support for copy/paste
-- ✅ Automatic service startup and health checks
+**Ports exposed:**
 
-**Docker Details:**
-- **Base Image**: Eclipse Temurin 21 JDK with Ubuntu
-- **Java Version**: 21 (Eclipse Temurin)
-- **JavaFX Version**: 21.0.6 (modular with platform-specific natives)
-- **Desktop Environment**: Xvfb + Fluxbox + x11vnc + noVNC
-- **Database**: PostgreSQL 16-Alpine
-- **Ports**: 8080 (app), 5900 (VNC), 6080 (web VNC), 5432 (DB)
+| Port | Service |
+|---|---|
+| `6080` | noVNC web client |
+| `5900` | Native VNC |
+| `8080` | Application HTTP (future REST API) |
+| `5432` | PostgreSQL |
 
-**Full Documentation:**
-See [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md) for comprehensive Docker deployment guide including:
-- VNC configuration (web and native clients)
-- Troubleshooting clipboard, display, and connectivity issues
-- Environment variable customization
-- Performance tuning and resource limits
-- Security best practices for production
+**Docker image details:**
+- Base: Eclipse Temurin 21 JDK (Ubuntu)
+- Desktop: Xvfb + Fluxbox + x11vnc + noVNC
+- Full clipboard support via `autocutsel`
 
-### Option 3: Pre-built Binary (Coming Soon)
+See [`DOCKER_USAGE_GUIDE.md`](DOCKER_USAGE_GUIDE.md) for advanced configuration (resource limits, custom VNC password, troubleshooting).
+
+---
+
+### System Requirements
+
+| | Minimum | Recommended |
+|---|---|---|
+| OS | Windows 10 / Ubuntu 20+ / macOS 10.15+ | Windows 11 / Ubuntu 22+ / macOS 12+ |
+| RAM | 2 GB | 4 GB+ |
+| Disk | 500 MB | 1 GB+ |
+| CPU | Dual-core | Quad-core+ |
+| Network | Stable broadband | Low-latency, wired |
 
 ---
 
 ## Configuration
 
 ### API Credentials
+
 Create `~/.investpro/config.properties`:
+
 ```properties
-# Binance US
-binance.us.key=your_api_key_here
-binance.us.secret=your_api_secret_here
+# --- Binance US ---
+binance.us.key=YOUR_API_KEY
+binance.us.secret=YOUR_API_SECRET
 
-# Coinbase Pro
-coinbase.key=your_api_key_here
-coinbase.secret=your_api_secret_here
-coinbase.passphrase=your_passphrase_here
+# --- Binance Global ---
+binance.key=YOUR_API_KEY
+binance.secret=YOUR_API_SECRET
 
-# OANDA
-oanda.token=your_bearer_token_here
-oanda.account_id=your_account_id_here
+# --- Coinbase ---
+coinbase.key=YOUR_API_KEY
+coinbase.secret=YOUR_API_SECRET
 
-# Telegram Bot (optional)
-telegram.bot.token=your_bot_token_here
-telegram.chat_id=your_chat_id_here
+# --- OANDA ---
+oanda.token=YOUR_BEARER_TOKEN
+oanda.account_id=YOUR_ACCOUNT_ID
+
+# --- Alpaca ---
+alpaca.key=YOUR_API_KEY
+alpaca.secret=YOUR_API_SECRET
+
+# --- Telegram Bot (optional) ---
+telegram_token=YOUR_BOT_TOKEN
+
+# --- Email notifications (optional) ---
+from_email=you@example.com
+to_email=alerts@example.com
+
+# --- OpenAI (optional, for AI-assisted analysis) ---
+openai.api_key=YOUR_OPENAI_KEY
+
+# --- Risk limits ---
+risk.small_account.enabled=true
+risk.small_account.threshold=100.0
+risk.small_account.oanda_units=1.0
 ```
 
-### Application Settings
-Available in UI under Settings → Preferences:
-- **Theme**: Light/Dark mode
-- **Chart Settings**: Candlestick colors, grid options
-- **Streaming**: Enable/disable WebSocket
-- **Rate Limiting**: Cooldown values
-- **Paper Trading**: Initial balance configuration
-- **Notifications**: Alert preferences
+> **Security:** Never commit this file to version control. It contains secrets.
+
+The OpenAI API key can also be set at runtime via the Telegram bot command `/setapikey YOUR_KEY` or via the `OPENAI_API_KEY` environment variable.
 
 ---
 
-## Quick Start Guide
+## Quick Start
 
-### 1. Launch Application
+### 1. Launch the application
+
 ```bash
-java -jar target/investpro-1.0-SNAPSHOT.jar
+java -jar target/investpro-1.0.0-SNAPSHOT.jar
 ```
 
-### 2. Connect to Exchange (Paper Trading)
-- Select "Paper Trading" mode from settings
-- Choose exchange (Binance US recommended)
-- Start with $10,000 USDT virtual balance
+### 2. Connect with paper trading (recommended first step)
 
-### 3. View Market Data
-- Select BTC/USDT from trade pair dropdown
-- WebSocket automatically streams live prices
-- View ticker, trades, and order book in real-time
+1. In the exchange selector, choose an exchange (e.g., **Binance US**)
+2. Enable **Paper Trading** mode — no API keys required
+3. A virtual balance is assigned automatically
 
-### 4. Place Your First Order
-- Set order size (e.g., 0.01 BTC)
-- Choose order type: Market or Limit
-- Click Buy/Sell button
-- Order executes instantly in paper trading mode
+### 3. Select a symbol and view live data
 
-### 5. View Charts & Analysis
-- Select timeframe (1m, 5m, 15m, etc.)
-- Add technical indicators from indicators menu
-- Draw trend lines and support/resistance
-- Use zoom and pan for detailed analysis
+- Pick a trade pair from the Market Watch panel (e.g., `BTC/USDT`)
+- WebSocket streams ticker, trades, and order book in real time
+- Charts update automatically
 
-### 6. Enable Alerts
-- Set price targets in Alert Manager
-- Add signal-based alerts from Strategy Engine
-- Configure Telegram notifications (optional)
-- Receive instant alerts on your phone
+### 4. Place a paper order
 
-### 7. Monitor System Health & Network
-- Open System Monitor from Tools menu
-- View overall system status, trading status, network connectivity
-- Monitor network latency in real-time
-- Enable auto-refresh to continuously monitor (default: 5-second intervals)
-- Check for alerts when network is slow or disconnected
-- Export system reports for troubleshooting
+- Set quantity and order type (Market or Limit)
+- Click **Buy** or **Sell**
+- Confirm in the Order History panel
+
+### 5. Enable a strategy
+
+- Open **Strategy Engine** → select a strategy from the catalog
+- Assign it to the active symbol
+- Signals are generated and reviewed through the pipeline before any order fires
+
+### 6. Set up Telegram alerts (optional)
+
+1. Create a Telegram bot via [@BotFather](https://t.me/botfather) and copy the token
+2. Set `telegram_token=YOUR_TOKEN` in config
+3. Send `/start` to your bot to register your chat ID
+4. Alerts for signals, fills, and errors are sent automatically
 
 ---
 
-## System Monitor Guide
+## Strategy Development
 
-### Features
-The System Monitor provides comprehensive visibility into:
-- **System Health**: Overall status and trading readiness
-- **Component Status**: Individual health of 9 subsystems (Exchange, Market Data, Account, Strategy, Risk, Execution, Agents, AI, Notifications)
-- **Network Monitoring**: Real-time network connectivity and latency measurement
-- **Alert History**: All critical alerts and warnings
-- **Performance Statistics**: Component health percentages and metrics
-- **Export & Reporting**: Save detailed reports for analysis
+Implement the `TradingStrategy` interface to write your own strategy:
 
-### Network Monitoring
-The network monitor automatically:
-1. **Measures Latency** to multiple exchange endpoints (Binance, Coinbase, etc.)
-2. **Detects Connectivity** to critical trading infrastructure
-3. **Alerts Users** when network becomes slow or disconnected
-4. **Tracks Trends** over time for performance analysis
-
-### Network Status Indicators
-| Status | Latency | Meaning | Action |
-|--------|---------|---------|--------|
-| ✅ Healthy | <500ms | Optimal trading conditions | Continue normal operations |
-| 🟠 Degraded | 500-1000ms | Acceptable but slower | Monitor order execution |
-| ⚠️ Slow | >1000ms | Significant delay | Consider reducing trade frequency |
-| ❌ Disconnected | No Connection | Network unavailable | Check connection, trading blocked |
-
-### How to Use
-1. **Open Monitor**: Tools → System Monitor
-2. **Check Status Cards**: View at-a-glance status
-3. **Review Latency**: Monitor network performance
-4. **View Alerts**: Check the "Alerts" tab for warnings
-5. **Auto-Refresh**: Enable checkbox to refresh every 5 seconds (configurable 1-60s)
-6. **Export Reports**: Click "Export" to save system state for analysis
-
----
-
-## API Reference
-
-### Exchange Interface
 ```java
-// Get live price
-Ticker ticker = exchange.getLivePrice(tradePair);
-double price = ticker.getLastPrice();
+package org.investpro.strategy.user;
 
-// Create market order
-CompletableFuture<String> orderFuture = 
-    exchange.createMarketOrder(tradePair, Side.BUY, quantity);
-String orderId = orderFuture.join();
+import org.investpro.strategy.TradingStrategy;
+import org.investpro.strategy.StrategyContext;
+import org.investpro.strategy.StrategySignal;
+import org.investpro.data.CandleData;
 
-// Fetch open orders
-CompletableFuture<List<OpenOrder>> orders = 
-    exchange.fetchOpenOrders(tradePair);
+public class MyMomentumStrategy implements TradingStrategy {
 
-// Stream real-time trades
-exchange.streamTrades(tradePair, (exchange, pair, trade) -> {
-    logger.info("Trade: {} {} at ${}", pair, trade.getAmount(), trade.getPrice());
-});
-
-// Get account details
-Account account = exchange.getAccount();
-double balance = account.getAvailableBalance("USDT");
-```
-
-### Trading Strategy
-```java
-public class MyStrategy implements TradingStrategy {
     @Override
-    public void onTick(TickEvent event) {
-        if (event.getPrice() > getSignalPrice()) {
-            buy(event.getTradePair(), 1.0);
-        }
+    public String getName() {
+        return "MyMomentumStrategy";
     }
-    
+
     @Override
-    public void onCandle(CandleData candle) {
-        // Analyze candle patterns
+    public StrategySignal evaluate(StrategyContext context) {
+        CandleData latest = context.getLatestCandle();
+        if (latest == null) return StrategySignal.NEUTRAL;
+
+        // Your logic here
+        if (latest.getClose() > latest.getOpen() * 1.005) {
+            return StrategySignal.buySignal(context.getTradePair(), latest.getClose());
+        }
+        return StrategySignal.NEUTRAL;
     }
 }
 ```
 
----
+Register in `StrategyBootstrapper` or use `StrategyRegistry.register(new MyMomentumStrategy())`.
 
-## Troubleshooting
+**Strategy pipeline safety gates** (cannot be bypassed):
+1. `SignalToDecisionFilter` — validates signal against current market conditions
+2. `BotTradeDecisionEngine` — institutional-grade decision evaluation
+3. `RiskManagementSystem` — enforces position sizing and loss limits
+4. `AiReasoningService` (if enabled) — optional AI review
+5. `TradeExecutionCoordinator` — final execution gate
 
-### HTTP 418 / 429 Rate Limiting
-**Problem**: Getting "IP banned" or "Too Many Requests" errors.
-
-**Solution**: 
-1. WebSocket streaming is enabled and working (check logs)
-2. Automatic rate limit cooldown is active (65 seconds)
-3. Prefer WebSocket for live data instead of REST polling
-4. Increase polling intervals if using REST fallback
-
-### WebSocket Connection Issues
-**Problem**: WebSocket connection fails or disconnects.
-
-**Solution**:
-1. Check internet connectivity
-2. Verify firewall allows WebSocket (port 443)
-3. Reconnection attempts happen automatically (exponential backoff: 2s → 32s)
-4. Check application logs at `~/.investpro/logs/investpro.log`
-
-### Network Connectivity & Latency Issues
-**Problem**: High network latency or connection failures to exchanges.
-
-**Solution**:
-1. **Open System Monitor**: Menu → Tools → System Monitor
-2. **Check Network Status**: View the "Network Status" and "Network Latency" cards
-3. **Interpret Latency Levels**:
-   - ✅ **Healthy**: <500ms latency (optimal trading)
-   - 🟠 **Degraded**: 500-1000ms latency (acceptable, but may affect execution speed)
-   - ⚠️ **Slow**: >1000ms latency (may cause order delays and missed opportunities)
-   - ❌ **Disconnected**: No network connection (trading operations blocked)
-
-4. **Performance Improvement Steps**:
-   - Switch to a wired connection (if using WiFi)
-   - Verify ISP connectivity with `ping google.com`
-   - Use VPN with server closer to exchange location
-   - Check for background applications consuming bandwidth
-   - Reduce number of simultaneous WebSocket streams
-
-5. **Monitoring**:
-   - Enable Auto-Refresh in System Monitor (default: 5-second intervals)
-   - Set alerts when latency exceeds 500ms
-   - Monitor latency trends in the Statistics tab
-   - Export reports for performance analysis
-
-### Java Version Error
-**Problem**: "Unsupported class version 65.0"
-
-**Solution**: 
-```bash
-# Install Java 21
-java --version  # Must be 21+
-# Download from: https://adoptium.net/
-```
-
-### JavaFX Display Error (Linux/Docker)
-**Problem**: "Cannot connect to display :0"
-
-**Solution**:
-```bash
-# Enable X11 forwarding
-export DISPLAY=:0
-xhost +local:docker  # Allow Docker access
-docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix ...
-```
+Auto-trading is **disabled by default**. Enable it explicitly via `SystemCore` after all validations pass.
 
 ---
 
-## Performance Metrics
+## Risk Management Philosophy
 
-### Tested Performance
-- **WebSocket Latency**: <50ms average (Binance US)
-- **Order Execution**: <100ms market orders
-- **Memory Usage**: ~400-600MB runtime
-- **CPU Usage**: <10% idle, <30% during heavy streaming
-- **Throughput**: 1000+ candles/minute from multiple streams
+InvestPro is built on the principle that **no signal should ever reach the market unchecked**.
 
-### Benchmarks
-- **Candle Processing**: 10k candles/second
-- **Trade Processing**: 5k trades/second
-- **Order Operations**: 100 orders/second
+The execution pipeline enforces:
 
----
+| Control | Description |
+|---|---|
+| **Max risk per trade** | Configurable % of account balance per position |
+| **Max daily loss** | Hard stop on cumulative daily losses |
+| **Small-account mode** | Reduced unit sizes when balance is below threshold |
+| **Symbol cooldown** | Prevents open+close in the same evaluation cycle |
+| **AI reasoning gate** | Optional second opinion before execution |
+| **Auto-trading off by default** | Must be explicitly enabled; never implied |
 
-## Development & Contributing
-
-### Project Structure
-```
-investpro/
-├── src/main/java/org/investpro/
-│   ├── exchange/           # Exchange adapters (Binance, Coinbase, etc)
-│   ├── exchange/websocket/ # WebSocket client implementations
-│   ├── ui/                 # JavaFX UI components
-│   ├── models/             # Trading data models
-│   ├── core/               # Core business logic
-│   ├── agents/             # Trading agents & strategies
-│   └── utils/              # Utilities & helpers
-├── src/test/java/          # Unit & integration tests
-├── src/main/resources/     # Static resources (images, CSS)
-├── pom.xml                 # Maven configuration
-└── Dockerfile              # Docker build configuration
-```
-### Docker VNC Password=investpro
-### How it looks like
-
-- url =http://localhost:6080/vnc.html?autoconnect=1&resize=scale
-- For hosting in google ,aws ,azure ,digitalocean and more
-- ![vnc](src/main/resources/images/investpro_docker_vnc_screen.png)
-### Build Profiles
-```bash
-# Development build with all plugins
-mvn clean package
-
-# Skip tests (faster)
-mvn clean package -DskipTests
-
-# With code coverage
-mvn clean package jacoco:report
-
-# Docker build
-docker build -t investpro:dev .
-```
-
-### Running Tests
-```bash
-# All tests
-mvn test
-
-# Specific test class
-mvn test -Dtest=BinanceUsTest
-
-# With coverage
-mvn test jacoco:report
-```
-
-### Code Style
-- **Language Level**: Java 21
-- **Style**: Google Java Style Guide
-- **Formatting**: Maven Compiler with warnings enabled
-- **Linting**: Integration with IDE inspectors
-
-### Contributing Guidelines
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+> **Strongly recommended:** Run any strategy in paper trading for a minimum of 2–4 weeks before enabling live trading. Monitor signal flow via `SignalMonitorService` logs.
 
 ---
 
 ## Roadmap
 
-### v2.0 (Current)
-- ✅ WebSocket streaming infrastructure
-- ✅ BinanceUS implementation complete
-- ✅ Multi-exchange support
-- ⏳ Binance Futures support
-- ⏳ Advanced backtesting engine
-- ⏳ Machine learning signals
+### v1.0 (Current — active development)
+- [x] 8 exchange adapters with WebSocket streaming
+- [x] Strategy engine + signal pipeline
+- [x] Agent runtime (SmartBot + SymbolAgents)
+- [x] Risk management system
+- [x] AI reasoning integration (OpenAI)
+- [x] Paper trading
+- [x] Telegram bot + command handler
+- [x] Docker + VNC deployment
+- [ ] StrategyLab backtesting (in progress)
+- [ ] Full test coverage
 
-### v2.5 (Planned)
-- Portfolio rebalancing tools
-- Advanced risk analytics
-- Real-time collaboration
-- Mobile app companion
+### v1.5 (Planned)
+- [ ] Futures / perpetual swap support (Binance)
+- [ ] Advanced backtesting: walk-forward, Monte Carlo
+- [ ] Portfolio rebalancing tools
+- [ ] Performance analytics dashboard (Sharpe, Sortino, max drawdown)
+- [ ] User-defined strategy builder UI
 
-### v3.0 (Future)
-- Decentralized exchange support
-- DeFi protocol integration
-- AI-powered strategy generation
-- Cloud synchronization
+### v2.0 (Future)
+- [ ] REST API server for remote control / web clients
+- [ ] DEX / DeFi protocol adapters
+- [ ] Cloud sync and multi-machine agent coordination
+- [ ] Mobile companion app
+- [ ] AI-generated strategy suggestions
 
 ---
 
-## License
+## Contributing
 
-This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
+Contributions are welcome. Please follow these steps:
+
+1. **Fork** the repository
+2. **Create a branch** for your feature or bugfix:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Write code** following the existing style (Java 21, Google Java Style)
+4. **Add or update tests** for changed behaviour
+5. **Run the build** to verify nothing is broken:
+   ```bash
+   mvn clean package
+   ```
+6. **Open a Pull Request** with a clear description of what changed and why
+
+### Code Standards
+- Java 21, Maven build
+- Lombok for boilerplate reduction
+- SLF4J/Logback for all logging (no `System.out.println`)
+- `@NotNull` / `@Nullable` JetBrains annotations on public API parameters
+- Null-safe code; no silent NPE swallowing
+
+### Reporting Issues
+Use [GitHub Issues](https://github.com/nguemechieu/investpro/issues). Include:
+- Java version (`java -version`)
+- OS
+- Steps to reproduce
+- Relevant log lines from `~/.investpro/logs/`
 
 ---
 
-## Support & Community
+## Troubleshooting
 
-### Getting Help
-- **Issues**: [GitHub Issues](https://github.com/nguemechieu/investpro/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/nguemechieu/investpro/discussions)
-- **Email**: nguemechieu@live.com
+**`Unsupported class version` error**
+```bash
+# Install Java 21+
+java --version
+# Download from https://adoptium.net/
+```
 
-### Contact
-- **Author**: Noel Martial Nguemechieu
-- **Created**: December 23, 2022
-- **Repository**: https://github.com/nguemechieu/investpro
+**WebSocket disconnects**
+- Reconnection with exponential back-off is automatic (2s → 32s)
+- Check `~/.investpro/logs/investpro.log`
+- Verify firewall allows outbound WebSocket on port 443
+
+**HTTP 429 / 418 rate limit**
+- WebSocket streaming avoids most REST rate limits
+- Automatic 65-second cooldown on REST rate-limit errors
+- Prefer WebSocket mode; disable REST polling if not needed
+
+**JavaFX display error on Linux / Docker**
+```bash
+export DISPLAY=:0
+xhost +local:docker
+docker run -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix ...
+# Or use the provided docker-compose.yml with built-in VNC
+```
+
+**High latency to exchange**
+Open **Tools → System Monitor** → Network tab to measure latency. Healthy: < 500 ms. Switch to a wired connection or a VPS closer to the exchange datacenter.
 
 ---
 
 ## Disclaimer
 
-**IMPORTANT**: InvestPro is provided as-is for educational and research purposes. Trading and investing carry inherent risks. Past performance does not guarantee future results. Always:
-
-- Start with paper trading before using live accounts
-- Use only capital you can afford to lose
-- Implement proper risk management
-- Understand all features before deployment
-- Consult financial advisors as needed
-
-The authors and contributors are not responsible for trading losses or outcomes resulting from use of this software.
-
----
-
-## Changelog
-
-### v2.0.0 (Current)
-- Complete WebSocket streaming implementation
-- All BinanceUS methods implemented
-- Deprecated Jackson API fixed
-- Multi-exchange adapter pattern
-- Comprehensive rate limiting
-- Paper trading simulation
-
-### v1.0.0 (Initial Release)
-- Basic exchange support
-- REST API integration
-- Paper trading foundation
-- JavaFX UI framework
-- Trade alert system
+> **IMPORTANT — READ BEFORE USING**
+>
+> InvestPro is provided as-is, for educational, research, and development purposes.
+>
+> - **Trading and investing carry significant financial risk.** You can lose some or all of your capital.
+> - **Past performance does not guarantee future results.** No backtested or paper-traded result implies live profitability.
+> - **This software does not provide financial advice.** It is a tool, not a recommendation engine.
+> - Always start with **paper trading**. Validate your strategy thoroughly before using real capital.
+> - Use only capital you can afford to lose entirely.
+> - Consult a qualified financial advisor before making any investment decisions.
+>
+> The author and contributors accept no responsibility for financial losses, missed opportunities, execution errors, or any other outcomes resulting from use of this software.
 
 ---
 
-**Made with ❤️ for traders and developers worldwide.**
+## License
 
+Licensed under the [Apache License 2.0](LICENSE).
+
+```
+Copyright 2022–2026 Noel Martial Nguemechieu
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```
+
+---
+
+## Contact & Community
+
+| Channel | Link |
+|---|---|
+| **GitHub Issues** | [Report bugs and request features](https://github.com/nguemechieu/investpro/issues) |
+| **GitHub Discussions** | [Ask questions and share ideas](https://github.com/nguemechieu/investpro/discussions) |
+| **Email** | nguemechieu@live.com |
+
+**Author:** Noel Martial Nguemechieu  
+**Repository:** [https://github.com/nguemechieu/investpro](https://github.com/nguemechieu/investpro)  
+**First commit:** December 2022
+
+---
+
+<p align="center">
+  <sub>Built with Java 21 · JavaFX 21.0.6 · Apache Maven · Open source under Apache 2.0</sub>
+</p>
+]]>
