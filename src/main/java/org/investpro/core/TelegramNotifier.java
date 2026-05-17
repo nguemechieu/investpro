@@ -28,32 +28,27 @@ import java.util.function.BiConsumer;
 
 /**
  * Telegram notifier for InvestPro.
- *
+ * <p>
  * Features:
- * - auto-detects chat_id/channel_id from getUpdates
- * - supports explicit chat id or @channelusername
- * - sends text messages
- * - sends photos
- * - sends documents
- * - multi-user bot with ChatGPT integration for intelligent responses
- * - handles queries about market, news, trades, positions, orders, risk
- * management
- * - processes order comments from multiple users
- *
- * Important:
- * Auto-detection works only after the bot receives an update.
- *
- * For private chat:
- * - Open the bot in Telegram
- * - Press Start or send any message
- *
- * For group:
- * - Add bot to the group
- * - Send a message in the group
- *
- * For channel:
- * - Add bot as channel admin
- * - Either use explicit @channelusername or make sure updates reach the bot
+ * <ul>
+ *   <li>Autodetects chat_id/channel_id from {@code getUpdates}</li>
+ *   <li>Supports explicit chat id or @channelusername</li>
+ *   <li>Sends text messages</li>
+ *   <li>Sends photos</li>
+ *   <li>Sends documents</li>
+ *   <li>Multiuser bot with ChatGPT integration for intelligent responses</li>
+ *   <li>Handles queries about market, news, trades, positions, orders, risk management</li>
+ *   <li>Processes order comments from multiple users</li>
+ * </ul>
+ * <p>
+ * <b>Important:</b> Auto-detection works only after the bot receives an update.
+ * <p>
+ * For private chat: open the bot in Telegram and press Start or send any message.
+ * <p>
+ * For group: add the bot to the group and send a message in the group.
+ * <p>
+ * For channel: add the bot as channel admin and either use explicit @channelusername
+ * or make sure updates reach the bot.
  */
 @Getter
 @Setter
@@ -62,6 +57,7 @@ public class TelegramNotifier {
     private static final String TELEGRAM_API_BASE = "https://api.telegram.org/bot";
     private static final String OPENAI_API_BASE = "https://api.openai.com/v1";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String NO_CHAT_ID_LOG = "Telegram {} skipped: no chat_id configured.";
 
     private final String botToken;
     private final HttpClient httpClient;
@@ -99,9 +95,9 @@ public class TelegramNotifier {
     }
 
     /**
-     * Detect the latest chat/channel ID from getUpdates and use it as target.
+     * Detect the latest chat/channel ID from {@code getUpdates} and use it as target.
      *
-     * Returns empty if no usable chat was found.
+     * @return an {@link Optional} containing the detected chat ID, or empty if none found
      */
     public Optional<String> detectAndUseLatestChatId() {
         Set<String> detected = detectChatIds();
@@ -120,7 +116,9 @@ public class TelegramNotifier {
     }
 
     /**
-     * Detect all chat IDs visible to this bot from getUpdates.
+     * Detect all chat IDs visible to this bot from {@code getUpdates}.
+     *
+     * @return set of detected chat IDs
      */
     public Set<String> detectChatIds() {
 
@@ -198,7 +196,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn("Telegram message skipped because no chat_id/channel_id is available.");
+            log.warn(NO_CHAT_ID_LOG, "message");
             return false;
         }
 
@@ -217,7 +215,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn("Telegram markdown message skipped because no chat_id/channel_id is available.");
+            log.warn(NO_CHAT_ID_LOG, "markdown message");
             return false;
         }
 
@@ -237,7 +235,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn("Telegram HTML message skipped because no chat_id/channel_id is available.");
+            log.warn(NO_CHAT_ID_LOG, "HTML message");
             return false;
         }
 
@@ -249,8 +247,7 @@ public class TelegramNotifier {
     }
 
     /**
-     * Send typing/action indicator to show user that bot is processing their
-     * request.
+     * Send typing/action indicator to show the user that the bot is processing their request.
      * Useful for long-running operations to give visual feedback.
      */
     public boolean sendChatAction(String targetChatId, ENUM_CHAT_ACTION action) {
@@ -283,9 +280,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            if (log.isWarnEnabled())
-                log.warn("""
-                        Telegram photo skipped because no chat_id/channel_id is available.""");
+            log.warn(NO_CHAT_ID_LOG, "photo");
             return false;
         }
 
@@ -314,7 +309,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn("Telegram photo skipped because no chat_id/channel_id is available.");
+            log.warn(NO_CHAT_ID_LOG, "photo");
             return false;
         }
 
@@ -339,8 +334,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            if (log.isWarnEnabled())
-                log.warn("Telegram document skipped because no chat_id/channel_id is available.");
+            log.warn(NO_CHAT_ID_LOG, "document");
             return false;
         }
 
@@ -369,7 +363,7 @@ public class TelegramNotifier {
         Optional<String> target = resolveTargetChatId();
 
         if (target.isEmpty()) {
-            log.warn("Telegram document skipped because no chat_id/channel_id is available.");
+            log.warn(NO_CHAT_ID_LOG, "document");
             return false;
         }
 
@@ -584,7 +578,7 @@ public class TelegramNotifier {
         /*
          * Allow:
          * - numeric chat id: 123456789
-         * - supergroup/channel id: -1001234567890
+         * - super-group/channel id: -1001234567890
          * - channel username: @my_channel
          */
         return text;
@@ -671,10 +665,9 @@ public class TelegramNotifier {
     }
 
     /**
-     * Process incoming messages from multiple users.
-     * Polls for new messages and processes them based on user queries.
-     * Supports: market info, news, trade queries, positions, orders, risk
-     * management, profitability questions.
+     * Process incoming messages from multiple users via {@code getUpdates}.
+     * Supports market info, news, trade queries, positions, orders, risk management,
+     * and profitability questions.
      */
     @SuppressWarnings("unused")
     public void pollAndProcessUserMessages() {
@@ -704,9 +697,8 @@ public class TelegramNotifier {
     }
 
     /**
-     * Get latest unprocessed message from a specific user/chat.
-     * Only returns messages with update_id > lastUpdateId to avoid processing the
-     * same message twice.
+     * Get the latest unprocessed message for a chat via {@code getUpdates}.
+     * Only returns messages with update_id greater than {@code lastUpdateId} to avoid reprocessing.
      */
     private Optional<UserMessage> getLatestUserMessage(String chatId) {
         try {
@@ -766,7 +758,7 @@ public class TelegramNotifier {
         log.info("Processing message from user {} ({}): {}", message.userId, message.userName, message.text);
 
         // Show typing indicator while processing
-        boolean typingIndicatorSent = sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
+        sendChatAction(message.chatId, ENUM_CHAT_ACTION.typing);
 
         String response;
 
@@ -827,11 +819,11 @@ public class TelegramNotifier {
     /**
      * Send message to a specific chat.
      */
-    private boolean sendMessageToChat(String targetChatId, String text) {
+    private void sendMessageToChat(String targetChatId, String text) {
         String body = "chat_id=%s&text=%s&parse_mode=Markdown".formatted(
                 encode(targetChatId),
                 encode(escapeMarkdown(text)));
-        return postForm("sendMessage", body);
+        postForm("sendMessage", body);
     }
 
     /**
@@ -1030,13 +1022,6 @@ public class TelegramNotifier {
     }
 
     /**
-     * Set the command handler for processing trading commands
-     */
-    public void setCommandHandler(TelegramCommandHandler handler) {
-        this.commandHandler = handler;
-    }
-
-    /**
      * Start polling for messages in background thread
      */
     public void startPolling() {
@@ -1056,6 +1041,7 @@ public class TelegramNotifier {
             while (pollingEnabled) {
                 try {
                     pollAndProcessUserMessages();
+                    //noinspection BusyWait
                     Thread.sleep(2000); // Poll every 2 seconds
                 } catch (InterruptedException e) {
                     if (pollingEnabled) {
