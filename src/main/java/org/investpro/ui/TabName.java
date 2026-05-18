@@ -23,6 +23,7 @@ public enum TabName {
     BROWSER("Browser", "Market Analysis", "🔍"),
     AGENTS("Agents", "AI Agents", "🤖"),
     JOURNAL("Journal", "Trading Journal", "📔"),
+    SYMBOL_STRATEGY("Symbol Strategy", "Symbol Strategy Assignment", "🧭"),
     STRATEGIES("Strategies", "Strategy Management", "🛠️"),
     STRATEGY_BUILDER("Strategy Builder", "Build Custom Strategies", "🏗️"),
     BACKTESTING("Backtesting", "Historical Backtest", "📊"),

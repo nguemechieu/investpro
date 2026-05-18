@@ -179,7 +179,7 @@ public class SystemCore {
         this.agentRegistry = new AgentRegistry(); // temp registry; agents imported into runtime below
 
         // Create Smart Bot — agents live inside the runtime, not in SmartBot
-        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus());
+        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus(), agentRegistry);
 
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();
@@ -368,9 +368,6 @@ public class SystemCore {
 
             DefaultTradingAgentModule defaultModule = new DefaultTradingAgentModule();
             defaultModule.configure(agentRegistry, systemCoreDependencies);
-
-            // Import all configured agents into AgentRuntime so SmartBot's runtime owns them
-            smartBot.getRuntime().importFrom(agentRegistry);
 
             log.debug("Default trading agents registered. count={}", agentRegistry.size());
 
@@ -566,8 +563,7 @@ public class SystemCore {
             symbolAgents.computeIfAbsent(symbol, s -> {
                 org.investpro.core.agents.symbol.SymbolAgent agent =
                         new org.investpro.core.agents.symbol.SymbolAgent(s, symbolAgentManager);
-                // Register into AgentRuntime so it's properly lifecycle-managed
-                smartBot.getRuntime().registerSymbol(s, symbolAgentManager);
+                smartBot.getAgentRegistry().register(agent);
                 log.debug("SymbolAgent registered in runtime for {}", s.toString('/'));
                 return agent;
             });

@@ -1939,13 +1939,7 @@ public class TradingDesk extends BorderPane {
             return;
         }
         try {
-            systemOperationsBoard = new SystemOperationsBoard(() -> {
-                if (systemCore == null) {
-                    return SystemOperationsBoard
-                            .notAvailable("SystemCore is not started. Connect an exchange or start bot trading.");
-                }
-                return systemCore.getSystemHealth();
-            });
+            systemOperationsBoard = new SystemOperationsBoard();
             final SystemOperationsBoard board = systemOperationsBoard;
             Stage stage = new Stage();
             systemOperationsBoardStage = stage;

@@ -46,9 +46,28 @@ public class AgentEventBus {
         subscribers.computeIfAbsent(eventType, ignored -> new CopyOnWriteArrayList<>()).add(handler);
     }
 
+    public void unsubscribe(String eventType, Consumer<AgentEvent> handler) {
+        if (eventType == null || handler == null) {
+            return;
+        }
+        List<Consumer<AgentEvent>> handlers = subscribers.get(eventType);
+        if (handlers != null) {
+            handlers.remove(handler);
+            if (handlers.isEmpty()) {
+                subscribers.remove(eventType);
+            }
+        }
+    }
+
     public void subscribeAll(Consumer<AgentEvent> handler) {
         if (handler != null) {
             allSubscribers.add(handler);
+        }
+    }
+
+    public void unsubscribeAll(Consumer<AgentEvent> handler) {
+        if (handler != null) {
+            allSubscribers.remove(handler);
         }
     }
 

@@ -169,6 +169,7 @@ public class CandleStickChart extends Region {
     private final Font canvasNumberFont = Font.font(FXUtils.getMonospacedFont(), 13);
 
     private final List<PriceLine> priceLines = new ArrayList<>();
+    private PriceLine currentMarketPriceLine;
     private final List<ChartIndicator> indicators = new ArrayList<>();
     private final List<ChartEvent> chartEvents = Collections.synchronizedList(new ArrayList<>());
     private boolean showChartEvents = true; // Toggle for displaying events
@@ -2116,7 +2117,33 @@ public class CandleStickChart extends Region {
 
     public void clearPriceLines() {
         priceLines.clear();
+        currentMarketPriceLine = null;
         requestChartRedraw();
+    }
+
+    public void setCurrentMarketPrice(double price) {
+        if (!Double.isFinite(price) || price <= 0.0) {
+            clearCurrentMarketPrice();
+            return;
+        }
+
+        if (currentMarketPriceLine == null) {
+            currentMarketPriceLine = new PriceLine(price, Color.web("#38bdf8"), "Market", false);
+            currentMarketPriceLine.setLineWidth(1.6);
+            priceLines.add(currentMarketPriceLine);
+        } else {
+            currentMarketPriceLine.setPrice(price);
+        }
+
+        requestChartRedraw();
+    }
+
+    public void clearCurrentMarketPrice() {
+        if (currentMarketPriceLine != null) {
+            priceLines.remove(currentMarketPriceLine);
+            currentMarketPriceLine = null;
+            requestChartRedraw();
+        }
     }
 
     public void setPriceLinesVisible(boolean visible) {
