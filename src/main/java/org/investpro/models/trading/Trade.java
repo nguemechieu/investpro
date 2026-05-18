@@ -14,8 +14,6 @@ import java.util.Objects;
  * A Trade represents a completed order (then called a trade), which is an
  * transaction where one
  * party buys and the other one sells some amount of currency at a fixed price.
- *
- *
  */
 @Data
 @Slf4j
@@ -34,7 +32,7 @@ public class Trade {
     private double takeProfit;
     private double swap;
     private double profit;
-    private double closePrice; // Exit price for closed trades
+    private double closePrice;
 
     public Trade() {
         super();
@@ -55,7 +53,6 @@ public class Trade {
      * don't need to be
      * *exact* (i.e. small rounding errors are fine), and we want to favor speed.
      */
-
     // 1315922016,5.800000000000,1.000000000000
     public Trade(TradePair tradePair, int timestamp, @NotNull Money price, double amount, Side transactionType,
             long localTradeId, double fee) {
@@ -67,6 +64,13 @@ public class Trade {
         this.localTradeId = localTradeId;
         this.fee = fee;
     }
+
+    // Explicit getters for trading fields (Lombok not reliable in CI for these)
+    public double getStopLoss() { return stopLoss; }
+    public double getTakeProfit() { return takeProfit; }
+    public double getSwap() { return swap; }
+    public double getProfit() { return profit; }
+    public double getClosePrice() { return closePrice; }
 
     @Override
     public String toString() {
@@ -95,5 +99,4 @@ public class Trade {
                 Objects.equals(price, other.price) &&
                 Objects.equals(amount, other.amount);
     }
-
 }
