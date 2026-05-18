@@ -78,8 +78,8 @@ public class TradeFeeRepository {
              PreparedStatement ps = conn.prepareStatement(INSERT_SQL, Statement.RETURN_GENERATED_KEYS)) {
 
             TradePair pair = fee.getTradePair();
-            String base  = (pair != null) ? pair.getBaseCurrencyCode()  : "";
-            String quote = (pair != null) ? pair.getCounterCurrencyCode() : "";
+            String base  = (pair != null) ? pair.getBaseCurrency().getCode()  : "";
+            String quote = (pair != null) ? pair.getCounterCurrency().getCode() : "";
 
             ps.setString(1, fee.getExchange());
             ps.setString(2, base);
@@ -120,8 +120,8 @@ public class TradeFeeRepository {
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, exchange);
-            ps.setString(2, pair.getBaseCurrencyCode());
-            ps.setString(3, pair.getCounterCurrencyCode());
+            ps.setString(2, pair.getBaseCurrency().getCode());
+            ps.setString(3, pair.getCounterCurrency().getCode());
             try (ResultSet rs = ps.executeQuery()) {
                 return map(rs);
             }

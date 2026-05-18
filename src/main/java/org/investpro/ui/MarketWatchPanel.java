@@ -41,7 +41,7 @@ import java.util.*;
 @Getter
 @Setter
 @Slf4j
-@SuppressWarnings("SpellCheckingInspection")
+
 public class MarketWatchPanel extends BorderPane {
 
     private final SystemCore systemCore;
@@ -318,21 +318,20 @@ public class MarketWatchPanel extends BorderPane {
         });
         liveReadyCol.setPrefWidth(75);
 
-        // Issue column
-        TableColumn<MarketWatchRow, String> issueCol = new TableColumn<>("Issue");
-        issueCol.setCellValueFactory(cellData -> cellData.getValue().issueProperty());
-        issueCol.setPrefWidth(200);
-        issueCol.setCellFactory(col -> new TableCell<>() {
+        // Assigned Strategy column — shows the strategy configured/evaluated for this symbol
+        TableColumn<MarketWatchRow, String> assignedStrategyCol = new TableColumn<>("Assigned Strategy");
+        assignedStrategyCol.setCellValueFactory(cellData -> cellData.getValue().assignedStrategyProperty());
+        assignedStrategyCol.setPrefWidth(200);
+        assignedStrategyCol.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null || item.isBlank()) {
-                    setText("");
-                    setStyle("");
+                    setText("—");
+                    setStyle("-fx-text-fill: #6b7280; -fx-font-style: italic;");
                 } else {
                     setText(item);
-                    setStyle("-fx-text-fill: #ef4444; -fx-font-size: 10px;");
-                    setWrapText(true);
+                    setStyle("-fx-text-fill: #60a5fa; -fx-font-weight: bold;");
                 }
             }
         });
@@ -340,7 +339,7 @@ public class MarketWatchPanel extends BorderPane {
         // Add columns to table
         table.getColumns().addAll(
                 iconCol, symbolCol, bidCol, askCol, spreadCol, sessionCol, modeCol,
-                strategyCol, tfCol, signalCol, scoreCol, liveReadyCol, issueCol);
+                strategyCol, tfCol, signalCol, scoreCol, liveReadyCol, assignedStrategyCol);
     }
 
     private HBox createControlsBar() {

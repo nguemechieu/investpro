@@ -682,9 +682,9 @@ public class TradingDesk extends BorderPane {
         }
     }
 
-    public boolean openRegisteredPanel(String panelId) {
+    public void openRegisteredPanel(String panelId) {
         if (panelId == null || panelId.isBlank()) {
-            return false;
+            return;
         }
 
         try {
@@ -706,14 +706,11 @@ public class TradingDesk extends BorderPane {
                 case "theme-customization" -> openThemeCustomization();
                 default -> {
                     log.warn("No TradingDesk panel action registered for id: {}", panelId);
-                    return false;
                 }
             }
-            return true;
         } catch (Exception exception) {
             log.error("Unable to open registered panel: {}", panelId, exception);
             showWarning("Panel", "Unable to open panel: " + exception.getMessage());
-            return false;
         }
     }
 
@@ -1489,17 +1486,115 @@ public class TradingDesk extends BorderPane {
             return new ReadOnlyStringWrapper(r == null ? "" : r);
         });
 
-        table.getColumns().setAll(symbolCol, timeframeCol, strategyCol, scoreCol, assignedCol, reasonCol);
+        // Live agent-state column — reads from SymbolAgentManager when available.
+        TableColumn<StrategyAssignment, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(c -> {
+            StrategyAssignment a = c.getValue();
+            if (a == null) return new ReadOnlyStringWrapper("");
+            if (systemCore == null || systemCore.getSymbolAgentManager() == null)
+                return new ReadOnlyStringWrapper(a.isValid() ? "Active" : "Inactive");
+            TradePair pair = marketWatchItems.stream()
+                    .filter(p -> p != null && p.toString('/').equalsIgnoreCase(a.getSymbol()))
+                    .findFirst().orElse(null);
+            if (pair == null) return new ReadOnlyStringWrapper(a.isValid() ? "Active" : "Inactive");
+            return systemCore.getSymbolAgentManager().getState(pair)
+                    .map(state -> state.getMarketWatchStatusText())
+                    .map(ReadOnlyStringWrapper::new)
+                    .orElseGet(() -> new ReadOnlyStringWrapper(a.isValid() ? "Active" : "Inactive"));
+        });
+        statusCol.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
+            @Override
+            protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                if (empty || text == null || text.isBlank()) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+                setText(text);
+                String lower = text.toLowerCase(java.util.Locale.ROOT);
+                if (lower.contains("live trad")) {
+                    setStyle("-fx-text-fill: #22c55e; -fx-font-weight: bold;");
+                } else if (lower.contains("live ready")) {
+                    setStyle("-fx-text-fill: #86efac;");
+                } else if (lower.contains("paper")) {
+                    setStyle("-fx-text-fill: #60a5fa;");
+                } else if (lower.contains("train") || lower.contains("evaluat")) {
+                    setStyle("-fx-text-fill: #fbbf24;");
+                } else if (lower.contains("fail") || lower.contains("block")) {
+                    setStyle("-fx-text-fill: #f87171;");
+                } else if (lower.contains("inactive") || lower.contains("paused")) {
+                    setStyle("-fx-text-fill: #94a3b8;");
+                } else {
+                    setStyle("-fx-text-fill: #e2e8f0;");
+                }
+            }
+        });
+        statusCol.setPrefWidth(160);
+        statusCol.setMinWidth(120);
+
+        table.getColumns().setAll(symbolCol, timeframeCol, strategyCol, scoreCol, assignedCol, statusCol, reasonCol);
+
+        Runnable refreshData = () -> {
+            StrategyAssignmentRepository repository = StrategyAssignmentRepository.getInstance();
+            LinkedHashMap<String, StrategyAssignment> merged = new LinkedHashMap<>();
+
+            // Always include currently active assignments from the canonical repository.
+            for (StrategyAssignment assignment : repository.getAllActive()) {
+                if (assignment != null && assignment.getAssignmentId() != null) {
+                    merged.put(assignment.getAssignmentId(), assignment);
+                }
+            }
+
+            // Also resolve active assignments for currently visible market-watch symbols
+            // using the selected timeframe to ensure the table reflects live desk context.
+            String timeframeCode = timeframeSelector.getSelectionModel().getSelectedItem();
+            if (timeframeCode != null && !timeframeCode.isBlank()) {
+                try {
+                    org.investpro.enums.timeframe.Timeframe timeframe =
+                            org.investpro.enums.timeframe.Timeframe.fromCode(timeframeCode);
+
+                    for (TradePair pair : marketWatchItems) {
+                        if (pair == null) {
+                            continue;
+                        }
+                        StrategyAssignment active = repository.getActive(pair.toString('/'), timeframe);
+                        if (active != null && active.getAssignmentId() != null) {
+                            merged.put(active.getAssignmentId(), active);
+                        }
+                    }
+
+                    TradePair selectedPair = symbolSelector.getSelectionModel().getSelectedItem();
+                    if (selectedPair != null) {
+                        StrategyAssignment selectedActive = repository.getActive(selectedPair.toString('/'), timeframe);
+                        if (selectedActive != null && selectedActive.getAssignmentId() != null) {
+                            merged.put(selectedActive.getAssignmentId(), selectedActive);
+                        }
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // Keep active repository data if current exchange exposes non-standard timeframe labels.
+                }
+            }
+
+            List<StrategyAssignment> sorted = merged.values().stream()
+                    .sorted(Comparator.comparing(
+                            StrategyAssignment::getAssignedAt,
+                            Comparator.nullsLast(Comparator.naturalOrder()))
+                            .reversed())
+                    .toList();
+
+            items.setAll(sorted);
+        };
 
         Button refreshBtn = new Button("⟳ Refresh");
         refreshBtn.getStyleClass().add("terminal-button");
-        refreshBtn.setOnAction(e -> {
-            items.clear();
-            items.addAll(StrategyAssignmentRepository.getInstance().getAll());
-        });
+        refreshBtn.setOnAction(e -> refreshData.run());
 
-        // Initial load
-        items.addAll(StrategyAssignmentRepository.getInstance().getAll());
+        symbolSelector.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refreshData.run());
+        timeframeSelector.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refreshData.run());
+
+        // Initial load from live runtime context.
+        refreshData.run();
 
         VBox container = new VBox(6, refreshBtn, table);
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -5508,7 +5603,7 @@ public class TradingDesk extends BorderPane {
         journal("Trades Review panel opened");
     }
 
-    private TableView<org.investpro.models.trading.Trade> buildTradeTable(List<org.investpro.models.trading.Trade> data) {
+    private @NotNull TableView<Trade> buildTradeTable(List<org.investpro.models.trading.Trade> data) {
         TableView<org.investpro.models.trading.Trade> table = new TableView<>();
         table.setStyle("-fx-background-color: #16213e;");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
@@ -5627,7 +5722,7 @@ public class TradingDesk extends BorderPane {
         return panel;
     }
 
-    private VBox createPlaceholderContent(String title) {
+    private @NotNull VBox createPlaceholderContent(String title) {
         VBox content = new VBox(12);
         content.setStyle("-fx-background-color: #0f3460; -fx-padding: 20px;");
         content.setAlignment(Pos.CENTER);
@@ -7094,13 +7189,12 @@ public class TradingDesk extends BorderPane {
             case "OANDA" -> new Oanda(credentials);
             case "BITFINEX" -> new Bitfinex(credentials);
             case "ALPACA" -> new Alpaca(credentials);
-            case "INTERACTIVE BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK" -> new InteractiveBrokers(credentials);
-            case "SCHWAB", "CHARLES SCHWAB" -> new Schwab(credentials);
+            case "INTERACTIVE BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK", "SCHWAB", "CHARLES SCHWAB" -> new InteractiveBrokers(credentials);
             case "COINBASE" -> new Coinbase(credentials);
             case "STELLAR NETWORK", "STELLAR-NETWORK", "STELLAR_NETWORK" -> new StellarNetwork(credentials);
             default -> {
                 log.warn("Exchange {} is not implemented yet. Falling back to Coinbase.", exchangeName);
-                yield new Coinbase(credentials);
+                throw new RuntimeException("UNSUPPORTED EXCHANGE");
             }
         };
 

@@ -1,8 +1,10 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="InvestPro" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="org.investpro.InvestPro" />
+    <option name="ALTERNATIVE_JRE_PATH" value="ms-21" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <option name="MAIN_CLASS_NAME" value="org.investpro.InvestProLauncher" />
     <module name="investpro" />
-    <option name="VM_PARAMETERS" value="--module-path C:\Users\nguem\.jdks\ms-21.0.10\lib --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.swing,javafx.web" />
+    <option name="PROGRAM_PARAMETERS" value="$MODULE_DIR$" />
     <method v="2">
       <option name="MakeProject" enabled="true" />
     </method>

@@ -11,6 +11,7 @@ import org.investpro.core.agents.execution.ExecutionEngine;
 import org.investpro.core.agents.execution.SymbolExecutionFilter;
 import org.investpro.core.agents.execution.TradeExecutionCoordinator;
 import org.investpro.core.agents.modules.DefaultTradingAgentModule;
+import org.investpro.core.agents.symbol.SymbolAgent;
 import org.investpro.core.agents.symbol.SymbolAgentManager;
 import org.investpro.core.bot.SmartBot;
 import org.investpro.decision.BotTradeDecisionEngine;
@@ -179,7 +180,7 @@ public class SystemCore {
         this.agentRegistry = new AgentRegistry(); // temp registry; agents imported into runtime below
 
         // Create Smart Bot — agents live inside the runtime, not in SmartBot
-        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus(), agentRegistry);
+        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus());
 
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();
@@ -443,7 +444,7 @@ public class SystemCore {
         log.info("✅ EventBusManager started - Event-driven architecture active");
 
         // Wire EventPersistenceListener to persist all events to database
-        wireEventPersistenceListener();
+       // wireEventPersistenceListener();
 
         // Register default agents now that tradingService is available
         registerDefaultAgents();
@@ -482,31 +483,6 @@ public class SystemCore {
         notifyAllChannels("SmartBot", "\uD83E\uDD16 SmartBot started.");
     }
 
-    /**
-     * Wires EventPersistenceListener to the EventBusManager.
-     * This ensures all published events are automatically persisted to the database
-     * as part of the event processing pipeline.
-     * <p>
-     * Called during SystemCore.start() to initialize event persistence.
-     */
-    private void wireEventPersistenceListener() {
-        try {
-            // Create repository implementation
-            EventLogRepositoryImpl eventLogRepository = new EventLogRepositoryImpl();
-
-            // Create persistence listener
-            EventPersistenceListener persistenceListener = new EventPersistenceListener(eventLogRepository);
-
-            // Subscribe to ALL events (listener will receive every event type)
-            eventBusManager.subscribeToAll(persistenceListener);
-
-            log.info("\u2705 EventPersistenceListener wired - All events will be persisted to database");
-        } catch (Exception e) {
-            log.error("Failed to wire EventPersistenceListener", e);
-            // Continue execution - event persistence is important but not critical to app
-            // operation
-        }
-    }
 
     /**
      * Initialize per-symbol agents for all symbols in the market watch list.
@@ -516,54 +492,9 @@ public class SystemCore {
         if (symbols == null || symbols.isEmpty() || smartBot == null) return;
         for (TradePair symbol : symbols) {
             symbolAgents.computeIfAbsent(symbol, s -> {
-                org.investpro.core.agents.symbol.SymbolAgent agent =
-                        new org.investpro.core.agents.symbol.SymbolAgent(s, symbolAgentManager);
-                // Register into AgentRuntime so it's properly lifecycle-managed
-                smartBot.getRuntime().registerSymbol(s, symbolAgentManager);
-                log.debug("SymbolAgent registered in runtime for {}", s.toString('/'));
-                return agent;
-            });
-        }
-        log.info("\u2705 {} symbol agents active", symbolAgents.size());
-    }
+                SymbolAgent agent =
+                        new SymbolAgent(s, symbolAgentManager);
 
-    /**
-     * Wires EventPersistenceListener to the EventBusManager.
-     * This ensures all published events are automatically persisted to the database
-     * as part of the event processing pipeline.
-     * <p>
-     * Called during SystemCore.start() to initialize event persistence.
-     */
-    private void wireEventPersistenceListener() {
-        try {
-            // Create repository implementation
-            EventLogRepositoryImpl eventLogRepository = new EventLogRepositoryImpl();
-
-            // Create persistence listener
-            EventPersistenceListener persistenceListener = new EventPersistenceListener(eventLogRepository);
-
-            // Subscribe to ALL events (listener will receive every event type)
-            eventBusManager.subscribeToAll(persistenceListener);
-
-            log.info("✅ EventPersistenceListener wired - All events will be persisted to database");
-        } catch (Exception e) {
-            log.error("Failed to wire EventPersistenceListener", e);
-            // Continue execution - event persistence is important but not critical to app
-            // operation
-        }
-    }
-
-    /**
-     * Initialize per-symbol agents for all symbols in the market watch list.
-     * Safe to call multiple times — existing agents are kept, new ones added.
-     */
-    public void initializeSymbolAgents(java.util.Collection<TradePair> symbols) {
-        if (symbols == null || symbols.isEmpty() || smartBot == null) return;
-        for (TradePair symbol : symbols) {
-            symbolAgents.computeIfAbsent(symbol, s -> {
-                org.investpro.core.agents.symbol.SymbolAgent agent =
-                        new org.investpro.core.agents.symbol.SymbolAgent(s, symbolAgentManager);
-                smartBot.getAgentRegistry().register(agent);
                 log.debug("SymbolAgent registered in runtime for {}", s.toString('/'));
                 return agent;
             });

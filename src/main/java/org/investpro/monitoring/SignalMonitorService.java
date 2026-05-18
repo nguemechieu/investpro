@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Strategy approval / rejection</li>
  *   <li>Risk approval / rejection / alerts</li>
  *   <li>AI reasoning approval / rejection</li>
- *   <li>Order lifecycle (submitted, accepted, rejected, filled, cancelled)</li>
+ *   <li>Order life cycle (submitted, accepted, rejected, filled, cancelled)</li>
  * </ul>
  */
 @Slf4j
@@ -41,7 +41,7 @@ public class SignalMonitorService {
     );
 
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private AgentEventBus eventBus;
+    AgentEventBus eventBus;
 
     public SignalMonitorService() {
     }

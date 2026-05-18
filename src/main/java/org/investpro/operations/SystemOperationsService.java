@@ -3,6 +3,7 @@ package org.investpro.operations;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.services.ExchangeService;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
@@ -401,11 +402,10 @@ public class SystemOperationsService {
         return (getMemoryUsedMb() * 100.0) / getMemoryMaxMb();
     }
 
-    @Nullable
-    private String getApplicationVersion() {
+    private @NotNull String getApplicationVersion() {
         try {
-            Package pkg = Package.getPackage("org.investpro");
-            if (pkg != null && pkg.getImplementationVersion() != null) {
+            Package pkg = Package.getPackages()[0];
+            if (pkg.getImplementationVersion() != null) {
                 return pkg.getImplementationVersion();
             }
         } catch (Exception e) {
@@ -414,8 +414,7 @@ public class SystemOperationsService {
         return "1.0.0";
     }
 
-    @Nullable
-    private String getActiveProfile() {
+    private @NotNull String getActiveProfile() {
         try {
             String profile = System.getProperty("investpro.profile");
             return profile != null ? profile : "default";

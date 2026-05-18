@@ -1,8 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="InvestProLauncher" type="Application" factoryName="Application" nameIsGenerated="true">
+  <configuration default="false" name="o" type="Application" factoryName="Application" nameIsGenerated="true">
     <option name="ALTERNATIVE_JRE_PATH" value="$USER_HOME$/.jdks/openjdk-26.0.1" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <option name="MAIN_CLASS_NAME" value="org.investpro.investpro.InvestProLauncher" />
     <module name="investpro" />
     <extension name="coverage">
       <pattern>
