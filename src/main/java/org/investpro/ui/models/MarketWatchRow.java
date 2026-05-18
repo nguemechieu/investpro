@@ -43,6 +43,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
     private final BooleanProperty liveReady = new SimpleBooleanProperty(false);
     private final StringProperty issue = new SimpleStringProperty();
     private final StringProperty lastSignal = new SimpleStringProperty();
+    private final StringProperty assignedStrategy = new SimpleStringProperty();
 
     // Metadata
     private long lastUpdated;
@@ -179,6 +180,14 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         return lastSignal.get();
     }
 
+    public StringProperty assignedStrategyProperty() {
+        return assignedStrategy;
+    }
+
+    public String getAssignedStrategy() {
+        return assignedStrategy.get();
+    }
+
     // ===== Setters for properties =====
 
     public void setBid(double value) {
@@ -211,6 +220,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
             agentState.set("Unknown");
             tradingMode.set("Unknown");
             activeStrategy.set("");
+            assignedStrategy.set("");
             activeTimeframe.set("");
             strategyScore.set(0.0);
             liveReady.set(false);
@@ -233,6 +243,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         tradingMode.set(mode.getDisplayName());
 
         activeStrategy.set(state.getActiveStrategyName() != null ? state.getActiveStrategyName() : "");
+        assignedStrategy.set(state.getAssignedStrategyName() != null ? state.getAssignedStrategyName() : "");
         activeTimeframe.set(state.getActiveTimeframe() != null ? state.getActiveTimeframe().getCode() : "");
 
         strategyScore.set(state.getStrategyScore());

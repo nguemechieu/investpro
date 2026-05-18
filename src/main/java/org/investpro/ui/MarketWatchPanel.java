@@ -36,12 +36,12 @@ import java.util.*;
  * - Active strategy and timeframe
  * - Strategy score
  * - Live readiness status
- * - Issues/reasons if blocked
+ * - Assigned strategy (the strategy configured/evaluated for this symbol)
  */
 @Getter
 @Setter
 @Slf4j
-@SuppressWarnings("SpellCheckingInspection")
+
 public class MarketWatchPanel extends BorderPane {
 
     private final SystemCore systemCore;
@@ -318,21 +318,20 @@ public class MarketWatchPanel extends BorderPane {
         });
         liveReadyCol.setPrefWidth(75);
 
-        // Issue column
-        TableColumn<MarketWatchRow, String> issueCol = new TableColumn<>("Issue");
-        issueCol.setCellValueFactory(cellData -> cellData.getValue().issueProperty());
-        issueCol.setPrefWidth(200);
-        issueCol.setCellFactory(col -> new TableCell<>() {
+        // Assigned Strategy column — shows the strategy configured/evaluated for this symbol
+        TableColumn<MarketWatchRow, String> assignedStrategyCol = new TableColumn<>("Assigned Strategy");
+        assignedStrategyCol.setCellValueFactory(cellData -> cellData.getValue().assignedStrategyProperty());
+        assignedStrategyCol.setPrefWidth(200);
+        assignedStrategyCol.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null || item.isBlank()) {
-                    setText("");
-                    setStyle("");
+                    setText("\u2014");
+                    setStyle("-fx-text-fill: #6b7280; -fx-font-style: italic;");
                 } else {
                     setText(item);
-                    setStyle("-fx-text-fill: #ef4444; -fx-font-size: 10px;");
-                    setWrapText(true);
+                    setStyle("-fx-text-fill: #60a5fa; -fx-font-weight: bold;");
                 }
             }
         });
@@ -340,7 +339,7 @@ public class MarketWatchPanel extends BorderPane {
         // Add columns to table
         table.getColumns().addAll(
                 iconCol, symbolCol, bidCol, askCol, spreadCol, sessionCol, modeCol,
-                strategyCol, tfCol, signalCol, scoreCol, liveReadyCol, issueCol);
+                strategyCol, tfCol, signalCol, scoreCol, liveReadyCol, assignedStrategyCol);
     }
 
     private HBox createControlsBar() {
@@ -534,7 +533,7 @@ public class MarketWatchPanel extends BorderPane {
         try {
             // Create CSV header
             StringBuilder csv = new StringBuilder();
-            csv.append("Symbol,Bid,Ask,Spread %,Session,Trading Mode,Strategy,Timeframe,Score,Live Ready,Issue\n");
+            csv.append("Symbol,Bid,Ask,Spread %,Session,Trading Mode,Strategy,Timeframe,Score,Live Ready,Assigned Strategy\n");
 
             // Add rows
             for (MarketWatchRow row : rowCache.values()) {
@@ -549,7 +548,7 @@ public class MarketWatchPanel extends BorderPane {
                         row.getActiveTimeframe(),
                         row.getStrategyScore(),
                         row.isLiveReady(),
-                        row.getIssue() == null ? "" : row.getIssue()));
+                        row.getAssignedStrategy() == null ? "" : row.getAssignedStrategy()));
             }
 
             // Save to file
