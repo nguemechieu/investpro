@@ -1,4 +1,4 @@
-<![CDATA[<p align="center">
+<p align="center">
   <img src="src/main/resources/images/Invest.png" alt="InvestPro Logo" width="120" />
 </p>
 
@@ -615,4 +615,3 @@ You may obtain a copy of the License at
 <p align="center">
   <sub>Built with Java 21 · JavaFX 21.0.6 · Apache Maven · Open source under Apache 2.0</sub>
 </p>
-]]>
