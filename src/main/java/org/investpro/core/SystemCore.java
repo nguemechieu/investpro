@@ -232,7 +232,7 @@ public class SystemCore {
         this.systemCoreDependencies = new SystemCoreDependencies(exchange, tradingService, strategyEngine,
                 riskManagementSystem, aiReasoningService, executionEngine, tradeExecutionCoordinator);
 
-        this.labService = new StrategyLabService();
+        this.labService = StrategyLabService.getInstance();
         // Wire symbol agent state updates for real-time UI
         this.symbolAgentUpdater = new SymbolAgentUpdater(smartBot.getEventBus(), getSymbolAgentManager());
 
@@ -443,7 +443,7 @@ public class SystemCore {
         // Initialize and start EventBusManager for event-driven architecture
         this.eventBusManager = EventBusManager.getInstance();
         this.eventBusManager.start();
-        log.info("\u2705 EventBusManager started - Event-driven architecture active");
+        log.info("✅ EventBusManager started - Event-driven architecture active");
 
         // Wire EventPersistenceListener to persist all events to database
         wireEventPersistenceListener();
@@ -530,6 +530,51 @@ public class SystemCore {
         log.info("\u2705 {} symbol agents active", symbolAgents.size());
     }
 
+    /**
+     * Wires EventPersistenceListener to the EventBusManager.
+     * This ensures all published events are automatically persisted to the database
+     * as part of the event processing pipeline.
+     * <p>
+     * Called during SystemCore.start() to initialize event persistence.
+     */
+    private void wireEventPersistenceListener() {
+        try {
+            // Create repository implementation
+            EventLogRepositoryImpl eventLogRepository = new EventLogRepositoryImpl();
+
+            // Create persistence listener
+            EventPersistenceListener persistenceListener = new EventPersistenceListener(eventLogRepository);
+
+            // Subscribe to ALL events (listener will receive every event type)
+            eventBusManager.subscribeToAll(persistenceListener);
+
+            log.info("✅ EventPersistenceListener wired - All events will be persisted to database");
+        } catch (Exception e) {
+            log.error("Failed to wire EventPersistenceListener", e);
+            // Continue execution - event persistence is important but not critical to app
+            // operation
+        }
+    }
+
+    /**
+     * Initialize per-symbol agents for all symbols in the market watch list.
+     * Safe to call multiple times — existing agents are kept, new ones added.
+     */
+    public void initializeSymbolAgents(java.util.Collection<TradePair> symbols) {
+        if (symbols == null || symbols.isEmpty() || smartBot == null) return;
+        for (TradePair symbol : symbols) {
+            symbolAgents.computeIfAbsent(symbol, s -> {
+                org.investpro.core.agents.symbol.SymbolAgent agent =
+                        new org.investpro.core.agents.symbol.SymbolAgent(s, symbolAgentManager);
+                // Register into AgentRuntime so it's properly lifecycle-managed
+                smartBot.getRuntime().registerSymbol(s, symbolAgentManager);
+                log.debug("SymbolAgent registered in runtime for {}", s.toString('/'));
+                return agent;
+            });
+        }
+        log.info("✅ {} symbol agents active", symbolAgents.size());
+    }
+
     public void stop() {
         stopStreaming();
 
@@ -564,7 +609,7 @@ public class SystemCore {
         // Shutdown EventBusManager gracefully
         if (eventBusManager != null) {
             eventBusManager.shutdown();
-            log.info("\u2705 EventBusManager shutdown complete - Event-driven architecture stopped");
+            log.info("✅ EventBusManager shutdown complete - Event-driven architecture stopped");
         }
 
         smartBot.stop();

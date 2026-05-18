@@ -6,7 +6,11 @@ import org.investpro.core.agents.Agent;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
-import org.investpro.strategy.StrategySignal;
+import org.investpro.models.trading.TradePair;
+
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.investpro.utils.Side.HOLD;
 
@@ -45,7 +49,13 @@ public class StrategyAgent implements Agent {
             return;
         }
 
-        if (!(event.payload() instanceof Signal signal)) {
+        Object payload = event.payload();
+        if (payload instanceof org.investpro.strategy.StrategySignal strategySignal) {
+            handleStrategySignal(strategySignal, event);
+            return;
+        }
+
+        if (!(payload instanceof Signal signal)) {
             return;
         }
 
@@ -53,6 +63,43 @@ public class StrategyAgent implements Agent {
             context.getEventBus().publishAsync(AgentEvent.of(AgentEvent.STRATEGY_SIGNAL_APPROVED, name(), signal));
         } else {
             context.getEventBus().publishAsync(AgentEvent.of(AgentEvent.STRATEGY_SIGNAL_REJECTED, name(), signal));
+        }
+    }
+
+    private void handleStrategySignal(org.investpro.strategy.StrategySignal signal, AgentEvent sourceEvent) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (sourceEvent.metadata() != null) {
+            metadata.putAll(sourceEvent.metadata());
+        }
+        metadata.putIfAbsent("symbol", signal.getSymbol());
+        metadata.putIfAbsent("timeframe", signal.getTimeframe());
+        metadata.put("side", signal.getSide());
+        metadata.put("confidence", signal.getConfidence());
+        metadata.put("strategy_name", signal.getStrategyName());
+        TradePair pair = parsePair(signal.getSymbol());
+        if (pair != null) {
+            metadata.put("tradePairObject", pair);
+            metadata.put("tradePair", pair);
+        }
+
+        String type = signal.getConfidence() >= 0.50 && !HOLD.equals(signal.getSide())
+                ? AgentEvent.STRATEGY_SIGNAL_APPROVED
+                : AgentEvent.STRATEGY_SIGNAL_REJECTED;
+        context.getEventBus().publishAsync(new AgentEvent(type, name(), signal, Instant.now(), metadata));
+    }
+
+    private TradePair parsePair(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+        String[] parts = symbol.replace('_', '/').replace('-', '/').split("/");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            return new TradePair(parts[0], parts[1]);
+        } catch (Exception ignored) {
+            return null;
         }
     }
 }

@@ -27,21 +27,24 @@ services:
       dockerfile: Dockerfile
     container_name: investpro-app
 
+    # Load API keys and secrets from .env (gitignored, never committed)
+    env_file:
+      - path: .env
+        required: false
+
     environment:
       APP_NAME: InvestPro
       APP_ENV: docker
       APP_DEBUG: "false"
       APP_TIMEZONE: America/New_York
 
+      # Database — overrides .env values so the Docker service name is used as host
       DB_DIALECT: postgresql
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_NAME: investpro
       DB_USERNAME: investpro
-      DB_USER: investpro
       DB_PASSWORD: investpro123
-      DB_DRIVER: org.postgresql.Driver
-      DB_URL: jdbc:postgresql://postgres:5432/investpro
 
       DISPLAY: ":0"
       GEOMETRY: "1530x840"

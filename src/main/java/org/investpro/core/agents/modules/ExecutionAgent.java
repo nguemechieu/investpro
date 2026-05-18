@@ -34,8 +34,8 @@ import java.util.Objects;
  * - Trade execution notifications
  * <p>
  * Note: This agent publishes execution requests but does not directly
- * place orders. Final execution goes through TradeExecutionCoordinator
- * and FinalRiskGate.
+ * place orders. Final execution goes through Trade Execution Coordinator
+ * and Final Risk Gate.
  */
 @Slf4j
 public class ExecutionAgent implements org.investpro.core.agents.Agent {
@@ -96,6 +96,11 @@ public class ExecutionAgent implements org.investpro.core.agents.Agent {
     }
 
     private void coordinateExecution(AgentEvent event) {
+        if (context == null || !context.isAutoTradingEnabled()) {
+            log.info("ExecutionAgent blocked execution because auto trading is disabled.");
+            return;
+        }
+
         if (!(event.payload() instanceof Map<?, ?> rawContext)) {
             log.debug("ExecutionAgent ignored RISK_REVIEWED event without context map");
             return;

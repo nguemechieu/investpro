@@ -209,16 +209,16 @@ public class SystemMenuBar extends MenuBar {
 
         MenuItem strategyLab = new MenuItem(t("menu.strategyLab", "Strategy Lab"));
         strategyLab.setAccelerator(new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN));
-        strategyLab.setOnAction(e -> log.info("Strategy Lab requested"));
+        strategyLab.setOnAction(e -> tradingDesk.openRegisteredPanel("strategy-lab"));
 
         MenuItem strategyDeveloper = new MenuItem(t("menu.strategyDeveloper", "Strategy Developer"));
-        strategyDeveloper.setOnAction(e -> log.info("Strategy Developer requested"));
+        strategyDeveloper.setOnAction(e -> tradingDesk.openRegisteredPanel("strategy-developer"));
 
         MenuItem strategyBuilder = new MenuItem(t("menu.strategyBuilder", "Strategy Builder"));
-        strategyBuilder.setOnAction(e -> log.info("Strategy Builder requested"));
+        strategyBuilder.setOnAction(e -> tradingDesk.openRegisteredPanel("strategy-builder"));
 
         MenuItem strategyAssignment = new MenuItem(t("menu.strategyAssignment", "Strategy Assignment"));
-        strategyAssignment.setOnAction(e -> log.info("Strategy Assignment requested"));
+        strategyAssignment.setOnAction(e -> tradingDesk.openRegisteredPanel("strategy-assignment"));
 
         MenuItem viewCatalog = new MenuItem(t("menu.viewCatalog", "View Strategy Catalog"));
         viewCatalog.setOnAction(e -> log.info("Strategy Catalog requested"));

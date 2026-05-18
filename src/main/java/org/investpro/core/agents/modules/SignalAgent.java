@@ -155,7 +155,7 @@ public class SignalAgent implements Agent {
             }
 
             StrategySignal signal = result.getSignal();
-            publishSignal(signal);
+            publishSignal(signal, result);
 
             log.info("Strategy signal: {} {} at {} (confidence: {}, strategy: {})",
                     signal.getSide(), symbol, timeframe,
@@ -178,7 +178,7 @@ public class SignalAgent implements Agent {
     /**
      * Publish strategy signal to the event bus.
      */
-    private void publishSignal(@NotNull StrategySignal signal) {
+    private void publishSignal(@NotNull StrategySignal signal, @NotNull StrategyDecisionResult result) {
         if (eventBus == null) {
             log.warn("Event bus not available for publishing signal");
             return;
@@ -186,16 +186,33 @@ public class SignalAgent implements Agent {
 
         try {
             // Create strategy_signal event and publish
+            Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+            metadata.put("symbol", signal.getSymbol());
+            metadata.put("timeframe", signal.getTimeframe());
+            metadata.put("side", signal.getSide());
+            metadata.put("confidence", signal.getConfidence());
+            metadata.put("strategy_name", signal.getStrategyName());
+            if (result.getAssignment() != null) {
+                metadata.put("assignment_id", result.getAssignment().getAssignmentId());
+                metadata.put("assignment_score", result.getAssignment().getScoreAtAssignment());
+                metadata.put("assignment_mode", result.getAssignment().getMode());
+            }
+            if (requiresPaperValidation()) {
+                metadata.put("trade_allowed", false);
+                metadata.put("block_reason", "Paper trading validation required before live execution");
+            }
+            TradePair pair = parsePair(signal.getSymbol());
+            if (pair != null) {
+                metadata.put("tradePairObject", pair);
+                metadata.put("tradePair", pair);
+            }
+
             AgentEvent signalEvent = new AgentEvent(
                     AgentEvent.SIGNAL_CREATED,
                     "SignalAgent",
                     signal,
                     Instant.now(),
-                    Map.of(
-                            "symbol", signal.getSymbol(),
-                            "timeframe", signal.getTimeframe(),
-                            "side", signal.getSide(),
-                            "confidence", signal.getConfidence()));
+                    metadata);
 
             eventBus.publish(signalEvent);
 
@@ -206,6 +223,12 @@ public class SignalAgent implements Agent {
         } catch (Exception e) {
             log.error("Failed to publish signal event", e);
         }
+    }
+
+    private boolean requiresPaperValidation() {
+        return Boolean.parseBoolean(System.getProperty(
+                "tradeadviser.strategy.requirePaperTradingBeforeLive",
+                "true"));
     }
 
     private String resolveSymbol(Map<String, Object> metadata) {
@@ -345,5 +368,21 @@ public class SignalAgent implements Agent {
             }
         }
         return fallback;
+    }
+
+    private TradePair parsePair(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+        String[] parts = symbol.replace('_', '/').replace('-', '/').split("/");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            return new TradePair(parts[0], parts[1]);
+        } catch (Exception exception) {
+            log.debug("Unable to parse TradePair from signal symbol {}", symbol, exception);
+            return null;
+        }
     }
 }

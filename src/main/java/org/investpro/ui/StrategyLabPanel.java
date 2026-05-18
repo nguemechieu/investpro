@@ -12,16 +12,20 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
+import org.investpro.data.CandleData;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
+import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyCatalog;
+import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.lab.StrategyConsensusResult;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.strategy.lab.StrategyLabSnapshot;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
 import org.investpro.strategy.lab.StrategyVote;
 import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
@@ -29,6 +33,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * JavaFX panel for InvestPro Strategy Lab.
@@ -95,7 +102,9 @@ public class StrategyLabPanel extends BorderPane {
 
     public StrategyLabPanel(@NotNull SystemCore systemCore) throws SQLException, ClassNotFoundException {
         this.systemCore = Objects.requireNonNull(systemCore, "systemCore must not be null");
-        this.labService = Objects.requireNonNull(systemCore.getLabService(), "labService must not be null");
+        this.labService = systemCore.getLabService() == null
+                ? StrategyLabService.getInstance()
+                : systemCore.getLabService();
 
         initializeUI();
         LocalizationService.applyTranslations(this);
@@ -108,7 +117,7 @@ public class StrategyLabPanel extends BorderPane {
         setTop(createControlsSection());
         setCenter(createContentTabs());
         setBottom(createStatusSection());
-        if (snapshot.hasConsensusData()) {
+        if (snapshot != null && snapshot.hasConsensusData()) {
             consensus = snapshot.getConsensus();
 
             if (snapshot.isConsensusReached()) {
@@ -705,14 +714,19 @@ public class StrategyLabPanel extends BorderPane {
 
         appendLog("Testing strategy '" + strategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode()
                 + "...");
-        setRunning(true, "Testing selected strategy...");
+        setRunning(true, "Testing selected strategy with real candles...");
 
-        labService.testStrategies(selectedSymbol, selectedTimeframe, List.of(strategyName))
+        fetchHistoricalCandles()
+                .thenCompose(candles -> labService.evaluateAndAssignBest(
+                        selectedSymbol,
+                        selectedTimeframe,
+                        candles,
+                        List.of(strategyName)))
                 .whenComplete((ignored, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Test failed: " + rootMessage(throwable));
                     } else {
-                        appendLog("Test completed.");
+                        appendLog("Real-candle test completed.");
                         refreshUI();
                     }
 
@@ -722,17 +736,19 @@ public class StrategyLabPanel extends BorderPane {
 
     private void testAllStrategies() {
         appendLog("Testing all strategies on " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
-        setRunning(true, "Testing all strategies...");
+        setRunning(true, "Testing all strategies with real candles...");
 
-        labService.testStrategies(
-                selectedSymbol,
-                selectedTimeframe,
-                new ArrayList<>(StrategyCatalog.availableStrategyNames()))
+        fetchHistoricalCandles()
+                .thenCompose(candles -> labService.evaluateAndAssignBest(
+                        selectedSymbol,
+                        selectedTimeframe,
+                        candles,
+                        new ArrayList<>(StrategyCatalog.availableStrategyNames())))
                 .whenComplete((ignored, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Tests failed: " + rootMessage(throwable));
                     } else {
-                        appendLog("All tests completed.");
+                        appendLog("All real-candle tests completed.");
                         refreshUI();
                     }
 
@@ -761,22 +777,26 @@ public class StrategyLabPanel extends BorderPane {
 
     private void assignBest() {
         appendLog("Assigning best strategy for " + selectedSymbol + "/" + selectedTimeframe.getCode() + "...");
+        setRunning(true, "Assigning best from real-candle evaluation...");
 
-        try {
-            StrategyAssignment assignment = labService.assignBest(selectedSymbol, selectedTimeframe);
-
-            if (assignment != null) {
-                appendLog("Assigned: " + assignment.getStrategyId());
-            } else {
-                appendLog("No suitable strategy found.");
-            }
-
-            refreshUI();
-
-        } catch (Exception exception) {
-            log.error("Failed to assign best strategy", exception);
-            appendLog("Assign best failed: " + rootMessage(exception));
-        }
+        fetchHistoricalCandles()
+                .thenCompose(candles -> labService.evaluateAndAssignBest(
+                        selectedSymbol,
+                        selectedTimeframe,
+                        candles))
+                .whenComplete((assignment, throwable) -> runOnFx(() -> {
+                    if (throwable != null) {
+                        log.error("Failed to assign best strategy", throwable);
+                        appendLog("Assign best failed: " + rootMessage(throwable));
+                    } else if (assignment != null) {
+                        appendLog("Assigned: " + assignment.getStrategyId());
+                        refreshUI();
+                    } else {
+                        appendLog("No suitable strategy found.");
+                        refreshUI();
+                    }
+                    setRunning(false, "Ready");
+                }));
     }
 
     private void openManualAssignDialog() {
@@ -801,8 +821,9 @@ public class StrategyLabPanel extends BorderPane {
 
         dialog.showAndWait().ifPresent(strategyName -> {
             try {
-                StrategyAssignment assignment = labService.manuallyAssign(selectedSymbol, selectedTimeframe,
-                        strategyName);
+                StrategyAssignment assignment = StrategySelectionService.getInstance()
+                        .manuallyAssign(selectedSymbol, selectedTimeframe, strategyName, true,
+                                "Manual assignment from Strategy Lab");
 
                 if (assignment != null) {
                     appendLog("Manually assigned: " + assignment.getStrategyId());
@@ -829,8 +850,14 @@ public class StrategyLabPanel extends BorderPane {
             }
 
             try {
-                labService.unassign(selectedSymbol, selectedTimeframe);
-                appendLog("Unassigned: " + selectedSymbol + "/" + selectedTimeframe.getCode());
+                StrategyAssignment active = StrategyAssignmentRepository.getInstance()
+                        .getActive(selectedSymbol, selectedTimeframe);
+                if (active != null) {
+                    StrategyAssignmentRepository.getInstance().delete(active.getAssignmentId());
+                    appendLog("Unassigned: " + selectedSymbol + "/" + selectedTimeframe.getCode());
+                } else {
+                    appendLog("No active assignment to unassign.");
+                }
                 refreshUI();
 
             } catch (Exception exception) {
@@ -860,19 +887,52 @@ public class StrategyLabPanel extends BorderPane {
 
         dialog.showAndWait().ifPresent(reason -> {
             try {
-                labService.getAssignmentService()
-                        .getActiveAssignment(selectedSymbol, selectedTimeframe)
-                        .ifPresentOrElse(assignment -> {
-                            labService.getAssignmentService().disableAssignment(assignment.getAssignmentId(), reason);
-                            appendLog("Disabled: " + assignment.getStrategyId());
-                            refreshUI();
-                        }, () -> appendLog("No active assignment to disable."));
+                StrategyAssignment assignment = StrategyAssignmentRepository.getInstance()
+                        .getActive(selectedSymbol, selectedTimeframe);
+                if (assignment == null) {
+                    appendLog("No active assignment to disable.");
+                    return;
+                }
+                StrategyAssignmentRepository.getInstance().save(assignment.disabled(reason));
+                appendLog("Disabled: " + assignment.getStrategyId());
+                refreshUI();
 
             } catch (Exception exception) {
                 log.error("Disable assignment failed", exception);
                 appendLog("Disable failed: " + rootMessage(exception));
             }
         });
+    }
+
+    private CompletableFuture<List<CandleData>> fetchHistoricalCandles() {
+        TradePair pair = symbolCombo == null ? null : symbolCombo.getValue();
+        if (pair == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Select a symbol first."));
+        }
+        if (systemCore.getExchange() == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Connect an exchange first."));
+        }
+
+        try {
+            CandleDataSupplier supplier = systemCore.getExchange()
+                    .getCandleDataSupplier(selectedTimeframe.getSeconds(), pair);
+            if (supplier == null) {
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                        "No candle supplier for " + pair.toString('/') + " " + selectedTimeframe.getCode()));
+            }
+
+            Future<List<CandleData>> future = supplier.get();
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    List<CandleData> candles = future.get(20, TimeUnit.SECONDS);
+                    return candles == null ? List.of() : candles;
+                } catch (Exception exception) {
+                    throw new IllegalStateException("Historical candle fetch failed", exception);
+                }
+            });
+        } catch (Exception exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
     }
 
     private void appendLog(String message) {
@@ -927,7 +987,9 @@ public class StrategyLabPanel extends BorderPane {
             }
 
             try {
-                StrategyAssignment assignment = labService.manuallyAssign(symbol, timeframe, strategyName);
+                StrategyAssignment assignment = StrategySelectionService.getInstance()
+                        .manuallyAssign(symbol, timeframe, strategyName, true,
+                                "Manual assignment from Strategy Lab ranking");
 
                 if (assignment != null) {
                     appendLog("Assigned from backtest results: " + assignment.getStrategyId() +

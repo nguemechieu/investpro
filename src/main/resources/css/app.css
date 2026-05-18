@@ -219,6 +219,72 @@ StackPane {
     -fx-spacing: 8;
 }
 
+.desk-command-strip {
+    -fx-padding: 7 10 8 10;
+    -fx-spacing: 8;
+    -fx-background-color: linear-gradient(to bottom, #101827, #0b1120);
+    -fx-border-color: #263246;
+    -fx-border-width: 1 0 1 0;
+}
+
+.desk-metric {
+    -fx-padding: 5 9 5 9;
+    -fx-background-color: #0f1724;
+    -fx-border-color: rgba(148, 163, 184, 0.24);
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-min-width: 92;
+}
+
+.desk-metric-title {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.desk-metric-value {
+    -fx-text-fill: #e5edf7;
+    -fx-font-size: 11px;
+    -fx-font-weight: 900;
+}
+
+.desk-positive {
+    -fx-text-fill: #4ade80;
+}
+
+.desk-warning {
+    -fx-text-fill: #fbbf24;
+}
+
+.desk-negative {
+    -fx-text-fill: #f87171;
+}
+
+.desk-updated-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.desk-action-button {
+    -fx-background-color: #141f31;
+    -fx-border-color: #2a3548;
+    -fx-border-width: 1;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-text-fill: #dbe6f3;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+    -fx-padding: 6 10 6 10;
+    -fx-cursor: hand;
+}
+
+.desk-action-button:hover {
+    -fx-background-color: #1b2a40;
+    -fx-border-color: #60a5fa;
+}
+
 .chart-workspace {
     -fx-background-color: #070b12;
     -fx-border-color: #263246;

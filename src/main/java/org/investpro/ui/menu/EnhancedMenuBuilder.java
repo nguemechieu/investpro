@@ -114,11 +114,7 @@ public class EnhancedMenuBuilder {
         MenuItem strategyBuilder = panelRegistry.createPanelMenuItem("strategy-builder");
         MenuItem strategyAssignment = panelRegistry.createPanelMenuItem("strategy-assignment");
 
-        strategyMenu.getItems().addAll(
-                strategyLab,
-                strategyDeveloper,
-                strategyBuilder,
-                strategyAssignment);
+        addIfPresent(strategyMenu, strategyLab, strategyDeveloper, strategyBuilder, strategyAssignment);
 
         return strategyMenu;
     }
@@ -133,13 +129,9 @@ public class EnhancedMenuBuilder {
         MenuItem backtesting = panelRegistry.createPanelMenuItem("backtesting");
         MenuItem backtestReport = panelRegistry.createPanelMenuItem("backtest-report");
 
-        analysisMenu.getItems().addAll(
-                technicalIndicators,
-                volumeIndicator,
-                analysisPanel,
-                new SeparatorMenuItem(),
-                backtesting,
-                backtestReport);
+        addIfPresent(analysisMenu, technicalIndicators, volumeIndicator, analysisPanel);
+        analysisMenu.getItems().add(new SeparatorMenuItem());
+        addIfPresent(analysisMenu, backtesting, backtestReport);
 
         return analysisMenu;
     }
@@ -152,11 +144,9 @@ public class EnhancedMenuBuilder {
         MenuItem tradingSystemStatus = panelRegistry.createPanelMenuItem("trading-system-status");
         MenuItem orderPanel = panelRegistry.createPanelMenuItem("order-panel");
 
-        toolsMenu.getItems().addAll(
-                settings,
-                new SeparatorMenuItem(),
-                tradingSystemStatus,
-                orderPanel);
+        addIfPresent(toolsMenu, settings);
+        toolsMenu.getItems().add(new SeparatorMenuItem());
+        addIfPresent(toolsMenu, tradingSystemStatus, orderPanel);
 
         return toolsMenu;
     }
@@ -195,6 +185,14 @@ public class EnhancedMenuBuilder {
             }
         });
         return item;
+    }
+
+    private void addIfPresent(Menu menu, MenuItem... items) {
+        for (MenuItem item : items) {
+            if (item != null) {
+                menu.getItems().add(item);
+            }
+        }
     }
 
     private void showKeyboardShortcuts() {

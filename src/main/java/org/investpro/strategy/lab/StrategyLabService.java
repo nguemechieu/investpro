@@ -4,7 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
+import org.investpro.strategy.StrategyContext;
+import org.investpro.strategy.StrategySelectionService;
+import org.investpro.models.trading.TradePair;
 import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.repository.StrategyAssignmentRepository;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -102,6 +106,102 @@ public class StrategyLabService {
                 StrategyCatalog.availableStrategyNames());
 
         return testStrategiesAsync(symbol, timeframes, allStrategyNames);
+    }
+
+    /**
+     * Test all available strategies against real candles for one symbol/timeframe,
+     * rank them, vote across the top candidates, and save the selected strategy to
+     * the canonical assignment repository used by live signal generation.
+     */
+    public CompletableFuture<StrategyAssignment> evaluateAndAssignBest(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull List<CandleData> candles) {
+        List<String> allStrategyNames = new ArrayList<>(StrategyCatalog.availableStrategyNames());
+        return evaluateAndAssignBest(symbol, timeframe, candles, allStrategyNames);
+    }
+
+    /**
+     * Same as evaluateAndAssignBest, scoped to a strategy subset.
+     */
+    public CompletableFuture<StrategyAssignment> evaluateAndAssignBest(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull List<CandleData> candles,
+            @NotNull List<String> strategyNames) {
+        return CompletableFuture.supplyAsync(() -> {
+            List<CandleData> cleanCandles = sanitizeCandles(candles);
+            if (cleanCandles.size() < 50) {
+                log.warn("Cannot evaluate strategies for {}/{}: only {} candles available",
+                        symbol, timeframe.getCode(), cleanCandles.size());
+                return null;
+            }
+
+            List<StrategyPerformanceReport> results = new ArrayList<>();
+            for (String strategyName : strategyNames) {
+                try {
+                    StrategyBacktestRequest request = StrategyBacktestRequest.builder()
+                            .symbol(symbol)
+                            .timeframe(timeframe)
+                            .strategyName(strategyName)
+                            .candles(cleanCandles)
+                            .initialCapital(10000.0)
+                            .commissionRate(0.001)
+                            .slippageRate(0.0002)
+                            .maxTrades(Integer.MAX_VALUE)
+                            .allowShorts(true)
+                            .useRiskManagement(true)
+                            .build();
+                    results.add(backtestRunner.run(request));
+                } catch (Exception exception) {
+                    log.warn("Strategy evaluation failed for {}/{} strategy={}: {}",
+                            symbol, timeframe.getCode(), strategyName, exception.getMessage());
+                }
+            }
+
+            List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
+            String cacheKey = makeKey(symbol, timeframe);
+            rankingsCache.put(cacheKey, ranked);
+
+            StrategyContext context = buildVotingContext(symbol, timeframe, cleanCandles);
+            StrategyConsensusResult consensus = votingEngine.vote(symbol, timeframe, context, ranked, 5);
+            consensusCache.put(cacheKey, consensus);
+
+            StrategyPerformanceReport selected = selectAssignmentCandidate(ranked, consensus);
+            if (selected == null) {
+                log.warn("No assignable strategy found for {}/{}", symbol, timeframe.getCode());
+                return null;
+            }
+
+            double minimumScore = readDoubleProperty("tradeadviser.strategy.minStrategyScore", 60.0);
+            if (selected.getScore() < minimumScore) {
+                log.warn("Best strategy for {}/{} did not meet minimum score: {} < {}",
+                        symbol, timeframe.getCode(), selected.getScore(), minimumScore);
+                return null;
+            }
+
+            boolean autoAssignBest = Boolean.parseBoolean(
+                    System.getProperty("tradeadviser.strategy.autoAssignBest", "true"));
+            if (!autoAssignBest) {
+                log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
+                        symbol, timeframe.getCode(), selected.getStrategyName(), selected.getScore());
+                return null;
+            }
+
+            String reason = "Auto-assigned from real-candle backtest";
+            if (consensus != null && consensus.isConsensusReached()
+                    && !"NONE".equalsIgnoreCase(consensus.getSelectedStrategyName())) {
+                reason = "Consensus assignment: " + consensus.getReason();
+            }
+
+            StrategyAssignment assignment = StrategySelectionService.getInstance()
+                    .autoAssign(symbol, timeframe, selected.getStrategyName(), selected.getScore(), reason);
+
+            log.info("Canonical strategy assignment created: {}/{} -> {} score={}",
+                    symbol, timeframe.getCode(), assignment == null ? "NONE" : assignment.getStrategyId(),
+                    selected.getScore());
+            return assignment;
+        }, executorService);
     }
 
     /**
@@ -210,7 +310,13 @@ public class StrategyLabService {
             @NotNull String symbol,
             @NotNull Timeframe timeframe) {
         List<StrategyPerformanceReport> rankings = getLastRanking(symbol, timeframe);
-        return assignmentService.autoAssignBest(symbol, timeframe, rankings);
+        StrategyPerformanceReport selected = selectAssignmentCandidate(rankings, getLastConsensus(symbol, timeframe));
+        if (selected == null) {
+            return null;
+        }
+        return StrategySelectionService.getInstance()
+                .autoAssign(symbol, timeframe, selected.getStrategyName(), selected.getScore(),
+                        "Auto-assigned from Strategy Lab ranking");
     }
 
     /**
@@ -220,19 +326,18 @@ public class StrategyLabService {
             @NotNull String symbol,
             @NotNull Timeframe timeframe,
             @NotNull String strategyName) {
-        return assignmentService.manuallyAssign(
-                symbol,
-                timeframe,
-                strategyName,
-                "Manual assignment from Strategy Lab",
-                false);
+        return StrategySelectionService.getInstance()
+                .manuallyAssign(symbol, timeframe, strategyName, true, "Manual assignment from Strategy Lab");
     }
 
     /**
      * Unassign a strategy.
      */
     public void unassign(@NotNull String symbol, @NotNull Timeframe timeframe) {
-        assignmentService.unassign(symbol, timeframe, "Unassigned from Strategy Lab");
+        StrategyAssignment active = StrategyAssignmentRepository.getInstance().getActive(symbol, timeframe);
+        if (active != null) {
+            StrategyAssignmentRepository.getInstance().delete(active.getAssignmentId());
+        }
     }
 
     /**
@@ -245,14 +350,14 @@ public class StrategyLabService {
 
         List<StrategyPerformanceReport> rankings = rankingsCache.getOrDefault(key, List.of());
         StrategyConsensusResult consensus = consensusCache.get(key);
-        Optional<StrategyAssignment> assignment = assignmentService.getActiveAssignment(symbol, timeframe);
+        StrategyAssignment assignment = StrategyAssignmentRepository.getInstance().getActive(symbol, timeframe);
 
         return StrategyLabSnapshot.builder()
                 .symbol(symbol)
                 .timeframe(timeframe)
                 .rankings(rankings)
                 .consensus(consensus)
-                .activeAssignment(assignment.orElse(null))
+                .activeAssignment(assignment)
                 .running(false)
                 .progress(1.0)
                 .statusMessage("Ready")
@@ -286,6 +391,81 @@ public class StrategyLabService {
      */
     private String makeKey(String symbol, Timeframe timeframe) {
         return symbol + "/" + timeframe.getCode();
+    }
+
+    private List<CandleData> sanitizeCandles(List<CandleData> candles) {
+        if (candles == null || candles.isEmpty()) {
+            return List.of();
+        }
+        return candles.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingLong(CandleData::openTime))
+                .toList();
+    }
+
+    private StrategyContext buildVotingContext(String symbol, Timeframe timeframe, List<CandleData> candles) {
+        CandleData latest = candles.isEmpty() ? null : candles.get(candles.size() - 1);
+        double current = latest == null ? 0.0 : latest.closePrice();
+        double spread = current > 0.0 ? Math.max(current * 0.0001, 0.00000001) : 0.0;
+
+        return StrategyContext.builder()
+                .symbol(parsePair(symbol))
+                .timeframe(timeframe)
+                .candles(candles)
+                .currentPrice(current)
+                .bid(current > 0.0 ? current - spread / 2.0 : 0.0)
+                .ask(current > 0.0 ? current + spread / 2.0 : 0.0)
+                .barsAvailable(candles.size())
+                .build();
+    }
+
+    private StrategyPerformanceReport selectAssignmentCandidate(
+            List<StrategyPerformanceReport> ranked,
+            StrategyConsensusResult consensus) {
+        if (consensus != null && consensus.isConsensusReached()
+                && !"NONE".equalsIgnoreCase(consensus.getSelectedStrategyName())) {
+            for (StrategyPerformanceReport report : ranked) {
+                if (report != null && Objects.equals(report.getStrategyName(), consensus.getSelectedStrategyName())) {
+                    return report;
+                }
+            }
+        }
+
+        StrategyPerformanceReport tradable = rankingEngine.getBestTradable(ranked);
+        if (tradable != null) {
+            return tradable;
+        }
+
+        return ranked == null || ranked.isEmpty() ? null : ranked.getFirst();
+    }
+
+    private TradePair parsePair(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+        String[] parts = symbol.replace('_', '/').replace('-', '/').split("/");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            return new TradePair(parts[0], parts[1]);
+        } catch (Exception exception) {
+            log.debug("Unable to parse TradePair from {}", symbol, exception);
+            return null;
+        }
+    }
+
+    private double readDoubleProperty(String propertyName, double fallback) {
+        String rawValue = System.getProperty(propertyName);
+        if (rawValue == null || rawValue.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(rawValue.trim());
+        } catch (NumberFormatException exception) {
+            log.warn("Invalid numeric system property {}={}; using {}", propertyName, rawValue, fallback);
+            return fallback;
+        }
     }
 
     /**

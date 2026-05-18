@@ -2,8 +2,10 @@ package org.investpro.ui;
 
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -19,6 +21,7 @@ import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
 import lombok.Getter;
@@ -81,9 +84,12 @@ import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategyCatalog;
+import org.investpro.strategy.StrategyAssignment;
+import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.DepthChart;
 import org.investpro.ui.charts.NewsEventOverlay;
+import org.investpro.ui.operations.SystemOperationsBoard;
 import org.investpro.ui.panels.*;
 import org.investpro.utils.DraggableTab;
 import org.investpro.utils.ZoomDirection;
@@ -93,17 +99,18 @@ import org.jetbrains.annotations.NotNull;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
-import java.awt.Desktop;
-
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -136,6 +143,7 @@ import static org.investpro.i18n.LocalizationService.t;
 @Slf4j
 @Getter
 @Setter
+@SuppressWarnings("SpellCheckingInspection")
 public class TradingDesk extends BorderPane {
     private static final double DEFAULT_WIDTH = 1540;
     private static final double DEFAULT_HEIGHT = 820;
@@ -150,7 +158,6 @@ public class TradingDesk extends BorderPane {
      */
     private static final String[] SUPPORTED_EXCHANGES = {
             "COINBASE",
-            "COINBASE PRO",
             "BINANCE US",
             "BINANCE",
             "OANDA",
@@ -224,6 +231,14 @@ public class TradingDesk extends BorderPane {
     private final Label connectionStatusLabel = new Label(t("status.disconnected"));
     private final Label symbolCountLabel = new Label(t("label.symbols", 0));
     private final Circle connectionIndicator = new Circle(6, Color.ORANGERED);
+    private final Label deskConnectionLabel = new Label("Offline");
+    private final Label deskRiskLabel = new Label("Risk: --");
+    private final Label deskExposureLabel = new Label("Exposure: --");
+    private final Label deskOrdersLabel = new Label("Orders: --");
+    private final Label deskMarketLabel = new Label("Market: --");
+    private final Label deskSpreadLabel = new Label("Spread: --");
+    private final Label deskStrategyLabel = new Label("Win: --");
+    private final Label deskUpdatedLabel = new Label("Updated: --");
 
     private final TextArea journalArea = new TextArea();
     private final ObservableList<String> agentActivityItems = FXCollections
@@ -234,7 +249,6 @@ public class TradingDesk extends BorderPane {
     private final ListView<String> expertsListView = new ListView<>();
     private final ListView<String> alertsListView = new ListView<>();
     private final ListView<String> signalListView = new ListView<>();
-    private final ListView<String> mailboxListView = new ListView<>();
 
     private final TradeRepository tradeRepository;
     private final OrderRepository orderRepository;
@@ -258,6 +272,7 @@ public class TradingDesk extends BorderPane {
     private VBox systemConsole;
     private Node marketWatchWrapper;
     private Node orderBookWrapper;
+    private Stage detachedSystemConsoleStage;
     private boolean consoleVisible = true;
     private boolean marketWatchVisible = true;
     private boolean orderBookVisible = true;
@@ -288,8 +303,11 @@ public class TradingDesk extends BorderPane {
     private DepthChart depthChart;
     private NewsCalendarPanel newsCalendarPanel;
     private MarketInfoPanel marketInfoPanel;
-    private SystemMonitorPanel systemMonitorPanel;
+    private SystemOperationsBoard systemOperationsBoard;
     private ActivityMonitorPanel activityMonitorPanel;
+    private ResourceMonitorPanel resourceMonitorPanel;
+    private ConsolePanel detachedConsolePanel;
+    private BacktestReportPanel backtestReportPanel;
     private org.investpro.ui.panels.ThemeCustomizationPanel themeCustomizationPanel;
     private MarketWatchPanel symbolAgentMarketWatch; // Symbol-level trading status (from SymbolAgentManager)
     private Navigation navigationPanel; // Exchange navigator
@@ -451,15 +469,16 @@ public class TradingDesk extends BorderPane {
 
         MenuBar menuBar = createMenuBar();
 
-        topSection.getChildren().addAll(menuBar, createMainToolBar());
+        topSection.getChildren().addAll(menuBar, createMainToolBar(), createDeskCommandStrip());
+        updateDeskCommandStrip();
         return topSection;
     }
 
     @Contract(" -> new")
     private @NotNull MenuBar createMenuBar() {
+        // ── File ─────────────────────────────────────────────────────────────
         Menu fileMenu = new Menu(t("menu.file"));
-
-        fileMenu.getItems().setAll(List.of(
+        fileMenu.getItems().setAll(
                 menuItem(t("menu.newChart"), new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN),
                         this::openSelectedSymbolChart),
                 new SeparatorMenuItem(),
@@ -474,10 +493,11 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.exit"), new KeyCodeCombination(KeyCode.Q, KeyCombination.CONTROL_DOWN), () -> {
                     shutdown();
                     Platform.exit();
-                })));
+                }));
 
+        // ── Edit ─────────────────────────────────────────────────────────────
         Menu editMenu = new Menu(t("menu.edit"));
-        editMenu.getItems().setAll(List.of(
+        editMenu.getItems().setAll(
                 menuItem(t("menu.undo"), new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN),
                         () -> withFocusedTextInput(TextInputControl::undo)),
                 menuItem(t("menu.redo"), new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN),
@@ -488,17 +508,11 @@ public class TradingDesk extends BorderPane {
                 menuItem(t("menu.copy"), new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN),
                         () -> withFocusedTextInput(TextInputControl::copy)),
                 menuItem(t("menu.paste"), new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN),
-                        () -> withFocusedTextInput(TextInputControl::paste))));
+                        () -> withFocusedTextInput(TextInputControl::paste)));
 
-        Menu insertMenu = new Menu(t("menu.insert"));
-        insertMenu.getItems().setAll(List.of(
-                menuItem(t("menu.indicators"), null, this::openInsertIndicatorDialog),
-                menuItem(t("menu.news"), null, this::openNewsCalendarPanel),
-                menuItem(t("menu.backgroundImage"), null, this::chooseActiveChartBackgroundImage),
-                menuItem(t("menu.clearBackgroundImage"), null, this::clearActiveChartBackgroundImage)));
-
+        // ── View ─────────────────────────────────────────────────────────────
         Menu viewMenu = new Menu(t("menu.view"));
-        viewMenu.getItems().setAll(List.of(
+        viewMenu.getItems().setAll(
                 menuItem(t("menu.showCharts"), null, chartTabPane::requestFocus),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.toggleMarketWatch"), new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN),
@@ -510,24 +524,34 @@ public class TradingDesk extends BorderPane {
                         this::toggleConsoleVisibility),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.dataWindow"), null, this::openDataWindow),
-                menuItem(t("menu.marketInfoPanel"), null, this::openMarketInfoPanel),
+                menuItem(t("menu.marketInfoPanel"), new KeyCodeCombination(KeyCode.I, KeyCombination.CONTROL_DOWN),
+                        this::openMarketInfoPanel),
                 menuItem(t("menu.symbolAgentWatch"), null, this::openSymbolAgentMarketWatch),
                 menuItem(t("menu.navigationPanel"), null, this::openNavigationPanel),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.zoomIn"), new KeyCodeCombination(KeyCode.PLUS, KeyCombination.CONTROL_DOWN),
                         () -> withActiveChart(chart -> chart.changeZoom(ZoomDirection.IN))),
                 menuItem(t("menu.zoomOut"), new KeyCodeCombination(KeyCode.MINUS, KeyCombination.CONTROL_DOWN),
-                        () -> withActiveChart(chart -> chart.changeZoom(ZoomDirection.OUT)))));
+                        () -> withActiveChart(chart -> chart.changeZoom(ZoomDirection.OUT))),
+                new SeparatorMenuItem(),
+                menuItem(t("menu.closeAllCharts"), null, this::closeAllCharts),
+                menuItem(t("menu.detachConsole"), null, this::detachConsoleWindow));
 
+        // ── Charts ───────────────────────────────────────────────────────────
         Menu chartsMenu = new Menu(t("menu.charts"));
-        chartsMenu.getItems().setAll(List.of(
+        chartsMenu.getItems().setAll(
                 menuItem(t("menu.candlestick"), null, this::openSelectedSymbolChart),
                 menuItem(t("menu.fitActiveChart"), null, () -> withActiveChart(CandleStickChart::fitChart)),
                 menuItem(t("menu.refreshActiveChart"), null, () -> withActiveChart(CandleStickChart::refreshChart)),
-                menuItem(t("menu.toggleCrosshair"), null, () -> withActiveChart(CandleStickChart::toggleCrosshair))));
+                menuItem(t("menu.toggleCrosshair"), null, () -> withActiveChart(CandleStickChart::toggleCrosshair)),
+                new SeparatorMenuItem(),
+                menuItem(t("menu.indicators"), null, this::openInsertIndicatorDialog),
+                menuItem(t("menu.backgroundImage"), null, this::chooseActiveChartBackgroundImage),
+                menuItem(t("menu.clearBackgroundImage"), null, this::clearActiveChartBackgroundImage));
 
-        Menu toolsMenu = new Menu(t("menu.tools"));
-        toolsMenu.getItems().setAll(List.of(
+        // ── Trade ────────────────────────────────────────────────────────────
+        Menu tradeMenu = new Menu("Trade");
+        tradeMenu.getItems().setAll(
                 menuItem(t("menu.order"), new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN),
                         this::openOrderPanel),
                 new SeparatorMenuItem(),
@@ -536,74 +560,71 @@ public class TradingDesk extends BorderPane {
                         this::toggleBotTrading),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.refreshLocalPositions"), null, this::refreshPositions),
-                menuItem(t("menu.cancelAllOrders"), null, this::cancelAllOrders)));
+                menuItem(t("menu.cancelAllOrders"), null, this::cancelAllOrders));
 
+        // ── Strategy ─────────────────────────────────────────────────────────
         Menu strategyMenu = new Menu(t("menu.strategy"));
-        strategyMenu.getItems().setAll(List.of(
-                menuItem(t("menu.strategyBuilder"), null, this::openStrategyBuilder),
+        strategyMenu.getItems().setAll(
+                menuItem("Strategy Lab", new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN),
+                        this::openStrategyLabPanel),
+                menuItem("Strategy Developer",
+                        new KeyCodeCombination(KeyCode.D, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                        this::openStrategyDeveloperPanel),
+                menuItem(t("menu.strategyBuilder"),
+                        new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                        this::openStrategyBuilder),
+                menuItem(t("menu.strategyAssignment"),
+                        new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                        this::openStrategyAssignmentPanel),
+                new SeparatorMenuItem(),
                 menuItem(t("menu.backtesting"), null, this::openBacktesting),
                 menuItem(t("menu.analysis"), null, this::openAnalysis),
+                menuItem("Backtest Report", null, this::openBacktestReportPanel),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.viewAllStrategies"), null, this::openAllStrategies),
                 menuItem(t("menu.importStrategy"), null, this::importStrategy),
-                menuItem(t("menu.exportStrategy"), null, this::exportStrategy)));
+                menuItem(t("menu.exportStrategy"), null, this::exportStrategy));
 
+        // ── Research ─────────────────────────────────────────────────────────
         Menu researchMenu = new Menu(t("menu.research"));
-        researchMenu.getItems().setAll(List.of(
+        researchMenu.getItems().setAll(
                 menuItem(t("menu.marketResearch"), null, this::openMarketResearch),
                 menuItem(t("menu.strategyResearch"), null, this::openStrategyResearch),
+                menuItem(t("menu.news"), null, this::openNewsCalendarPanel),
                 new SeparatorMenuItem(),
                 menuItem("Quant PM", null, this::showQuantPortfolioManagement),
                 menuItem("Signal Monitor", null, this::showSignalMonitor),
                 menuItem("ML Lab", null, this::showMLLab),
                 new SeparatorMenuItem(),
-                menuItem(t("menu.strategyAssignment"), null, () -> {
-                    try {
-                        showStrategyAssignmentPanel();
-                    } catch (SQLException | ClassNotFoundException ex) {
-                        log.error("Error showing strategy assignment panel", ex);
-                        showWarning(
-                                "Strategy Assignment",
-                                "Unable to open strategy assignment panel: " + ex.getMessage());
-                    }
-                }),
-                menuItem(t("menu.researchReports"), null, this::openResearchReports)));
+                menuItem(t("menu.researchReports"), null, this::openResearchReports));
 
-        Menu settingsMenu = new Menu(t("menu.settings"));
-        settingsMenu.getItems().setAll(List.of(
-                // Trading & Broker Settings
-                menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
-                menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
-                new SeparatorMenuItem(),
-                // Appearance & UI Settings
-                menuItem("Theme Settings", null, this::showThemeSettingsDialog),
-                menuItem("Visibility & Layout", null, this::showVisibilitySettingsDialog),
-                new SeparatorMenuItem(),
-                // Account & Security Settings
-                menuItem(t("menu.resetPassword"), null, this::openPasswordReset)));
-
+        // ── Review ───────────────────────────────────────────────────────────
         Menu reviewMenu = new Menu("Review");
-        reviewMenu.getItems().setAll(List.of(
+        reviewMenu.getItems().setAll(
                 menuItem("Performances", null, this::showPerformancesReview),
                 menuItem("Trades", null, this::showTradesReview),
                 new SeparatorMenuItem(),
                 menuItem("Recommendation", null, this::showRecommendations),
                 menuItem("Journal", null, this::showTradingJournal),
                 menuItem("Closed Journal", null, this::showClosedJournal),
-                menuItem("Generate Reports", null, this::generateTradeReports)));
+                menuItem("Generate Reports", null, this::generateTradeReports));
 
+        // ── System ───────────────────────────────────────────────────────────
         Menu systemMenu = new Menu("System");
-        systemMenu.getItems().setAll(List.of(
-                menuItem("System Monitor", null, this::openSystemMonitorWindow),
-                menuItem("Operations Board", null, this::openSystemOperationsBoard),
+        systemMenu.getItems().setAll(
+                menuItem("Operations Center", null, this::openSystemOperationsBoard),
+                menuItem("Trading System Status", null, this::tradingSystemStatus),
                 menuItem("Activity Monitor", null, this::openActivityMonitor),
+                menuItem("System Console", null, this::openSystemConsolePanel),
+                menuItem("Detached Console", null, this::openDetachedConsolePanel),
                 new SeparatorMenuItem(),
                 menuItem("Diagnostics", null, this::showSystemDiagnostics),
                 menuItem("Performance Metrics", null, this::showSystemMetrics),
-                menuItem("Resource Monitor", null, this::showResourceMonitor)));
+                menuItem("Resource Monitor", null, this::showResourceMonitor));
 
+        // ── Education ────────────────────────────────────────────────────────
         Menu educationMenu = new Menu("Education");
-        educationMenu.getItems().setAll(List.of(
+        educationMenu.getItems().setAll(
                 menuItem("Trading Basics", null, this::showTradingBasics),
                 menuItem("Strategy Guide", null, this::showStrategyGuide),
                 menuItem("Risk Management", null, this::showRiskManagement),
@@ -613,33 +634,41 @@ public class TradingDesk extends BorderPane {
                 menuItem("Investment Concepts", null, this::showInvestmentConcepts),
                 new SeparatorMenuItem(),
                 menuItem("Video Tutorials", null, this::showVideoTutorials),
-                menuItem("Documentation", null, this::showDocumentation)));
+                menuItem("Documentation", null, this::showDocumentation));
 
-        Menu windowMenu = new Menu(t("menu.window"));
-        windowMenu.getItems().setAll(List.of(
-                menuItem(t("menu.closeAllCharts"), null, this::closeAllCharts),
-                menuItem(t("menu.detachConsole"), null, this::detachConsoleWindow)));
+        // ── Settings ─────────────────────────────────────────────────────────
+        Menu settingsMenu = new Menu(t("menu.settings"));
+        settingsMenu.getItems().setAll(
+                menuItem("Settings", new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN),
+                        this::openSettingsPanel),
+                new SeparatorMenuItem(),
+                menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
+                menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
+                new SeparatorMenuItem(),
+                menuItem("Theme Customization", null, this::openThemeCustomization),
+                menuItem("Visibility & Layout", null, this::showVisibilitySettingsDialog),
+                new SeparatorMenuItem(),
+                menuItem(t("menu.resetPassword"), null, this::openPasswordReset));
 
-        Menu languageMenu = createLanguageMenu();
-
-        Menu licenseMenu = new Menu("License");
-        licenseMenu.getItems().setAll(List.of(
-                menuItem("License Management", null, this::openLicenseManagement)));
-
+        // ── Help ─────────────────────────────────────────────────────────────
         Menu helpMenu = new Menu(t("menu.help"));
-        helpMenu.getItems().addAll(
+        helpMenu.getItems().setAll(
                 menuItem("User Guide", new KeyCodeCombination(KeyCode.H, KeyCombination.CONTROL_DOWN),
                         this::showUserGuide),
                 menuItem("Keyboard Shortcuts", new KeyCodeCombination(KeyCode.K, KeyCombination.CONTROL_DOWN),
                         this::showKeyboardShortcuts),
                 menuItem(t("menu.helpItem"), new KeyCodeCombination(KeyCode.F1),
-                        () -> showInfo("Help", "InvestPro Help - F5 refreshes data, Ctrl+` toggles terminal.")),
+                        () -> showInfo("Help", "InvestPro Help — F5 refreshes data, Ctrl+` toggles terminal.")),
+                new SeparatorMenuItem(),
+                menuItem("License Management", null, this::openLicenseManagement),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.about"), null, () -> showInfo("About InvestPro",
-                        "InvestPro ----------------------------------------------------------- Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020-2026 TradeAdviser.LLC")));
+                        "InvestPro — Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020–2026 TradeAdviser LLC")));
 
-        return new MenuBar(fileMenu, editMenu, insertMenu, viewMenu, chartsMenu, toolsMenu, strategyMenu, researchMenu,
-                reviewMenu, systemMenu, educationMenu, settingsMenu, windowMenu, languageMenu, licenseMenu, helpMenu);
+        Menu languageMenu = createLanguageMenu();
+
+        return new MenuBar(fileMenu, editMenu, viewMenu, chartsMenu, tradeMenu, strategyMenu,
+                researchMenu, reviewMenu, systemMenu, educationMenu, settingsMenu, languageMenu, helpMenu);
     }
 
     private void openLicenseManagement() {
@@ -650,6 +679,41 @@ public class TradingDesk extends BorderPane {
         } catch (Exception ex) {
             log.error("Error opening license management", ex);
             showWarning("License Management", "Unable to open license management: " + ex.getMessage());
+        }
+    }
+
+    public boolean openRegisteredPanel(String panelId) {
+        if (panelId == null || panelId.isBlank()) {
+            return false;
+        }
+
+        try {
+            switch (panelId.trim().toLowerCase(Locale.ROOT)) {
+                case "strategy-lab" -> openStrategyLabPanel();
+                case "strategy-developer" -> openStrategyDeveloperPanel();
+                case "strategy-builder" -> openStrategyBuilder();
+                case "strategy-assignment" -> openStrategyAssignmentPanel();
+                case "order-panel" -> openOrderPanel();
+                case "trading-system-status" -> tradingSystemStatus();
+                case "activity-monitor" -> openActivityMonitor();
+                case "console" -> openSystemConsolePanel();
+                case "market-watch" -> openSymbolAgentMarketWatch();
+                case "market-info" -> openMarketInfoPanel();
+                case "news-calendar" -> openNewsCalendarPanel();
+                case "analysis" -> openAnalysis();
+                case "backtesting" -> openBacktesting();
+                case "settings" -> openSettingsPanel();
+                case "theme-customization" -> openThemeCustomization();
+                default -> {
+                    log.warn("No TradingDesk panel action registered for id: {}", panelId);
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception exception) {
+            log.error("Unable to open registered panel: {}", panelId, exception);
+            showWarning("Panel", "Unable to open panel: " + exception.getMessage());
+            return false;
         }
     }
 
@@ -675,7 +739,12 @@ public class TradingDesk extends BorderPane {
         }
         item.setOnAction(event -> {
             if (action != null) {
-                action.run();
+                try {
+                    action.run();
+                } catch (Exception exception) {
+                    log.error("Menu action failed: {}", text, exception);
+                    showWarning("Menu Action", "Unable to complete '%s': %s".formatted(text, rootMessage(exception)));
+                }
             }
         });
         return item;
@@ -751,6 +820,59 @@ public class TradingDesk extends BorderPane {
         return toolBar;
     }
 
+    private @NotNull HBox createDeskCommandStrip() {
+        HBox strip = new HBox(8);
+        strip.setAlignment(Pos.CENTER_LEFT);
+        strip.getStyleClass().add("desk-command-strip");
+
+        strip.getChildren().setAll(
+                createDeskMetric("Connection", deskConnectionLabel, "desk-metric-connection"),
+                createDeskMetric("Guardrail", deskRiskLabel, "desk-metric-risk"),
+                createDeskMetric("Exposure", deskExposureLabel, "desk-metric-exposure"),
+                createDeskMetric("Orders", deskOrdersLabel, "desk-metric-orders"),
+                createDeskMetric("Market", deskMarketLabel, "desk-metric-market"),
+                createDeskMetric("Spread", deskSpreadLabel, "desk-metric-spread"),
+                createDeskMetric("Strategy", deskStrategyLabel, "desk-metric-strategy"));
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button refreshDeskButton = createDeskActionButton("Refresh All", this::refreshDeskSnapshot);
+        Button riskButton = createDeskActionButton("Risk View", this::focusRiskMonitor);
+        Button analysisButton = createDeskActionButton("Analysis", this::openAnalysis);
+        Button orderTicketButton = createDeskActionButton("Order Ticket", this::openOrderPanel);
+
+        deskUpdatedLabel.getStyleClass().add("desk-updated-label");
+        strip.getChildren().addAll(spacer, deskUpdatedLabel, refreshDeskButton, riskButton, analysisButton,
+                orderTicketButton);
+        return strip;
+    }
+
+    private @NotNull VBox createDeskMetric(String title, Label valueLabel, String styleClass) {
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("desk-metric-title");
+
+        valueLabel.getStyleClass().setAll("desk-metric-value", styleClass);
+        valueLabel.setMinWidth(84);
+        valueLabel.setMaxWidth(150);
+
+        VBox metric = new VBox(1, titleLabel, valueLabel);
+        metric.getStyleClass().add("desk-metric");
+        metric.setAlignment(Pos.CENTER_LEFT);
+        return metric;
+    }
+
+    private @NotNull Button createDeskActionButton(String text, Runnable action) {
+        Button button = new Button(text);
+        button.getStyleClass().add("desk-action-button");
+        button.setOnAction(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+        return button;
+    }
+
     private SplitPane createMainWorkbench() {
         // Create center workspace with charts and terminal
         systemConsole = createTradingConsole();
@@ -820,7 +942,7 @@ public class TradingDesk extends BorderPane {
         detachButton.getStyleClass().add("terminal-button");
         detachButton.setOnAction(event -> detachMarketWatch());
 
-        Button closeButton = getCloseButton();
+        Button closeButton = createCloseButton(this::toggleMarketWatchVisibility);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -841,44 +963,36 @@ public class TradingDesk extends BorderPane {
             }
         });
 
-        // Initialize MarketInfoPanel if not already done
-        if (marketInfoPanel == null) {
-            marketInfoPanel = new MarketInfoPanel(exchange, newsDataProvider);
-        } else {
-            marketInfoPanel.setExchange(exchange);
-        }
+        // Search / filter field
+        TextField searchField = new TextField();
+        searchField.setPromptText("🔍 Filter symbols…");
+        searchField.setStyle(
+                "-fx-background-color: #1e293b; -fx-text-fill: #e2e8f0; " +
+                "-fx-border-color: #334155; -fx-border-radius: 4; -fx-background-radius: 4; " +
+                "-fx-prompt-text-fill: #64748b; -fx-font-size: 11px; -fx-padding: 5 8;");
+        FilteredList<TradePair> filteredItems = new FilteredList<>(marketWatchItems, p -> true);
+        searchField.textProperty().addListener((obs, old, query) ->
+                filteredItems.setPredicate(pair -> pair == null || query == null || query.isBlank() ||
+                        pair.toString('/').toUpperCase().contains(query.toUpperCase())));
+        marketWatchTable.setItems(filteredItems);
 
-        TabPane watchTabs = new TabPane();
-        watchTabs.getStyleClass().add("compact-tabs");
-
-        watchTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-
-        // Create OrderBook display for MarketWatch using shared
-        // orderBookBids/orderBookAsks
-        VBox sharedOrderBookView = createSharedOrderBookView();
-
-        watchTabs.getTabs().setAll(
-                new Tab("Symbols", marketWatchTable),
-                new Tab("Market Stats", marketInfoPanel),
-                new Tab("Order Book", sharedOrderBookView));
-
-        VBox box = new VBox(8, header, watchTabs);
+        VBox.setVgrow(marketWatchTable, Priority.ALWAYS);
+        VBox box = new VBox(4, header, searchField, marketWatchTable);
         box.setPadding(new Insets(8));
         box.getStyleClass().addAll("market-watch", "pro-panel");
-        VBox.setVgrow(watchTabs, Priority.ALWAYS);
         return box;
     }
 
-    private @NotNull Button getCloseButton() {
-        Button closeButton = new Button("✕");
-        closeButton.setStyle(
+    private @NotNull Button createCloseButton(Runnable toggleAction) {
+        Button btn = new Button("✕");
+        btn.setStyle(
                 "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;");
-        closeButton.setOnMouseEntered(e -> closeButton.setStyle(
+        btn.setOnMouseEntered(e -> btn.setStyle(
                 "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #ef4444; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnMouseExited(e -> closeButton.setStyle(
+        btn.setOnMouseExited(e -> btn.setStyle(
                 "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnAction(event -> toggleMarketWatchVisibility());
-        return closeButton;
+        btn.setOnAction(event -> toggleAction.run());
+        return btn;
     }
 
     private @NotNull HBox createMiniChartRow(TradePair pair) {
@@ -924,7 +1038,7 @@ public class TradingDesk extends BorderPane {
                 "-fx-padding: 8px 16px; -fx-background-color: #6366f1; -fx-text-fill: white; -fx-font-size: 12px;");
         detachButton.setOnAction(event -> detachOrderBook());
 
-        Button closeButton = getButton();
+        Button closeButton = createCloseButton(this::toggleOrderBookVisibility);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -951,95 +1065,6 @@ public class TradingDesk extends BorderPane {
         box.setPadding(new Insets(0));
         box.getStyleClass().addAll("order-book", "pro-panel");
         return box;
-    }
-
-    private @NotNull Button getButton() {
-        Button closeButton = new Button("✕");
-        closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;");
-        closeButton.setOnMouseEntered(e -> closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #ef4444; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnMouseExited(e -> closeButton.setStyle(
-                "-fx-font-size: 14; -fx-padding: 2 8 2 8; -fx-text-fill: #a0aec0; -fx-background-color: transparent; -fx-cursor: hand;"));
-        closeButton.setOnAction(event -> toggleOrderBookVisibility());
-        return closeButton;
-    }
-
-    /**
-     * Creates a compact orderbook view for the MarketWatch sidebar that shares
-     * the same orderBookBids/orderBookAsks data as the main Order Book tab.
-     * This eliminates duplicate orderbook fetches and keeps data consistent.
-     */
-    private @NotNull VBox createSharedOrderBookView() {
-        // Use HBox with two columns for compact side-by-side view
-        ListView<OrderBook.PriceLevel> bidsList = createCompactListView(true);
-        ListView<OrderBook.PriceLevel> asksList = createCompactListView(false);
-
-        HBox mainContent = new HBox(0, bidsList, asksList);
-        HBox.setHgrow(bidsList, Priority.ALWAYS);
-        HBox.setHgrow(asksList, Priority.ALWAYS);
-        mainContent.setStyle("-fx-background-color: #0f3460;");
-
-        // Header with current spread info
-        Label spreadLabel = new Label("Spread: --");
-        spreadLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #9ca3af; -fx-padding: 8;");
-
-        // Update spread on orderbook changes
-        java.util.function.Consumer<Object> updateSpread = (obj) -> {
-            if (!orderBookBids.isEmpty() && !orderBookAsks.isEmpty()) {
-                double bid = orderBookBids.get(0).getPrice();
-                double ask = orderBookAsks.get(0).getPrice();
-                double spread = ask - bid;
-                spreadLabel.setText(String.format("Spread: %.8f (%.4f%%)", spread, (spread / bid) * 100));
-            } else {
-                spreadLabel.setText("Spread: No Data");
-            }
-        };
-
-        orderBookBids.addListener((javafx.beans.InvalidationListener) observable -> updateSpread.accept(null));
-        orderBookAsks.addListener((javafx.beans.InvalidationListener) observable -> updateSpread.accept(null));
-
-        VBox container = new VBox(6, spreadLabel, mainContent);
-        container.setStyle("-fx-background-color: #0f3460;");
-        container.setPadding(new Insets(8));
-        VBox.setVgrow(mainContent, Priority.ALWAYS);
-        return container;
-    }
-
-    /**
-     * Creates a compact list view for bids or asks (for MarketWatch sidebar).
-     * Binds directly to the shared orderBookBids/orderBookAsks observable lists.
-     */
-    private @NotNull ListView<OrderBook.PriceLevel> createCompactListView(boolean isBids) {
-        ListView<OrderBook.PriceLevel> listView = new ListView<>(isBids ? orderBookBids : orderBookAsks);
-        listView.setStyle(
-                "-fx-background-color: #0f3460; -fx-text-fill: #ffffff; -fx-control-inner-background: #0f3460;");
-        listView.setCellFactory(param -> createCompactOrderBookCell(isBids));
-        listView.setPrefHeight(300);
-        return listView;
-    }
-
-    /**
-     * Creates a compact cell renderer for orderbook prices (one-line display).
-     */
-    private @NotNull javafx.scene.control.ListCell<OrderBook.PriceLevel> createCompactOrderBookCell(boolean isBids) {
-        return new javafx.scene.control.ListCell<>() {
-            @Override
-            protected void updateItem(OrderBook.PriceLevel item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    String text = String.format("%.8f | %.4f", item.getPrice(), item.getSize());
-                    setText(text);
-                    String color = isBids ? "#10b981" : "#ef4444"; // Green for bids, red for asks
-                    setStyle(String.format(
-                            "-fx-font-family: 'Courier New'; -fx-font-size: 10; -fx-text-fill: %s; -fx-padding: 2;",
-                            color));
-                }
-            }
-        };
     }
 
     private @NotNull VBox createBidsSection() {
@@ -1088,8 +1113,16 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        double bestBid = orderBookBids.get(0).getPrice();
-        double bestAsk = orderBookAsks.get(0).getPrice();
+        OrderBook.PriceLevel bid0 = orderBookBids.getFirst();
+        OrderBook.PriceLevel ask0 = orderBookAsks.getFirst();
+        if (bid0 == null || ask0 == null) {
+            Label emptyLabel = new Label("No Data");
+            emptyLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #9ca3af;");
+            bar.getChildren().add(emptyLabel);
+            return;
+        }
+        double bestBid = bid0.getPrice();
+        double bestAsk = ask0.getPrice();
         double midPrice = (bestBid + bestAsk) / 2.0;
         double spread = bestAsk - bestBid;
         double spreadPercent = (spread / midPrice) * 100;
@@ -1114,11 +1147,109 @@ public class TradingDesk extends BorderPane {
         spreadLabel.setStyle("-fx-font-size: 10; -fx-text-fill: #6b7280;");
         spreadBox.getChildren().addAll(bidLabel, askLabel, spreadLabel);
 
+        VBox usdBox = new VBox(2);
+        usdBox.setAlignment(Pos.CENTER_LEFT);
+        usdBox.setStyle("-fx-padding: 0 0 0 8;");
+        Label usdTitleLabel = new Label("USD value");
+        usdTitleLabel.setStyle("-fx-font-size: 10; -fx-text-fill: #9ca3af;");
+        Label usdValueLabel = new Label("...");
+        usdValueLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #f59e0b;");
+        usdBox.getChildren().addAll(usdTitleLabel, usdValueLabel);
+        updateUsdMidPriceConversion(usdValueLabel, midPrice, currentOrderBook == null ? null : currentOrderBook.getTradePair());
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         bar.getChildren().addAll(priceLabel, directionLabel, new Separator(Orientation.VERTICAL),
-                spreadBox, spacer);
+                spreadBox, spacer, new Separator(Orientation.VERTICAL), usdBox);
+    }
+
+    private void updateUsdMidPriceConversion(Label usdValueLabel, double midPrice, TradePair pair) {
+        if (usdValueLabel == null || pair == null || !Double.isFinite(midPrice) || midPrice <= 0.0) {
+            if (usdValueLabel != null) {
+                usdValueLabel.setText("-");
+            }
+            return;
+        }
+
+        String quote = normalizeAssetCode(pair.getCounterCode());
+        if (isUsdLikeAsset(quote)) {
+            usdValueLabel.setText(formatUsdValue(midPrice));
+            return;
+        }
+
+        usdValueLabel.setText("...");
+        CompletableFuture
+                .supplyAsync(() -> quoteUsdRate(quote))
+                .thenAccept(rate -> runOnFx(() -> {
+                    if (rate != null && Double.isFinite(rate) && rate > 0.0) {
+                        usdValueLabel.setText(formatUsdValue(midPrice * rate));
+                    } else {
+                        usdValueLabel.setText("-");
+                    }
+                }))
+                .exceptionally(exception -> {
+                    runOnFx(() -> usdValueLabel.setText("-"));
+                    log.debug("Unable to convert {} mid price to USD", pair, exception);
+                    return null;
+                });
+    }
+
+    private Double quoteUsdRate(String quote) {
+        if (exchange == null || quote == null || quote.isBlank()) {
+            return null;
+        }
+        if (isUsdLikeAsset(quote)) {
+            return 1.0;
+        }
+
+        Double directRate = fetchPairMidPrice(quote, "USDC");
+        if (directRate == null) {
+            directRate = fetchPairMidPrice(quote, "USD");
+        }
+        if (directRate != null && directRate > 0.0) {
+            return directRate;
+        }
+
+        Double inverseRate = fetchPairMidPrice("USDC", quote);
+        if (inverseRate == null) {
+            inverseRate = fetchPairMidPrice("USD", quote);
+        }
+        return inverseRate == null || inverseRate <= 0.0 ? null : 1.0 / inverseRate;
+    }
+
+    private Double fetchPairMidPrice(String base, String counter) {
+        try {
+            TradePair conversionPair = new TradePair(base, counter);
+            OrderBook conversionBook = exchange.fetchOrderBook(conversionPair).get(8, TimeUnit.SECONDS);
+            double conversionMid = conversionBook == null ? 0.0 : conversionBook.getMidPrice();
+            return Double.isFinite(conversionMid) && conversionMid > 0.0 ? conversionMid : null;
+        } catch (Exception exception) {
+            log.debug("Unable to fetch USD conversion pair {}/{}: {}", base, counter, rootMessage(exception));
+            return null;
+        }
+    }
+
+    private boolean isUsdLikeAsset(String code) {
+        String normalized = normalizeAssetCode(code);
+        return "USD".equals(normalized) || "USDC".equals(normalized) || "USDT".equals(normalized);
+    }
+
+    private String normalizeAssetCode(String code) {
+        return code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String formatUsdValue(double value) {
+        if (!Double.isFinite(value) || value <= 0.0) {
+            return "-";
+        }
+        if (value >= 1_000.0) {
+            return "$%,.2f".formatted(value);
+        }
+        if (value >= 1.0) {
+            return "$%.4f".formatted(value);
+        }
+        return "$%.8f".formatted(value);
     }
 
     private @NotNull HBox createOrderBookHeader(boolean isBids) {
@@ -1316,9 +1447,64 @@ public class TradingDesk extends BorderPane {
                 createFixedTab(TabName.MARKET_INFO, marketInfoPanel),
                 createFixedTab(TabName.OVERVIEW, new ScrollPane(overviewView)),
                 createFixedTab(TabName.BALANCES, createAccountBalancesView()),
-                createFixedTab(TabName.DEPTH, depthChart));
+                createFixedTab(TabName.DEPTH, depthChart),
+                createFixedTab(TabName.SYMBOL_STRATEGY, createSymbolStrategyTab()));
         navigatorTabs.getStyleClass().add("compact-tabs");
         return navigatorTabs;
+    }
+
+    private @NotNull Node createSymbolStrategyTab() {
+        ObservableList<StrategyAssignment> items = FXCollections.observableArrayList();
+
+        TableView<StrategyAssignment> table = new TableView<>(items);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setPlaceholder(new Label("No strategy assignments yet"));
+
+        TableColumn<StrategyAssignment, String> symbolCol = new TableColumn<>("Symbol");
+        symbolCol.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().getSymbol()));
+
+        TableColumn<StrategyAssignment, String> timeframeCol = new TableColumn<>("Timeframe");
+        timeframeCol.setCellValueFactory(c -> {
+            var tf = c.getValue().getTimeframe();
+            return new ReadOnlyStringWrapper(tf == null ? "" : tf.toString());
+        });
+
+        TableColumn<StrategyAssignment, String> strategyCol = new TableColumn<>("Strategy");
+        strategyCol.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().getStrategyId()));
+
+        TableColumn<StrategyAssignment, String> scoreCol = new TableColumn<>("Score");
+        scoreCol.setCellValueFactory(c ->
+                new ReadOnlyStringWrapper(String.format("%.2f", c.getValue().getScoreAtAssignment())));
+
+        TableColumn<StrategyAssignment, String> assignedCol = new TableColumn<>("Assigned");
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
+        assignedCol.setCellValueFactory(c -> {
+            Instant at = c.getValue().getAssignedAt();
+            return new ReadOnlyStringWrapper(at == null ? "" : dtf.format(at));
+        });
+
+        TableColumn<StrategyAssignment, String> reasonCol = new TableColumn<>("Reason");
+        reasonCol.setCellValueFactory(c -> {
+            String r = c.getValue().getReason();
+            return new ReadOnlyStringWrapper(r == null ? "" : r);
+        });
+
+        table.getColumns().setAll(symbolCol, timeframeCol, strategyCol, scoreCol, assignedCol, reasonCol);
+
+        Button refreshBtn = new Button("⟳ Refresh");
+        refreshBtn.getStyleClass().add("terminal-button");
+        refreshBtn.setOnAction(e -> {
+            items.clear();
+            items.addAll(StrategyAssignmentRepository.getInstance().getAll());
+        });
+
+        // Initial load
+        items.addAll(StrategyAssignmentRepository.getInstance().getAll());
+
+        VBox container = new VBox(6, refreshBtn, table);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        container.setPadding(new Insets(8));
+        return container;
     }
 
     private @NotNull VBox createAccountBalancesView() {
@@ -1412,7 +1598,7 @@ public class TradingDesk extends BorderPane {
         BorderPane workspace = new BorderPane();
         workspace.getStyleClass().add("chart-workspace");
 
-        Label title = new Label("Workspace Charts");
+        Label title = new Label("Workspace ");
         title.getStyleClass().add("workspace-title");
         Label context = new Label("Multi-symbol market workspace");
         context.getStyleClass().add("workspace-subtitle");
@@ -1459,7 +1645,7 @@ public class TradingDesk extends BorderPane {
         header.getStyleClass().add("workspace-header");
 
         chartTabPane.setSide(Side.TOP);
-        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
         chartTabPane.getStyleClass().add("chart-tabs");
         chartTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             if (newTab != null && !Objects.equals(oldTab, newTab)) {
@@ -1485,7 +1671,7 @@ public class TradingDesk extends BorderPane {
         detachButton.getStyleClass().add("terminal-button");
         detachButton.setOnAction(event -> detachConsoleWindow());
 
-        Button closeButton = getButton1();
+        Button closeButton = createCloseButton(this::toggleConsoleVisibility);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -1502,11 +1688,8 @@ public class TradingDesk extends BorderPane {
                 createDetachableTerminalTab(TabName.POSITIONS, createPositionsTab().getContent()),
                 createDetachableTerminalTab(TabName.RISK_MONITOR, createPositionRiskMonitorTab().getContent()),
                 createDetachableTerminalTab(TabName.SIGNALS, createSignalTab().getContent()),
-                createDetachableTerminalTab(TabName.NEWS_CALENDAR, createNewsTab().getContent()),
+                createDetachableTerminalTab(TabName.AGENTS, createAgentsTab().getContent()),
                 createDetachableTerminalTab(TabName.ALERTS, createAlertsTab().getContent()),
-                createDetachableTerminalTab(TabName.MAILBOX, createMailboxTab().getContent()),
-                createDetachableTerminalTab(TabName.CHAT, createChatTab().getContent()),
-                createDetachableTerminalTab(TabName.BROWSER, createMarketTab().getContent()),
                 createDetachableTerminalTab(TabName.JOURNAL, createJournalTab().getContent()));
 
         VBox console = new VBox(6, header, terminalTabPane);
@@ -1517,21 +1700,13 @@ public class TradingDesk extends BorderPane {
         return console;
     }
 
-    private @NotNull Button getButton1() {
-        Button closeButton = new Button("✕");
-        closeButton.getStyleClass().add("console-close-button");
-        closeButton.setOnMouseEntered(e -> {
-            // Hover effect via CSS
-        });
-        closeButton.setOnMouseExited(e -> {
-            // Unhover effect via CSS
-        });
-        closeButton.setOnAction(event -> toggleConsoleVisibility());
-        return closeButton;
-    }
-
     private void toggleConsoleVisibility() {
         if (centerSplit == null || systemConsole == null) {
+            return;
+        }
+
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
+            reattachConsole();
             return;
         }
 
@@ -1568,7 +1743,7 @@ public class TradingDesk extends BorderPane {
             marketWatchVisible = false;
         } else {
             if (!horizontalWorkbench.getItems().contains(marketWatchWrapper)) {
-                horizontalWorkbench.getItems().add(0, marketWatchWrapper);
+                horizontalWorkbench.getItems().addFirst(marketWatchWrapper);
             }
             horizontalWorkbench.setDividerPositions(0.22, 0.78);
             marketWatchVisible = true;
@@ -1603,6 +1778,12 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
+            detachedSystemConsoleStage.toFront();
+            detachedSystemConsoleStage.requestFocus();
+            return;
+        }
+
         centerSplit.getItems().remove(systemConsole);
         consoleVisible = false;
         centerSplit.layout();
@@ -1610,6 +1791,7 @@ public class TradingDesk extends BorderPane {
         Stage stage = new Stage();
         stage.setTitle("System Console");
         stage.setScene(new Scene(systemConsole, 980, 540));
+        detachedSystemConsoleStage = stage;
 
         if (getScene() != null && getScene().getWindow() != null) {
             stage.setX(getScene().getWindow().getX() + 100);
@@ -1617,6 +1799,7 @@ public class TradingDesk extends BorderPane {
         }
 
         stage.setOnCloseRequest(event -> reattachConsole());
+        stage.setOnHidden(event -> detachedSystemConsoleStage = null);
         stage.show();
         journal("Console detached.");
         saveAppState();
@@ -1625,6 +1808,10 @@ public class TradingDesk extends BorderPane {
     private void reattachConsole() {
         if (centerSplit == null || systemConsole == null) {
             return;
+        }
+
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.getScene() != null) {
+            detachedSystemConsoleStage.getScene().setRoot(new Pane());
         }
 
         if (!centerSplit.getItems().contains(systemConsole)) {
@@ -1657,6 +1844,15 @@ public class TradingDesk extends BorderPane {
      * independently.
      */
     private void createIndependentWindow(String title, Node content, double width, double height) {
+        if (content == null) {
+            showWarning(title, "Panel content is not available.");
+            return;
+        }
+        if (content.getScene() != null && content.getScene() == getScene()) {
+            showWarning(title, "This panel is already docked in the main workspace.");
+            return;
+        }
+
         // Check if window with this title is already open
         if (openIndependentWindows.containsKey(title)) {
             Stage existingStage = openIndependentWindows.get(title);
@@ -1672,6 +1868,8 @@ public class TradingDesk extends BorderPane {
             }
         }
 
+        detachFromPreviousScene(content);
+
         Stage stage = new Stage();
         stage.setTitle(title);
         stage.setWidth(width);
@@ -1686,7 +1884,8 @@ public class TradingDesk extends BorderPane {
         stage.setScene(scene);
 
         // Track window and remove from tracking when closed
-        stage.setOnCloseRequest(e -> {
+        stage.setOnHidden(e -> {
+            detachFromPreviousScene(content);
             openIndependentWindows.remove(title);
             log.info("Independent window closed: {}", title);
         });
@@ -1697,10 +1896,21 @@ public class TradingDesk extends BorderPane {
         log.info("Independent window opened: {}", title);
     }
 
+    private void detachFromPreviousScene(Node content) {
+        if (content == null || content.getScene() == null) {
+            return;
+        }
+
+        Scene previousScene = content.getScene();
+        if (previousScene.getRoot() != null) {
+            previousScene.setRoot(new Pane());
+        }
+    }
+
     private @NotNull Scene getScene(Node content, double width, double height) {
         javafx.scene.Parent sceneContent;
-        if (content instanceof BorderPane) {
-            sceneContent = (BorderPane) content;
+        if (content instanceof BorderPane || content instanceof ScrollPane || content instanceof StackPane) {
+            sceneContent = (javafx.scene.Parent) content;
         } else {
             ScrollPane scrollPane = new ScrollPane(content);
             scrollPane.setFitToWidth(true);
@@ -1709,21 +1919,60 @@ public class TradingDesk extends BorderPane {
             sceneContent = scrollPane;
         }
 
-        return new Scene(sceneContent, width, height);
+        Scene scene = new Scene(sceneContent, width, height);
+        var componentsCss = getClass().getClassLoader().getResource("css/components.css");
+        var appCss = getClass().getClassLoader().getResource("css/app.css");
+        if (componentsCss != null) {
+            scene.getStylesheets().add(componentsCss.toExternalForm());
+        }
+        if (appCss != null) {
+            scene.getStylesheets().add(appCss.toExternalForm());
+        }
+        return scene;
     }
 
-    private void openSystemMonitorWindow() {
-        if (systemMonitorPanel == null) {
-            systemMonitorPanel = new SystemMonitorPanel(() -> {
+    private Stage systemOperationsBoardStage;
+
+    private void openSystemOperationsBoard() {
+        if (systemOperationsBoardStage != null && systemOperationsBoardStage.isShowing()) {
+            systemOperationsBoardStage.toFront();
+            return;
+        }
+        try {
+            systemOperationsBoard = new SystemOperationsBoard(() -> {
                 if (systemCore == null) {
-                    return SystemMonitorPanel
+                    return SystemOperationsBoard
                             .notAvailable("SystemCore is not started. Connect an exchange or start bot trading.");
                 }
                 return systemCore.getSystemHealth();
             });
-        }
+            final SystemOperationsBoard board = systemOperationsBoard;
+            Stage stage = new Stage();
+            systemOperationsBoardStage = stage;
+            stage.setTitle("Operations Center");
+            StackPane root = new StackPane(board);
+            root.setPadding(new Insets(12));
+            root.setStyle("-fx-background-color: linear-gradient(to bottom, #0b1220, #111827);");
 
-        systemMonitorPanel.show();
+            Scene scene = new Scene(root, 1100, 700);
+            var appCss = getClass().getClassLoader().getResource("css/app.css");
+            var componentsCss = getClass().getClassLoader().getResource("css/components.css");
+            if (componentsCss != null) scene.getStylesheets().add(componentsCss.toExternalForm());
+            if (appCss != null)        scene.getStylesheets().add(appCss.toExternalForm());
+
+            stage.setMinWidth(900);
+            stage.setMinHeight(600);
+            stage.setScene(scene);
+            stage.setOnCloseRequest(e -> {
+                board.shutdown();
+                systemOperationsBoard = null;
+                systemOperationsBoardStage = null;
+            });
+            stage.show();
+        } catch (Exception e) {
+            log.error("Error opening Operations Center", e);
+            showWarning("Operations Center", "Unable to open: " + e.getMessage());
+        }
     }
 
     private void openActivityMonitor() {
@@ -1757,32 +2006,64 @@ public class TradingDesk extends BorderPane {
         createIndependentWindow("Theme Customization", themeCustomizationPanel, 900, 800);
     }
 
-    private void openSystemOperationsBoard() {
-        try {
-            var board = new org.investpro.ui.operations.SystemOperationsBoard();
-            Stage stage = new Stage();
-            stage.setTitle("InvestPro System & Operations Board");
-            stage.setScene(new Scene(board, 1400, 900));
-            stage.setOnCloseRequest(e -> board.shutdown());
-            stage.show();
-        } catch (Exception e) {
-            log.error("Error opening System Operations Board", e);
-            showWarning("System & Operations Board", "Unable to open board: " + e.getMessage());
+    private void openSystemConsolePanel() {
+        if (centerSplit == null || systemConsole == null) {
+            openDetachedConsolePanel();
+            showWarning("System Console", "Embedded console is unavailable, opened detached console instead.");
+            return;
         }
+
+        if (detachedSystemConsoleStage != null && detachedSystemConsoleStage.isShowing()) {
+            reattachConsole();
+        }
+
+        terminalTabPane.setVisible(true);
+        terminalTabPane.setManaged(true);
+        systemConsole.setVisible(true);
+        systemConsole.setManaged(true);
+
+        if (!centerSplit.getItems().contains(systemConsole)) {
+            centerSplit.getItems().add(systemConsole);
+        }
+        centerSplit.setDividerPositions(0.72);
+        consoleVisible = true;
+        centerSplit.layout();
+        if (mainVerticalWorkbench != null) {
+            mainVerticalWorkbench.layout();
+        }
+        if (horizontalWorkbench != null) {
+            horizontalWorkbench.layout();
+        }
+        systemConsole.requestFocus();
+        terminalTabPane.requestFocus();
+        saveAppState();
+    }
+
+    private void openDetachedConsolePanel() {
+        if (detachedConsolePanel == null) {
+            detachedConsolePanel = new ConsolePanel();
+            detachedConsolePanel.info("Detached console opened");
+        }
+        createIndependentWindow("Detached System Console", detachedConsolePanel, 900, 520);
     }
 
     private void openDataWindow() {
         if (dataWindow == null) {
             dataWindow = new DataWindow();
         }
+        TradePair selected = symbolSelector.getValue();
+        dataWindow.setSymbol(selected);
+        dataWindow.setTimeframe(timeframeSelector.getValue());
+        if (selected != null) {
+            dataWindow.updateQuote(selected, selected.getBid(), selected.getAsk(), selected.getLast(), Instant.now());
+        }
         createIndependentWindow("Data Window", dataWindow, 400, 500);
     }
 
     private void openMarketInfoPanel() {
-        if (marketInfoPanel == null) {
-            marketInfoPanel = new MarketInfoPanel();
-        }
-        createIndependentWindow("Market Info", marketInfoPanel, 450, 600);
+        MarketInfoPanel panel = new MarketInfoPanel(exchange, newsDataProvider);
+        panel.updateForPair(symbolSelector.getValue());
+        createIndependentWindow("Market Info", panel, 450, 600);
     }
 
     private void openSymbolAgentMarketWatch() {
@@ -1799,8 +2080,18 @@ public class TradingDesk extends BorderPane {
     private void openNavigationPanel() {
         if (navigationPanel == null) {
             navigationPanel = new Navigation();
+            navigationPanel.setOnExchangeChanged(() -> {
+                String selectedExchange = navigationPanel.getSelectedExchange();
+                if (selectedExchange != null && exchangeSelector.getItems().contains(selectedExchange)) {
+                    exchangeSelector.setValue(selectedExchange);
+                    onExchangeChanged();
+                }
+            });
         }
+        navigationPanel.setCurrentExchange(safe(exchangeSelector.getValue()));
+        navigationPanel.setConnectionStatus(hasBrokerAccess());
         navigationPanel.show();
+        navigationPanel.toFront();
     }
 
     private @NotNull Tab createPositionsTab() {
@@ -1826,112 +2117,12 @@ public class TradingDesk extends BorderPane {
         return createFixedTab(TabName.POSITIONS, content);
     }
 
-    private @NotNull Tab createNewsTab() {
-        ListView<NewsEvent> newsListView = new ListView<>();
-        List<NewsEvent> newsData;
-        try {
-            newsData = new NewsDataProvider().getUpcomingNewsEvents();
-        } catch (Exception exception) {
-            log.warn("Unable to load news.", exception);
-            newsData = Collections.emptyList();
-        }
-        newsListView.setItems(FXCollections.observableArrayList(newsData));
-        VBox content = new VBox(newsListView);
-        VBox.setVgrow(newsListView, Priority.ALWAYS);
-        return createFixedTab(TabName.NEWS_CALENDAR, content);
-    }
-
     private @NotNull Tab createAlertsTab() {
         alertsListView.setItems(
                 FXCollections.observableArrayList("No active alerts.", "Create alerts from chart or order panel."));
         VBox content = new VBox(alertsListView);
         VBox.setVgrow(alertsListView, Priority.ALWAYS);
         return createFixedTab(TabName.ALERTS, content);
-    }
-
-    private @NotNull Tab createMailboxTab() {
-        mailboxListView.setItems(
-                FXCollections.observableArrayList("Mailbox is empty.", "Broker/system messages will appear here."));
-        VBox content = new VBox(mailboxListView);
-        VBox.setVgrow(mailboxListView, Priority.ALWAYS);
-        return createFixedTab(TabName.MAILBOX, content);
-    }
-
-    private @NotNull Tab createChatTab() {
-        ListView<String> chatListView = new ListView<>();
-        HBox inputArea = new HBox(5);
-        inputArea.setPadding(new Insets(8));
-        inputArea.getStyleClass().add("chat-input");
-
-        TextField messageInput = new TextField();
-        messageInput.setPromptText("Type message...");
-
-        Button sendButton = new Button("Send");
-        sendButton.getStyleClass().add("send-button");
-        sendButton.setPrefWidth(70);
-
-        ObservableList<String> chatMessages = FXCollections
-                .observableArrayList("Chat initialized - Ready to receive messages");
-        chatListView.setItems(chatMessages);
-
-        sendButton.setOnAction(event -> {
-            String message = safe(messageInput.getText());
-            if (!message.isBlank()) {
-                chatMessages.add("[You]: %s".formatted(message));
-                chatListView.scrollTo(chatMessages.size() - 1);
-                messageInput.clear();
-                messageInput.requestFocus();
-            }
-        });
-        messageInput.setOnAction(event -> sendButton.fire());
-
-        HBox.setHgrow(messageInput, Priority.ALWAYS);
-        inputArea.getChildren().addAll(messageInput, sendButton);
-
-        VBox content = new VBox(chatListView, inputArea);
-        VBox.setVgrow(chatListView, Priority.ALWAYS);
-        content.setStyle("-fx-background-color: #0f172a;");
-        return createFixedTab(TabName.CHAT, content);
-    }
-
-    private @NotNull Tab createMarketTab() {
-        Label marketInfo = new Label(
-                "Market Information\n\nClick 'Open in Browser' to view market data in your default browser.");
-        marketInfo.setStyle("-fx-font-size: 14; -fx-text-fill: #64748b; -fx-padding: 20;");
-        marketInfo.setWrapText(true);
-
-        TextField searchField = new TextField();
-        searchField.setPromptText("Search market information (opens in browser)...");
-
-        Button openBrowserButton = getButton(searchField);
-
-        searchField.setOnAction(event -> openBrowserButton.fire());
-
-        HBox toolbar = new HBox(8, searchField, openBrowserButton);
-        toolbar.setPadding(new Insets(8));
-        HBox.setHgrow(searchField, Priority.ALWAYS);
-
-        VBox content = new VBox(6, toolbar, marketInfo);
-        VBox.setVgrow(marketInfo, Priority.ALWAYS);
-        return createFixedTab(TabName.BROWSER, content);
-    }
-
-    private @NotNull Button getButton(TextField searchField) {
-        Button openBrowserButton = new Button("Open in Browser");
-
-        openBrowserButton.setOnAction(event -> {
-            try {
-                String query = safe(searchField.getText());
-                if (query.isBlank()) {
-                    openInSystemBrowser("https://www.google.com");
-                } else {
-                    openInSystemBrowser("https://www.google.com/search?q=%s".formatted(query.replace(" ", "+")));
-                }
-            } catch (Exception exception) {
-                showWarning("Browser", "Could not open browser: %s".formatted(exception.getMessage()));
-            }
-        });
-        return openBrowserButton;
     }
 
     private @NotNull Tab createSignalTab() {
@@ -2004,13 +2195,7 @@ public class TradingDesk extends BorderPane {
      * MarketDataEngine cache.
      */
     private void startMarketWatchRefresh() {
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> {
-            Thread t = new Thread(r, "MarketWatchRefresh");
-            t.setDaemon(true);
-            return t;
-        });
-
-        scheduler.scheduleAtFixedRate(() -> {
+        autoRefreshExecutor.scheduleAtFixedRate(() -> {
             if (marketDataEngine != null && !marketWatchItems.isEmpty()) {
                 Platform.runLater(() -> {
                     for (TradePair pair : marketWatchItems) {
@@ -2027,31 +2212,113 @@ public class TradingDesk extends BorderPane {
 
     private void configureMarketWatchTableView(@NotNull TableView<TradePair> table) {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.setPlaceholder(new Label("No symbols loaded"));
+        table.setPlaceholder(new Label("No symbols in watch list"));
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        table.getColumns().addAll(
-                tableColumn("Session", pair -> pair == null ? "" : getTradingSessionStatus(pair), 80),
-                tableColumn("%Last Price", pair -> pair == null ? "" : String.valueOf(pair.getLastPrice()), 80),
-                tableColumn("Symbol", pair -> pair == null ? "" : pair.toString('/'), 100),
-                tableColumn("Spread %", pair -> pair == null ? "" : formatSpreadPercent(pair), 75),
-                tableColumn("%Change", pair -> pair == null ? "" : String.valueOf(pair.getChangePercent()), 80),
+        table.setStyle("-fx-font-size: 11px;");
 
-                tableColumn("volume", pair -> pair == null ? "" : marketPrice(pair.getVolume()), 80),
-                tableColumn("24/High", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80),
-                tableColumn("24/Low", pair -> pair == null ? "" : marketPrice(pair.getHigh24h()), 80));
+        // ── Symbol ────────────────────────────────────────────────────────────
+        TableColumn<TradePair, String> symbolCol = new TableColumn<>("Symbol");
+        symbolCol.setCellValueFactory(cd -> {
+            TradePair p = cd.getValue();
+            return new SimpleStringProperty(p == null ? "" : p.toString('/'));
+        });
+        symbolCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String s, boolean empty) {
+                super.updateItem(s, empty);
+                if (empty || s == null || s.isBlank()) { setText(null); setStyle(""); return; }
+                setText(s);
+                setStyle("-fx-font-weight: bold; -fx-text-fill: #f1f5f9;");
+            }
+        });
+        symbolCol.setPrefWidth(88);
 
+        // ── Bid ───────────────────────────────────────────────────────────────
+        TableColumn<TradePair, String> bidCol = new TableColumn<>("Bid");
+        bidCol.setCellValueFactory(cd -> {
+            TradePair p = cd.getValue();
+            return new SimpleStringProperty(p == null ? "" : price(p.getBid()));
+        });
+        bidCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String s, boolean empty) {
+                super.updateItem(s, empty);
+                if (empty || s == null || s.isBlank()) { setText(null); setStyle(""); return; }
+                setText(s); setAlignment(Pos.CENTER_RIGHT);
+                setStyle("-fx-text-fill: #60a5fa; -fx-font-family: monospace;");
+            }
+        });
+        bidCol.setPrefWidth(70);
+
+        // ── Ask ───────────────────────────────────────────────────────────────
+        TableColumn<TradePair, String> askCol = new TableColumn<>("Ask");
+        askCol.setCellValueFactory(cd -> {
+            TradePair p = cd.getValue();
+            return new SimpleStringProperty(p == null ? "" : price(p.getAsk()));
+        });
+        askCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String s, boolean empty) {
+                super.updateItem(s, empty);
+                if (empty || s == null || s.isBlank()) { setText(null); setStyle(""); return; }
+                setText(s); setAlignment(Pos.CENTER_RIGHT);
+                setStyle("-fx-text-fill: #fb923c; -fx-font-family: monospace;");
+            }
+        });
+        askCol.setPrefWidth(70);
+
+        // ── Spread (pts) ──────────────────────────────────────────────────────
+        TableColumn<TradePair, String> spreadCol = new TableColumn<>("Spr");
+        spreadCol.setCellValueFactory(cd -> {
+            TradePair p = cd.getValue();
+            return new SimpleStringProperty(p == null ? "" : formatSpreadPts(p));
+        });
+        spreadCol.setPrefWidth(48);
+
+        // ── Last ──────────────────────────────────────────────────────────────
+        TableColumn<TradePair, String> lastCol = new TableColumn<>("Last");
+        lastCol.setCellValueFactory(cd -> {
+            TradePair p = cd.getValue();
+            return new SimpleStringProperty(p == null ? "" : price(p.getLastPrice()));
+        });
+        lastCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String s, boolean empty) {
+                super.updateItem(s, empty);
+                if (empty || s == null || s.isBlank()) { setText(null); setStyle(""); return; }
+                setText(s); setAlignment(Pos.CENTER_RIGHT);
+                setStyle("-fx-font-weight: bold; -fx-text-fill: #f1f5f9; -fx-font-family: monospace;");
+            }
+        });
+        lastCol.setPrefWidth(72);
+
+        table.getColumns().addAll(symbolCol, bidCol, askCol, spreadCol, lastCol);
+
+        // ── Row factory: alternating rows + context menu + double-click ───────
         table.setRowFactory(view -> {
             TableRow<TradePair> row = new TableRow<>() {
                 @Override
                 protected void updateItem(TradePair item, boolean empty) {
                     super.updateItem(item, empty);
-                    if (!empty && item != null && item.getChangePercent() != 0) {
-                        setStyle(item.getChangePercent() > 0 ? "-fx-text-fill: #10b981;" : "-fx-text-fill: #ef4444;");
-                    } else {
-                        setStyle("");
-                    }
+                    if (empty || item == null) { setStyle(""); return; }
+                    setStyle(getIndex() % 2 == 0 ? "-fx-background-color: #0f172a;" : "-fx-background-color: #1a2332;");
                 }
             };
+            ContextMenu ctx = new ContextMenu();
+            MenuItem tradeItem  = new MenuItem("⬆ Trade");
+            MenuItem chartItem  = new MenuItem("📈 Chart");
+            MenuItem removeItem = new MenuItem("✕  Remove");
+            tradeItem.setOnAction(e -> {
+                if (!row.isEmpty()) {
+                    symbolSelector.getSelectionModel().select(row.getItem());
+                    openOrderPanel();
+                }
+            });
+            chartItem.setOnAction(e -> {
+                if (!row.isEmpty()) {
+                    symbolSelector.getSelectionModel().select(row.getItem());
+                    openSelectedSymbolChart();
+                }
+            });
+            removeItem.setOnAction(e -> { if (!row.isEmpty()) marketWatchItems.remove(row.getItem()); });
+            ctx.getItems().addAll(tradeItem, chartItem, new SeparatorMenuItem(), removeItem);
+            row.setContextMenu(ctx);
             row.setOnMouseClicked(event -> {
                 if (event.getClickCount() == 2 && !row.isEmpty()) {
                     symbolSelector.getSelectionModel().select(row.getItem());
@@ -2136,14 +2403,15 @@ public class TradingDesk extends BorderPane {
     private void configureAccountSummaryArea() {
         accountSummaryArea.setEditable(false);
         accountSummaryArea.setWrapText(true);
-        accountSummaryArea.setStyle(
-                "-fx-control-inner-background: #0f172a; " +
-                        "-fx-text-fill: #f1f5f9; " +
-                        "-fx-font-family: 'Consolas', 'Monaco', monospace; " +
-                        "-fx-font-size: 11px; " +
-                        "-fx-padding: 10px; " +
-                        "-fx-focus-color: transparent; " +
-                        "-fx-faint-focus-color: transparent;");
+        accountSummaryArea.setStyle("""
+                -fx-control-inner-background: #0f172a;
+                -fx-text-fill: #f1f5f9;
+                -fx-font-family: 'Consolas', 'Monaco', monospace;
+                -fx-font-size: 11px;
+                -fx-padding: 10px;
+                -fx-focus-color: transparent;
+                -fx-faint-focus-color: transparent;
+                """);
         accountSummaryArea.setText("""
                 ═════════════════════════════════════════════════
                                 ACCOUNT SUMMARY
@@ -2184,7 +2452,7 @@ public class TradingDesk extends BorderPane {
                 tableColumn("Type", Order::getType, 90),
                 tableColumn("Side", order -> String.valueOf(order.getSide()), 70),
                 tableColumn("Symbol", Order::getSymbol, 110),
-                tableColumn("Quantity", order -> number(order.getQuantity()), 90),
+                tableColumn("Qty", order -> number(order.getQuantity()), 90),
                 tableColumn("Price", order -> price(order.getPrice()), 90),
                 tableColumn("Status", Order::getStatus, 90));
         return table;
@@ -2284,6 +2552,167 @@ public class TradingDesk extends BorderPane {
         connectionStatusLabel.setText(connected ? t("status.connected") : t("status.disconnected"));
         updateConnectControl(connected);
         symbolCountLabel.setText(t("label.symbols", marketWatchItems.size()));
+        updateDeskCommandStrip();
+    }
+
+    private void updateDeskCommandStrip() {
+        if (deskConnectionLabel == null) {
+            return;
+        }
+
+        boolean connected;
+        try {
+            connected = hasBrokerAccess();
+        } catch (Exception exception) {
+            connected = false;
+        }
+
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        int positions = accountPositionItems.size();
+        int openOrders = accountOpenOrderItems.size();
+        int riskFlags = (int) positionHealthItems.stream()
+                .filter(score -> score != null && score.getOverallScore() < 0.60)
+                .count();
+
+        double exposure = estimateAccountExposure();
+        double spreadPercent = estimateSpreadPercent(selected);
+        MarketSnapshot market = deskMarketSnapshot();
+        StrategyStats strategy = strategyStats();
+
+        deskConnectionLabel.setText(connected ? safe(exchangeSelector.getValue()) : "Offline");
+        deskRiskLabel.setText(riskFlags == 0 ? "Clear" : riskFlags + " flag(s)");
+        deskExposureLabel.setText(exposure > 0.0 ? formatCurrencyCompact(exposure) : positions + " pos");
+        deskOrdersLabel.setText(openOrders + " open");
+        deskMarketLabel.setText(market.hasMarketData()
+                ? formatSignedPercent(market.averageChangePercent(), 2) + " breadth " + formatNumber(market.positiveBreadth(), 0)
+                : marketWatchItems.size() + " symbols");
+        deskSpreadLabel.setText(spreadPercent > 0.0 ? formatNumber(spreadPercent, 3) + "%" : "Spread: --");
+        deskStrategyLabel.setText(strategy.totalTrades() > 0
+                ? formatNumber(strategy.winRatePercent(), 1) + "% / PF " + formatNumber(strategy.profitFactor(), 2)
+                : "No sample");
+        deskUpdatedLabel.setText("Updated: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+        deskRiskLabel.getStyleClass().removeAll("desk-positive", "desk-warning", "desk-negative");
+        deskRiskLabel.getStyleClass().add(riskFlags == 0 ? "desk-positive" : riskFlags > 2 ? "desk-negative" : "desk-warning");
+
+        deskMarketLabel.getStyleClass().removeAll("desk-positive", "desk-warning", "desk-negative");
+        if (market.hasMarketData()) {
+            deskMarketLabel.getStyleClass().add(market.averageChangePercent() >= 0 ? "desk-positive" : "desk-negative");
+        }
+    }
+
+    private void refreshDeskSnapshot() {
+        cachedMarketSnapshotAt = Instant.EPOCH;
+        cachedStrategyStatsAt = Instant.EPOCH;
+        loadSelectedOrderBook();
+        loadSymbolsForSelectedExchange();
+        refreshAccountWorkspace();
+        updateDeskCommandStrip();
+        journal("Desk snapshot refreshed.");
+    }
+
+    private void focusRiskMonitor() {
+        openSystemConsolePanel();
+        refreshAccountWorkspace();
+        if (terminalTabPane != null) {
+            terminalTabPane.getTabs().stream()
+                    .filter(tab -> Objects.equals(tab.getText(), TabName.RISK_MONITOR.getTabId()))
+                    .findFirst()
+                    .ifPresent(tab -> terminalTabPane.getSelectionModel().select(tab));
+        }
+        updateDeskCommandStrip();
+    }
+
+    private double estimateAccountExposure() {
+        double exposure = accountPositionItems.stream()
+                .filter(Objects::nonNull)
+                .mapToDouble(position -> Math.abs(position.getQuantity()) * firstPositive(
+                        position.getCurrentPrice(),
+                        position.getEntryPrice(),
+                        0.0))
+                .sum();
+
+        if (exposure > 0.0) {
+            return exposure;
+        }
+
+        return positionsItems.stream()
+                .filter(Objects::nonNull)
+                .mapToDouble(position -> Math.abs(position.getQuantity()) * firstPositive(
+                        position.getCurrentPrice(),
+                        position.getEntryPrice(),
+                        0.0))
+                .sum();
+    }
+
+    private double estimateSpreadPercent(TradePair selected) {
+        double bid = 0.0;
+        double ask = 0.0;
+
+        if (!orderBookBids.isEmpty() && !orderBookAsks.isEmpty()) {
+            bid = orderBookBids.getFirst().getPrice();
+            ask = orderBookAsks.getFirst().getPrice();
+        } else if (selected != null) {
+            bid = selected.getBid();
+            ask = selected.getAsk();
+        }
+
+        if (bid <= 0.0 || ask <= 0.0 || ask <= bid) {
+            return 0.0;
+        }
+
+        double mid = (bid + ask) / 2.0;
+        return mid <= 0.0 ? 0.0 : ((ask - bid) / mid) * 100.0;
+    }
+
+    private MarketSnapshot deskMarketSnapshot() {
+        if (cachedMarketSnapshot.hasMarketData() && cachedMarketSnapshotAt.plusSeconds(30).isAfter(Instant.now())) {
+            return cachedMarketSnapshot;
+        }
+
+        List<TradePair> pairs = new ArrayList<>(marketWatchItems);
+        if (pairs.isEmpty() && symbolSelector.getValue() != null) {
+            pairs.add(symbolSelector.getValue());
+        }
+
+        double weightedChange = 0.0;
+        double totalWeight = 0.0;
+        double positiveWeight = 0.0;
+        double totalQuoteVolume = 0.0;
+        double btcQuoteVolume = 0.0;
+
+        for (TradePair pair : pairs) {
+            if (pair == null) {
+                continue;
+            }
+
+            double price = firstPositive(pair.getLastPrice(), pair.getMidPrice(), pair.getBid(), pair.getAsk());
+            double volume = safePositive(pair.getVolume());
+            double quoteVolume = price > 0.0 && volume > 0.0 ? price * volume : volume;
+            double weight = quoteVolume > 0.0 ? quoteVolume : 1.0;
+            double change = finite(pair.getChangePercent());
+
+            weightedChange += change * weight;
+            totalWeight += weight;
+            if (change > 0.0) {
+                positiveWeight += weight;
+            }
+            totalQuoteVolume += Math.max(0.0, quoteVolume);
+            if ("BTC".equalsIgnoreCase(pair.getBaseCode())) {
+                btcQuoteVolume += Math.max(0.0, quoteVolume);
+            }
+        }
+
+        if (totalWeight <= 0.0) {
+            return MarketSnapshot.empty();
+        }
+
+        double averageChange = weightedChange / totalWeight;
+        double breadth = positiveWeight / totalWeight;
+        double sentimentIndex = clamp(50.0 + (averageChange * 6.0) + ((breadth - 0.5) * 40.0), 0.0, 100.0);
+        double syntheticVix = clamp(12.0 + Math.abs(averageChange) * 4.0, 8.0, 80.0);
+        double btcDominance = totalQuoteVolume > 0.0 ? (btcQuoteVolume / totalQuoteVolume) * 100.0 : -1.0;
+        return new MarketSnapshot(sentimentIndex, averageChange, breadth, syntheticVix, btcDominance, totalQuoteVolume);
     }
 
     private void updateConnectControl(boolean connected) {
@@ -2334,8 +2763,9 @@ public class TradingDesk extends BorderPane {
 
     private void configureSelectors(MarketConfiguration configuration) {
         exchangeSelector.getItems().setAll(SUPPORTED_EXCHANGES);
-        String configuredExchange = configuration == null ? preferences.get("selected_exchange", "")
-                : safe(configuration.exchange());
+        String configuredExchange = normalizeExchangeName(configuration == null
+                ? preferences.get("selected_exchange", "")
+                : safe(configuration.exchange()));
 
         if (!configuredExchange.isBlank() && exchangeSelector.getItems().contains(configuredExchange)) {
             exchangeSelector.getSelectionModel().select(configuredExchange);
@@ -2443,7 +2873,7 @@ public class TradingDesk extends BorderPane {
                         ? "1h"
                         : supportedTimeframes.isEmpty()
                                 ? null
-                                : supportedTimeframes.get(0);
+                                : supportedTimeframes.getFirst();
 
         if (selectedTimeframe != null) {
             timeframeSelector.getSelectionModel().select(selectedTimeframe);
@@ -2486,9 +2916,9 @@ public class TradingDesk extends BorderPane {
     }
 
     private void configureChartArea() {
-        chartTabPane.setSide(Side.TOP);
-        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
-        chartTabPane.setMinHeight(0);
+        chartTabPane.setSide(Side.BOTTOM);
+        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
+        chartTabPane.setMinHeight(440);
         DraggableTab.registerTabPane(chartTabPane);
     }
 
@@ -2570,20 +3000,15 @@ public class TradingDesk extends BorderPane {
         BrokerSession existingSession = brokerSessions.get(safe(selectedExchange));
 
         if (existingSession != null && existingSession.accessGranted()) {
+            // Already connected to this exchange — reuse the active session
             exchange = existingSession.exchange();
             brokerAccessGranted = true;
         } else {
-            if (hasExchangeCredentials(selectedExchange)) {
-                loadExchangeCredentials(selectedExchange);
-            } else {
-                configuredApiKey = "";
-                configuredApiSecret = "";
-                telegramToken = "";
-            }
+            // Not connected — load any stored credentials so the dialog is pre-filled,
+            // then create a provisional exchange for symbol loading only.
+            loadExchangeCredentials(selectedExchange);
             exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
                     configuredTradingMode);
-            // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
-            new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
         }
 
         setTelegramToken(telegramToken);
@@ -2615,10 +3040,8 @@ public class TradingDesk extends BorderPane {
                 try {
                     log.info("Updating running bot with new exchange: {}", selectedExchange);
                     systemCore.getSmartBot().updateExchange(exchange);
-                    // Continue trading with new exchange
                 } catch (Exception e) {
                     log.warn("Failed to update bot exchange, recreating SystemCore: {}", e.getMessage());
-                    // Fall back to recreating
                     try {
                         systemCore = createSystemCore(exchange);
                     } catch (SQLException | ClassNotFoundException ex) {
@@ -2627,11 +3050,8 @@ public class TradingDesk extends BorderPane {
                     }
                 }
             } else {
-                // Bot not running, create new one
                 try {
                     systemCore = createSystemCore(exchange);
-                    // Wire up the primary stage to the Telegram command handler for screenshot
-                    // capability
                     if (systemCore.getTelegramCommandHandler() != null && getScene() != null
                             && getScene().getWindow() instanceof Stage) {
                         systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
@@ -2645,9 +3065,8 @@ public class TradingDesk extends BorderPane {
             enablePositionAutoRefresh();
             initializeSymbolAgentPanels();
             refreshAccountWorkspace();
-        } else if (hasExchangeCredentials(selectedExchange)) {
-            proceedWithConnection();
         } else {
+            // Exchange not connected — always prompt for credentials and trading venue
             showExchangeCredentialDialog(selectedExchange);
         }
     }
@@ -2775,6 +3194,7 @@ public class TradingDesk extends BorderPane {
         publishConnectionSignal();
         enablePositionAutoRefresh();
         refreshAccountWorkspace();
+        loadSymbolsForSelectedExchange();
 
         TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
 
@@ -3183,19 +3603,23 @@ public class TradingDesk extends BorderPane {
                 orderBookBids.clear();
                 orderBookAsks.clear();
                 currentOrderBook = new OrderBook();
+                updateChartsFromOrderBookMidPrice(currentOrderBook);
                 if (depthChart != null) {
                     depthChart.update(currentOrderBook);
                 }
+                updateDeskCommandStrip();
                 return;
             }
 
             currentOrderBook = orderBook;
             orderBookBids.setAll(orderBook.getBids() == null ? List.of() : orderBook.getBids());
             orderBookAsks.setAll(orderBook.getAsks() == null ? List.of() : orderBook.getAsks());
+            updateChartsFromOrderBookMidPrice(orderBook);
 
             if (depthChart != null) {
                 depthChart.update(orderBook);
             }
+            updateDeskCommandStrip();
         });
     }
 
@@ -3401,7 +3825,7 @@ public class TradingDesk extends BorderPane {
         operationsService.setTradingEngineProvider(() -> buildTradingEngineSnapshot(core));
 
         // Wire risk status provider
-        operationsService.setRiskStatusProvider(() -> buildRiskStatusSnapshot(core));
+        operationsService.setRiskStatusProvider(this::buildRiskStatusSnapshot);
 
         // Record bot startup event if SmartBot starts
         if (core.getSmartBot() != null) {
@@ -3455,7 +3879,7 @@ public class TradingDesk extends BorderPane {
     /**
      * Build RiskStatusSnapshot from SystemCore state
      */
-    private SystemSnapshot.RiskStatusSnapshot buildRiskStatusSnapshot(SystemCore core) {
+    private SystemSnapshot.RiskStatusSnapshot buildRiskStatusSnapshot() {
         try {
             double accountBalance = 0.0;
             double portfolioExposurePercent = 0.0;
@@ -3539,7 +3963,9 @@ public class TradingDesk extends BorderPane {
     private String getLastSignal(SystemCore core) {
         try {
             // TODO: Get actual last signal from SignalProcessor
-            return null;
+
+            return core.getSignalToDecisionFilter().toString();
+
         } catch (Exception e) {
             log.debug("Error getting last signal", e);
             return null;
@@ -3702,12 +4128,12 @@ public class TradingDesk extends BorderPane {
         if (items == null || value == null) {
             return;
         }
-        if (items.size() == 1 && items.get(0).contains("will appear here")) {
+        if (items.size() == 1 && items.getFirst().contains("will appear here")) {
             items.clear();
         }
         items.addFirst(value);
         while (items.size() > maxItems) {
-            items.remove(items.size() - 1);
+            items.removeLast();
         }
     }
 
@@ -3833,6 +4259,7 @@ public class TradingDesk extends BorderPane {
 
         if (systemCore != null && systemCore.getSymbolAgentManager() != null) {
             systemCore.getSymbolAgentManager().initializeSymbols(tradePairs);
+            systemCore.initializeSymbolAgents(tradePairs);
         }
 
         String rememberedSymbol = preferences.get("selected_symbol_" + safe(exchangeSelector.getValue()), "");
@@ -3841,10 +4268,11 @@ public class TradingDesk extends BorderPane {
                 .findFirst()
                 .orElse(null);
 
-        TradePair selected = rememberedPair != null ? rememberedPair : tradePairs.get(0);
+        TradePair selected = rememberedPair != null ? rememberedPair : tradePairs.getFirst();
         symbolSelector.getSelectionModel().select(selected);
         marketWatchTable.getSelectionModel().select(selected);
         symbolCountLabel.setText(t("label.symbols", tradePairs.size()));
+        updateDeskCommandStrip();
         if (symbolAgentMarketWatch != null) {
             symbolAgentMarketWatch.refreshMarketWatchData();
         }
@@ -4134,10 +4562,7 @@ public class TradingDesk extends BorderPane {
     }
 
     private void openNewsCalendarPanel() {
-        if (newsCalendarPanel == null) {
-            newsCalendarPanel = new NewsCalendarPanel(newsDataProvider);
-        }
-        createIndependentWindow("News", newsCalendarPanel, 760, 560);
+        createIndependentWindow("News", new NewsCalendarPanel(newsDataProvider), 760, 560);
     }
 
     private void chooseActiveChartBackgroundImage() {
@@ -4300,6 +4725,7 @@ public class TradingDesk extends BorderPane {
             return;
         }
         accountOpenOrderItems.setAll(orders);
+        updateDeskCommandStrip();
         journal("Open orders updated: " + orders.size() + " order(s)");
     }
 
@@ -4310,6 +4736,7 @@ public class TradingDesk extends BorderPane {
         }
         // Replace all history with fetched data (reverse order to show newest first)
         accountHistoryItems.setAll(reverseCopy(orders));
+        updateDeskCommandStrip();
         journal("Account history updated: " + orders.size() + " order(s)");
     }
 
@@ -4320,6 +4747,7 @@ public class TradingDesk extends BorderPane {
         }
         // Replace all positions with fetched data
         accountPositionItems.setAll(positions);
+        updateDeskCommandStrip();
         journal("Positions updated: " + positions.size() + " position(s)");
     }
 
@@ -4334,6 +4762,7 @@ public class TradingDesk extends BorderPane {
                 .toList();
         // Replace all trades with fetched data (reverse order to show newest first)
         accountTradeItems.setAll(reverseCopy(tradesWithProfit));
+        updateDeskCommandStrip();
         journal("Trades updated: " + tradesWithProfit.size() + " trade(s)");
     }
 
@@ -4381,6 +4810,7 @@ public class TradingDesk extends BorderPane {
                 .map(this::createPositionHealthScore)
                 .toList();
         positionHealthItems.setAll(healthScores);
+        updateDeskCommandStrip();
         journal("Risk monitor updated: " + positions.size() + " position(s) analyzed");
     }
 
@@ -4443,6 +4873,7 @@ public class TradingDesk extends BorderPane {
                 account,
                 hasBrokerAccess(),
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
+        updateDeskCommandStrip();
     }
 
     private void refreshPositions() {
@@ -4797,7 +5228,7 @@ public class TradingDesk extends BorderPane {
     private void openResearchReports() {
         log.info("Opening Research Reports");
         VBox reportsPanel = createResearchReportsPanel();
-        createDetachableTerminalTab(TabName.RESEARCH_REPORTS, reportsPanel);
+        createIndependentWindow("Research Reports", reportsPanel, 900, 700);
         journal("Research Reports panel opened");
     }
 
@@ -4827,11 +5258,33 @@ public class TradingDesk extends BorderPane {
 
         Button viewBtn = new Button("View Report");
         viewBtn.setStyle("-fx-padding: 6 16; -fx-background-color: #3b82f6; -fx-text-fill: white;");
-        viewBtn.setOnAction(e -> showInfo("Report", "Report details loading..."));
+        viewBtn.setOnAction(e -> {
+            String selected = reportsList.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                showWarning("Report", "Select a report first.");
+                return;
+            }
+            showInfo("Report", selected + "\n\nSummary\n" + buildResearchReportSummary(selected));
+        });
 
         Button downloadBtn = new Button("Download PDF");
         downloadBtn.setStyle("-fx-padding: 6 16; -fx-background-color: #10b981; -fx-text-fill: white;");
-        downloadBtn.setOnAction(e -> showInfo("Download", "Report PDF download started..."));
+        downloadBtn.setOnAction(e -> {
+            String selected = reportsList.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                showWarning("Download", "Select a report first.");
+                return;
+            }
+            try {
+                Path outputDir = Path.of("output", "reports");
+                Files.createDirectories(outputDir);
+                Path reportPath = outputDir.resolve("research-report-%s.txt".formatted(SNAPSHOT_FORMAT.format(LocalDateTime.now())));
+                Files.writeString(reportPath, selected + "\n\n" + buildResearchReportSummary(selected), StandardCharsets.UTF_8);
+                showInfo("Download", "Report exported to:\n" + reportPath.toAbsolutePath());
+            } catch (Exception exception) {
+                showWarning("Download", "Unable to export report: " + rootMessage(exception));
+            }
+        });
 
         actionBox.getChildren().addAll(viewBtn, downloadBtn);
 
@@ -4848,7 +5301,50 @@ public class TradingDesk extends BorderPane {
         journal("Performances Review panel opened");
     }
 
+    private Map<String, Double> computeTradeMetrics(List<org.investpro.models.trading.Trade> trades) {
+        Map<String, Double> m = new java.util.LinkedHashMap<>();
+        m.put("totalTrades", (double) trades.size());
+        double totalProfit = 0, totalLoss = 0, bestTrade = Double.NEGATIVE_INFINITY, worstTrade = Double.POSITIVE_INFINITY;
+        int wins = 0, losses = 0, consWins = 0, consLosses = 0, maxConsWins = 0, maxConsLosses = 0;
+        for (org.investpro.models.trading.Trade t : trades) {
+            double p = t.getProfit();
+            if (p >= 0) { totalProfit += p; wins++; consWins++; consLosses = 0; maxConsWins = Math.max(maxConsWins, consWins); }
+            else { totalLoss += p; losses++; consLosses++; consWins = 0; maxConsLosses = Math.max(maxConsLosses, consLosses); }
+            if (p > bestTrade) bestTrade = p;
+            if (p < worstTrade) worstTrade = p;
+        }
+        double netPnl = totalProfit + totalLoss;
+        double winRate = trades.isEmpty() ? 0 : (wins * 100.0 / trades.size());
+        double avgWin = wins == 0 ? 0 : totalProfit / wins;
+        double avgLoss = losses == 0 ? 0 : totalLoss / losses;
+        double profitFactor = Math.abs(totalLoss) < 0.0001 ? 0 : totalProfit / Math.abs(totalLoss);
+        m.put("wins", (double) wins);
+        m.put("losses", (double) losses);
+        m.put("winRate", winRate);
+        m.put("totalProfit", totalProfit);
+        m.put("totalLoss", totalLoss);
+        m.put("netPnl", netPnl);
+        m.put("avgPnl", trades.isEmpty() ? 0 : netPnl / trades.size());
+        m.put("profitFactor", profitFactor);
+        m.put("avgWin", avgWin);
+        m.put("avgLoss", avgLoss);
+        m.put("bestTrade", trades.isEmpty() ? 0 : bestTrade);
+        m.put("worstTrade", trades.isEmpty() ? 0 : worstTrade);
+        m.put("maxConsWins", (double) maxConsWins);
+        m.put("maxConsLosses", (double) maxConsLosses);
+        return m;
+    }
+
     private VBox createPerformancesReviewPanel() {
+        List<org.investpro.models.trading.Trade> trades;
+        try {
+            trades = tradeRepository.findAll();
+        } catch (java.sql.SQLException e) {
+            log.warn("Failed to load trades for performance panel", e);
+            trades = List.of();
+        }
+        final List<org.investpro.models.trading.Trade> allTrades = trades;
+
         VBox panel = new VBox(12);
         panel.setPadding(new Insets(16));
         panel.setStyle("-fx-background-color: #1a1a2e;");
@@ -4856,17 +5352,156 @@ public class TradingDesk extends BorderPane {
         Label title = new Label("Performance Analytics");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
+        Button refreshBtn = new Button("⟳ Refresh");
+        refreshBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 6 16;");
+
+        HBox header = new HBox(12, title, refreshBtn);
+        header.setAlignment(Pos.CENTER_LEFT);
+
         TabPane performanceTabs = new TabPane();
         performanceTabs.setStyle("-fx-control-inner-background: #0f3460;");
         performanceTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab returnTab = new Tab("Returns", createPlaceholderContent("Returns Analysis"));
-        Tab drawdownTab = new Tab("Drawdown", createPlaceholderContent("Drawdown Analysis"));
-        Tab sharpeTab = new Tab("Sharpe Ratio", createPlaceholderContent("Sharpe Ratio Metrics"));
-        Tab winRateTab = new Tab("Win Rate", createPlaceholderContent("Win Rate Statistics"));
+        // --- Summary tab ---
+        Map<String, Double> metrics = computeTradeMetrics(allTrades);
+        GridPane summaryGrid = new GridPane();
+        summaryGrid.setHgap(24);
+        summaryGrid.setVgap(10);
+        summaryGrid.setPadding(new Insets(16));
+        summaryGrid.setStyle("-fx-background-color: #16213e;");
 
-        performanceTabs.getTabs().addAll(returnTab, drawdownTab, sharpeTab, winRateTab);
-        panel.getChildren().addAll(title, performanceTabs);
+        String[][] summaryRows = {
+            {"Total Trades", number(metrics.get("totalTrades"))},
+            {"Win Rate", String.format("%.1f%%", metrics.get("winRate"))},
+            {"Total P&L", money(metrics.get("netPnl"))},
+            {"Average Trade P&L", money(metrics.get("avgPnl"))},
+            {"Profit Factor", String.format("%.2f", metrics.get("profitFactor"))},
+            {"Average Win", money(metrics.get("avgWin"))},
+            {"Average Loss", money(metrics.get("avgLoss"))},
+            {"Best Trade", money(metrics.get("bestTrade"))},
+            {"Worst Trade", money(metrics.get("worstTrade"))},
+            {"Max Consecutive Wins", number(metrics.get("maxConsWins"))},
+            {"Max Consecutive Losses", number(metrics.get("maxConsLosses"))}
+        };
+        for (int i = 0; i < summaryRows.length; i++) {
+            Label lbl = new Label(summaryRows[i][0]);
+            lbl.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 13px;");
+            double val = 0;
+            try { val = Double.parseDouble(summaryRows[i][1].replaceAll("[^\\d.\\-]", "")); } catch (Exception ignored) {}
+            Label val2 = new Label(summaryRows[i][1]);
+            String color = (val >= 0) ? "#10b981" : "#ef4444";
+            if (i < 2 || i == 4 || i == 9 || i == 10) color = "#ffffff";
+            val2.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 13px; -fx-font-weight: bold;");
+            summaryGrid.add(lbl, 0, i);
+            summaryGrid.add(val2, 1, i);
+        }
+
+        ScrollPane summaryScroll = new ScrollPane(summaryGrid);
+        summaryScroll.setStyle("-fx-background-color: #16213e;");
+        summaryScroll.setFitToWidth(true);
+        Tab summaryTab = new Tab("Summary", summaryScroll);
+
+        // --- Monthly P&L tab ---
+        TableView<String[]> monthlyTable = new TableView<>();
+        monthlyTable.setStyle("-fx-background-color: #16213e;");
+        monthlyTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        TableColumn<String[], String> monthCol = new TableColumn<>("Month");
+        monthCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[0]));
+        TableColumn<String[], String> mPnlCol = new TableColumn<>("Total P&L");
+        mPnlCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[1]));
+        TableColumn<String[], String> mCountCol = new TableColumn<>("Trades");
+        mCountCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[2]));
+        TableColumn<String[], String> mWinCol = new TableColumn<>("Win Rate");
+        mWinCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[3]));
+        monthlyTable.getColumns().addAll(monthCol, mPnlCol, mCountCol, mWinCol);
+
+        Map<String, List<org.investpro.models.trading.Trade>> byMonth = new java.util.TreeMap<>();
+        DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("yyyy-MM").withZone(ZoneId.systemDefault());
+        for (org.investpro.models.trading.Trade t : allTrades) {
+            if (t.getTimestamp() != null) {
+                String key = monthFmt.format(t.getTimestamp());
+                byMonth.computeIfAbsent(key, k -> new ArrayList<>()).add(t);
+            }
+        }
+        ObservableList<String[]> monthlyData = FXCollections.observableArrayList();
+        for (Map.Entry<String, List<org.investpro.models.trading.Trade>> entry : byMonth.entrySet()) {
+            Map<String, Double> mm = computeTradeMetrics(entry.getValue());
+            monthlyData.add(new String[]{
+                entry.getKey(),
+                money(mm.get("netPnl")),
+                number(mm.get("totalTrades")),
+                String.format("%.1f%%", mm.get("winRate"))
+            });
+        }
+        monthlyTable.setItems(monthlyData);
+        Tab monthlyTab = new Tab("Monthly P&L", monthlyTable);
+
+        // --- By Symbol tab ---
+        TableView<String[]> symbolTable = new TableView<>();
+        symbolTable.setStyle("-fx-background-color: #16213e;");
+        symbolTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        TableColumn<String[], String> symCol = new TableColumn<>("Symbol");
+        symCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[0]));
+        TableColumn<String[], String> symCountCol = new TableColumn<>("Trades");
+        symCountCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[1]));
+        TableColumn<String[], String> symPnlCol = new TableColumn<>("Total P&L");
+        symPnlCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[2]));
+        TableColumn<String[], String> symWinCol = new TableColumn<>("Win Rate");
+        symWinCol.setCellValueFactory(row -> new javafx.beans.property.ReadOnlyStringWrapper(row.getValue()[3]));
+        symbolTable.getColumns().addAll(symCol, symCountCol, symPnlCol, symWinCol);
+
+        Map<String, List<org.investpro.models.trading.Trade>> bySymbol = new java.util.LinkedHashMap<>();
+        for (org.investpro.models.trading.Trade t : allTrades) {
+            String sym = t.getTradePair() != null ? t.getTradePair().getSymbol() : "N/A";
+            bySymbol.computeIfAbsent(sym, k -> new ArrayList<>()).add(t);
+        }
+        ObservableList<String[]> symbolData = FXCollections.observableArrayList();
+        for (Map.Entry<String, List<org.investpro.models.trading.Trade>> entry : bySymbol.entrySet()) {
+            Map<String, Double> sm = computeTradeMetrics(entry.getValue());
+            symbolData.add(new String[]{
+                entry.getKey(),
+                number(sm.get("totalTrades")),
+                money(sm.get("netPnl")),
+                String.format("%.1f%%", sm.get("winRate"))
+            });
+        }
+        symbolTable.setItems(symbolData);
+        Tab bySymbolTab = new Tab("By Symbol", symbolTable);
+
+        performanceTabs.getTabs().addAll(summaryTab, monthlyTab, bySymbolTab);
+
+        refreshBtn.setOnAction(e -> {
+            List<org.investpro.models.trading.Trade> fresh;
+            try { fresh = tradeRepository.findAll(); } catch (java.sql.SQLException ex) { log.warn("Refresh failed", ex); fresh = List.of(); }
+            Map<String, Double> rm = computeTradeMetrics(fresh);
+            // Rebuild summary rows in-place
+            for (int i = 0; i < summaryRows.length; i++) {
+                String[] rowData = new String[]{
+                    summaryRows[i][0],
+                    i == 0 ? number(rm.get("totalTrades")) :
+                    i == 1 ? String.format("%.1f%%", rm.get("winRate")) :
+                    i == 2 ? money(rm.get("netPnl")) :
+                    i == 3 ? money(rm.get("avgPnl")) :
+                    i == 4 ? String.format("%.2f", rm.get("profitFactor")) :
+                    i == 5 ? money(rm.get("avgWin")) :
+                    i == 6 ? money(rm.get("avgLoss")) :
+                    i == 7 ? money(rm.get("bestTrade")) :
+                    i == 8 ? money(rm.get("worstTrade")) :
+                    i == 9 ? number(rm.get("maxConsWins")) :
+                    number(rm.get("maxConsLosses"))
+                };
+                summaryRows[i][1] = rowData[1];
+            }
+            // Update summary labels
+            summaryGrid.getChildren().stream()
+                .filter(n -> n instanceof Label && GridPane.getColumnIndex(n) != null && GridPane.getColumnIndex(n) == 1)
+                .forEach(n -> {
+                    int row = GridPane.getRowIndex(n) != null ? GridPane.getRowIndex(n) : 0;
+                    if (row < summaryRows.length) ((Label) n).setText(summaryRows[row][1]);
+                });
+        });
+
+        panel.getChildren().addAll(header, performanceTabs);
         VBox.setVgrow(performanceTabs, Priority.ALWAYS);
 
         return panel;
@@ -4879,7 +5514,35 @@ public class TradingDesk extends BorderPane {
         journal("Trades Review panel opened");
     }
 
+    private TableView<org.investpro.models.trading.Trade> buildTradeTable(List<org.investpro.models.trading.Trade> data) {
+        TableView<org.investpro.models.trading.Trade> table = new TableView<>();
+        table.setStyle("-fx-background-color: #16213e;");
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.getColumns().addAll(
+            tableColumn("Time",         t -> t.getTimestamp() != null ? dateTime(t.getTimestamp()) : "-", 140),
+            tableColumn("Symbol",       t -> t.getTradePair() != null ? t.getTradePair().getSymbol() : "-", 80),
+            tableColumn("Type",         t -> t.getTransactionType() != null ? t.getTransactionType().name() : "-", 60),
+            tableColumn("Size",         t -> number(t.getAmount()), 80),
+            tableColumn("Entry Price",  t -> price(t.getPrice()), 100),
+            tableColumn("Close Price",  t -> price(t.getClosePrice()), 100),
+            tableColumn("Fee",          t -> money(t.getFee()), 70),
+            tableColumn("Swap",         t -> money(t.getSwap()), 70),
+            tableColumn("P&L",          t -> money(t.getProfit()), 90)
+        );
+        table.setItems(FXCollections.observableArrayList(data));
+        return table;
+    }
+
     private VBox createTradesReviewPanel() {
+        List<org.investpro.models.trading.Trade> trades;
+        try {
+            trades = tradeRepository.findAll();
+        } catch (java.sql.SQLException e) {
+            log.warn("Failed to load trades for review panel", e);
+            trades = List.of();
+        }
+        final List<org.investpro.models.trading.Trade> allTrades = new ArrayList<>(trades);
+
         VBox panel = new VBox(12);
         panel.setPadding(new Insets(16));
         panel.setStyle("-fx-background-color: #1a1a2e;");
@@ -4887,17 +5550,84 @@ public class TradingDesk extends BorderPane {
         Label title = new Label("Trades Analysis");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
+        Button refreshBtn = new Button("⟳ Refresh");
+        refreshBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 6 16;");
+
+        HBox header = new HBox(12, title, refreshBtn);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        TableView<org.investpro.models.trading.Trade> allTable = buildTradeTable(allTrades);
+
+        List<org.investpro.models.trading.Trade> buyList = new ArrayList<>();
+        List<org.investpro.models.trading.Trade> sellList = new ArrayList<>();
+        for (org.investpro.models.trading.Trade t : allTrades) {
+            if (t.getTransactionType() != null && "BUY".equals(t.getTransactionType().name())) buyList.add(t);
+            else sellList.add(t);
+        }
+        TableView<org.investpro.models.trading.Trade> buyTable = buildTradeTable(buyList);
+        TableView<org.investpro.models.trading.Trade> sellTable = buildTradeTable(sellList);
+
+        // P&L Analysis grid
+        Map<String, Double> metrics = computeTradeMetrics(allTrades);
+        GridPane pnlGrid = new GridPane();
+        pnlGrid.setHgap(24);
+        pnlGrid.setVgap(10);
+        pnlGrid.setPadding(new Insets(16));
+        pnlGrid.setStyle("-fx-background-color: #16213e;");
+
+        String[][] pnlRows = {
+            {"Total Trades", number(metrics.get("totalTrades"))},
+            {"Total Profit", money(metrics.get("totalProfit"))},
+            {"Total Loss", money(metrics.get("totalLoss"))},
+            {"Net P&L", money(metrics.get("netPnl"))},
+            {"Win Rate", String.format("%.1f%%", metrics.get("winRate"))},
+            {"Average Win", money(metrics.get("avgWin"))},
+            {"Average Loss", money(metrics.get("avgLoss"))},
+            {"Best Trade", money(metrics.get("bestTrade"))},
+            {"Worst Trade", money(metrics.get("worstTrade"))}
+        };
+        for (int i = 0; i < pnlRows.length; i++) {
+            Label lbl = new Label(pnlRows[i][0]);
+            lbl.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 13px;");
+            double rawVal = metrics.getOrDefault(
+                i == 0 ? "totalTrades" : i == 1 ? "totalProfit" : i == 2 ? "totalLoss" :
+                i == 3 ? "netPnl" : i == 4 ? "winRate" : i == 5 ? "avgWin" :
+                i == 6 ? "avgLoss" : i == 7 ? "bestTrade" : "worstTrade", 0.0);
+            Label val = new Label(pnlRows[i][1]);
+            String clr = (i == 0 || i == 4) ? "#ffffff" : rawVal >= 0 ? "#10b981" : "#ef4444";
+            val.setStyle("-fx-text-fill: " + clr + "; -fx-font-size: 13px; -fx-font-weight: bold;");
+            pnlGrid.add(lbl, 0, i);
+            pnlGrid.add(val, 1, i);
+        }
+        ScrollPane pnlScroll = new ScrollPane(pnlGrid);
+        pnlScroll.setStyle("-fx-background-color: #16213e;");
+        pnlScroll.setFitToWidth(true);
+
         TabPane tradesTabs = new TabPane();
         tradesTabs.setStyle("-fx-control-inner-background: #0f3460;");
         tradesTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab allTradesTab = new Tab("All Trades", createPlaceholderContent("Complete Trade History"));
-        Tab closedTab = new Tab("Closed", createPlaceholderContent("Closed Trades"));
-        Tab openTab = new Tab("Open", createPlaceholderContent("Open Trades"));
-        Tab pnlTab = new Tab("P&L Analysis", createPlaceholderContent("Profit & Loss Analysis"));
+        Tab allTradesTab = new Tab("All Trades", allTable);
+        Tab buyTab = new Tab("Buy", buyTable);
+        Tab sellTab = new Tab("Sell", sellTable);
+        Tab pnlTab = new Tab("P&L Analysis", pnlScroll);
 
-        tradesTabs.getTabs().addAll(allTradesTab, closedTab, openTab, pnlTab);
-        panel.getChildren().addAll(title, tradesTabs);
+        tradesTabs.getTabs().addAll(allTradesTab, buyTab, sellTab, pnlTab);
+
+        refreshBtn.setOnAction(e -> {
+            List<org.investpro.models.trading.Trade> fresh;
+            try { fresh = tradeRepository.findAll(); } catch (java.sql.SQLException ex) { log.warn("Refresh failed", ex); fresh = List.of(); }
+            allTable.setItems(FXCollections.observableArrayList(fresh));
+            List<org.investpro.models.trading.Trade> fb = new ArrayList<>(), fs = new ArrayList<>();
+            for (org.investpro.models.trading.Trade t : fresh) {
+                if (t.getTransactionType() != null && "BUY".equals(t.getTransactionType().name())) fb.add(t);
+                else fs.add(t);
+            }
+            buyTable.setItems(FXCollections.observableArrayList(fb));
+            sellTable.setItems(FXCollections.observableArrayList(fs));
+        });
+
+        panel.getChildren().addAll(header, tradesTabs);
         VBox.setVgrow(tradesTabs, Priority.ALWAYS);
 
         return panel;
@@ -4918,46 +5648,481 @@ public class TradingDesk extends BorderPane {
         return content;
     }
 
+    private VBox createRecommendationsPanel() {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16));
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("Trade Recommendations");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        ListView<String> recommendations = new ListView<>();
+        recommendations.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
+
+        TradePair selected = symbolSelector.getValue();
+        if (selected == null) {
+            recommendations.getItems().add("Select a symbol to generate symbol-specific recommendations.");
+        } else {
+            recommendations.getItems().add("Active symbol: " + selected.toString('/'));
+            recommendations.getItems().add("Venue: " + (exchange == null ? "-" : exchange.getDisplayName()));
+            recommendations.getItems().add("24h change: " + String.format("%.2f%%", selected.getChangePercent()));
+            recommendations.getItems().add("Volume: " + formatLargeNumber(selected.getVolume()));
+            recommendations.getItems().add("Spread: " + spreadText(selected));
+            recommendations.getItems().add("Recommended next step: open Analysis & Insights before executing.");
+        }
+
+        if (!signalItems.isEmpty()) {
+            recommendations.getItems().add("");
+            recommendations.getItems().add("Latest signal context:");
+            signalItems.stream().limit(8).forEach(recommendations.getItems()::add);
+        }
+
+        if (!positionHealthItems.isEmpty()) {
+            recommendations.getItems().add("");
+            recommendations.getItems().add("Position health flags:");
+            positionHealthItems.stream()
+                    .limit(8)
+                    .map(Object::toString)
+                    .forEach(recommendations.getItems()::add);
+        }
+
+        HBox actions = new HBox(8);
+        Button analysisButton = new Button("Open Analysis");
+        analysisButton.setOnAction(event -> openAnalysis());
+        Button orderButton = new Button("Open Order Panel");
+        orderButton.setOnAction(event -> openOrderPanel());
+        Button refreshButton = new Button("Refresh");
+        refreshButton.setOnAction(event -> createIndependentWindow("Recommendations", createRecommendationsPanel(), 900, 700));
+        actions.getChildren().addAll(analysisButton, orderButton, refreshButton);
+
+        panel.getChildren().addAll(title, recommendations, actions);
+        VBox.setVgrow(recommendations, Priority.ALWAYS);
+        return panel;
+    }
+
+    private String buildResearchReportSummary(String reportTitle) {
+        MarketSnapshot snapshot = marketSnapshot();
+        return " Market snapshot"+reportTitle+":"+"\n"+
+                """
+                Sentiment: %s
+                Sentiment index: %s
+                Trading volume: %s
+                Active symbol: %s
+                Data source: %s
+                """.formatted(
+                getOverallMarketSentiment(),
+                getMarketSentimentIndex(),
+                getTradingVolume(),
+                symbolSelector.getValue() == null ? "-" : symbolSelector.getValue().toString('/'),
+                snapshot.hasMarketData() ? "live/cache" : "local fallback");
+    }
+
+    private VBox createQuantPortfolioPanel() {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16));
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("Quant Portfolio Manager");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        GridPane summary = new GridPane();
+        summary.setHgap(24);
+        summary.setVgap(10);
+        summary.setPadding(new Insets(16));
+        summary.setStyle("-fx-background-color: #16213e;");
+
+        double longPnl = positionsItems.stream().filter(Position::isBuy).mapToDouble(Position::getUnrealizedPnl).sum();
+        double shortPnl = positionsItems.stream().filter(position -> !position.isBuy()).mapToDouble(Position::getUnrealizedPnl).sum();
+        double exposure = positionsItems.stream()
+                .mapToDouble(position -> Math.abs(position.getQuantity() * position.getCurrentPrice()))
+                .sum();
+
+        addSummaryRow(summary, 0, "Open Positions", String.valueOf(positionsItems.size()));
+        addSummaryRow(summary, 1, "Long P&L", money(longPnl));
+        addSummaryRow(summary, 2, "Short P&L", money(shortPnl));
+        addSummaryRow(summary, 3, "Total P&L", money(longPnl + shortPnl));
+        addSummaryRow(summary, 4, "Gross Exposure", money(exposure));
+        addSummaryRow(summary, 5, "Market Watch Symbols", String.valueOf(marketWatchItems.size()));
+
+        TableView<Position> positions = new TableView<>(FXCollections.observableArrayList(positionsItems));
+        positions.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        positions.getColumns().addAll(
+                tableColumn("Symbol", position -> position.getTradePair() == null ? "-" : position.getTradePair().toString('/'), 120),
+                tableColumn("Side", position -> position.isBuy() ? "LONG" : "SHORT", 80),
+                tableColumn("Qty", position -> number(position.getQuantity()), 80),
+                tableColumn("Price", position -> price(position.getCurrentPrice()), 100),
+                tableColumn("P&L", position -> money(position.getUnrealizedPnl()), 100)
+        );
+
+        Button refresh = new Button("Refresh Positions");
+        refresh.setOnAction(event -> {
+            refreshPositions();
+            createIndependentWindow("Quant Portfolio Manager", createQuantPortfolioPanel(), 950, 750);
+        });
+
+        panel.getChildren().addAll(title, summary, positions, refresh);
+        VBox.setVgrow(positions, Priority.ALWAYS);
+        return panel;
+    }
+
+    private VBox createSignalMonitorPanel() {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16));
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("Signal Monitor");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        ListView<String> signals = new ListView<>(FXCollections.observableArrayList(signalItems));
+        ListView<String> activity = new ListView<>(FXCollections.observableArrayList(agentActivityItems));
+        signals.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
+        activity.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
+
+        TabPane tabs = new TabPane(
+                new Tab("Signals", signals),
+                new Tab("Agent Activity", activity));
+        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        Button refresh = new Button("Refresh");
+        refresh.setOnAction(event -> {
+            signals.setItems(FXCollections.observableArrayList(signalItems));
+            activity.setItems(FXCollections.observableArrayList(agentActivityItems));
+        });
+
+        panel.getChildren().addAll(title, tabs, refresh);
+        VBox.setVgrow(tabs, Priority.ALWAYS);
+        return panel;
+    }
+
+    private VBox createSystemDiagnosticsPanel() {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16));
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+
+        Label title = new Label("System Diagnostics");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+
+        ListView<String> diagnostics = new ListView<>();
+        diagnostics.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
+        diagnostics.getItems().add("Exchange: " + safe(exchangeSelector.getValue()));
+        diagnostics.getItems().add("Broker access: " + (hasBrokerAccess() ? "Granted" : "Not connected"));
+        diagnostics.getItems().add("SystemCore: " + (systemCore == null ? "Not started" : "Started"));
+        diagnostics.getItems().add("Bot trading: " + (botTradingEnabled ? "Enabled" : "Disabled"));
+        diagnostics.getItems().add("Symbols loaded: " + marketWatchItems.size());
+        diagnostics.getItems().add("Open positions: " + positionsItems.size());
+        diagnostics.getItems().add("Orders loaded: " + accountOpenOrderItems.size());
+
+        if (systemCore != null) {
+            try {
+                diagnostics.getItems().add("System health: " + systemCore.getSystemHealth());
+            } catch (Exception exception) {
+                diagnostics.getItems().add("System health unavailable: " + rootMessage(exception));
+            }
+        }
+
+        HBox actions = new HBox(8);
+        Button operations = new Button("Open Operations Center");
+        operations.setOnAction(event -> openSystemOperationsBoard());
+        Button resources = new Button("Open Resource Monitor");
+        resources.setOnAction(event -> showResourceMonitor());
+        Button reconnect = new Button("Reconnect");
+        reconnect.setOnAction(event -> connectSelectedExchange());
+        actions.getChildren().addAll(operations, resources, reconnect);
+
+        panel.getChildren().addAll(title, diagnostics, actions);
+        VBox.setVgrow(diagnostics, Priority.ALWAYS);
+        return panel;
+    }
+
+    private void openDocumentationWindow(String title, List<String> candidates, String fallback) {
+        TextArea text = new TextArea(loadDocumentationText(candidates, fallback));
+        text.setEditable(false);
+        text.setWrapText(true);
+        text.setStyle("-fx-control-inner-background: #0f172a; -fx-text-fill: #e5e7eb; -fx-font-family: monospace;");
+        createIndependentWindow(title, text, 900, 700);
+    }
+
+    private String loadDocumentationText(List<String> candidates, String fallback) {
+        for (String candidate : candidates) {
+            try {
+                Path path = Path.of(candidate);
+                if (Files.exists(path) && Files.isRegularFile(path)) {
+                    return Files.readString(path, StandardCharsets.UTF_8);
+                }
+            } catch (Exception exception) {
+                log.debug("Unable to read documentation candidate: {}", candidate, exception);
+            }
+        }
+        return fallback;
+    }
+
+    private void addSummaryRow(GridPane grid, int row, String name, String value) {
+        Label label = new Label(name);
+        label.setStyle("-fx-text-fill: #a0aec0;");
+        Label valueLabel = new Label(value);
+        valueLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
+        grid.add(label, 0, row);
+        grid.add(valueLabel, 1, row);
+    }
+
+    private String spreadText(TradePair pair) {
+        if (pair == null || pair.getBid() <= 0 || pair.getAsk() <= 0) {
+            return "-";
+        }
+        return price(Math.abs(pair.getAsk() - pair.getBid()));
+    }
+
+    private String formatLargeNumber(double value) {
+        if (!Double.isFinite(value) || value <= 0) {
+            return "-";
+        }
+        if (value >= 1_000_000_000) {
+            return String.format("%.2fB", value / 1_000_000_000.0);
+        }
+        if (value >= 1_000_000) {
+            return String.format("%.2fM", value / 1_000_000.0);
+        }
+        if (value >= 1_000) {
+            return String.format("%.2fK", value / 1_000.0);
+        }
+        return number(value);
+    }
+
     // ============ REVIEW MENU HANDLERS ============
     private void showRecommendations() {
         log.info("Opening Recommendations panel");
-        createIndependentWindow("Recommendations", createPlaceholderContent("AI-Powered Trade Recommendations"), 900,
-                700);
+        createIndependentWindow("Recommendations", createRecommendationsPanel(), 900, 700);
         journal("Recommendations panel opened");
     }
 
     private void showTradingJournal() {
         log.info("Opening Trading Journal");
-        createIndependentWindow("Trading Journal", createPlaceholderContent("Daily Trading Journal & Notes"), 900, 700);
+        Preferences journalPrefs = Preferences.userRoot().node("investpro/journal");
+
+        // Left panel: date picker + list of past entries
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.setStyle("-fx-background-color: #0f3460; -fx-text-fill: #ffffff;");
+        datePicker.setPrefWidth(190);
+
+        ListView<String> entryList = new ListView<>();
+        entryList.setStyle("-fx-background-color: #0f3460; -fx-text-fill: #ffffff;");
+        ObservableList<String> entryDates = FXCollections.observableArrayList();
+        try {
+            for (String key : journalPrefs.keys()) {
+                if (key.startsWith("journal_")) entryDates.add(key.substring(8));
+            }
+        } catch (Exception ignored) {}
+        entryDates.sort(Collections.reverseOrder());
+        entryList.setItems(entryDates);
+
+        Label leftTitle = new Label("Past Entries");
+        leftTitle.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 12px;");
+        VBox leftPanel = new VBox(8, datePicker, leftTitle, entryList);
+        leftPanel.setPadding(new Insets(12));
+        leftPanel.setStyle("-fx-background-color: #16213e;");
+        leftPanel.setPrefWidth(200);
+        VBox.setVgrow(entryList, Priority.ALWAYS);
+
+        // Right panel: date label + text area + buttons
+        Label dateLabel = new Label("Date: " + LocalDate.now());
+        dateLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 14px; -fx-font-weight: bold;");
+
+        TextArea notesArea = new TextArea();
+        notesArea.setStyle("-fx-background-color: #0f3460; -fx-text-fill: #ffffff; -fx-font-size: 13px;");
+        notesArea.setWrapText(true);
+        notesArea.setPromptText("Write your trading notes here...");
+        String todayKey = "journal_" + LocalDate.now();
+        notesArea.setText(journalPrefs.get(todayKey, ""));
+
+        Button saveBtn = new Button("💾 Save");
+        saveBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 6 16;");
+        Button clearBtn = new Button("🗑 Clear");
+        clearBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; -fx-padding: 6 16;");
+
+        HBox btnRow = new HBox(8, saveBtn, clearBtn);
+        btnRow.setAlignment(Pos.CENTER_RIGHT);
+
+        VBox rightPanel = new VBox(10, dateLabel, notesArea, btnRow);
+        rightPanel.setPadding(new Insets(12));
+        rightPanel.setStyle("-fx-background-color: #1a1a2e;");
+        VBox.setVgrow(notesArea, Priority.ALWAYS);
+
+        // Wire up events
+        datePicker.setOnAction(e -> {
+            LocalDate date = datePicker.getValue();
+            if (date != null) {
+                dateLabel.setText("Date: " + date);
+                String key = "journal_" + date;
+                notesArea.setText(journalPrefs.get(key, ""));
+            }
+        });
+
+        entryList.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                try { datePicker.setValue(LocalDate.parse(newVal)); } catch (Exception ignored) {}
+                dateLabel.setText("Date: " + newVal);
+                notesArea.setText(journalPrefs.get("journal_" + newVal, ""));
+            }
+        });
+
+        saveBtn.setOnAction(e -> {
+            LocalDate date = datePicker.getValue();
+            if (date == null) return;
+            String key = "journal_" + date;
+            journalPrefs.put(key, notesArea.getText());
+            String dateStr = date.toString();
+            if (!entryDates.contains(dateStr)) {
+                entryDates.addFirst(dateStr);
+            }
+            journal("Journal entry saved for " + dateStr);
+        });
+
+        clearBtn.setOnAction(e -> notesArea.clear());
+
+        SplitPane splitPane = new SplitPane(leftPanel, rightPanel);
+        splitPane.setDividerPositions(0.22);
+        splitPane.setStyle("-fx-background-color: #1a1a2e;");
+
+        createIndependentWindow("Trading Journal", splitPane, 900, 650);
         journal("Trading Journal opened");
     }
 
     private void showClosedJournal() {
         log.info("Opening Closed Journal");
-        createIndependentWindow("Closed Journal", createPlaceholderContent("Historical Closed Trades Journal"), 900,
-                700);
+
+        List<org.investpro.models.trading.Trade> allTrades;
+        try {
+            allTrades = tradeRepository.findAll();
+        } catch (java.sql.SQLException e) {
+            log.warn("Failed to load trades for closed journal", e);
+            allTrades = List.of();
+        }
+
+        List<org.investpro.models.trading.Trade> closedTrades = new ArrayList<>();
+        Set<String> symbols = new java.util.LinkedHashSet<>();
+        symbols.add("All");
+        for (org.investpro.models.trading.Trade t : allTrades) {
+            if (t.getClosePrice() > 0) {
+                closedTrades.add(t);
+                if (t.getTradePair() != null) symbols.add(t.getTradePair().getSymbol());
+            }
+        }
+
+        TableView<org.investpro.models.trading.Trade> table = new TableView<>();
+        table.setStyle("-fx-background-color: #16213e;");
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.getColumns().addAll(
+            tableColumn("Time",        t -> t.getTimestamp() != null ? dateTime(t.getTimestamp()) : "-", 140),
+            tableColumn("Symbol",      t -> t.getTradePair() != null ? t.getTradePair().getSymbol() : "-", 80),
+            tableColumn("Type",        t -> t.getTransactionType() != null ? t.getTransactionType().name() : "-", 60),
+            tableColumn("Size",        t -> number(t.getAmount()), 80),
+            tableColumn("Entry Price", t -> price(t.getPrice()), 100),
+            tableColumn("Close Price", t -> price(t.getClosePrice()), 100),
+            tableColumn("Profit",      t -> money(t.getProfit()), 90)
+        );
+        ObservableList<org.investpro.models.trading.Trade> tableData = FXCollections.observableArrayList(closedTrades);
+        table.setItems(tableData);
+
+        // Filters
+        ComboBox<String> symbolFilter = new ComboBox<>(FXCollections.observableArrayList(symbols));
+        symbolFilter.setValue("All");
+        symbolFilter.setStyle("-fx-background-color: #0f3460; -fx-text-fill: #ffffff;");
+
+        DatePicker fromDate = new DatePicker();
+        fromDate.setPromptText("From date");
+        fromDate.setStyle("-fx-background-color: #0f3460;");
+        DatePicker toDate = new DatePicker();
+        toDate.setPromptText("To date");
+        toDate.setStyle("-fx-background-color: #0f3460;");
+
+        Button applyFilter = new Button("Apply Filter");
+        applyFilter.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 6 16;");
+        Button refreshBtn = new Button("⟳ Refresh");
+        refreshBtn.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-padding: 6 16;");
+
+        Label symLbl = new Label("Symbol:");
+        symLbl.setStyle("-fx-text-fill: #a0aec0;");
+        Label fromLbl = new Label("From:");
+        fromLbl.setStyle("-fx-text-fill: #a0aec0;");
+        Label toLbl = new Label("To:");
+        toLbl.setStyle("-fx-text-fill: #a0aec0;");
+
+        HBox filterBar = new HBox(8, symLbl, symbolFilter, fromLbl, fromDate, toLbl, toDate, applyFilter, refreshBtn);
+        filterBar.setAlignment(Pos.CENTER_LEFT);
+        filterBar.setPadding(new Insets(8));
+        filterBar.setStyle("-fx-background-color: #16213e;");
+
+        applyFilter.setOnAction(e -> {
+            String sym = symbolFilter.getValue();
+            LocalDate from = fromDate.getValue();
+            LocalDate to = toDate.getValue();
+            List<org.investpro.models.trading.Trade> filtered = new ArrayList<>();
+            for (org.investpro.models.trading.Trade t : closedTrades) {
+                if (!"All".equals(sym) && (t.getTradePair() == null || !sym.equals(t.getTradePair().getSymbol()))) continue;
+                if (t.getTimestamp() != null) {
+                    LocalDate tradeDate = t.getTimestamp().atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (from != null && tradeDate.isBefore(from)) continue;
+                    if (to != null && tradeDate.isAfter(to)) continue;
+                }
+                filtered.add(t);
+            }
+            tableData.setAll(filtered);
+        });
+
+        refreshBtn.setOnAction(e -> {
+            List<org.investpro.models.trading.Trade> fresh;
+            try { fresh = tradeRepository.findAll(); } catch (java.sql.SQLException ex) { log.warn("Refresh failed", ex); fresh = List.of(); }
+            closedTrades.clear();
+            for (org.investpro.models.trading.Trade t : fresh) { if (t.getClosePrice() > 0) closedTrades.add(t); }
+            tableData.setAll(closedTrades);
+        });
+
+        VBox panel = new VBox(0, filterBar, table);
+        panel.setStyle("-fx-background-color: #1a1a2e;");
+        VBox.setVgrow(table, Priority.ALWAYS);
+
+        createIndependentWindow("Closed Journal", panel, 1000, 700);
         journal("Closed Journal opened");
     }
 
     private void generateTradeReports() {
         log.info("Generating trade reports");
-        showInfo("Generate Reports",
-                "Trade reports generation started. Reports will be saved to your documents folder.");
-        journal("Trade reports generation initiated");
+        try {
+            List<org.investpro.models.trading.Trade> trades = tradeRepository.findAll();
+            Map<String, Double> metrics = computeTradeMetrics(trades);
+            Path outputDir = Path.of("output", "reports");
+            Files.createDirectories(outputDir);
+            Path reportPath = outputDir.resolve("trade-report-%s.txt".formatted(SNAPSHOT_FORMAT.format(LocalDateTime.now())));
+
+            String report = "InvestPro Trade Report\n" +
+                    "Generated: " + LocalDateTime.now() + "\n\n" +
+                    "Total Trades: " + number(metrics.get("totalTrades")) + "\n" +
+                    "Win Rate: " + String.format("%.1f%%", metrics.get("winRate")) + "\n" +
+                    "Net P&L: " + money(metrics.get("netPnl")) + "\n" +
+                    "Profit Factor: " + String.format("%.2f", metrics.get("profitFactor")) + "\n" +
+                    "Average Trade P&L: " + money(metrics.get("avgPnl")) + "\n" +
+                    "Best Trade: " + money(metrics.get("bestTrade")) + "\n" +
+                    "Worst Trade: " + money(metrics.get("worstTrade")) + "\n";
+
+            Files.writeString(reportPath, report, StandardCharsets.UTF_8);
+            showInfo("Generate Reports", "Trade report saved to:\n" + reportPath.toAbsolutePath());
+            journal("Trade report generated: " + reportPath);
+        } catch (Exception exception) {
+            log.error("Failed to generate trade report", exception);
+            showWarning("Generate Reports", "Unable to generate report: " + rootMessage(exception));
+        }
     }
 
     // ============ RESEARCH MENU HANDLERS ============
     private void showQuantPortfolioManagement() {
         log.info("Opening Quant PM");
-        createIndependentWindow("Quant Portfolio Manager",
-                createPlaceholderContent("Quantitative Portfolio Management & Optimization"), 950, 750);
+        createIndependentWindow("Quant Portfolio Manager", createQuantPortfolioPanel(), 950, 750);
         journal("Quant PM opened");
     }
 
     private void showSignalMonitor() {
         log.info("Opening Signal Monitor");
-        createIndependentWindow("Signal Monitor",
-                createPlaceholderContent("Real-time Trading Signal Monitoring & Analysis"), 950, 750);
+        createIndependentWindow("Signal Monitor", createSignalMonitorPanel(), 950, 750);
         journal("Signal Monitor opened");
     }
 
@@ -4971,65 +6136,62 @@ public class TradingDesk extends BorderPane {
     // ============ SYSTEM MENU HANDLERS ============
     private void showSystemDiagnostics() {
         log.info("Opening System Diagnostics");
-        createIndependentWindow("System Diagnostics",
-                createPlaceholderContent("System Health & Diagnostic Information"), 900, 700);
+        createIndependentWindow("System Diagnostics", createSystemDiagnosticsPanel(), 900, 700);
         journal("System Diagnostics opened");
     }
 
     private void showSystemMetrics() {
         log.info("Opening System Metrics");
-        createIndependentWindow("Performance Metrics", createPlaceholderContent("Real-time System Performance Metrics"),
-                900, 700);
+        showResourceMonitor();
         journal("System Metrics opened");
     }
 
     private void showResourceMonitor() {
         log.info("Opening Resource Monitor");
-        createIndependentWindow("Resource Monitor", createPlaceholderContent("CPU, Memory, Network & Disk Usage"), 900,
-                700);
+        if (resourceMonitorPanel == null) {
+            resourceMonitorPanel = new ResourceMonitorPanel();
+        }
+        createIndependentWindow("Resource Monitor", resourceMonitorPanel, 980, 760);
         journal("Resource Monitor opened");
     }
 
     // ============ EDUCATION MENU HANDLERS ============
     private void showTradingBasics() {
         log.info("Opening Trading Basics");
-        createIndependentWindow("Trading Basics", createPlaceholderContent("Fundamentals of Trading & Market Concepts"),
-                900, 700);
+        openDocumentationWindow("Trading Basics", List.of("README.md", "QUICK_REFERENCE.md"),
+                "Start by connecting an exchange, selecting a symbol, opening a chart, and validating risk before automated trading.");
         journal("Trading Basics opened");
     }
 
     private void showStrategyGuide() {
         log.info("Opening Strategy Guide");
-        createIndependentWindow("Strategy Guide", createPlaceholderContent("Comprehensive Guide to Trading Strategies"),
-                900, 700);
+        openDocumentationWindow("Strategy Guide", List.of("STRATEGY_INTEGRATION_GUIDE.md", "USER_STRATEGY_IMPLEMENTATION.md", "docs/user-strategies.md"),
+                "Strategy documentation was not found in the local docs folder.");
         journal("Strategy Guide opened");
     }
 
     private void showRiskManagement() {
         log.info("Opening Risk Management Guide");
-        createIndependentWindow("Risk Management", createPlaceholderContent("Risk Management Best Practices & Tools"),
-                900, 700);
+        openAnalysis();
         journal("Risk Management guide opened");
     }
 
     private void showMarketAnalysis() {
         log.info("Opening Market Analysis Guide");
-        createIndependentWindow("Market Analysis", createPlaceholderContent("Technical & Fundamental Market Analysis"),
-                900, 700);
+        openAnalysis();
         journal("Market Analysis guide opened");
     }
 
     private void showTechnicalIndicators() {
         log.info("Opening Technical Indicators");
-        createIndependentWindow("Technical Indicators",
-                createPlaceholderContent("How to Use Technical Indicators Effectively"), 900, 700);
+        openInsertIndicatorDialog();
         journal("Technical Indicators guide opened");
     }
 
     private void showInvestmentConcepts() {
         log.info("Opening Investment Concepts");
-        createIndependentWindow("Investment Concepts", createPlaceholderContent("Core Investment & Portfolio Concepts"),
-                900, 700);
+        openDocumentationWindow("Investment Concepts", List.of("BACKTESTING_GUIDE.md", "DEVELOPER_GUIDE.md"),
+                "Use the performance, backtesting, and portfolio screens to compare risk, return, drawdown, and execution quality.");
         journal("Investment Concepts opened");
     }
 
@@ -5042,8 +6204,8 @@ public class TradingDesk extends BorderPane {
 
     private void showDocumentation() {
         log.info("Opening Documentation");
-        showInfo("Documentation",
-                "Complete documentation available at:\nhttps://docs.investpro.com\n\nSections:\n- API Reference\n- Strategy Development Guide\n- Configuration Guide");
+        openDocumentationWindow("Documentation", List.of("README.md", "DEVELOPER_GUIDE.md", "SYSTEM_ARCHITECTURE.md"),
+                "No local documentation files were found.");
         journal("Documentation accessed");
     }
 
@@ -5058,19 +6220,22 @@ public class TradingDesk extends BorderPane {
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
         TextArea guide = new TextArea(
-                "GETTING STARTED\n" +
-                        "1. Set up your exchange credentials (Settings → Exchange Credentials)\n" +
-                        "2. Choose your trading strategy (Strategy Menu)\n" +
-                        "3. Configure risk parameters (Trader Profile)\n" +
-                        "4. Monitor positions and orders (Trading Desk)\n\n" +
-                        "MAIN FEATURES\n" +
-                        "• Market Research: Analyze trends and sentiment\n" +
-                        "• Strategy Builder: Create and backtest strategies\n" +
-                        "• Telegram Bot: Trade and monitor on the go\n" +
-                        "• Review Panel: Track performances and trades\n" +
-                        "• Education: Learn trading concepts\n\n" +
-                        "KEYBOARD SHORTCUTS\n" +
-                        "Press Ctrl+K to view all keyboard shortcuts");
+                """
+                        GETTING STARTED
+                        1. Set up your exchange credentials (Settings → Exchange Credentials)
+                        2. Choose your trading strategy (Strategy Menu)
+                        3. Configure risk parameters (Trader Profile)
+                        4. Monitor positions and orders (Trading Desk)
+
+                        MAIN FEATURES
+                        • Market Research: Analyze trends and sentiment
+                        • Strategy Builder: Create and backtest strategies
+                        • Telegram Bot: Trade and monitor on the go
+                        • Review Panel: Track performances and trades
+                        • Education: Learn trading concepts
+
+                        KEYBOARD SHORTCUTS
+                        Press Ctrl+K to view all keyboard shortcuts""");
 
         guide.setWrapText(true);
         guide.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #e2e8f0;");
@@ -5093,25 +6258,29 @@ public class TradingDesk extends BorderPane {
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
         TextArea shortcuts = new TextArea(
-                "TRADING ACTIONS\n" +
-                        "Ctrl+O : Open Order Panel\n" +
-                        "Ctrl+T : Toggle Bot Trading\n" +
-                        "Ctrl+H : User Guide\n" +
-                        "Ctrl+K : Keyboard Shortcuts\n" +
-                        "F1     : Help\n\n" +
-                        "UI NAVIGATION\n" +
-                        "F5     : Refresh Data\n" +
-                        "Ctrl+` : Toggle Terminal\n" +
-                        "Tab    : Focus Next Component\n" +
-                        "Shift+Tab : Focus Previous Component\n\n" +
-                        "CHART CONTROLS\n" +
-                        "+ : Zoom In\n" +
-                        "- : Zoom Out\n" +
-                        "Right Arrow : Next Timeframe\n" +
-                        "Left Arrow : Previous Timeframe\n\n" +
-                        "GENERAL\n" +
-                        "Ctrl+Q : Quit Application\n" +
-                        "Ctrl+S : Save Settings");
+                """
+                        TRADING ACTIONS
+                        Ctrl+O : Open Order Panel
+                        Ctrl+T : Toggle Bot Trading
+                        Ctrl+H : User Guide
+                        Ctrl+K : Keyboard Shortcuts
+                        F1     : Help
+
+                        UI NAVIGATION
+                        F5     : Refresh Data
+                        Ctrl+` : Toggle Terminal
+                        Tab    : Focus Next Component
+                        Shift+Tab : Focus Previous Component
+
+                        CHART CONTROLS
+                        + : Zoom In
+                        - : Zoom Out
+                        Right Arrow : Next Timeframe
+                        Left Arrow : Previous Timeframe
+
+                        GENERAL
+                        Ctrl+Q : Quit Application
+                        Ctrl+S : Save Settings""");
 
         shortcuts.setWrapText(true);
         shortcuts.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #e2e8f0;");
@@ -5328,8 +6497,7 @@ public class TradingDesk extends BorderPane {
 
             // Apply panel visibility changes
             applyVisibilitySettings(showMarketWatchCheckBox.isSelected(), showOrderBookCheckBox.isSelected(),
-                    showTerminalCheckBox.isSelected(), showChartsCheckBox.isSelected(),
-                    showPositionsCheckBox.isSelected());
+                    showTerminalCheckBox.isSelected(), showChartsCheckBox.isSelected());
 
             // Apply font size
             applyFontSize((int) fontSizeSlider.getValue());
@@ -5342,7 +6510,7 @@ public class TradingDesk extends BorderPane {
      * Apply visibility settings to panels
      */
     private void applyVisibilitySettings(boolean showMarketWatch, boolean showOrderBook, boolean showTerminal,
-            boolean showCharts, boolean showPositions) {
+            boolean showCharts) {
         // Market Watch visibility
         if (marketWatchWrapper != null) {
             marketWatchWrapper.setVisible(showMarketWatch);
@@ -5395,104 +6563,218 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
+        boolean oanda      = "OANDA".equalsIgnoreCase(selectedExchange);
+        boolean isCoinbase = "Coinbase".equalsIgnoreCase(selectedExchange);
+        boolean hasCreds   = !configuredApiKey.isBlank();
+
+        // ── Dialog shell ──────────────────────────────────────────────────────
         Dialog<Boolean> dialog = new Dialog<>();
-        dialog.setTitle("Exchange Credentials");
-        dialog.setHeaderText("Enter credentials for " + selectedExchange);
+        dialog.setTitle("Connect to " + selectedExchange);
+        dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
 
-        ButtonType connectType = new ButtonType("Save & Connect", ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().setAll(connectType, ButtonType.CANCEL);
+        ButtonType connectBtn = new ButtonType("Connect", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(connectBtn, ButtonType.CANCEL);
 
-        GridPane grid = new GridPane();
-        grid.setHgap(15);
-        grid.setVgap(12);
-        grid.setPadding(new Insets(15));
-        grid.getStyleClass().add("credential-dialog-grid");
+        // ── Header band ───────────────────────────────────────────────────────
+        Label exchangeTitle = new Label(selectedExchange.toUpperCase());
+        exchangeTitle.setStyle("""
+                -fx-font-size: 20px;
+                -fx-font-weight: bold;
+                -fx-text-fill: #f8fafc;
+                """);
 
-        TextField apiKeyField = new TextField(configuredApiKey);
-        apiKeyField.getStyleClass().add("credential-text-field");
+        Label statusBadge = new Label(hasCreds ? "⚠  Not Connected" : "Not Configured");
+        statusBadge.setStyle("""
+                -fx-background-color: %s;
+                -fx-text-fill: white;
+                -fx-font-size: 11px;
+                -fx-font-weight: bold;
+                -fx-padding: 3 10 3 10;
+                -fx-background-radius: 10;
+                """.formatted(hasCreds ? "#f59e0b" : "#6b7280"));
 
+        Label subText = new Label(hasCreds
+                ? "Confirm your credentials and trading venue to reconnect."
+                : "Enter your API credentials and select a trading venue.");
+        subText.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 12px;");
+        subText.setWrapText(true);
+
+        HBox badgeRow = new HBox(10, exchangeTitle, statusBadge);
+        badgeRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+        VBox header = new VBox(6, badgeRow, subText);
+        header.setStyle("""
+                -fx-background-color: #1e293b;
+                -fx-padding: 20 24 16 24;
+                -fx-border-color: #334155;
+                -fx-border-width: 0 0 1 0;
+                """);
+        header.setPrefWidth(520);
+
+        // ── Helper: builds a labelled field section ────────────────────────────
+        // (label on top, control below — modern UI pattern)
+
+        // ── Credentials section ───────────────────────────────────────────────
+        String apiLabelText    = oanda ? "API Token"    : "API Key";
+        String secretLabelText = oanda ? "Account ID"   : "API Secret";
+        String apiPrompt       = oanda ? "Enter your OANDA v20 API token" : "Paste your API key here";
+        String secretPrompt    = oanda ? "Account ID (e.g. 001-001-123456-001)" : "Paste your API secret / private key";
+
+        TextField    apiKeyField = new TextField(configuredApiKey);
         PasswordField secretField = new PasswordField();
         secretField.setText(configuredApiSecret);
-        secretField.getStyleClass().add("credential-text-field");
 
+        // For Coinbase, the secret is a multi-line PEM key — use TextArea instead
+        TextArea pemArea = null;
+        if (isCoinbase) {
+            pemArea = new TextArea(configuredApiSecret);
+            pemArea.setPromptText("-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----");
+            pemArea.setPrefRowCount(6);
+            pemArea.setWrapText(true);
+            pemArea.setStyle("""
+                    -fx-font-family: 'Courier New', monospace;
+                    -fx-font-size: 11px;
+                    -fx-background-color: #0f172a;
+                    -fx-text-fill: #e2e8f0;
+                    -fx-border-color: #334155;
+                    -fx-border-radius: 4;
+                    -fx-background-radius: 4;
+                    """);
+        }
+
+        styleDialogField(apiKeyField, apiPrompt);
+        styleDialogField(secretField, secretPrompt);
+
+        // ── Venue toggle (LIVE / PAPER) ────────────────────────────────────────
+        ToggleGroup venueGroup   = new ToggleGroup();
+        ToggleButton liveToggle  = new ToggleButton("LIVE");
+        ToggleButton paperToggle = new ToggleButton("PAPER");
+        liveToggle.setToggleGroup(venueGroup);
+        paperToggle.setToggleGroup(venueGroup);
+        liveToggle.setPrefWidth(110);
+        paperToggle.setPrefWidth(110);
+
+        boolean isLive = !"PAPER".equalsIgnoreCase(configuredTradingMode);
+        liveToggle.setSelected(isLive);
+        paperToggle.setSelected(!isLive);
+
+        String toggleBase = """
+                -fx-font-weight: bold;
+                -fx-font-size: 12px;
+                -fx-cursor: hand;
+                -fx-background-radius: 4;
+                -fx-border-radius: 4;
+                """;
+        Runnable applyVenueStyles = () -> {
+            if (liveToggle.isSelected()) {
+                liveToggle.setStyle(toggleBase + "-fx-background-color: #ef4444; -fx-text-fill: white; -fx-border-color: #dc2626;");
+                paperToggle.setStyle(toggleBase + "-fx-background-color: #1e293b; -fx-text-fill: #94a3b8; -fx-border-color: #334155;");
+            } else {
+                liveToggle.setStyle(toggleBase + "-fx-background-color: #1e293b; -fx-text-fill: #94a3b8; -fx-border-color: #334155;");
+                paperToggle.setStyle(toggleBase + "-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;");
+            }
+        };
+        applyVenueStyles.run();
+        liveToggle.selectedProperty().addListener((obs, o, n)  -> applyVenueStyles.run());
+        paperToggle.selectedProperty().addListener((obs, o, n) -> applyVenueStyles.run());
+
+        Label liveWarning = new Label("⚠  LIVE mode executes real trades with real funds.");
+        liveWarning.setStyle("-fx-text-fill: #f87171; -fx-font-size: 11px;");
+        liveWarning.visibleProperty().bind(liveToggle.selectedProperty());
+        liveWarning.managedProperty().bind(liveToggle.selectedProperty());
+
+        HBox venueButtons = new HBox(8, liveToggle, paperToggle);
+
+        // ── Optional notifications section ────────────────────────────────────
         TextField telegramField = new TextField(telegramToken);
-        telegramField.getStyleClass().add("credential-text-field");
+        TextField emailField    = new TextField(oandaEmailNotification);
+        styleDialogField(telegramField, "Telegram bot token (optional)");
+        styleDialogField(emailField,    "Email address for trade alerts (optional)");
 
-        TextField emailField = new TextField(oandaEmailNotification);
-        emailField.getStyleClass().add("credential-text-field");
-
-        // Trading mode selector - using ChoiceBox (immutable) instead of ComboBox
-        ChoiceBox<String> tradingModeChoice = new ChoiceBox<>();
-        tradingModeChoice.getItems().addAll("LIVE", "PAPER");
-        tradingModeChoice.setValue(configuredTradingMode != null ? configuredTradingMode : "LIVE");
-        tradingModeChoice.setPrefWidth(Double.MAX_VALUE);
-        tradingModeChoice.getStyleClass().add("credential-choice-box");
-
-        // Style labels
-        Label apiLabel = new Label(selectedExchange.equalsIgnoreCase("OANDA") ? "Token" : "API Key");
-        apiLabel.getStyleClass().add("credential-dialog-label");
-
-        Label secretLabel = new Label(selectedExchange.equalsIgnoreCase("OANDA") ? "Account ID" : "API Secret");
-        secretLabel.getStyleClass().add("credential-dialog-label");
-
-        Label tradingLabel = new Label("Trading Mode");
-        tradingLabel.getStyleClass().add("credential-dialog-label");
-
-        Label telegramLabel = new Label("Telegram Token");
-        telegramLabel.getStyleClass().add("credential-dialog-label");
-
-        Label emailLabel = new Label("Email Notifications");
-        emailLabel.getStyleClass().add("credential-dialog-label");
-
-        boolean oanda = "OANDA".equalsIgnoreCase(selectedExchange);
-        apiKeyField.setPromptText(oanda ? "OANDA Token" : "API Key");
-        secretField.setPromptText(oanda ? "Account ID optional" : "API Secret");
-        telegramField.setPromptText("Telegram Token optional");
-        emailField.setPromptText("Email for OANDA notifications (optional)");
         emailField.setVisible(oanda);
         emailField.setManaged(oanda);
 
-        grid.addRow(0, apiLabel, apiKeyField);
-        grid.addRow(1, secretLabel, secretField);
-        grid.addRow(2, tradingLabel, tradingModeChoice);
-        grid.addRow(3, telegramLabel, telegramField);
-        if (oanda) {
-            grid.addRow(4, emailLabel, emailField);
-        }
-
-        // Add helpful info for Coinbase
-        boolean isCoinbase = "Coinbase".equalsIgnoreCase(selectedExchange);
+        // ── Coinbase help accordion ────────────────────────────────────────────
+        TitledPane coinbaseHelp = null;
         if (isCoinbase) {
-            TextArea coinbaseHelpArea = new TextArea(
-                    "Coinbase Advanced Trade Setup:\n\n" +
-                            "API Key Format:\n" +
-                            "organizations/{org_id}/apiKeys/{key_id}\n\n" +
-                            "API Secret:\n" +
-                            "Complete EC private key in PEM format (from .pem file)\n\n" +
-                            "Steps:\n" +
-                            "1. Go to Coinbase → Settings → Developers → API Keys\n" +
-                            "2. Create a new API key with 'View accounts' permission\n" +
-                            "3. Copy the key name (starts with 'organizations/')\n" +
-                            "4. Download & open the private key .pem file\n" +
-                            "5. Copy entire contents (-----BEGIN...END-----)");
-            coinbaseHelpArea.setWrapText(true);
-            coinbaseHelpArea.setEditable(false);
-            coinbaseHelpArea.setPrefRowCount(8);
-            coinbaseHelpArea.getStyleClass().add("credential-help-area");
-
-            Label helpLabel = new Label("Help");
-            helpLabel.getStyleClass().add("credential-dialog-label");
-            grid.addRow(5, helpLabel, coinbaseHelpArea);
-            GridPane.setColumnSpan(coinbaseHelpArea, 1);
+            Label helpText = new Label("""
+                    1. Go to Coinbase → Settings → Developers → API Keys
+                    2. Create a key with "Trade" permission
+                    3. Copy the Key Name (starts with organizations/)
+                    4. Download the .pem file and paste its full contents below""");
+            helpText.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
+            helpText.setWrapText(true);
+            coinbaseHelp = new TitledPane("Coinbase Advanced Trade — Setup Guide", helpText);
+            coinbaseHelp.setExpanded(false);
+            coinbaseHelp.setStyle("""
+                    -fx-background-color: #0f172a;
+                    -fx-text-fill: #64748b;
+                    -fx-font-size: 11px;
+                    """);
         }
 
-        dialog.getDialogPane().setContent(grid);
-        dialog.setResultConverter(buttonType -> {
-            if (buttonType == connectType) {
-                String apiKey = safe(apiKeyField.getText());
-                String apiSecret = safe(secretField.getText());
+        // ── Assemble body ──────────────────────────────────────────────────────
+        VBox body = new VBox(16);
+        body.setPadding(new Insets(20, 24, 8, 24));
+        body.setStyle("-fx-background-color: #0f172a;");
+        body.setPrefWidth(520);
 
-                // Validate Coinbase credentials before saving
+        body.getChildren().addAll(
+                sectionBlock("CREDENTIALS",
+                        fieldBlock(apiLabelText, apiKeyField),
+                        isCoinbase ? fieldBlock(secretLabelText, pemArea) : fieldBlock(secretLabelText, secretField)
+                ),
+                sectionBlock("TRADING VENUE",
+                        venueButtons,
+                        liveWarning
+                ),
+                sectionBlock("NOTIFICATIONS (optional)",
+                        fieldBlock("Telegram Token", telegramField),
+                        oanda ? fieldBlock("Email", emailField) : null
+                )
+        );
+
+        if (coinbaseHelp != null) {
+            body.getChildren().add(coinbaseHelp);
+        }
+
+        // ── Footer ─────────────────────────────────────────────────────────────
+        VBox root = new VBox(header, body);
+        root.setStyle("-fx-background-color: #0f172a;");
+
+        dialog.getDialogPane().setContent(root);
+        dialog.getDialogPane().setStyle("""
+                -fx-background-color: #0f172a;
+                -fx-border-color: #1e293b;
+                -fx-border-width: 1;
+                """);
+        dialog.getDialogPane().setPrefWidth(560);
+
+        // Style the Connect button
+        javafx.application.Platform.runLater(() -> {
+            javafx.scene.Node connectNode = dialog.getDialogPane().lookupButton(connectBtn);
+            if (connectNode != null) {
+                connectNode.setStyle("""
+                        -fx-background-color: #10b981;
+                        -fx-text-fill: white;
+                        -fx-font-weight: bold;
+                        -fx-font-size: 13px;
+                        -fx-padding: 8 20;
+                        -fx-background-radius: 4;
+                        -fx-cursor: hand;
+                        """);
+            }
+        });
+
+        // ── Capture result ─────────────────────────────────────────────────────
+        final TextArea finalPemArea = pemArea;
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == connectBtn) {
+                String apiKey    = safe(apiKeyField.getText());
+                String apiSecret = isCoinbase
+                        ? safe(finalPemArea.getText())
+                        : safe(secretField.getText());
+
                 if ("Coinbase".equalsIgnoreCase(selectedExchange)) {
                     String validationError = validateCoinbaseCredentials(apiKey, apiSecret);
                     if (validationError != null && !validationError.isBlank()) {
@@ -5501,10 +6783,10 @@ public class TradingDesk extends BorderPane {
                     }
                 }
 
-                configuredApiKey = apiKey;
-                configuredApiSecret = apiSecret;
-                configuredTradingMode = tradingModeChoice.getValue();
-                telegramToken = safe(telegramField.getText());
+                configuredApiKey      = apiKey;
+                configuredApiSecret   = apiSecret;
+                configuredTradingMode = liveToggle.isSelected() ? "LIVE" : "PAPER";
+                telegramToken         = safe(telegramField.getText());
                 if (oanda) {
                     oandaEmailNotification = safe(emailField.getText());
                 }
@@ -5516,9 +6798,8 @@ public class TradingDesk extends BorderPane {
 
         dialog.showAndWait().ifPresent(saved -> {
             if (saved) {
-                exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
-                        configuredTradingMode);
-                // Connect WebSocket stream on background thread to avoid blocking JavaFX thread
+                exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret,
+                        configuredAccountId, configuredTradingMode);
                 new Thread(() -> exchange.connectStream(), "WebSocketConnector-" + selectedExchange).start();
                 setTelegramToken(telegramToken);
                 proceedWithConnection();
@@ -5526,48 +6807,114 @@ public class TradingDesk extends BorderPane {
         });
     }
 
+    /** Applies a consistent dark-theme style to a text input field. */
+    private void styleDialogField(javafx.scene.control.TextInputControl field, String prompt) {
+        field.setPromptText(prompt);
+        field.setMaxWidth(Double.MAX_VALUE);
+        field.setStyle("""
+                -fx-background-color: #1e293b;
+                -fx-text-fill: #f1f5f9;
+                -fx-prompt-text-fill: #475569;
+                -fx-border-color: #334155;
+                -fx-border-radius: 4;
+                -fx-background-radius: 4;
+                -fx-padding: 8 10;
+                -fx-font-size: 12px;
+                """);
+    }
+
+    /** Creates a label + control stacked vertically. Null control is silently skipped. */
+    private VBox fieldBlock(String labelText, javafx.scene.Node control) {
+        if (control == null) return new VBox();
+        Label lbl = new Label(labelText);
+        lbl.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px; -fx-font-weight: bold;");
+        VBox block = new VBox(5, lbl, control);
+        VBox.setVgrow(control, javafx.scene.layout.Priority.ALWAYS);
+        HBox.setHgrow(control, javafx.scene.layout.Priority.ALWAYS);
+        return block;
+    }
+
+    /** Creates a titled section separator with children stacked below. Null children are skipped. */
+    private VBox sectionBlock(String title, javafx.scene.Node... children) {
+        Label sectionTitle = new Label(title);
+        sectionTitle.setStyle("""
+                -fx-text-fill: #475569;
+                -fx-font-size: 10px;
+                -fx-font-weight: bold;
+                """);
+
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color: #1e293b;");
+
+        HBox titleRow = new HBox(10, sectionTitle, sep);
+        titleRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        HBox.setHgrow(sep, javafx.scene.layout.Priority.ALWAYS);
+
+        VBox section = new VBox(10, titleRow);
+        for (javafx.scene.Node child : children) {
+            if (child != null && !(child instanceof VBox vb && vb.getChildren().isEmpty())) {
+                section.getChildren().add(child);
+            }
+        }
+        return section;
+    }
+
     private String validateCoinbaseCredentials(String apiKey, String apiSecret) {
         // Check if both fields are provided
         if (apiKey == null || apiKey.isBlank()) {
-            return "API Key (CDP Key Name) cannot be empty.\n\n" +
-                    "Format: organizations/{org_id}/apiKeys/{key_id}\n\n" +
-                    "Get this from Coinbase → Developer → API Keys → Copy the key name.";
+            return """
+                    API Key (CDP Key Name) cannot be empty.
+
+                    Format: organizations/{org_id}/apiKeys/{key_id}
+
+                    Get this from Coinbase → Developer → API Keys → Copy the key name.""";
         }
 
         if (apiSecret == null || apiSecret.isBlank()) {
-            return "API Secret (EC Private Key) cannot be empty.\n\n" +
-                    "This should be the EC private key in PEM format, starting with:\n" +
-                    "-----BEGIN EC PRIVATE KEY-----\n" +
-                    "or\n" +
-                    "-----BEGIN PRIVATE KEY-----";
+            return """
+                    API Secret (EC Private Key) cannot be empty.
+
+                    This should be the EC private key in PEM format, starting with:
+                    -----BEGIN EC PRIVATE KEY-----
+                    or
+                    -----BEGIN PRIVATE KEY-----""";
         }
 
         // Validate API Key format
         if (!apiKey.contains("organizations/") || !apiKey.contains("/apiKeys/")) {
-            return "Invalid API Key format.\n\n" +
-                    "Expected format: organizations/{org_id}/apiKeys/{key_id}\n\n" +
-                    "Example: organizations/12345678-1234-5678-1234-567812345678/apiKeys/87654321-4321-8765-4321-876543218765";
+            return """
+                    Invalid API Key format.
+
+                    Expected format: organizations/{org_id}/apiKeys/{key_id}
+
+                    Example: organizations/12345678-1234-5678-1234-567812345678/apiKeys/87654321-4321-8765-4321-876543218765""";
         }
 
         // Validate Private Key format
         String keyTrimmed = apiSecret.trim();
         if (!keyTrimmed.contains("BEGIN") || !keyTrimmed.contains("PRIVATE KEY")) {
-            return "Invalid Private Key format.\n\n" +
-                    "The private key should be in PEM format, containing:\n" +
-                    "• -----BEGIN EC PRIVATE KEY----- (or -----BEGIN PRIVATE KEY-----)\n" +
-                    "• Base64 encoded key content\n" +
-                    "• -----END EC PRIVATE KEY----- (or -----END PRIVATE KEY-----)\n\n" +
-                    "Get this from Coinbase → Developer → API Keys → Download the private key file.";
+            return """
+                    Invalid Private Key format.
+
+                    The private key should be in PEM format, containing:
+                    • -----BEGIN EC PRIVATE KEY----- (or -----BEGIN PRIVATE KEY-----)
+                    • Base64 encoded key content
+                    • -----END EC PRIVATE KEY----- (or -----END PRIVATE KEY-----)
+
+                    Get this from Coinbase → Developer → API Keys → Download the private key file.""";
         }
 
         // Validate that it looks like a complete key
         if (keyTrimmed.split("\n").length < 3) {
-            return "Private Key appears incomplete.\n\n" +
-                    "Make sure you've copied the ENTIRE private key, including:\n" +
-                    "• The BEGIN line\n" +
-                    "• All content in the middle\n" +
-                    "• The END line\n\n" +
-                    "Tip: Open the .pem file in a text editor and copy the entire contents.";
+            return """
+                    Private Key appears incomplete.
+
+                    Make sure you've copied the ENTIRE private key, including:
+                    • The BEGIN line
+                    • All content in the middle
+                    • The END line
+
+                    Tip: Open the .pem file in a text editor and copy the entire contents.""";
         }
 
         return null; // Validation passed
@@ -5621,10 +6968,10 @@ public class TradingDesk extends BorderPane {
                 })
                 .onTradeUpdate(trade -> {
                     if (trade != null) {
-                        accountTradeItems.add(0, trade);
+                        accountTradeItems.addFirst(trade);
 
                         while (accountTradeItems.size() > 500) {
-                            accountTradeItems.remove(accountTradeItems.size() - 1);
+                            accountTradeItems.removeLast();
                         }
                     }
                 })
@@ -5650,7 +6997,7 @@ public class TradingDesk extends BorderPane {
                 })
                 .onFillUpdate(fill -> {
                     if (fill != null) {
-                        accountTradeItems.add(0, fill);
+                        accountTradeItems.addFirst(fill);
                     }
                 })
                 .onError((exchangeName, throwable) -> journal("Stream error from %s: %s".formatted(
@@ -5662,11 +7009,65 @@ public class TradingDesk extends BorderPane {
     private void updateOrderBookUi(@NotNull OrderBook orderBook) {
         currentOrderBook = orderBook;
 
-        orderBookBids.setAll(orderBook.getBids());
-        orderBookAsks.setAll(orderBook.getAsks());
+        orderBookBids.setAll(orderBook.getBids() == null ? List.of() : orderBook.getBids());
+        orderBookAsks.setAll(orderBook.getAsks() == null ? List.of() : orderBook.getAsks());
+        updateChartsFromOrderBookMidPrice(orderBook);
 
         if (depthChart != null) {
             depthChart.update(orderBook);
+        }
+    }
+
+    private void updateChartsFromOrderBookMidPrice(@NotNull OrderBook orderBook) {
+        double midPrice = orderBook.getMidPrice();
+        if (!Double.isFinite(midPrice) || midPrice <= 0.0) {
+            CandleStickChart activeChart = getActiveChart();
+            if (activeChart != null) {
+                activeChart.clearCurrentMarketPrice();
+            }
+            return;
+        }
+
+
+        OrderBook.PriceLevel bestBid = orderBook.getBestBid();
+        OrderBook.PriceLevel bestAsk = orderBook.getBestAsk();
+        TradePair orderBookPair = orderBook.getTradePair() != null ? orderBook.getTradePair() : activeOrderBookPair;
+        if (orderBookPair != null && bestBid != null && bestAsk != null) {
+            orderBookPair.updateQuote(bestBid.getPrice(), bestAsk.getPrice());
+            if (dataWindow != null) {
+                dataWindow.updateQuote(orderBookPair, bestBid.getPrice(), bestAsk.getPrice(), midPrice, orderBook.getTimestamp());
+            }
+        }
+
+        for (Tab tab : chartTabPane.getTabs()) {
+            if (tab.getContent() instanceof ChartContainer container
+                    && isSameTradePair(container.getTradePair(), orderBookPair)) {
+                CandleStickChart chart = container.getChart();
+                if (chart != null) {
+                    chart.setCurrentMarketPrice(midPrice);
+                }
+            } else if (tab == chartTabPane.getSelectionModel().getSelectedItem()
+                    && orderBookPair == null
+                    && tab.getContent() instanceof ChartContainer container) {
+                CandleStickChart chart = container.getChart();
+                if (chart != null) {
+                    chart.setCurrentMarketPrice(midPrice);
+                }
+            }
+        }
+    }
+
+    private boolean isSameTradePair(@Nullable TradePair left, @Nullable TradePair right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        if (Objects.equals(left, right)) {
+            return true;
+        }
+        try {
+            return Objects.equals(left.toString('/'), right.toString('/'));
+        } catch (Exception exception) {
+            return Objects.equals(String.valueOf(left), String.valueOf(right));
         }
     }
 
@@ -5680,6 +7081,8 @@ public class TradingDesk extends BorderPane {
         String normalizedName = normalizeExchangeName(exchangeName);
         boolean paperMode = "PAPER".equalsIgnoreCase(safe(tradingMode))
                 || "SANDBOX".equalsIgnoreCase(safe(tradingMode));
+        boolean stellar = "STELLAR NETWORK".equals(normalizedName);
+        String normalizedAccountId = stellar ? safe(apiKey) : safe(accountId);
 
         ExchangeCredentials credentials = new ExchangeCredentials(
                 normalizedExchangeId(normalizedName),
@@ -5688,7 +7091,7 @@ public class TradingDesk extends BorderPane {
                 normalizedName.equals("COINBASE") ? safe(apiKey) : null,
                 normalizedName.equals("COINBASE") ? safe(apiSecret) : null,
                 null,
-                safe(accountId),
+               normalizedAccountId,
                 paperMode);
 
         Exchange createdExchange = switch (normalizedName) {
@@ -5698,6 +7101,7 @@ public class TradingDesk extends BorderPane {
             case "BITFINEX" -> new Bitfinex(credentials);
             case "ALPACA" -> new Alpaca(credentials);
             case "INTERACTIVE BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK" -> new InteractiveBrokers(credentials);
+            case "SCHWAB", "CHARLES SCHWAB" -> new Schwab(credentials);
             case "COINBASE" -> new Coinbase(credentials);
             case "STELLAR NETWORK", "STELLAR-NETWORK", "STELLAR_NETWORK" -> new StellarNetwork(credentials);
             default -> {
@@ -5732,6 +7136,7 @@ public class TradingDesk extends BorderPane {
             case "OANDA", "OANDA FX", "OANDA FOREX" -> "OANDA";
             case "ALPACA", "ALPACA STOCKS", "ALPACA EQUITIES" -> "ALPACA";
             case "INTERACTIVE BROKERS", "INTERACTIVEBROKERS", "IBKR", "IBK" -> "INTERACTIVE BROKERS";
+            case "SCHWAB", "CHARLES SCHWAB", "CHARLESSCHWAB" -> "SCHWAB";
             case "STELLAR", "STELLAR NETWORK", "STELLARNETWORK" -> "STELLAR NETWORK";
             default -> name;
         };
@@ -5746,17 +7151,10 @@ public class TradingDesk extends BorderPane {
             case "ALPACA" -> "alpaca";
             case "BITFINEX" -> "bitfinex";
             case "INTERACTIVE BROKERS" -> "interactive_brokers";
+            case "SCHWAB" -> "schwab";
             case "STELLAR NETWORK" -> "stellar-network";
             default -> normalizedName.toLowerCase(Locale.ROOT).replace(" ", "_");
         };
-    }
-
-    private void openInSystemBrowser(String url) throws IOException {
-        if (!Desktop.isDesktopSupported()) {
-            showWarning("Browser", "Desktop browser integration is not supported on this system.");
-            return;
-        }
-        Desktop.getDesktop().browse(URI.create(url));
     }
 
     private void withFocusedTextInput(java.util.function.Consumer<TextInputControl> action) {
@@ -5819,10 +7217,6 @@ public class TradingDesk extends BorderPane {
         return value <= 0 || !Double.isFinite(value) ? "-" : String.format("%.5f", value);
     }
 
-    private String marketPrice(double value) {
-        return value <= 0 || !Double.isFinite(value) ? "-" : String.format("%.5f", value);
-    }
-
     private String formatPrice(double value) {
         return value <= 0 || !Double.isFinite(value) ? "-" : String.format("%.5f", value);
     }
@@ -5831,17 +7225,27 @@ public class TradingDesk extends BorderPane {
         return !Double.isFinite(value) ? "0.00" : String.format("%.2f", value);
     }
 
-    private String number(double value) {
+    private @NotNull String number(double value) {
         return !Double.isFinite(value) ? "0" : String.format("%.4f", value);
     }
 
-    private String formatSpreadPercent(TradePair pair) {
-        if (pair == null || pair.getBid() <= 0) {
-            return "-";
-        }
+
+    /** Returns the spread in points (pips × 10 for 5-decimal pairs). */
+    private String formatSpreadPts(TradePair pair) {
+        if (pair == null || pair.getBid() <= 0 || pair.getAsk() <= 0) return "-";
         double spread = pair.getAsk() - pair.getBid();
-        double spreadPercent = (spread / pair.getBid()) * 100.0;
-        return String.format("%.3f%%", spreadPercent);
+        if (spread <= 0) return "-";
+        // Determine decimal precision from bid magnitude
+        double bid = pair.getBid();
+        double pts;
+        if (bid >= 100) {
+            pts = spread * 100;        // e.g., BTC/USD
+        } else if (bid >= 1) {
+            pts = spread * 10_000;     // e.g., EUR/USD (5-decimal)
+        } else {
+            pts = spread * 100_000;    // e.g., XLM/USDC
+        }
+        return pts >= 10 ? String.format("%.0f", pts) : String.format("%.1f", pts);
     }
 
     private String compactMarketNumber(double value) {
@@ -5977,6 +7381,9 @@ public class TradingDesk extends BorderPane {
         tradePair.setAsk(ticker.getAskPrice());
         tradePair.setLast(ticker.getLastPrice());
         tradePair.setVolume(ticker.getVolume());
+        tradePair.setHigh24h(ticker.getHighPrice());
+        tradePair.setLow24h(ticker.getLowPrice());
+        tradePair.setChangePercent(ticker.getChangePercent());
         tradePair.setUpdatedAt(Instant.now());
 
         int index = marketWatchItems.indexOf(tradePair);
@@ -5988,6 +7395,9 @@ public class TradingDesk extends BorderPane {
             updated.setAsk(ticker.getAskPrice());
             updated.setLast(ticker.getLastPrice());
             updated.setVolume(ticker.getVolume());
+            updated.setHigh24h(ticker.getHighPrice());
+            updated.setLow24h(ticker.getLowPrice());
+            updated.setChangePercent(ticker.getChangePercent());
             updated.setUpdatedAt(Instant.now());
             marketWatchItems.set(index, updated);
         }
@@ -5997,10 +7407,10 @@ public class TradingDesk extends BorderPane {
 
     public void updateTradeFromStream(Trade trade) {
         if (trade != null) {
-            accountTradeItems.add(0, trade);
+            accountTradeItems.addFirst(trade);
 
             while (accountTradeItems.size() > 500) {
-                accountTradeItems.remove(accountTradeItems.size() - 1);
+                accountTradeItems.removeLast();
             }
         }
     }
@@ -6026,10 +7436,10 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        accountOpenOrderItems.add(0, order);
+        accountOpenOrderItems.addFirst(order);
 
         while (accountOpenOrderItems.size() > 500) {
-            accountOpenOrderItems.remove(accountOpenOrderItems.size() - 1);
+            accountOpenOrderItems.removeLast();
         }
     }
 
@@ -6038,10 +7448,10 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        accountPositionItems.add(0, position);
+        accountPositionItems.addFirst(position);
 
         while (accountPositionItems.size() > 500) {
-            accountPositionItems.remove(accountPositionItems.size() - 1);
+            accountPositionItems.removeLast();
         }
     }
 
@@ -6177,7 +7587,7 @@ public class TradingDesk extends BorderPane {
              */
             TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
             if (selected == null && !marketWatchItems.isEmpty()) {
-                selected = marketWatchItems.get(0);
+                selected = marketWatchItems.getFirst();
             }
             if (selected != null && hasBrokerAccess()) {
                 startDesktopStream(selected);
@@ -6206,7 +7616,7 @@ public class TradingDesk extends BorderPane {
         }
 
         try {
-            TradePair primarySymbol = symbols.get(0);
+            TradePair primarySymbol = symbols.getFirst();
 
             /*
              * Prevent duplicate exchange streams:
@@ -6297,6 +7707,59 @@ public class TradingDesk extends BorderPane {
     // ============================================================================
     // Strategy Menu Methods
     // ============================================================================
+
+    private void openStrategyLabPanel() {
+        if (systemCore == null) {
+            showWarning("Strategy Lab", "SystemCore is not initialized. Connect an exchange first.");
+            return;
+        }
+
+        try {
+            StrategyLabPanel strategyLabPanel = new StrategyLabPanel(systemCore);
+            createIndependentWindow("Strategy Lab", strategyLabPanel, 1200, 800);
+            journal("Strategy Lab opened");
+            log.info("Strategy Lab panel opened");
+        } catch (SQLException | ClassNotFoundException exception) {
+            log.error("Strategy Lab panel failed to open", exception);
+            showWarning("Strategy Lab", "Unable to open Strategy Lab: " + exception.getMessage());
+        }
+    }
+
+    private void openStrategyDeveloperPanel() {
+        StrategyDeveloperPanel strategyDeveloperPanel = new StrategyDeveloperPanel(systemCore);
+        createIndependentWindow("Strategy Developer", strategyDeveloperPanel, 1100, 760);
+        journal("Strategy Developer opened");
+        log.info("Strategy Developer panel opened");
+    }
+
+    private void openStrategyAssignmentPanel() {
+        if (systemCore == null) {
+            showWarning("Strategy Assignment", "SystemCore is not initialized. Connect an exchange first.");
+            return;
+        }
+        try {
+            showStrategyAssignmentPanel();
+        } catch (SQLException | ClassNotFoundException exception) {
+            log.error("Strategy Assignment panel failed to open", exception);
+            showWarning("Strategy Assignment", "Unable to open Strategy Assignment: " + exception.getMessage());
+        }
+    }
+
+    private void openSettingsPanel() {
+        SettingsPanel settingsPanel = new SettingsPanel(systemCore);
+        createIndependentWindow("Settings", settingsPanel, 900, 760);
+        journal("Settings panel opened");
+        log.info("Settings panel opened");
+    }
+
+    private void openBacktestReportPanel() {
+        if (backtestReportPanel == null) {
+            backtestReportPanel = new BacktestReportPanel();
+        }
+        createIndependentWindow("Backtest Report", backtestReportPanel, 900, 760);
+        journal("Backtest Report panel opened");
+        log.info("Backtest Report panel opened");
+    }
 
     private void openStrategyBuilder() {
         StrategyBuilderPanel strategyBuilder = new StrategyBuilderPanel(systemCore);
@@ -6557,8 +8020,12 @@ public class TradingDesk extends BorderPane {
 
         Stage orderStage = new Stage();
         orderStage.setTitle("Order Manager - " + (selectedSymbol != null ? selectedSymbol.getSymbol() : "Trading"));
-        orderStage.setScene(new Scene(orderPanel, 1000, 700));
-        orderStage.setResizable(true);
+        orderStage.setScene(new Scene(orderPanel, 400, 300));
+        orderStage.setWidth(400);
+        orderStage.setHeight(300);
+        orderStage.setMinWidth(400);
+        orderStage.setMinHeight(300);
+        orderStage.setResizable(false);
         orderStage.show();
 
         log.info("Order panel opened for symbol: {}", selectedSymbol != null ? selectedSymbol.getSymbol() : "N/A");
@@ -6692,7 +8159,7 @@ public class TradingDesk extends BorderPane {
         return stats.totalTrades() > 1 ? formatNumber(stats.sortinoRatio(), 2) : "N/A";
     }
 
-    private String getStrategyMonthlyReturn() {
+    private @NotNull String getStrategyMonthlyReturn() {
         StrategyStats stats = strategyStats();
         return stats.totalTrades() > 0 ? formatSignedPercent(stats.monthlyReturnPercent(), 1) : "N/A";
     }
@@ -7177,6 +8644,10 @@ public class TradingDesk extends BorderPane {
             var systemHealth = systemCore.getSystemHealth();
             var currentSession = brokerSessions.get(exchange != null ? exchange.getName() : "");
             var account = currentSession != null ? currentSession.account() : null;
+            double availableBalance = account != null ? account.getAvailableBalance() : 0.0;
+            double equity = account != null ? account.getEquity() : 0.0;
+            double unrealizedPnl = account != null ? account.getUnrealizedPnl() : 0.0;
+            double realizedPnlToday = account != null ? account.getRealizedPnlToday() : 0.0;
             var isAutoTrading = systemCore.getSmartBot() != null && systemCore.getSmartBot().isAutoTradingEnabled();
             List<CandleData> candleList = new ArrayList<>(systemCore.getHistoricalDataRepository().findAll());
             // Build a comprehensive trading system status snapshot
@@ -7190,7 +8661,7 @@ public class TradingDesk extends BorderPane {
                     .activeVenue(exchange != null ? exchange.getName() : "N/A")
                     .connectedSince(systemHealth != null ? systemHealth.getTimestamp() : java.time.Instant.now())
                     .lastHeartbeat(java.time.Instant.now())
-                    .uptimeSeconds(systemHealth != null ? 0L : 0L)
+                    .uptimeSeconds(0L)
 
                     // Connectivity Status
                     .restApiConnected(true)
@@ -7250,11 +8721,11 @@ public class TradingDesk extends BorderPane {
                     .feedbackSamples(0)
 
                     // Account
-                    .balance(account.getAvailableBalance())
-                    .equity(account.getEquity())
-                    .availableBalance(account.getAvailableBalance())
-                    .unrealizedPnl(account.getUnrealizedPnl())
-                    .realizedPnlToday(account.getRealizedPnlToday())
+                    .balance(availableBalance)
+                    .equity(equity)
+                    .availableBalance(availableBalance)
+                    .unrealizedPnl(unrealizedPnl)
+                    .realizedPnlToday(realizedPnlToday)
                     .feesAndCommission(0.0)
                     .swapOrFundingCost(0.0)
                     .openPositionCount(0)
@@ -7300,10 +8771,15 @@ public class TradingDesk extends BorderPane {
 
         } catch (Exception e) {
             log.error("Error displaying trading system status", e);
-            showError("Error", "Failed to display trading system status: " + e.getMessage());
+            showError( "Failed to display trading system status: " + e.getMessage());
         }
     }
 
-    private void showError(String error, String s) {
+    private void showError( String s) {
+        Stage stage=new Stage();
+        AnchorPane rt =new AnchorPane(new Text(s));
+        Scene sc=new Scene(rt,400,450);
+        stage.setScene(sc);
+        stage.show();
     }
 }

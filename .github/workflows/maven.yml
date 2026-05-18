@@ -28,7 +28,7 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn -B package --file pom.xml
+        run: ./mvnw -B -DskipTests package --file pom.xml
 
     # Optional: Upload the full dependency graph to improve the quality of Dependabot alerts
     # - name: Update dependency graph

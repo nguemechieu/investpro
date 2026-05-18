@@ -23,7 +23,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:0 \
     GEOMETRY=1530x840 \
     DEPTH=24 \
-    VNC_PASSWORD=${VNC_PASSWORD:-changeme} \
     JAVA_OPTS="-Xmx2g -Xms512m -Djava.awt.headless=false -Dprism.order=sw -Dprism.verbose=false"
 
 WORKDIR /app
@@ -79,6 +78,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     xauth \
     xclip \
+    xsel \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
@@ -86,10 +86,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy built application
 # ============================================================
 
-COPY --from=build /build/target/*.jar /app/investpro.jar
-
-# Optional if your build creates target/lib
-COPY --from=build /build/target/lib /app/lib
+COPY --from=build /build/target /tmp/target
+RUN cp /tmp/target/*.jar /app/investpro.jar && \
+    if [ -d /tmp/target/lib ]; then cp -r /tmp/target/lib /app/lib; else mkdir -p /app/lib; fi && \
+    rm -rf /tmp/target
 
 # ============================================================
 # App directories

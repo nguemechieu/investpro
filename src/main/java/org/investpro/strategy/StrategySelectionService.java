@@ -1,6 +1,10 @@
 package org.investpro.strategy;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -23,6 +27,8 @@ import java.util.stream.Collectors;
  * Strategies are progressively instantiated only as they pass each filter
  * stage.
  */
+@Getter
+@Setter
 @Slf4j
 public final class StrategySelectionService {
 
@@ -36,7 +42,7 @@ public final class StrategySelectionService {
     private static final int LIVE_ELIGIBLE_PER_PAIR_TIMEFRAME = 3;
 
     private final StrategyRegistry registry;
-    private final StrategyLabService strategyLabService;
+    private  StrategyLabService strategyLabService;
     private final ExecutorService executorService;
 
     // Selection state
@@ -69,6 +75,66 @@ public final class StrategySelectionService {
             }
         }
         return instance;
+    }
+
+    /**
+     * Get singleton instance with the canonical registry and strategy lab service.
+     */
+    @NotNull
+    public static StrategySelectionService getInstance() {
+        return getInstance(StrategyRegistry.getInstance(), StrategyLabService.getInstance());
+    }
+
+    /**
+     * Returns the active canonical assignment used by live signal generation.
+     */
+    @Nullable
+    public StrategyAssignment getCurrentAssignment(@NotNull String symbol, @NotNull Timeframe timeframe) {
+        return StrategyAssignmentRepository.getInstance().getActive(symbol, timeframe);
+    }
+
+    /**
+     * Assign a strategy into the canonical repository that StrategyDecisionService reads.
+     */
+    public StrategyAssignment manuallyAssign(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            boolean locked,
+            @Nullable String reason) {
+        StrategyAssignment assignment = StrategyAssignment.builder()
+                .symbol(symbol)
+                .timeframe(timeframe)
+                .strategyId(strategyId)
+                .mode(StrategyAssignment.StrategyAssignmentMode.MANUAL)
+                .assignedBy(StrategyAssignment.AssignedBy.USER)
+                .active(true)
+                .locked(locked)
+                .reason(reason == null || reason.isBlank() ? "Manual strategy assignment" : reason)
+                .build();
+        StrategyAssignmentRepository.getInstance().save(assignment);
+        return assignment;
+    }
+
+    /**
+     * Auto-assign the selected strategy into the canonical repository.
+     */
+    public StrategyAssignment autoAssign(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            double score,
+            @Nullable String reason) {
+        StrategyAssignment existing = getCurrentAssignment(symbol, timeframe);
+        if (existing != null && !existing.canBeAutoReplaced()) {
+            log.info("Keeping locked/manual assignment for {}/{}: {}", symbol, timeframe.getCode(),
+                    existing.getStrategyId());
+            return existing;
+        }
+
+        StrategyAssignment assignment = StrategyAssignment.auto(symbol, timeframe, strategyId, score, reason);
+        StrategyAssignmentRepository.getInstance().save(assignment);
+        return assignment;
     }
 
     /**
@@ -146,7 +212,7 @@ public final class StrategySelectionService {
 
     /**
      * Stage 1: Generate initial candidate strategies from catalog.
-     *
+     * <p>
      * Selects approximately INITIAL_CANDIDATES from the catalog by:
      * - Including all core strategies
      * - Sampling style/risk variants proportionally

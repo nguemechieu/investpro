@@ -1,11 +1,16 @@
+#-------------------------------------------------------------------------------#
+#        Discover additional configuration options in our documentation         #
+#               https://www.jetbrains.com/help/qodana/github.html               #
+#-------------------------------------------------------------------------------#
+
 name: Qodana
 on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: # Specify your branches here
-      - main # The 'main' branch
-      - 'releases/*' # The release branches
+    branches:
+      - main
+
 
 jobs:
   qodana:
@@ -15,14 +20,21 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
-          fetch-depth: 0  # a full history is required for pull request analysis
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.1
-        with:
-          pr-mode: false
+        uses: JetBrains/qodana-action@v2025.3
         env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1467142723 }}
-          QODANA_ENDPOINT: 'https://qodana.cloud'
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        with:
+          # When pr-mode is set to true, Qodana analyzes only the files that have been changed
+          pr-mode: false
+          use-caches: true
+          post-pr-comment: true
+          use-annotations: true
+          # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
+          upload-result: false
+          # quick-fixes available in Ultimate and Ultimate Plus plans
+          push-fixes: 'none'

@@ -1,6 +1,7 @@
 package org.investpro.core;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
@@ -160,9 +161,15 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             double confidence = getDoubleAttribute(event, "confidence");
 
             SymbolAgentState state = symbolAgentManager.ensureSymbol(symbol);
-            state.setState(SymbolEvaluationState.ASSIGNED);
             state.setActiveStrategyName(strategyName);
-            state.setCanTradeLive(true);
+            if (state.getState() == SymbolEvaluationState.NOT_STARTED
+                    || state.getState() == SymbolEvaluationState.COLLECTING_DATA
+                    || state.getState() == SymbolEvaluationState.BACKTESTING
+                    || state.getState() == SymbolEvaluationState.RANKING) {
+                state.setState(SymbolEvaluationState.ASSIGNED);
+                state.setCanTradeLive(false);
+                state.setBlockReason("Signal approved before paper validation completed");
+            }
             if (!side.isBlank()) {
                 state.setLastSignalSide(side);
                 state.setLastSignalConfidence(confidence);

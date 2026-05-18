@@ -1,11 +1,13 @@
 package org.investpro.ui.panels;
 
 import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.data.CandleData;
 import org.investpro.core.SystemCore;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
@@ -13,9 +15,15 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.strategy.StrategyCatalog;
+import org.investpro.strategy.lab.StrategyLabService;
+import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Strategy Assignment Panel - Assign trading strategies to symbols and manage
@@ -45,8 +53,12 @@ public class StrategyAssignmentPanel extends VBox{
         private Spinner<Double> takeProfitPercentSpinner;
 
         private TextArea strategyNotesArea;
+        private Label currentAssignmentLabel;
+        private Label statusLabel;
         private SystemCore systemCore;
         private  StrategyAssignment strategyAssignment;
+        private final StrategyAssignmentRepository repository = StrategyAssignmentRepository.getInstance();
+        private final StrategyLabService labService = StrategyLabService.getInstance();
 
         public StrategyAssignmentPanel(@NotNull SystemCore systemCore) throws SQLException, ClassNotFoundException {
                 this.setStyle("-fx-background-color: #1a1a2e; -fx-padding: 16;");
@@ -73,6 +85,9 @@ public class StrategyAssignmentPanel extends VBox{
                 // Strategy Notes Section
                 VBox notesSection = createStrategyNotesSection();
 
+                // Current canonical assignment section
+                VBox currentAssignmentSection = createCurrentAssignmentSection();
+
                 // Buttons
                 HBox buttonBox = createButtonBox();
 
@@ -89,13 +104,36 @@ public class StrategyAssignmentPanel extends VBox{
                                 new Separator(),
                                 riskSection,
                                 new Separator(),
-                                notesSection);
+                                notesSection,
+                                new Separator(),
+                                currentAssignmentSection);
                 scrollPane.setContent(contentBox);
                 scrollPane.setStyle("-fx-control-inner-background: #1a1a2e;");
 
                 this.getChildren().addAll(titleLabel, scrollPane, buttonBox);
                 VBox.setVgrow(scrollPane, Priority.ALWAYS);
+                initializeDefaults();
+                refreshCurrentAssignmentLabel();
                 LocalizationService.applyTranslations(this);
+        }
+
+        private void initializeDefaults() {
+                confidenceThresholdSpinner.getValueFactory().setValue(65.0);
+                minSignalStrengthSpinner.getValueFactory().setValue(6);
+                positionSizePercentSpinner.getValueFactory().setValue(5.0);
+                maxTradesPerDaySpinner.getValueFactory().setValue(10);
+                stopLossPercentSpinner.getValueFactory().setValue(2.0);
+                takeProfitPercentSpinner.getValueFactory().setValue(5.0);
+
+                if (!entrySignalCombo.getItems().isEmpty()) {
+                        entrySignalCombo.setValue(entrySignalCombo.getItems().get(0));
+                }
+                if (!exitSignalCombo.getItems().isEmpty()) {
+                        exitSignalCombo.setValue(exitSignalCombo.getItems().get(0));
+                }
+                if (!stopLossTypeCombo.getItems().isEmpty()) {
+                        stopLossTypeCombo.setValue(stopLossTypeCombo.getItems().get(0));
+                }
         }
 
         private @NotNull VBox createSelectionSection() throws SQLException, ClassNotFoundException {
@@ -114,7 +152,9 @@ public class StrategyAssignmentPanel extends VBox{
                 Label symbolLabel = new Label("Trading Symbol:");
                 symbolLabel.setStyle("-fx-text-fill: #a0aec0;");
                 symbolCombo = new ComboBox<>();
-                symbolCombo.getItems().addAll(systemCore.getExchange().getTradePairSymbol());
+                if (systemCore.getExchange() != null) {
+                        symbolCombo.getItems().addAll(systemCore.getExchange().getTradePairSymbol());
+                }
                 symbolCombo.setPrefWidth(250);
                 symbolCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
                 grid.add(symbolLabel, 0, 0);
@@ -134,7 +174,9 @@ public class StrategyAssignmentPanel extends VBox{
                 Label timeframeLabel = new Label("Timeframe:");
                 timeframeLabel.setStyle("-fx-text-fill: #a0aec0;");
                 timeframeCombo = new ComboBox<>();
-                timeframeCombo.getItems().addAll(systemCore.getExchange().getSupportedTimeframes());
+                if (systemCore.getExchange() != null) {
+                        timeframeCombo.getItems().addAll(systemCore.getExchange().getSupportedTimeframes());
+                }
                 timeframeCombo.setPrefWidth(250);
                 timeframeCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
                 grid.add(timeframeLabel, 0, 2);
@@ -314,6 +356,29 @@ public class StrategyAssignmentPanel extends VBox{
                 return section;
         }
 
+        private VBox createCurrentAssignmentSection() {
+                VBox section = new VBox(8);
+                section.setStyle(
+                                "-fx-border-color: #374151; -fx-border-radius: 4; -fx-padding: 12; -fx-background-color: #16213e;");
+
+                Label title = new Label("Current System Assignment");
+                title.setStyle("-fx-font-size: 12; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
+
+                currentAssignmentLabel = new Label("Select a symbol and timeframe to inspect the active assignment.");
+                currentAssignmentLabel.setWrapText(true);
+                currentAssignmentLabel.setStyle("-fx-text-fill: #a0aec0;");
+
+                statusLabel = new Label("Ready");
+                statusLabel.setWrapText(true);
+                statusLabel.setStyle("-fx-text-fill: #94a3b8;");
+
+                symbolCombo.valueProperty().addListener((obs, oldValue, newValue) -> refreshCurrentAssignmentLabel());
+                timeframeCombo.valueProperty().addListener((obs, oldValue, newValue) -> refreshCurrentAssignmentLabel());
+
+                section.getChildren().addAll(title, currentAssignmentLabel, statusLabel);
+                return section;
+        }
+
         private HBox createButtonBox() {
                 HBox buttonBox = new HBox(12);
                 buttonBox.setStyle("-fx-padding: 12; -fx-alignment: CENTER_RIGHT;");
@@ -328,6 +393,11 @@ public class StrategyAssignmentPanel extends VBox{
                                 "-fx-padding: 8 16; -fx-font-size: 11; -fx-background-color: #3b82f6; -fx-text-fill: #ffffff;");
                 testButton.setOnAction(e -> testStrategy());
 
+                Button loadButton = new Button("Load Existing");
+                loadButton.setStyle(
+                                "-fx-padding: 8 16; -fx-font-size: 11; -fx-background-color: #6366f1; -fx-text-fill: #ffffff;");
+                loadButton.setOnAction(e -> loadExistingAssignment());
+
                 Button resetButton = new Button("Reset");
                 resetButton.setStyle(
                                 "-fx-padding: 8 16; -fx-font-size: 11; -fx-background-color: #374151; -fx-text-fill: #a0aec0;");
@@ -336,14 +406,14 @@ public class StrategyAssignmentPanel extends VBox{
                 Region spacer = new Region();
                 HBox.setHgrow(spacer, Priority.ALWAYS);
 
-                buttonBox.getChildren().addAll(spacer, testButton, assignButton, resetButton);
+                buttonBox.getChildren().addAll(spacer, loadButton, testButton, assignButton, resetButton);
                 return buttonBox;
         }
 
         private void assignStrategy() {
-                String symbol = symbolCombo.getValue().toString('/');
+                TradePair selectedPair = symbolCombo.getValue();
                 String strategy = strategyCombo.getValue();
-                String timeframeCode = timeframeCombo.getValue().getCode();
+                Timeframe selectedTimeframe = timeframeCombo.getValue();
                 Double confidence = confidenceThresholdSpinner.getValue();
                 Integer signalStrength = minSignalStrengthSpinner.getValue();
                 Double positionSize = positionSizePercentSpinner.getValue();
@@ -354,9 +424,10 @@ public class StrategyAssignmentPanel extends VBox{
                 Double takeProfit = takeProfitPercentSpinner.getValue();
                 boolean enabled = enableStrategyCheckbox.isSelected();
                 Boolean useRisk = useRiskManagementCheckbox.isSelected();
+                String notes = strategyNotesArea.getText() == null ? "" : strategyNotesArea.getText().trim();
 
                 // Validate inputs
-                if (symbol == null || symbol.isBlank()) {
+                if (selectedPair == null) {
                         showError("Validation Error", "Please select a trading symbol");
                         return;
                 }
@@ -364,46 +435,55 @@ public class StrategyAssignmentPanel extends VBox{
                         showError("Validation Error", "Please select a strategy");
                         return;
                 }
-                if (timeframeCode == null || timeframeCode.isBlank()) {
+                if (selectedTimeframe == null) {
                         showError("Validation Error", "Please select a timeframe");
                         return;
                 }
+                if (entrySignal == null || entrySignal.isBlank()) {
+                        showError("Validation Error", "Please select an entry signal");
+                        return;
+                }
+                if (exitSignal == null || exitSignal.isBlank()) {
+                        showError("Validation Error", "Please select an exit signal");
+                        return;
+                }
+
+                String symbol = selectedPair.toString('/');
+                String timeframeCode = selectedTimeframe.getCode();
 
                 try {
-                        // Convert timeframe code to Timeframe enum
-                        Timeframe timeframe = Timeframe.fromCode(timeframeCode);
-
                         // Create strategy assignment
                         String reason = String.format(
-                                        "Manual assignment: %s on %s (%s) with %s entry and %s exit. Stop: %.1f%%, TP: %.1f%%, Position: %.1f%%, Max Trades: %d",
+                                        "Manual assignment: %s on %s (%s) with %s entry and %s exit. Stop: %.1f%%, TP: %.1f%%, Position: %.1f%%, Max Trades: %d. Notes: %s",
                                         strategy, symbol, timeframeCode, entrySignal, exitSignal, stopLoss, takeProfit,
-                                        positionSize, maxTrades);
+                                        positionSize, maxTrades, notes.isBlank() ? "n/a" : notes);
 
-                        StrategyAssignment assignment = StrategyAssignment.builder()
+                        StrategyAssignment assignmentToPersist = StrategyAssignment.builder()
                                         .symbol(symbol)
-                                        .timeframe(timeframe)
+                                        .timeframe(selectedTimeframe)
                                         .strategyId(strategy) // Use strategy name as ID (can be mapped later if needed)
                                         .mode(StrategyAssignment.StrategyAssignmentMode.MANUAL)
                                         .assignedBy(StrategyAssignment.AssignedBy.USER)
-                                        .scoreAtAssignment(confidence / 100.0) // Convert percentage to decimal
+                                        .scoreAtAssignment(confidence)
                                         .active(enabled)
                                         .reason(reason)
-                                        .locked(false)
+                                        .locked(true)
                                         .build();
 
                         // Save to repository
-                        StrategyAssignmentRepository repository = StrategyAssignmentRepository.getInstance();
-                        repository.save(assignment);
+                        repository.save(assignmentToPersist);
+                        this.strategyAssignment = assignmentToPersist;
+                        refreshCurrentAssignmentLabel();
 
                         log.info(
                                         "Strategy Assigned Successfully: id={}, symbol={}, strategy={}, timeframe={}, confidence={}, signal={}, position={}, maxTrades={}, entry={}, exit={}, stopLoss={}, takeProfit={}, enabled={}, useRisk={}",
-                                        assignment.getAssignmentId(), symbol, strategy, timeframeCode, confidence,
+                                        assignmentToPersist.getAssignmentId(), symbol, strategy, timeframeCode, confidence,
                                         signalStrength, positionSize, maxTrades, entrySignal,
                                         exitSignal, stopLoss, takeProfit, enabled, useRisk);
 
                         showInfo("Success", String.format(
                                         "Strategy '%s' assigned to %s (%s) successfully!\nAssignment ID: %s", strategy,
-                                        symbol, timeframeCode, assignment.getAssignmentId()));
+                                        symbol, timeframeCode, assignmentToPersist.getAssignmentId()));
                 } catch (IllegalArgumentException e) {
                         log.error("Failed to assign strategy: {}", e.getMessage());
                         showError("Error", "Failed to assign strategy: " + e.getMessage());
@@ -411,10 +491,80 @@ public class StrategyAssignmentPanel extends VBox{
         }
 
         private void testStrategy() {
-                String symbol = symbolCombo.getValue().toString('/');
+                TradePair selectedPair = symbolCombo.getValue();
                 String strategy = strategyCombo.getValue();
-                log.info("Testing strategy: {} for symbol: {}", strategy, symbol);
-                showInfo("Test", "Testing " + strategy + " strategy on " + symbol + "...");
+                Timeframe selectedTimeframe = timeframeCombo.getValue();
+
+                if (selectedPair == null || strategy == null || strategy.isBlank() || selectedTimeframe == null) {
+                        showError("Validation Error",
+                                        "Please select symbol, strategy, and timeframe before testing.");
+                        return;
+                }
+
+                String symbol = selectedPair.toString('/');
+                statusLabel.setText("Running real-candle backtest and assignment check...");
+
+                fetchHistoricalCandles(selectedPair, selectedTimeframe)
+                                .thenCompose(candles -> labService.evaluateAndAssignBest(
+                                                symbol,
+                                                selectedTimeframe,
+                                                candles,
+                                                List.of(strategy)))
+                                .thenAccept(assignment -> Platform.runLater(() -> {
+                                        if (assignment == null) {
+                                                statusLabel.setText("No assignment created. Strategy failed minimum score, data, or auto-assign checks.");
+                                                refreshCurrentAssignmentLabel();
+                                                return;
+                                        }
+
+                                        this.strategyAssignment = assignment;
+                                        strategyCombo.setValue(assignment.getStrategyId());
+                                        confidenceThresholdSpinner.getValueFactory()
+                                                        .setValue(displayScore(assignment.getScoreAtAssignment()));
+                                        statusLabel.setText("Assigned by real-candle evaluation: "
+                                                        + assignment.getDisplayName());
+                                        refreshCurrentAssignmentLabel();
+                                        showInfo("Strategy Evaluation",
+                                                        "Assigned " + assignment.getStrategyId() + " to " + symbol
+                                                                        + " (" + selectedTimeframe.getCode() + ").");
+                                }))
+                                .exceptionally(exception -> {
+                                        Platform.runLater(() -> {
+                                                String reason = rootMessage(exception);
+                                                statusLabel.setText("Evaluation failed: " + reason);
+                                                showError("Strategy Evaluation", reason);
+                                        });
+                                        return null;
+                                });
+        }
+
+        private void loadExistingAssignment() {
+                TradePair selectedPair = symbolCombo.getValue();
+                Timeframe selectedTimeframe = timeframeCombo.getValue();
+
+                if (selectedPair == null || selectedTimeframe == null) {
+                        showError("Validation Error", "Select symbol and timeframe to load an assignment.");
+                        return;
+                }
+
+                String symbol = selectedPair.toString('/');
+                StrategyAssignment existing = repository.getAssignment(symbol, selectedTimeframe);
+
+                if (existing == null) {
+                        showInfo("No Assignment",
+                                        "No active assignment found for " + symbol + " (" + selectedTimeframe.getCode()
+                                                        + ").");
+                        return;
+                }
+
+                this.strategyAssignment = existing;
+                strategyCombo.setValue(existing.getStrategyId());
+                enableStrategyCheckbox.setSelected(existing.isActive());
+                confidenceThresholdSpinner.getValueFactory().setValue(displayScore(existing.getScoreAtAssignment()));
+                strategyNotesArea.setText(existing.getReason() == null ? "" : existing.getReason());
+                refreshCurrentAssignmentLabel();
+
+                showInfo("Loaded", "Loaded assignment: " + existing.getDisplayName());
         }
 
         private void resetAssignment() {
@@ -427,13 +577,97 @@ public class StrategyAssignmentPanel extends VBox{
                 maxTradesPerDaySpinner.getValueFactory().setValue(10);
                 stopLossPercentSpinner.getValueFactory().setValue(2.0);
                 takeProfitPercentSpinner.getValueFactory().setValue(5.0);
-                entrySignalCombo.setValue(null);
-                exitSignalCombo.setValue(null);
-                stopLossTypeCombo.setValue(null);
+                if (!entrySignalCombo.getItems().isEmpty()) {
+                        entrySignalCombo.setValue(entrySignalCombo.getItems().get(0));
+                } else {
+                        entrySignalCombo.setValue(null);
+                }
+                if (!exitSignalCombo.getItems().isEmpty()) {
+                        exitSignalCombo.setValue(exitSignalCombo.getItems().get(0));
+                } else {
+                        exitSignalCombo.setValue(null);
+                }
+                if (!stopLossTypeCombo.getItems().isEmpty()) {
+                        stopLossTypeCombo.setValue(stopLossTypeCombo.getItems().get(0));
+                } else {
+                        stopLossTypeCombo.setValue(null);
+                }
                 enableStrategyCheckbox.setSelected(true);
                 useRiskManagementCheckbox.setSelected(true);
                 strategyNotesArea.clear();
+                strategyAssignment = null;
+                refreshCurrentAssignmentLabel();
                 log.info("Strategy assignment panel reset to defaults");
+        }
+
+        private CompletableFuture<List<CandleData>> fetchHistoricalCandles(TradePair pair, Timeframe timeframe) {
+                if (systemCore.getExchange() == null) {
+                        return CompletableFuture.failedFuture(new IllegalStateException("Connect an exchange first."));
+                }
+
+                try {
+                        CandleDataSupplier supplier = systemCore.getExchange()
+                                        .getCandleDataSupplier(timeframe.getSeconds(), pair);
+                        if (supplier == null) {
+                                return CompletableFuture.failedFuture(new IllegalStateException(
+                                                "No candle supplier for " + pair.toString('/') + " "
+                                                                + timeframe.getCode()));
+                        }
+
+                        Future<List<CandleData>> future = supplier.get();
+                        return CompletableFuture.supplyAsync(() -> {
+                                try {
+                                        List<CandleData> candles = future.get(20, TimeUnit.SECONDS);
+                                        return candles == null ? List.of() : candles;
+                                } catch (Exception exception) {
+                                        throw new IllegalStateException("Historical candle fetch failed", exception);
+                                }
+                        });
+                } catch (Exception exception) {
+                        return CompletableFuture.failedFuture(exception);
+                }
+        }
+
+        private void refreshCurrentAssignmentLabel() {
+                if (currentAssignmentLabel == null) {
+                        return;
+                }
+
+                TradePair pair = symbolCombo == null ? null : symbolCombo.getValue();
+                Timeframe timeframe = timeframeCombo == null ? null : timeframeCombo.getValue();
+                if (pair == null || timeframe == null) {
+                        currentAssignmentLabel.setText("Select a symbol and timeframe to inspect the active assignment.");
+                        return;
+                }
+
+                StrategyAssignment active = repository.getActive(pair.toString('/'), timeframe);
+                if (active == null) {
+                        currentAssignmentLabel.setText("No active canonical assignment for "
+                                        + pair.toString('/') + " | " + timeframe.getCode());
+                        return;
+                }
+
+                currentAssignmentLabel.setText(String.format(
+                                "Active: %s | %s | score %.1f | mode %s | locked %s",
+                                active.getStrategyId(),
+                                active.getTimeframe().getCode(),
+                                active.getScoreAtAssignment(),
+                                active.getMode(),
+                                active.isLocked()));
+        }
+
+        private double displayScore(double score) {
+                return score > 0.0 && score <= 1.0 ? score * 100.0 : score;
+        }
+
+        private String rootMessage(Throwable throwable) {
+                Throwable cursor = throwable;
+                while (cursor != null && cursor.getCause() != null) {
+                        cursor = cursor.getCause();
+                }
+                return cursor == null || cursor.getMessage() == null || cursor.getMessage().isBlank()
+                                ? "Unknown error"
+                                : cursor.getMessage();
         }
 
         private void showInfo(String title, String message) {

@@ -98,15 +98,18 @@ public class StrategyDecisionService {
             StrategyAssignment assignment = selectionService.getCurrentAssignment(symbol, parsedTimeframe);
 
             if (assignment == null) {
-                assignment = autoAssignFallbackStrategy(symbol, parsedTimeframe, candles, resolvedTradePair);
+                assignment = isCompatibilityFallbackEnabled()
+                        ? autoAssignFallbackStrategy(symbol, parsedTimeframe, candles, resolvedTradePair)
+                        : null;
                 if (assignment == null) {
                     String reason = String.format(
-                            "No compatible strategy assignment found for %s %s",
+                            "No evaluated strategy assignment found for %s %s",
                             symbol, timeframe);
                     log.debug(reason);
                     return StrategyDecisionResult.rejected(reason, warnings);
                 }
-                warnings.add("No manual strategy assignment was found; auto-selected " + assignment.getStrategyId());
+                warnings.add("No evaluated assignment was found; compatibility fallback selected "
+                        + assignment.getStrategyId());
             }
 
             if (!assignment.isValid()) {
@@ -268,6 +271,12 @@ public class StrategyDecisionService {
                 selected.getId().toString(),
                 false,
                 "Auto-selected first compatible strategy for live signal generation");
+    }
+
+    private boolean isCompatibilityFallbackEnabled() {
+        return Boolean.parseBoolean(System.getProperty(
+                "tradeadviser.strategy.allowCompatibilityFallback",
+                "false"));
     }
 
     private Timeframe parseTimeframe(String timeframe) {

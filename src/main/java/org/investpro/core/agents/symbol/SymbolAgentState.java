@@ -66,18 +66,15 @@ public class SymbolAgentState {
      * Returns UNKNOWN if the state field has not been initialised.
      */
     public SymbolTradingMode getTradingMode() {
-        if (state == null) {
-            return SymbolTradingMode.UNKNOWN;
-        }
+
         return switch (state) {
             case NOT_STARTED, COLLECTING_DATA, BACKTESTING, RANKING -> SymbolTradingMode.TRAINING;
             case PAPER_TRADING -> SymbolTradingMode.PAPER_TRADING;
             case ASSIGNED -> {
-                if (assignedStrategyName != null && !assignedStrategyName.isBlank()) {
-                    yield SymbolTradingMode.LIVE_READY;
-                } else {
+                if (assignedStrategyName == null || assignedStrategyName.isBlank()) {
                     yield SymbolTradingMode.NO_ASSIGNMENT;
                 }
+                yield canTradeLive ? SymbolTradingMode.LIVE_READY : SymbolTradingMode.PAPER_TRADING;
             }
             case LIVE_READY -> SymbolTradingMode.LIVE_READY;
             case LIVE_TRADING -> SymbolTradingMode.LIVE_TRADING;
@@ -95,7 +92,18 @@ public class SymbolAgentState {
 
         return switch (mode) {
             case TRAINING -> "Training / Evaluating";
-            case PAPER_TRADING -> "Paper trading candidates";
+            case PAPER_TRADING -> {
+                String strategy = activeStrategyName != null && !activeStrategyName.isBlank()
+                        ? activeStrategyName
+                        : assignedStrategyName;
+                if (strategy != null && activeTimeframe != null) {
+                    yield "Paper validating: " + strategy + " | " + activeTimeframe.getCode();
+                }
+                if (strategy != null && !strategy.isBlank()) {
+                    yield "Paper validating: " + strategy;
+                }
+                yield "Paper trading candidates";
+            }
             case LIVE_READY -> {
                 String base;
                 if (activeStrategyName != null && activeTimeframe != null) {
@@ -133,11 +141,11 @@ public class SymbolAgentState {
     }
 
     /**
-     * Returns a compact signal text like "\u25b2 BUY 0.82" or "\u25bc SELL 0.65", empty if no signal.
+     * Returns a compact signal text like "▲ BUY 0.82" or "▼ SELL 0.65", empty if no signal.
      */
     public String getSignalText() {
         if (lastSignalSide == null || lastSignalSide.isBlank()) return "";
-        String arrow = "BUY".equalsIgnoreCase(lastSignalSide) ? "\u25b2" : "\u25bc";
+        String arrow = "BUY".equalsIgnoreCase(lastSignalSide) ? "▲" : "▼";
         if (lastSignalConfidence > 0) {
             return String.format("%s %s %.2f", arrow, lastSignalSide.toUpperCase(), lastSignalConfidence);
         }
