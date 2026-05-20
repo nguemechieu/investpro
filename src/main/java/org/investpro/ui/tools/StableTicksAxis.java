@@ -18,6 +18,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Dimension2D;
 import javafx.scene.chart.ValueAxis;
 import javafx.util.Duration;
+import javafx.util.StringConverter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,7 +29,7 @@ import java.util.List;
 
 /**
  * Stable numeric axis for financial charts.
- *
+ * <p>
  * Goals:
  * - keep tick positions stable in value-space
  * - generate readable "nice" tick spacing
@@ -575,6 +576,52 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return Math.min(value, 2.0);
     }
 
+    public void setTickLabelFormatter(String symbol) {
+        String safeSymbol = symbol == null ? "" : symbol.trim();
+
+        super.setTickLabelFormatter(new StringConverter<>() {
+            @Override
+            public String toString(Number number) {
+                if (number == null) {
+                    return "";
+                }
+
+                double value = number.doubleValue();
+
+                if (!Double.isFinite(value)) {
+                    return "";
+                }
+
+                if (Math.abs(value) >= 1_000) {
+                    return safeSymbol + "%,.2f".formatted(value);
+                }
+
+                if (Math.abs(value) >= 1) {
+                    return safeSymbol + "%.4f".formatted(value);
+                }
+
+                return safeSymbol + "%.8f".formatted(value);
+            }
+
+            @Override
+            public Number fromString(String text) {
+                if (text == null || text.isBlank()) {
+                    return 0.0;
+                }
+
+                String cleaned = text
+                        .replace(safeSymbol, "")
+                        .replace(",", "")
+                        .trim();
+
+                try {
+                    return Double.parseDouble(cleaned);
+                } catch (NumberFormatException exception) {
+                    return 0.0;
+                }
+            }
+        });
+    }
     private record Range(double low, double high, double tickSpacing, double scale) {
 
 

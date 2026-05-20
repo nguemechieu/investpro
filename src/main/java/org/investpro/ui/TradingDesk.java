@@ -36,32 +36,16 @@ import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.data.CandleData;
 import org.investpro.enums.SystemState;
 import org.investpro.enums.RiskStatus;
+import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.consumers.DesktopExchangeStreamBridge;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.i18n.SupportedLanguage;
 
-import org.investpro.indicators.BollingerBandsIndicator;
-import org.investpro.indicators.ChartIndicator;
-import org.investpro.indicators.ExponentialMovingAverageIndicator;
-import org.investpro.indicators.MACDIndicator;
-import org.investpro.indicators.RSIIndicator;
-import org.investpro.indicators.SimpleMovingAverageIndicator;
-import org.investpro.indicators.VWAPIndicator;
-import org.investpro.indicators.StochasticIndicator;
-import org.investpro.indicators.CCIIndicator;
-import org.investpro.indicators.ATRIndicator;
-import org.investpro.indicators.VolatilityIndicator;
-import org.investpro.indicators.OBVIndicator;
-import org.investpro.indicators.VolumeIndicator;
-import org.investpro.indicators.ADXIndicator;
-import org.investpro.indicators.IchimokuIndicator;
-import org.investpro.indicators.ParabolicSARIndicator;
-import org.investpro.indicators.FibonacciRetracementIndicator;
-import org.investpro.indicators.ZigzagIndicator;
-import org.investpro.indicators.FractalIndicator;
+import org.investpro.indicators.*;
 import org.investpro.licensing.LicenseManager;
+import org.investpro.monitoring.ActivityLogAppender;
 import org.investpro.monitoring.TradingSystemStatusSnapshot;
 import org.investpro.operations.SystemActivityEvent;
 import org.investpro.operations.SystemOperationsService;
@@ -87,6 +71,7 @@ import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.repository.StrategyAssignmentRepository;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.DepthChart;
@@ -104,6 +89,8 @@ import lombok.extern.slf4j.Slf4j;
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -120,9 +107,13 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.prefs.Preferences;
@@ -136,7 +127,7 @@ import static org.investpro.utils.Side.SELL;
 import static org.investpro.i18n.LocalizationService.t;
 
 /**
- * Main InvestPro / TradeAdviser trading terminal window.
+ * Main InvestPro trading terminal window.
  * <p>
  * This version is wired to SystemCore:
  * - TradingWindow owns the UI.
@@ -155,6 +146,10 @@ public class TradingDesk extends BorderPane {
     private static final double CONSOLE_HEIGHT = 250;
     private static final String ENV_TELEGRAM_TOKEN = "INVESTPRO_TELEGRAM_BOT_TOKEN";
     private static final DateTimeFormatter SNAPSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final DateTimeFormatter STATUS_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final List<Timeframe> MT5_TIMEFRAMES = List.of(
+            Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.M30, Timeframe.H1,
+            Timeframe.H4, Timeframe.D1, Timeframe.W1, Timeframe.MN);
 
     /**
      * Keep this list aligned with createExchange(...).
@@ -182,7 +177,7 @@ public class TradingDesk extends BorderPane {
 
     private final ComboBox<String> exchangeSelector = new ComboBox<>();
     private final ComboBox<TradePair> symbolSelector = new ComboBox<>();
-    private final ComboBox<String> timeframeSelector = new ComboBox<>();
+    private final ComboBox<Timeframe> timeframeSelector = new ComboBox<>();
     private final ComboBox<String> botSymbolScopeSelector = new ComboBox<>();
     private final ComboBox<String> orderTypeSelector = new ComboBox<>();
     private final ComboBox<String> tradingModeSelector = new ComboBox<>();
@@ -243,6 +238,21 @@ public class TradingDesk extends BorderPane {
     private final Label deskSpreadLabel = new Label("Spread: --");
     private final Label deskStrategyLabel = new Label("Win: --");
     private final Label deskUpdatedLabel = new Label("Updated: --");
+    private final Map<Timeframe, ToggleButton> timeframeButtons = new EnumMap<>(Timeframe.class);
+    private final Label statusBrokerLabel = new Label("Broker: -");
+    private final Label statusModeLabel = new Label("Mode: -");
+    private final Label statusActiveSymbolLabel = new Label("Symbol: -");
+    private final Label statusLatencyLabel = new Label("Latency: -- ms");
+    private final Label statusServerTimeLabel = new Label("Time: --:--:--");
+    private final Label statusMarketDataLabel = new Label("Data: idle");
+    private final Label chartHeaderSymbolLabel = new Label("No chart");
+    private final Label chartHeaderTimeframeLabel = new Label("TF: -");
+    private final Label chartHeaderQuoteLabel = new Label("Bid/Ask: -");
+    private final Label chartHeaderSpreadLabel = new Label("Spread: -");
+    private final Label orderBookSymbolLabel = new Label("No symbol");
+    private final TextField quickTradeAmountField = new TextField("1");
+    private final AtomicBoolean autoRefreshTasksStarted = new AtomicBoolean(false);
+    private final AtomicBoolean positionAutoRefreshStarted = new AtomicBoolean(false);
 
     private final TextArea journalArea = new TextArea();
     private final ObservableList<String> agentActivityItems = FXCollections
@@ -269,6 +279,11 @@ public class TradingDesk extends BorderPane {
         thread.setDaemon(true);
         return thread;
     });
+    private final ExecutorService botOperationExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "TradingWindow-BotOperation");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private SplitPane mainVerticalWorkbench;
     private SplitPane horizontalWorkbench;
@@ -283,13 +298,15 @@ public class TradingDesk extends BorderPane {
 
     private Exchange exchange;
     private MarketDataEngine marketDataEngine;
-    private MarketSnapshot cachedMarketSnapshot = MarketSnapshot.empty();
-    private Instant cachedMarketSnapshotAt = Instant.EPOCH;
+    private volatile MarketSnapshot cachedMarketSnapshot = MarketSnapshot.empty();
+    private volatile Instant cachedMarketSnapshotAt = Instant.EPOCH;
+    private final AtomicBoolean marketSnapshotRefreshInFlight = new AtomicBoolean(false);
     private StrategyStats cachedStrategyStats = StrategyStats.empty();
     private Instant cachedStrategyStatsAt = Instant.EPOCH;
     private final Map<String, BrokerSession> brokerSessions = new HashMap<>();
     private SystemCore systemCore;
     private boolean systemCoreEventsSubscribed;
+    private final AtomicBoolean botTradingOperationInFlight = new AtomicBoolean(false);
     private final NewsDataProvider newsDataProvider = new NewsDataProvider();
     private final ExchangeService exchangeService = new ExchangeService();
 
@@ -371,7 +388,7 @@ public class TradingDesk extends BorderPane {
         setPrefSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
         setMinSize(1200, 690);
         setFocusTraversable(true);
-        getStyleClass().add("trading-window-pro");
+        getStyleClass().addAll("trading-window-pro", "mt5-root");
         setNodeOrientation(LocalizationService.getCurrentLanguage().isRightToLeft()
                 ? javafx.geometry.NodeOrientation.RIGHT_TO_LEFT
                 : javafx.geometry.NodeOrientation.LEFT_TO_RIGHT);
@@ -469,9 +486,10 @@ public class TradingDesk extends BorderPane {
 
     private @NotNull VBox createTopSection() {
         VBox topSection = new VBox(0);
-        topSection.setStyle("-fx-background-color: #1a1a2e;");
+        topSection.getStyleClass().add("mt5-top-section");
 
         MenuBar menuBar = createMenuBar();
+        menuBar.getStyleClass().add("mt5-menu-bar");
 
         topSection.getChildren().addAll(menuBar, createMainToolBar(), createDeskCommandStrip());
         updateDeskCommandStrip();
@@ -667,7 +685,7 @@ public class TradingDesk extends BorderPane {
                 menuItem("License Management", null, this::openLicenseManagement),
                 new SeparatorMenuItem(),
                 menuItem(t("menu.about"), null, () -> showInfo("About InvestPro",
-                        "InvestPro — Professional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU\n© 2020–2026 TradeAdviser LLC")));
+                        "InvestPro Terminal\nProfessional Trading Desk\nVersion: 1.0.0\nDeveloper: NOEL NGUEMECHIEU")));
 
         Menu languageMenu = createLanguageMenu();
 
@@ -778,45 +796,87 @@ public class TradingDesk extends BorderPane {
 
     @Contract(" -> new")
     private @NotNull ToolBar createMainToolBar() {
-        exchangeSelector.setPrefWidth(180);
-        symbolSelector.setPrefWidth(220);
-        timeframeSelector.setPrefWidth(120);
-        tradingModeSelector.setPrefWidth(120);
+        createCompactCombo(exchangeSelector, 170, "Broker");
+        createCompactCombo(symbolSelector, 190, "Symbol");
+        createCompactCombo(timeframeSelector, 82, "Timeframe");
+        createCompactCombo(tradingModeSelector, 92, "Mode");
+        createCompactCombo(orderTypeSelector, 92, "Order Type");
 
-        Label brand = new Label("InvestPro ");
-        brand.getStyleClass().add("terminal-brand");
+        Label brand = new Label("InvestPro Terminal");
+        brand.getStyleClass().addAll("terminal-brand", "mt5-brand");
+
+        Button newOrderButton = createToolbarButton("New Order", "Open order ticket");
+        newOrderButton.setOnAction(event -> openOrderPanel());
+
+        Button autoScrollButton = createToolbarButton("Auto-scroll", "Chart auto-scroll placeholder");
+        autoScrollButton.setOnAction(event -> journal("Auto-scroll chart tool selected."));
+
+        Button chartToolsButton = createToolbarButton("Chart Tools", "Chart drawing tools placeholder");
+        chartToolsButton.setOnAction(event -> journal("Chart tools selected."));
+
+        Button closeAllButton = createToolbarButton("Close All", "Close all positions placeholder");
+        closeAllButton.getStyleClass().add("danger-button");
+        closeAllButton.setOnAction(event -> showInfo("Close All", "Close-all positions command is not wired yet."));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         ToolBar toolBar = new ToolBar(
                 brand,
-                new Separator(Orientation.VERTICAL),
-                new Label(t("toolbar.mode")),
+                createVerticalSeparator(),
                 tradingModeSelector,
-                new Separator(Orientation.VERTICAL),
-                new Label(t("toolbar.broker")),
+                createVerticalSeparator(),
+                new Label("Broker"),
                 exchangeSelector,
                 connectControl,
-                new Separator(Orientation.VERTICAL),
-                new Label(t("toolbar.symbol")),
+                createVerticalSeparator(),
+                new Label("Symbol"),
                 symbolSelector,
-                new Label(t("toolbar.timeframe")),
                 timeframeSelector,
                 refreshSymbolsButton,
                 addChartButton,
-                new Separator(Orientation.VERTICAL),
-                new Label(t("toolbar.orderType")),
+                createVerticalSeparator(),
+                createTimeframeStrip(),
+                createVerticalSeparator(),
+                newOrderButton,
+                new Label("Type"),
                 orderTypeSelector,
                 exchangeVenueLabel,
                 buyButton,
                 sellButton,
                 cancelAllButton,
-                new Separator(Orientation.VERTICAL),
+                closeAllButton,
+                createVerticalSeparator(),
+                autoScrollButton,
+                crosshairToolbarButton(),
+                chartToolsButton,
+                createVerticalSeparator(),
+                new Label("Algo"),
+                botTradeButton,
+                createVerticalSeparator(),
                 spacer,
-                new Label(t("toolbar.aiTerminal")));
-        toolBar.getStyleClass().add("main-trading-toolbar");
+                new Label("Toolbox"));
+        toolBar.getStyleClass().addAll("main-trading-toolbar", "mt5-toolbar");
         return toolBar;
+    }
+
+    private @NotNull Button crosshairToolbarButton() {
+        Button button = createToolbarButton("Crosshair", "Toggle crosshair on active chart");
+        button.setOnAction(event -> withActiveChart(CandleStickChart::toggleCrosshair));
+        return button;
+    }
+
+    private @NotNull HBox createTimeframeStrip() {
+        HBox strip = new HBox(2);
+        strip.getStyleClass().add("mt5-timeframe-strip");
+        timeframeButtons.clear();
+        for (Timeframe timeframe : MT5_TIMEFRAMES) {
+            ToggleButton button = createTimeframeButton(timeframe);
+            timeframeButtons.put(timeframe, button);
+            strip.getChildren().add(button);
+        }
+        setActiveTimeframeButton(timeframeSelector.getSelectionModel().getSelectedItem());
+        return strip;
     }
 
     private @NotNull HBox createDeskCommandStrip() {
@@ -872,6 +932,87 @@ public class TradingDesk extends BorderPane {
         return button;
     }
 
+    private @NotNull Button createToolbarButton(String text, String tooltip) {
+        Button button = new Button(text);
+        button.getStyleClass().add("mt5-toolbar-button");
+        button.setTooltip(new Tooltip(tooltip == null || tooltip.isBlank() ? text : tooltip));
+        button.setFocusTraversable(false);
+        return button;
+    }
+
+    private <T> ComboBox<T> createCompactCombo(ComboBox<T> comboBox, double width, String tooltip) {
+        comboBox.setPrefWidth(width);
+        comboBox.setMinWidth(Math.min(width, 72));
+        comboBox.getStyleClass().add("mt5-compact-combo");
+        comboBox.setTooltip(new Tooltip(tooltip));
+        return comboBox;
+    }
+
+    private @NotNull ToggleButton createTimeframeButton(Timeframe timeframe) {
+        ToggleButton button = new ToggleButton(timeframe.name());
+        button.getStyleClass().add("mt5-timeframe-button");
+        button.setTooltip(new Tooltip(timeframe.getDisplayName()));
+        button.setFocusTraversable(false);
+        button.setOnAction(event -> {
+            timeframeSelector.getSelectionModel().select(timeframe);
+            applyTimeframeSelection(timeframe, true);
+        });
+        return button;
+    }
+
+    private @NotNull Separator createVerticalSeparator() {
+        Separator separator = new Separator(Orientation.VERTICAL);
+        separator.getStyleClass().add("mt5-separator");
+        return separator;
+    }
+
+    private void setActiveTimeframeButton(Timeframe selected) {
+        timeframeButtons.forEach((timeframe, button) -> {
+            boolean active = timeframe == selected;
+            button.setSelected(active);
+            button.getStyleClass().remove("mt5-timeframe-button-active");
+            if (active) {
+                button.getStyleClass().add("mt5-timeframe-button-active");
+            }
+        });
+        chartHeaderTimeframeLabel.setText("TF: " + (selected == null ? "-" : selected.name()));
+    }
+
+    private @NotNull HBox createPanelHeader(String title, Node... actions) {
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("panel-title");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox header = new HBox(6, titleLabel, spacer);
+        if (actions != null) {
+            header.getChildren().addAll(Arrays.stream(actions)
+                    .filter(Objects::nonNull)
+                    .toList());
+        }
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().addAll("panel-header", "mt5-panel-header");
+        return header;
+    }
+
+    private @NotNull Button createCommandButton(String text, String styleClass, Runnable action) {
+        Button button = new Button(text);
+        button.getStyleClass().addAll("mt5-command-button", styleClass);
+        button.setFocusTraversable(false);
+        button.setOnAction(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+        return button;
+    }
+
+    private @NotNull Label createStatusChip(String text, String styleClass) {
+        Label label = new Label(text);
+        label.getStyleClass().addAll("mt5-status-chip", styleClass);
+        return label;
+    }
+
     private SplitPane createMainWorkbench() {
         // Create center workspace with charts and terminal
         systemConsole = createTradingConsole();
@@ -923,6 +1064,40 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull VBox createMarketWatchPane() {
+        Label count = new Label();
+        count.getStyleClass().add("panel-meta");
+        count.textProperty().bind(symbolCountLabel.textProperty());
+
+        Button openSelectedButton = marketWatchActionButton("Chart", "/img/newtab.png", "Open selected symbol chart");
+        openSelectedButton.setOnAction(event -> openSelectedFromMarketWatch());
+
+        Button refreshButton = marketWatchActionButton("Refresh", "/img/refresh-solid.png", "Refresh market watch symbols");
+        refreshButton.setOnAction(event -> loadSymbolsForSelectedExchange());
+
+        Button detachButton = marketWatchActionButton("Detach", "/img/expand-solid.png", "Detach market watch");
+        detachButton.setOnAction(event -> detachMarketWatch());
+
+        Button closeButton = createCloseButton(this::toggleMarketWatchVisibility);
+        HBox header = createPanelHeader("Market Watch", count, openSelectedButton, refreshButton, detachButton, closeButton);
+
+        TextField searchField = new TextField();
+        searchField.setPromptText("Search symbols");
+        searchField.getStyleClass().add("mt5-market-search");
+
+        FilteredList<TradePair> filteredItems = new FilteredList<>(marketWatchItems, pair -> true);
+        searchField.textProperty().addListener((obs, old, query) ->
+                filteredItems.setPredicate(pair -> pair == null || query == null || query.isBlank()
+                        || pair.toString('/').toUpperCase(Locale.ROOT).contains(query.toUpperCase(Locale.ROOT))));
+        marketWatchTable.setItems(filteredItems);
+
+        VBox.setVgrow(marketWatchTable, Priority.ALWAYS);
+        VBox box = new VBox(4, header, searchField, marketWatchTable);
+        box.setPadding(new Insets(8));
+        box.getStyleClass().addAll("market-watch", "pro-panel", "mt5-panel", "mt5-market-watch");
+        return box;
+    }
+
+    private @NotNull VBox createMarketWatchPaneLegacy() {
         Label title = new Label("Market Watch");
         title.getStyleClass().add("panel-title");
         Label count = new Label();
@@ -1071,6 +1246,48 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull VBox createOrderBookPane() {
+        orderBookSymbolLabel.getStyleClass().add("panel-meta");
+        orderBookSymbolLabel.setText("No symbol");
+
+        Button refreshButton = createToolbarButton("Refresh", "Refresh depth of market");
+        refreshButton.setOnAction(event -> loadSelectedOrderBook());
+
+        Button detachButton = createToolbarButton("Detach", "Detach depth of market");
+        detachButton.setOnAction(event -> detachOrderBook());
+
+        Button closeButton = createCloseButton(this::toggleOrderBookVisibility);
+        HBox header = createPanelHeader("Depth of Market", orderBookSymbolLabel, refreshButton, detachButton, closeButton);
+
+        VBox asksSection = createAsksSection();
+        HBox midPriceBar = createHorizontalMidPriceBar();
+        VBox bidsSection = createBidsSection();
+
+        SplitPane splitPane = new SplitPane(asksSection, midPriceBar, bidsSection);
+        splitPane.setOrientation(Orientation.VERTICAL);
+        splitPane.getStyleClass().add("mt5-depth-split");
+        splitPane.setDividerPositions(0.42, 0.52);
+        VBox.setVgrow(splitPane, Priority.ALWAYS);
+
+        VBox box = new VBox(0, header, splitPane, createQuickTradePanel());
+        box.setPadding(new Insets(0));
+        box.getStyleClass().addAll("order-book", "pro-panel", "mt5-panel", "mt5-order-book");
+        return box;
+    }
+
+    private @NotNull HBox createQuickTradePanel() {
+        quickTradeAmountField.setPrefWidth(82);
+        quickTradeAmountField.getStyleClass().add("mt5-amount-field");
+
+        Button buyMarket = createCommandButton("BUY MARKET", "buy-button", () -> submitQuickMarketOrder(BUY));
+        Button sellMarket = createCommandButton("SELL MARKET", "sell-button", () -> submitQuickMarketOrder(SELL));
+
+        HBox quickTrade = new HBox(6, new Label("Amount"), quickTradeAmountField, buyMarket, sellMarket);
+        quickTrade.setAlignment(Pos.CENTER_LEFT);
+        quickTrade.getStyleClass().add("mt5-quick-trade");
+        return quickTrade;
+    }
+
+    private @NotNull VBox createOrderBookPaneLegacy() {
         Label title = new Label("Order Book");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
         Label count = new Label("Bids/Asks: 0");
@@ -1599,7 +1816,7 @@ public class TradingDesk extends BorderPane {
 
             // Also resolve active assignments for currently visible market-watch symbols
             // using the selected timeframe to ensure the table reflects live desk context.
-            String timeframeCode = timeframeSelector.getSelectionModel().getSelectedItem();
+            String timeframeCode = timeframeSelector.getSelectionModel().getSelectedItem().getCode();
             if (timeframeCode != null && !timeframeCode.isBlank()) {
                 try {
                     org.investpro.enums.timeframe.Timeframe timeframe =
@@ -1705,7 +1922,7 @@ public class TradingDesk extends BorderPane {
                 .thenCombine(safeAccountDouble(() -> currentExchange.fetchAvailableBalance("USD")),
                         (balance, available) -> new double[] { balance, available })
                 .thenCombine(safeAccountDouble(currentExchange::fetchEquity),
-                        (values, equity) -> new double[] { values[0], values[1], equity })
+                        (values, equity) -> new double[] { values[0], values[1], equity.doubleValue() })
                 .thenCombine(safeAccountDouble(currentExchange::fetchMarginUsed),
                         (values, marginUsed) -> new double[] { values[0], values[1], values[2], marginUsed })
                 .thenCombine(safeAccountDouble(currentExchange::fetchFreeMargin),
@@ -1741,6 +1958,99 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull Node createChartWorkspace() {
+        BorderPane workspace = new BorderPane();
+        workspace.getStyleClass().addAll("chart-workspace", "mt5-chart-workspace");
+
+        HBox header = createChartHeader();
+
+        chartTabPane.setSide(Side.TOP);
+        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
+        chartTabPane.getStyleClass().addAll("chart-tabs", "mt5-chart-tabs");
+        VBox emptyState = createChartEmptyState();
+        emptyState.setVisible(chartTabPane.getTabs().isEmpty());
+        emptyState.setManaged(chartTabPane.getTabs().isEmpty());
+        chartTabPane.getTabs().addListener((javafx.collections.ListChangeListener<Tab>) change -> {
+            boolean empty = chartTabPane.getTabs().isEmpty();
+            emptyState.setVisible(empty);
+            emptyState.setManaged(empty);
+        });
+
+        chartTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            if (newTab != null && !Objects.equals(oldTab, newTab)) {
+                updateOrderBookForChartTab(newTab);
+            }
+            updateChartHeader();
+        });
+
+        workspace.setTop(header);
+        StackPane chartSurface = new StackPane(chartTabPane, emptyState);
+        chartSurface.getStyleClass().add("mt5-chart-surface");
+        workspace.setCenter(chartSurface);
+        updateChartHeader();
+        return workspace;
+    }
+
+    private @NotNull HBox createChartHeader() {
+        chartHeaderSymbolLabel.getStyleClass().add("mt5-chart-symbol");
+        chartHeaderTimeframeLabel.getStyleClass().add("mt5-chart-meta");
+        chartHeaderQuoteLabel.getStyleClass().add("mt5-chart-meta");
+        chartHeaderSpreadLabel.getStyleClass().add("mt5-chart-meta");
+
+        Button fitButton = createToolbarButton("Fit", "Fit active chart");
+        fitButton.setOnAction(event -> withActiveChart(CandleStickChart::fitChart));
+
+        Button refreshButton = createToolbarButton("Refresh", "Refresh active chart");
+        refreshButton.setOnAction(event -> withActiveChart(CandleStickChart::refreshChart));
+
+        Button crosshairButton = createToolbarButton("Crosshair", "Toggle active chart crosshair");
+        crosshairButton.setOnAction(event -> withActiveChart(CandleStickChart::toggleCrosshair));
+
+        Button closeAllButton = createToolbarButton("Close All", "Close all chart tabs");
+        closeAllButton.setOnAction(event -> closeAllCharts());
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox header = new HBox(10,
+                chartHeaderSymbolLabel,
+                chartHeaderTimeframeLabel,
+                chartHeaderQuoteLabel,
+                chartHeaderSpreadLabel,
+                spacer,
+                fitButton,
+                refreshButton,
+                crosshairButton,
+                closeAllButton);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().add("mt5-chart-header");
+        return header;
+    }
+
+    private @NotNull VBox createChartEmptyState() {
+        Label title = new Label("Open a symbol from Market Watch or press Ctrl+N.");
+        title.getStyleClass().add("mt5-empty-title");
+        Label subtitle = new Label("Charts, strategy overlays, and live trade updates appear here.");
+        subtitle.getStyleClass().add("mt5-empty-subtitle");
+        Button openButton = createCommandButton("Open Chart", "mt5-toolbar-button", this::openSelectedSymbolChart);
+
+        VBox empty = new VBox(10, title, subtitle, openButton);
+        empty.setAlignment(Pos.CENTER);
+        empty.getStyleClass().add("mt5-chart-empty-state");
+        return empty;
+    }
+
+    private void updateChartHeader() {
+        TradePair selected = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+        Timeframe timeframe = timeframeSelector == null ? null : timeframeSelector.getSelectionModel().getSelectedItem();
+        chartHeaderSymbolLabel.setText(selected == null ? "No chart" : selected.toString('/'));
+        chartHeaderTimeframeLabel.setText("TF: " + (timeframe == null ? "-" : timeframe.name()));
+        chartHeaderQuoteLabel.setText(selected == null
+                ? "Bid/Ask: -"
+                : "Bid/Ask: %s / %s".formatted(price(selected.getBid()), price(selected.getAsk())));
+        chartHeaderSpreadLabel.setText(selected == null ? "Spread: -" : "Spread: " + formatSpreadPts(selected));
+    }
+
+    private @NotNull Node createChartWorkspaceLegacy() {
         BorderPane workspace = new BorderPane();
         workspace.getStyleClass().add("chart-workspace");
 
@@ -1855,6 +2165,74 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull VBox createTradingConsole() {
+        Label title = new Label("Toolbox");
+        title.getStyleClass().add("terminal-title");
+        Label product = new Label("InvestPro Terminal");
+        product.getStyleClass().add("panel-meta");
+        VBox titleBlock = new VBox(1, title, product);
+
+        Button detachButton = createToolbarButton("Detach", "Detach Toolbox");
+        detachButton.setOnAction(event -> detachConsoleWindow());
+        Button minimizeButton = createToolbarButton("Minimize", "Hide Toolbox");
+        minimizeButton.setOnAction(event -> toggleConsoleVisibility());
+        Button closeButton = createCloseButton(this::toggleConsoleVisibility);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox header = new HBox(6, titleBlock, spacer, detachButton, minimizeButton, closeButton);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().addAll("panel-header", "console-tab-header", "mt5-panel-header");
+
+        terminalTabPane.setSide(Side.TOP);
+        terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        terminalTabPane.getStyleClass().addAll("console-tab-pane", "mt5-terminal-tabs");
+        terminalTabPane.getTabs().setAll(
+                createTerminalTab("Trade", createPositionsTab().getContent()),
+                createTerminalTab("Exposure", buildPortfolioPane()),
+                createTerminalTab("Account History", createAccountHistoryPlaceholder()),
+                createTerminalTab("News", createNewsPlaceholder()),
+                createTerminalTab("Alerts", createAlertsTab().getContent()),
+                createTerminalTab("Mailbox", createMailboxPlaceholder()),
+                createTerminalTab("Experts", createAgentsTab().getContent()),
+                createTerminalTab("Journal", createJournalTab().getContent()),
+                createTerminalTab("Signals", createSignalTab().getContent()),
+                createTerminalTab("Risk Monitor", createPositionRiskMonitorTab().getContent()));
+
+        VBox console = new VBox(0, header, terminalTabPane);
+        console.setPrefHeight(CONSOLE_HEIGHT);
+        console.getStyleClass().addAll("system-console", "bottom-terminal", "mt5-terminal");
+        VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
+        return console;
+    }
+
+    private @NotNull Tab createTerminalTab(String title, Node content) {
+        Tab tab = new Tab(title, content == null ? new Pane() : content);
+        tab.setClosable(false);
+        return tab;
+    }
+
+    private @NotNull Node createAccountHistoryPlaceholder() {
+        return createTerminalPlaceholder("Account history will show closed orders and deals.");
+    }
+
+    private @NotNull Node createNewsPlaceholder() {
+        return createTerminalPlaceholder("Market news and calendar updates appear here.");
+    }
+
+    private @NotNull Node createMailboxPlaceholder() {
+        return createTerminalPlaceholder("Broker messages, system mail, and alerts appear here.");
+    }
+
+    private @NotNull VBox createTerminalPlaceholder(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("mt5-empty-subtitle");
+        VBox box = new VBox(label);
+        box.setAlignment(Pos.CENTER);
+        box.getStyleClass().add("mt5-terminal-placeholder");
+        return box;
+    }
+
+    private @NotNull VBox createTradingConsoleLegacy() {
         Label title = new Label("Terminal");
         title.getStyleClass().add("terminal-title");
         VBox titleBlock = new VBox(1, title);
@@ -2177,7 +2555,7 @@ public class TradingDesk extends BorderPane {
             activityMonitorPanel = new ActivityMonitorPanel();
 
             // Hook activity monitor into the log appender to receive real-time logs
-            org.investpro.monitoring.ActivityLogAppender appender = org.investpro.monitoring.ActivityLogAppender
+            ActivityLogAppender appender =ActivityLogAppender
                     .getInstance();
             appender.addListener(logEvent -> {
                 // Extract simple component name from logger name
@@ -2250,7 +2628,7 @@ public class TradingDesk extends BorderPane {
         }
         TradePair selected = symbolSelector.getValue();
         dataWindow.setSymbol(selected);
-        dataWindow.setTimeframe(timeframeSelector.getValue());
+        dataWindow.setTimeframe(timeframeSelector.getValue().getCode());
         if (selected != null) {
             dataWindow.updateQuote(selected, selected.getBid(), selected.getAsk(), selected.getLast(), Instant.now());
         }
@@ -2411,7 +2789,9 @@ public class TradingDesk extends BorderPane {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setPlaceholder(new Label("No symbols in watch list"));
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        table.setStyle("-fx-font-size: 11px;");
+        table.setFixedCellSize(24);
+        table.getStyleClass().addAll("mt5-market-watch-table", "compact-table");
+        table.getColumns().clear();
 
         // ── Symbol ────────────────────────────────────────────────────────────
         TableColumn<TradePair, String> symbolCol = new TableColumn<>("Symbol");
@@ -2501,7 +2881,27 @@ public class TradingDesk extends BorderPane {
         });
         lastCol.setPrefWidth(72);
 
-        table.getColumns().addAll(symbolCol, bidCol, askCol, spreadCol, lastCol);
+        TableColumn<TradePair, String> changeCol = new TableColumn<>("Change %");
+        changeCol.setCellValueFactory(cd -> {
+            TradePair p = cd.getValue();
+            return new SimpleStringProperty(p == null ? "" : formatSignedPercent(p.getChangePercent(), 2));
+        });
+        changeCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String s, boolean empty) {
+                super.updateItem(s, empty);
+                if (empty || s == null || s.isBlank()) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+                setText(s);
+                setAlignment(Pos.CENTER_RIGHT);
+                setStyle("-fx-font-family: monospace; -fx-text-fill: " + (s.startsWith("-") ? "#ef4444" : "#10b981") + ";");
+            }
+        });
+        changeCol.setPrefWidth(74);
+
+        table.getColumns().addAll(symbolCol, bidCol, askCol, spreadCol, lastCol, changeCol);
 
         // ── Row factory: alternating rows + context menu + double-click ───────
         table.setRowFactory(view -> {
@@ -2540,6 +2940,61 @@ public class TradingDesk extends BorderPane {
             });
             return row;
         });
+
+        table.setRowFactory(view -> createMarketWatchRow());
+    }
+
+    private @NotNull TableRow<TradePair> createMarketWatchRow() {
+        TableRow<TradePair> row = new TableRow<>() {
+            @Override
+            protected void updateItem(TradePair item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().removeAll("mt5-row-even", "mt5-row-odd");
+                if (!empty && item != null) {
+                    getStyleClass().add(getIndex() % 2 == 0 ? "mt5-row-even" : "mt5-row-odd");
+                }
+            }
+        };
+
+        MenuItem tradeItem = new MenuItem("New Order");
+        MenuItem chartItem = new MenuItem("Chart Window");
+        MenuItem depthItem = new MenuItem("Depth of Market");
+        MenuItem specItem = new MenuItem("Specification / Market Info");
+        MenuItem removeItem = new MenuItem("Remove");
+
+        tradeItem.setOnAction(event -> withMarketWatchRow(row, this::openOrderPanel));
+        chartItem.setOnAction(event -> withMarketWatchRow(row, this::openSelectedSymbolChart));
+        depthItem.setOnAction(event -> withMarketWatchRow(row, this::loadSelectedOrderBook));
+        specItem.setOnAction(event -> withMarketWatchRow(row, this::openMarketInfoPanel));
+        removeItem.setOnAction(event -> {
+            if (!row.isEmpty()) {
+                marketWatchItems.remove(row.getItem());
+            }
+        });
+
+        row.setContextMenu(new ContextMenu(tradeItem, chartItem, depthItem, specItem, new SeparatorMenuItem(), removeItem));
+        row.setOnMouseClicked(event -> {
+            if (row.isEmpty()) {
+                return;
+            }
+            symbolSelector.getSelectionModel().select(row.getItem());
+            if (event.getClickCount() == 2) {
+                openSelectedSymbolChart();
+            } else {
+                loadOrderBook(row.getItem());
+            }
+        });
+        return row;
+    }
+
+    private void withMarketWatchRow(TableRow<TradePair> row, Runnable action) {
+        if (row == null || row.isEmpty()) {
+            return;
+        }
+        symbolSelector.getSelectionModel().select(row.getItem());
+        if (action != null) {
+            action.run();
+        }
     }
 
     private double midPrice(TradePair pair) {
@@ -2733,20 +3188,47 @@ public class TradingDesk extends BorderPane {
     }
 
     private @NotNull HBox createStatusBar() {
-        HBox statusBar = new HBox(10);
-        statusBar.setPadding(new Insets(6, 10, 6, 10));
+        HBox statusBar = new HBox(8);
         statusBar.setAlignment(Pos.CENTER_LEFT);
+        statusBar.getStyleClass().add("mt5-status-bar");
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        statusBrokerLabel.getStyleClass().add("mt5-status-chip");
+        statusModeLabel.getStyleClass().add("mt5-status-chip");
+        statusActiveSymbolLabel.getStyleClass().add("mt5-status-chip");
+        symbolCountLabel.getStyleClass().add("mt5-status-chip");
+        statusLatencyLabel.getStyleClass().add("mt5-status-chip");
+        statusServerTimeLabel.getStyleClass().add("mt5-status-chip");
+        statusMarketDataLabel.getStyleClass().add("mt5-status-chip");
+
         statusBar.getChildren().setAll(
-                new Label("Status:"),
                 connectionIndicator,
                 connectionStatusLabel,
-                new Separator(Orientation.VERTICAL),
+                createVerticalSeparator(),
+                statusBrokerLabel,
+                statusModeLabel,
+                statusActiveSymbolLabel,
                 symbolCountLabel,
+                statusLatencyLabel,
+                statusMarketDataLabel,
                 spacer,
-                new Label(t("label.terminal")));
+                statusServerTimeLabel,
+                createStatusChip("InvestPro Terminal", "terminal-label"));
+        updateStatusBarValues();
         return statusBar;
+    }
+
+    private void updateStatusBarValues() {
+        TradePair selected = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+        statusBrokerLabel.setText("Broker: " + safe(exchangeSelector == null ? "" : exchangeSelector.getValue()));
+        statusModeLabel.setText("Mode: " + safe(tradingModeSelector == null ? "" : tradingModeSelector.getValue()));
+        statusActiveSymbolLabel.setText("Symbol: " + (selected == null ? "-" : selected.toString('/')));
+        statusLatencyLabel.setText("Latency: -- ms");
+        statusMarketDataLabel.setText("Data: " + (marketDataEngine == null ? "idle" : "cache"));
+        statusServerTimeLabel.setText("Time: " + LocalDateTime.now().format(STATUS_TIME_FORMAT));
+        updateChartHeader();
     }
 
     private void updateConnectionStatus() {
@@ -2761,6 +3243,7 @@ public class TradingDesk extends BorderPane {
         connectionStatusLabel.setText(connected ? t("status.connected") : t("status.disconnected"));
         updateConnectControl(connected);
         symbolCountLabel.setText(t("label.symbols", marketWatchItems.size()));
+        updateStatusBarValues();
         updateDeskCommandStrip();
     }
 
@@ -3000,6 +3483,7 @@ public class TradingDesk extends BorderPane {
                     marketInfoPanel.setExchange(exchange);
                     marketInfoPanel.updateForPair(selected);
                 }
+                updateStatusBarValues();
                 saveAppState();
             }
         });
@@ -3020,6 +3504,7 @@ public class TradingDesk extends BorderPane {
                 exchange.setUserSelectedTradingMode(selectedMode);
                 log.info("Trading mode switched to: {}", selectedMode);
                 appendAgentActivity("Trading mode: " + selectedMode);
+                updateStatusBarValues();
             }
         });
     }
@@ -3064,42 +3549,54 @@ public class TradingDesk extends BorderPane {
     }
 
     private void configureTimeframeSelector() {
-
-        List<String> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
-                ? exchange.getSupportedTimeframes()
-                        .stream()
-                        .map(String::valueOf)
-                        .toList()
-                : List.of("1m", "5m", "15m", "30m", "1h", "4h", "1d");
-
-        timeframeSelector.getItems().setAll(supportedTimeframes);
-
-        String savedTimeframe = preferences.get("selected_timeframe", "1h");
-
-        String selectedTimeframe = supportedTimeframes.contains(savedTimeframe)
-                ? savedTimeframe
-                : supportedTimeframes.contains("1h")
-                        ? "1h"
-                        : supportedTimeframes.isEmpty()
-                                ? null
-                                : supportedTimeframes.getFirst();
-
-        if (selectedTimeframe != null) {
-            timeframeSelector.getSelectionModel().select(selectedTimeframe);
+        List<Timeframe> supportedTimeframes = exchange != null && exchange.getSupportedTimeframes() != null
+                ? new ArrayList<>(exchange.getSupportedTimeframes())
+                : new ArrayList<>(MT5_TIMEFRAMES);
+        if (supportedTimeframes.isEmpty()) {
+            supportedTimeframes = new ArrayList<>(MT5_TIMEFRAMES);
         }
 
-        timeframeSelector.setOnAction(event -> {
-            String selected = timeframeSelector.getSelectionModel().getSelectedItem();
+        String savedTimeframe = preferences.get("selected_timeframe", "1h");
+        Timeframe selectedTimeframe = parseTimeframeOrDefault(savedTimeframe, supportedTimeframes);
 
-            if (selected == null || selected.isBlank()) {
+        timeframeSelector.getItems().setAll(supportedTimeframes);
+        timeframeSelector.getSelectionModel().select(selectedTimeframe);
+        setActiveTimeframeButton(selectedTimeframe);
+
+        timeframeSelector.setOnAction(event -> {
+            Timeframe selected = timeframeSelector.getSelectionModel().getSelectedItem();
+            if (selected == null) {
                 return;
             }
-
-            preferences.put("selected_timeframe", selected);
-            onTimeframeChanged(selected);
-            saveAppState();
-            journal("Timeframe changed to: " + selected);
+            applyTimeframeSelection(selected, true);
         });
+    }
+
+    private Timeframe parseTimeframeOrDefault(String value, List<Timeframe> supportedTimeframes) {
+        try {
+            Timeframe parsed = value == null || value.isBlank() ? Timeframe.H1 : Timeframe.fromCode(value);
+            return supportedTimeframes.contains(parsed)
+                    ? parsed
+                    : supportedTimeframes.contains(Timeframe.H1) ? Timeframe.H1 : supportedTimeframes.getFirst();
+        } catch (Exception exception) {
+            return supportedTimeframes.contains(Timeframe.H1) ? Timeframe.H1 : supportedTimeframes.getFirst();
+        }
+    }
+
+    private void applyTimeframeSelection(Timeframe timeframe, boolean persist) {
+        if (timeframe == null) {
+            return;
+        }
+        if (!Objects.equals(timeframeSelector.getSelectionModel().getSelectedItem(), timeframe)) {
+            timeframeSelector.getSelectionModel().select(timeframe);
+        }
+        setActiveTimeframeButton(timeframe);
+        if (persist) {
+            preferences.put("selected_timeframe", timeframe.getCode());
+            onTimeframeChanged(timeframe.getCode());
+            saveAppState();
+            journal("Timeframe changed to: " + timeframe.name());
+        }
     }
 
     private void onTimeframeChanged(String timeframe) {
@@ -3148,7 +3645,7 @@ public class TradingDesk extends BorderPane {
     private void configureChartArea() {
         chartTabPane.setSide(Side.BOTTOM);
         chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
-        chartTabPane.setMinHeight(440);
+        chartTabPane.setMinHeight(400);
         DraggableTab.registerTabPane(chartTabPane);
     }
 
@@ -3211,7 +3708,7 @@ public class TradingDesk extends BorderPane {
                     systemCoreEventsSubscribed = false;
                 }
             } catch (Exception exception) {
-                log.debug("Failed to update SystemCore bot during exchange change", exception);
+                throw  new RuntimeException("Failed to update SystemCore bot during exchange change", exception);
             }
         }
 
@@ -3221,7 +3718,8 @@ public class TradingDesk extends BorderPane {
                 exchange.disconnectStream();
                 // Note: Don't fully disconnect - just stop streaming for graceful transition
             } catch (Exception exception) {
-                log.debug("Failed to disconnect stream from old exchange", exception);
+                throw new RuntimeException("Failed to disconnect stream from old exchange", exception);
+
             }
         }
 
@@ -3441,7 +3939,7 @@ public class TradingDesk extends BorderPane {
      * alerts.
      * <p>
      * This does not mean OANDA itself sends the emails.
-     * TradeAdviser sends emails when OANDA-related events happen:
+     * InvestPro sends emails when OANDA-related events happen:
      * - ORDER_FILLED
      * - ORDER_REJECTED
      * - STREAM_DISCONNECTED
@@ -3606,6 +4104,29 @@ public class TradingDesk extends BorderPane {
 
             submitOrderByType(orderType, selected, side, amount);
         });
+    }
+
+    private void submitQuickMarketOrder(org.investpro.utils.Side side) {
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showWarning("Order", "Select a symbol before submitting an order.");
+            return;
+        }
+
+        double amount;
+        try {
+            amount = Double.parseDouble(quickTradeAmountField.getText().trim());
+        } catch (Exception exception) {
+            showWarning("Order", "Amount must be a number.");
+            return;
+        }
+
+        if (amount <= 0) {
+            showWarning("Order", "Amount must be greater than zero.");
+            return;
+        }
+
+        submitOrderByType("MARKET", selected, side, amount);
     }
 
     private void submitOrderByType(String orderType, TradePair tradePair, org.investpro.utils.Side side,
@@ -3783,6 +4304,7 @@ public class TradingDesk extends BorderPane {
         }
 
         activeOrderBookPair = tradePair;
+        runOnFx(() -> orderBookSymbolLabel.setText(tradePair.toString('/')));
         // DO NOT clear orderbook data - keep displaying previous data while fetching
         // new data
         // This prevents the on/off blinking effect when switching between chart tabs
@@ -3842,6 +4364,7 @@ public class TradingDesk extends BorderPane {
             }
 
             currentOrderBook = orderBook;
+            orderBookSymbolLabel.setText(orderBook.getTradePair() == null ? "No symbol" : orderBook.getTradePair().toString('/'));
             orderBookBids.setAll(orderBook.getBids() == null ? List.of() : orderBook.getBids());
             orderBookAsks.setAll(orderBook.getAsks() == null ? List.of() : orderBook.getAsks());
             updateChartsFromOrderBookMidPrice(orderBook);
@@ -4008,13 +4531,25 @@ public class TradingDesk extends BorderPane {
         log.info("Displaying system announcements");
     }
 
-    private SystemCore createSystemCore(Exchange exchange) throws SQLException, ClassNotFoundException {
+    @Contract("null -> fail")
+    private @NonNull SystemCore createSystemCore(Exchange exchange) throws SQLException, ClassNotFoundException {
         if (exchange == null) {
             throw new IllegalArgumentException("exchange cannot be null");
         }
 
         Properties config = new Properties();
-        config.setProperty("telegram_token", safe(telegramToken));
+
+        try (InputStream input = Objects.requireNonNull(
+                getClass().getClassLoader().getResourceAsStream("config.properties"),
+                "config.properties not found in src/main/resources"
+        )) {
+            config.load(input);
+
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to load config.properties", e);
+        }
+
+        config.setProperty("TELEGRAM_TOKEN", safe(telegramToken));
 
         String openAiKey = safe(System.getenv("OPENAI_API_KEY"));
         if (!openAiKey.isBlank()) {
@@ -4118,7 +4653,7 @@ public class TradingDesk extends BorderPane {
                 try {
                     Account account = exchange.getUserAccountDetails();
                     if (account != null) {
-                        accountBalance = account.getTotalBalance();
+                        accountBalance = account.getAvailableBalance();
                         double available = account.getAvailableBalance();
                         portfolioExposurePercent = accountBalance > 0 ? (available / accountBalance * 100) : 0.0;
                     }
@@ -4159,17 +4694,55 @@ public class TradingDesk extends BorderPane {
     /**
      * Get list of active strategies from SystemCore
      */
-    private List<String> getActiveStrategies(SystemCore core) {
-        List<String> strategies = new ArrayList<>();
+    @Contract("_ -> new")
+    private @NonNull List<String> getActiveStrategies(SystemCore core) {
+        LinkedHashSet<String> strategies = new LinkedHashSet<>();
         try {
-            if (core.getStrategyEngine() != null) {
-                // TODO: Get actual active strategy names from StrategyEngine
-                strategies.add("Primary Strategy");
+            StrategyAssignmentRepository.getInstance().getAllActive().stream()
+                    .map(StrategyAssignment::getStrategyId)
+                    .map(this::safeStrategyName)
+                    .filter(name -> !name.isBlank())
+                    .forEach(strategies::add);
+
+            if (core.getStrategyEngine() != null && core.getStrategyEngine().getLastSignalCache() != null) {
+                core.getStrategyEngine().getLastSignalCache().values().stream()
+                        .filter(Objects::nonNull)
+                        .filter(signal -> signal.getSide() == BUY || signal.getSide() == SELL)
+                        .map(this::displayStrategyName)
+                        .filter(name -> !name.isBlank())
+                        .forEach(strategies::add);
             }
+
+            String activeStrategyName = safeStrategyName(core.getActiveStrategyName());
+            if (strategies.isEmpty()
+                    && !activeStrategyName.isBlank()
+                    && !"Not available yet".equalsIgnoreCase(activeStrategyName)
+                    && !"No active strategy signal yet".equalsIgnoreCase(activeStrategyName)
+                    && !"Unknown strategy".equalsIgnoreCase(activeStrategyName)) {
+                strategies.add(activeStrategyName);
+            }
+
         } catch (Exception e) {
             log.debug("Error getting active strategies", e);
         }
-        return strategies;
+        return new ArrayList<>(strategies);
+    }
+
+    private String displayStrategyName(StrategySignal signal) {
+        if (signal == null) {
+            return "";
+        }
+
+        String strategyName = safeStrategyName(signal.getStrategyName());
+        if (!strategyName.isBlank()) {
+            return strategyName;
+        }
+
+        return safeStrategyName(signal.getStrategyId());
+    }
+
+    private String safeStrategyName(String strategyName) {
+        return strategyName == null ? "" : strategyName.trim();
     }
 
     /**
@@ -4182,7 +4755,7 @@ public class TradingDesk extends BorderPane {
                 symbols.add(core.getSelectedTradePair().toString());
             }
         } catch (Exception e) {
-            log.debug("Error getting monitored symbols", e);
+            throw  new RuntimeException("Error getting monitored symbols", e);
         }
         return symbols;
     }
@@ -4255,18 +4828,24 @@ public class TradingDesk extends BorderPane {
 
         if (coreMissing || botMissing || botNotStarted) {
             try {
-                systemCore = createSystemCore(exchange);
-                // Wire up the primary stage to the Telegram command handler for screenshot
-                // capability
-                if (systemCore.getTelegramCommandHandler() != null && getScene() != null
-                        && getScene().getWindow() instanceof Stage) {
-                    systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+                if (coreMissing || botMissing) {
+                    systemCore = createSystemCore(exchange);
                 }
             } catch (SQLException | ClassNotFoundException e) {
                 log.error("Failed to create SystemCore", e);
                 throw new RuntimeException("Failed to initialize trading system", e);
             }
-            initializeSymbolAgentPanels();
+
+            runOnFxAndWait(() -> {
+                // Wire up the primary stage to the Telegram command handler for screenshot
+                // capability.
+                if (systemCore.getTelegramCommandHandler() != null && getScene() != null
+                        && getScene().getWindow() instanceof Stage) {
+                    systemCore.getTelegramCommandHandler().setPrimaryStage((Stage) getScene().getWindow());
+                }
+                initializeSymbolAgentPanels();
+            });
+
             systemCore.start(tradingService, selectedPair);
             systemCore.getSmartBot().setSelectedTradePair(selectedPair);
 
@@ -4327,7 +4906,7 @@ public class TradingDesk extends BorderPane {
         appendAgentActivity("Broker session validated for %s.".formatted(exchangeSelector.getValue()));
     }
 
-    private String formatAgentEvent(AgentEvent event) {
+    private @NonNull String formatAgentEvent(@NonNull AgentEvent event) {
         return "[%s] %s | %s | %s".formatted(
                 DateTimeFormatter.ofPattern("HH:mm:ss").format(event.timestamp().atZone(ZoneId.systemDefault())),
                 event.type(),
@@ -4335,7 +4914,7 @@ public class TradingDesk extends BorderPane {
                 event.payload() == null ? "" : event.payload().toString());
     }
 
-    private String formatSignalEvent(AgentEvent event) {
+    private String formatSignalEvent(@NonNull AgentEvent event) {
         if (event.payload() instanceof Signal signal) {
             return "[%s] %s %s confidence %.0f%% via %s".formatted(
                     DateTimeFormatter.ofPattern("HH:mm:ss")
@@ -4387,7 +4966,7 @@ public class TradingDesk extends BorderPane {
             }
             preferences.sync();
         } catch (Exception exception) {
-            log.debug("Failed to save app state", exception);
+            throw new RuntimeException("Failed to save app state", exception);
         }
     }
 
@@ -4409,7 +4988,7 @@ public class TradingDesk extends BorderPane {
 
                 }
             } catch (Exception exception) {
-                log.debug("Failed to stop SystemCore streaming", exception);
+                throw  new RuntimeException("Failed to stop SystemCore streaming", exception);
             }
         }
 
@@ -4424,8 +5003,8 @@ public class TradingDesk extends BorderPane {
      */
     private void bootstrapInstrumentsForExchange() {
         if (exchange == null || marketDataEngine == null) {
-            log.warn("Cannot bootstrap instruments: exchange={}, engine={}", exchange, marketDataEngine);
-            return;
+            throw new RuntimeException("Cannot bootstrap instruments: exchange={}, engine={}");
+
         }
 
         new Thread(() -> {
@@ -4646,52 +5225,25 @@ public class TradingDesk extends BorderPane {
     private void startBotFromChart(TradePair selected, ChartContainer container) {
         symbolSelector.getSelectionModel().select(selected);
 
-        try {
-            if (!hasBrokerAccess()) {
-                showWarning("Bot Trading", "Validate broker credentials before starting the bot.");
-                return;
-            }
-            if (lacksOrderSubmissionAccess()) {
-                showWarning("Bot Trading",
-                        "%s is connected, but this adapter cannot submit orders.".formatted(exchange.getDisplayName()));
-                return;
-            }
-
-            ensureSystemCoreStarted(selected);
-
-            // Initialize analysis panel if not already done
-            if (analysisPanel == null) {
-                analysisPanel = new AnalysisPanel(systemCore);
-            }
-
-            // Set selected strategy/symbol for analysis metrics
-            String activeStrategy = systemCore.getActiveStrategyName();
-            if (activeStrategy != null && !activeStrategy.isBlank()) {
-                analysisPanel.selectStrategyAndSymbol(activeStrategy, selected.toString('/'));
-            }
-
-            // Start recording trades when bot starts
-            if (systemCore.getExchange().fetchAccount() != null) {
-                analysisPanel.getLiveMetricsTracker()
-                        .startTracking(systemCore.getExchange().fetchAccount().get().getAvailableBalance());
-            }
-
-            systemCore.setAutoTradingEnabled(true);
-            systemCore.startStreaming(selected, SystemCore.StreamingMode.EVERYTHING);
-
-            CandleStickChart chart = container.getChart();
-            if (chart != null) {
-                chart.setAutoTradeEnabled(true);
-            }
-
-            botTradingEnabled = true;
-            appendAgentActivity("SystemCore bot enabled from chart toolbar for " + selected.toString('/'));
-            refreshBotTradeButton();
-            saveAppState();
-        } catch (Exception exception) {
-            log.error("Failed to start chart auto trading", exception);
-            showWarning("Bot Trading", "Could not start bot trading: %s".formatted(rootMessage(exception)));
+        if (!hasBrokerAccess()) {
+            showWarning("Bot Trading", "Validate broker credentials before starting the bot.");
+            return;
         }
+        if (lacksOrderSubmissionAccess()) {
+            showWarning("Bot Trading",
+                    "%s is connected, but this adapter cannot submit orders.".formatted(exchange.getDisplayName()));
+            return;
+        }
+
+        startBotTradingAsync(
+                List.of(selected),
+                "chart toolbar for " + selected.toString('/'),
+                () -> {
+                    CandleStickChart chart = container.getChart();
+                    if (chart != null) {
+                        chart.setAutoTradeEnabled(true);
+                    }
+                });
     }
 
     private @Nullable CandleStickChart getActiveChart() {
@@ -4722,38 +5274,10 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        List<String> choices = List.of(
+       List<INDICATORS>  choices = List.of(INDICATORS.values()
                 // Moving Averages
-                "SMA 20",
-                "SMA 50",
-                "SMA 200",
-                "EMA 12",
-                "EMA 26",
-                // Momentum Indicators
-                "RSI 14",
-                "Stochastic",
-                "CCI 20",
-                "MACD",
-                // Volatility Indicators
-                "Bollinger Bands",
-                "ATR 14",
-                "Volatility",
-                // Volume Indicators
-                "VWAP",
-                "OBV",
-                "Volume",
-                // Trend Indicators
-                "ADX 14",
-                "Ichimoku",
-                "Parabolic SAR",
-                // Retracement Levels
-                "Fibonacci Retracement",
-                "Zigzag",
-                // Pattern Recognition
-                "Fractal",
-                // Utility
-                "Clear Indicators");
-        ChoiceDialog<String> dialog = new ChoiceDialog<>("SMA 20", choices);
+              );
+        ChoiceDialog<String> dialog = new ChoiceDialog<>();
         dialog.setTitle(t("dialog.indicators.title"));
         dialog.setHeaderText(t("dialog.indicators.header"));
         dialog.setContentText(t("dialog.indicators.content"));
@@ -4827,6 +5351,7 @@ public class TradingDesk extends BorderPane {
     private void chooseActiveChartBackgroundImage() {
         CandleStickChart chart = requireActiveChart("Background Image");
         if (chart == null) {
+            log.info("null chart");
             return;
         }
 
@@ -5186,6 +5711,9 @@ public class TradingDesk extends BorderPane {
         if (isAutoRefreshExecutorUnavailable()) {
             return;
         }
+        if (!positionAutoRefreshStarted.compareAndSet(false, true)) {
+            return;
+        }
         autoRefreshExecutor.scheduleAtFixedRate(() -> {
             if (hasBrokerAccess()) {
                 refreshAccountWorkspace();
@@ -5202,9 +5730,13 @@ public class TradingDesk extends BorderPane {
         if (isAutoRefreshExecutorUnavailable()) {
             return;
         }
+        if (!autoRefreshTasksStarted.compareAndSet(false, true)) {
+            return;
+        }
         autoRefreshExecutor.scheduleAtFixedRate(() -> runOnFx(this::updateConnectionStatus), 2, 5, TimeUnit.SECONDS);
 
-        // Stream ticker prices for all market watch symbols
+        // TODO: Prefer WebSocket/cache-first market data here; this polling path is a
+        // compatibility fallback for exchange adapters that do not stream tickers yet.
         autoRefreshExecutor.scheduleAtFixedRate(() -> {
             try {
                 if (exchange != null && hasBrokerAccess() && !marketWatchItems.isEmpty()) {
@@ -5792,15 +6324,15 @@ public class TradingDesk extends BorderPane {
         return table;
     }
 
-    private VBox createTradesReviewPanel() {
+    private @NonNull VBox createTradesReviewPanel() {
         List<org.investpro.models.trading.Trade> trades;
         try {
             trades = tradeRepository.findAll();
         } catch (java.sql.SQLException e) {
-            log.warn("Failed to load trades for review panel", e);
+            showAlert("Failed to load trades for review panel\n"+ e.getMessage());
             trades = List.of();
         }
-        final List<org.investpro.models.trading.Trade> allTrades = new ArrayList<>(trades);
+        final List<Trade> allTrades = new ArrayList<>(trades);
 
         VBox panel = new VBox(12);
         panel.setPadding(new Insets(16));
@@ -5817,14 +6349,14 @@ public class TradingDesk extends BorderPane {
 
         TableView<org.investpro.models.trading.Trade> allTable = buildTradeTable(allTrades);
 
-        List<org.investpro.models.trading.Trade> buyList = new ArrayList<>();
-        List<org.investpro.models.trading.Trade> sellList = new ArrayList<>();
-        for (org.investpro.models.trading.Trade t : allTrades) {
+        List<Trade> buyList = new ArrayList<>();
+        List<Trade> sellList = new ArrayList<>();
+        for (Trade t : allTrades) {
             if (t.getTransactionType() != null && "BUY".equals(t.getTransactionType().name())) buyList.add(t);
             else sellList.add(t);
         }
-        TableView<org.investpro.models.trading.Trade> buyTable = buildTradeTable(buyList);
-        TableView<org.investpro.models.trading.Trade> sellTable = buildTradeTable(sellList);
+        TableView<Trade> buyTable = buildTradeTable(buyList);
+        TableView<Trade> sellTable = buildTradeTable(sellList);
 
         // P&L Analysis grid
         Map<String, Double> metrics = computeTradeMetrics(allTrades);
@@ -5863,18 +6395,17 @@ public class TradingDesk extends BorderPane {
         pnlScroll.setFitToWidth(true);
 
         TabPane tradesTabs = new TabPane();
-        tradesTabs.setStyle("-fx-control-inner-background: #0f3460;");
-        tradesTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+       // tradesTabs.setStyle("-fx-control-inner-background: #0f3460;");
+        tradesTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
 
         Tab allTradesTab = new Tab("All Trades", allTable);
         Tab buyTab = new Tab("Buy", buyTable);
         Tab sellTab = new Tab("Sell", sellTable);
         Tab pnlTab = new Tab("P&L Analysis", pnlScroll);
-
         tradesTabs.getTabs().addAll(allTradesTab, buyTab, sellTab, pnlTab);
 
         refreshBtn.setOnAction(e -> {
-            List<org.investpro.models.trading.Trade> fresh;
+            List<Trade> fresh;
             try { fresh = tradeRepository.findAll(); } catch (java.sql.SQLException ex) { log.warn("Refresh failed", ex); fresh = List.of(); }
             allTable.setItems(FXCollections.observableArrayList(fresh));
             List<org.investpro.models.trading.Trade> fb = new ArrayList<>(), fs = new ArrayList<>();
@@ -5892,12 +6423,12 @@ public class TradingDesk extends BorderPane {
         return panel;
     }
 
-    private @NotNull VBox createPlaceholderContent(String title) {
+    private @NotNull VBox createPlaceholderContent() {
         VBox content = new VBox(12);
         content.setStyle("-fx-background-color: #0f3460; -fx-padding: 20px;");
         content.setAlignment(Pos.CENTER);
 
-        Label label = new Label(title);
+        Label label = new Label("Machine Learning Models & Experimentation");
         label.setStyle("-fx-font-size: 14px; -fx-text-fill: #a0aec0;");
 
         Label placeholder = new Label("Detailed analysis data will be displayed here");
@@ -6387,7 +6918,7 @@ public class TradingDesk extends BorderPane {
 
     private void showMLLab() {
         log.info("Opening ML Lab");
-        createIndependentWindow("ML Lab", createPlaceholderContent("Machine Learning Models & Experimentation"), 950,
+        createIndependentWindow("ML Lab", createPlaceholderContent(), 950,
                 750);
         journal("ML Lab opened");
     }
@@ -6594,8 +7125,7 @@ public class TradingDesk extends BorderPane {
     /**
      * Display theme settings dialog for dark/light mode and customization
      */
-    private void
-    bbshowThemeSettingsDialog() {
+    private void showThemeSettingsDialog() {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Theme Settings");
         dialog.setHeaderText("Customize application appearance and theme");
@@ -7434,6 +7964,39 @@ public class TradingDesk extends BorderPane {
         }
     }
 
+    private void runOnFxAndWait(Runnable runnable) {
+        if (runnable == null) {
+            return;
+        }
+        if (Platform.isFxApplicationThread()) {
+            runnable.run();
+            return;
+        }
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        Platform.runLater(() -> {
+            try {
+                runnable.run();
+            } catch (RuntimeException exception) {
+                failure.set(exception);
+            } finally {
+                latch.countDown();
+            }
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted waiting for JavaFX update", exception);
+        }
+
+        if (failure.get() != null) {
+            throw failure.get();
+        }
+    }
+
     private void showInfo(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);
@@ -7823,35 +8386,7 @@ public class TradingDesk extends BorderPane {
 
     private void toggleBotTrading() {
         if (botTradingEnabled) {
-            botTradingEnabled = false;
-
-            if (systemCore != null) {
-                try {
-                    systemCore.setAutoTradingEnabled(false);
-                    systemCore.stopStreaming();
-                } catch (Exception exception) {
-                    log.debug("Failed to stop SystemCore streaming", exception);
-                }
-            }
-
-            withActiveChart(chart -> chart.setAutoTradeEnabled(false));
-            appendAgentActivity("SystemCore bot auto trading disabled.");
-            refreshBotTradeButton();
-            saveAppState();
-
-            /*
-             * After bot stream stops, restart one UI-owned stream for the active symbol.
-             * Starting one stream per watchlist symbol would repeatedly stop the previous
-             * subscription and leave only the last symbol active.
-             */
-            TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
-            if (selected == null && !marketWatchItems.isEmpty()) {
-                selected = marketWatchItems.getFirst();
-            }
-            if (selected != null && hasBrokerAccess()) {
-                startDesktopStream(selected);
-            }
-
+            stopBotTradingAsync();
             return;
         }
 
@@ -7874,37 +8409,110 @@ public class TradingDesk extends BorderPane {
             return;
         }
 
-        try {
-            TradePair primarySymbol = symbols.getFirst();
+        startBotTradingAsync(
+                symbols,
+                "%d symbol(s) using %s".formatted(symbols.size(), botSymbolScopeSelector.getValue()),
+                () -> withActiveChart(chart -> chart.setAutoTradeEnabled(true)));
+    }
 
-            /*
-             * Prevent duplicate exchange streams:
-             * - UI-only stream OFF
-             * - SystemCore bot stream ON
-             */
-            stopDesktopStream();
-
-            ensureSystemCoreStarted(primarySymbol);
-            systemCore.setAutoTradingEnabled(true);
-            systemCore.startStreaming(symbols, SystemCore.StreamingMode.EVERYTHING);
-
-            withActiveChart(chart -> chart.setAutoTradeEnabled(true));
-
-            botTradingEnabled = true;
-
-            appendAgentActivity(
-                    "SystemCore bot enabled for %d symbol(s) using %s."
-                            .formatted(symbols.size(), botSymbolScopeSelector.getValue()));
-
-            refreshBotTradeButton();
-            saveAppState();
-
-        } catch (Exception exception) {
-            log.error("Failed to toggle bot trading", exception);
-            showWarning(
-                    "Bot Trading",
-                    "Could not start bot trading: %s".formatted(rootMessage(exception)));
+    private void startBotTradingAsync(List<TradePair> symbols, String activityScope, Runnable fxSuccessAction) {
+        if (!botTradingOperationInFlight.compareAndSet(false, true)) {
+            appendAgentActivity("Bot operation already in progress.");
+            return;
         }
+
+        botTradeButton.setDisable(true);
+        appendAgentActivity("Starting SystemCore bot...");
+
+        List<TradePair> selectedSymbols = List.copyOf(symbols);
+        CompletableFuture
+                .runAsync(() -> {
+                    TradePair primarySymbol = selectedSymbols.getFirst();
+
+                    /*
+                     * Prevent duplicate exchange streams:
+                     * - UI-only stream OFF
+                     * - SystemCore bot stream ON
+                     */
+                    stopDesktopStream();
+
+                    ensureSystemCoreStarted(primarySymbol);
+                    systemCore.setAutoTradingEnabled(true);
+                    systemCore.startStreaming(selectedSymbols, SystemCore.StreamingMode.EVERYTHING);
+                }, botOperationExecutor)
+                .thenRun(() -> runOnFx(() -> {
+                    if (fxSuccessAction != null) {
+                        fxSuccessAction.run();
+                    }
+                    botTradingEnabled = true;
+                    appendAgentActivity("SystemCore bot enabled for " + activityScope + ".");
+                    refreshBotTradeButton();
+                    saveAppState();
+                }))
+                .exceptionally(exception -> {
+                    log.error("Failed to toggle bot trading", exception);
+                    runOnFx(() -> showWarning(
+                            "Bot Trading",
+                            "Could not start bot trading: %s".formatted(rootMessage(exception))));
+                    return null;
+                })
+                .whenComplete((unused, exception) -> runOnFx(() -> {
+                    botTradingOperationInFlight.set(false);
+                    botTradeButton.setDisable(false);
+                    refreshBotTradeButton();
+                }));
+    }
+
+    private void stopBotTradingAsync() {
+        if (!botTradingOperationInFlight.compareAndSet(false, true)) {
+            appendAgentActivity("Bot operation already in progress.");
+            return;
+        }
+
+        botTradeButton.setDisable(true);
+        appendAgentActivity("Stopping SystemCore bot...");
+
+        TradePair selected = symbolSelector.getSelectionModel().getSelectedItem();
+        if (selected == null && !marketWatchItems.isEmpty()) {
+            selected = marketWatchItems.getFirst();
+        }
+        TradePair symbolToResume = selected;
+
+        CompletableFuture
+                .runAsync(() -> {
+                    if (systemCore != null) {
+                        systemCore.setAutoTradingEnabled(false);
+                        systemCore.stopStreaming();
+                    }
+                }, botOperationExecutor)
+                .thenRun(() -> runOnFx(() -> {
+                    botTradingEnabled = false;
+                    withActiveChart(chart -> chart.setAutoTradeEnabled(false));
+                    appendAgentActivity("SystemCore bot auto trading disabled.");
+                    refreshBotTradeButton();
+                    saveAppState();
+
+                    /*
+                     * After bot stream stops, restart one UI-owned stream for the active symbol.
+                     * Starting one stream per watchlist symbol would repeatedly stop the previous
+                     * subscription and leave only the last symbol active.
+                     */
+                    if (symbolToResume != null && hasBrokerAccess()) {
+                        startDesktopStream(symbolToResume);
+                    }
+                }))
+                .exceptionally(exception -> {
+                    log.debug("Failed to stop SystemCore streaming", exception);
+                    runOnFx(() -> showWarning(
+                            "Bot Trading",
+                            "Could not stop bot trading cleanly: %s".formatted(rootMessage(exception))));
+                    return null;
+                })
+                .whenComplete((unused, exception) -> runOnFx(() -> {
+                    botTradingOperationInFlight.set(false);
+                    botTradeButton.setDisable(false);
+                    refreshBotTradeButton();
+                }));
     }
 
     // ============================================================================
@@ -7950,6 +8558,17 @@ public class TradingDesk extends BorderPane {
             Thread.currentThread().interrupt();
             autoRefreshExecutor.shutdownNow();
             log.debug("Auto-refresh executor interrupted during shutdown", exception);
+        }
+
+        try {
+            botOperationExecutor.shutdown();
+            if (!botOperationExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                botOperationExecutor.shutdownNow();
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            botOperationExecutor.shutdownNow();
+            log.debug("Bot operation executor interrupted during shutdown", exception);
         }
 
         try {
@@ -8487,26 +9106,65 @@ public class TradingDesk extends BorderPane {
             pairs.add(symbolSelector.getValue());
         }
 
-        if (!pairs.isEmpty() && exchange != null) {
-            try {
-                List<Ticker> tickers = exchange.fetchTickers(pairs).get(2, TimeUnit.SECONDS);
-                if (tickers != null) {
-                    for (int i = 0; i < tickers.size() && i < pairs.size(); i++) {
-                        Ticker ticker = tickers.get(i);
-                        TradePair pair = pairs.get(i);
-                        if (ticker != null && pair != null) {
-                            pair.updateTicker(
-                                    ticker.getBidPrice(),
-                                    ticker.getAskPrice(),
-                                    ticker.getLastPrice(),
-                                    ticker.getVolume(),
-                                    ticker.getChangePercent());
-                        }
+        // Return immediately with local data and refresh network values asynchronously to
+        // avoid blocking the FX thread.
+        MarketSnapshot localSnapshot = computeMarketSnapshotFromPairs(pairs);
+        if (localSnapshot.hasMarketData()) {
+            cachedMarketSnapshot = localSnapshot;
+            cachedMarketSnapshotAt = Instant.now();
+        }
+
+        refreshMarketSnapshotAsync(pairs);
+        return cachedMarketSnapshot;
+    }
+
+    private void refreshMarketSnapshotAsync(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty() || exchange == null
+                || !marketSnapshotRefreshInFlight.compareAndSet(false, true)) {
+            return;
+        }
+
+        exchange.fetchTickers(pairs)
+                .orTimeout(2, TimeUnit.SECONDS)
+                .thenApply(tickers -> {
+                    applyTickerUpdates(pairs, tickers);
+                    return computeMarketSnapshotFromPairs(pairs);
+                })
+                .exceptionally(exception -> {
+                    log.debug("Unable to refresh market research snapshot: {}", rootMessage(exception));
+                    return computeMarketSnapshotFromPairs(pairs);
+                })
+                .thenAccept(snapshot -> {
+                    if (snapshot != null) {
+                        cachedMarketSnapshot = snapshot;
+                        cachedMarketSnapshotAt = Instant.now();
                     }
-                }
-            } catch (Exception exception) {
-                log.debug("Unable to refresh market research snapshot: {}", rootMessage(exception));
+                })
+                .whenComplete((result, throwable) -> marketSnapshotRefreshInFlight.set(false));
+    }
+
+    private void applyTickerUpdates(List<TradePair> pairs, List<Ticker> tickers) {
+        if (tickers == null || pairs == null) {
+            return;
+        }
+
+        for (int i = 0; i < tickers.size() && i < pairs.size(); i++) {
+            Ticker ticker = tickers.get(i);
+            TradePair pair = pairs.get(i);
+            if (ticker != null && pair != null) {
+                pair.updateTicker(
+                        ticker.getBidPrice(),
+                        ticker.getAskPrice(),
+                        ticker.getLastPrice(),
+                        ticker.getVolume(),
+                        ticker.getChangePercent());
             }
+        }
+    }
+
+    private @NotNull MarketSnapshot computeMarketSnapshotFromPairs(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return MarketSnapshot.empty();
         }
 
         double weightedChange = 0.0;
@@ -8545,9 +9203,7 @@ public class TradingDesk extends BorderPane {
         }
 
         if (totalWeight <= 0.0) {
-            cachedMarketSnapshot = MarketSnapshot.empty();
-            cachedMarketSnapshotAt = Instant.now();
-            return cachedMarketSnapshot;
+            return MarketSnapshot.empty();
         }
 
         double averageChange = weightedChange / totalWeight;
@@ -8560,10 +9216,8 @@ public class TradingDesk extends BorderPane {
         double syntheticVix = clamp(12.0 + Math.abs(averageChange) * 4.0 + averageSpread * 2.5, 8.0, 80.0);
         double btcDominance = totalQuoteVolume > 0.0 ? (btcQuoteVolume / totalQuoteVolume) * 100.0 : -1.0;
 
-        cachedMarketSnapshot = new MarketSnapshot(sentimentIndex, averageChange, breadth, syntheticVix, btcDominance,
-                totalQuoteVolume);
-        cachedMarketSnapshotAt = Instant.now();
-        return cachedMarketSnapshot;
+        return new MarketSnapshot(sentimentIndex, averageChange, breadth, syntheticVix, btcDominance,
+            totalQuoteVolume);
     }
 
     private StrategyStats strategyStats() {
@@ -9026,7 +9680,7 @@ public class TradingDesk extends BorderPane {
 
             // Create and display the panel
             TradingSystemStatusPanel statusPanel = new TradingSystemStatusPanel(snapshot);
-            createIndependentWindow("Trading System Status", statusPanel, 1200, 800);
+            createIndependentWindow("Trading System Status", statusPanel, 800, 700);
 
         } catch (Exception e) {
             log.error("Error displaying trading system status", e);

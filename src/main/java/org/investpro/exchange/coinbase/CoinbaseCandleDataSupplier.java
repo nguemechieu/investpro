@@ -31,6 +31,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
     private static final Logger logger = LoggerFactory.getLogger(CoinbaseCandleDataSupplier.class);
     private static final String PUBLIC_PRODUCT_CANDLES_URL =
             "https://api.coinbase.com/api/v3/brokerage/market/products/%s/candles";
+    private static final int MAX_COINBASE_CANDLES_PER_REQUEST = 349;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -51,8 +52,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                 3600,    // 1 hour
                 7200,    // 2 hours
                 21600,   // 6 hours
-                86400,    // 1 day
-                108000 // 1 Month
+                86400    // 1 day
         ));
     }
 
@@ -82,9 +82,16 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
             endTime.set((int) (Instant.now().toEpochMilli() / 1000L));
         }
 
-        int startTime = Math.max(endTime.get() - (numCandles * secondsPerCandle), EARLIEST_DATA);
+        CoinbaseGranularity granularity = CoinbaseGranularity.fromSeconds(secondsPerCandle);
+        int requestCandles = Math.min(MAX_COINBASE_CANDLES_PER_REQUEST, Math.max(1, numCandles));
+        int startTime = Math.max(endTime.get() - (requestCandles * granularity.seconds()), EARLIEST_DATA);
 
-        String uriStr = "%s?granularity=%s&start=%d&end=%d&limit=%d".formatted(PUBLIC_PRODUCT_CANDLES_URL.formatted(encode(tradePair.toString('-').toUpperCase(Locale.ROOT))), encode(granularityName(secondsPerCandle)), startTime, endTime.get(), Math.min(350, Math.max(1, numCandles)));
+        String uriStr = "%s?granularity=%s&start=%d&end=%d&limit=%d".formatted(
+                PUBLIC_PRODUCT_CANDLES_URL.formatted(encode(tradePair.toString('-').toUpperCase(Locale.ROOT))),
+                encode(granularity.apiName()),
+                startTime,
+                endTime.get(),
+                requestCandles);
 
         if (startTime == EARLIEST_DATA) {
             // signal more data is false
@@ -119,7 +126,7 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                         List<CandleData> candleData = new ArrayList<>();
                         for (JsonNode candle : candles) {
                             long candleStart = parseLong(candle.path("start").asText("0"));
-                            if (candleStart + secondsPerCandle > endTime.get()) {
+                            if (candleStart + granularity.seconds() > endTime.get()) {
                                 continue;
                             }
 
@@ -149,14 +156,40 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
 
     @Contract(pure = true)
     private @NotNull String granularityName(int seconds) {
-        return switch (seconds) {
-            case 60 -> "ONE_MINUTE";
-            case 300 -> "FIVE_MINUTES";
-            case 900 -> "FIFTEEN_MINUTES";
-            case 21600 -> "SIX_HOURS";
-            case 86400 -> "ONE_DAY";
-            default -> "ONE_HOUR";
-        };
+        return CoinbaseGranularity.fromSeconds(seconds).apiName();
+    }
+
+    private record CoinbaseGranularity(String apiName, int seconds) {
+        private static final List<CoinbaseGranularity> SUPPORTED = List.of(
+                new CoinbaseGranularity("ONE_MINUTE", 60),
+                new CoinbaseGranularity("FIVE_MINUTE", 300),
+                new CoinbaseGranularity("FIFTEEN_MINUTE", 900),
+                new CoinbaseGranularity("THIRTY_MINUTE", 1800),
+                new CoinbaseGranularity("ONE_HOUR", 3600),
+                new CoinbaseGranularity("TWO_HOUR", 7200),
+                new CoinbaseGranularity("SIX_HOUR", 21600),
+                new CoinbaseGranularity("ONE_DAY", 86400)
+        );
+
+        private static CoinbaseGranularity fromSeconds(int requestedSeconds) {
+            return SUPPORTED.stream()
+                    .filter(granularity -> granularity.seconds() == requestedSeconds)
+                    .findFirst()
+                    .orElseGet(() -> nearestSupported(requestedSeconds));
+        }
+
+        private static CoinbaseGranularity nearestSupported(int requestedSeconds) {
+            CoinbaseGranularity nearest = SUPPORTED.stream()
+                    .min(Comparator.comparingInt(granularity -> Math.abs(granularity.seconds() - requestedSeconds)))
+                    .orElse(SUPPORTED.get(0));
+
+            logger.warn(
+                    "Coinbase does not support {}s candles; using {} ({}s) instead.",
+                    requestedSeconds,
+                    nearest.apiName(),
+                    nearest.seconds());
+            return nearest;
+        }
     }
 
     private double parseDouble(String text) {

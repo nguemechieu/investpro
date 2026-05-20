@@ -30,8 +30,8 @@ import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
+import org.investpro.ui.tools.ChartToolbar;
 import org.investpro.utils.CandleDataSupplier;
-import org.investpro.utils.ZoomDirection;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -124,12 +124,6 @@ public class ChartContainer extends Region {
         actionBar.setAlignment(Pos.CENTER_RIGHT);
         actionBar.getChildren().setAll(
                 chartActionButton("Refresh", "/img/refresh-solid.png", () -> withChart(CandleStickChart::refreshChart)),
-                chartActionButton("Zoom In", "/img/search-plus-solid.png",
-                        () -> withChart(chart -> chart.changeZoom(ZoomDirection.IN))),
-                chartActionButton("Zoom Out", "/img/search-minus-solid.png",
-                        () -> withChart(chart -> chart.changeZoom(ZoomDirection.OUT))),
-                chartActionButton("Screenshot", "/img/screenshot.png", () -> withChart(CandleStickChart::screenshot)),
-                chartActionButton("Print", "/img/print-solid.png", () -> withChart(CandleStickChart::print)),
                 chartActionButton("Auto Trade", "/img/auto-trade-solid.png", () -> {
                     if (onAutoTradeAction != null) {
                         onAutoTradeAction.run();
@@ -166,13 +160,10 @@ public class ChartContainer extends Region {
         }
         button.setMinSize(30, 28);
         button.setPrefSize(30, 28);
+        button.getStyleClass().add("chart-action-button");
         button.setStyle("""
-                -fx-background-color: #0f172a;
-                -fx-border-color: #334155;
-                -fx-border-radius: 999;
-                -fx-background-radius: 999;
-                -fx-padding: 5;
-                -fx-cursor: hand;
+                -fx-background-color: transparent;
+                -fx-padding: 0;
                 """);
         button.setOnAction(event -> {
             if (action != null) {

@@ -159,24 +159,24 @@ public class MarketWatchPanel extends BorderPane {
 
         // Bid column
         TableColumn<MarketWatchRow, Double> bidCol = new TableColumn<>("Bid");
-        bidCol.setCellValueFactory(cellData -> (ObservableValue<Double>) (Object) cellData.getValue().bidProperty());
+        bidCol.setCellValueFactory(cellData -> cellData.getValue().bidProperty().asObject());
         bidCol.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(Double item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? "" : String.format("%.5f", item));
+                setText(empty ? "" : String.format("%.5f", item == null ? 0.0 : item));
             }
         });
         bidCol.setPrefWidth(80);
 
         // Ask column
         TableColumn<MarketWatchRow, Double> askCol = new TableColumn<>("Ask");
-        askCol.setCellValueFactory(cellData -> (ObservableValue<Double>) (Object) cellData.getValue().askProperty());
+        askCol.setCellValueFactory(cellData -> cellData.getValue().askProperty().asObject());
         askCol.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(Double item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? "" : String.format("%.5f", item));
+                setText(empty ? "" : String.format("%.5f", item == null ? 0.0 : item));
             }
         });
         askCol.setPrefWidth(80);

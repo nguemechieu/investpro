@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
 /**
@@ -73,6 +74,12 @@ public class TelegramNotifier {
     private TelegramCommandHandler commandHandler;
     private volatile boolean pollingEnabled = false;
     private volatile Thread pollingThread;
+
+        // Guard against concurrent getUpdates calls (Telegram HTTP 409)
+    // Guard against concurrent getUpdates calls (Telegram HTTP 409)
+    private final AtomicBoolean getUpdatesInFlight = new AtomicBoolean(false);
+    private volatile long lastDetectionAttemptMs = 0L;
+    private static final long DETECTION_MIN_INTERVAL_MS = 30_000L; // 30 s cooldown
 
     public TelegramNotifier(String botToken) {
         this(botToken, "");
@@ -124,16 +131,6 @@ public class TelegramNotifier {
 
         String url = apiUrl("getUpdates");
 
-        if (lastUpdateId >= 0) {
-            url += "?offset=%d".formatted(lastUpdateId + 1);
-        }
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(30))
-                .GET()
-                .build();
-
         Set<String> chatIds = new LinkedHashSet<>();
 
         if (!isEnabled()) {
@@ -141,7 +138,31 @@ public class TelegramNotifier {
             return chatIds;
         }
 
+        // Throttle: don't retry more often than once every 30 s
+        long now = System.currentTimeMillis();
+        if (now - lastDetectionAttemptMs < DETECTION_MIN_INTERVAL_MS) {
+            log.debug("Telegram getUpdates skipped: cooldown active.");
+            return chatIds;
+        }
+
+        // Allow only one thread at a time to call getUpdates (prevents HTTP 409)
+        if (!getUpdatesInFlight.compareAndSet(false, true)) {
+            log.debug("Telegram getUpdates skipped: another thread already polling.");
+            return chatIds;
+        }
+
+        lastDetectionAttemptMs = now;
         try {
+            if (lastUpdateId >= 0) {
+                url += "?offset=%d".formatted(lastUpdateId + 1);
+            }
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() >= 400) {
@@ -165,7 +186,6 @@ public class TelegramNotifier {
                 }
 
                 Optional<String> id = extractChatId(update);
-
                 id.ifPresent(chatIds::add);
             }
         } catch (IOException exception) {
@@ -175,6 +195,8 @@ public class TelegramNotifier {
             log.warn("Telegram chat detection interrupted", exception);
         } catch (Exception exception) {
             log.warn("Telegram chat detection failed", exception);
+        } finally {
+            getUpdatesInFlight.set(false);
         }
 
         return chatIds;

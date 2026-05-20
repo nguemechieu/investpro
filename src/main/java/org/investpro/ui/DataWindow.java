@@ -39,8 +39,8 @@ public class DataWindow extends VBox {
             .withZone(ZoneId.systemDefault());
 
     private final Label titleLabel = new Label("Data Window");
-    private final Label symbolLabel = new Label("Symbol: -");
-    private final Label timeframeLabel = new Label("Timeframe: -");
+    private final Label symbolLabel = new Label("Symbol: ");
+    private final Label timeframeLabel = new Label("TF: ");
 
     private final ObservableList<DataRow> rows = FXCollections.observableArrayList();
     private final TableView<DataRow> tableView = new TableView<>(rows);

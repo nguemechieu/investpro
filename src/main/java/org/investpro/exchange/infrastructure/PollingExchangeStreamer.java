@@ -2,10 +2,13 @@ package org.investpro.exchange.infrastructure;
 
 import org.investpro.models.trading.TradePair;
 import org.investpro.exchange.Exchange;
+import org.investpro.exchange.Coinbase;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -21,6 +24,8 @@ public class PollingExchangeStreamer {
     private final Exchange exchange;
     private final ScheduledExecutorService scheduler;
     private final Map<TradePair, ScheduledFuture<?>> tickerTasks = new ConcurrentHashMap<>();
+    private final Map<TradePair, AtomicInteger> tickerCycles = new ConcurrentHashMap<>();
+    private final Map<TradePair, AtomicInteger> orderBookCycles = new ConcurrentHashMap<>();
 
     @Override
     public String toString() {
@@ -46,16 +51,47 @@ public class PollingExchangeStreamer {
     public void streamTicker(TradePair tradePair, ExchangeStreamConsumer consumer) {
         tickerTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
             try {
+                if (exchange instanceof Coinbase coinbase) {
+                    AtomicInteger cycle = tickerCycles.computeIfAbsent(pair, ignored -> new AtomicInteger(0));
+                    int n = cycle.incrementAndGet();
+
+                    var snapshot = coinbase.getLatestSnapshot(pair);
+                    if (snapshot.ticker() != null) {
+                        consumer.onTicker(exchange.getName(), pair, snapshot.ticker());
+                        return;
+                    }
+
+                    // Sparse fallback refresh: one REST-backed attempt every 3 cycles.
+                    if (n % 3 != 0) {
+                        return;
+                    }
+                }
                 consumer.onTicker(exchange.getName(), pair, exchange.getLivePrice(pair));
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, DEFAULT_TICKER_PERIOD_SECONDS));
+        }, tickerPeriodSeconds()));
     }
 
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
         orderBookTasks.computeIfAbsent(tradePair, pair -> scheduleAtFixedRate(() -> {
             try {
+                if (exchange instanceof Coinbase coinbase) {
+                    AtomicInteger cycle = orderBookCycles.computeIfAbsent(pair, ignored -> new AtomicInteger(0));
+                    int n = cycle.incrementAndGet();
+
+                    var snapshot = coinbase.getLatestSnapshot(pair);
+                    if (snapshot.orderBook() != null) {
+                        consumer.onOrderBook(exchange.getName(), pair, snapshot.orderBook());
+                        return;
+                    }
+
+                    // Sparse fallback refresh: one REST-backed attempt every 5 cycles.
+                    if (n % 5 != 0) {
+                        return;
+                    }
+                }
+
                 exchange.fetchOrderBook(pair)
                         .thenAccept(orderBook -> consumer.onOrderBook(exchange.getName(), pair, orderBook))
                         .exceptionally(throwable -> {
@@ -65,7 +101,21 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, DEFAULT_ORDER_BOOK_PERIOD_SECONDS));
+        }, orderBookPeriodSeconds()));
+    }
+
+    private long tickerPeriodSeconds() {
+        if (exchange instanceof Coinbase) {
+            return 20L;
+        }
+        return DEFAULT_TICKER_PERIOD_SECONDS;
+    }
+
+    private long orderBookPeriodSeconds() {
+        if (exchange instanceof Coinbase) {
+            return 60L;
+        }
+        return DEFAULT_ORDER_BOOK_PERIOD_SECONDS;
     }
 
     public void streamAccount(ExchangeStreamConsumer consumer) {
@@ -137,10 +187,12 @@ public class PollingExchangeStreamer {
 
     public void stopTicker(TradePair tradePair) {
         cancel(tickerTasks.remove(tradePair));
+        tickerCycles.remove(tradePair);
     }
 
     public void stopOrderBook(TradePair tradePair) {
         cancel(orderBookTasks.remove(tradePair));
+        orderBookCycles.remove(tradePair);
     }
 
     public void stopAccount() {
@@ -163,6 +215,8 @@ public class PollingExchangeStreamer {
         orderBookTasks.values().forEach(this::cancel);
         tickerTasks.clear();
         orderBookTasks.clear();
+        tickerCycles.clear();
+        orderBookCycles.clear();
         stopAccount();
         stopOrders();
         stopPositions();

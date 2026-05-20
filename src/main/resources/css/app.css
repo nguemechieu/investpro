@@ -117,31 +117,64 @@
 
 .candle-chart-toolbar {
     -fx-alignment: center-left;
-    -fx-spacing: 4;
+    -fx-spacing: 6;
     -fx-background-color: transparent;
 }
 
 .candle-chart-toolbar-button {
-    -fx-background-color: #141f31;
-    -fx-border-color: #2a3548;
+    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
+    -fx-border-color: #34445f;
     -fx-border-width: 1;
-    -fx-background-radius: 3;
-    -fx-border-radius: 3;
-    -fx-text-fill: #dbe6f3;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-text-fill: #e5edf7;
     -fx-font-size: 11px;
     -fx-font-weight: 700;
     -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
 }
 
 .candle-chart-toolbar-button:hover {
-    -fx-background-color: #1b2a40;
-    -fx-border-color: #3b82f6;
+    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
+    -fx-border-color: #60a5fa;
+}
+
+.candle-chart-toolbar-button:armed,
+.candle-chart-toolbar-button:active,
+.candle-chart-toolbar-button:active {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #93c5fd;
+    -fx-text-fill: white;
 }
 
 .candle-chart-toolbar-button:active {
-    -fx-background-color: #1d4ed8;
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #93c5fd;
+}
+
+.candle-chart-toolbar-button.clear-objects-button {
+    -fx-border-color: #7f1d1d;
+}
+
+.candle-chart-toolbar-button.clear-objects-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #7f1d1d, #450a0a);
+    -fx-border-color: #f87171;
+}
+
+.chart-action-button {
+    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
+    -fx-border-color: #34445f;
+    -fx-border-width: 1;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 5;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
+}
+
+.chart-action-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
     -fx-border-color: #60a5fa;
-    -fx-text-fill: white;
 }
 AnchorPane,
 BorderPane,
@@ -1329,3 +1362,157 @@ StackPane {
    - sellButton.getStyleClass().add("sell-button");
    - autoTradeButton.getStyleClass().add("auto-button");
    ============================================================================ */
+
+/* ============================================================================
+   MT5-style InvestPro terminal shell
+   ============================================================================ */
+.mt5-root {
+    -fx-background-color: #050915;
+    -fx-font-size: 11px;
+}
+
+.mt5-top-section,
+.mt5-menu-bar,
+.mt5-toolbar {
+    -fx-background-color: #101827;
+    -fx-border-color: #263449;
+    -fx-border-width: 0 0 1 0;
+}
+
+.mt5-toolbar {
+    -fx-padding: 4 6;
+    -fx-spacing: 5;
+}
+
+.mt5-brand {
+    -fx-text-fill: #e5eefb;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.mt5-toolbar-button,
+.mt5-command-button {
+    -fx-background-color: #172033;
+    -fx-text-fill: #d7e1ee;
+    -fx-border-color: #2c3a52;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 4 8;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+
+.mt5-toolbar-button:hover,
+.mt5-command-button:hover {
+    -fx-background-color: #22304a;
+    -fx-border-color: #4ea5ff;
+}
+
+.mt5-compact-combo,
+.mt5-amount-field,
+.mt5-market-search {
+    -fx-background-color: #090f1d;
+    -fx-text-fill: #e6edf7;
+    -fx-border-color: #2c3a52;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 3 6;
+    -fx-font-size: 11px;
+}
+
+.mt5-timeframe-strip {
+    -fx-spacing: 2;
+    -fx-alignment: center-left;
+}
+
+.mt5-timeframe-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #9fb0c4;
+    -fx-border-color: #2c3a52;
+    -fx-border-radius: 2;
+    -fx-background-radius: 2;
+    -fx-padding: 3 6;
+    -fx-font-size: 10px;
+}
+
+.mt5-timeframe-button-active,
+.mt5-timeframe-button:selected {
+    -fx-background-color: #1d4ed8;
+    -fx-text-fill: white;
+    -fx-border-color: #60a5fa;
+}
+
+.mt5-panel {
+    -fx-background-color: #0b1220;
+    -fx-border-color: #263449;
+}
+
+.mt5-panel-header,
+.mt5-chart-header {
+    -fx-background-color: #111a2b;
+    -fx-border-color: #263449;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 5 8;
+}
+
+.mt5-market-watch-table,
+.mt5-market-watch-table .column-header-background,
+.mt5-terminal,
+.mt5-order-book,
+.mt5-chart-workspace {
+    -fx-background-color: #050915;
+}
+
+.mt5-row-even {
+    -fx-background-color: #08101e;
+}
+
+.mt5-row-odd {
+    -fx-background-color: #0d1728;
+}
+
+.mt5-chart-symbol {
+    -fx-text-fill: #f8fafc;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+}
+
+.mt5-chart-meta,
+.mt5-status-chip,
+.panel-meta {
+    -fx-text-fill: #9fb0c4;
+    -fx-font-size: 11px;
+}
+
+.mt5-chart-empty-state,
+.mt5-terminal-placeholder {
+    -fx-background-color: #050915;
+    -fx-padding: 24;
+}
+
+.mt5-empty-title {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.mt5-empty-subtitle {
+    -fx-text-fill: #94a3b8;
+}
+
+.mt5-quick-trade,
+.mt5-status-bar {
+    -fx-background-color: #0b1220;
+    -fx-border-color: #263449;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 5 8;
+    -fx-spacing: 6;
+}
+
+.paper-mode-chip {
+    -fx-text-fill: #38bdf8;
+}
+
+.live-mode-chip {
+    -fx-text-fill: #22c55e;
+}

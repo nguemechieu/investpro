@@ -14,7 +14,6 @@ import org.investpro.service.AuthResult;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Date;
@@ -70,6 +69,7 @@ public abstract class Exchange implements
         return "LIVE";
     }
 
+
     protected boolean modeRequestsPaperNetwork() {
         return "PAPER".equals(getResolvedTradingMode());
     }
@@ -95,6 +95,8 @@ public abstract class Exchange implements
     public TradePair getSelecTradePair() throws Exception {
         return getSelectedTradePair();
     }
+
+
 
     public void buy(
             TradePair tradePair,

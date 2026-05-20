@@ -235,9 +235,39 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
             agentState.set("Unknown");
         }
 
-        if (state.getBidPrice() > 0) bid.set(state.getBidPrice());
-        if (state.getAskPrice() > 0) ask.set(state.getAskPrice());
-        if (state.getSpreadPercent() > 0) spreadPercent.set(state.getSpreadPercent());
+        double resolvedBid = state.getBidPrice() > 0 ? state.getBidPrice() : getBid();
+        double resolvedAsk = state.getAskPrice() > 0 ? state.getAskPrice() : getAsk();
+
+        TradePair pair = state.getSymbol();
+        if (pair != null) {
+            if (resolvedBid <= 0 && pair.getBid() > 0) {
+                resolvedBid = pair.getBid();
+            }
+            if (resolvedAsk <= 0 && pair.getAsk() > 0) {
+                resolvedAsk = pair.getAsk();
+            }
+        }
+
+        // Last-resort fallback keeps UI values non-null/non-empty.
+        if (resolvedBid <= 0 && resolvedAsk > 0) {
+            resolvedBid = resolvedAsk;
+        }
+        if (resolvedAsk <= 0 && resolvedBid > 0) {
+            resolvedAsk = resolvedBid;
+        }
+
+        bid.set(Math.max(0.0, resolvedBid));
+        ask.set(Math.max(0.0, resolvedAsk));
+
+        if (resolvedBid > 0 && resolvedAsk > 0 && resolvedAsk >= resolvedBid) {
+            spread.set(resolvedAsk - resolvedBid);
+            spreadPercent.set(((resolvedAsk - resolvedBid) / resolvedAsk) * 100.0);
+        } else if (state.getSpreadPercent() > 0) {
+            spreadPercent.set(state.getSpreadPercent());
+        } else {
+            spread.set(0.0);
+            spreadPercent.set(0.0);
+        }
 
         SymbolTradingMode mode = state.getTradingMode();
         tradingMode.set(mode.getDisplayName());

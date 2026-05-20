@@ -26,7 +26,6 @@ import java.util.prefs.Preferences;
  * @author NOEL NGUEMECHIEU
  */
 @Getter
-
 @Setter
 @Slf4j
 public final class LicenseManager {
@@ -36,11 +35,10 @@ public final class LicenseManager {
 
     private volatile License currentLicense;
     private final Object licenseLock = new Object();
-    private  SystemCore systemCore;
+    private SystemCore systemCore;
 
     public LicenseManager(SystemCore systemCore) {
-
-        this .systemCore=systemCore;
+        this.systemCore = systemCore;
     }
 
     /**

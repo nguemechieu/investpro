@@ -58,12 +58,13 @@ public final class CurrencyIconLoader {
     private static final String FALLBACK_PATH = "/icons/currencies/unknown.png";
 
     private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
+    private static volatile Image fallbackImage;
 
     private CurrencyIconLoader() {
     }
 
     /**
-     * Load the icon for the given currency code (e.g. "BTC", "USD").
+     * Load the icon for the given currency code (e.g. "BTC", "USDt").
      *
      * @param currencyCode ISO or crypto currency code
      * @return Image, or {@code null} if neither the icon nor the fallback is found
@@ -89,7 +90,12 @@ public final class CurrencyIconLoader {
     }
 
     private static Image loadFallback() {
-        return CACHE.computeIfAbsent("__fallback__", ignored -> tryLoad(FALLBACK_PATH));
+        Image image = fallbackImage;
+        if (image == null) {
+            image = tryLoad(FALLBACK_PATH);
+            fallbackImage = image;
+        }
+        return image;
     }
 
     private static Image tryLoad(String resourcePath) {

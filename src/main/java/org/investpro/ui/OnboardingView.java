@@ -1,10 +1,6 @@
 package org.investpro.ui;
 
-import javafx.animation.FadeTransition;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.PauseTransition;
-import javafx.animation.Timeline;
+import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,19 +8,14 @@ import javafx.scene.Cursor;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.util.Duration;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.SupportedExchange;
 import org.investpro.exchange.contracts.CredentialProvider;
-import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.factory.ExchangeFactory;
 import org.investpro.exchange.providers.UiCredentialProvider;
 import org.investpro.i18n.LocalizationService;
@@ -55,6 +46,8 @@ import static org.investpro.i18n.LocalizationService.t;
  * </ol>
  */
 @Slf4j
+@Getter
+@Setter
 public class OnboardingView extends StackPane {
 
     private static final int DEFAULT_WIDTH = 1540;
@@ -144,7 +137,6 @@ public class OnboardingView extends StackPane {
         loadRememberedCredentials();
         getChildren().setAll(createLoginStep());
     }
-
     private @NotNull BorderPane createLoginStep() {
         rememberMeCheckBox.setText(t("onboarding.rememberMe"));
 
@@ -159,26 +151,26 @@ public class OnboardingView extends StackPane {
         styleInputField(usernameField, t("onboarding.username"));
         styleInputField(passwordField, t("onboarding.password"));
         styleInputField(emailField, t("onboarding.email"));
+
         emailField.setVisible(false);
         emailField.setManaged(false);
 
         rememberMeCheckBox.setStyle(checkBoxStyle());
         rememberMeCheckBox.setPrefHeight(34);
+        rememberMeCheckBox.setMinHeight(34);
         rememberMeCheckBox.setWrapText(false);
-        rememberMeCheckBox.setMaxWidth(200);
-        rememberMeCheckBox.setMinWidth(100);
-        rememberMeCheckBox.setVisible(false);
-        rememberMeCheckBox.setManaged(false);
-
+        rememberMeCheckBox.setVisible(true);
+        rememberMeCheckBox.setManaged(true);
+        rememberMeCheckBox.setDisable(false);
+        rememberMeCheckBox.setMouseTransparent(false);
+        rememberMeCheckBox.setFocusTraversable(true);
+        rememberMeCheckBox.setMaxWidth(Region.USE_PREF_SIZE);
 
         Hyperlink forgotPasswordButton = new Hyperlink("Forgot Password?");
         forgotPasswordButton.setOnAction(event -> showForgotPasswordDialog(statusLabelForInline()));
 
-        HBox rememberBox = new HBox(12, rememberMeCheckBox, spacer(), forgotPasswordButton);
-        rememberBox.setAlignment(Pos.CENTER_LEFT);
-        rememberBox.setMaxWidth(Double.MAX_VALUE);
-
         Label validation = inlineValidationLabel();
+
         Button loginButton = createPrimaryButton(t("onboarding.logIn"));
         Button createAccountButton = createSuccessButton(t("onboarding.createAccount"));
 
@@ -187,13 +179,46 @@ public class OnboardingView extends StackPane {
 
         HBox buttonBox = new HBox(12, loginButton, createAccountButton);
         buttonBox.setAlignment(Pos.CENTER);
+
         HBox.setHgrow(loginButton, Priority.ALWAYS);
         HBox.setHgrow(createAccountButton, Priority.ALWAYS);
+
         loginButton.setMaxWidth(Double.MAX_VALUE);
         createAccountButton.setMaxWidth(Double.MAX_VALUE);
 
-        VBox form = new VBox(14, usernameField, passwordField, emailField, rememberBox, buttonBox, validation);
+        GridPane form = new GridPane();
         form.setAlignment(Pos.TOP_CENTER);
+        form.setHgap(12);
+        form.setVgap(14);
+        form.setMaxWidth(420);
+
+        ColumnConstraints fullWidth = new ColumnConstraints();
+        fullWidth.setHgrow(Priority.ALWAYS);
+        fullWidth.setFillWidth(true);
+        form.getColumnConstraints().add(fullWidth);
+
+        usernameField.setMaxWidth(Double.MAX_VALUE);
+        passwordField.setMaxWidth(Double.MAX_VALUE);
+        emailField.setMaxWidth(Double.MAX_VALUE);
+        buttonBox.setMaxWidth(Double.MAX_VALUE);
+        validation.setMaxWidth(Double.MAX_VALUE);
+
+        int row = 0;
+
+        form.add(usernameField, 0, row++);
+        form.add(passwordField, 0, row++);
+        form.add(emailField, 0, row++);
+
+        form.add(spacer(), 0, row++);
+
+
+        form.add(rememberMeCheckBox, 0, row++);
+
+        form.add(spacer(), 0, row++);
+        form.add(buttonBox, 0, row++);
+        form.add(validation, 0, row);
+        form.add(spacer(), 0, row++);
+        form.add(forgotPasswordButton, 1, row+1);
 
         VBox card = new VBox(20, badge("SECURE TERMINAL ACCESS"), title, prompt, form);
         card.setAlignment(Pos.TOP_LEFT);
@@ -401,7 +426,9 @@ public class OnboardingView extends StackPane {
 
     private Region spacer() {
         Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        spacer.setMinHeight(4);
+        spacer.setPrefHeight(4);
+        spacer.setMaxHeight(4);
         return spacer;
     }
 
@@ -607,6 +634,7 @@ public class OnboardingView extends StackPane {
 
         CheckBox rememberCredentialsCheckBox = new CheckBox("Remember credentials");
         rememberCredentialsCheckBox.setStyle(checkBoxStyle());
+        rememberCredentialsCheckBox.setVisible(true);
 
         Button continueButton = createPrimaryButton("Continue");
         continueButton.setPrefWidth(138);
@@ -682,7 +710,7 @@ public class OnboardingView extends StackPane {
         String tradingMode = selectedTradingModeChoiceBox.getValue();
 
         if (tradingMode == null || tradingMode.isBlank()) {
-            tradingMode = "PAPER TRADING";
+            tradingMode = "PAPER";
         }
 
         if (selectedExchange == SupportedExchange.OANDA) {
@@ -867,11 +895,22 @@ public class OnboardingView extends StackPane {
 
     private void showForgotPasswordDialog(Label validation) {
         TextInputDialog lookupDialog = new TextInputDialog(usernameField.getText());
+
         lookupDialog.setTitle("Forgot Password");
         lookupDialog.setHeaderText("Find your InvestPro account");
         lookupDialog.setContentText("Username or email:");
+        lookupDialog.setGraphic(null);
+
+        DialogPane dialogPane = lookupDialog.getDialogPane();
+        dialogPane.setPrefSize(420, 260);
+        dialogPane.setStyle("""
+            -fx-background-color: #0f172a;
+            -fx-text-fill: #e2e8f0;
+            """);
+
         lookupDialog.showAndWait().ifPresent(lookup -> {
             ResetTokenResult tokenResult = authService.beginPasswordReset(lookup);
+
             if (!tokenResult.success()) {
                 validation.setStyle("-fx-text-fill: " + DANGER + ";");
                 validation.setText(tokenResult.message());
@@ -883,6 +922,7 @@ public class OnboardingView extends StackPane {
             tokenAlert.setHeaderText("Reset token created for %s".formatted(tokenResult.email()));
             tokenAlert.setContentText("Use this token within 30 minutes:\n\n%s".formatted(tokenResult.token()));
             tokenAlert.showAndWait();
+
             showResetPasswordDialog(lookup, tokenResult.token(), validation);
         });
     }
@@ -1083,46 +1123,22 @@ public class OnboardingView extends StackPane {
                 .replace(" ", "")
                 .replace("-", "_");
 
-        if (normalized.equals("binance")) {
-            return "binance";
-        }
-        if (normalized.equals("binanceus") || normalized.equals("binance_us") || normalized.equals("binance_us_spot")) {
-            return "binance-us";
-        }
-        if (normalized.equals("coinbase") || normalized.equals("coinbaseadvanced")
-                || normalized.equals("coinbase_advanced") || normalized.equals("coinbaseadvancedtrade")
-                || normalized.equals("coinbase_advanced_trade") || normalized.equals("coinbasepro")
-                || normalized.equals("coinbase_pro")) {
-            return "coinbase";
-        }
-        if (normalized.equals("oanda") || normalized.equals("oanda_fx") || normalized.equals("oanda_forex")) {
-            return "oanda";
-        }
-        if (normalized.equals("alpaca") || normalized.equals("alpaca_stocks") || normalized.equals("alpaca_equities")) {
-            return "alpaca";
-        }
-        if (normalized.equals("bitfinex")) {
-            return "bitfinex";
-        }
-        if (normalized.equals("bitfinexus") || normalized.equals("bitfinex_us")) {
-            return "bitfinex-us";
-        }
-        if (normalized.equals("interactivebrokers") || normalized.equals("interactive_brokers")
-                || normalized.equals("ibkr") || normalized.equals("ibk")) {
-            return "interactive-brokers";
-        }
-        if (normalized.equals("kraken")) {
-            return "kraken";
-        }
-        if (normalized.equals("ig") || normalized.equals("bittrex") || normalized.equals("bitmex")
-                || normalized.equals("kucoin") || normalized.equals("kucoinus") || normalized.equals("kucoin_us")
-                || normalized.equals("bitstamp") || normalized.equals("poloniex")) {
-            return normalized.replace("_", "-");
-        }
-        if (normalized.equals("stellar") || normalized.equals("stellar_network") || normalized.equals("stellarnetwork")) {
-            return "stellar-network";
-        }
+        return switch (normalized) {
+            case "binance" -> "binance";
+            case "binanceus", "binance_us", "binance_us_spot" -> "binance-us";
+            case "coinbase", "coinbaseadvanced", "coinbase_advanced", "coinbaseadvancedtrade",
+                 "coinbase_advanced_trade", "coinbasepro", "coinbase_pro" -> "coinbase";
+            case "oanda", "oanda_fx", "oanda_forex" -> "oanda";
+            case "alpaca", "alpaca_stocks", "alpaca_equities" -> "alpaca";
+            case "bitfinex" -> "bitfinex";
+            case "bitfinexus", "bitfinex_us" -> "bitfinex-us";
+            case "interactivebrokers", "interactive_brokers", "ibkr", "ibk" -> "interactive-brokers";
+            case "kraken" -> "kraken";
+            case "ig", "bittrex", "bitmex", "kucoin", "kucoinus", "kucoin_us", "bitstamp", "poloniex" ->
+                    normalized.replace("_", "-");
+            case "stellar", "stellar_network", "stellarnetwork" -> "stellar-network";
+            default -> throw new IllegalArgumentException("Unsupported exchange: " + value);
+        };
 
-        throw new IllegalArgumentException("Unsupported exchange: " + value);
     }
 }

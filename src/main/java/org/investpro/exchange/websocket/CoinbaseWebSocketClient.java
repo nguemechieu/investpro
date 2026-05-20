@@ -63,7 +63,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             Collections.synchronizedMap(new HashMap<>());
 
     /**
-     * Generic raw stream handlers for subscribeStream(...).
+     * Generic raw stream handlers for subscribeStream.
      */
     private final Map<String, Consumer<String>> rawStreamHandlers = new ConcurrentHashMap<>();
 
@@ -159,8 +159,8 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         String channel = messageJson.path("channel").asText("");
 
         if ("subscriptions".equalsIgnoreCase(channel)) {
-            log.info("Coinbase subscription acknowledged: {}", messageJson);
-            return;
+            throw new RuntimeException("Coinbase subscription acknowledged: \n"+ messageJson.asText());
+
         }
 
         if (HEARTBEATS_CHANNEL.equalsIgnoreCase(channel)) {
@@ -218,7 +218,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     /**
      * Routes events from a Coinbase Advanced Trade {@code l2_data} message to any
-     * {@code rawStreamHandlers} registered under the key {@code "level2:{PRODUCT-ID}"}.
+     * {@code rawStreamHandlers} registered under the key {@code "level2:PRODUCT-ID"}.
      * Each event JSON object is dispatched individually so the handler receives one
      * snapshot or update at a time.
      */
@@ -374,6 +374,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         if (isOpen()) {
             try {
                 sendUnsubscribe(tradePair, MARKET_TRADES_CHANNEL);
+                stopAllStreamLiveTrades();
             } catch (Exception exception) {
                 log.warn("Unable to send Coinbase unsubscribe for {}", tradePair, exception);
             }

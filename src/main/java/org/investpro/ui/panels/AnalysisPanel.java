@@ -27,7 +27,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -74,11 +77,19 @@ public class AnalysisPanel extends VBox {
     private static final String CYAN = "#06b6d4";
     private static final String PURPLE = "#8b5cf6";
 
+    private static final String NOT_AVAILABLE = "N/A";
+
     private final SystemCore systemCore;
     private final AnalysisDataProvider dataProvider;
     private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
+    private final ScheduledExecutorService botStatusMonitor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "analysis-bot-status-monitor");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private boolean showingLiveMetrics = false;
+    private boolean wasBotRunning = false;
     private String currentLiveStrategy = null;
     private String currentLiveSymbol = null;
 
@@ -275,12 +286,12 @@ public class AnalysisPanel extends VBox {
         HBox scoreCards = new HBox(12);
         scoreCards.setAlignment(Pos.CENTER_LEFT);
 
-        institutionalScoreLabel = createScoreLabel("Institutional Score", "N/A", CYAN);
-        performanceScoreLabel = createScoreLabel("Performance", "N/A", GREEN);
-        riskScoreLabel = createScoreLabel("Risk", "N/A", RED);
-        executionScoreLabel = createScoreLabel("Execution", "N/A", BLUE);
-        liquidityScoreLabel = createScoreLabel("Liquidity", "N/A", PURPLE);
-        regimeScoreLabel = createScoreLabel("Regime Fit", "N/A", AMBER);
+        institutionalScoreLabel = createScoreLabel("Institutional Score", CYAN);
+        performanceScoreLabel = createScoreLabel("Performance", GREEN);
+        riskScoreLabel = createScoreLabel("Risk", RED);
+        executionScoreLabel = createScoreLabel("Execution", BLUE);
+        liquidityScoreLabel = createScoreLabel("Liquidity", PURPLE);
+        regimeScoreLabel = createScoreLabel("Regime Fit", AMBER);
 
         scoreCards.getChildren().addAll(
                 wrapCard(institutionalScoreLabel),
@@ -306,14 +317,14 @@ public class AnalysisPanel extends VBox {
         VBox content = createTabContainer();
 
         GridPane quickMetricsGrid = createMetricsGrid(GREEN);
-        sharpeValueLabel = addMetricRow(quickMetricsGrid, 0, "Sharpe Ratio", "N/A", Color.web(GREEN));
-        sortinoValueLabel = addMetricRow(quickMetricsGrid, 1, "Sortino Ratio", "N/A", Color.web(GREEN));
-        calmarValueLabel = addMetricRow(quickMetricsGrid, 2, "Calmar Ratio", "N/A", Color.web(GREEN));
-        profitFactorValueLabel = addMetricRow(quickMetricsGrid, 3, "Profit Factor", "N/A", Color.web(GREEN));
-        recoveryFactorValueLabel = addMetricRow(quickMetricsGrid, 4, "Recovery Factor", "N/A", Color.web(GREEN));
-        expectancyValueLabel = addMetricRow(quickMetricsGrid, 5, "Expected Value / Trade", "N/A", Color.web(CYAN));
-        winRateValueLabel = addMetricRow(quickMetricsGrid, 6, "Win Rate", "N/A", Color.web(CYAN));
-        totalTradesValueLabel = addMetricRow(quickMetricsGrid, 7, "Total Trades", "N/A", Color.web(MUTED));
+        sharpeValueLabel = addMetricRow(quickMetricsGrid, 0, "Sharpe Ratio", Color.web(GREEN));
+        sortinoValueLabel = addMetricRow(quickMetricsGrid, 1, "Sortino Ratio", Color.web(GREEN));
+        calmarValueLabel = addMetricRow(quickMetricsGrid, 2, "Calmar Ratio", Color.web(GREEN));
+        profitFactorValueLabel = addMetricRow(quickMetricsGrid, 3, "Profit Factor", Color.web(GREEN));
+        recoveryFactorValueLabel = addMetricRow(quickMetricsGrid, 4, "Recovery Factor", Color.web(GREEN));
+        expectancyValueLabel = addMetricRow(quickMetricsGrid, 5, "Expected Value / Trade", Color.web(CYAN));
+        winRateValueLabel = addMetricRow(quickMetricsGrid, 6, "Win Rate", Color.web(CYAN));
+        totalTradesValueLabel = addMetricRow(quickMetricsGrid, 7, "Total Trades", Color.web(MUTED));
 
         performanceChart = createBarChart("Performance Metrics", "Metric", "Value", 320);
 
@@ -326,19 +337,19 @@ public class AnalysisPanel extends VBox {
         VBox content = createTabContainer();
 
         GridPane metricsGrid = createMetricsGrid(RED);
-        maxDrawdownValueLabel = addMetricRow(metricsGrid, 0, "Max Drawdown", "N/A", Color.web(RED));
-        volatilityValueLabel = addMetricRow(metricsGrid, 1, "Annual Volatility", "N/A", Color.web(AMBER));
-        valueAtRiskValueLabel = addMetricRow(metricsGrid, 2, "Value at Risk 95%", "N/A", Color.web(AMBER));
-        conditionalValueAtRiskValueLabel = addMetricRow(metricsGrid, 3, "Conditional VaR", "N/A", Color.web(RED));
-        maxConsecutiveLossValueLabel = addMetricRow(metricsGrid, 4, "Max Consecutive Losses", "N/A", Color.web(RED));
-        recoveryTimeValueLabel = addMetricRow(metricsGrid, 5, "Recovery Time", "N/A", Color.web(MUTED));
-        tailRatioValueLabel = addMetricRow(metricsGrid, 6, "Tail Ratio", "N/A", Color.web(PURPLE));
-        ulcerIndexValueLabel = addMetricRow(metricsGrid, 7, "Ulcer Index", "N/A", Color.web(PURPLE));
-        kellyValueLabel = addMetricRow(metricsGrid, 8, "Kelly Fraction", "N/A", Color.web(CYAN));
+        maxDrawdownValueLabel = addMetricRow(metricsGrid, 0, "Max Drawdown", Color.web(RED));
+        volatilityValueLabel = addMetricRow(metricsGrid, 1, "Annual Volatility", Color.web(AMBER));
+        valueAtRiskValueLabel = addMetricRow(metricsGrid, 2, "Value at Risk 95%", Color.web(AMBER));
+        conditionalValueAtRiskValueLabel = addMetricRow(metricsGrid, 3, "Conditional VaR", Color.web(RED));
+        maxConsecutiveLossValueLabel = addMetricRow(metricsGrid, 4, "Max Consecutive Losses", Color.web(RED));
+        recoveryTimeValueLabel = addMetricRow(metricsGrid, 5, "Recovery Time", Color.web(MUTED));
+        tailRatioValueLabel = addMetricRow(metricsGrid, 6, "Tail Ratio", Color.web(PURPLE));
+        ulcerIndexValueLabel = addMetricRow(metricsGrid, 7, "Ulcer Index", Color.web(PURPLE));
+        kellyValueLabel = addMetricRow(metricsGrid, 8, "Kelly Fraction", Color.web(CYAN));
 
-        drawdownChart = createLineChart("Drawdown Over Time", "Point", "Drawdown %", 340, true);
-        rollingSharpeChart = createLineChart("Rolling Sharpe", "Point", "Sharpe", 280, true);
-        rollingVolatilityChart = createLineChart("Rolling Volatility", "Point", "Volatility %", 280, true);
+        drawdownChart = createLineChart("Drawdown Over Time", "Drawdown %", 340);
+        rollingSharpeChart = createLineChart("Rolling Sharpe", "Sharpe", 280);
+        rollingVolatilityChart = createLineChart("Rolling Volatility", "Volatility %", 280);
 
         content.getChildren().addAll(metricsGrid, drawdownChart, rollingSharpeChart, rollingVolatilityChart);
         VBox.setVgrow(drawdownChart, Priority.ALWAYS);
@@ -347,7 +358,7 @@ public class AnalysisPanel extends VBox {
 
     private VBox createEquityCurveTab() {
         VBox content = createTabContainer();
-        equityCurveChart = createLineChart("Equity Curve", "Point", "Equity", 420, false);
+        equityCurveChart = createLineChart("Equity Curve", "Equity", 420);
         content.getChildren().add(equityCurveChart);
         VBox.setVgrow(equityCurveChart, Priority.ALWAYS);
         return content;
@@ -366,13 +377,13 @@ public class AnalysisPanel extends VBox {
     private VBox createFactorTab() {
         VBox content = createTabContainer();
         GridPane factorMetrics = createMetricsGrid(PURPLE);
-        alphaValueLabel = addMetricRow(factorMetrics, 0, "Alpha", "N/A", Color.web(GREEN));
-        betaValueLabel = addMetricRow(factorMetrics, 1, "Beta", "N/A", Color.web(BLUE));
-        informationRatioValueLabel = addMetricRow(factorMetrics, 2, "Information Ratio", "N/A", Color.web(CYAN));
-        skewnessValueLabel = addMetricRow(factorMetrics, 3, "Skewness", "N/A", Color.web(AMBER));
-        kurtosisValueLabel = addMetricRow(factorMetrics, 4, "Kurtosis", "N/A", Color.web(AMBER));
-        exposureValueLabel = addMetricRow(factorMetrics, 5, "Gross Exposure", "N/A", Color.web(MUTED));
-        turnoverValueLabel = addMetricRow(factorMetrics, 6, "Turnover", "N/A", Color.web(MUTED));
+        alphaValueLabel = addMetricRow(factorMetrics, 0, "Alpha", Color.web(GREEN));
+        betaValueLabel = addMetricRow(factorMetrics, 1, "Beta", Color.web(BLUE));
+        informationRatioValueLabel = addMetricRow(factorMetrics, 2, "Information Ratio", Color.web(CYAN));
+        skewnessValueLabel = addMetricRow(factorMetrics, 3, "Skewness", Color.web(AMBER));
+        kurtosisValueLabel = addMetricRow(factorMetrics, 4, "Kurtosis", Color.web(AMBER));
+        exposureValueLabel = addMetricRow(factorMetrics, 5, "Gross Exposure", Color.web(MUTED));
+        turnoverValueLabel = addMetricRow(factorMetrics, 6, "Turnover", Color.web(MUTED));
 
         factorExposureChart = createBarChart("Factor Exposure", "Factor", "Exposure", 360);
         content.getChildren().addAll(factorMetrics, factorExposureChart);
@@ -409,7 +420,7 @@ public class AnalysisPanel extends VBox {
         VBox content = createTabContainer();
         Label info = createMutedLabel(
                 "Monte Carlo paths are generated from the observed equity/return structure when backend paths are unavailable. This is a risk visualization, not a prediction.");
-        monteCarloChart = createLineChart("Monte Carlo Equity Paths", "Point", "Equity", 420, false);
+        monteCarloChart = createLineChart("Monte Carlo Equity Paths", "Equity", 420);
         content.getChildren().addAll(info, monteCarloChart);
         VBox.setVgrow(monteCarloChart, Priority.ALWAYS);
         return content;
@@ -438,10 +449,10 @@ public class AnalysisPanel extends VBox {
     private VBox createExecutionTab() {
         VBox content = createTabContainer();
         GridPane executionGrid = createMetricsGrid(BLUE);
-        avgSlippageValueLabel = addMetricRow(executionGrid, 0, "Avg Slippage", "N/A", Color.web(AMBER));
-        spreadCostValueLabel = addMetricRow(executionGrid, 1, "Spread Cost", "N/A", Color.web(AMBER));
-        marketImpactValueLabel = addMetricRow(executionGrid, 2, "Market Impact", "N/A", Color.web(RED));
-        fillQualityValueLabel = addMetricRow(executionGrid, 3, "Fill Quality", "N/A", Color.web(GREEN));
+        avgSlippageValueLabel = addMetricRow(executionGrid, 0, "Avg Slippage", Color.web(AMBER));
+        spreadCostValueLabel = addMetricRow(executionGrid, 1, "Spread Cost", Color.web(AMBER));
+        marketImpactValueLabel = addMetricRow(executionGrid, 2, "Market Impact", Color.web(RED));
+        fillQualityValueLabel = addMetricRow(executionGrid, 3, "Fill Quality", Color.web(GREEN));
 
         TextArea executionNotes = new TextArea();
         executionNotes.setEditable(false);
@@ -517,7 +528,7 @@ public class AnalysisPanel extends VBox {
                     // Load live metrics if bot is currently trading, otherwise load backtesting
                     // results
                     if (showingLiveMetrics && strategy.equals(currentLiveStrategy) && pair.equals(currentLiveSymbol)) {
-                        return liveMetricsToAnalysisSnapshot(strategy, pair);
+                        return liveMetricsToAnalysisSnapshot();
                     } else {
                         return dataProvider.loadAnalysis(strategy, pair);
                     }
@@ -839,7 +850,7 @@ public class AnalysisPanel extends VBox {
             return List.of();
         }
 
-        double start = equity.get(equity.size() - 1);
+        double start = equity.getLast();
         if (!isFinite(start) || start <= 0.0) {
             start = 10_000.0;
         }
@@ -930,10 +941,9 @@ public class AnalysisPanel extends VBox {
         return chart;
     }
 
-    private LineChart<Number, Number> createLineChart(String title, String xLabel, String yLabel, double minHeight,
-            boolean negativeFriendly) {
+    private LineChart<Number, Number> createLineChart(String title, String yLabel, double minHeight) {
         NumberAxis xAxis = new NumberAxis();
-        xAxis.setLabel(xLabel);
+        xAxis.setLabel("Point");
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel(yLabel);
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
@@ -946,11 +956,11 @@ public class AnalysisPanel extends VBox {
         return chart;
     }
 
-    private Label addMetricRow(GridPane grid, int row, String metric, String value, Color color) {
+    private Label addMetricRow(GridPane grid, int row, String metric, Color color) {
         Label metricLabel = new Label(metric);
         metricLabel.setStyle("-fx-text-fill: " + MUTED + ";");
 
-        Label valueLabel = new Label(value);
+        Label valueLabel = new Label(NOT_AVAILABLE);
         valueLabel.setStyle("-fx-text-fill: " + colorToHex(color) + "; -fx-font-weight: bold;");
 
         grid.add(metricLabel, 0, row);
@@ -980,8 +990,8 @@ public class AnalysisPanel extends VBox {
         return label;
     }
 
-    private Label createScoreLabel(String title, String value, String color) {
-        Label label = new Label(title + "\n" + value);
+    private Label createScoreLabel(String title, String color) {
+        Label label = new Label(title + "\n" + NOT_AVAILABLE);
         label.setAlignment(Pos.CENTER);
         label.setMinWidth(150);
         label.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
@@ -1245,7 +1255,7 @@ public class AnalysisPanel extends VBox {
     /**
      * Convert live trading metrics to AnalysisSnapshot for display.
      */
-    private AnalysisSnapshot liveMetricsToAnalysisSnapshot(String strategy, String pair) {
+    private AnalysisSnapshot liveMetricsToAnalysisSnapshot() {
         // For now, return basic snapshot with live metrics
         // Full computation would be complex; this is a placeholder for real-time
         // display
@@ -1261,33 +1271,21 @@ public class AnalysisPanel extends VBox {
      * - When bot stops, reverts back to backtesting metrics
      */
     private void startBotStatusMonitoring() {
-        CompletableFuture.runAsync(() -> {
-            boolean wasBotRunning = false;
+        botStatusMonitor.scheduleAtFixedRate(this::updateBotMetricMode, 0, 1, TimeUnit.SECONDS);
+    }
 
-            while (isVisible()) {
-                try {
-                    boolean isBotRunning = systemCore != null && systemCore.isAutoTradingEnabled();
+    private void updateBotMetricMode() {
+        boolean isBotRunning = systemCore != null && systemCore.isAutoTradingEnabled();
 
-                    // Bot transitioned from stopped to running
-                    if (isBotRunning && !wasBotRunning) {
-                        Platform.runLater(this::switchToLiveMetrics);
-                        wasBotRunning = true;
-                        log.info("Bot started - switching to LIVE trading metrics");
-                    }
-                    // Bot transitioned from running to stopped
-                    else if (!isBotRunning && wasBotRunning) {
-                        Platform.runLater(this::switchToBacktestMetrics);
-                        wasBotRunning = false;
-                        log.info("Bot stopped - switching back to BACKTEST metrics");
-                    }
-
-                    Thread.sleep(1000); // Check every 1 second
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        });
+        if (isBotRunning && !wasBotRunning) {
+            Platform.runLater(this::switchToLiveMetrics);
+            wasBotRunning = true;
+            log.info("Bot started - switching to LIVE trading metrics");
+        } else if (!isBotRunning && wasBotRunning) {
+            Platform.runLater(this::switchToBacktestMetrics);
+            wasBotRunning = false;
+            log.info("Bot stopped - switching back to BACKTEST metrics");
+        }
     }
 
     /**
@@ -1372,15 +1370,9 @@ public class AnalysisPanel extends VBox {
     }
 
     /**
-     * Get live metrics tracker for recording trades.
-     */
-    public LiveTradingMetricsTracker getLiveMetricsTracker() {
-        return liveMetricsTracker;
-    }
-
-    /**
      * Record a trade in live metrics tracking.
      */
+    @SuppressWarnings("unused")
     public void recordLiveTrading(String strategy, String symbol, Trade trade) {
         if (showingLiveMetrics && strategy.equals(currentLiveStrategy) && symbol.equals(currentLiveSymbol)) {
             liveMetricsTracker.recordTrade(trade);
@@ -1442,7 +1434,7 @@ public class AnalysisPanel extends VBox {
                 returns = deriveReturnsFromEquity(equityCurve);
             }
 
-            Map<String, Integer> buckets = readStringIntegerMap(analysis, "returnBuckets", "returnDistribution");
+            Map<String, Integer> buckets = readReturnBuckets(analysis);
             if (buckets.isEmpty() && !returns.isEmpty()) {
                 buckets = buildReturnBuckets(returns);
             }
@@ -1508,9 +1500,9 @@ public class AnalysisPanel extends VBox {
                     returns,
                     readDoubleList(analysis, "rollingSharpe", "rollingSharpeRatio"),
                     readDoubleList(analysis, "rollingVolatility", "rollingVol"),
-                    readNestedDoubleList(analysis, "monteCarloPaths", "simulationPaths"),
+                    readMonteCarloPaths(analysis),
                     buckets,
-                    readCorrelationMap(analysis, "correlations", "correlationMatrix"),
+                    readCorrelationMap(analysis),
                     readStringDoubleMap(analysis, "factorExposures", "factorLoadings", "exposures"),
                     readStringDoubleMap(analysis, "regimeWeights", "regimeDistribution", "regimes"),
                     readStringDoubleMap(analysis, "stressScenarios", "stressResults", "scenarioPnl"),
@@ -1669,8 +1661,8 @@ public class AnalysisPanel extends VBox {
             return normalizeDoubleList(value);
         }
 
-        private List<List<Double>> readNestedDoubleList(Object target, String... names) {
-            Object value = readAny(target, names);
+        private List<List<Double>> readMonteCarloPaths(Object target) {
+            Object value = readAny(target, "monteCarloPaths", "simulationPaths");
             if (value == null) {
                 return List.of();
             }
@@ -1718,8 +1710,8 @@ public class AnalysisPanel extends VBox {
             return result;
         }
 
-        private Map<String, Integer> readStringIntegerMap(Object target, String... names) {
-            Object value = readAny(target, names);
+        private Map<String, Integer> readReturnBuckets(Object target) {
+            Object value = readAny(target, "returnBuckets", "returnDistribution");
             if (!(value instanceof Map<?, ?> map)) {
                 return Map.of();
             }
@@ -1748,8 +1740,8 @@ public class AnalysisPanel extends VBox {
             return result;
         }
 
-        private Map<String, Map<String, Double>> readCorrelationMap(Object target, String... names) {
-            Object value = readAny(target, names);
+        private Map<String, Map<String, Double>> readCorrelationMap(Object target) {
+            Object value = readAny(target, "correlations", "correlationMatrix");
             if (!(value instanceof Map<?, ?> outerMap)) {
                 return Map.of();
             }
@@ -1785,19 +1777,23 @@ public class AnalysisPanel extends VBox {
         }
 
         private Double toDouble(Object value) {
-            if (value == null) {
-                return null;
-            }
-            if (value instanceof Number number) {
-                double d = number.doubleValue();
-                return Double.isFinite(d) ? d : null;
-            }
-            if (value instanceof String string) {
-                try {
-                    double d = Double.parseDouble(string.trim().replace("%", "").replace(",", ""));
-                    return Double.isFinite(d) ? d : null;
-                } catch (NumberFormatException ignored) {
+            switch (value) {
+                case null -> {
                     return null;
+                }
+                case Number number -> {
+                    double d = number.doubleValue();
+                    return Double.isFinite(d) ? d : null;
+                }
+                case String string -> {
+                    try {
+                        double d = Double.parseDouble(string.trim().replace("%", "").replace(",", ""));
+                        return Double.isFinite(d) ? d : null;
+                    } catch (NumberFormatException ignored) {
+                        return null;
+                    }
+                }
+                default -> {
                 }
             }
             return null;
