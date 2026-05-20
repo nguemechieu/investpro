@@ -1,4 +1,4 @@
-package org.investpro.trading.validation;
+package org.investpro.trading;
 
 /**
  * Validation rules and thresholds for pre-trade checks.

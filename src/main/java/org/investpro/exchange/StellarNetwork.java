@@ -70,9 +70,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 /**
  * Stellar Network adapter for InvestPro.
@@ -117,6 +121,18 @@ public class StellarNetwork extends Exchange {
     private final List<Position> positions = new CopyOnWriteArrayList<>();
     private final List<Trade> tradeHistory = new CopyOnWriteArrayList<>();
     private final AtomicLong nextOrderId = new AtomicLong(1000);
+    private final ExecutorService ioExecutor = Executors.newFixedThreadPool(
+            Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors())),
+            new ThreadFactory() {
+                private final AtomicLong sequence = new AtomicLong(1);
+
+                @Override
+                public Thread newThread(@NotNull Runnable runnable) {
+                    Thread thread = new Thread(runnable, "stellar-io-" + sequence.getAndIncrement());
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
 
     protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
@@ -424,7 +440,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             try {
                 if (isPaperTrading()) {
                     if (balances.isEmpty()) {
@@ -666,7 +682,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair symbol, Side side, double quantity) {
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             TradePair pair = pairOrDefault(symbol);
             Side safeSide = side == null ? Side.BUY : side;
             double normalizedQuantity = normalizeAmount(pair, quantity);
@@ -690,7 +706,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair symbol, Side side, double quantity, double limitPrice) {
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             TradePair pair = pairOrDefault(symbol);
             Side safeSide = side == null ? Side.BUY : side;
             double normalizedQuantity = normalizeAmount(pair, quantity);
@@ -718,9 +734,14 @@ public class StellarNetwork extends Exchange {
         String orderId = "STL-" + (marketLike ? "MARKET" : "LIMIT") + "-" + nextOrderId.getAndIncrement();
         Ticker ticker = safeTicker(pair);
 
+        double bid = ticker.getBidPrice();
+        double ask = ticker.getAskPrice();
+        boolean hasValidBid = Double.isFinite(bid) && bid > 0;
+        boolean hasValidAsk = Double.isFinite(ask) && ask > 0;
+
         boolean marketable = marketLike
-                || (side == Side.BUY && limitPrice >= ticker.getAskPrice())
-                || (side == Side.SELL && limitPrice <= ticker.getBidPrice());
+            || (side == Side.BUY && hasValidAsk && limitPrice >= ask)
+            || (side == Side.SELL && hasValidBid && limitPrice <= bid);
 
         if (marketable) {
             double executionPrice = marketLike
@@ -901,7 +922,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<String> cancelOrder(String orderId) {
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             if (orderId == null || orderId.isBlank()) {
                 throw new IllegalArgumentException("orderId must not be blank");
             }
@@ -939,7 +960,7 @@ public class StellarNetwork extends Exchange {
             return CompletableFuture.completedFuture(List.of());
         }
 
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             List<String> cancelled = new ArrayList<>();
             for (String orderId : orderIds) {
                 if (orderId == null || orderId.isBlank()) {
@@ -1262,7 +1283,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<Ticker> fetchTicker(TradePair tradePair) {
-        return CompletableFuture.supplyAsync(() -> safeTicker(tradePair));
+        return supplyAsyncIo(() -> safeTicker(tradePair));
     }
 
     @Override
@@ -1276,7 +1297,7 @@ public class StellarNetwork extends Exchange {
                 .distinct()
                 .toList();
 
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             List<Ticker> tickers = new ArrayList<>();
 
             for (TradePair pair : uniquePairs) {
@@ -1310,6 +1331,18 @@ public class StellarNetwork extends Exchange {
 
     private Ticker safeTicker(TradePair tradePair) {
         TradePair pair = pairOrDefault(tradePair);
+
+        if (isPaperTrading()) {
+            Ticker ticker = new Ticker(
+                    DEFAULT_XLM_USDC_PRICE,
+                    DEFAULT_XLM_USDC_PRICE * 0.999,
+                    DEFAULT_XLM_USDC_PRICE * 1.001,
+                    0.0,
+                    System.currentTimeMillis());
+            ticker.setTradePair(pair);
+            return ticker;
+        }
+
         try {
             OrderBook orderBook = fetchStellarOrderBook(pair);
             double bid = orderBook.getBestBid() == null ? 0.0 : orderBook.getBestBid().getPrice();
@@ -1344,7 +1377,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<OrderBook> fetchOrderBook(TradePair tradePair) {
-        return CompletableFuture.supplyAsync(() -> fetchStellarOrderBook(tradePair));
+        return supplyAsyncIo(() -> fetchStellarOrderBook(tradePair));
     }
 
     private OrderBook fetchStellarOrderBook(TradePair tradePair) {
@@ -1420,7 +1453,7 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public CompletableFuture<List<Trade>> fetchRecentTradesUntil(TradePair tradePair, Instant stopAt) {
-        return CompletableFuture.supplyAsync(() -> fetchRecentTrades(tradePair, MAX_RECENT_TRADES).stream()
+        return supplyAsyncIo(() -> fetchRecentTrades(tradePair, MAX_RECENT_TRADES).stream()
                 .filter(trade -> stopAt == null || !trade.getTimestamp().isAfter(stopAt))
                 .toList());
     }
@@ -1465,7 +1498,7 @@ public class StellarNetwork extends Exchange {
             return CompletableFuture.completedFuture(filterTrades(tradePair, tradeHistory.size()));
         }
 
-        return CompletableFuture.supplyAsync(() -> {
+        return supplyAsyncIo(() -> {
             try {
                 var request = activeServer().trades()
                         .forAccount(accountId)
@@ -1554,10 +1587,14 @@ public class StellarNetwork extends Exchange {
         if (tradePair == null || currentCandleStartedAt == null) {
             return failedFuture(new IllegalArgumentException("tradePair and currentCandleStartedAt must not be null"));
         }
-        return CompletableFuture.supplyAsync(() -> fetchInProgressAggregationCandle(
+        return supplyAsyncIo(() -> fetchInProgressAggregationCandle(
                 pairOrDefault(tradePair),
                 currentCandleStartedAt,
                 secondsPerCandle));
+    }
+
+    private <T> CompletableFuture<T> supplyAsyncIo(Supplier<T> supplier) {
+        return CompletableFuture.supplyAsync(supplier, ioExecutor);
     }
 
     @Override

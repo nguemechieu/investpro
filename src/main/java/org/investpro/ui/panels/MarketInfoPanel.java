@@ -13,13 +13,19 @@ import org.investpro.exchange.Exchange;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.market.MarketMetrics;
 import org.investpro.market.MarketStats;
+import org.investpro.models.Account;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.MarketInfoDataProvider;
 import org.investpro.service.NewsDataProvider;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -72,6 +78,8 @@ public class MarketInfoPanel extends ScrollPane {
     private AssetClass currentAssetClass = AssetClass.UNKNOWN;
     private MarketStats currentStats;
     private MarketMetrics currentMetrics;
+    private Account currentAccount;
+    private String currentAccountStatus = "Account balances not loaded.";
 
     public MarketInfoPanel() {
         this(null, null);
@@ -135,10 +143,15 @@ public class MarketInfoPanel extends ScrollPane {
         currentAssetClass = inferAssetClass(pair);
         currentStats = null;
         currentMetrics = null;
+        currentAccount = null;
+        currentAccountStatus = exchange == null
+                ? "Account balances unavailable: no exchange selected."
+                : "Loading account balances...";
 
         applyLoadingState(pair);
 
         CompletableFuture<MarketStats> statsFuture = dataProvider.getMarketInfo(exchange, pair);
+        loadAccountSnapshot(pair);
 
         statsFuture
                 .thenAccept(stats -> Platform.runLater(() -> updateStats(stats)))
@@ -190,6 +203,7 @@ public class MarketInfoPanel extends ScrollPane {
 
         VBox sections = new VBox(12);
         sections.getChildren().add(createPairSnapshotSection());
+        sections.getChildren().add(createAccountBalanceSection());
 
         if (currentStats != null) {
             sections.getChildren().add(createMarketStatsSection(currentStats));
@@ -205,6 +219,41 @@ public class MarketInfoPanel extends ScrollPane {
 
         sections.getChildren().add(createProviderRoutingSection());
         mainContent.getChildren().setAll(headerBox, sections);
+    }
+
+    private void loadAccountSnapshot(TradePair pair) {
+        if (exchange == null) {
+            return;
+        }
+
+        try {
+            exchange.fetchAccount()
+                    .thenAccept(account -> Platform.runLater(() -> {
+                        if (pair != currentPair) {
+                            return;
+                        }
+                        currentAccount = account;
+                        currentAccountStatus = account == null
+                                ? "Account balances unavailable."
+                                : "Account balances loaded from " + firstNonBlank(account.getBrokerName(), exchange.getDisplayName(), exchange.getName());
+                        renderCurrentState(currentStats == null ? "Market stats loading..." : "Market stats loaded.");
+                    }))
+                    .exceptionally(error -> {
+                        log.debug("Unable to load account balances for market info", error);
+                        Platform.runLater(() -> {
+                            if (pair != currentPair) {
+                                return;
+                            }
+                            currentAccount = null;
+                            currentAccountStatus = "Account balances unavailable: " + rootMessage(error);
+                            renderCurrentState(currentStats == null ? "Market stats loading..." : "Market stats loaded.");
+                        });
+                        return null;
+                    });
+        } catch (Exception exception) {
+            currentAccount = null;
+            currentAccountStatus = "Account balances unavailable: " + rootMessage(exception);
+        }
     }
 
     private void updateHeader(String status) {
@@ -253,6 +302,47 @@ public class MarketInfoPanel extends ScrollPane {
         addGridRow(grid, 6, "Distance from high", value(distanceFromHighText(stats), colorFromWeb(stats.getATHColor(), AMBER)));
 
         section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createAccountBalanceSection() {
+        VBox section = section("Account Balances");
+        GridPane grid = grid();
+
+        if (currentAccount == null) {
+            addGridRow(grid, 0, "Status", value(currentAccountStatus, MUTED));
+            section.getChildren().add(grid);
+            return section;
+        }
+
+        addGridRow(grid, 0, "Broker", value(firstNonBlank(currentAccount.getBrokerName(), exchange == null ? "" : exchange.getDisplayName()), BLUE));
+        addGridRow(grid, 1, "Account", value(firstNonBlank(currentAccount.getAccountId(), currentAccount.getAccount(), "Connected"), MUTED));
+        addGridRow(grid, 2, "Base currency", value(firstNonBlank(currentAccount.getBaseCurrency(), "USD"), CYAN));
+        addGridRow(grid, 3, "Total balance", value(formatAccountAmount(currentAccount.getTotalBalance(), currentAccount.getBaseCurrency()), GREEN));
+        addGridRow(grid, 4, "Available", value(formatAccountAmount(currentAccount.getAvailableBalance(), currentAccount.getBaseCurrency()), GREEN));
+        addGridRow(grid, 5, "Locked / hold", value(formatAccountAmount(currentAccount.getLockedBalance(), currentAccount.getBaseCurrency()), AMBER));
+
+        int row = 6;
+        for (String code : selectedBalanceCodes()) {
+            addGridRow(
+                    grid,
+                    row++,
+                    code + " balance",
+                    value(formatCurrencyBalance(code, currentAccount.getBalances(), currentAccount.getAvailableBalances(), currentAccount.getLockedBalances()), TEXT)
+            );
+        }
+
+        String nonZero = nonZeroBalancesText(currentAccount.getBalances());
+        if (!nonZero.isBlank()) {
+            addGridRow(grid, row++, "Non-zero balances", value(nonZero, PURPLE));
+        }
+
+        if (currentAccount.getUpdatedAt() != null) {
+            addGridRow(grid, row, "Updated", value(DateTimeFormatter.ISO_INSTANT.format(currentAccount.getUpdatedAt()), MUTED));
+        }
+
+        section.getChildren().add(grid);
+        section.getChildren().add(mutedLabel(currentAccountStatus));
         return section;
     }
 
@@ -823,8 +913,120 @@ public class MarketInfoPanel extends ScrollPane {
         return String.format("%.2f", value);
     }
 
+    private Set<String> selectedBalanceCodes() {
+        Set<String> codes = new LinkedHashSet<>();
+        if (currentPair != null) {
+            String base = safePairCode(currentPair::getBaseCode).toUpperCase(Locale.ROOT);
+            String quote = inferQuoteCode(currentPair).toUpperCase(Locale.ROOT);
+            if (!base.isBlank()) {
+                codes.add(base);
+            }
+            if (!quote.isBlank()) {
+                codes.add(quote);
+            }
+        }
+
+        if (currentAccount != null && !safe(currentAccount.getBaseCurrency()).isBlank()) {
+            codes.add(currentAccount.getBaseCurrency().toUpperCase(Locale.ROOT));
+        }
+        return codes;
+    }
+
+    private String formatCurrencyBalance(
+            String code,
+            Map<String, Double> totalBalances,
+            Map<String, Double> availableBalances,
+            Map<String, Double> lockedBalances
+    ) {
+        String normalized = safe(code).toUpperCase(Locale.ROOT);
+        double total = balanceFor(totalBalances, normalized);
+        double available = balanceFor(availableBalances, normalized);
+        double locked = balanceFor(lockedBalances, normalized);
+
+        if (total <= 0.0 && available <= 0.0 && locked <= 0.0) {
+            return "0 " + normalized;
+        }
+
+        return "%s %s available, %s total, %s hold".formatted(
+                formatBalanceAmount(available),
+                normalized,
+                formatBalanceAmount(total),
+                formatBalanceAmount(locked)
+        );
+    }
+
+    private String nonZeroBalancesText(Map<String, Double> balances) {
+        if (balances == null || balances.isEmpty()) {
+            return "";
+        }
+
+        return balances.entrySet().stream()
+                .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+                .filter(entry -> Double.isFinite(entry.getValue()) && Math.abs(entry.getValue()) > 0.0)
+                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .limit(8)
+                .map(entry -> "%s %s".formatted(formatBalanceAmount(entry.getValue()), entry.getKey().toUpperCase(Locale.ROOT)))
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("");
+    }
+
+    private double balanceFor(Map<String, Double> balances, String code) {
+        if (balances == null || code == null || code.isBlank()) {
+            return 0.0;
+        }
+
+        Double direct = balances.get(code);
+        if (direct != null && Double.isFinite(direct)) {
+            return direct;
+        }
+
+        for (Map.Entry<String, Double> entry : balances.entrySet()) {
+            if (entry.getKey() != null
+                    && entry.getKey().equalsIgnoreCase(code)
+                    && entry.getValue() != null
+                    && Double.isFinite(entry.getValue())) {
+                return entry.getValue();
+            }
+        }
+        return 0.0;
+    }
+
+    private String formatAccountAmount(double value, String currencyCode) {
+        String code = firstNonBlank(currencyCode, "USD").toUpperCase(Locale.ROOT);
+        return formatBalanceAmount(value) + " " + code;
+    }
+
+    private String formatBalanceAmount(double value) {
+        if (!Double.isFinite(value)) {
+            return "0";
+        }
+        double abs = Math.abs(value);
+        if (abs >= 1000.0) {
+            return String.format("%,.2f", value);
+        }
+        if (abs >= 1.0) {
+            return String.format("%.6f", value);
+        }
+        if (abs > 0.0) {
+            return String.format("%.8f", value);
+        }
+        return "0";
+    }
+
     private double safeDouble(double value) {
         return Double.isFinite(value) ? value : 0.0;
+    }
+
+    private String rootMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown error";
+        }
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        String message = current.getMessage();
+        return message == null || message.isBlank() ? current.getClass().getSimpleName() : message;
     }
 
     private double firstPositive(double... values) {

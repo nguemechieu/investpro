@@ -161,6 +161,39 @@
     -fx-border-color: #f87171;
 }
 
+.chart-options-pane {
+    -fx-background-color: #0b1220;
+    -fx-border-color: #263449;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-spacing: 10;
+}
+
+.chart-options-grid {
+    -fx-hgap: 18;
+    -fx-vgap: 12;
+}
+
+.chart-options-label {
+    -fx-text-fill: #dbeafe;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.chart-options-switch {
+    -fx-cursor: hand;
+}
+
+.chart-options-switch .text {
+    -fx-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+.chart-options-switch:selected .thumb-area {
+    -fx-background-color: #2563eb;
+}
+
 .chart-action-button {
     -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
     -fx-border-color: #34445f;
@@ -482,6 +515,27 @@ StackPane {
 .menu-item:focused .label,
 .menu-item:hover .label {
     -fx-text-fill: white;
+}
+
+.market-watch-context-menu {
+    -fx-background-color: #0b1220;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-padding: 5;
+}
+
+.market-watch-menu-item {
+    -fx-padding: 8 18 8 14;
+}
+
+.market-watch-menu-item .label {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 12px;
+}
+
+.market-watch-menu-item:focused,
+.market-watch-menu-item:hover {
+    -fx-background-color: #1d4ed8;
 }
 
 

@@ -30,6 +30,7 @@ import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
+
 import org.investpro.ui.tools.ChartToolbar;
 import org.investpro.utils.CandleDataSupplier;
 

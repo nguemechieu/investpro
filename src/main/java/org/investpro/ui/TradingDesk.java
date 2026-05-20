@@ -2962,6 +2962,12 @@ public class TradingDesk extends BorderPane {
         MenuItem specItem = new MenuItem("Specification / Market Info");
         MenuItem removeItem = new MenuItem("Remove");
 
+        tradeItem.getStyleClass().add("market-watch-menu-item");
+        chartItem.getStyleClass().add("market-watch-menu-item");
+        depthItem.getStyleClass().add("market-watch-menu-item");
+        specItem.getStyleClass().add("market-watch-menu-item");
+        removeItem.getStyleClass().add("market-watch-menu-item");
+
         tradeItem.setOnAction(event -> withMarketWatchRow(row, this::openOrderPanel));
         chartItem.setOnAction(event -> withMarketWatchRow(row, this::openSelectedSymbolChart));
         depthItem.setOnAction(event -> withMarketWatchRow(row, this::loadSelectedOrderBook));
@@ -2972,7 +2978,16 @@ public class TradingDesk extends BorderPane {
             }
         });
 
-        row.setContextMenu(new ContextMenu(tradeItem, chartItem, depthItem, specItem, new SeparatorMenuItem(), removeItem));
+        ContextMenu contextMenu = new ContextMenu(
+                tradeItem,
+                chartItem,
+                depthItem,
+                specItem,
+                new SeparatorMenuItem(),
+                removeItem
+        );
+        contextMenu.getStyleClass().add("market-watch-context-menu");
+        row.setContextMenu(contextMenu);
         row.setOnMouseClicked(event -> {
             if (row.isEmpty()) {
                 return;
@@ -2991,7 +3006,9 @@ public class TradingDesk extends BorderPane {
         if (row == null || row.isEmpty()) {
             return;
         }
-        symbolSelector.getSelectionModel().select(row.getItem());
+        TradePair selected = row.getItem();
+        marketWatchTable.getSelectionModel().select(selected);
+        symbolSelector.getSelectionModel().select(selected);
         if (action != null) {
             action.run();
         }
@@ -8859,33 +8876,8 @@ public class TradingDesk extends BorderPane {
 
     private void openOrderPanel() {
         try {
-            // Get selected symbol
-            TradePair selectedSymbol;
-
-            if (symbolSelector != null && symbolSelector.getValue() != null) {
-                selectedSymbol = symbolSelector.getValue();
-            } else {
-                selectedSymbol = null;
-            }
-
-            CompletableFuture<OrderBook> orderBookFuture = exchange != null
-                    && selectedSymbol != null
-                    && exchange.supportsOrderBook()
-                            ? exchange.fetchOrderBook(selectedSymbol)
-                            : CompletableFuture.completedFuture(null);
-
-            orderBookFuture
-                    .exceptionally(exception -> {
-                        log.debug("Order panel opened without order book data", exception);
-                        return null;
-                    })
-                    .thenAccept(orderBook -> runOnFx(() -> {
-                        try {
-                            showOrderPanelWindow(selectedSymbol);
-                        } catch (SQLException | ClassNotFoundException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }));
+            TradePair selectedSymbol = symbolSelector == null ? null : symbolSelector.getValue();
+            showOrderPanelWindow(selectedSymbol);
 
         } catch (Exception e) {
             log.error("Error opening order panel", e);

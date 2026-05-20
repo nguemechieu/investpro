@@ -214,6 +214,7 @@ public class SystemCore {
                 riskManagementSystem,
                 aiReasoningService,
                 executionEngine);
+        this.tradeExecutionCoordinator.setSystemCore(this);
 
         // Initialize StrategyEngine with TradeExecutionCoordinator
         this.strategyEngine = new StrategyEngine(tradeExecutionCoordinator);

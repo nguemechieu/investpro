@@ -194,40 +194,55 @@ public class BacktestingService  {
         final BacktestResult[] bestResult = { null };
         final double[] bestReturn = { Double.NEGATIVE_INFINITY };
 
-        optimizeRecursive(strategy, config, historicalData, parameterRanges,
-                new HashMap<>(), parameterRanges.keySet().iterator(),
-                result -> {
-                    if (result.getReturnPercent() > bestReturn[0]) {
-                        bestReturn[0] = result.getReturnPercent();
-                        bestResult[0] = result;
-                    }
-                });
+        if (parameterRanges == null || parameterRanges.isEmpty()) {
+            BacktestResult single = runBacktest(strategy, config, historicalData);
+            return single;
+        }
 
-        return bestResult[0];
-    }
+        List<String> paramNames = new ArrayList<>(parameterRanges.keySet());
+        List<Object[]> valueMatrix = new ArrayList<>(paramNames.size());
 
-    private void optimizeRecursive(BacktestStrategy strategy, BacktestConfig config,
-            List<CandleData> historicalData,
-            Map<String, Object[]> parameterRanges,
-            Map<String, Object> currentParams,
-            Iterator<String> paramIterator,
-            java.util.function.Consumer<BacktestResult> callback) {
-        if (!paramIterator.hasNext()) {
-            // Set current parameters and run backtest
+        for (String paramName : paramNames) {
+            Object[] values = parameterRanges.get(paramName);
+            if (values == null || values.length == 0) {
+                log.warn("Skipping optimization because parameter '{}' has no candidate values", paramName);
+                return runBacktest(strategy, config, historicalData);
+            }
+            valueMatrix.add(values);
+        }
+
+        int dimensions = valueMatrix.size();
+        int[] indices = new int[dimensions];
+        Map<String, Object> currentParams = new HashMap<>();
+
+        while (true) {
+            for (int i = 0; i < dimensions; i++) {
+                currentParams.put(paramNames.get(i), valueMatrix.get(i)[indices[i]]);
+            }
+
             currentParams.forEach(strategy::setParameter);
             BacktestResult result = runBacktest(strategy, config, historicalData);
-            callback.accept(result);
-            return;
+            if (result.getReturnPercent() > bestReturn[0]) {
+                bestReturn[0] = result.getReturnPercent();
+                bestResult[0] = result;
+            }
+
+            int carry = dimensions - 1;
+            while (carry >= 0) {
+                indices[carry]++;
+                if (indices[carry] < valueMatrix.get(carry).length) {
+                    break;
+                }
+                indices[carry] = 0;
+                carry--;
+            }
+
+            if (carry < 0) {
+                break;
+            }
         }
 
-        String paramName = paramIterator.next();
-        Object[] values = parameterRanges.get(paramName);
-
-        for (Object value : values) {
-            currentParams.put(paramName, value);
-            optimizeRecursive(strategy, config, historicalData, parameterRanges,
-                    currentParams, paramIterator, callback);
-        }
+        return bestResult[0];
     }
 
     /**

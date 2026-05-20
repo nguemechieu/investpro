@@ -74,6 +74,8 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             Collections.synchronizedSet(new HashSet<>());
 
     private volatile @Nullable TradePair defaultTradePair;
+    private volatile String lastErrorMessage = "";
+    private volatile long lastErrorLoggedAtMs = 0L;
 
     public CoinbaseWebSocketClient(@NotNull URI uri, @NotNull Draft draft, @Nullable String jwt) {
         super(uri, draft);
@@ -159,8 +161,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         String channel = messageJson.path("channel").asText("");
 
         if ("subscriptions".equalsIgnoreCase(channel)) {
-            throw new RuntimeException("Coinbase subscription acknowledged: \n"+ messageJson.asText());
-
+            if (log.isDebugEnabled()) {
+                log.debug("Coinbase subscription acknowledged: {}", formatSubscriptionAcknowledgement(messageJson));
+            }
+            return;
         }
 
         if (HEARTBEATS_CHANNEL.equalsIgnoreCase(channel)) {
@@ -364,6 +368,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     @Override
     public void stopStreamLiveTrades(@NotNull TradePair tradePair) {
+        stopStreamLiveTrades(tradePair, true);
+    }
+
+    private void stopStreamLiveTrades(@NotNull TradePair tradePair, boolean sendUnsubscribe) {
         liveTradeConsumers.remove(tradePair);
         pendingSubscriptions.remove(tradePair);
 
@@ -371,10 +379,9 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             defaultTradePair = findAnyRegisteredPair();
         }
 
-        if (isOpen()) {
+        if (sendUnsubscribe && isOpen()) {
             try {
                 sendUnsubscribe(tradePair, MARKET_TRADES_CHANNEL);
-                stopAllStreamLiveTrades();
             } catch (Exception exception) {
                 log.warn("Unable to send Coinbase unsubscribe for {}", tradePair, exception);
             }
@@ -385,7 +392,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
     public void stopAllStreamLiveTrades() {
         for (TradePair tradePair : List.copyOf(liveTradeConsumers.keySet())) {
-            stopStreamLiveTrades(tradePair);
+            stopStreamLiveTrades(tradePair, isOpen());
         }
 
         liveTradeConsumers.clear();
@@ -577,7 +584,63 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             errorMessage = messageJson.toString();
         }
 
+        long now = System.currentTimeMillis();
+        if (errorMessage.equals(lastErrorMessage) && now - lastErrorLoggedAtMs < 5_000L) {
+            log.debug("Coinbase WebSocket repeated error suppressed: {}", errorMessage);
+            return;
+        }
+
+        lastErrorMessage = errorMessage;
+        lastErrorLoggedAtMs = now;
         log.error("Coinbase WebSocket error: {}", errorMessage);
+    }
+
+    static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {
+        JsonNode events = messageJson.path("events");
+
+        if (!events.isArray()) {
+            return messageJson.toString();
+        }
+
+        Map<String, Set<String>> subscriptionsByChannel = new LinkedHashMap<>();
+
+        for (JsonNode event : events) {
+            JsonNode subscriptions = event.path("subscriptions");
+
+            if (!subscriptions.isObject()) {
+                continue;
+            }
+
+            Iterator<Map.Entry<String, JsonNode>> fields = subscriptions.fields();
+
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                Set<String> productIds = subscriptionsByChannel.computeIfAbsent(
+                        field.getKey(),
+                        ignored -> new TreeSet<>()
+                );
+
+                JsonNode products = field.getValue();
+                if (products.isArray()) {
+                    for (JsonNode product : products) {
+                        String productId = product.asText("").trim();
+                        if (!productId.isBlank()) {
+                            productIds.add(productId);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (subscriptionsByChannel.isEmpty()) {
+            return messageJson.toString();
+        }
+
+        StringJoiner summary = new StringJoiner(", ");
+        subscriptionsByChannel.forEach((subscriptionChannel, productIds) ->
+                summary.add(subscriptionChannel + "=" + productIds)
+        );
+        return summary.toString();
     }
 
     private @Nullable TradePair findTradePair(String productId) {

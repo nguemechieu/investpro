@@ -79,7 +79,10 @@ public class TelegramNotifier {
     // Guard against concurrent getUpdates calls (Telegram HTTP 409)
     private final AtomicBoolean getUpdatesInFlight = new AtomicBoolean(false);
     private volatile long lastDetectionAttemptMs = 0L;
+    private volatile long lastDetectionWarningMs = 0L;
+    private volatile boolean lastDetectionFailed = false;
     private static final long DETECTION_MIN_INTERVAL_MS = 30_000L; // 30 s cooldown
+    private static final long DETECTION_WARNING_INTERVAL_MS = 120_000L;
 
     public TelegramNotifier(String botToken) {
         this(botToken, "");
@@ -110,6 +113,10 @@ public class TelegramNotifier {
         Set<String> detected = detectChatIds();
 
         if (detected.isEmpty()) {
+            if (lastDetectionFailed) {
+                log.debug("Telegram chat detection unavailable; message will be skipped until a chat_id is configured.");
+                return Optional.empty();
+            }
             log.warn(
                     "Telegram chat detection found no chats. Send /start to the bot or add it to a group/channel first.");
             return Optional.empty();
@@ -152,6 +159,7 @@ public class TelegramNotifier {
         }
 
         lastDetectionAttemptMs = now;
+        lastDetectionFailed = false;
         try {
             if (lastUpdateId >= 0) {
                 url += "?offset=%d".formatted(lastUpdateId + 1);
@@ -189,17 +197,32 @@ public class TelegramNotifier {
                 id.ifPresent(chatIds::add);
             }
         } catch (IOException exception) {
-            log.warn("Telegram chat detection IO error", exception);
+            lastDetectionFailed = true;
+            logTelegramDetectionFailure("IO error", exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            log.warn("Telegram chat detection interrupted", exception);
+            lastDetectionFailed = true;
+            logTelegramDetectionFailure("interrupted", exception);
         } catch (Exception exception) {
-            log.warn("Telegram chat detection failed", exception);
+            lastDetectionFailed = true;
+            logTelegramDetectionFailure("failed", exception);
         } finally {
             getUpdatesInFlight.set(false);
         }
 
         return chatIds;
+    }
+
+    private void logTelegramDetectionFailure(String category, Exception exception) {
+        long now = System.currentTimeMillis();
+        String message = rootMessage(exception);
+
+        if (now - lastDetectionWarningMs >= DETECTION_WARNING_INTERVAL_MS) {
+            lastDetectionWarningMs = now;
+            log.warn("Telegram chat detection {}: {}. Configure TELEGRAM_CHAT_ID or check network/DNS.", category, message);
+        } else {
+            log.debug("Telegram chat detection {}: {}", category, message, exception);
+        }
     }
 
     /**
@@ -1106,6 +1129,23 @@ public class TelegramNotifier {
      */
     public boolean isPollingEnabled() {
         return pollingEnabled;
+    }
+
+    private static String rootMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown error";
+        }
+
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+
+        String message = current.getMessage();
+        if (message == null || message.isBlank()) {
+            message = current.getClass().getSimpleName();
+        }
+        return message;
     }
 
     /**

@@ -7,6 +7,7 @@ import org.investpro.ai.AiReasoningService;
 import org.investpro.ai.AiTradeReviewRequest;
 import org.investpro.ai.AiTradeReviewResponse;
 import org.investpro.ai.FinalRiskGate;
+import org.investpro.core.SystemCore;
 import org.investpro.models.Account;
 import org.investpro.core.execution.ExecutionIntent;
 import org.investpro.core.execution.PositionTransitionPolicy;
@@ -19,6 +20,7 @@ import org.investpro.risk.RiskDecision;
 import org.investpro.risk.RiskManagementSystem;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.trading.PreTradeValidationEngine;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -54,9 +56,11 @@ public class TradeExecutionCoordinator {
     private final RiskManagementSystem riskManagementSystem;
     private final AiReasoningService aiReasoningService;
     private final ExecutionEngine executionEngine;
+    private final PreTradeValidationEngine preTradeValidationEngine = new PreTradeValidationEngine();
     private final PositionTransitionPolicy positionTransitionPolicy = new PositionTransitionPolicy();
     private final SymbolTradeLockManager symbolTradeLockManager = new SymbolTradeLockManager();
     private final ConcurrentHashMap<String, Instant> lastActionTimes = new ConcurrentHashMap<>();
+    private volatile SystemCore systemCore;
 
     private static final Duration TRANSITION_COOLDOWN = Duration.ofSeconds(10);
 
@@ -73,6 +77,10 @@ public class TradeExecutionCoordinator {
         this.executionEngine = Objects.requireNonNull(
                 executionEngine,
                 "executionEngine cannot be null");
+    }
+
+    public void setSystemCore(@Nullable SystemCore systemCore) {
+        this.systemCore = systemCore;
     }
 
     /**
@@ -254,7 +262,13 @@ public class TradeExecutionCoordinator {
             @Nullable String exchangeName,
             @NotNull String symbolText) {
         try {
-            RiskDecision riskDecision = riskManagementSystem.evaluateTrade(riskContext);
+            TradeRiskContext validatedContext = applyPreTradeValidation(side, riskContext, symbolText);
+            if (validatedContext == null) {
+            return completed(TradeExecutionResult.rejected(
+                "Pre-trade validation rejected execution for " + symbolText));
+            }
+
+            RiskDecision riskDecision = riskManagementSystem.evaluateTrade(validatedContext);
 
             if (riskDecision == null) {
                 return completed(TradeExecutionResult.rejected(
@@ -263,7 +277,7 @@ public class TradeExecutionCoordinator {
 
             AiTradeReviewRequest aiRequest = AiTradeReviewRequest.from(
                     side,
-                    riskContext,
+                validatedContext,
                     riskDecision);
 
             AiTradeReviewResponse aiResponse = aiReasoningService.reviewTrade(aiRequest);
@@ -278,8 +292,8 @@ public class TradeExecutionCoordinator {
 
             if (finalDecision.isApproved()) {
                 CompletableFuture<ExecutionEngine.PositionExecutionResult> executionFuture = signal != null
-                        ? executionEngine.executeApprovedOrder(signal, riskContext, finalDecision)
-                        : executionEngine.executeApprovedOrder(side, riskContext, finalDecision);
+                    ? executionEngine.executeApprovedOrder(signal, validatedContext, finalDecision)
+                    : executionEngine.executeApprovedOrder(side, validatedContext, finalDecision);
 
                 return executionFuture
                         .thenApply(executionResult -> {
@@ -328,6 +342,210 @@ public class TradeExecutionCoordinator {
             log.error("TradeExecutionCoordinator: Unexpected error in risk/AI/execution pipeline", exception);
             return completed(TradeExecutionResult.failed(rootMessage(exception)));
         }
+    }
+
+    private @Nullable TradeRiskContext applyPreTradeValidation(
+            @NotNull Side side,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull String symbolText) {
+        PreTradeValidationEngine.TradeRequest request = toValidationRequest(side, riskContext, symbolText);
+        PreTradeValidationEngine.TradingContext context = toTradingContext(riskContext);
+        PreTradeValidationEngine.ValidationResult result = preTradeValidationEngine.validate(request, context);
+
+        if (result.rejected()) {
+            String reason = result.blockers().isEmpty()
+                    ? result.summary()
+                    : result.blockers().getFirst();
+            log.warn("TradeExecutionCoordinator: pre-trade rejected. symbol={} reason={}", symbolText, reason);
+            return null;
+        }
+
+        double requested = Math.max(0.0, riskContext.getRequestedPositionSize());
+        double finalQty = Math.max(0.0, result.finalQuantity());
+        if (requested > 0.0 && finalQty > 0.0 && finalQty < requested) {
+            log.info("TradeExecutionCoordinator: pre-trade size reduction. symbol={} requested={} final={}",
+                    symbolText, requested, finalQty);
+            return riskContext.toBuilder().requestedPositionSize(finalQty).build();
+        }
+
+        return riskContext;
+    }
+
+    private PreTradeValidationEngine.TradeRequest toValidationRequest(
+            @NotNull Side side,
+            @NotNull TradeRiskContext riskContext,
+            @NotNull String symbolText) {
+        PreTradeValidationEngine.OrderSide mappedSide = switch (side) {
+            case BUY -> PreTradeValidationEngine.OrderSide.BUY;
+            case SELL -> PreTradeValidationEngine.OrderSide.SELL;
+            default -> PreTradeValidationEngine.OrderSide.UNKNOWN;
+        };
+
+        double requestedPrice = firstPositive(
+                riskContext.getEntryPrice(),
+                riskContext.getCurrentPrice(),
+                riskContext.getAskPrice(),
+                riskContext.getBidPrice());
+
+        boolean aiEnabled = systemCore != null && systemCore.isAiReasoningEnabled();
+        boolean liveTrading = systemCore == null
+                ? executionEngine.getExchange() != null && !executionEngine.getExchange().isPaperTrading()
+                : systemCore.getExchange() != null && !systemCore.getExchange().isPaperTrading();
+
+        return new PreTradeValidationEngine.TradeRequest(
+                symbolText,
+                mappedSide,
+                PreTradeValidationEngine.OrderType.MARKET,
+                Math.max(0.0, riskContext.getRequestedPositionSize()),
+                requestedPrice,
+                Math.max(1.0, riskContext.getRequestedLeverage()),
+                !aiEnabled,
+                !liveTrading
+        );
+    }
+
+    private PreTradeValidationEngine.TradingContext toTradingContext(@NotNull TradeRiskContext riskContext) {
+        Exchange exchange = executionEngine.getExchange();
+        Account account = systemCore != null ? systemCore.getAccount() : null;
+
+        return new PreTradeValidationEngine.TradingContext() {
+            @Override
+            public String systemState() {
+                if (systemCore != null) {
+                    return systemCore.canTradeNow() ? "READY" : "DEGRADED";
+                }
+                return "READY";
+            }
+
+            @Override
+            public boolean killSwitchTriggered() {
+                return false;
+            }
+
+            @Override
+            public boolean autoTradingEnabled() {
+                return systemCore == null || systemCore.isAutoTradingEnabled();
+            }
+
+            @Override
+            public PreTradeValidationEngine.AccountView account() {
+                return new PreTradeValidationEngine.AccountView() {
+                    @Override
+                    public boolean tradingEnabled() {
+                        return account == null || account.isTradingEnabled();
+                    }
+
+                    @Override
+                    public double equity() {
+                        return firstPositive(riskContext.getAccountEquity(), account == null ? 0.0 : account.getEquity());
+                    }
+
+                    @Override
+                    public double freeMargin() {
+                        return firstPositive(riskContext.getFreeMargin(), account == null ? 0.0 : account.getFreeMargin());
+                    }
+
+                    @Override
+                    public double totalExposure() {
+                        return Math.max(0.0, riskContext.getCurrentOpenRisk());
+                    }
+
+                    @Override
+                    public double exposureForSymbol(String symbol) {
+                        return 0.0;
+                    }
+
+                    @Override
+                    public double dailyPnl() {
+                        return account == null ? 0.0 : account.getRealizedPnl();
+                    }
+
+                    @Override
+                    public double drawdownPercent() {
+                        return 0.0;
+                    }
+
+                    @Override
+                    public int openPositionCount() {
+                        return account == null ? 0 : account.getOpenPositionCount();
+                    }
+                };
+            }
+
+            @Override
+            public boolean brokerConnected() {
+                return exchange != null && Boolean.TRUE.equals(exchange.isConnected());
+            }
+
+            @Override
+            public String selectedVenue() {
+                return exchange == null ? "UNKNOWN" : exchange.getName();
+            }
+
+            @Override
+            public PreTradeValidationEngine.InstrumentRegistryView instrumentRegistry() {
+                return new PreTradeValidationEngine.InstrumentRegistryView() {
+                    @Override
+                    public boolean isKnownInstrument(String symbol) {
+                        return symbol != null && !symbol.isBlank();
+                    }
+
+                    @Override
+                    public boolean isTradable(String symbol, String venue) {
+                        if (exchange == null || riskContext.getSymbol() == null) {
+                            return false;
+                        }
+                        return exchange.supportsTradePair(riskContext.getSymbol());
+                    }
+                };
+            }
+
+            @Override
+            public boolean aiReviewEnabled() {
+                return systemCore != null && systemCore.isAiReasoningEnabled();
+            }
+
+            @Override
+            public boolean liveTrading() {
+                return exchange != null && !exchange.isPaperTrading();
+            }
+
+            @Override
+            public PreTradeValidationEngine.MarketSnapshot marketSnapshot() {
+                Instant timestamp = Instant.now();
+                return new PreTradeValidationEngine.MarketSnapshot() {
+                    @Override
+                    public PreTradeValidationEngine.QuoteView quote() {
+                        return new PreTradeValidationEngine.QuoteView() {
+                            @Override
+                            public double bid() {
+                                return firstPositive(riskContext.getBidPrice(), riskContext.getCurrentPrice(), riskContext.getEntryPrice());
+                            }
+
+                            @Override
+                            public double ask() {
+                                return firstPositive(riskContext.getAskPrice(), riskContext.getCurrentPrice(), riskContext.getEntryPrice());
+                            }
+
+                            @Override
+                            public double midPrice() {
+                                double bid = bid();
+                                double ask = ask();
+                                if (bid > 0.0 && ask > 0.0) {
+                                    return (bid + ask) / 2.0;
+                                }
+                                return firstPositive(riskContext.getCurrentPrice(), riskContext.getEntryPrice());
+                            }
+                        };
+                    }
+
+                    @Override
+                    public Instant updatedAt() {
+                        return timestamp;
+                    }
+                };
+            }
+        };
     }
 
     private CompletableFuture<TradeExecutionResult> closeExistingPositionOnly(

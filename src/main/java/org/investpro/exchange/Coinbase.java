@@ -58,10 +58,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 import java.util.zip.GZIPInputStream;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -2396,15 +2393,41 @@ public class Coinbase extends Exchange {
 
         requirePrivateEndpointAuth("Coinbase all open orders");
 
-        String url = "%s/orders/historical/batch?order_status=OPEN".formatted(REST_BASE_URL);
-
+        String url = "%s/orders/historical/batch".formatted(REST_BASE_URL);
+        OpenOrder openOrder2 = new OpenOrder();
         HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
+        CompletableFuture<List<Order>> orders0 = fetchAllOrders();
+        CompletableFuture<List<OpenOrder>> openOrders0 =CompletableFuture.completedFuture(new ArrayList<>());
+        try {
+            for (Order openOrder:orders0.get()){
 
-        return sendAsync(request)
-                .thenApply(this::parseOpenOrdersAll)
-                .exceptionally(this::emptyOpenOrdersOnAuthFailure);
+                if (openOrder.getStatus().toUpperCase().equals("OPEN")){
+
+
+
+                    openOrder2.setOrderType(OpenOrder.OrderType.valueOf(openOrder.getOrderType()));
+                    openOrder2.setFilledSize(openOrder.getFilledQuantity());
+                    openOrder2.setPrice(openOrder.getPrice());
+                    openOrder2.setOrderId(String.valueOf(openOrder.getId()));
+                    openOrder2.setSize(openOrder.getQuantity());
+                    openOrders0.get().add(openOrder2);
+                    openOrder2.setCreatedAt(openOrder.getCreatedAt());
+                    openOrder2.setUpdatedAt(openOrder.getUpdatedAt());
+                    openOrder2.setSide(openOrder.getSide());
+                    openOrder2.setTradePair(openOrder.getTradePair());
+                    openOrder2.setTimestamp(openOrder.getTimeInForce());
+                    openOrders0.get().add(openOrder2);
+                }
+
+            }
+
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
+        return openOrders0;
     }
 
     @Override
@@ -2426,9 +2449,7 @@ public class Coinbase extends Exchange {
         if (!query.isEmpty()) {
             url += "?%s".formatted(String.join("&", query));
         }
-
         HttpRequest request = authenticatedRequest("GET", url)
-                .GET()
                 .build();
 
         return sendAsync(request)
