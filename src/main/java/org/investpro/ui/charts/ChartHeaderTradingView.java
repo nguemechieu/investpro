@@ -1,4 +1,4 @@
-package org.investpro.ui.charts;
+﻿package org.investpro.ui.charts;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -132,7 +132,7 @@ public class ChartHeaderTradingView extends VBox {
 
         // Change percentage and absolute
         changeLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: " + GREEN_COLOR + ";");
-        changeLabel.setText("↑ +2.35% (+1,045.50)");
+        changeLabel.setText("â†‘ +2.35% (+1,045.50)");
 
         // Timeframe
         timeframeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + TEXT_SECONDARY + ";");
@@ -206,10 +206,10 @@ public class ChartHeaderTradingView extends VBox {
         try {
             switch (chartType.toLowerCase()) {
                 case "candlestick" -> log.debug("Chart type: Candlestick (current)");
-                case "line"        -> log.info("Chart type: Line (feature coming soon)");
-                case "bar"         -> log.info("Chart type: Bar (feature coming soon)");
-                case "area"        -> log.info("Chart type: Area (feature coming soon)");
-                default            -> log.error("Unknown chart type: {}", chartType);
+                case "line"        -> log.debug("Chart type: Line (feature coming soon)");
+                case "bar"         -> log.debug("Chart type: Bar (feature coming soon)");
+                case "area"        -> log.debug("Chart type: Area (feature coming soon)");
+                default            -> log.warn("Unknown chart type: {}", chartType);
             }
         } catch (Exception e) {
             log.error("Error changing chart type: {}", chartType, e);
@@ -322,7 +322,7 @@ public class ChartHeaderTradingView extends VBox {
         // Color change based on sign
         String changeColor = change >= 0 ? GREEN_COLOR : RED_COLOR;
         String changeText = String.format("%s %+.2f (%+.2f%%)",
-                change >= 0 ? "↑" : "↓", change, changePercent);
+                change >= 0 ? "â†‘" : "â†“", change, changePercent);
         changeLabel.setText(changeText);
         changeLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: " + changeColor + ";");
 
@@ -357,7 +357,7 @@ public class ChartHeaderTradingView extends VBox {
     public void updateChange(double change, double changePercent) {
         String changeColor = change >= 0 ? GREEN_COLOR : RED_COLOR;
         String changeText = String.format("%s %+.2f (%+.2f%%)",
-                change >= 0 ? "↑" : "↓", change, changePercent);
+                change >= 0 ? "â†‘" : "â†“", change, changePercent);
         changeLabel.setText(changeText);
         changeLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: " + changeColor + ";");
     }
