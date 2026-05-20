@@ -418,17 +418,17 @@ public class BotTradeDecisionEngine {
         for (String strategyName : availableStrategies) {
             double regimeFit = calculateRegimeFitForStrategy(strategyName, regime);
             double assetFit = calculateAssetFitForStrategy(strategyName, assetType);
-            double signalFit = signalStrength; // Use actual signal strength
+            // Use actual signal strength
             double timeframeFit = 0.70; // Would calculate from candle data
             double recentPerf = 0.65; // Would calculate from backtest
 
-            double avgScore = (regimeFit + assetFit + signalFit + timeframeFit + recentPerf) / 5.0;
+            double avgScore = (regimeFit + assetFit + signalStrength + timeframeFit + recentPerf) / 5.0;
 
             if (bestScore == null || avgScore > bestScore.finalFitnessScore()) {
                 bestScore = new StrategyFitScore(
                         strategyName,
                         "org.investpro.strategy." + strategyName.replace(" ", ""),
-                        regimeFit, assetFit, timeframeFit, recentPerf, signalFit,
+                        regimeFit, assetFit, timeframeFit, recentPerf, signalStrength,
                         avgScore,
                         "Scored against market regime and asset type",
                         null, Instant.now());

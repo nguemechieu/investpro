@@ -1,11 +1,15 @@
 package org.investpro.exchange.infrastructure;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.coinbase.CoinbaseExchange;
 import org.investpro.exchange.coinbase.CoinbaseFuturesExchange;
 import org.investpro.exchange.coinbase.CoinbasePerpetualExchange;
 import org.investpro.exchange.coinbase.CoinbaseSpotExchange;
 import org.investpro.exchange.core.*;
 import org.investpro.exchange.oanda.OandaFxCfdExchange;
+import org.jspecify.annotations.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,8 +19,11 @@ import java.util.logging.Logger;
  * BrokerRouter - Central routing logic for selecting the right broker/venue implementation
  * based on broker, venue, and instrument type.
  */
+@Slf4j
+@Getter
+@Setter
 public class BrokerRouter {
-    private static final Logger logger = Logger.getLogger(BrokerRouter.class.getName());
+
     
     private final Map<String, VenueAwareExchange> activeExchanges;
     
@@ -27,7 +34,7 @@ public class BrokerRouter {
     /**
      * Create and get the appropriate exchange implementation.
      */
-    public VenueAwareExchange getExchange(String brokerName, BrokerVenue venue, String apiKey, String apiSecret) {
+    public VenueAwareExchange getExchange(String brokerName, @NonNull BrokerVenue venue, String apiKey, String apiSecret) {
         String cacheKey = brokerName + ":" + venue.name();
         
         // Check cache
@@ -48,7 +55,7 @@ public class BrokerRouter {
     
     private VenueAwareExchange createExchange(String brokerName, BrokerVenue venue, String apiKey, String apiSecret) {
         if (brokerName == null || venue == null) {
-            logger.severe("Broker name and venue required");
+            log.error("Broker name and venue required");
             return null;
         }
         
@@ -60,7 +67,7 @@ public class BrokerRouter {
                     case COINBASE_US_FUTURES -> new CoinbaseFuturesExchange(apiKey, apiSecret);
                     case COINBASE_INTERNATIONAL_PERPETUALS -> new CoinbasePerpetualExchange(apiKey, apiSecret);
                     default -> {
-                        logger.severe("Unsupported Coinbase venue: " + venue);
+                        log.error("Unsupported Coinbase venue: " + venue);
                         yield null;
                     }
                 };
@@ -69,7 +76,7 @@ public class BrokerRouter {
             // Route to OANDA
             else if (brokerName.equalsIgnoreCase("OANDA")) {
                 if (venue != BrokerVenue.OANDA_FX_CFD) {
-                    logger.severe("OANDA only supports FX_CFD venue, got: " + venue);
+                    log.error("OANDA only supports FX_CFD venue, got: " + venue);
                     return null;
                 }
                 return new OandaFxCfdExchange(apiKey);
@@ -77,11 +84,11 @@ public class BrokerRouter {
             
             // Other brokers not yet implemented
             else {
-                logger.severe("Broker not yet implemented: " + brokerName);
+                log.error("Broker not yet implemented: " + brokerName);
                 return null;
             }
         } catch (Exception e) {
-            logger.severe("Failed to create exchange: " + e.getMessage());
+            log.error("Failed to create exchange: " + e.getMessage());
             return null;
         }
     }

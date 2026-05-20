@@ -664,7 +664,7 @@ public class Binance extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return submitBinanceOrder(tradePair, side, amount, 0.0, "MARKET");
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -715,7 +715,7 @@ public class Binance extends Exchange {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return submitBinanceOrder(tradePair, side, amount, limitPrice, "LIMIT");
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -833,6 +833,11 @@ public class Binance extends Exchange {
 
     @Override
     public void connect() {
+        if (isPaperTrading()) {
+            connected.set(true);
+            logger.info("Binance paper mode selected; live network connection skipped.");
+            return;
+        }
         if (hasCredentials()) {
             try {
                 fetchAccount().join();
@@ -1007,7 +1012,7 @@ public class Binance extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return CompletableFuture.supplyAsync(this::fetchLiveAccount);
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -1087,11 +1092,12 @@ public class Binance extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        // If user explicitly selected trading mode during onboarding, respect that
-        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
-            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        if (modeRequestsPaperNetwork()) {
+            return true;
         }
-        // Otherwise, default to paper trading if no credentials
+        if (modeRequestsLiveNetwork()) {
+            return false;
+        }
         return !hasCredentials();
     }
 

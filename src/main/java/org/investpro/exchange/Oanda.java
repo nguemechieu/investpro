@@ -30,6 +30,7 @@ import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.investpro.exchange.oanda.OandaCandleDataSupplier;
+import org.investpro.exchange.oanda.OandaTransactionClient;
 import org.investpro.exchange.oanda.OandaTradingSessionFactory;
 import org.investpro.exchange.oanda.OandaRateLimiter;
 import org.investpro.exchange.websocket.OandaWebSocketClient;
@@ -65,6 +66,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Random;
+import java.util.function.Consumer;
 
 @Slf4j
 @EqualsAndHashCode(callSuper = true)
@@ -81,10 +83,27 @@ public class Oanda extends Exchange {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     protected final ExchangeStreamConsumer liveTradeConsumers = new UiExchangeStreamConsumer();
 
-    private static final String OANDA_API_URL = "https://api-fxtrade.oanda.com";
-    // "https://stream-fxtrade.oanda.com/v3/accounts/<ACCOUNT>/pricing/stream?instruments=EUR_USD%2CUSD_CAD"
-
-    private static final String OANDA_STREAM_URL = "https://stream-fxtrade.oanda.com";
+    private static final String OANDA_LIVE_API_URL = "https://api-fxtrade.oanda.com";
+    private static final String OANDA_PRACTICE_API_URL = "https://api-fxpractice.oanda.com";
+    private static final String OANDA_LIVE_STREAM_URL = "https://stream-fxtrade.oanda.com";
+    private static final String OANDA_PRACTICE_STREAM_URL = "https://stream-fxpractice.oanda.com";
+    private static final String ACCOUNTS_ROUTE = "/v3/accounts";
+    private static final String ACCOUNT_ROUTE = "/v3/accounts/%s";
+    private static final String ACCOUNT_SUMMARY_ROUTE = "/v3/accounts/%s/summary";
+    private static final String ACCOUNT_INSTRUMENTS_ROUTE = "/v3/accounts/%s/instruments";
+    private static final String ACCOUNT_CONFIGURATION_ROUTE = "/v3/accounts/%s/configuration";
+    private static final String ACCOUNT_CHANGES_ROUTE = "/v3/accounts/%s/changes";
+    private static final String ACCOUNT_ORDERS_ROUTE = "/v3/accounts/%s/orders";
+    private static final String ACCOUNT_PENDING_ORDERS_ROUTE = "/v3/accounts/%s/pendingOrders";
+    private static final String ACCOUNT_ORDER_ROUTE = "/v3/accounts/%s/orders/%s";
+    private static final String ACCOUNT_ORDER_CANCEL_ROUTE = "/v3/accounts/%s/orders/%s/cancel";
+    private static final String ACCOUNT_ORDER_CLIENT_EXTENSIONS_ROUTE =
+            "/v3/accounts/%s/orders/%s/clientExtensions";
+    private static final String ACCOUNT_POSITIONS_ROUTE = "/v3/accounts/%s/positions";
+    private static final String ACCOUNT_OPEN_POSITIONS_ROUTE = "/v3/accounts/%s/openPositions";
+    private static final String ACCOUNT_POSITION_ROUTE = "/v3/accounts/%s/positions/%s";
+    private static final String ACCOUNT_POSITION_CLOSE_ROUTE = "/v3/accounts/%s/positions/%s/close";
+    private static final String ACCOUNT_TRANSACTIONS_ROUTE = "/v3/accounts/%s/transactions";
 
     private final HttpClient httpClient;
     private final PollingExchangeStreamer pollingStreamer;
@@ -180,7 +199,7 @@ public class Oanda extends Exchange {
 
         try {
             this.websocketClient = new OandaWebSocketClient(
-                    URI.create(OANDA_STREAM_URL + "/v3/accounts/%s/pricing/stream".formatted(this.accountId)),
+                    URI.create(oandaStreamUrl() + "/v3/accounts/%s/pricing/stream".formatted(this.accountId)),
                     new Draft_6455());
             this.websocketClient.addHeader("Authorization", "Bearer %s".formatted(this.apiKey));
             this.websocketAvailable = false;
@@ -192,6 +211,25 @@ public class Oanda extends Exchange {
     }
 
     private void initializePaperTradingAccount() {
+    }
+
+    private String oandaApiUrl() {
+        return isPaperTrading() ? OANDA_PRACTICE_API_URL : OANDA_LIVE_API_URL;
+    }
+
+    private String oandaStreamUrl() {
+        return isPaperTrading() ? OANDA_PRACTICE_STREAM_URL : OANDA_LIVE_STREAM_URL;
+    }
+
+    private String oandaRoute(String routeTemplate, Object... args) {
+        String route = args == null || args.length == 0
+                ? routeTemplate
+                : routeTemplate.formatted(args);
+        return oandaApiUrl() + route;
+    }
+
+    private OandaTransactionClient transactionClient() {
+        return new OandaTransactionClient(httpClient, OBJECT_MAPPER, oandaApiUrl(), oandaStreamUrl(), apiKey);
     }
 
     // ---------------------------------------------------------------------
@@ -225,11 +263,12 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        // If user explicitly selected trading mode during onboarding, respect that
-        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
-            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        if (modeRequestsPaperNetwork()) {
+            return true;
         }
-        // Otherwise, check if sandbox
+        if (modeRequestsLiveNetwork()) {
+            return false;
+        }
         return isSandbox();
     }
 
@@ -253,8 +292,8 @@ public class Oanda extends Exchange {
                 .exchangeName("OANDA")
                 .exchangeId("oanda")
                 .displayName("OANDA Forex & CFD Trading")
-                .apiBaseUrl(OANDA_API_URL)
-                .webSocketBaseUrl(OANDA_STREAM_URL)
+                .apiBaseUrl(oandaApiUrl())
+                .webSocketBaseUrl(oandaStreamUrl())
                 .authenticationType("API_KEY")
 
                 // Market coverage - OANDA specializes in forex and CFD
@@ -484,7 +523,7 @@ public class Oanda extends Exchange {
             return Collections.emptyList();
         }
 
-        String url = "%s/v3/accounts/%s/instruments".formatted(OANDA_API_URL, resolvedAccountId);
+        String url = oandaRoute(ACCOUNT_INSTRUMENTS_ROUTE, resolvedAccountId);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -563,7 +602,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new OandaCandleDataSupplier(secondsPerCandle, tradePair, apiKey);
+        return new OandaCandleDataSupplier(secondsPerCandle, tradePair, apiKey, oandaApiUrl());
     }
 
     @Override
@@ -588,7 +627,7 @@ public class Oanda extends Exchange {
         String to = Instant.now().toString();
 
         String url = "%s/v3/instruments/%s/candles?from=%s&to=%s&granularity=%s&price=M"
-                .formatted(OANDA_API_URL, toInstrument(tradePair), from, to, granularity);
+                .formatted(oandaApiUrl(), toInstrument(tradePair), from, to, granularity);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -679,7 +718,7 @@ public class Oanda extends Exchange {
         }
 
         // Attempt 1: Try orderBook endpoint
-        String orderBookUrl = "%s/v3/instruments/%s/orderBook".formatted(OANDA_API_URL, tradePair.toString('_'));
+        String orderBookUrl = "%s/v3/instruments/%s/orderBook".formatted(oandaApiUrl(), tradePair.toString('_'));
         HttpRequest orderBookRequest = requestBuilder(orderBookUrl).GET().build();
 
         return httpClient.sendAsync(orderBookRequest, HttpResponse.BodyHandlers.ofString())
@@ -692,7 +731,7 @@ public class Oanda extends Exchange {
                     log.debug("OANDA orderBook HTTP {}, attempting positionBook fallback", response.statusCode());
 
                     // Attempt 2: Try positionBook endpoint
-                    String positionBookUrl = "%s/v3/instruments/%s/positionBook".formatted(OANDA_API_URL,
+                    String positionBookUrl = "%s/v3/instruments/%s/positionBook".formatted(oandaApiUrl(),
                             tradePair.toString('_'));
                     HttpRequest positionBookRequest = requestBuilder(positionBookUrl).GET().build();
 
@@ -716,34 +755,6 @@ public class Oanda extends Exchange {
 
 
 
-
-
-    //########################################################################################
-    //#GET  POSITIONS BY  SYMBOL
-    //############################################################################################
-
-
-    public CompletableFuture<String>fetchPositionBook(TradePair tradePair) {
-        if (tradePair == null) {
-            return failedFuture(new IllegalArgumentException("tradePair must not be null"));
-        }
-
-        String url = "%s/v3/instruments/%s/positionBook".formatted(OANDA_API_URL, tradePair.toString('_'));
-
-        HttpRequest request = requestBuilder(url)
-                .GET()
-                .build();
-
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (!isSuccess(response)) {
-                        throw new RuntimeException(
-                                "OANDA positionBook failed HTTP %d: %s".formatted(response.statusCode(),
-                                        response.body()));
-                    }
-                    return response.body();
-                });
-    }
 
     /**
      * Parse OANDA distribution order book response.
@@ -849,19 +860,81 @@ public class Oanda extends Exchange {
      */
     @Contract("_, _ -> new")
     private @NotNull OrderBook parseOandaPositionBook(String body, TradePair tradePair) {
+        OrderBook positionBookDepth = new OrderBook(tradePair);
+
+        List<OrderBook.PriceLevel> bids = new ArrayList<>();
+        List<OrderBook.PriceLevel> asks = new ArrayList<>();
+
         try {
             JsonNode root = OBJECT_MAPPER.readTree(body);
-            JsonNode positionBook = root.path("positionBook");
+            JsonNode positionBookNode = root.path("positionBook");
+            JsonNode bucketsNode = positionBookNode.path("buckets");
 
-            OrderBook orderBook = new OrderBook(tradePair);
+            if (!bucketsNode.isArray()) {
+                log.warn("OANDA positionBook response for {} does not contain buckets array", tradePair);
+                positionBookDepth.setTimestamp(parseInstantOrNow(positionBookNode.path("time").asText("")));
+                positionBookDepth.setBids(bids);
+                positionBookDepth.setAsks(asks);
+                return positionBookDepth;
+            }
 
-            // For now, return typed empty book until full parser is ready
-            log.debug("Parsed OANDA positionBook for {}", tradePair);
+            for (JsonNode bucket : bucketsNode) {
+                if (bucket == null || !bucket.isObject()) {
+                    continue;
+                }
 
-            return orderBook;
-        } catch (Exception e) {
-            log.warn("Failed to parse OANDA positionBook response: {}", e.getMessage());
-            return new OrderBook(tradePair);
+                double price = bucket.path("price").asDouble(0.0);
+                if (!Double.isFinite(price) || price <= 0.0) {
+                    continue;
+                }
+
+                /*
+                 * OANDA positionBook bucket fields are distribution percentages,
+                 * not executable order sizes.
+                 *
+                 * Use them as visual market concentration:
+                 * - longCountPercent  => bullish/long concentration
+                 * - shortCountPercent => bearish/short concentration
+                 */
+                double longCountPercent = bucket.path("longCountPercent").asDouble(0.0);
+                double shortCountPercent = bucket.path("shortCountPercent").asDouble(0.0);
+
+                if (Double.isFinite(longCountPercent) && longCountPercent > 0.0) {
+                    bids.add(new OrderBook.PriceLevel(price, longCountPercent));
+                }
+
+                if (Double.isFinite(shortCountPercent) && shortCountPercent > 0.0) {
+                    asks.add(new OrderBook.PriceLevel(price, shortCountPercent));
+                }
+            }
+
+            bids.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice).reversed());
+            asks.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice));
+
+            positionBookDepth.setBids(bids);
+            positionBookDepth.setAsks(asks);
+            positionBookDepth.setTimestamp(parseInstantOrNow(positionBookNode.path("time").asText("")));
+
+            log.debug(
+                    "Parsed OANDA positionBook for {} with {} long buckets and {} short buckets",
+                    tradePair,
+                    bids.size(),
+                    asks.size()
+            );
+
+            return positionBookDepth;
+
+        } catch (Exception exception) {
+            log.warn(
+                    "Failed to parse OANDA positionBook response for {}: {}",
+                    tradePair,
+                    exception.getMessage()
+            );
+
+            positionBookDepth.setBids(bids);
+            positionBookDepth.setAsks(asks);
+            positionBookDepth.setTimestamp(Instant.now());
+            return positionBookDepth;
         }
     }
 
@@ -885,7 +958,7 @@ public class Oanda extends Exchange {
 
         String instrument = toInstrument(tradePair);
         String url = "%s/v3/accounts/%s/pricing?instruments=%s"
-                .formatted(OANDA_API_URL, account, instrument);
+                .formatted(oandaApiUrl(), account, instrument);
 
         HttpRequest request = requestBuilder(url).GET().build();
 
@@ -1089,7 +1162,7 @@ public class Oanda extends Exchange {
             return cached;
         }
 
-        String url = "%s/v3/accounts/%s/summary".formatted(OANDA_API_URL, account);
+        String url = oandaRoute(ACCOUNT_SUMMARY_ROUTE, account);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -1197,11 +1270,6 @@ public class Oanda extends Exchange {
         return fetchAccount().thenApply(account -> account != null ? account.getFreeMargin() : 0.0);
     }
 
-    private CompletableFuture<Double> fetchAccountSummaryDouble(String fieldName) {
-        // DEPRECATED: Use fetchAccount() instead to reuse cached data
-        return fetchAccount()
-                .thenApply(account -> account != null ? account.getTotalBalance() : 0.0);
-    }
 
     // ---------------------------------------------------------------------
     // Orders
@@ -1219,7 +1287,7 @@ public class Oanda extends Exchange {
                     throw new IllegalStateException("OANDA account id is missing");
                 }
 
-                String url = "%s/v3/accounts/%s/orders".formatted(OANDA_API_URL, account);
+                String url = oandaRoute(ACCOUNT_ORDERS_ROUTE, account);
 
                 String instrument = safe(order.getSymbol()).replace("/", "_").replace("-", "_")
                         .toUpperCase(Locale.ROOT);
@@ -1354,7 +1422,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture("");
         }
 
-        String url = "%s/v3/accounts/%s/orders/%s/cancel".formatted(OANDA_API_URL, account, orderId.trim());
+        String url = oandaRoute(ACCOUNT_ORDER_CANCEL_ROUTE, account, orderId.trim());
 
         HttpRequest request = requestBuilder(url)
                 .PUT(HttpRequest.BodyPublishers.noBody())
@@ -1411,7 +1479,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Optional.empty());
         }
 
-        String url = "%s/v3/accounts/%s/orders/%s".formatted(OANDA_API_URL, account, orderId.trim());
+        String url = oandaRoute(ACCOUNT_ORDER_ROUTE, account, orderId.trim());
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -1459,7 +1527,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        String url = "%s/v3/accounts/%s/orders?state=PENDING".formatted(OANDA_API_URL, account);
+        String url = oandaRoute(ACCOUNT_PENDING_ORDERS_ROUTE, account);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -1564,7 +1632,7 @@ public class Oanda extends Exchange {
         }
 
         String instrumentQuery = tradePair == null ? "" : "&instrument=%s".formatted(toInstrument(tradePair));
-        String url = "%s/v3/accounts/%s/orders?state=ALL&count=100%s".formatted(OANDA_API_URL, account,
+        String url = "%s?state=ALL&count=100%s".formatted(oandaRoute(ACCOUNT_ORDERS_ROUTE, account),
                 instrumentQuery);
 
         HttpRequest request = requestBuilder(url)
@@ -1625,13 +1693,20 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<Position>> fetchAllPositions() {
+        return fetchOpenPositions();
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/openPositions - List currently open positions.
+     */
+    public CompletableFuture<List<Position>> fetchOpenPositions() {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        String url = "%s/v3/accounts/%s/openPositions".formatted(OANDA_API_URL, account);
+        String url = oandaRoute(ACCOUNT_OPEN_POSITIONS_ROUTE, account);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -1692,8 +1767,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture("");
         }
 
-        String url = "%s/v3/accounts/%s/positions/%s/close"
-                .formatted(OANDA_API_URL, account, toInstrument(tradePair));
+        String url = oandaRoute(ACCOUNT_POSITION_CLOSE_ROUTE, account, toInstrument(tradePair));
 
         Map<String, Object> body = Map.of(
                 "longUnits", "ALL",
@@ -1728,7 +1802,7 @@ public class Oanda extends Exchange {
         }
 
         String instrumentQuery = tradePair == null ? "" : "&instrument=%s".formatted(toInstrument(tradePair));
-        String url = "%s/v3/accounts/%s/trades?state=OPEN%s".formatted(OANDA_API_URL, account, instrumentQuery);
+        String url = "%s/v3/accounts/%s/trades?state=OPEN%s".formatted(oandaApiUrl(), account, instrumentQuery);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -2340,13 +2414,14 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/orders - List all orders
      */
+    @Override
     public CompletableFuture<List<Order>> fetchAllOrders() {
         String account = resolveAccountId();
         if (account.isBlank()) {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        String url = "%s/v3/accounts/%s/orders".formatted(OANDA_API_URL, account);
+        String url = oandaRoute(ACCOUNT_ORDERS_ROUTE, account);
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2370,16 +2445,38 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/pendingOrders - List pending orders
      */
+    @Override
     public CompletableFuture<List<Order>> fetchPendingOrders() {
-        return fetchAllOrders()
-                .thenApply(orders -> orders.stream()
-                        .filter(o -> o.getStatus() != null && o.getStatus().equals("PENDING"))
-                        .toList());
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String url = oandaRoute(ACCOUNT_PENDING_ORDERS_ROUTE, account);
+        HttpRequest request = requestBuilder(url).GET().build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (!isSuccess(response)) {
+                        logger.warn("OANDA fetch pending orders failed HTTP {}", response.statusCode());
+                        return Collections.emptyList();
+                    }
+                    try {
+                        JsonNode orders = OBJECT_MAPPER.readTree(response.body()).path("orders");
+                        return orders.isArray()
+                                ? parseOrderList(orders)
+                                : Collections.emptyList();
+                    } catch (Exception e) {
+                        logger.error("Failed to parse OANDA pending orders", e);
+                        return Collections.emptyList();
+                    }
+                });
     }
 
     /**
      * PUT /v3/accounts/{accountID}/orders/{orderSpecifier} - Replace an order
      */
+    @Override
     public CompletableFuture<String> replaceOrder(String orderId, Order newOrder) {
         Objects.requireNonNull(newOrder, "newOrder must not be null");
         if (orderId.isBlank()) {
@@ -2392,7 +2489,7 @@ public class Oanda extends Exchange {
         }
 
         try {
-            String url = "%s/v3/accounts/%s/orders/%s".formatted(OANDA_API_URL, account, orderId.trim());
+            String url = oandaRoute(ACCOUNT_ORDER_ROUTE, account, orderId.trim());
             Map<String, Object> payload = buildOrderPayload(newOrder);
 
             HttpRequest request = requestBuilder(url)
@@ -2422,8 +2519,7 @@ public class Oanda extends Exchange {
         }
 
         try {
-            String url = "%s/v3/accounts/%s/orders/%s/clientExtensions"
-                    .formatted(OANDA_API_URL, account, orderId.trim());
+            String url = oandaRoute(ACCOUNT_ORDER_CLIENT_EXTENSIONS_ROUTE, account, orderId.trim());
             Map<String, Object> payload = Map.of("clientExtensions", extensions);
 
             HttpRequest request = requestBuilder(url)
@@ -2444,7 +2540,7 @@ public class Oanda extends Exchange {
      * GET /v3/accounts - List all accounts accessible to the API token
      */
     public CompletableFuture<List<Account>> listAccounts() {
-        String url = "%s/v3/accounts".formatted(OANDA_API_URL);
+        String url = oandaRoute(ACCOUNTS_ROUTE);
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2484,7 +2580,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(null);
         }
 
-        String url = "%s/v3/accounts/%s".formatted(OANDA_API_URL, finalAccountId);
+        String url = oandaRoute(ACCOUNT_ROUTE, finalAccountId);
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2512,7 +2608,7 @@ public class Oanda extends Exchange {
         }
 
         try {
-            String url = "%s/v3/accounts/%s/configuration".formatted(OANDA_API_URL, accountID);
+            String url = oandaRoute(ACCOUNT_CONFIGURATION_ROUTE, accountID);
             HttpRequest request = requestBuilder(url)
                     .header("Content-Type", "application/json")
                     .method("PATCH", HttpRequest.BodyPublishers.ofString(OBJECT_MAPPER.writeValueAsString(config)))
@@ -2539,7 +2635,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(null);
         }
 
-        String url = "%s/v3/accounts/%s/changes".formatted(OANDA_API_URL, finalAccountId);
+        String url = oandaRoute(ACCOUNT_CHANGES_ROUTE, finalAccountId);
         if (!safe(sinceTransactionID).isBlank()) {
             url += "?sinceTransactionID=" + sinceTransactionID;
         }
@@ -2573,7 +2669,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        String url = "%s/v3/accounts/%s/trades".formatted(OANDA_API_URL, account);
+        String url = "%s/v3/accounts/%s/trades".formatted(oandaApiUrl(), account);
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2605,7 +2701,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Optional.empty());
         }
 
-        String url = "%s/v3/accounts/%s/trades/%s".formatted(OANDA_API_URL, account, tradeID.trim());
+        String url = "%s/v3/accounts/%s/trades/%s".formatted(oandaApiUrl(), account, tradeID.trim());
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2638,7 +2734,7 @@ public class Oanda extends Exchange {
 
         try {
             String url = "%s/v3/accounts/%s/trades/%s/close"
-                    .formatted(OANDA_API_URL, account, tradeID.trim());
+                    .formatted(oandaApiUrl(), account, tradeID.trim());
             Map<String, Object> payload = Map.of(
                     "units", units == 0 ? "ALL" : String.valueOf((long) units));
 
@@ -2670,7 +2766,7 @@ public class Oanda extends Exchange {
 
         try {
             String url = "%s/v3/accounts/%s/trades/%s/clientExtensions"
-                    .formatted(OANDA_API_URL, account, tradeID.trim());
+                    .formatted(oandaApiUrl(), account, tradeID.trim());
             Map<String, Object> payload = Map.of("clientExtensions", extensions);
 
             HttpRequest request = requestBuilder(url)
@@ -2701,7 +2797,7 @@ public class Oanda extends Exchange {
 
         try {
             String url = "%s/v3/accounts/%s/trades/%s/orders"
-                    .formatted(OANDA_API_URL, account, tradeID.trim());
+                    .formatted(oandaApiUrl(), account, tradeID.trim());
             Map<String, Object> orders = new LinkedHashMap<>();
 
             if (stopLoss > 0) {
@@ -2734,7 +2830,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        String url = "%s/v3/accounts/%s/positions".formatted(OANDA_API_URL, account);
+        String url = oandaRoute(ACCOUNT_POSITIONS_ROUTE, account);
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2761,8 +2857,7 @@ public class Oanda extends Exchange {
             return CompletableFuture.completedFuture(Optional.empty());
         }
 
-        String url = "%s/v3/accounts/%s/positions/%s"
-                .formatted(OANDA_API_URL, account, instrument.trim().toUpperCase());
+        String url = oandaRoute(ACCOUNT_POSITION_ROUTE, account, instrument.trim().toUpperCase());
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2792,14 +2887,15 @@ public class Oanda extends Exchange {
     /**
      * GET /v3/accounts/{accountID}/transactions - Get transaction history
      */
+    
     public CompletableFuture<List<JsonNode>> getTransactions(int maxCount, String sinceTransactionID) {
         String account = resolveAccountId();
         if (account.isBlank()) {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        String url = "%s/v3/accounts/%s/transactions?count=%d"
-                .formatted(OANDA_API_URL, account, Math.min(maxCount, 1000));
+        String url = "%s?count=%d"
+                .formatted(oandaRoute(ACCOUNT_TRANSACTIONS_ROUTE, account), Math.min(maxCount, 1000));
         if (!safe(sinceTransactionID).isBlank()) {
             url += "&sinceTransactionID=" + sinceTransactionID;
         }
@@ -2830,6 +2926,55 @@ public class Oanda extends Exchange {
                 });
     }
 
+    /**
+     * GET /v3/accounts/{accountID}/transactions/{transactionID}
+     */
+    public CompletableFuture<JsonNode> getTransaction(String transactionID) {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return failedFuture(new IllegalStateException("OANDA account id is missing"));
+        }
+        return transactionClient().getTransaction(account, transactionID);
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/transactions/idrange
+     */
+    public CompletableFuture<List<JsonNode>> getTransactionIdRange(String fromTransactionID, String toTransactionID) {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        return transactionClient().getTransactionIdRange(account, fromTransactionID, toTransactionID);
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/transactions/sinceid
+     */
+    public CompletableFuture<List<JsonNode>> getTransactionsSinceId(String sinceTransactionID) {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        return transactionClient().getTransactionsSinceId(account, sinceTransactionID);
+    }
+
+    /**
+     * GET /v3/accounts/{accountID}/transactions/stream
+     *
+     * <p>
+     * This endpoint is served by OANDA's streaming base URL.
+     */
+    public CompletableFuture<Void> streamTransactions(
+            Consumer<JsonNode> onMessage,
+            Consumer<Throwable> onError) {
+        String account = resolveAccountId();
+        if (account.isBlank()) {
+            return failedFuture(new IllegalStateException("OANDA account id is missing"));
+        }
+        return transactionClient().streamTransactions(account, onMessage, onError);
+    }
+
     // --------- PRICING ENDPOINTS ---------
 
     /**
@@ -2848,7 +2993,7 @@ public class Oanda extends Exchange {
 
         String instrumentsParam = String.join(",", instruments);
         String url = "%s/v3/accounts/%s/candles/latest?instruments=%s"
-                .formatted(OANDA_API_URL, account, instrumentsParam);
+                .formatted(oandaApiUrl(), account, instrumentsParam);
         HttpRequest request = requestBuilder(url).GET().build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -2892,7 +3037,7 @@ public class Oanda extends Exchange {
         }
 
         String url = "%s/v3/accounts/%s/instruments/%s/candles?price=MBA"
-                .formatted(OANDA_API_URL, account, instrument.trim().toUpperCase());
+                .formatted(oandaApiUrl(), account, instrument.trim().toUpperCase());
 
         if (!safe(granularity).isBlank()) {
             url += "&granularity=" + granularity;
@@ -3089,21 +3234,8 @@ public class Oanda extends Exchange {
         setCached(cacheKey, account, 3000, accountCache); // 3s TTL
     }
 
-    public List<Position> getPositionsCached(String cacheKey) {
-        return getCached(cacheKey, positionsCache);
-    }
 
-    public void setPositionsCached(String cacheKey, List<Position> positions) {
-        setCached(cacheKey, positions, 3000, positionsCache); // 3s TTL
-    }
 
-    public List<OpenOrder> getOpenOrdersCached(String cacheKey) {
-        return getCached(cacheKey, openOrdersCache);
-    }
-
-    public void setOpenOrdersCached(String cacheKey, List<OpenOrder> orders) {
-        setCached(cacheKey, orders, 3000, openOrdersCache); // 3s TTL
-    }
 
     public void logDiagnostics() {
         logger.info(
@@ -3136,7 +3268,7 @@ public class Oanda extends Exchange {
             return "";
         }
 
-        String url = "%s/v3/accounts".formatted(OANDA_API_URL);
+        String url = oandaRoute(ACCOUNTS_ROUTE);
 
         HttpRequest request = requestBuilder(url)
                 .GET()
@@ -3174,7 +3306,7 @@ public class Oanda extends Exchange {
                 .header("User-Agent", "InvestPro/1.0");
     }
 
-    private HttpResponse<String> send(HttpRequest request) throws IOException, InterruptedException {
+    private HttpResponse<String> send(HttpRequest request) throws IOException {
         totalOandaRequests.incrementAndGet();
         try {
             return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3, 1000L, 30000L));
@@ -3186,7 +3318,7 @@ public class Oanda extends Exchange {
         }
     }
 
-    private HttpResponse<String> sendCritical(HttpRequest request) throws IOException, InterruptedException {
+    private HttpResponse<String> sendCritical(HttpRequest request) throws IOException {
         totalOandaRequests.incrementAndGet();
         try {
             return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 5, 1000L, 30000L));
@@ -3202,7 +3334,7 @@ public class Oanda extends Exchange {
      * Send HTTP request with exponential backoff retry logic (synchronized
      * version).
      * Uses rate limiter for concurrency control.
-     * 
+     * <p>
      * Backoff strategy:
      * - Starts at 1000ms (not 200ms to respect API limits)
      * - Adds jitter ±250-750ms to prevent thundering herd
@@ -3238,7 +3370,6 @@ public class Oanda extends Exchange {
                 if (now - lastLogTime > 60000) { // Log once per minute to avoid spam
                     logger.warn("OANDA 429: Max retries ({}) exhausted. Endpoint: {}",
                             maxRetries, extractEndpoint(request.uri().toString()));
-                    lastLogTime = now;
                     last429TimeMs = now;
                     last429Endpoint = extractEndpoint(request.uri().toString());
                 }
@@ -3471,7 +3602,7 @@ public class Oanda extends Exchange {
         }
 
         String url = "%s/v3/accounts/%s/pricing?instruments=%s"
-                .formatted(OANDA_API_URL, account, instruments);
+                .formatted(oandaApiUrl(), account, instruments);
 
         HttpRequest request = requestBuilder(url).GET().build();
 
@@ -3559,19 +3690,5 @@ public class Oanda extends Exchange {
         }, oandaExecutor);
     }
 
-    /**
-     * Critical request version with higher retry count.
-     * Initial delay: 1000ms, Max delay: 30 seconds, Max retries: 5 (critical
-     * operations)
-     */
-    private CompletableFuture<HttpResponse<String>> sendWithExponentialBackoffCritical(HttpRequest request) {
-        totalOandaRequests.incrementAndGet();
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 5, 1000L, 30000L));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }, oandaExecutor);
-    }
+
 }

@@ -4,6 +4,8 @@ import org.investpro.exchange.core.BrokerVenue;
 import org.investpro.exchange.core.InstrumentMetadata;
 import org.investpro.exchange.core.InstrumentType;
 import org.investpro.exchange.core.MarketType;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -69,7 +71,7 @@ public class OandaProductMetadataService {
         );
     }
     
-    private BigDecimal getPriceIncrement(String instrumentName) {
+    private @NonNull BigDecimal getPriceIncrement(@NonNull String instrumentName) {
         // OANDA uses different pip increments per instrument
         if (instrumentName.startsWith("X")) {
             return BigDecimal.valueOf(0.01); // Metals: 0.01
@@ -84,24 +86,24 @@ public class OandaProductMetadataService {
         return BigDecimal.ONE; // 1 unit (not fractional)
     }
     
-    private BigDecimal getMinQuantity(String instrumentName) {
+    @Contract(pure = true)
+    private @NonNull BigDecimal getMinQuantity(String instrumentName) {
         return BigDecimal.valueOf(1); // Minimum 1 unit
     }
     
-    private BigDecimal getMinNotional(String instrumentName) {
+    @Contract(pure = true)
+    private @NonNull BigDecimal getMinNotional(String instrumentName) {
         // Typical minimum notional value
         return BigDecimal.valueOf(100);
     }
     
-    private BigDecimal getMaxLeverage(InstrumentType instrumentType) {
+    private BigDecimal getMaxLeverage(@NonNull InstrumentType instrumentType) {
         // OANDA leverage limits (typical)
         return switch (instrumentType) {
             case FOREX_CFD -> BigDecimal.valueOf(50);
-            case METAL_CFD -> BigDecimal.valueOf(20);
-            case INDEX_CFD -> BigDecimal.valueOf(20);
+            case METAL_CFD, INDEX_CFD, STOCK_CFD -> BigDecimal.valueOf(20);
             case COMMODITY_CFD -> BigDecimal.valueOf(10);
-            case STOCK_CFD -> BigDecimal.valueOf(20);
-            default -> BigDecimal.ONE;
+            default -> null;
         };
     }
     

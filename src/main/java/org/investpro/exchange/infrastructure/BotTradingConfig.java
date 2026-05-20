@@ -1,6 +1,7 @@
 package org.investpro.exchange.infrastructure;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.investpro.models.trading.TradePair;
 import java.util.*;
 import java.util.prefs.Preferences;
@@ -8,9 +9,12 @@ import java.util.prefs.Preferences;
 /**
  * Configuration for bot trading settings
  */
+@Getter
+@Setter
+
 public class BotTradingConfig {
     
-    @Getter
+
     public enum SymbolTradingMode {
         ALL_SYMBOLS("Trade all available symbols"),
         BEST_SYMBOLS("Trade only best performing symbols"),
@@ -166,19 +170,11 @@ public class BotTradingConfig {
     public void setTradeSize(double tradeSize) {
         this.tradeSize = Math.max(0, tradeSize);
     }
-    
-    public double getStopLoss() {
-        return stopLoss;
-    }
-    
+
     public void setStopLoss(double stopLoss) {
         this.stopLoss = Math.max(0, stopLoss);
     }
-    
-    public double getTakeProfit() {
-        return takeProfit;
-    }
-    
+
     public void setTakeProfit(double takeProfit) {
         this.takeProfit = Math.max(0, takeProfit);
     }

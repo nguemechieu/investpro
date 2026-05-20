@@ -14,6 +14,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -31,6 +32,7 @@ import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.signal.Signal;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
+import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.data.CandleData;
 import org.investpro.enums.SystemState;
 import org.investpro.enums.RiskStatus;
@@ -91,6 +93,7 @@ import org.investpro.ui.charts.DepthChart;
 import org.investpro.ui.charts.NewsEventOverlay;
 import org.investpro.ui.operations.SystemOperationsBoard;
 import org.investpro.ui.panels.*;
+import org.investpro.ui.utils.CurrencyIconLoader;
 import org.investpro.utils.DraggableTab;
 import org.investpro.utils.ZoomDirection;
 
@@ -126,6 +129,7 @@ import java.util.prefs.Preferences;
 
 import javafx.embed.swing.SwingFXUtils;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import static org.investpro.utils.Side.BUY;
 import static org.investpro.utils.Side.SELL;
@@ -704,9 +708,7 @@ public class TradingDesk extends BorderPane {
                 case "backtesting" -> openBacktesting();
                 case "settings" -> openSettingsPanel();
                 case "theme-customization" -> openThemeCustomization();
-                default -> {
-                    log.warn("No TradingDesk panel action registered for id: {}", panelId);
-                }
+                default -> log.warn("No TradingDesk panel action registered for id: {}", panelId);
             }
         } catch (Exception exception) {
             log.error("Unable to open registered panel: {}", panelId, exception);
@@ -927,16 +929,13 @@ public class TradingDesk extends BorderPane {
         count.getStyleClass().add("panel-meta");
         count.textProperty().bind(symbolCountLabel.textProperty());
 
-        Button openSelectedButton = new Button("Open");
-        openSelectedButton.getStyleClass().add("terminal-button");
+        Button openSelectedButton = marketWatchActionButton("Open", "/img/newtab.png", "Open selected symbol chart");
         openSelectedButton.setOnAction(event -> openSelectedFromMarketWatch());
 
-        Button refreshButton = new Button("Refresh");
-        refreshButton.getStyleClass().add("terminal-button");
+        Button refreshButton = marketWatchActionButton("Refresh", "/img/refresh-solid.png", "Refresh market watch symbols");
         refreshButton.setOnAction(event -> loadSymbolsForSelectedExchange());
 
-        Button detachButton = new Button("Detach");
-        detachButton.getStyleClass().add("terminal-button");
+        Button detachButton = marketWatchActionButton("Detach", "/img/expand-solid.png", "Detach market watch");
         detachButton.setOnAction(event -> detachMarketWatch());
 
         Button closeButton = createCloseButton(this::toggleMarketWatchVisibility);
@@ -992,10 +991,59 @@ public class TradingDesk extends BorderPane {
         return btn;
     }
 
+    private Button marketWatchActionButton(String text, String iconPath, String tooltip) {
+        Button button = new Button(text);
+        button.getStyleClass().add("terminal-button");
+        ImageView icon = loadUiIcon(iconPath, 14);
+        if (icon != null) {
+            button.setGraphic(icon);
+        }
+        button.setTooltip(new Tooltip(tooltip == null ? text : tooltip));
+        button.setStyle("""
+                -fx-background-color: #1e293b;
+                -fx-text-fill: #e2e8f0;
+                -fx-border-color: #334155;
+                -fx-border-radius: 999;
+                -fx-background-radius: 999;
+                -fx-font-size: 11px;
+                -fx-font-weight: bold;
+                -fx-padding: 6 10;
+                -fx-cursor: hand;
+                """);
+        return button;
+    }
+
+    private ImageView loadUiIcon(String resourcePath, double size) {
+        try {
+            var stream = TradingDesk.class.getResourceAsStream(resourcePath);
+            if (stream == null) {
+                return null;
+            }
+            ImageView imageView = new ImageView(new Image(stream));
+            imageView.setFitWidth(size);
+            imageView.setFitHeight(size);
+            imageView.setPreserveRatio(true);
+            return imageView;
+        } catch (Exception exception) {
+            log.debug("Unable to load UI icon {}: {}", resourcePath, exception.getMessage());
+            return null;
+        }
+    }
+
     private @NotNull HBox createMiniChartRow(TradePair pair) {
         Label symbolLabel = new Label(pair == null ? "-" : pair.toString('/'));
         symbolLabel.getStyleClass().add("symbol-name");
         symbolLabel.setMinWidth(88);
+        ImageView symbolIcon = null;
+        if (pair != null) {
+            Image icon = CurrencyIconLoader.loadCurrencyIcon(pair.getBaseCode());
+            if (icon != null) {
+                symbolIcon = new ImageView(icon);
+                symbolIcon.setFitWidth(20);
+                symbolIcon.setFitHeight(20);
+                symbolIcon.setPreserveRatio(true);
+            }
+        }
 
         Label bidLabel = new Label("Bid: %s".formatted(pair == null ? "-" : price(pair.getBid())));
         bidLabel.getStyleClass().add("symbol-bid");
@@ -1003,8 +1051,7 @@ public class TradingDesk extends BorderPane {
         Label askLabel = new Label("Ask: %s".formatted(pair == null ? "-" : price(pair.getAsk())));
         askLabel.getStyleClass().add("symbol-ask");
 
-        Button viewButton = new Button("View");
-        viewButton.getStyleClass().add("terminal-button");
+        Button viewButton = marketWatchActionButton("Chart", "/img/newtab.png", "Open chart");
         viewButton.setOnAction(event -> {
             if (pair != null) {
                 symbolSelector.getSelectionModel().select(pair);
@@ -1012,7 +1059,11 @@ public class TradingDesk extends BorderPane {
             }
         });
 
-        HBox row = new HBox(10, symbolLabel, bidLabel, askLabel, viewButton);
+        HBox row = new HBox(10);
+        if (symbolIcon != null) {
+            row.getChildren().add(symbolIcon);
+        }
+        row.getChildren().addAll(symbolLabel, bidLabel, askLabel, viewButton);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(6));
         row.getStyleClass().add("mini-symbol-row");
@@ -1498,7 +1549,7 @@ public class TradingDesk extends BorderPane {
                     .findFirst().orElse(null);
             if (pair == null) return new ReadOnlyStringWrapper(a.isValid() ? "Active" : "Inactive");
             return systemCore.getSymbolAgentManager().getState(pair)
-                    .map(state -> state.getMarketWatchStatusText())
+                    .map(SymbolAgentState::getMarketWatchStatusText)
                     .map(ReadOnlyStringWrapper::new)
                     .orElseGet(() -> new ReadOnlyStringWrapper(a.isValid() ? "Active" : "Inactive"));
         });
@@ -1693,12 +1744,21 @@ public class TradingDesk extends BorderPane {
         BorderPane workspace = new BorderPane();
         workspace.getStyleClass().add("chart-workspace");
 
-        Label title = new Label("Workspace ");
+        // ============================================================
+        // Header title
+        // ============================================================
+        Label title = new Label("Workspace");
         title.getStyleClass().add("workspace-title");
+
         Label context = new Label("Multi-symbol market workspace");
         context.getStyleClass().add("workspace-subtitle");
-        VBox titleBlock = new VBox(1, title, context);
 
+        VBox titleBlock = new VBox(2, title, context);
+        titleBlock.getStyleClass().add("workspace-title-block");
+
+        // ============================================================
+        // Chart actions
+        // ============================================================
         Button fitButton = new Button("Fit");
         fitButton.getStyleClass().add("terminal-button");
         fitButton.setOnAction(event -> withActiveChart(CandleStickChart::fitChart));
@@ -1711,37 +1771,62 @@ public class TradingDesk extends BorderPane {
         crosshairButton.getStyleClass().add("terminal-button");
         crosshairButton.setOnAction(event -> withActiveChart(CandleStickChart::toggleCrosshair));
 
-        botSymbolScopeSelector.getItems().setAll("Selected Symbol", "Watchlist", "Best Today");
-        botSymbolScopeSelector.getSelectionModel().select(preferences.get("bot_symbol_scope", "Selected Symbol"));
-        botSymbolScopeSelector.setPrefWidth(135);
-        botSymbolScopeSelector.setOnAction(event -> saveAppState());
-
-        botTradeButton.setOnAction(event -> toggleBotTrading());
-        refreshBotTradeButton();
-
         Button closeAllButton = new Button("Close All");
         closeAllButton.getStyleClass().add("terminal-button");
         closeAllButton.setOnAction(event -> closeAllCharts());
 
+        // ============================================================
+        // Bot controls
+        // ============================================================
+        botSymbolScopeSelector.getItems().setAll(
+                "Selected Symbol",
+                "Watchlist",
+                "Best Today"
+        );
+
+        botSymbolScopeSelector.getSelectionModel()
+                .select(preferences.get("bot_symbol_scope", "Selected Symbol"));
+
+        botSymbolScopeSelector.setPrefWidth(145);
+        botSymbolScopeSelector.getStyleClass().add("terminal-combo-box");
+        botSymbolScopeSelector.setOnAction(event -> saveAppState());
+
+        Label botLabel = new Label("Bot");
+        botLabel.getStyleClass().add("workspace-control-label");
+
+        botTradeButton.setOnAction(event -> toggleBotTrading());
+        refreshBotTradeButton();
+
+        // ============================================================
+        // Header layout
+        // ============================================================
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox header = new HBox(8,
-                titleBlock,
-                spacer,
+        HBox headerActions = new HBox(
+                8,
                 fitButton,
                 refreshButton,
                 crosshairButton,
-                new Label("Bot"),
+                botLabel,
                 botSymbolScopeSelector,
                 botTradeButton,
-                closeAllButton);
+                closeAllButton
+        );
+        headerActions.setAlignment(Pos.CENTER_RIGHT);
+        headerActions.getStyleClass().add("workspace-header-actions");
+
+        HBox header = new HBox(12, titleBlock, spacer, headerActions);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("workspace-header");
 
+        // ============================================================
+        // Chart tabs
+        // ============================================================
         chartTabPane.setSide(Side.TOP);
-        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
+        chartTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         chartTabPane.getStyleClass().add("chart-tabs");
+
         chartTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             if (newTab != null && !Objects.equals(oldTab, newTab)) {
                 updateOrderBookForChartTab(newTab);
@@ -1752,9 +1837,21 @@ public class TradingDesk extends BorderPane {
         workspacePane.getStyleClass().add("workspace-pane");
         workspacePane.setCenter(chartTabPane);
 
+        // ============================================================
+        // Final workspace
+        // ============================================================
         workspace.setTop(header);
         workspace.setCenter(workspacePane);
-        return workspace;
+
+        ScrollPane scrollPane = new ScrollPane(workspace);
+        scrollPane.getStyleClass().add("workspace-scroll-pane");
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setPannable(true);
+
+        return scrollPane;
     }
 
     private @NotNull VBox createTradingConsole() {
@@ -1770,16 +1867,16 @@ public class TradingDesk extends BorderPane {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(8, titleBlock, spacer, detachButton, closeButton);
+        HBox header = new HBox(4, titleBlock, spacer, detachButton, closeButton);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().addAll("panel-header", "console-tab-header");
 
         terminalTabPane.setSide(Side.TOP);
         terminalTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
         terminalTabPane.getStyleClass().add("console-tab-pane");
-        DraggableTab.registerTabPane(terminalTabPane);
-        terminalTabPane.getTabs().setAll(
-                createFixedTab(TabName.PORTFOLIO, buildPortfolioPane()),
+       // DraggableTab.registerTabPane(terminalTabPane);
+        terminalTabPane.getTabs().addAll(
+                createDetachableTerminalTab(TabName.PORTFOLIO, buildPortfolioPane()),
                 createDetachableTerminalTab(TabName.POSITIONS, createPositionsTab().getContent()),
                 createDetachableTerminalTab(TabName.RISK_MONITOR, createPositionRiskMonitorTab().getContent()),
                 createDetachableTerminalTab(TabName.SIGNALS, createSignalTab().getContent()),
@@ -1787,11 +1884,21 @@ public class TradingDesk extends BorderPane {
                 createDetachableTerminalTab(TabName.ALERTS, createAlertsTab().getContent()),
                 createDetachableTerminalTab(TabName.JOURNAL, createJournalTab().getContent()));
 
-        VBox console = new VBox(6, header, terminalTabPane);
-        console.setPadding(new Insets(8));
+        VBox terminalSurface = new VBox(6, header, terminalTabPane);
+        terminalSurface.getStyleClass().add("terminal-scroll-content");
+        VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
+
+        ScrollPane terminalScrollPane = new ScrollPane(terminalSurface);
+        terminalScrollPane.getStyleClass().add("terminal-scroll-pane");
+        terminalScrollPane.setFitToWidth(true);
+        terminalScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        terminalScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        terminalScrollPane.setPannable(true);
+
+        VBox console = new VBox(terminalScrollPane);
         console.setPrefHeight(CONSOLE_HEIGHT);
         console.getStyleClass().addAll("system-console", "bottom-terminal");
-        VBox.setVgrow(terminalTabPane, Priority.ALWAYS);
+        VBox.setVgrow(terminalScrollPane, Priority.ALWAYS);
         return console;
     }
 
@@ -1918,14 +2025,15 @@ public class TradingDesk extends BorderPane {
         saveAppState();
     }
 
-    private @NotNull DraggableTab createDetachableTerminalTab(TabName tabName, Node content) {
+    private @NotNull DraggableTab createDetachableTerminalTab(@NonNull TabName tabName, Node content) {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
-        tab.setClosable(true);
+
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
+        tab.setContent(content);
         return tab;
     }
 
-    private @NotNull Tab createFixedTab(TabName tabName, Node content) {
+    private @NotNull DraggableTab createFixedTab(@NonNull TabName tabName, Node content) {
         DraggableTab tab = new DraggableTab(tabName.getTabId(), content);
         tab.setClosable(true);
         tab.setTooltip(new Tooltip(tabName.getDisplayName()));
@@ -2314,8 +2422,24 @@ public class TradingDesk extends BorderPane {
         symbolCol.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String s, boolean empty) {
                 super.updateItem(s, empty);
-                if (empty || s == null || s.isBlank()) { setText(null); setStyle(""); return; }
+                if (empty || s == null || s.isBlank()) {
+                    setText(null);
+                    setGraphic(null);
+                    setStyle("");
+                    return;
+                }
                 setText(s);
+                String baseCode = s.contains("/") ? s.substring(0, s.indexOf('/')) : s;
+                Image icon = CurrencyIconLoader.loadCurrencyIcon(baseCode);
+                if (icon != null) {
+                    ImageView imageView = new ImageView(icon);
+                    imageView.setFitWidth(18);
+                    imageView.setFitHeight(18);
+                    imageView.setPreserveRatio(true);
+                    setGraphic(imageView);
+                } else {
+                    setGraphic(null);
+                }
                 setStyle("-fx-font-weight: bold; -fx-text-fill: #f1f5f9;");
             }
         });
@@ -2428,10 +2552,6 @@ public class TradingDesk extends BorderPane {
             return (bid + ask) / 2.0;
         }
         return pair.getLast();
-    }
-
-    private @NotNull String getTradingSessionStatus(TradePair pair) {
-        return pair == null ? "UNKNOWN" : pair.getTradingSessionStatus().name();
     }
 
     private void detachMarketWatch() {
@@ -2996,12 +3116,33 @@ public class TradingDesk extends BorderPane {
     }
 
     private void configureButtons() {
+        configureToolbarButtonIcons();
         refreshSymbolsButton.setOnAction(event -> loadSymbolsForSelectedExchange());
         addChartButton.setOnAction(event -> openSelectedSymbolChart());
         connectButton.setOnAction(event -> connectSelectedExchange());
         buyButton.setOnAction(event -> submitMarketOrder(BUY));
         sellButton.setOnAction(event -> submitMarketOrder(SELL));
         cancelAllButton.setOnAction(event -> cancelAllOrders());
+    }
+
+    private void configureToolbarButtonIcons() {
+        setButtonIcon(refreshSymbolsButton, "/img/refresh-solid.png", 14, "Refresh symbols");
+        setButtonIcon(addChartButton, "/img/newtab.png", 14, "Open selected chart");
+        setButtonIcon(botTradeButton, "/img/auto-trade-solid.png", 14, "Start or stop bot trading");
+        setButtonIcon(cancelAllButton, "/img/trash-solid.png", 14, "Cancel all open orders");
+    }
+
+    private void setButtonIcon(Button button, String iconPath, double size, String tooltip) {
+        if (button == null) {
+            return;
+        }
+        ImageView icon = loadUiIcon(iconPath, size);
+        if (icon != null) {
+            button.setGraphic(icon);
+        }
+        if (tooltip != null && !tooltip.isBlank()) {
+            button.setTooltip(new Tooltip(tooltip));
+        }
     }
 
     private void configureChartArea() {
@@ -4317,12 +4458,28 @@ public class TradingDesk extends BorderPane {
             tradePairs = exchange.getTradePairSymbol();
         } catch (Exception exception) {
             log.error("Failed to load trade pairs from {}", exchangeSelector.getValue(), exception);
+            if (isStellarExchangeSelected()) {
+                showStellarTrustlinePrompt("Unable to load Stellar account balances/trustlines: %s"
+                        .formatted(rootMessage(exception)));
+                updateConnectionStatus();
+                return;
+            }
             tradePairs = fallbackMarketWatchPairs();
             showWarning("API Error", "Failed to load live trade pairs from %s: %s. Showing default symbols."
                     .formatted(exchangeSelector.getValue(), rootMessage(exception)));
         }
 
         if (tradePairs == null || tradePairs.isEmpty()) {
+            if (isStellarExchangeSelected()) {
+                showStellarTrustlinePrompt("""
+                        No Stellar trusted assets were found for Market Watch.
+
+                        Add a trustline for the asset issuer you want to trade, then refresh/reconnect Stellar. \
+                        Market Watch only uses assets already present in your Stellar balances/trustlines.
+                        """);
+                updateConnectionStatus();
+                return;
+            }
             tradePairs = fallbackMarketWatchPairs();
         }
 
@@ -4385,6 +4542,19 @@ public class TradingDesk extends BorderPane {
 
         updateConnectionStatus();
 
+    }
+
+    private boolean isStellarExchangeSelected() {
+        if (exchange != null && "stellar".equalsIgnoreCase(exchange.getExchangeId())) {
+            return true;
+        }
+        String selected = safe(exchangeSelector == null ? null : exchangeSelector.getValue());
+        return selected.toLowerCase(Locale.ROOT).contains("stellar");
+    }
+
+    private void showStellarTrustlinePrompt(String message) {
+        log.warn("Stellar trustline prompt: {}", message);
+        showWarning("Stellar Trustline Required", message);
     }
 
     private @NotNull List<TradePair> fallbackMarketWatchPairs() {
@@ -6424,7 +6594,8 @@ public class TradingDesk extends BorderPane {
     /**
      * Display theme settings dialog for dark/light mode and customization
      */
-    private void showThemeSettingsDialog() {
+    private void
+    bbshowThemeSettingsDialog() {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Theme Settings");
         dialog.setHeaderText("Customize application appearance and theme");

@@ -131,7 +131,7 @@ public class TradingSystemStatusPanel extends VBox {
         systemHealthLabel.setStyle("""
                 -fx-font-size: 12pt;
                 -fx-font-weight: bold;
-                -fx-text-fill: """ + getHealthColor(snapshot.systemHealthScore()) + ";");
+                -fx-text-fill:\s""" + getHealthColor(snapshot.systemHealthScore()) + ";");
 
         String heartbeatAge = formatDuration(Duration.between(snapshot.lastHeartbeat(), Instant.now()).getSeconds());
         Label heartbeatLabel = createInfoLabel("Last Heartbeat: " + heartbeatAge + " ago", "#38bdf8");

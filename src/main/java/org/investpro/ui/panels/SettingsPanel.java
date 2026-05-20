@@ -1,12 +1,26 @@
 package org.investpro.ui.panels;
 
+import jakarta.mail.Message;
+import jakarta.mail.Session;
 import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
+
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,11 +29,9 @@ import org.investpro.core.SystemCore;
 import org.investpro.i18n.LocalizationService;
 import org.jetbrains.annotations.NotNull;
 
-import jakarta.mail.Message;
-import jakarta.mail.Session;
-
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.prefs.Preferences;
 
@@ -27,20 +39,21 @@ import static org.investpro.i18n.LocalizationService.t;
 
 /**
  * System Settings Panel.
- * <p>
- * This panel controls system-level safety settings:
- * - require backtest before live trading
- * - require paper trading before live trading
- * - auto-assign best strategy
- * - minimum strategy score
- * - small account mode
- * - 1-unit trading under small-account threshold
- * - prevent open/close same cycle
- * - prevent instant reverse orders
- * - symbol cooldown
- * <p>
- * This panel does not place orders.
- * It only saves configuration and applies it to SystemCore.
+ *
+ * <p>This panel controls system-level configuration and safety settings:</p>
+ * <ul>
+ *     <li>Require backtest before live trading</li>
+ *     <li>Require paper trading before live trading</li>
+ *     <li>Auto-assign best strategy after evaluation</li>
+ *     <li>Minimum strategy score</li>
+ *     <li>Small account mode and micro-unit execution</li>
+ *     <li>Open/close and reverse-order protection</li>
+ *     <li>Symbol cooldown</li>
+ *     <li>Market streaming mode</li>
+ *     <li>OpenAI, Telegram, and email notification settings</li>
+ * </ul>
+ *
+ * <p>This panel never places orders directly. It saves configuration and applies it to {@link SystemCore}.</p>
  */
 @Slf4j
 @Getter
@@ -48,6 +61,17 @@ import static org.investpro.i18n.LocalizationService.t;
 public class SettingsPanel extends VBox {
 
     private static final Preferences PREFS = Preferences.userNodeForPackage(SettingsPanel.class);
+
+    private static final String SETTINGS_PREFIX = "investpro";
+    private static final String COLOR_BG = "#0f172a";
+    private static final String COLOR_PANEL = "#16213e";
+    private static final String COLOR_INPUT = "#0f3460";
+    private static final String COLOR_TEXT = "#ffffff";
+    private static final String COLOR_MUTED = "#a0aec0";
+    private static final String COLOR_SUCCESS = "#10b981";
+    private static final String COLOR_ERROR = "#ef4444";
+    private static final String COLOR_INFO = "#60a5fa";
+    private static final String COLOR_WARNING = "#fbbf24";
 
     private final SystemCore systemCore;
 
@@ -66,7 +90,6 @@ public class SettingsPanel extends VBox {
     private CheckBox preventInstantReverseCheckbox;
     private Spinner<Integer> symbolCooldownSecondsSpinner;
 
-    // Streaming mode settings
     private CheckBox enableStreamingCheckbox;
     private ComboBox<SystemCore.StreamingMode> streamingModeCombo;
     private Label streamingModeDescriptionLabel;
@@ -74,7 +97,6 @@ public class SettingsPanel extends VBox {
     private Button stopStreamingButton;
     private Label streamingStatusLabel;
 
-    // OpenAI configuration
     private CheckBox enableOpenAiCheckbox;
     private PasswordField openaiApiKeyField;
     private ComboBox<String> openaiModelCombo;
@@ -82,13 +104,11 @@ public class SettingsPanel extends VBox {
     private Spinner<Integer> maxTokensSpinner;
     private Button testOpenAIButton;
 
-    // Telegram configuration
     private CheckBox enableTelegramCheckbox;
     private PasswordField telegramBotTokenField;
     private TextField telegramChatIdField;
     private Button testTelegramButton;
 
-    // Email notification configuration
     private CheckBox enableEmailCheckbox;
     private TextField smtpServerField;
     private Spinner<Integer> smtpPortSpinner;
@@ -104,7 +124,7 @@ public class SettingsPanel extends VBox {
 
         setPadding(new Insets(16));
         setSpacing(12);
-        setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
+        setStyle("-fx-background-color: " + COLOR_BG + "; -fx-text-fill: " + COLOR_TEXT + ";");
         getStyleClass().add("settings-panel");
 
         setupUi();
@@ -114,7 +134,7 @@ public class SettingsPanel extends VBox {
 
     private void setupUi() {
         Label titleLabel = new Label("System Settings");
-        titleLabel.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+        titleLabel.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: " + COLOR_TEXT + ";");
 
         VBox systemSafetySection = createSystemSafetySection();
         VBox streamingSection = createStreamingSection();
@@ -124,9 +144,8 @@ public class SettingsPanel extends VBox {
         HBox buttonBox = createButtonBox();
 
         statusLabel = new Label("Ready");
-        statusLabel.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 12;");
+        setStatusNeutral("Ready");
 
-        ScrollPane scrollPane = new ScrollPane();
         VBox content = new VBox(12,
                 titleLabel,
                 new Separator(),
@@ -141,32 +160,18 @@ public class SettingsPanel extends VBox {
                 emailSection,
                 new Separator());
         content.setPadding(new Insets(8));
-        scrollPane.setContent(content);
+
+        ScrollPane scrollPane = new ScrollPane(content);
         scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
 
-        getChildren().addAll(
-                scrollPane,
-                new Separator(),
-                buttonBox,
-                statusLabel);
-
+        getChildren().addAll(scrollPane, new Separator(), buttonBox, statusLabel);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
     }
 
     private VBox createSystemSafetySection() {
-        Label sectionTitle = new Label("System Safety & Strategy Evaluation");
-        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #ef4444;");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
-        grid.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #ef4444; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4;");
+        Label sectionTitle = sectionTitle("System Safety & Strategy Evaluation", COLOR_ERROR);
+        GridPane grid = sectionGrid(COLOR_ERROR);
 
         requireBacktestBeforeLiveCheckbox = styledCheckBox("Require Backtest Before Live Trading", true);
         requirePaperTradingBeforeLiveCheckbox = styledCheckBox("Require Paper Trading Before Live Trading", true);
@@ -190,8 +195,7 @@ public class SettingsPanel extends VBox {
         addRow(grid, 3, "Minimum Strategy Score:", minStrategyScoreSpinner);
         addRow(grid, 4, "Top Strategies For Paper Test:", topStrategiesToPaperTradeSpinner);
 
-        Separator separator = new Separator();
-        grid.add(separator, 0, 5, 2, 1);
+        grid.add(new Separator(), 0, 5, 2, 1);
 
         grid.add(smallAccountModeCheckbox, 0, 6, 2, 1);
         addRow(grid, 7, "Small Account Threshold ($):", smallAccountThresholdSpinner);
@@ -205,95 +209,78 @@ public class SettingsPanel extends VBox {
     }
 
     private VBox createStreamingSection() {
-        Label sectionTitle = new Label("Market Data Streaming");
-        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
-        grid.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #3b82f6; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4;");
+        Label sectionTitle = sectionTitle("Market Data Streaming", "#3b82f6");
+        GridPane grid = sectionGrid("#3b82f6");
 
         enableStreamingCheckbox = styledCheckBox("Enable Live Market Streaming", false);
-        enableStreamingCheckbox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            streamingModeCombo.setDisable(!newVal);
-            startStreamingButton.setDisable(!newVal);
-            updateStreamingUI();
-        });
 
         streamingModeCombo = new ComboBox<>();
-        streamingModeCombo.getItems().addAll(systemCore.getAvailableStreamingModes());
+        if (systemCore != null) {
+            streamingModeCombo.getItems().addAll(systemCore.getAvailableStreamingModes());
+        }
+        if (streamingModeCombo.getItems().isEmpty()) {
+            streamingModeCombo.getItems().add(SystemCore.StreamingMode.SAFE_DEFAULT);
+        }
         streamingModeCombo.setValue(SystemCore.StreamingMode.SAFE_DEFAULT);
         streamingModeCombo.setDisable(true);
+        streamingModeCombo.setStyle(inputStyle());
         streamingModeCombo.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldVal, newVal) -> updateStreamingModeDescription(newVal));
-        streamingModeCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
 
         streamingModeDescriptionLabel = new Label();
-        streamingModeDescriptionLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11; -fx-wrap-text: true;");
+        streamingModeDescriptionLabel.setWrapText(true);
         streamingModeDescriptionLabel.setPrefHeight(50);
+        streamingModeDescriptionLabel.setStyle("-fx-text-fill: " + COLOR_INFO + "; -fx-font-size: 11;");
         updateStreamingModeDescription(SystemCore.StreamingMode.SAFE_DEFAULT);
 
         startStreamingButton = new Button("▶ Start Streaming");
-        startStreamingButton.setStyle(buttonStyle("#10b981"));
+        startStreamingButton.setStyle(buttonStyle(COLOR_SUCCESS));
         startStreamingButton.setDisable(true);
         startStreamingButton.setOnAction(event -> handleStartStreaming());
 
         stopStreamingButton = new Button("⏸ Stop Streaming");
-        stopStreamingButton.setStyle(buttonStyle("#ef4444"));
+        stopStreamingButton.setStyle(buttonStyle(COLOR_ERROR));
+        stopStreamingButton.setDisable(true);
         stopStreamingButton.setOnAction(event -> handleStopStreaming());
 
         streamingStatusLabel = new Label("Not streaming");
-        streamingStatusLabel.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11;");
+        streamingStatusLabel.setStyle("-fx-text-fill: " + COLOR_MUTED + "; -fx-font-size: 11;");
+
+        enableStreamingCheckbox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            streamingModeCombo.setDisable(!newVal);
+            updateStreamingUI();
+        });
 
         HBox streamControlBox = new HBox(10, startStreamingButton, stopStreamingButton);
         streamControlBox.setAlignment(Pos.CENTER_LEFT);
 
         grid.add(enableStreamingCheckbox, 0, 0, 2, 1);
-        grid.add(new Label("Streaming Mode:"), 0, 1);
-        grid.add(streamingModeCombo, 1, 1);
+        addRow(grid, 1, "Streaming Mode:", streamingModeCombo);
         grid.add(streamingModeDescriptionLabel, 0, 2, 2, 1);
         grid.add(new Separator(), 0, 3, 2, 1);
         grid.add(streamControlBox, 0, 4, 2, 1);
-        grid.add(new Label("Status:"), 0, 5);
-        grid.add(streamingStatusLabel, 1, 5);
+        addRow(grid, 5, "Status:", streamingStatusLabel);
 
         return new VBox(8, sectionTitle, grid);
     }
 
     private VBox createOpenAiSection() {
-        Label sectionTitle = new Label("OpenAI Configuration");
-        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #8b5cf6;");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
-        grid.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #8b5cf6; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4;");
+        Label sectionTitle = sectionTitle("OpenAI Configuration", "#8b5cf6");
+        GridPane grid = sectionGrid("#8b5cf6");
 
         enableOpenAiCheckbox = styledCheckBox("Enable OpenAI Integration", false);
 
         openaiApiKeyField = new PasswordField();
-        openaiApiKeyField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        openaiApiKeyField.setStyle(inputStyle());
         openaiApiKeyField.setPromptText("sk-...");
 
         openaiModelCombo = new ComboBox<>();
-        openaiModelCombo.getItems().addAll("gpt-4o", "gpt-4", "gpt-3.5-turbo");
+        openaiModelCombo.getItems().addAll("gpt-4o", "gpt-4.1", "gpt-4.1-mini", "gpt-4", "gpt-3.5-turbo");
         openaiModelCombo.setValue("gpt-4o");
-        openaiModelCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        openaiModelCombo.setStyle(inputStyle());
 
         temperatureSpinner = doubleSpinner(0.0, 2.0, 0.7, 0.1);
-        maxTokensSpinner = intSpinner(1, 4000, 1000, 100);
+        maxTokensSpinner = intSpinner(1, 16_000, 1000, 100);
 
         testOpenAIButton = new Button("Test Connection");
         testOpenAIButton.setStyle(buttonStyle("#8b5cf6"));
@@ -310,32 +297,21 @@ public class SettingsPanel extends VBox {
     }
 
     private VBox createTelegramSection() {
-        Label sectionTitle = new Label("Telegram Notifications");
-        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #60a5fa;");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
-        grid.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #60a5fa; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4;");
+        Label sectionTitle = sectionTitle("Telegram Notifications", COLOR_INFO);
+        GridPane grid = sectionGrid(COLOR_INFO);
 
         enableTelegramCheckbox = styledCheckBox("Enable Telegram Notifications", false);
 
         telegramBotTokenField = new PasswordField();
-        telegramBotTokenField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        telegramBotTokenField.setStyle(inputStyle());
         telegramBotTokenField.setPromptText("Bot token from @BotFather");
 
         telegramChatIdField = new TextField();
-        telegramChatIdField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        telegramChatIdField.setStyle(inputStyle());
         telegramChatIdField.setPromptText("Your chat ID");
 
         testTelegramButton = new Button("Test Connection");
-        testTelegramButton.setStyle(buttonStyle("#60a5fa"));
+        testTelegramButton.setStyle(buttonStyle(COLOR_INFO));
         testTelegramButton.setOnAction(event -> testTelegramConnection());
 
         grid.add(enableTelegramCheckbox, 0, 0, 2, 1);
@@ -347,34 +323,23 @@ public class SettingsPanel extends VBox {
     }
 
     private VBox createEmailSection() {
-        Label sectionTitle = new Label("Email Notifications");
-        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #ec4899;");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
-        grid.setStyle(
-                "-fx-background-color: #16213e; " +
-                        "-fx-border-color: #ec4899; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4;");
+        Label sectionTitle = sectionTitle("Email Notifications", "#ec4899");
+        GridPane grid = sectionGrid("#ec4899");
 
         enableEmailCheckbox = styledCheckBox("Enable Email Notifications", false);
 
         smtpServerField = new TextField();
-        smtpServerField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        smtpServerField.setStyle(inputStyle());
         smtpServerField.setPromptText("smtp.gmail.com");
 
         smtpPortSpinner = intSpinner(1, 65535, 587, 1);
 
         emailAddressField = new TextField();
-        emailAddressField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        emailAddressField.setStyle(inputStyle());
         emailAddressField.setPromptText("your-email@gmail.com");
 
         emailPasswordField = new PasswordField();
-        emailPasswordField.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        emailPasswordField.setStyle(inputStyle());
         emailPasswordField.setPromptText("App password");
 
         enableTlsCheckbox = styledCheckBox("Use TLS", true);
@@ -403,94 +368,63 @@ public class SettingsPanel extends VBox {
             return;
         }
 
-        // Disable button and show loading state
-        testTelegramButton.setDisable(true);
-        testTelegramButton.setText("Testing...");
-        statusLabel.setText("Testing Telegram connection...");
+        if (!botToken.matches("^\\d+:[a-zA-Z0-9_-]+$")) {
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"), "Invalid bot token format");
+            return;
+        }
 
-        // Run test in background thread
-        Thread testThread = new Thread(() -> {
-            try {
-                // Test 1: Verify bot token format (should be numbers:string)
-                if (!botToken.matches("^\\d+:[a-zA-Z0-9_-]+$")) {
-                    throw new IllegalArgumentException("Invalid bot token format");
-                }
+        runButtonTask(
+                testTelegramButton,
+                "Testing...",
+                "Testing Telegram connection...",
+                () -> {
+                    String apiUrl = "https://api.telegram.org/bot" + botToken + "/getMe";
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) URI.create(apiUrl).toURL().openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
 
-                // Test 2: Verify chat ID is numeric
-                try {
-                    Long.parseLong(chatId);
-                } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException("Chat ID must be a number");
-                }
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == 401) {
+                        throw new RuntimeException("Invalid bot token (401 Unauthorized)");
+                    }
+                    if (responseCode != 200) {
+                        throw new RuntimeException("Telegram API error (code: " + responseCode + ")");
+                    }
 
-                // Test 3: Make HTTP request to Telegram Bot API
-                String apiUrl = "https://api.telegram.org/bot" + botToken + "/getMe";
-                java.net.URL url = URI.create(apiUrl).toURL();
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                int responseCode = conn.getResponseCode();
-
-                if (responseCode == 200) {
-                    // Test 4: Try sending a test message
                     String sendUrl = "https://api.telegram.org/bot" + botToken + "/sendMessage";
-                    java.net.URL sendUrlObj = URI.create(sendUrl).toURL();
-                    java.net.HttpURLConnection sendConn = (java.net.HttpURLConnection) sendUrlObj.openConnection();
+                    java.net.HttpURLConnection sendConn = (java.net.HttpURLConnection) URI.create(sendUrl).toURL().openConnection();
                     sendConn.setRequestMethod("POST");
                     sendConn.setConnectTimeout(5000);
                     sendConn.setReadTimeout(5000);
                     sendConn.setDoOutput(true);
                     sendConn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-                    String payload = "chat_id=" + chatId + "&text=" + java.net.URLEncoder.encode(
+                    String payload = "chat_id=" + java.net.URLEncoder.encode(chatId, StandardCharsets.UTF_8)
+                            + "&text=" + java.net.URLEncoder.encode(
                             "✅ InvestPro Telegram connection test successful!", StandardCharsets.UTF_8);
+
                     try (java.io.OutputStream os = sendConn.getOutputStream()) {
-                        byte[] input = payload.getBytes(StandardCharsets.UTF_8);
-                        os.write(input, 0, input.length);
+                        os.write(payload.getBytes(StandardCharsets.UTF_8));
                     }
 
                     int sendResponseCode = sendConn.getResponseCode();
-                    if (sendResponseCode == 200) {
-                        Platform.runLater(() -> {
-                            showAlert(Alert.AlertType.INFORMATION, t("common.success"),
-                                    "✅ Telegram connection successful!\n" +
-                                            "Bot verified and test message sent to chat.");
-                            statusLabel.setText("Telegram connection test successful");
-                            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
-                        });
-                    } else {
+                    if (sendResponseCode != 200) {
                         throw new RuntimeException("Failed to send test message (code: " + sendResponseCode + ")");
                     }
-                } else if (responseCode == 401) {
-                    throw new RuntimeException("Invalid bot token (401 Unauthorized)");
-                } else {
-                    throw new RuntimeException("Telegram API error (code: " + responseCode + ")");
-                }
-
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    log.error("Telegram test failed", e);
+                },
+                () -> {
+                    showAlert(Alert.AlertType.INFORMATION, t("common.success"),
+                            "✅ Telegram connection successful!\nBot verified and test message sent to chat.");
+                    setStatusSuccess("Telegram connection test successful");
+                },
+                exception -> {
+                    log.error("Telegram test failed", exception);
                     showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "Telegram connection failed:\n" + e.getMessage());
-                    statusLabel.setText("Telegram connection test failed: " + e.getMessage());
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                            "Telegram connection failed:\n" + exception.getMessage());
+                    setStatusError("Telegram connection test failed: " + exception.getMessage());
                 });
-            } finally {
-                Platform.runLater(() -> {
-                    testTelegramButton.setDisable(false);
-                    testTelegramButton.setText("Test Connection");
-                });
-            }
-        });
-
-        testThread.setName("telegram-test-thread");
-        testThread.setDaemon(true);
-        testThread.start();
     }
-
-    Properties props = new Properties();
 
     private void testEmailConnection() {
         String smtpServer = smtpServerField.getText().trim();
@@ -501,114 +435,67 @@ public class SettingsPanel extends VBox {
 
         if (smtpServer.isEmpty() || emailAddress.isEmpty() || password.isEmpty()) {
             showAlert(Alert.AlertType.WARNING, t("common.validationError"),
-                    "Please fill in all required fields: SMTP Server, Email, and Password");
+                    "Please fill in SMTP Server, Email, and Password");
             return;
         }
 
-        // Validate email format
         if (!emailAddress.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
-                    "Invalid email address format");
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"), "Invalid email address format");
             return;
         }
 
-        // Disable button and show loading state
-        testEmailButton.setDisable(true);
-        testEmailButton.setText("Testing...");
-        statusLabel.setText("Testing Email connection...");
+        runButtonTask(
+                testEmailButton,
+                "Testing...",
+                "Testing Email connection...",
+                () -> {
+                    Properties mailProps = new Properties();
+                    mailProps.put("mail.smtp.host", smtpServer);
+                    mailProps.put("mail.smtp.port", String.valueOf(smtpPort));
+                    mailProps.put("mail.smtp.auth", "true");
+                    mailProps.put("mail.smtp.starttls.enable", String.valueOf(useTls));
+                    mailProps.put("mail.smtp.starttls.required", String.valueOf(useTls));
+                    mailProps.put("mail.smtp.connectiontimeout", "5000");
+                    mailProps.put("mail.smtp.timeout", "5000");
+                    mailProps.put("mail.smtp.writetimeout", "5000");
 
-        // Run test in background thread
-        Thread testThread = new Thread(() -> {
-            try {
-                // Test SMTP connection using JavaMail API
+                    Session session = Session.getInstance(mailProps, new jakarta.mail.Authenticator() {
+                        @Override
+                        protected jakarta.mail.PasswordAuthentication getPasswordAuthentication() {
+                            return new jakarta.mail.PasswordAuthentication(emailAddress, password);
+                        }
+                    });
+                    session.setDebug(false);
 
-                props.put("mail.smtp.host", smtpServer);
-                props.put("mail.smtp.port", String.valueOf(smtpPort));
-                props.put("mail.smtp.auth", "true");
-                props.put("mail.smtp.starttls.enable", String.valueOf(useTls));
-                props.put("mail.smtp.starttls.required", String.valueOf(useTls));
-                props.put("mail.smtp.socketFactory.port", String.valueOf(smtpPort));
-                if (useTls) {
-                    props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-                }
-                props.put("mail.smtp.connectiontimeout", "5000");
-                props.put("mail.smtp.timeout", "5000");
+                    Message message = new MimeMessage(session);
+                    message.setFrom(new InternetAddress(emailAddress));
+                    message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(emailAddress));
+                    message.setSubject("InvestPro Email Test");
+                    message.setText("""
+                            ✅ InvestPro email connection test successful!
 
-                // Create session with authentication
-                Session session = Session.getInstance(props,
-                        new jakarta.mail.Authenticator() {
-                            @Override
-                            protected jakarta.mail.PasswordAuthentication getPasswordAuthentication() {
-                                return new jakarta.mail.PasswordAuthentication(emailAddress, password);
-                            }
-                        });
+                            This is a test message from InvestPro.
+                            Email notifications are now configured and ready to use.
+                            """);
 
-                session.setDebug(false);
-
-                // Create test message
-                Message message = new MimeMessage(session);
-                message.setFrom(new InternetAddress(emailAddress));
-                message.setRecipients(Message.RecipientType.TO,
-                        InternetAddress.parse(emailAddress));
-                message.setSubject("InvestPro Email Test");
-                message.setText("""
-                        ✅ InvestPro email connection test successful!
-
-                        This is a test message from InvestPro trading platform.
-                        Email notifications are now configured and ready to use.""");
-
-                // Send test message
-                Transport.send(message);
-
-                Platform.runLater(() -> {
+                    Transport.send(message);
+                },
+                () -> {
                     showAlert(Alert.AlertType.INFORMATION, t("common.success"),
-                            "✅ Email connection successful!\n" +
-                                    "Test message sent to: " + emailAddress);
-                    statusLabel.setText("Email connection test successful");
-                    statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
-                });
-
-            } catch (jakarta.mail.AuthenticationFailedException e) {
-                Platform.runLater(() -> {
-                    log.error("Email authentication failed", e);
-                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "Authentication failed. Check your email and password.");
-                    statusLabel.setText("Email test failed: Authentication error");
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-                });
-            } catch (jakarta.mail.MessagingException e) {
-                Platform.runLater(() -> {
-                    log.error("Email test failed", e);
-                    String errorMsg = e.getMessage();
+                            "✅ Email connection successful!\nTest message sent to: " + emailAddress);
+                    setStatusSuccess("Email connection test successful");
+                },
+                exception -> {
+                    log.error("Email test failed", exception);
+                    String errorMsg = exception.getMessage() == null ? "Unknown email error" : exception.getMessage();
                     if (errorMsg.contains("Connection refused")) {
                         errorMsg = "Cannot connect to SMTP server. Check server address and port.";
-                    } else if (errorMsg.contains("timeout")) {
+                    } else if (errorMsg.toLowerCase().contains("timeout")) {
                         errorMsg = "Connection timeout. SMTP server is not responding.";
                     }
-                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "Email connection failed:\n" + errorMsg);
-                    statusLabel.setText("Email test failed: " + errorMsg);
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"), "Email connection failed:\n" + errorMsg);
+                    setStatusError("Email test failed: " + errorMsg);
                 });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    log.error("Email test failed", e);
-                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "Unexpected error:\n" + e.getMessage());
-                    statusLabel.setText("Email test failed: " + e.getMessage());
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-                });
-            } finally {
-                Platform.runLater(() -> {
-                    testEmailButton.setDisable(false);
-                    testEmailButton.setText("Test Connection");
-                });
-            }
-        });
-
-        testThread.setName("email-test-thread");
-        testThread.setDaemon(true);
-        testThread.start();
     }
 
     private void testOpenAIConnection() {
@@ -616,120 +503,98 @@ public class SettingsPanel extends VBox {
         String model = openaiModelCombo.getValue();
 
         if (apiKey.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
-                    "Please enter your OpenAI API key");
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"), "Please enter your OpenAI API key");
             return;
         }
 
         if (!apiKey.startsWith("sk-")) {
-            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
-                    "Invalid API key format (should start with 'sk-')");
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"), "Invalid API key format. It should start with 'sk-'.");
             return;
         }
 
-        // Disable button and show loading state
-        testOpenAIButton.setDisable(true);
-        testOpenAIButton.setText("Testing...");
-        statusLabel.setText("Testing OpenAI connection...");
-        statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+        runButtonTask(
+                testOpenAIButton,
+                "Testing...",
+                "Testing OpenAI connection...",
+                () -> {
+                    String apiUrl = "https://api.openai.com/v1/models/" + model;
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) URI.create(apiUrl).toURL().openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+                    conn.setRequestProperty("Accept", "application/json");
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
 
-        // Run test in background thread
-        Thread testThread = new Thread(() -> {
-            try {
-                // Create HTTP request to OpenAI API
-                String apiUrl = "https://api.openai.com/v1/models/" + model;
-                java.net.URL url = URI.create(apiUrl).toURL();
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-                conn.setRequestProperty("Accept", "application/json");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                int responseCode = conn.getResponseCode();
-
-                if (responseCode == 200) {
-                    // Successfully authenticated and model exists
-                    Platform.runLater(() -> {
-                        showAlert(Alert.AlertType.INFORMATION, t("common.success"),
-                                "✅ OpenAI connection successful!\n" +
-                                        "API key validated and model '" + model + "' is accessible.");
-                        statusLabel.setText("OpenAI connection test successful");
-                        statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
-                    });
-                } else if (responseCode == 401) {
-                    throw new RuntimeException("Invalid API key (401 Unauthorized). Check your API key.");
-                } else if (responseCode == 404) {
-                    throw new RuntimeException("Model not found (404). Check your model name or subscription.");
-                } else if (responseCode == 429) {
-                    throw new RuntimeException("Rate limited (429). Too many requests. Wait and try again.");
-                } else {
-                    throw new RuntimeException("OpenAI API error (code: " + responseCode + ")");
-                }
-
-                conn.disconnect();
-
-            } catch (java.net.MalformedURLException e) {
-                Platform.runLater(() -> {
-                    log.error("OpenAI test failed - invalid URL", e);
-                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "Invalid model name or URL format.");
-                    statusLabel.setText("OpenAI test failed: Invalid URL");
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-                });
-            } catch (java.io.IOException e) {
-                Platform.runLater(() -> {
-                    log.error("OpenAI test failed", e);
-                    String errorMsg = e.getMessage();
-                    if (errorMsg != null && errorMsg.contains("timeout")) {
-                        errorMsg = "Connection timeout. Check your internet connection.";
-                    } else if (errorMsg == null) {
-                        errorMsg = "Network error - unable to reach OpenAI API";
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == 200) {
+                        return;
                     }
+                    if (responseCode == 401) {
+                        throw new RuntimeException("Invalid API key (401 Unauthorized). Check your API key.");
+                    }
+                    if (responseCode == 404) {
+                        throw new RuntimeException("Model not found (404). Check your model name or subscription.");
+                    }
+                    if (responseCode == 429) {
+                        throw new RuntimeException("Rate limited (429). Too many requests. Wait and try again.");
+                    }
+                    throw new RuntimeException("OpenAI API error (code: " + responseCode + ")");
+                },
+                () -> {
+                    showAlert(Alert.AlertType.INFORMATION, t("common.success"),
+                            "✅ OpenAI connection successful!\nAPI key validated and model '" + model + "' is accessible.");
+                    setStatusSuccess("OpenAI connection test successful");
+                },
+                exception -> {
+                    log.error("OpenAI test failed", exception);
                     showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "OpenAI connection failed:\n" + errorMsg);
-                    statusLabel.setText("OpenAI test failed: " + errorMsg);
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                            "OpenAI connection failed:\n" + exception.getMessage());
+                    setStatusError("OpenAI test failed: " + exception.getMessage());
                 });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    log.error("OpenAI test failed", e);
-                    showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"),
-                            "OpenAI connection failed:\n" + e.getMessage());
-                    statusLabel.setText("OpenAI test failed: " + e.getMessage());
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-                });
+    }
+
+    private void runButtonTask(Button button,
+                               String busyText,
+                               String statusText,
+                               ThrowingRunnable task,
+                               Runnable onSuccess,
+                               java.util.function.Consumer<Exception> onFailure) {
+        String originalText = button.getText();
+        button.setDisable(true);
+        button.setText(busyText);
+        setStatusInfo(statusText);
+
+        Thread thread = new Thread(() -> {
+            try {
+                task.run();
+                Platform.runLater(onSuccess);
+            } catch (Exception exception) {
+                Platform.runLater(() -> onFailure.accept(exception));
             } finally {
                 Platform.runLater(() -> {
-                    testOpenAIButton.setDisable(false);
-                    testOpenAIButton.setText("Test Connection");
+                    button.setDisable(false);
+                    button.setText(originalText);
                 });
             }
         });
-
-        testThread.setName("openai-test-thread");
-        testThread.setDaemon(true);
-        testThread.start();
+        thread.setName("settings-task-" + originalText.toLowerCase().replace(' ', '-'));
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void updateStreamingModeDescription(SystemCore.StreamingMode mode) {
-        if (mode != null) {
-            streamingModeDescriptionLabel.setText(mode.description);
-        }
+        streamingModeDescriptionLabel.setText(mode == null ? "" : mode.description);
     }
 
     private void handleStartStreaming() {
         if (systemCore == null) {
             showAlert(Alert.AlertType.WARNING, t("common.error"), "SystemCore is not available");
-            statusLabel.setText("Error: SystemCore not initialized");
-            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            setStatusError("Error: SystemCore not initialized");
             return;
         }
 
         if (!enableStreamingCheckbox.isSelected()) {
-            showAlert(Alert.AlertType.WARNING, t("common.validationError"),
-                    "Please enable Live Market Streaming first");
+            showAlert(Alert.AlertType.WARNING, t("common.validationError"), "Please enable Live Market Streaming first");
             return;
         }
 
@@ -739,118 +604,77 @@ public class SettingsPanel extends VBox {
             streamingModeCombo.setValue(mode);
         }
 
-        // Show loading state
-        startStreamingButton.setDisable(true);
-        startStreamingButton.setText("⏳ Starting...");
-        statusLabel.setText("Starting streaming in " + mode.name() + " mode...");
-        statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
-
-        // Run in background thread to avoid blocking UI
         SystemCore.StreamingMode finalMode = mode;
-        SystemCore.StreamingMode finalMode1 = mode;
-        Thread streamThread = new Thread(() -> {
-            try {
-                if (systemCore.getSelectedTradePair() == null) {
-                    Platform.runLater(() -> {
-                        statusLabel.setText("No trading pair selected");
-                        statusLabel.setStyle("-fx-text-fill: #fbbf24; -fx-font-size: 11;");
+        runButtonTask(
+                startStreamingButton,
+                "⏳ Starting...",
+                "Starting streaming in " + finalMode.name() + " mode...",
+                () -> {
+                    if (systemCore.getSelectedTradePair() == null) {
+                        systemCore.switchStreamingMode(finalMode);
+                    } else {
+                        systemCore.startStreaming(systemCore.getSelectedTradePair(), finalMode);
+                    }
+                },
+                () -> {
+                    updateStreamingStatusUI(systemCore.isStreaming());
+                    if (systemCore.getSelectedTradePair() == null) {
+                        setStatusWarning("Streaming mode set, but no trading pair is selected");
                         showAlert(Alert.AlertType.INFORMATION, t("common.info"),
                                 "Please select a trading symbol first.\nStreaming mode set to " + finalMode.name());
-                        systemCore.switchStreamingMode(finalMode);
-                    });
-                } else {
-                    systemCore.startStreaming(systemCore.getSelectedTradePair(), finalMode1);
-                    Platform.runLater(() -> {
-                        updateStreamingStatusUI(true);
-                        statusLabel.setText("✅ Streaming started with mode: " + finalMode1.name());
-                        statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
-                        log.info("Streaming started: pair={}, mode={}", systemCore.getSelectedTradePair(), finalMode1);
-                    });
-                }
-            } catch (Exception e) {
-                log.error("Error starting stream", e);
-                Platform.runLater(() -> {
-                    statusLabel.setText("Error: " + e.getMessage());
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-                    showAlert(Alert.AlertType.ERROR, t("common.error"),
-                            "Failed to start streaming:\n" + e.getMessage());
+                    } else {
+                        setStatusSuccess("✅ Streaming started with mode: " + finalMode.name());
+                        log.info("Streaming started: pair={}, mode={}", systemCore.getSelectedTradePair(), finalMode);
+                    }
+                },
+                exception -> {
+                    log.error("Error starting stream", exception);
                     updateStreamingStatusUI(false);
+                    setStatusError("Error: " + exception.getMessage());
+                    showAlert(Alert.AlertType.ERROR, t("common.error"),
+                            "Failed to start streaming:\n" + exception.getMessage());
                 });
-            } finally {
-                Platform.runLater(() -> {
-                    startStreamingButton.setDisable(systemCore.isStreaming() || !enableStreamingCheckbox.isSelected());
-                    startStreamingButton.setText("▶ Start Streaming");
-                });
-            }
-        });
-
-        streamThread.setName("stream-start-thread");
-        streamThread.setDaemon(true);
-        streamThread.start();
     }
 
     private void handleStopStreaming() {
         if (systemCore == null) {
             showAlert(Alert.AlertType.WARNING, t("common.error"), "SystemCore is not available");
-            statusLabel.setText("Error: SystemCore not initialized");
-            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+            setStatusError("Error: SystemCore not initialized");
             return;
         }
 
-        // Show loading state
-        stopStreamingButton.setDisable(true);
-        stopStreamingButton.setText("⏳ Stopping...");
-        statusLabel.setText("Stopping streaming...");
-        statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
-
-        // Run in background thread
-        Thread stopThread = new Thread(() -> {
-            try {
-                systemCore.stopStreaming();
-                Platform.runLater(() -> {
+        runButtonTask(
+                stopStreamingButton,
+                "⏳ Stopping...",
+                "Stopping streaming...",
+                systemCore::stopStreaming,
+                () -> {
                     updateStreamingStatusUI(false);
-                    statusLabel.setText("✅ Streaming stopped");
-                    statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+                    setStatusSuccess("✅ Streaming stopped");
                     log.info("Streaming stopped");
-                });
-            } catch (Exception e) {
-                log.error("Error stopping stream", e);
-                Platform.runLater(() -> {
-                    statusLabel.setText("Error: " + e.getMessage());
-                    statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
+                },
+                exception -> {
+                    log.error("Error stopping stream", exception);
+                    setStatusError("Error: " + exception.getMessage());
                     showAlert(Alert.AlertType.ERROR, t("common.error"),
-                            "Failed to stop streaming:\n" + e.getMessage());
+                            "Failed to stop streaming:\n" + exception.getMessage());
                 });
-            } finally {
-                Platform.runLater(() -> {
-                    stopStreamingButton.setDisable(true);
-                    stopStreamingButton.setText("⏸ Stop Streaming");
-                });
-            }
-        });
-
-        stopThread.setName("stream-stop-thread");
-        stopThread.setDaemon(true);
-        stopThread.start();
     }
 
     private void updateStreamingUI() {
-        if (systemCore != null) {
-            updateStreamingStatusUI(systemCore.isStreaming());
-        }
+        updateStreamingStatusUI(systemCore != null && systemCore.isStreaming());
     }
 
     private void updateStreamingStatusUI(boolean isStreaming) {
         streamingStatusLabel.setText(isStreaming ? t("settings.streamingActive") : t("settings.notStreaming"));
-        streamingStatusLabel
-                .setStyle("-fx-text-fill: " + (isStreaming ? "#10b981" : "#a0aec0") + "; -fx-font-size: 11;");
+        streamingStatusLabel.setStyle("-fx-text-fill: " + (isStreaming ? COLOR_SUCCESS : COLOR_MUTED) + "; -fx-font-size: 11;");
         startStreamingButton.setDisable(isStreaming || !enableStreamingCheckbox.isSelected());
         stopStreamingButton.setDisable(!isStreaming);
     }
 
     private HBox createButtonBox() {
         Button saveButton = new Button("Save Settings");
-        saveButton.setStyle(buttonStyle("#10b981"));
+        saveButton.setStyle(buttonStyle(COLOR_SUCCESS));
         saveButton.setOnAction(event -> saveSettings());
 
         Button applyButton = new Button("Apply Now");
@@ -866,14 +690,12 @@ public class SettingsPanel extends VBox {
 
         HBox box = new HBox(12, spacer, saveButton, applyButton, resetButton);
         box.setAlignment(Pos.CENTER_RIGHT);
-
         return box;
     }
 
     private void saveSettings() {
         try {
-            statusLabel.setText("Saving settings...");
-            statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+            setStatusInfo("Saving settings...");
 
             SystemSafetySettings settings = buildSettingsFromUi();
             settings.save();
@@ -883,66 +705,41 @@ public class SettingsPanel extends VBox {
             saveOpenAiSettings();
             saveTelegramSettings();
             saveEmailSettings();
+            flushPreferences();
 
-            statusLabel.setText("✅ Settings saved successfully");
-            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+            setStatusSuccess("✅ Settings saved successfully");
             log.info("System settings saved: {}", settings);
 
-            showAlert(
-                    Alert.AlertType.INFORMATION,
-                    t("settings.savedTitle"),
+            showAlert(Alert.AlertType.INFORMATION, t("settings.savedTitle"),
                     t("settings.savedMessage") + "\n\nAll settings have been persisted to disk.");
         } catch (Exception e) {
             log.error("Error saving settings", e);
-            statusLabel.setText("Error saving settings: " + e.getMessage());
-            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-            showAlert(Alert.AlertType.ERROR, t("common.error"),
-                    "Failed to save settings:\n" + e.getMessage());
-        }
-    }
-
-    private void saveStreamingSettings() {
-        try {
-            SystemCore.StreamingMode mode = streamingModeCombo.getValue();
-            if (mode != null) {
-                PREFS.put("streamingMode", mode.name());
-            }
-            PREFS.putBoolean("enableStreaming", enableStreamingCheckbox.isSelected());
-            // Flush preferences to disk to ensure persistence
-            PREFS.flush();
-            log.info("Streaming settings saved and flushed to disk");
-        } catch (Exception e) {
-            log.error("Error saving streaming settings", e);
-            throw new RuntimeException("Failed to save streaming settings: " + e.getMessage(), e);
+            setStatusError("Error saving settings: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, t("common.error"), "Failed to save settings:\n" + e.getMessage());
         }
     }
 
     private void applySettings() {
         try {
-            statusLabel.setText("Applying settings...");
-            statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+            setStatusInfo("Applying settings...");
 
             SystemSafetySettings settings = buildSettingsFromUi();
             applySettingsToSystemCore(settings);
-
-            // Save streaming settings
             saveStreamingSettings();
             saveOpenAiSettings();
             saveTelegramSettings();
             saveEmailSettings();
+            flushPreferences();
 
-            statusLabel.setText("✅ Settings applied to system");
-            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+            setStatusSuccess("✅ Settings applied to system");
             log.info("System settings applied: {}", settings);
 
             showAlert(Alert.AlertType.INFORMATION, t("common.info"),
-                    "Settings applied successfully!\n\nThese settings are now active and will take effect immediately.");
+                    "Settings applied successfully!\n\nThese settings are now active.");
         } catch (Exception e) {
             log.error("Error applying settings", e);
-            statusLabel.setText("Error applying settings: " + e.getMessage());
-            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-            showAlert(Alert.AlertType.ERROR, t("common.error"),
-                    "Failed to apply settings:\n" + e.getMessage());
+            setStatusError("Error applying settings: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, t("common.error"), "Failed to apply settings:\n" + e.getMessage());
         }
     }
 
@@ -954,26 +751,23 @@ public class SettingsPanel extends VBox {
         confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.CANCEL);
 
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.YES) {
-            statusLabel.setText("Reset cancelled");
+            setStatusNeutral("Reset cancelled");
             return;
         }
 
         try {
-            statusLabel.setText("Resetting to defaults...");
-            statusLabel.setStyle("-fx-text-fill: #60a5fa; -fx-font-size: 11;");
+            setStatusInfo("Resetting to defaults...");
 
             SystemSafetySettings defaults = SystemSafetySettings.defaults();
             applySettingsToUi(defaults);
             defaults.save();
             applySettingsToSystemCore(defaults);
 
-            // Reset streaming settings to defaults
             streamingModeCombo.setValue(SystemCore.StreamingMode.SAFE_DEFAULT);
             enableStreamingCheckbox.setSelected(false);
             saveStreamingSettings();
             updateStreamingUI();
 
-            // Reset OpenAI settings
             enableOpenAiCheckbox.setSelected(false);
             openaiApiKeyField.clear();
             openaiModelCombo.setValue("gpt-4o");
@@ -981,13 +775,11 @@ public class SettingsPanel extends VBox {
             maxTokensSpinner.getValueFactory().setValue(1000);
             saveOpenAiSettings();
 
-            // Reset Telegram settings
             enableTelegramCheckbox.setSelected(false);
             telegramBotTokenField.clear();
             telegramChatIdField.clear();
             saveTelegramSettings();
 
-            // Reset Email settings
             enableEmailCheckbox.setSelected(false);
             smtpServerField.clear();
             smtpPortSpinner.getValueFactory().setValue(587);
@@ -996,18 +788,14 @@ public class SettingsPanel extends VBox {
             enableTlsCheckbox.setSelected(true);
             saveEmailSettings();
 
-            statusLabel.setText("✅ All settings reset to defaults");
-            statusLabel.setStyle("-fx-text-fill: #10b981; -fx-font-size: 11;");
+            flushPreferences();
+            setStatusSuccess("✅ All settings reset to defaults");
             log.info("System settings reset to defaults");
-
-            showAlert(Alert.AlertType.INFORMATION, t("common.success"),
-                    "All settings have been reset to their default values.");
+            showAlert(Alert.AlertType.INFORMATION, t("common.success"), "All settings have been reset to their default values.");
         } catch (Exception e) {
             log.error("Error resetting settings", e);
-            statusLabel.setText("Error resetting settings: " + e.getMessage());
-            statusLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11;");
-            showAlert(Alert.AlertType.ERROR, t("common.error"),
-                    "Failed to reset settings:\n" + e.getMessage());
+            setStatusError("Error resetting settings: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, t("common.error"), "Failed to reset settings:\n" + e.getMessage());
         }
     }
 
@@ -1016,44 +804,42 @@ public class SettingsPanel extends VBox {
         applySettingsToUi(settings);
         applySettingsToSystemCore(settings);
 
-        // Load streaming settings
+        loadStreamingSettings();
+        loadOpenAiSettings();
+        loadTelegramSettings();
+        loadEmailSettings();
+
+        setStatusNeutral(t("settings.loaded"));
+        log.info("System settings loaded: {}", settings);
+    }
+
+    private void saveStreamingSettings() {
+        SystemCore.StreamingMode mode = streamingModeCombo.getValue();
+        if (mode != null) {
+            PREFS.put("streamingMode", mode.name());
+        }
+        PREFS.putBoolean("enableStreaming", enableStreamingCheckbox.isSelected());
+        log.debug("Streaming settings saved");
+    }
+
+    private void loadStreamingSettings() {
         String savedStreamingMode = PREFS.get("streamingMode", SystemCore.StreamingMode.SAFE_DEFAULT.name());
         try {
-            SystemCore.StreamingMode mode = SystemCore.StreamingMode.valueOf(savedStreamingMode);
-            streamingModeCombo.setValue(mode);
+            streamingModeCombo.setValue(SystemCore.StreamingMode.valueOf(savedStreamingMode));
         } catch (IllegalArgumentException e) {
             streamingModeCombo.setValue(SystemCore.StreamingMode.SAFE_DEFAULT);
         }
         enableStreamingCheckbox.setSelected(PREFS.getBoolean("enableStreaming", false));
         updateStreamingUI();
-
-        // Load OpenAI settings
-        loadOpenAiSettings();
-
-        // Load Telegram settings
-        loadTelegramSettings();
-
-        // Load Email settings
-        loadEmailSettings();
-
-        statusLabel.setText(t("settings.loaded"));
-        log.info("System settings loaded: {}", settings);
     }
 
     private void saveOpenAiSettings() {
-        try {
-            PREFS.putBoolean("openaiEnabled", enableOpenAiCheckbox.isSelected());
-            PREFS.put("openaiApiKey", openaiApiKeyField.getText());
-            PREFS.put("openaiModel", openaiModelCombo.getValue());
-            PREFS.putDouble("openaiTemperature", temperatureSpinner.getValue());
-            PREFS.putInt("openaiMaxTokens", maxTokensSpinner.getValue());
-            // Flush preferences to disk to ensure persistence
-            PREFS.flush();
-            log.info("OpenAI settings saved and flushed to disk");
-        } catch (Exception e) {
-            log.error("Error saving OpenAI settings", e);
-            throw new RuntimeException("Failed to save OpenAI settings: " + e.getMessage(), e);
-        }
+        PREFS.putBoolean("openaiEnabled", enableOpenAiCheckbox.isSelected());
+        PREFS.put("openaiApiKey", openaiApiKeyField.getText());
+        PREFS.put("openaiModel", openaiModelCombo.getValue());
+        PREFS.putDouble("openaiTemperature", temperatureSpinner.getValue());
+        PREFS.putInt("openaiMaxTokens", maxTokensSpinner.getValue());
+        log.debug("OpenAI settings saved");
     }
 
     private void loadOpenAiSettings() {
@@ -1065,17 +851,10 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveTelegramSettings() {
-        try {
-            PREFS.putBoolean("telegramEnabled", enableTelegramCheckbox.isSelected());
-            PREFS.put("telegramBotToken", telegramBotTokenField.getText());
-            PREFS.put("telegramChatId", telegramChatIdField.getText());
-            // Flush preferences to disk to ensure persistence
-            PREFS.flush();
-            log.info("Telegram settings saved and flushed to disk");
-        } catch (Exception e) {
-            log.error("Error saving Telegram settings", e);
-            throw new RuntimeException("Failed to save Telegram settings: " + e.getMessage(), e);
-        }
+        PREFS.putBoolean("telegramEnabled", enableTelegramCheckbox.isSelected());
+        PREFS.put("telegramBotToken", telegramBotTokenField.getText());
+        PREFS.put("telegramChatId", telegramChatIdField.getText());
+        log.debug("Telegram settings saved");
     }
 
     private void loadTelegramSettings() {
@@ -1085,20 +864,13 @@ public class SettingsPanel extends VBox {
     }
 
     private void saveEmailSettings() {
-        try {
-            PREFS.putBoolean("emailEnabled", enableEmailCheckbox.isSelected());
-            PREFS.put("smtpServer", smtpServerField.getText());
-            PREFS.putInt("smtpPort", smtpPortSpinner.getValue());
-            PREFS.put("emailAddress", emailAddressField.getText());
-            PREFS.put("emailPassword", emailPasswordField.getText());
-            PREFS.putBoolean("emailUseTls", enableTlsCheckbox.isSelected());
-            // Flush preferences to disk to ensure persistence
-            PREFS.flush();
-            log.info("Email settings saved and flushed to disk");
-        } catch (Exception e) {
-            log.error("Error saving Email settings", e);
-            throw new RuntimeException("Failed to save Email settings: " + e.getMessage(), e);
-        }
+        PREFS.putBoolean("emailEnabled", enableEmailCheckbox.isSelected());
+        PREFS.put("smtpServer", smtpServerField.getText());
+        PREFS.putInt("smtpPort", smtpPortSpinner.getValue());
+        PREFS.put("emailAddress", emailAddressField.getText());
+        PREFS.put("emailPassword", emailPasswordField.getText());
+        PREFS.putBoolean("emailUseTls", enableTlsCheckbox.isSelected());
+        log.debug("Email settings saved");
     }
 
     private void loadEmailSettings() {
@@ -1117,11 +889,9 @@ public class SettingsPanel extends VBox {
                 autoAssignBestStrategyCheckbox.isSelected(),
                 minStrategyScoreSpinner.getValue(),
                 topStrategiesToPaperTradeSpinner.getValue(),
-
                 smallAccountModeCheckbox.isSelected(),
                 smallAccountThresholdSpinner.getValue(),
                 smallAccountUnitsSpinner.getValue(),
-
                 preventOpenCloseSameCycleCheckbox.isSelected(),
                 preventInstantReverseCheckbox.isSelected(),
                 symbolCooldownSecondsSpinner.getValue());
@@ -1156,86 +926,132 @@ public class SettingsPanel extends VBox {
             systemCore.applySystemSettings(settings);
             log.info("Applied settings to SystemCore");
         } catch (Exception exception) {
-            log.warn("SystemCore does not support applySystemSettings(SystemSafetySettings): {}",
-                    exception.getMessage());
+            log.warn("SystemCore does not support applySystemSettings(SystemSafetySettings): {}", exception.getMessage());
         }
     }
 
+    /**
+     * Applies system settings using InvestPro-neutral keys.
+     *
+     * <p>All previous tradeadviser.* keys have been removed.</p>
+     */
     private void applySettingsAsSystemProperties(@NotNull SystemSafetySettings settings) {
-        System.setProperty(
-                "tradeadviser.strategy.requireBacktestBeforeLive",
-                String.valueOf(settings.requireBacktestBeforeLive()));
-        System.setProperty(
-                "tradeadviser.strategy.requirePaperTradingBeforeLive",
-                String.valueOf(settings.requirePaperTradingBeforeLive()));
-        System.setProperty(
-                "tradeadviser.strategy.autoAssignBest",
-                String.valueOf(settings.autoAssignBestStrategy()));
-        System.setProperty(
-                "tradeadviser.strategy.minScore",
-                String.valueOf(settings.minStrategyScore()));
-        System.setProperty(
-                "tradeadviser.strategy.topCandidates",
-                String.valueOf(settings.topStrategiesToPaperTrade()));
+        System.setProperty(SETTINGS_PREFIX + ".strategy.requireBacktestBeforeLive", String.valueOf(settings.requireBacktestBeforeLive()));
+        System.setProperty(SETTINGS_PREFIX + ".strategy.requirePaperTradingBeforeLive", String.valueOf(settings.requirePaperTradingBeforeLive()));
+        System.setProperty(SETTINGS_PREFIX + ".strategy.autoAssignBest", String.valueOf(settings.autoAssignBestStrategy()));
+        System.setProperty(SETTINGS_PREFIX + ".strategy.minScore", String.valueOf(settings.minStrategyScore()));
+        System.setProperty(SETTINGS_PREFIX + ".strategy.topCandidates", String.valueOf(settings.topStrategiesToPaperTrade()));
 
-        System.setProperty(
-                "tradeadviser.execution.smallAccountMode",
-                String.valueOf(settings.smallAccountModeEnabled()));
-        System.setProperty(
-                "tradeadviser.execution.smallAccountThreshold",
-                String.valueOf(settings.smallAccountThreshold()));
-        System.setProperty(
-                "tradeadviser.execution.smallAccountTradeUnits",
-                String.valueOf(settings.smallAccountUnits()));
-        System.setProperty(
-                "tradeadviser.execution.preventOpenCloseSameCycle",
-                String.valueOf(settings.preventOpenCloseSameCycle()));
-        System.setProperty(
-                "tradeadviser.execution.preventInstantReverse",
-                String.valueOf(settings.preventInstantReverse()));
-        System.setProperty(
-                "tradeadviser.execution.symbolCooldownSeconds",
-                String.valueOf(settings.symbolCooldownSeconds()));
+        System.setProperty(SETTINGS_PREFIX + ".execution.smallAccountMode", String.valueOf(settings.smallAccountModeEnabled()));
+        System.setProperty(SETTINGS_PREFIX + ".execution.smallAccountThreshold", String.valueOf(settings.smallAccountThreshold()));
+        System.setProperty(SETTINGS_PREFIX + ".execution.smallAccountTradeUnits", String.valueOf(settings.smallAccountUnits()));
+        System.setProperty(SETTINGS_PREFIX + ".execution.preventOpenCloseSameCycle", String.valueOf(settings.preventOpenCloseSameCycle()));
+        System.setProperty(SETTINGS_PREFIX + ".execution.preventInstantReverse", String.valueOf(settings.preventInstantReverse()));
+        System.setProperty(SETTINGS_PREFIX + ".execution.symbolCooldownSeconds", String.valueOf(settings.symbolCooldownSeconds()));
     }
 
     private void addRow(GridPane grid, int row, String label, Control control) {
         Label labelNode = new Label(label);
-        labelNode.setStyle("-fx-text-fill: #a0aec0;");
-
-        control.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
-
+        labelNode.setStyle("-fx-text-fill: " + COLOR_MUTED + ";");
+        control.setStyle(inputStyle());
         grid.add(labelNode, 0, row);
         grid.add(control, 1, row);
+    }
+
+    private void addRow(GridPane grid, int row, String label, Label valueLabel) {
+        Label labelNode = new Label(label);
+        labelNode.setStyle("-fx-text-fill: " + COLOR_MUTED + ";");
+        grid.add(labelNode, 0, row);
+        grid.add(valueLabel, 1, row);
+    }
+
+    private Label sectionTitle(String text, String color) {
+        Label sectionTitle = new Label(text);
+        sectionTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
+        return sectionTitle;
+    }
+
+    private GridPane sectionGrid(String borderColor) {
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(12));
+        grid.setStyle("-fx-background-color: " + COLOR_PANEL + "; "
+                + "-fx-border-color: " + borderColor + "; "
+                + "-fx-border-width: 1; "
+                + "-fx-border-radius: 6; "
+                + "-fx-background-radius: 6;");
+        return grid;
     }
 
     private CheckBox styledCheckBox(String text, boolean selected) {
         CheckBox checkBox = new CheckBox(text);
         checkBox.setSelected(selected);
-        checkBox.setStyle("-fx-text-fill: #a0aec0;");
+        checkBox.setStyle("-fx-text-fill: " + COLOR_MUTED + ";");
         return checkBox;
     }
 
     private Spinner<Double> doubleSpinner(double min, double max, double initial, double step) {
         Spinner<Double> spinner = new Spinner<>(min, max, initial, step);
         spinner.setEditable(true);
-        spinner.getEditor().setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        spinner.getEditor().setStyle(inputStyle());
         return spinner;
     }
 
     private Spinner<Integer> intSpinner(int min, int max, int initial, int step) {
         Spinner<Integer> spinner = new Spinner<>(min, max, initial, step);
         spinner.setEditable(true);
-        spinner.getEditor().setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
+        spinner.getEditor().setStyle(inputStyle());
         return spinner;
     }
 
+    private String inputStyle() {
+        return "-fx-control-inner-background: " + COLOR_INPUT + "; -fx-text-fill: " + COLOR_TEXT + ";";
+    }
+
     private String buttonStyle(String color) {
-        return "-fx-padding: 8 24; " +
-                "-fx-background-color: " + color + "; " +
-                "-fx-text-fill: white; " +
-                "-fx-font-size: 12; " +
-                "-fx-background-radius: 6; " +
-                "-fx-cursor: hand;";
+        return "-fx-padding: 8 24; "
+                + "-fx-background-color: " + color + "; "
+                + "-fx-text-fill: white; "
+                + "-fx-font-size: 12; "
+                + "-fx-background-radius: 6; "
+                + "-fx-cursor: hand;";
+    }
+
+    private void setStatusInfo(String text) {
+        setStatus(text, COLOR_INFO);
+    }
+
+    private void setStatusSuccess(String text) {
+        setStatus(text, COLOR_SUCCESS);
+    }
+
+    private void setStatusError(String text) {
+        setStatus(text, COLOR_ERROR);
+    }
+
+    private void setStatusWarning(String text) {
+        setStatus(text, COLOR_WARNING);
+    }
+
+    private void setStatusNeutral(String text) {
+        setStatus(text, COLOR_MUTED);
+    }
+
+    private void setStatus(String text, String color) {
+        if (statusLabel == null) {
+            return;
+        }
+        statusLabel.setText(text);
+        statusLabel.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 11;");
+    }
+
+    private void flushPreferences() {
+        try {
+            PREFS.flush();
+        } catch (Exception exception) {
+            throw new RuntimeException("Failed to flush settings to disk: " + exception.getMessage(), exception);
+        }
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
@@ -1244,6 +1060,11 @@ public class SettingsPanel extends VBox {
         alert.setHeaderText(title);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 
     /**
@@ -1256,11 +1077,9 @@ public class SettingsPanel extends VBox {
             boolean autoAssignBestStrategy,
             double minStrategyScore,
             int topStrategiesToPaperTrade,
-
             boolean smallAccountModeEnabled,
             double smallAccountThreshold,
             double smallAccountUnits,
-
             boolean preventOpenCloseSameCycle,
             boolean preventInstantReverse,
             int symbolCooldownSeconds) {
@@ -1272,11 +1091,9 @@ public class SettingsPanel extends VBox {
                     true,
                     60.0,
                     5,
-
                     true,
                     100.0,
                     1.0,
-
                     true,
                     true,
                     30);
@@ -1291,11 +1108,9 @@ public class SettingsPanel extends VBox {
                     PREFS.getBoolean("autoAssignBestStrategy", d.autoAssignBestStrategy()),
                     PREFS.getDouble("minStrategyScore", d.minStrategyScore()),
                     PREFS.getInt("topStrategiesToPaperTrade", d.topStrategiesToPaperTrade()),
-
                     PREFS.getBoolean("smallAccountModeEnabled", d.smallAccountModeEnabled()),
                     PREFS.getDouble("smallAccountThreshold", d.smallAccountThreshold()),
                     PREFS.getDouble("smallAccountUnits", d.smallAccountUnits()),
-
                     PREFS.getBoolean("preventOpenCloseSameCycle", d.preventOpenCloseSameCycle()),
                     PREFS.getBoolean("preventInstantReverse", d.preventInstantReverse()),
                     PREFS.getInt("symbolCooldownSeconds", d.symbolCooldownSeconds()));
@@ -1307,11 +1122,9 @@ public class SettingsPanel extends VBox {
             PREFS.putBoolean("autoAssignBestStrategy", autoAssignBestStrategy);
             PREFS.putDouble("minStrategyScore", Math.max(0.0, minStrategyScore));
             PREFS.putInt("topStrategiesToPaperTrade", Math.max(1, topStrategiesToPaperTrade));
-
             PREFS.putBoolean("smallAccountModeEnabled", smallAccountModeEnabled);
             PREFS.putDouble("smallAccountThreshold", Math.max(0.0, smallAccountThreshold));
             PREFS.putDouble("smallAccountUnits", Math.max(1.0, smallAccountUnits));
-
             PREFS.putBoolean("preventOpenCloseSameCycle", preventOpenCloseSameCycle);
             PREFS.putBoolean("preventInstantReverse", preventInstantReverse);
             PREFS.putInt("symbolCooldownSeconds", Math.max(0, symbolCooldownSeconds));

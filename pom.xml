@@ -37,6 +37,18 @@
             <version>3.45.2.0</version>
         </dependency>
 
+        <!-- Stellar SDK -->
+        <dependency>
+            <groupId>network.lightsail</groupId>
+            <artifactId>stellar-sdk</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+
         <!-- JSON & Data Processing -->
         <dependency>
             <groupId>org.json</groupId>

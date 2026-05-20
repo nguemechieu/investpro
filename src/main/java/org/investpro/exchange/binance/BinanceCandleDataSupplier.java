@@ -106,7 +106,7 @@ public class BinanceCandleDataSupplier extends CandleDataSupplier {
             case 259200 -> "3d";
             case 604800 -> "1w";
             case 2592000 -> "1M";
-            default -> "1h";
+            default -> "";
         };
     }
 

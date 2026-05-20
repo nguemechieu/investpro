@@ -1,5 +1,7 @@
 package org.investpro.operations;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.contracts.ExchangeIdentity;
 import org.investpro.exchange.services.ExchangeService;
@@ -18,21 +20,27 @@ import java.util.function.Supplier;
  * Thread-safe and non-blocking. Supports optional data providers for
  * trading engine and risk manager state.
  */
+@Setter
+@Getter
 @Slf4j
 public class SystemOperationsService {
 
     private static volatile SystemOperationsService instance;
 
+    /**
+     * -- GETTER --
+     *  Get the SystemActivityBus for activity logging
+     */
+
     private final SystemActivityBus activityBus;
-    @Nullable
-    private Instant applicationStartTime;
+
+    private final Instant applicationStartTime;
 
     // Optional data providers - wire these when services are available
-    @Nullable
+
     private Supplier<SystemSnapshot.TradingEngineSnapshot> tradingEngineProvider;
-    @Nullable
+
     private Supplier<SystemSnapshot.RiskStatusSnapshot> riskStatusProvider;
-    @Nullable
     private ExchangeService exchangeService;
 
     private SystemOperationsService() {
@@ -229,13 +237,6 @@ public class SystemOperationsService {
                 .latestRejectionReason(null)
                 .latestRejectionTime(null)
                 .build();
-    }
-
-    /**
-     * Get the SystemActivityBus for activity logging
-     */
-    public SystemActivityBus getActivityBus() {
-        return activityBus;
     }
 
     /**

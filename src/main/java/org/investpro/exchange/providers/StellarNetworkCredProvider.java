@@ -17,7 +17,7 @@ public class StellarNetworkCredProvider {
     private ExchangeCredentials credentials;
 
     public StellarNetworkCredProvider(CredentialProvider provider) {
-        this.credentials = new ExchangeCredentialResolver(provider).resolve("OANDA");
+        this.credentials = new ExchangeCredentialResolver(provider).resolve("stellar-network");
         logCredentialStatus();
     }
 
@@ -38,7 +38,8 @@ public class StellarNetworkCredProvider {
     }
 
     public boolean hasAdvancedTradeCredentials() {
-        return credentials.hasCoinbaseAdvancedTradeCredentials();
+        return credentials.accountId() != null && !credentials.accountId().isBlank()
+                && credentials.privateKey() != null && !credentials.privateKey().isBlank();
     }
 
     public boolean hasLegacyCredentials() {
@@ -47,11 +48,12 @@ public class StellarNetworkCredProvider {
 
     public void logCredentialStatus() {
         log.info("STELLAR NETWORK Credential Status:");
-        log.info(" Trade EC Key: {}", hasAdvancedTradeCredentials() ? "CONFIGURED" : "NOT CONFIGURED");
-        log.info("  Legacy REST API: {}", hasLegacyCredentials() ? "CONFIGURED" : "NOT CONFIGURED");
+        log.info("  Stellar public/secret key: {}", hasAdvancedTradeCredentials() ? "CONFIGURED" : "NOT CONFIGURED");
+        log.info("  Public account only: {}", credentials.accountId() != null && !credentials.accountId().isBlank()
+                ? "CONFIGURED" : "NOT CONFIGURED");
 
-        if (credentials.keyName() != null) {
-            log.info("  Key Name: {}...", credentials.keyName().substring(0, Math.min(30, credentials.keyName().length())));
+        if (credentials.accountId() != null) {
+            log.info("  Account ID: {}...", credentials.accountId().substring(0, Math.min(30, credentials.accountId().length())));
         }
     }
 }

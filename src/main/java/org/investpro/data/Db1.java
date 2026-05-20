@@ -13,12 +13,17 @@ import org.investpro.utils.SymmetricPair;
 import org.jetbrains.annotations.NotNull;
 import java.io.PrintWriter;
 import java.sql.*;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 
 public class Db1 implements Db {
     private Connection conn;
+    private final Map<String, Currency> currencyCache = new ConcurrentHashMap<>();
     private static final int BUSY_TIMEOUT_MS = 10000; // 10 seconds
     private static final String PRAGMA_BUSY_TIMEOUT = "PRAGMA busy_timeout = %d;";
     private static final String PRAGMA_WAL_MODE = "PRAGMA journal_mode = WAL;";
@@ -26,6 +31,8 @@ public class Db1 implements Db {
     public Db1(@NotNull Properties conf) throws ClassNotFoundException {
         Class.forName("org.sqlite.JDBC");
         initializeConnection(conf);
+        createTables();
+        preloadCurrencies();
     }
 
     private void initializeConnection(@NotNull Properties conf) {
@@ -449,6 +456,7 @@ public class Db1 implements Db {
 
                 CurrencyType type = currency.getCurrencyType();
                 Currency.CURRENCIES.put(new SymmetricPair<>(currency.getCode(), type), currency);
+                currencyCache.put(normalizeCurrencyCode(currency.getCode()), currency);
 
                 log.info("New Currency with code: {} was added to the database", currency.getCode());
             }
@@ -459,47 +467,79 @@ public class Db1 implements Db {
     }
 
     public Currency getCurrency(String code) throws SQLException {
-        createTables();
-        Currency newCurrency;
-
-        PreparedStatement statement = conn.prepareStatement("SELECT * FROM currencies WHERE code = ?");
-        statement.setString(1, code);
-        ResultSet check = statement.executeQuery();
-
-        if (!check.next()) {
-            log.info("Currency not found with code: %s, determining type...", code);
-
-            try {
-                // Determine currency type and fractional digits based on code
-                CurrencyType type = determineCurrencyType(code);
-                int fractionalDigits = determineFractionalDigits(code, type);
-
-                newCurrency = createCurrencyByType(type, code, fractionalDigits);
-                save(newCurrency);
-                log.info("Created new currency: {} (type: {}, fractional_digits: {})", code, type, fractionalDigits);
-
-                return newCurrency;
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            code = check.getString("code");
-            String fullDisplayName = check.getString("full_display_name");
-            String shortDisplayName = check.getString("short_display_name");
-            int fractionalDigits = check.getInt("fractional_digits");
-            String symbol = check.getString("symbol");
-            String image = check.getString("image");
-            String currencyType = check.getString("currency_type");
-
-            log.info("Currency found with code: %s", code);
-            log.info("Currency: code=%s, name=%s, type=%s, fractional_digits=%d",
-                    code, fullDisplayName, currencyType, fractionalDigits);
-
-            CurrencyType type = CurrencyType.valueOf(currencyType);
-            newCurrency = new Currency(type, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image) {
-            };
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Currency code must not be blank");
         }
-        return newCurrency;
+
+        createTables();
+        String normalizedCode = normalizeCurrencyCode(code);
+
+        Currency cached = currencyCache.get(normalizedCode);
+        if (cached != null) {
+            return cached;
+        }
+
+        Currency fromDb = queryCurrencyByCode(normalizedCode);
+        if (fromDb != null) {
+            currencyCache.put(normalizedCode, fromDb);
+            return fromDb;
+        }
+
+        try {
+            CurrencyType type = determineCurrencyType(normalizedCode);
+            int fractionalDigits = determineFractionalDigits(normalizedCode, type);
+            Currency created = createCurrencyByType(type, normalizedCode, fractionalDigits);
+            save(created);
+            currencyCache.put(normalizedCode, created);
+            log.info("Created new currency: {} (type: {}, fractional_digits: {})", normalizedCode, type, fractionalDigits);
+            return created;
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Currency queryCurrencyByCode(String code) throws SQLException {
+        String sql = "SELECT * FROM currencies WHERE code = ?";
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, code);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+
+                String fullDisplayName = resultSet.getString("full_display_name");
+                String shortDisplayName = resultSet.getString("short_display_name");
+                int fractionalDigits = resultSet.getInt("fractional_digits");
+                String symbol = resultSet.getString("symbol");
+                String image = resultSet.getString("image");
+                String currencyType = resultSet.getString("currency_type");
+
+                log.debug("Currency found with code: {}", code);
+
+                CurrencyType type = CurrencyType.valueOf(currencyType);
+                return new Currency(type, fullDisplayName, shortDisplayName, code, fractionalDigits, symbol, image) {
+                };
+            }
+        }
+    }
+
+    private String normalizeCurrencyCode(String code) {
+        return code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    public void preloadCurrencies() {
+        List<String> common = List.of(
+                "USD", "EUR", "GBP", "JPY",
+                "BTC", "ETH", "XLM", "USDC", "USDT",
+                "SOL", "BNB", "XRP");
+
+        for (String code : common) {
+            try {
+                getCurrency(code);
+            } catch (Exception exception) {
+                log.debug("Unable to preload currency {}", code, exception);
+            }
+        }
     }
 
     /**

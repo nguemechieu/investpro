@@ -364,7 +364,7 @@ public class InstitutionalBacktestMetrics {
      */
     public String getSummary() {
 
-        String sb = "═══════════════════════════════════════════════════════════════\n" +
+        return "═══════════════════════════════════════════════════════════════\n" +
                 "        INSTITUTIONAL BACKTESTING REPORT\n" +
                 "═══════════════════════════════════════════════════════════════\n\n" +
 
@@ -407,8 +407,6 @@ public class InstitutionalBacktestMetrics {
                 String.format("│ VaR (95%%):              $%.2f\n", var95) +
                 String.format("│ CVaR (95%%):             $%.2f\n", cvar95) +
                 "└───────────────────────────────────────────────────────────┘\n";
-
-        return sb;
     }
 
     /**

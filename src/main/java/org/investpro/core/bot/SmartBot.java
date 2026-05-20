@@ -8,6 +8,7 @@ import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
 import org.investpro.core.agents.AgentRuntime;
 import org.investpro.exchange.Exchange;
+import org.investpro.exchange.infrastructure.BotTradingConfig;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
 import org.jetbrains.annotations.NotNull;
@@ -45,20 +46,29 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SmartBot {
     private final AgentEventBus eventBus;
     private final AgentRuntime runtime;
+    private final BotTradingConfig botTradingConfig;
 
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     private AgentContext context;
 
     public SmartBot() {
-        this(AgentRuntime.createDefault(), new AgentEventBus());
+        this(AgentRuntime.createDefault(), new AgentEventBus(), loadBotTradingConfig());
     }
 
     public SmartBot(
             @NotNull AgentRuntime runtime,
             @NotNull AgentEventBus eventBus) {
+        this(runtime, eventBus, loadBotTradingConfig());
+    }
+
+    public SmartBot(
+            @NotNull AgentRuntime runtime,
+            @NotNull AgentEventBus eventBus,
+            @NotNull BotTradingConfig botTradingConfig) {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
+        this.botTradingConfig = Objects.requireNonNull(botTradingConfig, "botTradingConfig must not be null");
     }
 
     /**
@@ -87,22 +97,22 @@ public class SmartBot {
         newContext.setEventBus(eventBus);
         newContext.setSelectedTradePair(selectedTradePair);
         newContext.setSelectedSymbol(tradePairText(selectedTradePair));
+        newContext.setBotTradingConfig(botTradingConfig);
 
         /*
-         * Safe defaults.
-         *
-         * Auto-trading starts OFF.
-         * AI reasoning can be enabled, but AI still cannot execute directly.
+         * Persisted bot settings feed runtime risk limits. AI reasoning can be
+         * enabled, but execution still goes through the normal risk gate.
          */
-        newContext.setAutoTradingEnabled(false);
+        newContext.setAutoTradingEnabled(botTradingConfig.isEnabled());
         newContext.setAiReasoningEnabled(true);
-        newContext.setMaxRiskPerTrade(0.01);
-        newContext.setMaxDailyLoss(0.03);
+        newContext.setMaxRiskPerTrade(percentToRatio(botTradingConfig.getMaxPortfolioRiskPercent(), 0.01));
+        newContext.setMaxDailyLoss(percentToRatio(botTradingConfig.getMaxDailyLosses(), 0.03));
 
         this.context = newContext;
 
         try {
             runtime.start(context);
+            runtime.setAutoTradingEnabled(botTradingConfig.isEnabled());
 
             publishSystemEvent("SMART_BOT_STARTED", "SmartBot started.");
 
@@ -360,6 +370,19 @@ public class SmartBot {
 
     private String tradePairText(TradePair tradePair) {
         return tradePair == null ? "" : tradePair.toString('/');
+    }
+
+    private static BotTradingConfig loadBotTradingConfig() {
+        BotTradingConfig config = new BotTradingConfig();
+        config.loadFromPreferences();
+        return config;
+    }
+
+    private static double percentToRatio(double percent, double fallback) {
+        if (!Double.isFinite(percent) || percent <= 0) {
+            return fallback;
+        }
+        return percent / 100.0;
     }
 
     private String safeExchangeName(Exchange exchange) {

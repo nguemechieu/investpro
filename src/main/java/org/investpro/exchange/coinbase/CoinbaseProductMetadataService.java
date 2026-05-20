@@ -1,12 +1,15 @@
 package org.investpro.exchange.coinbase;
 
+import lombok.Getter;
 import org.investpro.exchange.core.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
  * CoinbaseProductMetadataService - Fetches and caches Coinbase product metadata.
  */
+@Getter
 public class CoinbaseProductMetadataService {
     private final CoinbaseAuthProvider authProvider;
     private final Map<String, InstrumentMetadata> metadataCache;
@@ -86,14 +89,14 @@ public class CoinbaseProductMetadataService {
         };
     }
     
-    private java.math.BigDecimal getPriceIncrement(String productId) {
+    private BigDecimal getPriceIncrement(String productId) {
         // Stub - would parse from API response
-        return java.math.BigDecimal.valueOf(0.01);
+        return BigDecimal.valueOf(0.01);
     }
     
-    private java.math.BigDecimal getQuantityIncrement(String productId) {
+    private BigDecimal getQuantityIncrement(String productId) {
         // Stub - would parse from API response
-        return java.math.BigDecimal.valueOf(0.0001);
+        return BigDecimal.valueOf(0.0001);
     }
     
     private java.math.BigDecimal getMinQuantity(String productId) {
@@ -101,9 +104,9 @@ public class CoinbaseProductMetadataService {
         return java.math.BigDecimal.valueOf(0.001);
     }
     
-    private java.math.BigDecimal getMinNotional(String productId) {
+    private BigDecimal getMinNotional(String productId) {
         // Stub - would parse from API response
-        return java.math.BigDecimal.TEN;
+        return BigDecimal.TEN;
     }
     
     private java.math.BigDecimal getMaxLeverage(BrokerVenue venue) {

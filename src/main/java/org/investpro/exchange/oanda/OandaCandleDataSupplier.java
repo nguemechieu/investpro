@@ -36,20 +36,26 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final int EARLIEST_DATA = 1422144000; // roughly the first trade
-    private static final String OANDA_API_URL = "https://api-fxtrade.oanda.com";
+    private static final String OANDA_LIVE_API_URL = "https://api-fxtrade.oanda.com";
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(java.time.Duration.ofSeconds(20))
             .build();
 
     private final String apiToken;
+    private final String apiBaseUrl;
 
     public OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
         this(secondsPerCandle, tradePair, "");
     }
 
     public OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiToken) {
+        this(secondsPerCandle, tradePair, apiToken, OANDA_LIVE_API_URL);
+    }
+
+    public OandaCandleDataSupplier(int secondsPerCandle, TradePair tradePair, String apiToken, String apiBaseUrl) {
         super(200, secondsPerCandle, tradePair, new SimpleIntegerProperty(-1));
         this.apiToken = firstNonBlank(apiToken, configuredToken());
+        this.apiBaseUrl = firstNonBlank(apiBaseUrl, OANDA_LIVE_API_URL);
     }
 
     @Override
@@ -68,7 +74,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
 
     @Override
     public CandleDataSupplier getCandleDataSupplier(int secondsPerCandle, TradePair tradePair) {
-        return new OandaCandleDataSupplier(secondsPerCandle, tradePair, apiToken);
+        return new OandaCandleDataSupplier(secondsPerCandle, tradePair, apiToken, apiBaseUrl);
     }
 
     @Override
@@ -109,7 +115,7 @@ public class OandaCandleDataSupplier extends CandleDataSupplier {
 
         String uriStr = "%s/v3/instruments/%s/candles?granularity=%s&from=%s&to=%s&price=M"
                 .formatted(
-                        OANDA_API_URL,
+                        apiBaseUrl,
                         urlEncode(toOandaInstrument(tradePair)),
                         toOandaGranularity(secondsPerCandle),
                         urlEncode(startDateString),

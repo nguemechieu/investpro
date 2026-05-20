@@ -28,7 +28,7 @@ import java.util.*;
 
 /**
  * MarketWatch Panel displays symbol-level agent state and trading readiness.
- * 
+ * <p>
  * Shows:
  * - Market data (bid, ask, spread)
  * - Agent state (training, paper trading, live ready, live trading, blocked,
@@ -133,7 +133,7 @@ public class MarketWatchPanel extends BorderPane {
                     setGraphic(null);
                 } else {
                     // Extract base currency (before underscore) for icon lookup
-                    String baseCurrency = item.split("_")[0];
+                    String baseCurrency = item.split("[_/\\-]")[0];
                     Image icon = CurrencyIconLoader.loadCurrencyIcon(baseCurrency);
                     if (icon != null) {
                         ImageView imageView = new ImageView(icon);
@@ -354,7 +354,7 @@ public class MarketWatchPanel extends BorderPane {
         Label symbolCountLabel = new Label("Symbols: 0");
         symbolCountLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
 
-        Button refreshButton = new Button("\u27F3 Refresh");
+        Button refreshButton = new Button("⟳");
         refreshButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #3b82f6; " +
@@ -366,7 +366,7 @@ public class MarketWatchPanel extends BorderPane {
             symbolCountLabel.setText("Symbols: " + rowCache.size());
         });
 
-        Button pauseButton = new Button("\u23F8 Pause");
+        Button pauseButton = new Button("⏸ ");
         pauseButton.setStyle(
                 "-fx-padding: 6 12; " +
                         "-fx-background-color: #8b5cf6; " +
@@ -376,7 +376,7 @@ public class MarketWatchPanel extends BorderPane {
         pauseButton.setOnAction(e -> {
             if (refreshTimer != null && refreshTimer.getStatus() == javafx.animation.Animation.Status.RUNNING) {
                 refreshTimer.stop();
-                pauseButton.setText("\u25B6 Resume");
+                pauseButton.setText("▶ ");
                 pauseButton.setStyle(
                         "-fx-padding: 6 12; " +
                                 "-fx-background-color: #10b981; " +

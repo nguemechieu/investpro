@@ -187,7 +187,7 @@ public class Bitfinex extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return submitBitfinexOrder(tradePair, side, amount, 0.0, "EXCHANGE MARKET");
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -233,7 +233,7 @@ public class Bitfinex extends Exchange {
     @Override
     public CompletableFuture<String> createLimitOrder(TradePair tradePair, Side side, double amount,
             double limitPrice) {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return submitBitfinexOrder(tradePair, side, amount, limitPrice, "EXCHANGE LIMIT");
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -333,11 +333,12 @@ public class Bitfinex extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        // If user explicitly selected trading mode during onboarding, respect that
-        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
-            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        if (modeRequestsPaperNetwork()) {
+            return true;
         }
-        // Otherwise, default to paper trading if no credentials
+        if (modeRequestsLiveNetwork()) {
+            return false;
+        }
         return !hasCredentials();
     }
 
@@ -481,6 +482,11 @@ public class Bitfinex extends Exchange {
 
     @Override
     public void connect() {
+        if (isPaperTrading()) {
+            connected.set(true);
+            logger.info("Bitfinex paper mode selected; live network connection skipped.");
+            return;
+        }
         if (hasCredentials()) {
             try {
                 fetchAccount().join();
@@ -654,7 +660,7 @@ public class Bitfinex extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return CompletableFuture.supplyAsync(this::fetchLiveAccount);
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -1348,7 +1354,7 @@ public class Bitfinex extends Exchange {
             case 604800 -> "1w";
             case 2592000 -> "1M";
 
-            default -> "1m";
+            default -> "";
         };
     }
 

@@ -10,204 +10,222 @@ import javafx.beans.value.ObservableValue;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Separator;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.text.Font;
 import javafx.util.Duration;
-import lombok.Getter;
-import lombok.Setter;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.CandleStickChartOptions;
 import org.investpro.utils.DelayedSizeChangeListener;
 import org.investpro.utils.PopOver;
 import org.investpro.utils.ZoomDirection;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 
+import static org.investpro.ui.ChartToolbar.Tool.OPTIONS;
 import static org.investpro.utils.FXUtils.computeTextDimensions;
 
 /**
- * A resizable toolbar, placed at the top of a {@code CandleStickChart} and
- * contained
- * inside a {@code CandleStickChartContainer}, that contains a series of
- * labelled
- * buttons that allow for controlling the chart paired with this toolbar. Some
- * of the
- * functions of the buttons are:
+ * Responsive chart toolbar for InvestPro candlestick charts.
  *
- * <ul>
- * <li>Select the duration of each candle</li>
- * <li>Zoom the chart in/out</li>
- * <li>Print the chart</li>
- * <li>Configure the chart's options (via a PopOver triggered by a button)</li>
- * <li>Take screenshots of the chart</li>
- * <li>Enable/disable auto trading</li>
- * </ul>
- * <p>
- * The toolbar buttons are labelled with either text (which is used for the
- * duration buttons,
- * e.g. "6h") or a glyph (e.g. magnifying glasses with a plus/minus for zoom
- * in/out).
- * <p>
- * The toolbar is responsive and adjusts button sizes and fonts based on
- * container width.
- * It manages a PopOver for chart options and handles mouse interactions
- * elegantly.
+ * <p>The toolbar is exchange-agnostic and works with OANDA, crypto exchanges, and any adapter
+ * that exposes candle granularities in seconds. It normalizes and sorts granularities so the UI
+ * stays consistent across exchanges.
  */
-@Getter
-@Setter
 public class ChartToolbar extends Region {
-    // Layout Constants
-    private static final int POPOVER_BUFFER_PERCENTAGE = 10;
-    private static final int FONT_SIZE_THRESHOLD = 900;
-    private static final int FONT_SIZE_LARGE = 14;
-    private static final int FONT_SIZE_MEDIUM = 13;
-    private static final int GLYPH_FONT_SIZE_LARGE = 15;
-    private static final int PADDING_ADJUSTMENT_FACTOR = 100;
-    private static final int TEXT_PADDING_TOP_BOTTOM_LARGE = 4;
-    private static final int TEXT_PADDING_LEFT_RIGHT_LARGE = 8;
-    private static final int TEXT_PADDING_BASE = 4;
-    private static final int GLYPH_PADDING_TOP_BOTTOM_LARGE = 5;
-    private static final int GLYPH_PADDING_LEFT_RIGHT_LARGE = 10;
-    private static final int GLYPH_PADDING_BASE = 5;
-    private static final int SEPARATOR_PADDING_LARGE = 20;
-    private static final int TEXT_BUTTON_WIDTH_PADDING = 15;
-    private static final int SIZE_ADJUSTMENT_DELAY_PRIMARY = 750;
-    private static final int SIZE_ADJUSTMENT_DELAY_SECONDARY = 300;
 
-    // UI Components
-    private final HBox toolbar = new HBox();
-    private PopOver optionsPopOver;
+    private static final int MIN_BUTTON_SIZE = 28;
+    private static final int LARGE_WIDTH_BREAKPOINT = 900;
+    private static final int MEDIUM_WIDTH_BREAKPOINT = 680;
+
+    private final HBox toolbar;
+    private final PopOver optionsPopOver;
+    private final Separator functionOptionsSeparator;
+
     private MouseExitedPopOverFilter mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
-    private Separator functionOptionsSeparator;
 
-    // Action buttons
-    private final Button screenshotButton = new ToolbarButton(Tool.SCREEN_SHOT);
-
-    // Callbacks for button actions
-    private Runnable onScreenshotAction;
-    private Runnable onAutoTradeAction;
-    private Runnable onPrintAction;
-
-    public ChartToolbar(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight,
-            PopOver optionsPopOver, Separator functionOptionsSeparator) {
-        this.optionsPopOver = optionsPopOver;
-        this.functionOptionsSeparator = functionOptionsSeparator;
+    ChartToolbar(ObservableNumberValue containerWidth,
+                 ObservableNumberValue containerHeight,
+                 Set<Integer> granularities) {
         Objects.requireNonNull(containerWidth, "containerWidth must not be null");
         Objects.requireNonNull(containerHeight, "containerHeight must not be null");
+        Objects.requireNonNull(granularities, "granularities must not be null");
 
-        List<Node> toolbarNodes = buildToolbarNodes();
-        configureToolbar(toolbarNodes, containerWidth, containerHeight);
-    }
+        this.optionsPopOver = new PopOver();
+        this.optionsPopOver.setTitle("Chart Options");
+        this.optionsPopOver.setHeaderAlwaysVisible(true);
 
-    /**
-     * Builds the list of toolbar nodes (buttons and separators)
-     */
-    private @NotNull List<Node> buildToolbarNodes() {
-        List<Node> toolbarNodes = new ArrayList<>();
-        addActionButtons(toolbarNodes);
-        addFunctionButtons(toolbarNodes);
-        return toolbarNodes;
-    }
+        this.functionOptionsSeparator = new Separator();
+        this.functionOptionsSeparator.setOpacity(0);
+        this.functionOptionsSeparator.setPadding(new Insets(0, 18, 0, 0));
 
-    /**
-     * Adds action buttons (screenshot, auto-trade).
-     */
-    private void addActionButtons(@NotNull List<Node> toolbarNodes) {
-        toolbarNodes.add(screenshotButton);
-        toolbarNodes.add(createInvisibleSeparator());
-    }
+        this.toolbar = new HBox(6);
+        this.toolbar.setAlignment(Pos.CENTER_LEFT);
+        this.toolbar.getStyleClass().add("candle-chart-toolbar");
+        this.toolbar.setFillHeight(true);
 
-    /**
-     * Adds function buttons (zoom, navigation, overlays, print, options).
-     */
-    private void addFunctionButtons(@NotNull List<Node> toolbarNodes) {
-        functionOptionsSeparator = createInvisibleSeparator();
-        functionOptionsSeparator.setPadding(new Insets(0, SEPARATOR_PADDING_LARGE, 0, 0));
+        List<Node> toolbarNodes = buildToolbarNodes(normalizeGranularities(granularities));
+        toolbar.getChildren().setAll(toolbarNodes);
 
-        if (optionsPopOver == null) {
-            optionsPopOver = new PopOver();
-            optionsPopOver.setTitle("Chart Options");
-            optionsPopOver.setHeaderAlwaysVisible(true);
-        }
+        getStyleClass().add("candle-chart-toolbar-wrapper");
+        getChildren().setAll(toolbar);
 
-        Tool[] essentialTools = {
-                Tool.ZOOM_IN,
-                Tool.ZOOM_OUT,
-                Tool.JUMP_TO_LATEST,
-                Tool.FIT_CHART,
-                Tool.REFRESH_CHART,
-                Tool.TOGGLE_CROSSHAIR,
-                Tool.TOGGLE_PRICE_LINES,
-                Tool.ADD_SUPPORT_LINE,
-                Tool.ADD_RESISTANCE_LINE,
-                Tool.ADD_ENTRY_LINE,
-                Tool.ADD_STOP_LOSS_LINE,
-                Tool.ADD_TAKE_PROFIT_LINE,
-                Tool.CLEAR_PRICE_LINES,
-                Tool.APPLY_SCALING,
-                Tool.PRINT,
-                Tool.AUTO_TRADE
+        BooleanProperty gotFirstSize = new SimpleBooleanProperty(false);
+        SizeChangeListener sizeListener = new SizeChangeListener(gotFirstSize, containerWidth, containerHeight);
+        containerWidth.addListener(sizeListener);
+        containerHeight.addListener(sizeListener);
+
+        ChangeListener<Boolean> gotFirstSizeChangeListener = new ChangeListener<>() {
+            @Override
+            public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
+                if (Boolean.TRUE.equals(newValue)) {
+                    sizeListener.resize();
+                    gotFirstSize.removeListener(this);
+                }
+            }
         };
-
-        toolbarNodes.add(functionOptionsSeparator);
-
-        for (Tool tool : essentialTools) {
-            ToolbarButton toolbarButton = new ToolbarButton(tool);
-            toolbarNodes.add(toolbarButton);
-        }
+        gotFirstSize.addListener(gotFirstSizeChangeListener);
     }
 
+    private List<Node> buildToolbarNodes(List<Integer> sortedGranularities) {
+        List<Node> nodes = new ArrayList<>((sortedGranularities.size() * 2) + Tool.values().length + 4);
 
-    /**
-     * Creates an invisible separator for visual grouping.
-     */
-    private Separator createInvisibleSeparator() {
+        GranularityBucket previousBucket = null;
+        for (Integer granularity : sortedGranularities) {
+            if (granularity == null || granularity <= 0) {
+                continue;
+            }
+
+            GranularityBucket bucket = bucketFor(granularity);
+            if (previousBucket != null && bucket != previousBucket) {
+                nodes.add(invisibleSeparator(10));
+            }
+            previousBucket = bucket;
+
+            nodes.add(new ToolbarButton(formatGranularity(granularity), granularity));
+        }
+
+        nodes.add(invisibleSeparator(14));
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        nodes.add(spacer);
+
+        for (Tool tool : Tool.values()) {
+            ToolbarButton toolbarButton = new ToolbarButton(tool);
+
+            if (tool == OPTIONS) {
+                nodes.add(functionOptionsSeparator);
+                configureOptionsButton(toolbarButton);
+            }
+
+            nodes.add(toolbarButton);
+        }
+
+        return nodes;
+    }
+
+    private List<Integer> normalizeGranularities(Set<Integer> granularities) {
+        LinkedHashSet<Integer> normalized = new LinkedHashSet<>();
+
+        for (Integer granularity : granularities) {
+            if (granularity == null || granularity <= 0) {
+                continue;
+            }
+            normalized.add(granularity);
+        }
+
+        // Safe defaults for OANDA + common crypto exchanges when an adapter returns nothing.
+        if (normalized.isEmpty()) {
+            normalized.addAll(List.of(60, 300, 900, 1800, 3600, 14400, 86400, 604800, 2592000));
+        }
+
+        return normalized.stream()
+                .sorted(Comparator.naturalOrder())
+                .toList();
+    }
+
+    private Separator invisibleSeparator(int rightPadding) {
         Separator separator = new Separator();
         separator.setOpacity(0);
+        separator.setPadding(new Insets(0, rightPadding, 0, 0));
         return separator;
     }
 
-    /**
-     * Configures the toolbar container and sets up dynamic resizing.
-     */
-    private void configureToolbar(List<Node> toolbarNodes, ObservableNumberValue containerWidth,
-            ObservableNumberValue containerHeight) {
-        toolbar.getChildren().addAll(toolbarNodes);
-        toolbar.getStyleClass().add("candle-chart-toolbar");
-        toolbar.setFillHeight(true);
+    private String formatGranularity(int seconds) {
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+        if (seconds < 3600) {
+            return (seconds / 60) + "m";
+        }
+        if (seconds < 86400) {
+            return (seconds / 3600) + "h";
+        }
+        if (seconds < 604800) {
+            return (seconds / 86400) + "d";
+        }
+        if (seconds < 2592000) {
+            return (seconds / 604800) + "w";
+        }
+        return (seconds / 2592000) + "mo";
+    }
 
-        BooleanProperty gotFirstSize = new SimpleBooleanProperty(false);
-        final SizeChangeListener sizeListener = new SizeChangeListener(gotFirstSize, containerWidth,
-                containerHeight);
-        containerWidth.addListener(sizeListener);
-        containerHeight.addListener(sizeListener);
-        ChangeListener<? super Boolean> gotFirstSizeChangeListener = new ChangeListener<>() {
-            @Override
-            public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
-                sizeListener.resize();
-                gotFirstSize.removeListener(this);
+    private GranularityBucket bucketFor(int seconds) {
+        if (seconds < 60) {
+            return GranularityBucket.SECONDS;
+        }
+        if (seconds < 3600) {
+            return GranularityBucket.MINUTES;
+        }
+        if (seconds < 86400) {
+            return GranularityBucket.HOURS;
+        }
+        if (seconds < 604800) {
+            return GranularityBucket.DAYS;
+        }
+        if (seconds < 2592000) {
+            return GranularityBucket.WEEKS;
+        }
+        return GranularityBucket.MONTHS;
+    }
+
+    private void configureOptionsButton(ToolbarButton toolbarButton) {
+        toolbarButton.setOnMouseEntered(event -> {
+            mouseInsideOptionsButton = true;
+            optionsPopOver.show(toolbarButton);
+        });
+
+        toolbarButton.setOnMouseExited(event -> {
+            mouseInsideOptionsButton = false;
+            Scene scene = getScene();
+            if (scene == null || scene.getWindow() == null) {
+                optionsPopOver.hide(Duration.seconds(0.25));
+                return;
             }
-        };
-
-        gotFirstSize.addListener(gotFirstSizeChangeListener);
-        getChildren().setAll(toolbar);
+            if (mouseExitedPopOverFilter == null) {
+                mouseExitedPopOverFilter = new MouseExitedPopOverFilter(scene);
+                scene.getWindow().addEventFilter(MouseEvent.MOUSE_MOVED, mouseExitedPopOverFilter);
+            }
+        });
     }
 
     @Override
@@ -216,328 +234,277 @@ public class ChartToolbar extends Region {
     }
 
     @Override
-    protected double computeMinWidth(double height) {
-        return 0;
-    }
-
-    @Override
-    protected double computePrefWidth(double height) {
-        return 520;
+    protected double computePrefHeight(double width) {
+        return 42;
     }
 
     @Override
     protected double computeMinHeight(double width) {
-        return 28;
+        return 34;
     }
 
     @Override
-    protected double computePrefHeight(double width) {
-        return 32;
+    protected double computePrefWidth(double height) {
+        return toolbar.prefWidth(height);
     }
 
-    /**
-     * Sets which toolbar button is active based on the selected granularity.
-     *
-     * @param secondsPerCandle the selected candle duration in seconds
-     * @throws NullPointerException if secondsPerCandle is null
-     */
-    public void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
+    void setActiveToolbarButton(IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(secondsPerCandle, "secondsPerCandle must not be null");
+
         for (Node childNode : toolbar.getChildren()) {
             if (childNode instanceof ToolbarButton tool) {
-                tool.setActive(secondsPerCandle.get() == tool.duration);
+                tool.setActive(tool.duration != -1 && secondsPerCandle.get() == tool.duration);
             }
         }
     }
 
-    /**
-     * Registers event handlers for all toolbar buttons with the chart.
-     * Connects granularity buttons to timeframe changes and tool buttons to their
-     * actions.
-     *
-     * @param candleStickChart the chart to control
-     * @param secondsPerCandle the property tracking the current candle duration
-     * @throws NullPointerException if either parameter is null
-     */
-    public void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
+    void registerEventHandlers(CandleStickChart candleStickChart, IntegerProperty secondsPerCandle) {
         Objects.requireNonNull(candleStickChart, "candleStickChart must not be null");
         Objects.requireNonNull(secondsPerCandle, "secondsPerCandle must not be null");
 
-        this.candleStickChart = candleStickChart;
-        registerToolHandlers(candleStickChart);
-        registerActionHandlers();
-    }
-
-    /**
-     * Registers handlers for tool buttons (zoom, print, options).
-     */
-    private void registerToolHandlers(CandleStickChart candleStickChart) {
         for (Node childNode : toolbar.getChildren()) {
-            if (childNode instanceof ToolbarButton tool) {
-                if (tool.tool == null) {
-                    continue;
-                }
+            if (!(childNode instanceof ToolbarButton tool)) {
+                continue;
+            }
 
-                switch (tool.tool) {
-                    // Zoom functions
-                    case ZOOM_IN, ZOOM_OUT ->
-                        tool.setOnAction(event -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
-                    // Chart navigation
-                    case JUMP_TO_LATEST -> tool.setOnAction(event -> candleStickChart.jumpToLatestCandle());
-                    case FIT_CHART -> tool.setOnAction(event -> candleStickChart.fitChart());
-                    case REFRESH_CHART -> tool.setOnAction(event -> candleStickChart.refreshChart());
-                    case AUTO_TRADE -> tool.setOnAction(event -> candleStickChart.autoTrade());
-                    case SCREEN_SHOT -> tool.setOnAction(event -> candleStickChart.screenshot());
+            if (tool.duration != -1) {
+                tool.setOnAction(event -> {
+                    secondsPerCandle.setValue(tool.duration);
+                    setActiveToolbarButton(secondsPerCandle);
+                });
+                continue;
+            }
 
-                    // Crosshair controls
-                    case TOGGLE_CROSSHAIR -> tool.setOnAction(event -> candleStickChart.toggleCrosshair());
+            if (tool.tool == null) {
+                continue;
+            }
 
-                    // Price line controls
-                    case TOGGLE_PRICE_LINES -> tool.setOnAction(event -> candleStickChart.togglePriceLines());
-                    case ADD_SUPPORT_LINE ->
-                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.SUPPORT));
-                    case ADD_RESISTANCE_LINE ->
-                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.RESISTANCE));
-                    case ADD_ENTRY_LINE ->
-                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.ENTRY));
-                    case ADD_STOP_LOSS_LINE ->
-                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.STOP_LOSS));
-                    case ADD_TAKE_PROFIT_LINE ->
-                        tool.setOnAction(event -> addPromptedPriceLine(candleStickChart, PriceLineKind.TAKE_PROFIT));
-                    case CLEAR_PRICE_LINES -> tool.setOnAction(event -> candleStickChart.clearPriceLines());
-
-                    // Adaptive scaling
-                    case APPLY_SCALING -> tool.setOnAction(event -> candleStickChart.applyAdaptiveScaling());
-
-                    // Other functions
-                    case PRINT -> tool.setOnAction(event -> executePrintAction());
-
-                    // OPTIONS button already has handlers from attachOptionsButtonBehavior - skip
-                    // override
-                    case OPTIONS -> {
-                        // No action needed - OPTIONS button was already configured in
-                        // attachOptionsButtonBehavior
-                    }
-
+            switch (tool.tool) {
+                case ZOOM_IN, ZOOM_OUT -> tool.setOnAction(event -> candleStickChart.changeZoom(tool.tool.getZoomDirection()));
+                case PRINT -> tool.setOnAction(event -> candleStickChart.print());
+                case SCREENSHOT -> tool.setOnAction(event -> candleStickChart.screenshot());
+                case CROSSHAIR -> tool.setOnAction(event -> candleStickChart.toggleCrosshair());
+                case AUTO_TRADE -> tool.setOnAction(event -> candleStickChart.autoTrade());
+                case REFRESH -> tool.setOnAction(event -> candleStickChart.refreshChart());
+                case OPTIONS -> {
+                    // Popover is handled by mouse enter/exit.
                 }
             }
         }
     }
 
-    private void addPromptedPriceLine(CandleStickChart chart, PriceLineKind kind) {
-        if (chart == null || kind == null) {
-            return;
-        }
-
-        double defaultPrice = chart.getHoveredPrice() > 0 ? chart.getHoveredPrice() : chart.getLatestClosePrice();
-        TextInputDialog dialog = new TextInputDialog(defaultPrice > 0 ? String.valueOf(defaultPrice) : "");
-        dialog.setTitle(kind.dialogTitle());
-        dialog.setHeaderText(kind.dialogTitle());
-        dialog.setContentText("Price:");
-
-        Optional<String> answer = dialog.showAndWait();
-        if (answer.isEmpty()) {
-            return;
-        }
-
-        double price;
-        try {
-            price = Double.parseDouble(answer.get().trim());
-        } catch (NumberFormatException exception) {
-            return;
-        }
-
-        if (!Double.isFinite(price) || price <= 0.0) {
-            return;
-        }
-
-        switch (kind) {
-            case SUPPORT -> chart.addSupportPriceLine(price);
-            case RESISTANCE -> chart.addResistancePriceLine(price);
-            case ENTRY -> chart.addEntryPriceLine(price);
-            case STOP_LOSS -> chart.addStopLossPriceLine(price);
-            case TAKE_PROFIT -> chart.addTakeProfitPriceLine(price);
-        }
-    }
-
-    /**
-     * Registers handlers for action buttons (screenshot, auto-trade).
-     */
-    private void registerActionHandlers() {
-        screenshotButton.setOnAction(event -> executeScreenshotAction());
-    }
-
-    /**
-     * Sets the chart options pane to be displayed in the options PopOver.
-     *
-     * @param chartOptions the chart options UI component
-     * @throws NullPointerException if chartOptions is null
-     */
-    public void setChartOptions(@NotNull CandleStickChartOptions chartOptions) {
+    void setChartOptions(CandleStickChartOptions chartOptions) {
         Objects.requireNonNull(chartOptions, "chartOptions must not be null");
         optionsPopOver.setContentNode(chartOptions.getOptionsPane());
     }
 
-    /**
-     * Stores reference to the candlestick chart for direct method calls.
-     * This allows toolbar to properly manage chart state via public API methods.
-     */
-    private CandleStickChart candleStickChart;
-
-    /**
-     * Executes the screenshot action if a callback is set.
-     */
-    private void executeScreenshotAction() {
-        if (onScreenshotAction != null) {
-            onScreenshotAction.run();
-        } else if (candleStickChart != null) {
-            candleStickChart.screenshot();
-        }
-    }
-
-    private void executePrintAction() {
-        if (onPrintAction != null) {
-            onPrintAction.run();
-        } else if (candleStickChart != null) {
-            candleStickChart.print();
-        }
-    }
-
-    /**
-     * Enumeration of toolbar tools (non-granularity buttons).
-     * Includes zoom controls, navigation, crosshair toggle, and price line
-     * management.
-     */
     enum Tool {
-        // Zoom controls
-        ZOOM_IN("/img/search-plus-solid.png", "Zoom In"),
-        ZOOM_OUT("/img/search-minus-solid.png", "Zoom Out"),
+        ZOOM_IN("/img/search-plus-solid.png", "+", "Zoom In"),
+        ZOOM_OUT("/img/search-minus-solid.png", "−", "Zoom Out"),
+        REFRESH("/img/refresh-solid.png", "⟳", "Refresh"),
+        CROSSHAIR("/img/crosshairs-solid.png", "⌖", "Crosshair"),
+        SCREENSHOT("/img/screenshot.png", "▣", "Screenshot"),
+        AUTO_TRADE("/img/auto-trade-solid.png", "A", "Auto Trade"),
+        PRINT("/img/print-solid.png", "⎙", "Print"),
+        OPTIONS("/img/cog-solid.png", "⚙", "Options");
 
-        // Chart navigation
-        JUMP_TO_LATEST("/img/arrow-right-solid.png", "Jump to Latest"),
-        FIT_CHART("/img/expand-solid.png", "Fit Chart"),
-        REFRESH_CHART("/img/refresh-solid.png", "Refresh Chart"),
+        private final String img;
+        private final String fallbackText;
+        private final String label;
 
-        // Overlay controls
-        TOGGLE_CROSSHAIR("/img/crosshairs-solid.png", "Toggle Crosshair"),
-        TOGGLE_PRICE_LINES("/img/minus-solid.png", "Toggle Price Lines"),
-        ADD_SUPPORT_LINE("/img/plus-solid.png", "Add Support Line"),
-        ADD_RESISTANCE_LINE("/img/plus-solid.png", "Add Resistance Line"),
-        ADD_ENTRY_LINE("/img/plus-solid.png", "Add Entry Line"),
-        ADD_STOP_LOSS_LINE("/img/plus-solid.png", "Add Stop Loss Line"),
-        ADD_TAKE_PROFIT_LINE("/img/plus-solid.png", "Add Take Profit Line"),
-        CLEAR_PRICE_LINES("/img/trash-solid.png", "Clear Price Lines"),
-
-        // Adaptive scaling
-        APPLY_SCALING("/img/sliders-solid.png", "Apply Adaptive Scaling"),
-
-        // Chart options
-        PRINT("/img/print-solid.png", "Print Chart"),
-        OPTIONS("/img/cog-solid.png", "Chart Options"),
-        SCREEN_SHOT("/img/screenshot.png", "Chart Screen Shot"),
-        AUTO_TRADE("/img/auto-trade-solid.png", "Auto Trade");
-
-        private final String imgPath;
-        private final String tooltip;
-
-        Tool(String imgPath, String tooltip) {
-            this.imgPath = imgPath;
-            this.tooltip = tooltip;
+        Tool(String img, String fallbackText, String label) {
+            this.img = img;
+            this.fallbackText = fallbackText;
+            this.label = label;
         }
 
-        /**
-         * Gets the resource path to the icon image.
-         */
-        String getImagePath() {
-            return imgPath;
-        }
-
-        /**
-         * Gets the tooltip text for this tool.
-         */
-        String getTooltipText() {
-            return tooltip;
-        }
-
-        String getFallbackLabel() {
-            return switch (this) {
-                case ZOOM_IN -> "+";
-                case ZOOM_OUT -> "-";
-                case JUMP_TO_LATEST -> ">|";
-                case FIT_CHART -> "Fit";
-                case REFRESH_CHART -> "Ref";
-                case TOGGLE_CROSSHAIR -> "Cross";
-                case TOGGLE_PRICE_LINES -> "Line";
-                case ADD_SUPPORT_LINE -> "Sup";
-                case ADD_RESISTANCE_LINE -> "Res";
-                case ADD_ENTRY_LINE -> "Ent";
-                case ADD_STOP_LOSS_LINE -> "SL";
-                case ADD_TAKE_PROFIT_LINE -> "TP";
-                case CLEAR_PRICE_LINES -> "Clr";
-                case APPLY_SCALING -> "Scale";
-                case PRINT -> "Print";
-                case OPTIONS -> "Opt";
-                case SCREEN_SHOT -> "Screen Shot";
-                case AUTO_TRADE -> "AI Trade";
-            };
-        }
-
-        /**
-         * Checks if this tool is a zoom function.
-         */
         boolean isZoomFunction() {
             return this == ZOOM_IN || this == ZOOM_OUT;
         }
 
-        /**
-         * Gets the zoom direction for zoom tools.
-         *
-         * @return the zoom direction
-         * @throws IllegalArgumentException if this is not a zoom tool
-         */
         ZoomDirection getZoomDirection() {
             if (!isZoomFunction()) {
-                throw new IllegalArgumentException(
-                        "cannot call getZoomDirection() on non-zoom function: %s".formatted(name()));
+                throw new IllegalArgumentException("cannot call getZoomDirection() on non-zoom function: " + name());
             }
             return this == ZOOM_IN ? ZoomDirection.IN : ZoomDirection.OUT;
         }
     }
 
-    private enum PriceLineKind {
-        SUPPORT("Add Support Line"),
-        RESISTANCE("Add Resistance Line"),
-        ENTRY("Add Entry Line"),
-        STOP_LOSS("Add Stop Loss Line"),
-        TAKE_PROFIT("Add Take Profit Line");
+    private enum GranularityBucket {
+        SECONDS,
+        MINUTES,
+        HOURS,
+        DAYS,
+        WEEKS,
+        MONTHS
+    }
 
-        private final String dialogTitle;
-
-        PriceLineKind(String dialogTitle) {
-            this.dialogTitle = dialogTitle;
+    private class SizeChangeListener extends DelayedSizeChangeListener {
+        SizeChangeListener(BooleanProperty gotFirstSize,
+                           ObservableValue<Number> containerWidth,
+                           ObservableValue<Number> containerHeight) {
+            super(750, 300, gotFirstSize, containerWidth, containerHeight);
         }
 
-        String dialogTitle() {
-            return dialogTitle;
+        public void resize() {
+            double width = Math.max(320, containerWidth.getValue().doubleValue());
+
+            Font textFont;
+            Font glyphFont;
+            Insets textPadding;
+            Insets glyphPadding;
+            double gap;
+
+            if (width >= LARGE_WIDTH_BREAKPOINT) {
+                textFont = Font.font(13);
+                glyphFont = Font.font(18);
+                textPadding = new Insets(5, 10, 5, 10);
+                glyphPadding = new Insets(6, 10, 6, 10);
+                gap = 6;
+            } else if (width >= MEDIUM_WIDTH_BREAKPOINT) {
+                textFont = Font.font(12);
+                glyphFont = Font.font(16);
+                textPadding = new Insets(4, 8, 4, 8);
+                glyphPadding = new Insets(5, 8, 5, 8);
+                gap = 4;
+            } else {
+                textFont = Font.font(11);
+                glyphFont = Font.font(14);
+                textPadding = new Insets(3, 6, 3, 6);
+                glyphPadding = new Insets(4, 6, 4, 6);
+                gap = 3;
+            }
+
+            toolbar.setSpacing(gap);
+
+            for (Node toolbarNode : toolbar.getChildren()) {
+                if (!(toolbarNode instanceof ToolbarButton toolbarButton)) {
+                    continue;
+                }
+
+                if (toolbarButton.duration != -1) {
+                    toolbarButton.setStyle("-fx-font-size: " + textFont.getSize() + "px;");
+                    toolbarButton.setPrefWidth(width >= LARGE_WIDTH_BREAKPOINT
+                            ? Region.USE_COMPUTED_SIZE
+                            : computeTextDimensions(toolbarButton.textLabel, textFont).getWidth() + 16);
+                    toolbarButton.setMinHeight(MIN_BUTTON_SIZE);
+                    toolbarButton.setPadding(textPadding);
+                } else {
+                    toolbarButton.setStyle("-fx-font-size: " + glyphFont.getSize() + "px;");
+                    if (toolbarButton.graphicLabel != null) {
+                        toolbarButton.graphicLabel.setFitHeight(glyphFont.getSize());
+                        toolbarButton.graphicLabel.setFitWidth(glyphFont.getSize());
+                    }
+                    toolbarButton.setMinHeight(MIN_BUTTON_SIZE);
+                    toolbarButton.setPadding(glyphPadding);
+                }
+            }
+
+            functionOptionsSeparator.setPadding(new Insets(0, width >= LARGE_WIDTH_BREAKPOINT ? 18 : 8, 0, 0));
+            requestLayout();
         }
     }
 
-    /**
-     * A specialized Button for the toolbar that can be either a text-labeled
-     * granularity button
-     * or a glyph-labeled tool button.
-     */
+    private class MouseExitedPopOverFilter implements EventHandler<MouseEvent> {
+        private final Scene scene;
+
+        MouseExitedPopOverFilter(Scene scene) {
+            this.scene = scene;
+        }
+
+        @Override
+        public void handle(MouseEvent event) {
+            if (scene == null || scene.getWindow() == null) {
+                optionsPopOver.hide(Duration.seconds(0.25));
+                mouseExitedPopOverFilter = null;
+                return;
+            }
+
+            boolean insidePopover = event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
+                    && event.getScreenX() >= optionsPopOver.getX()
+                    && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
+                    && event.getScreenY() >= optionsPopOver.getY();
+
+            if (!insidePopover && !mouseInsideOptionsButton) {
+                optionsPopOver.hide(Duration.seconds(0.25));
+                scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
+                mouseExitedPopOverFilter = null;
+            }
+        }
+    }
+
     private static class ToolbarButton extends Button {
+        private static final PseudoClass ACTIVE_CLASS = PseudoClass.getPseudoClass("active");
+
         private final String textLabel;
         private final ImageView graphicLabel;
         private final Tool tool;
         private final int duration;
-        private final PseudoClass activeClass = PseudoClass.getPseudoClass("active");
+
+        ToolbarButton(String textLabel, int duration) {
+            this(textLabel, null, null, duration);
+        }
+
+        ToolbarButton(Tool tool) {
+            this(null, tool, tool.img, -1);
+        }
+
+        private ToolbarButton(String textLabel, Tool tool, String img, int duration) {
+            if (textLabel == null && tool == null && img == null) {
+                throw new IllegalArgumentException("textLabel, tool, and img were all null");
+            }
+
+            this.textLabel = textLabel;
+            this.tool = tool;
+            this.duration = duration;
+
+            setText(textLabel == null ? "" : textLabel);
+
+            ImageView loadedGraphic = null;
+            if (img != null) {
+                loadedGraphic = tryLoadIcon(img);
+                if (loadedGraphic != null) {
+                    setGraphic(loadedGraphic);
+                } else if (tool != null) {
+                    setText(tool.fallbackText);
+                }
+            }
+
+            this.graphicLabel = loadedGraphic;
+
+            setMinSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE);
+            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            setFocusTraversable(false);
+            setTextOverrun(OverrunStyle.CLIP);
+            setEllipsisString("");
+            getStyleClass().add("candle-chart-toolbar-button");
+            setTooltip(new Tooltip(tool == null ? textLabel : tool.label));
+        }
+
+        private static ImageView tryLoadIcon(String img) {
+            try {
+                InputStream stream = ToolbarButton.class.getResourceAsStream(img);
+                if (stream == null) {
+                    return null;
+                }
+                Image image = new Image(stream);
+                if (image.isError()) {
+                    return null;
+                }
+                ImageView imageView = new ImageView(image);
+                imageView.setPreserveRatio(true);
+                imageView.setSmooth(true);
+                imageView.setMouseTransparent(true);
+                return imageView;
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
 
         private final BooleanProperty active = new BooleanPropertyBase(false) {
             @Override
             public void invalidated() {
-                pseudoClassStateChanged(activeClass, get());
+                pseudoClassStateChanged(ACTIVE_CLASS, get());
             }
 
             @Override
@@ -551,254 +518,8 @@ public class ChartToolbar extends Region {
             }
         };
 
-        /**
-         * Creates a glyph-labeled button for tools.
-         *
-         * @param tool the tool type
-         */
-        ToolbarButton(Tool tool) {
-            this(null, tool, tool.getImagePath(), -1);
-        }
-
-        /**
-         * Internal constructor for all button types.
-         *
-         * @param textLabel the text label or null
-         * @param tool      the tool type or null
-         * @param imgPath   the image path or null
-         * @param duration  the duration in seconds or -1
-         */
-        private ToolbarButton(String textLabel, Tool tool, String imgPath, int duration) {
-            if (textLabel == null && imgPath == null) {
-                throw new IllegalArgumentException("textLabel and imgPath cannot both be null");
-            }
-            this.textLabel = textLabel;
-            this.tool = tool;
-            this.duration = duration;
-
-            // Set text content
-            setText(textLabel == null ? "" : textLabel);
-
-            // Set icon if provided
-            if (imgPath != null) {
-                InputStream imageStream = ToolbarButton.class.getResourceAsStream(imgPath);
-                if (imageStream != null) {
-                    Image image = new Image(imageStream);
-                    graphicLabel = new ImageView(image);
-                    setGraphic(graphicLabel);
-                } else {
-                    graphicLabel = null;
-                    setText(tool == null ? "" : tool.getFallbackLabel());
-                }
-            } else {
-                graphicLabel = null;
-            }
-
-            if (tool != null) {
-                setTooltip(new Tooltip(tool.getTooltipText()));
-                setAccessibleText(tool.getTooltipText());
-            }
-
-            // Configure button appearance
-            setMinSize(5, 5);
-            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            textOverrunProperty().set(OverrunStyle.CLIP);
-            setEllipsisString("");
-            getStyleClass().add("candle-chart-toolbar-button");
-        }
-
-        /**
-         * Sets whether this button is currently active/selected.
-         *
-         * @param active true if active, false otherwise
-         */
         public void setActive(boolean active) {
             this.active.set(active);
-        }
-
-    }
-
-    /**
-     * Listener that adjusts toolbar button sizes and fonts based on container
-     * dimensions.
-     * Uses delayed sizing to debounce rapid resize events.
-     */
-    private class SizeChangeListener extends DelayedSizeChangeListener {
-        SizeChangeListener(BooleanProperty gotFirstSize, ObservableValue<Number> containerWidth,
-                ObservableValue<Number> containerHeight) {
-            super(SIZE_ADJUSTMENT_DELAY_PRIMARY, SIZE_ADJUSTMENT_DELAY_SECONDARY, gotFirstSize,
-                    containerWidth, containerHeight);
-        }
-
-        /**
-         * Recalculates and applies sizes, padding, and fonts to all toolbar buttons.
-         */
-        public void resize() {
-            double width = containerWidth.getValue().doubleValue();
-            boolean isLargeScreen = width >= FONT_SIZE_THRESHOLD;
-
-            // Calculate text button dimensions
-            Font textFont = calculateTextFont(isLargeScreen, width);
-            Insets textPadding = calculateTextPadding(isLargeScreen, width);
-
-            // Calculate glyph button dimensions
-            Font glyphFont = calculateGlyphFont(isLargeScreen, width);
-            Insets glyphPadding = calculateGlyphPadding(isLargeScreen, width);
-
-            // Apply sizes to buttons
-            applyButtonSizes(textFont, textPadding, glyphFont, glyphPadding, width);
-
-            // Update separator padding
-            updateSeparatorPadding(isLargeScreen, width);
-        }
-
-        /**
-         * Calculates appropriate font size for text buttons.
-         */
-        private Font calculateTextFont(boolean isLargeScreen, double width) {
-            if (isLargeScreen) {
-                return Font.font(FONT_SIZE_LARGE);
-            } else {
-                int sizeReduction = (int) ((1000 - width) / PADDING_ADJUSTMENT_FACTOR);
-                return Font.font(Math.max(8, FONT_SIZE_MEDIUM - sizeReduction));
-            }
-        }
-
-        /**
-         * Calculates appropriate padding for text buttons.
-         */
-        private Insets calculateTextPadding(boolean isLargeScreen, double width) {
-            if (isLargeScreen) {
-                return new Insets(TEXT_PADDING_TOP_BOTTOM_LARGE, TEXT_PADDING_LEFT_RIGHT_LARGE,
-                        TEXT_PADDING_TOP_BOTTOM_LARGE, TEXT_PADDING_LEFT_RIGHT_LARGE);
-            } else {
-                int sizeReduction = (int) ((1000 - width) / PADDING_ADJUSTMENT_FACTOR);
-                int topBottom = Math.max(0, TEXT_PADDING_BASE - sizeReduction);
-                int leftRight = Math.max(0, TEXT_PADDING_LEFT_RIGHT_LARGE - 2 * sizeReduction);
-                return new Insets(topBottom, leftRight, topBottom, leftRight);
-            }
-        }
-
-        /**
-         * Calculates appropriate font size for glyph buttons.
-         */
-        private Font calculateGlyphFont(boolean isLargeScreen, double width) {
-            if (isLargeScreen) {
-                return Font.font(GLYPH_FONT_SIZE_LARGE);
-            } else {
-                int sizeReduction = 2 * (int) ((1000 - width) / PADDING_ADJUSTMENT_FACTOR);
-                return Font.font(Math.max(12, GLYPH_FONT_SIZE_LARGE - sizeReduction));
-            }
-        }
-
-        /**
-         * Calculates appropriate padding for glyph buttons.
-         */
-        private Insets calculateGlyphPadding(boolean isLargeScreen, double width) {
-            if (isLargeScreen) {
-                return new Insets(GLYPH_PADDING_TOP_BOTTOM_LARGE, GLYPH_PADDING_LEFT_RIGHT_LARGE,
-                        GLYPH_PADDING_TOP_BOTTOM_LARGE, GLYPH_PADDING_LEFT_RIGHT_LARGE);
-            } else {
-                int sizeReduction = (int) ((1000 - width) / PADDING_ADJUSTMENT_FACTOR);
-                int topBottom = Math.max(0, GLYPH_PADDING_BASE - sizeReduction);
-                int leftRight = Math.max(0, GLYPH_PADDING_LEFT_RIGHT_LARGE - 2 * sizeReduction);
-                return new Insets(topBottom, leftRight, topBottom, leftRight);
-            }
-        }
-
-        /**
-         * Applies calculated sizes and padding to all toolbar buttons.
-         */
-        private void applyButtonSizes(Font textFont, Insets textPadding, Font glyphFont,
-                Insets glyphPadding, double width) {
-            long buttonCount = toolbar.getChildren()
-                    .stream()
-                    .filter(node -> node instanceof Button)
-                    .count();
-            double compactWidth = Math.max(
-                    24.0,
-                    Math.min(48.0, (Math.max(280.0, width) - 12.0) / Math.max(1.0, buttonCount)));
-            for (Node toolbarNode : toolbar.getChildren()) {
-                if (toolbarNode instanceof Button button && !(toolbarNode instanceof ToolbarButton)) {
-                    button.setFont(glyphFont);
-                    button.setPadding(glyphPadding);
-                    button.setMinWidth(Math.min(24.0, compactWidth));
-                    button.setPrefWidth(Math.max(compactWidth, 34.0));
-                    button.setMaxWidth(Math.max(compactWidth, 34.0));
-                    button.setTextOverrun(OverrunStyle.CLIP);
-                } else if (toolbarNode instanceof ToolbarButton toolbarButton) {
-                    if (toolbarButton.duration != -1) {
-                        // Text button (granularity)
-                        toolbarButton.setStyle("-fx-font-size: %s".formatted(textFont.getSize()));
-                        double textWidth = computeTextDimensions(toolbarButton.textLabel, textFont).getWidth();
-                        double targetWidth = Math.min(compactWidth, textWidth + TEXT_BUTTON_WIDTH_PADDING);
-                        toolbarButton.setMinWidth(Math.min(24.0, targetWidth));
-                        toolbarButton.setPrefWidth(targetWidth);
-                        toolbarButton.setMaxWidth(targetWidth);
-                        toolbarButton.setPadding(textPadding);
-                    } else {
-                        // Glyph button (tool)
-                        if (toolbarButton.graphicLabel != null) {
-                            toolbarButton.graphicLabel.setFitHeight(glyphFont.getSize());
-                            toolbarButton.graphicLabel.setFitWidth(glyphFont.getSize());
-                        }
-                        toolbarButton.setFont(glyphFont);
-                        toolbarButton.setMinWidth(Math.min(24.0, compactWidth));
-                        toolbarButton.setPrefWidth(compactWidth);
-                        toolbarButton.setMaxWidth(compactWidth);
-                        toolbarButton.setPadding(glyphPadding);
-                    }
-                }
-            }
-        }
-
-        /**
-         * Updates the padding of the separator between function and option buttons.
-         */
-        private void updateSeparatorPadding(boolean isLargeScreen, double width) {
-            if (isLargeScreen) {
-                functionOptionsSeparator.setPadding(new Insets(width + 2, 0, 0, 0));
-            } else {
-                functionOptionsSeparator.setPadding(new Insets(width + 1, 2, 0, 0));
-            }
-        }
-    }
-
-    /**
-     * Event filter that hides the options PopOver when the mouse exits it.
-     * Includes a buffer zone around the PopOver to prevent flickering.
-     */
-    private class MouseExitedPopOverFilter implements EventHandler<MouseEvent> {
-        private final Scene scene;
-
-        MouseExitedPopOverFilter(Scene scene) {
-            this.scene = Objects.requireNonNull(scene, "scene must not be null");
-        }
-
-        @Override
-        public void handle(@NotNull MouseEvent event) {
-            if (!isMouseOverPopOver(event) && !mouseInsideOptionsButton) {
-                optionsPopOver.hide(Duration.seconds(0.25));
-                scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
-                mouseExitedPopOverFilter = null;
-            }
-        }
-
-        /**
-         * Checks if the mouse position is over the PopOver or its buffer zone.
-         *
-         * @param event the mouse event
-         * @return true if the mouse is over the PopOver or buffer zone
-         */
-        private boolean isMouseOverPopOver(@NotNull MouseEvent event) {
-            double bufferZone = optionsPopOver.getWidth() * (POPOVER_BUFFER_PERCENTAGE / 100.0);
-            double minX = optionsPopOver.getX() - bufferZone;
-            double maxX = optionsPopOver.getX() + optionsPopOver.getWidth() + bufferZone;
-            double minY = optionsPopOver.getY() - bufferZone;
-            double maxY = optionsPopOver.getY() + optionsPopOver.getHeight() + bufferZone;
-
-            return event.getScreenX() >= minX && event.getScreenX() <= maxX &&
-                    event.getScreenY() >= minY && event.getScreenY() <= maxY;
         }
     }
 }

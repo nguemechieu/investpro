@@ -142,9 +142,8 @@ public class FeaturePipeline {
         for (int i = 0; i < period; i++) {
             sum += candles.get(i).closePrice();
         }
-        double sma = sum / period;
 
-        double ema = sma;
+        double ema = sum / period;
         double multiplier = 2.0 / (period + 1);
 
         for (int i = period; i < candles.size(); i++) {

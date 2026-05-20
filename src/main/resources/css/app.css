@@ -291,6 +291,11 @@ StackPane {
     -fx-border-width: 0 0 0 1;
 }
 
+.workspace-scroll-pane,
+.workspace-scroll-pane > .viewport {
+    -fx-background-color: #070b12;
+}
+
 .left-rail {
     -fx-background-color: #070b12;
 }
@@ -1236,6 +1241,84 @@ StackPane {
     -fx-border-color: -primary-light;
 }
 
+.chart-workspace {
+    -fx-background-color: linear-gradient(to bottom, #020617, #0f172a);
+}
+
+.workspace-header {
+    -fx-padding: 10 14;
+    -fx-spacing: 12;
+    -fx-background-color: rgba(15, 23, 42, 0.96);
+    -fx-border-color: rgba(51, 65, 85, 0.85);
+    -fx-border-width: 0 0 1 0;
+}
+
+.workspace-title {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.workspace-subtitle {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+.workspace-control-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.workspace-header-actions {
+    -fx-alignment: center-right;
+}
+
+.chart-terminal-stack {
+    -fx-background-color: #020617;
+}
+
+.workspace-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.workspace-scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.terminal-scroll-pane,
+.terminal-scroll-pane > .viewport,
+.terminal-scroll-content {
+    -fx-background-color: #020617;
+}
+
+.terminal-scroll-content {
+    -fx-padding: 8;
+}
+
+.terminal-button {
+    -fx-background-color: #1e293b;
+    -fx-text-fill: #e2e8f0;
+    -fx-border-color: #334155;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12;
+    -fx-cursor: hand;
+}
+
+.terminal-button:hover {
+    -fx-background-color: #334155;
+    -fx-border-color: #38bdf8;
+    -fx-text-fill: #ffffff;
+}
+
+.terminal-combo-box {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #334155;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
 
 /* ============================================================================
    OPTIONAL: APPLY TO YOUR NEW TRADINGWINDOW COMPONENTS

@@ -169,7 +169,7 @@ public class SystemCore {
 public class TradingWindow extends JFrame {
     private SystemCore systemCore;
     private BotRuntimeController botController;
-    private ManualTradeController manualTradeController;
+    private final ManualTradeController manualTradeController;
     
     private void onStartBotButton() {
         botController.start(exchange, tradingService, selectedPair);

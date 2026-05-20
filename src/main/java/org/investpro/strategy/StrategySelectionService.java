@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 2. Backtest filter → top 100 by profit factor
  * 3. Paper trade filter → top 20
  * 4. Live eligibility → top 3 per symbol/timeframe
- *
+ * <p>
  * Runs asynchronously during application startup to avoid blocking UI.
  * Strategies are progressively instantiated only as they pass each filter
  * stage.
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 @Slf4j
-public final class StrategySelectionService {
+public  class StrategySelectionService {
 
     private static volatile StrategySelectionService instance;
     private static final Object LOCK = new Object();
@@ -42,7 +42,7 @@ public final class StrategySelectionService {
     private static final int LIVE_ELIGIBLE_PER_PAIR_TIMEFRAME = 3;
 
     private final StrategyRegistry registry;
-    private  StrategyLabService strategyLabService;
+
     private final ExecutorService executorService;
 
     // Selection state
@@ -55,6 +55,7 @@ public final class StrategySelectionService {
     private volatile Instant lastSelectionTime;
     private volatile String lastSelectionStatus = "Not started";
 
+    private  StrategyLabService strategyLabService;
     private StrategySelectionService(StrategyRegistry registry, StrategyLabService strategyLabService) {
         this.registry = registry;
         this.strategyLabService = strategyLabService;

@@ -1,28 +1,29 @@
 package org.investpro.exchange.models;
 
-import lombok.Builder;
-import lombok.Singular;
-import lombok.Value;
+import lombok.*;
 
 import java.util.Collections;
 import java.util.Set;
 
 /**
  * Describes the complete capability profile of an exchange.
- *
+ * <p>
  * This allows the UI, trading services, risk engine, execution engine,
  * and onboarding flow to query what an exchange supports before attempting
  * operations.
  */
 @Value
 @Builder(toBuilder = true)
+@Getter
+@ToString
+@Setter
 public class ExchangeCapability {
 
     // ---------------------------------------------------------------------
     // Identity
     // ---------------------------------------------------------------------
 
-    String exchangeName;
+   String exchangeName;
     String exchangeId;
     String displayName;
 

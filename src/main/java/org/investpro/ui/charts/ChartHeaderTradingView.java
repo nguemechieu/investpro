@@ -9,6 +9,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.indicators.ChartIndicator;
 import org.investpro.indicators.SimpleMovingAverageIndicator;
@@ -32,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * @author NOEL NGUEMECHIEU
  */
+@Slf4j
 @Getter
 public class ChartHeaderTradingView extends VBox {
     private static final String DARK_BG = "#0a0e17";
@@ -203,49 +205,32 @@ public class ChartHeaderTradingView extends VBox {
 
         try {
             switch (chartType.toLowerCase()) {
-                case "candlestick" -> {
-                    System.out.println("Chart type: Candlestick (current)");
-                    // Candlestick is the default chart type
-                }
-                case "line" -> {
-                    System.out.println("Chart type: Line (feature coming soon)");
-                    // Future: Implement line chart rendering
-                }
-                case "bar" -> {
-                    System.out.println("Chart type: Bar (feature coming soon)");
-                    // Future: Implement bar chart rendering
-                }
-                case "area" -> {
-                    System.out.println("Chart type: Area (feature coming soon)");
-                    // Future: Implement area chart rendering
-                }
-                default -> System.out.println("Unknown chart type: " + chartType);
+                case "candlestick" -> log.debug("Chart type: Candlestick (current)");
+                case "line"        -> log.info("Chart type: Line (feature coming soon)");
+                case "bar"         -> log.info("Chart type: Bar (feature coming soon)");
+                case "area"        -> log.info("Chart type: Area (feature coming soon)");
+                default            -> log.error("Unknown chart type: {}", chartType);
             }
         } catch (Exception e) {
-            System.err.println("Error changing chart type: " + e.getMessage());
+            log.error("Error changing chart type: {}", chartType, e);
         }
     }
 
     private void handleAddIndicator(String indicatorName) {
         if (indicatorName == null || indicatorName.isEmpty()) {
-            System.out.println("Please select an indicator");
+            log.warn("No indicator selected");
             return;
         }
 
         try {
-            // Create appropriate indicator based on selection
             ChartIndicator indicator = createIndicator(indicatorName);
             if (indicator != null) {
-                // Add indicator to chart
                 candleStickChart.addIndicator(indicator);
-                System.out.println("Added indicator: " + indicatorName);
-
-                // Clear selection after adding
+                log.info("Added indicator: {}", indicatorName);
                 indicatorComboBox.setValue(null);
             }
         } catch (Exception e) {
-            System.err.println("Error adding indicator: " + e.getMessage());
-
+            log.error("Error adding indicator: {}", indicatorName, e);
         }
     }
 
@@ -263,44 +248,44 @@ public class ChartHeaderTradingView extends VBox {
 
             return switch (type) {
                 case "SMA" -> {
-                    System.out.println("Creating SMA20 indicator");
+                    log.debug("Creating SMA20 indicator");
                     yield new SimpleMovingAverageIndicator(20);
                 }
                 case "EMA" -> {
-                    System.out.println("Creating EMA12 indicator");
+                    log.debug("Creating EMA12 indicator");
                     yield new ExponentialMovingAverageIndicator(12);
                 }
                 case "RSI" -> {
-                    System.out.println("Creating RSI14 indicator");
+                    log.debug("Creating RSI14 indicator");
                     yield new RSIIndicator(14);
                 }
                 case "MACD" -> {
-                    System.out.println("Creating MACD indicator");
+                    log.debug("Creating MACD indicator");
                     yield new MACDIndicator();
                 }
                 case "BOLLINGER" -> {
-                    System.out.println("Creating Bollinger Bands indicator");
+                    log.debug("Creating Bollinger Bands indicator");
                     yield new BollingerBandsIndicator(20, 2.0);
                 }
                 case "VOLUME" -> {
-                    System.out.println("Creating Volume indicator");
+                    log.debug("Creating Volume indicator");
                     yield new VolumeIndicator();
                 }
                 case "ATR" -> {
-                    System.out.println("Creating ATR14 indicator");
+                    log.debug("Creating ATR14 indicator");
                     yield new ATRIndicator(14);
                 }
                 case "STOCHASTIC" -> {
-                    System.out.println("Creating Stochastic indicator");
+                    log.debug("Creating Stochastic indicator");
                     yield new StochasticIndicator(14, 3, 3);
                 }
                 default -> {
-                    System.out.println("Unknown indicator type: " + type);
+                    log.warn("Unknown indicator type: {}", type);
                     yield null;
                 }
             };
         } catch (Exception e) {
-            System.err.println("Error creating indicator: " + e.getMessage());
+            log.error("Error creating indicator: {}", indicatorName, e);
             return null;
         }
     }
@@ -421,16 +406,13 @@ public class ChartHeaderTradingView extends VBox {
         }
 
         try {
-            // Create the appropriate indicator
             ChartIndicator indicator = createIndicator(indicatorType);
             if (indicator != null) {
-                // Add to chart
                 candleStickChart.addIndicator(indicator);
-                System.out.println("Successfully added indicator: " + indicatorType);
+                log.info("Successfully added indicator: {}", indicatorType);
             }
         } catch (Exception e) {
-            System.err.println("Error adding indicator: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error adding indicator: {}", indicatorType, e);
         }
     }
 
@@ -446,28 +428,25 @@ public class ChartHeaderTradingView extends VBox {
         try {
             switch (chartType.toLowerCase()) {
                 case "candlestick" -> {
-                    System.out.println("Chart type: Candlestick (current)");
+                    log.debug("Chart type: Candlestick (current)");
                     chartTypeComboBox.setValue("Candlestick");
                 }
                 case "line" -> {
-                    System.out.println("Chart type: Line (feature coming soon)");
+                    log.debug("Chart type: Line (feature coming soon)");
                     chartTypeComboBox.setValue("Line");
-                    // Future: Implement line chart rendering
                 }
                 case "bar" -> {
-                    System.out.println("Chart type: Bar (feature coming soon)");
+                    log.debug("Chart type: Bar (feature coming soon)");
                     chartTypeComboBox.setValue("Bar");
-                    // Future: Implement bar chart rendering
                 }
                 case "area" -> {
-                    System.out.println("Chart type: Area (feature coming soon)");
+                    log.debug("Chart type: Area (feature coming soon)");
                     chartTypeComboBox.setValue("Area");
-                    // Future: Implement area chart rendering
                 }
-                default -> System.out.println("Unknown chart type: " + chartType);
+                default -> log.warn("Unknown chart type: {}", chartType);
             }
         } catch (Exception e) {
-            System.err.println("Error changing chart type: " + e.getMessage());
+            log.error("Error changing chart type: {}", chartType, e);
         }
     }
 
@@ -483,5 +462,18 @@ public class ChartHeaderTradingView extends VBox {
      */
     public List<String> getAvailableIndicators() {
         return new ArrayList<>(indicatorComboBox.getItems());
+    }
+
+    public void updateHeader(String slashSymbol, double v, double change, double changePercent, double v1, double v2, double v3, double v4, double volume) {
+    }
+
+    public void addVolumeBar(VolumeIndicatorPanel.VolumeBar volumeBar) {
+    }
+
+    public void updateIndicator(String name, String formattedValue, String signalColor) {
+    }
+
+    public void updateVolumeMA() {
+
     }
 }

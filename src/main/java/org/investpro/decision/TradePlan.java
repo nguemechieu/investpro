@@ -42,9 +42,7 @@ public record TradePlan(
             return false;
         if (rewardAmount == null || rewardAmount.signum() < 0)
             return false;
-        if (riskRewardRatio < 0)
-            return false;
-        return true;
+        return !(riskRewardRatio < 0);
     }
 
     /**

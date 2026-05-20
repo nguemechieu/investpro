@@ -26,12 +26,10 @@ public record MarketConfiguration(
         return openaiModel;
     }
 
-    public String openaiOrgId() {
-        return openaiOrgId;
-    }
+
 
     public String tradingMode() {
-        return tradingMode != null ? tradingMode : "LIVE";
+        return tradingMode != null ? "PAPER" : "LIVE";
     }
 
     public boolean isPaperTrading() {
@@ -40,5 +38,9 @@ public record MarketConfiguration(
 
     public boolean hasOpenAiConfiguration() {
         return openaiApiKey != null && !openaiApiKey.isBlank();
+    }
+
+    public String selectedTradingMode() {
+        return tradingMode != null ? tradingMode : "LIVE";
     }
 }

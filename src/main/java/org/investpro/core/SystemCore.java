@@ -20,6 +20,7 @@ import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
+import org.investpro.exchange.infrastructure.BotTradingConfig;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.models.trading.OpenOrder;
@@ -179,8 +180,11 @@ public class SystemCore {
         AgentRuntime agentRuntime = new AgentRuntime();
         this.agentRegistry = new AgentRegistry(); // temp registry; agents imported into runtime below
 
+        BotTradingConfig botTradingConfig = new BotTradingConfig();
+        botTradingConfig.loadFromPreferences();
+
         // Create Smart Bot — agents live inside the runtime, not in SmartBot
-        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus());
+        this.smartBot = new SmartBot(agentRuntime, new AgentEventBus(), botTradingConfig);
 
         this.fromEmail = this.config.getProperty("from_email", "").trim();
         this.toEmail = this.config.getProperty("to_email", "").trim();

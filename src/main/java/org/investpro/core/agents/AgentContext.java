@@ -3,6 +3,7 @@ package org.investpro.core.agents;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.exchange.Exchange;
+import org.investpro.exchange.infrastructure.BotTradingConfig;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
 import org.investpro.enums.timeframe.Timeframe;
@@ -31,6 +32,7 @@ public class AgentContext {
     private String selectedSymbol = "";
     private TradePair selectedTradePair;
     private Timeframe timeframe;
+    private BotTradingConfig botTradingConfig;
 
     public AgentContext() {
     }

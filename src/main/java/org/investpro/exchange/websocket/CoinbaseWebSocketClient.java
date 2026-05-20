@@ -167,6 +167,12 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
+        // Route level2 order book events to rawStreamHandlers registered as "level2:{PRODUCT-ID}"
+        if ("l2_data".equalsIgnoreCase(channel)) {
+            dispatchLevel2Events(messageJson);
+            return;
+        }
+
         if (!MARKET_TRADES_CHANNEL.equalsIgnoreCase(channel)) {
             log.debug("Ignoring Coinbase channel {}", channel);
             return;
@@ -208,6 +214,34 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                 sideText,
                 timeText
         );
+    }
+
+    /**
+     * Routes events from a Coinbase Advanced Trade {@code l2_data} message to any
+     * {@code rawStreamHandlers} registered under the key {@code "level2:{PRODUCT-ID}"}.
+     * Each event JSON object is dispatched individually so the handler receives one
+     * snapshot or update at a time.
+     */
+    private void dispatchLevel2Events(@NotNull JsonNode messageJson) {
+        JsonNode events = messageJson.path("events");
+        if (!events.isArray()) {
+            return;
+        }
+        for (JsonNode event : events) {
+            String productId = event.path("product_id").asText("").trim().toUpperCase(Locale.ROOT);
+            if (productId.isBlank()) {
+                continue;
+            }
+            String handlerKey = "level2:" + productId;
+            Consumer<String> handler = rawStreamHandlers.get(handlerKey);
+            if (handler != null) {
+                try {
+                    handler.accept(event.toString());
+                } catch (Exception exception) {
+                    log.warn("Error dispatching level2 event for {}: {}", productId, exception.getMessage());
+                }
+            }
+        }
     }
 
     private void processLegacyMessage(@NotNull JsonNode messageJson, @NotNull String type) {

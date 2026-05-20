@@ -195,7 +195,7 @@ public class SystemOperationsBoard extends BorderPane {
 
         Label titleLabel = new Label("Trading Engine Status");
         titleLabel.setStyle(
-                "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + (true ? "-text-primary" : "white") + ";");
+                "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + ("-text-primary") + ";");
 
         TextArea engineArea = new TextArea();
         engineArea.setEditable(false);
@@ -221,7 +221,7 @@ public class SystemOperationsBoard extends BorderPane {
 
         Label titleLabel = new Label("Risk Manager Status");
         titleLabel.setStyle(
-                "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + (true ? "-text-primary" : "white") + ";");
+                "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + ("-text-primary") + ";");
 
         TextArea riskArea = new TextArea();
         riskArea.setEditable(false);

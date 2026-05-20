@@ -6,11 +6,9 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.config.AppConfig;
 import org.investpro.ui.theme.ThemeConfig;
 
 import java.io.IOException;
@@ -375,7 +373,7 @@ public class ThemeCustomizationPanel extends VBox {
             String css = currentTheme.toCSSVariables();
             Path exportPath = Paths.get(System.getProperty("user.home"), "Downloads", "theme-custom.css");
             Files.writeString(exportPath, css);
-            showAlert("Success", "Theme exported to:\n" + exportPath.toString());
+            showAlert("Success", "Theme exported to:\n" + exportPath);
             log.info("Theme exported to: {}", exportPath);
         } catch (IOException e) {
             log.error("Failed to export theme as CSS", e);
@@ -403,7 +401,7 @@ public class ThemeCustomizationPanel extends VBox {
             existing = existing.replaceAll("(?m)^THEME_.*$\n?", "");
 
             // Append new theme settings
-            String updated = existing + "\n" + envContent.toString();
+            String updated = existing + "\n" + envContent;
             Files.writeString(envPath, updated);
 
             showAlert("Success", "Theme settings saved to .env file");

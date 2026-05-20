@@ -58,7 +58,7 @@ public class StrategyLabPanel extends BorderPane {
     private final SystemCore systemCore;
     private final StrategyLabService labService;
 
-    private String selectedSymbol = "USD/USD";
+    private String selectedSymbol = "EUR/USD";
     private Timeframe selectedTimeframe = Timeframe.H1;
     private volatile boolean running;
 

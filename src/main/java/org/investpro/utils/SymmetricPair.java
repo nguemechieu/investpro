@@ -43,12 +43,9 @@ public record SymmetricPair<F, S>(F first, S second) {
      */
     @Override
     public boolean equals(Object object) {
-        if (!(object instanceof SymmetricPair<?, ?> other)) {
+        if (!(object instanceof SymmetricPair<?, ?>(Object first1, Object second1))) {
             return false;
         }
-
-        Object first1 = other.first;
-        Object second1 = other.second;
 
         return (Objects.equals(this.first, first1) && Objects.equals(this.second, second1)) ||
                 (Objects.equals(this.second, first1) && Objects.equals(this.first, second1));

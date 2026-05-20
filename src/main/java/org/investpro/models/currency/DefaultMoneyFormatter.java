@@ -191,8 +191,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
             numDigitsBeforeDecimalPoint = 1;
         }
 
-        StringBuilder numberBeforeDecimalPointBuilder = new StringBuilder();
-        numberBeforeDecimalPointBuilder.append("0".repeat(Math.max(0, numDigitsBeforeDecimalPoint)));
+        String numberBeforeDecimalPointBuilder = "0".repeat(Math.max(0, numDigitsBeforeDecimalPoint));
 
         StringBuilder numberAfterDecimalPointBuilder = new StringBuilder();
 
@@ -259,7 +258,7 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
             }
         }
 
-        String numberBeforeDecimalPoint = numberBeforeDecimalPointBuilder.toString();
+        String numberBeforeDecimalPoint = numberBeforeDecimalPointBuilder;
         String numberAfterDecimalPoint = numberAfterDecimalPointBuilder.toString();
 
         // Apply digit grouping separator

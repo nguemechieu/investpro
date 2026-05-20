@@ -38,12 +38,11 @@ public class ResourceMonitorPanel extends BorderPane {
     private final Label diskLabel = new Label("Disk: n/a");
     private final Label processLabel = new Label("Uptime: n/a");
     private final TextArea detailsArea = new TextArea();
-    private final Timeline refreshTimeline;
 
     public ResourceMonitorPanel() {
         initializeUi();
         refreshMetrics();
-        refreshTimeline = new Timeline(new KeyFrame(Duration.seconds(2), event -> refreshMetrics()));
+        Timeline refreshTimeline = new Timeline(new KeyFrame(Duration.seconds(2), event -> refreshMetrics()));
         refreshTimeline.setCycleCount(Animation.INDEFINITE);
         refreshTimeline.play();
     }

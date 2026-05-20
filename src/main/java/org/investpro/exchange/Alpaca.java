@@ -74,7 +74,7 @@ public class Alpaca extends Exchange {
 
     private AlpacaWebSocket createWebSocketClient() {
 
-        return new AlpacaWebSocket(URI.create(ALPACA_LIVE_URL), new Draft_6455());
+        return new AlpacaWebSocket(URI.create(alpacaBaseUrl()), new Draft_6455());
     }
 
     private void initializePaperTradingAccount() {
@@ -109,12 +109,13 @@ public class Alpaca extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        // If user explicitly selected trading mode during onboarding, respect that
-        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
-            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        if (modeRequestsPaperNetwork()) {
+            return true;
         }
-        // Otherwise, check credentials and environment variable
-        return !hasCredentials() || Boolean.parseBoolean(System.getenv().getOrDefault("ALPACA_PAPER", "false"));
+        if (modeRequestsLiveNetwork()) {
+            return false;
+        }
+        return Boolean.parseBoolean(System.getenv().getOrDefault("ALPACA_PAPER", "false"));
     }
 
     @Override
@@ -556,7 +557,7 @@ public class Alpaca extends Exchange {
 
     @Override
     public CompletableFuture<String> createMarketOrder(TradePair tradePair, Side side, double amount) {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return submitAlpacaOrder(tradePair, side, amount, 0.0, "market");
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -599,7 +600,11 @@ public class Alpaca extends Exchange {
     }
 
     private boolean hasCredentials() {
-        return exchangeCredentials != null;
+        return exchangeCredentials != null
+                && exchangeCredentials.apiKey() != null
+                && !exchangeCredentials.apiKey().isBlank()
+                && exchangeCredentials.apiSecret() != null
+                && !exchangeCredentials.apiSecret().isBlank();
     }
 
     @Override
@@ -608,7 +613,7 @@ public class Alpaca extends Exchange {
             Side side,
             double amount,
             double limitPrice) {
-        if (hasCredentials()) {
+        if (!isPaperTrading() && hasCredentials()) {
             return submitAlpacaOrder(tradePair, side, amount, limitPrice, "limit");
         }
         return CompletableFuture.supplyAsync(() -> {
@@ -1084,6 +1089,9 @@ public class Alpaca extends Exchange {
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
+        if (isPaperTrading() || !hasCredentials()) {
+            return CompletableFuture.completedFuture(paperAccountSnapshot());
+        }
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -1121,6 +1129,24 @@ public class Alpaca extends Exchange {
                 throw new IllegalStateException("Unable to fetch Alpaca account.", exception);
             }
         });
+    }
+
+    private Account paperAccountSnapshot() {
+        double equity = balances.values().stream().mapToDouble(Double::doubleValue).sum();
+        Account account = new Account();
+        account.setTotalBalance(equity);
+        account.setAvailableBalance(balances.getOrDefault("USD", equity));
+        account.setEquity(equity);
+        account.setCash(balances.getOrDefault("USD", 0.0));
+        account.setBuyingPower(balances.getOrDefault("USD", 0.0));
+        account.setBalances(new LinkedHashMap<>(balances));
+        account.setAvailableBalances(new LinkedHashMap<>(balances));
+        account.setExchangeId("alpaca");
+        account.setBrokerName("Alpaca");
+        account.setPaperTrading(true);
+        account.setConnected(true);
+        account.setUpdatedAt(Instant.now());
+        return account;
     }
 
     @Override

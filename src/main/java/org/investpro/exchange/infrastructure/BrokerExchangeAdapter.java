@@ -1,6 +1,7 @@
 package org.investpro.exchange.infrastructure;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.Account;
 import  org.investpro.data.InProgressCandleData;
 import org.investpro.exchange.credentials.ExchangeCredentials;
@@ -19,37 +20,39 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Shared desktop-safe broker adapter scaffold.
- *
+ * <p>
  * It lets brokers appear in the terminal, persist credentials, stream by polling
  * where possible, and fail trading-only features explicitly until a concrete API
  * integration is added.
  */
+@Slf4j
 public abstract class BrokerExchangeAdapter extends Exchange {
 
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final PollingExchangeStreamer pollingStreamer = new PollingExchangeStreamer(this);
-    private final java.util.Map<String, Double> paperBalances = new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.Map<String, String> paperOrders = new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.concurrent.atomic.AtomicLong nextPaperOrderId = new java.util.concurrent.atomic.AtomicLong(1000);
+    private final Map<String, Double> paperBalances = new ConcurrentHashMap<>();
+    private final Map<String, String> paperOrders = new ConcurrentHashMap<>();
+    private final AtomicLong nextPaperOrderId = new AtomicLong(1000);
 
     protected BrokerExchangeAdapter(ExchangeCredentials exchangeCredentials) {
         super(exchangeCredentials);
         paperBalances.put("USD", 10000.0);
+        log.info(paperOrders.toString());
     }
 
 
 
-    @Override
-    public String getSignal() {
-        return "HOLD";
-    }
+
 
     @Override
     public boolean isSandbox() {

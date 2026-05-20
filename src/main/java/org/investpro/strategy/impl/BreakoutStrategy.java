@@ -121,7 +121,6 @@ public class BreakoutStrategy extends BaseStrategy {
                     && previous.closePrice() >= support;
 
             if (bullishBreakout) {
-                double stopLoss = support;
                 double takeProfit = currentPrice * (1.0 + TAKE_PROFIT_BUFFER);
 
                 updateSignalDescription(
@@ -137,11 +136,11 @@ public class BreakoutStrategy extends BaseStrategy {
                         resistance,
                         support);
 
+                double stopLoss = support;
                 return buildBuySignal(context, currentPrice, stopLoss, takeProfit, resistance, support);
             }
 
             if (bearishBreakout) {
-                double stopLoss = resistance;
                 double takeProfit = currentPrice * (1.0 - TAKE_PROFIT_BUFFER);
 
                 updateSignalDescription(
@@ -157,6 +156,7 @@ public class BreakoutStrategy extends BaseStrategy {
                         resistance,
                         support);
 
+                double stopLoss = resistance;
                 return buildSellSignal(context, currentPrice, stopLoss, takeProfit, resistance, support);
             }
 

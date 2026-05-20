@@ -122,7 +122,6 @@ public class MeanReversionStrategy extends BaseStrategy {
 
             if (oversoldAtLowerBand) {
                 double stopLoss = lowerBand * (1.0 - STOP_LOSS_BUFFER);
-                double takeProfit = sma20;
 
                 updateSignalDescription(
                         "Mean-reversion BUY: price below lower Bollinger Band and RSI oversold. " +
@@ -131,6 +130,7 @@ public class MeanReversionStrategy extends BaseStrategy {
                                 ", sma20=" + sma20 +
                                 ", rsi14=" + rsi14);
 
+                double takeProfit = sma20;
                 return buildBuySignal(context, currentPrice, stopLoss, takeProfit);
             }
 

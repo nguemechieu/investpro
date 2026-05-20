@@ -56,6 +56,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.zip.GZIPInputStream;
@@ -95,6 +96,20 @@ public class Coinbase extends Exchange {
 
     private String apiSecret;
     private String apiKey;
+    private final Map<String, CacheEntry<Ticker>> tickerCache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry<OrderBook>> orderBookCache = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<OrderBook>> orderBookInFlight = new ConcurrentHashMap<>();
+    private final Map<String, Long> tickerRateLimitedUntilMs = new ConcurrentHashMap<>();
+    private final Map<String, Long> orderBookRateLimitedUntilMs = new ConcurrentHashMap<>();
+    /** Products for which a level2 WebSocket subscription is already active. */
+    private final Set<String> level2Subscribed = ConcurrentHashMap.newKeySet();
+    private volatile long lastOpenOrdersAuthWarningMs = 0L;
+
+    private record CacheEntry<T>(T value, long expiresAtMs) {
+        boolean expired() {
+            return System.currentTimeMillis() >= expiresAtMs;
+        }
+    }
 
     // Bot trading components
 
@@ -147,8 +162,7 @@ public class Coinbase extends Exchange {
     }
 
     private boolean hasCredentials() {
-
-        return apiKey == null || apiSecret == null || apiKey.trim().isEmpty() || apiSecret.trim().isEmpty();
+        return hasPrivateEndpointAuth() || (isPaperTrading() && supportsPaperTradingMode());
     }
 
     @Contract(" -> new")
@@ -191,6 +205,27 @@ public class Coinbase extends Exchange {
         positions.clear();
 
         log.info("Coinbase paper trading account initialized with $10,000 USD and $10,000 USDC");
+    }
+
+    private Account createPaperAccount() {
+        Account account = Account.coinbase("coinbase-paper", "USD");
+        account.setUsername("Coinbase Paper");
+        account.setBrokerName("Coinbase Advanced Trade");
+        account.setExchangeId("coinbase");
+        account.setSandbox(true);
+        account.setPaperTrading(true);
+        account.setConnected(true);
+        account.setBalances(new LinkedHashMap<>(balances));
+        account.setAvailableBalances(new LinkedHashMap<>(balances));
+        account.setLockedBalances(new LinkedHashMap<>());
+        account.setTotalBalance(balances.getOrDefault("USD", 0.0));
+        account.setAvailableBalance(balances.getOrDefault("USD", 0.0));
+        account.setCash(balances.getOrDefault("USD", 0.0));
+        account.setBuyingPower(balances.getOrDefault("USD", 0.0));
+        account.setPortfolioValue(balances.getOrDefault("USD", 0.0));
+        account.setEquity(balances.getOrDefault("USD", 0.0));
+        account.setUpdatedAt(Instant.now());
+        return account;
     }
 
     public static @NotNull String decodeBody(byte[] byteArray, String encoding) {
@@ -249,11 +284,12 @@ public class Coinbase extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        // If user explicitly selected trading mode during onboarding, respect that
-        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
-            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        if (modeRequestsPaperNetwork()) {
+            return true;
         }
-        // Otherwise, always live trading for Coinbase by default
+        if (modeRequestsLiveNetwork()) {
+            return false;
+        }
         return false;
     }
 
@@ -399,6 +435,11 @@ public class Coinbase extends Exchange {
     @Override
     public synchronized void connect() {
         try {
+            if (isPaperTrading()) {
+                log.info("Coinbase paper mode selected; live websocket connection skipped.");
+                return;
+            }
+
             if (websocketClient != null && websocketClient.isOpen()) {
                 log.info("Coinbase WebSocket already connected. Skipping duplicate connect.");
                 return;
@@ -669,7 +710,7 @@ public class Coinbase extends Exchange {
     }
 
     private boolean hasPrivateEndpointAuth() {
-        return jwtSigner != null || !bearerToken().isBlank();
+        return !isPaperTrading() && (jwtSigner != null || !bearerToken().isBlank());
     }
 
     private @NotNull String buildCredentialErrorMessage() {
@@ -756,6 +797,14 @@ public class Coinbase extends Exchange {
                     httpResponse.body(),
                     contentEncoding);
 
+            if (httpResponse.statusCode() == 429 && attempt < maxAttempts - 1) {
+                long backoffMs = retryDelayMs(httpResponse, attempt);
+                log.warn("Coinbase rate limited for {}. Retrying in {}ms ({}/{})",
+                        request.uri(), backoffMs, attempt + 1, maxAttempts);
+                sleepBeforeRetry(request, backoffMs);
+                return sendWithRetry(request, attempt + 1, maxAttempts);
+            }
+
             if (httpResponse.statusCode() >= 400) {
                 String errorMsg = "Coinbase HTTP %d for %s: %s"
                         .formatted(httpResponse.statusCode(), request.uri(), body);
@@ -810,8 +859,12 @@ public class Coinbase extends Exchange {
     }
 
     private @NotNull CompletableFuture<String> sendAsync(HttpRequest request) {
+        return sendAsyncWithRetry(request, 0, 3);
+    }
+
+    private @NotNull CompletableFuture<String> sendAsyncWithRetry(HttpRequest request, int attempt, int maxAttempts) {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
-                .thenApply(httpResponse -> {
+                .thenCompose(httpResponse -> {
                     String contentEncoding = httpResponse.headers()
                             .firstValue("Content-Encoding")
                             .orElse("");
@@ -820,14 +873,49 @@ public class Coinbase extends Exchange {
                             httpResponse.body(),
                             contentEncoding);
 
+                    if (httpResponse.statusCode() == 429 && attempt < maxAttempts - 1) {
+                        long backoffMs = retryDelayMs(httpResponse, attempt);
+                        log.warn("Coinbase rate limited for {}. Retrying in {}ms ({}/{})",
+                                request.uri(), backoffMs, attempt + 1, maxAttempts);
+                        return CompletableFuture
+                                .supplyAsync(() -> {
+                                    sleepBeforeRetry(request, backoffMs);
+                                    return "";
+                                })
+                                .thenCompose(ignored -> sendAsyncWithRetry(request, attempt + 1, maxAttempts));
+                    }
+
                     if (httpResponse.statusCode() >= 400) {
                         throw new RuntimeException(
                                 "Coinbase HTTP %d for %s: %s"
                                         .formatted(httpResponse.statusCode(), request.uri(), body));
                     }
 
-                    return body;
+                    return CompletableFuture.completedFuture(body);
                 });
+    }
+
+    private long retryDelayMs(HttpResponse<?> response, int attempt) {
+        Optional<String> retryAfter = response.headers().firstValue("Retry-After");
+        if (retryAfter.isPresent()) {
+            try {
+                return Math.max(1_000L, Long.parseLong(retryAfter.get().trim()) * 1_000L);
+            } catch (NumberFormatException ignored) {
+                // Fall through to exponential backoff.
+            }
+        }
+        return Math.min(10_000L, 1_000L * (1L << Math.min(attempt, 4)));
+    }
+
+    private void sleepBeforeRetry(HttpRequest request, long backoffMs) {
+        try {
+            Thread.sleep(backoffMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(
+                    "Coinbase retry interrupted: %s".formatted(request.uri()),
+                    interruptedException);
+        }
     }
 
     private static JsonNode readJson(String body) {
@@ -1180,27 +1268,176 @@ public class Coinbase extends Exchange {
         }
 
         String product = productId(tradePair);
+        String cacheKey = product + ":50";
+
+        // Return fresh cache if available
+        CacheEntry<OrderBook> cached = orderBookCache.get(cacheKey);
+        if (cached != null && !cached.expired()) {
+            return CompletableFuture.completedFuture(cached.value());
+        }
+
+        // Return stale cache if rate-limited
+        if (isCoolingDown(orderBookRateLimitedUntilMs, product)) {
+            if (cached != null) {
+                return CompletableFuture.completedFuture(cached.value());
+            }
+            log.debug("Coinbase order book rate-limited and no cache for {}", product);
+            return CompletableFuture.completedFuture(new OrderBook(tradePair));
+        }
+
+        // Subscribe to WebSocket level2 stream on first access (keeps cache warm, avoids REST polling)
+        subscribeLevel2IfNeeded(tradePair, product);
+
+        // Deduplicate: return the in-flight future if one is already running for this product
+        CompletableFuture<OrderBook> existing = orderBookInFlight.get(cacheKey);
+        if (existing != null && !existing.isDone()) {
+            return existing;
+        }
+
         String url = "%s?product_id=%s&limit=50".formatted(PUBLIC_PRODUCT_BOOK_URL, encode(product));
+        HttpRequest request = authenticatedRequest("GET", url).GET().build();
 
-        HttpRequest request = authenticatedRequest("GET", url)
-                .GET()
-                .build();
+        CompletableFuture<OrderBook> future = sendAsync(request).thenApply(response -> {
+            OrderBook orderBook = parseOrderBook(response, tradePair);
+            // Cache for 15 seconds — order books don't need sub-second freshness for display
+            orderBookCache.put(cacheKey, new CacheEntry<>(orderBook, System.currentTimeMillis() + 15_000L));
+            orderBookInFlight.remove(cacheKey);
+            return orderBook;
+        }).exceptionally(throwable -> {
+            orderBookInFlight.remove(cacheKey);
+            if (isCoinbaseRateLimit(throwable)) {
+                markCoolingDown(orderBookRateLimitedUntilMs, product);
+                CacheEntry<OrderBook> stale = orderBookCache.get(cacheKey);
+                if (stale != null) {
+                    return stale.value();
+                }
+                log.debug("Coinbase order book rate-limited, no cache for {}", product);
+                return new OrderBook(tradePair);
+            }
+            throw new CompletionException(unwrap(throwable));
+        });
 
-        return sendAsync(request).thenApply(response -> parseOrderBook(response, tradePair));
+        orderBookInFlight.put(cacheKey, future);
+        return future;
+    }
+
+    /**
+     * Called by the WebSocket level2 handler to push a fresh order book snapshot
+     * directly into the cache, bypassing REST entirely.
+     */
+    public void updateOrderBookFromWebSocket(String product, OrderBook orderBook) {
+        String cacheKey = product + ":50";
+        orderBookCache.put(cacheKey, new CacheEntry<>(orderBook, System.currentTimeMillis() + 15_000L));
+        // Also clear any rate limit flag since WS data is fresh
+        orderBookRateLimitedUntilMs.remove(product);
+    }
+
+    /**
+     * Subscribe to the Coinbase level2 WebSocket channel for the given product if not already subscribed.
+     * The handler parses snapshot/update events and updates the order book cache via
+     * {@link #updateOrderBookFromWebSocket}.
+     */
+    private void subscribeLevel2IfNeeded(TradePair tradePair, String product) {
+        if (websocketClient == null || !websocketClient.isOpen()) {
+            return;
+        }
+        if (!level2Subscribed.add(product)) {
+            // already subscribed
+            return;
+        }
+
+        // Per-product mutable order book state maintained from l2_data events
+        List<OrderBook.PriceLevel> snapshotBids = new ArrayList<>();
+        List<OrderBook.PriceLevel> snapshotAsks = new ArrayList<>();
+
+        String streamKey = "level2:" + product;
+
+        websocketClient.subscribeStream(streamKey, eventJson -> {
+            try {
+                JsonNode event = OBJECT_MAPPER.readTree(eventJson);
+                String type = event.path("type").asText("");
+                JsonNode updates = event.path("updates");
+
+                if ("snapshot".equalsIgnoreCase(type)) {
+                    snapshotBids.clear();
+                    snapshotAsks.clear();
+                }
+
+                if (updates.isArray()) {
+                    for (JsonNode u : updates) {
+                        String side = u.path("side").asText("");
+                        double price = u.path("price_level").asDouble(0);
+                        double qty   = u.path("new_quantity").asDouble(0);
+                        if (price <= 0) continue;
+
+                        List<OrderBook.PriceLevel> levels = "bid".equalsIgnoreCase(side) ? snapshotBids : snapshotAsks;
+
+                        if (qty <= 0) {
+                            levels.removeIf(pl -> pl.getPrice() == price);
+                        } else {
+                            boolean found = false;
+                            for (OrderBook.PriceLevel pl : levels) {
+                                if (pl.getPrice() == price) {
+                                    pl.setSize(qty);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                levels.add(new OrderBook.PriceLevel(price, qty));
+                            }
+                        }
+                    }
+                }
+
+                if (!snapshotBids.isEmpty() || !snapshotAsks.isEmpty()) {
+                    // Sort: bids descending, asks ascending
+                    snapshotBids.sort((a, b) -> Double.compare(b.getPrice(), a.getPrice()));
+                    snapshotAsks.sort((a, b) -> Double.compare(a.getPrice(), b.getPrice()));
+                    int limit = 50;
+                    List<OrderBook.PriceLevel> bids = snapshotBids.size() > limit ? snapshotBids.subList(0, limit) : snapshotBids;
+                    List<OrderBook.PriceLevel> asks = snapshotAsks.size() > limit ? snapshotAsks.subList(0, limit) : snapshotAsks;
+                    updateOrderBookFromWebSocket(product, new OrderBook(tradePair, new ArrayList<>(bids), new ArrayList<>(asks)));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse level2 event for {}: {}", product, e.getMessage());
+            }
+        });
+
+        log.info("Subscribed Coinbase level2 WebSocket stream for {}", product);
     }
 
     @Override
     public Ticker getLivePrice(TradePair tradePair) {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
 
-        String url = "%s/%s/ticker".formatted(PUBLIC_PRODUCTS_URL, encode(productId(tradePair)));
+        String product = productId(tradePair);
+        CacheEntry<Ticker> cached = tickerCache.get(product);
+        if (cached != null && !cached.expired()) {
+            return cached.value();
+        }
+        if (isCoolingDown(tickerRateLimitedUntilMs, product) && cached != null) {
+            return cached.value();
+        }
+
+        String url = "%s/%s/ticker".formatted(PUBLIC_PRODUCTS_URL, encode(product));
 
         HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
 
-        @NotNull
-        String httpResponse = send(request);
+        @NotNull String httpResponse;
+        try {
+            httpResponse = send(request);
+        } catch (RuntimeException exception) {
+            if (isCoinbaseRateLimit(exception)) {
+                markCoolingDown(tickerRateLimitedUntilMs, product);
+                if (cached != null) {
+                    return cached.value();
+                }
+            }
+            throw exception;
+        }
         JsonNode root = readJson(httpResponse);
 
         Ticker ticker = new Ticker();
@@ -1236,6 +1473,7 @@ public class Coinbase extends Exchange {
             ticker.setTimestamp(System.currentTimeMillis());
         }
 
+        tickerCache.put(product, new CacheEntry<>(ticker, System.currentTimeMillis() + 2_000L));
         return ticker;
     }
 
@@ -1459,6 +1697,10 @@ public class Coinbase extends Exchange {
 
     @Override
     public Account getUserAccountDetails() {
+        if (isPaperTrading()) {
+            return createPaperAccount();
+        }
+
         requirePrivateEndpointAuth("Coinbase account details");
 
         HttpRequest request = authenticatedRequest("GET", ACCOUNTS_URL)
@@ -1473,14 +1715,104 @@ public class Coinbase extends Exchange {
             JsonNode accounts = root.path("accounts");
 
             if (accounts.isArray() && !accounts.isEmpty()) {
-                JsonNode first = accounts.get(0);
-                return OBJECT_MAPPER.treeToValue(first, Account.class);
+                return parseCoinbaseAccounts(accounts);
             }
 
-            return OBJECT_MAPPER.readValue(response, Account.class);
-        } catch (JsonProcessingException exception) {
+            if (root.has("account")) {
+                return parseCoinbaseAccounts(OBJECT_MAPPER.createArrayNode().add(root.path("account")));
+            }
+
+            throw new IllegalStateException("Coinbase account response did not include account data.");
+        } catch (Exception exception) {
             throw new RuntimeException("Unable to parse Coinbase accounts response", exception);
         }
+    }
+
+    private Account parseCoinbaseAccounts(JsonNode accounts) {
+        if (accounts == null || !accounts.isArray() || accounts.isEmpty()) {
+            throw new IllegalStateException("Coinbase returned no accounts for these credentials.");
+        }
+
+        Map<String, Double> totalBalances = new LinkedHashMap<>();
+        Map<String, Double> availableBalances = new LinkedHashMap<>();
+        Map<String, Double> lockedBalances = new LinkedHashMap<>();
+        String primaryAccountId = "";
+        String primaryCurrency = "USD";
+
+        for (JsonNode accountNode : accounts) {
+            String currency = firstText(accountNode, "currency", "currency_code");
+            if (currency.isBlank()) {
+                continue;
+            }
+
+            String accountId = firstText(accountNode, "uuid", "id");
+            if (primaryAccountId.isBlank()) {
+                primaryAccountId = accountId;
+                primaryCurrency = currency;
+            }
+            if ("USD".equalsIgnoreCase(currency)) {
+                primaryAccountId = accountId;
+                primaryCurrency = currency;
+            }
+
+            double available = coinbaseMoneyValue(accountNode.path("available_balance"));
+            double hold = coinbaseMoneyValue(accountNode.path("hold"));
+            double total = available + hold;
+
+            totalBalances.put(currency, total);
+            availableBalances.put(currency, available);
+            lockedBalances.put(currency, hold);
+        }
+
+        if (totalBalances.isEmpty()) {
+            throw new IllegalStateException("Coinbase account response did not include usable balances.");
+        }
+
+        Account account = Account.coinbase(primaryAccountId.isBlank() ? "coinbase-live" : primaryAccountId,
+                primaryCurrency);
+        account.setUsername("Coinbase Live");
+        account.setBrokerName("Coinbase Advanced Trade");
+        account.setExchangeId("coinbase");
+        account.setSandbox(false);
+        account.setPaperTrading(false);
+        account.setConnected(true);
+        account.setBalances(totalBalances);
+        account.setAvailableBalances(availableBalances);
+        account.setLockedBalances(lockedBalances);
+
+        double usdTotal = totalBalances.getOrDefault("USD", totalBalances.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .sum());
+        double usdAvailable = availableBalances.getOrDefault("USD", availableBalances.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .sum());
+        double usdLocked = lockedBalances.getOrDefault("USD", lockedBalances.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .sum());
+
+        account.setTotalBalance(usdTotal);
+        account.setAvailableBalance(usdAvailable);
+        account.setLockedBalance(usdLocked);
+        account.setCash(usdAvailable);
+        account.setBuyingPower(usdAvailable);
+        account.setPortfolioValue(usdTotal);
+        account.setEquity(usdTotal);
+        account.setUpdatedAt(Instant.now());
+        account.getMetadata().put("accountCount", accounts.size());
+        return account;
+    }
+
+    private double coinbaseMoneyValue(JsonNode moneyNode) {
+        if (moneyNode == null || moneyNode.isMissingNode() || moneyNode.isNull()) {
+            return 0.0;
+        }
+        if (moneyNode.isNumber()) {
+            return moneyNode.asDouble(0.0);
+        }
+        if (moneyNode.isTextual()) {
+            return parseDouble(moneyNode.asText(), 0.0);
+        }
+        return parseDouble(moneyNode.path("value").asText("0"), 0.0);
     }
 
     @Override
@@ -1909,6 +2241,10 @@ public class Coinbase extends Exchange {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
 
+        if (isPaperTrading()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
         requirePrivateEndpointAuth("Coinbase open orders");
 
         String url = "%s/orders/historical/batch?product_id=%s&order_status=OPEN"
@@ -1918,11 +2254,17 @@ public class Coinbase extends Exchange {
                 .GET()
                 .build();
 
-        return sendAsync(request).thenApply(this::parseOpenOrders);
+        return sendAsync(request)
+                .thenApply(this::parseOpenOrders)
+                .exceptionally(this::emptyOpenOrdersOnAuthFailure);
     }
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchAllOpenOrders() {
+        if (isPaperTrading()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
         requirePrivateEndpointAuth("Coinbase all open orders");
 
         String url = "%s/orders/historical/batch?order_status=OPEN".formatted(REST_BASE_URL);
@@ -1931,7 +2273,9 @@ public class Coinbase extends Exchange {
                 .GET()
                 .build();
 
-        return sendAsync(request).thenApply(this::parseOpenOrdersAll);
+        return sendAsync(request)
+                .thenApply(this::parseOpenOrdersAll)
+                .exceptionally(this::emptyOpenOrdersOnAuthFailure);
     }
 
     @Override
@@ -2007,6 +2351,37 @@ public class Coinbase extends Exchange {
 
                     return orders;
                 });
+    }
+
+    private List<OpenOrder> emptyOpenOrdersOnAuthFailure(Throwable throwable) {
+        Throwable root = unwrap(throwable);
+        String message = root.getMessage() == null ? "" : root.getMessage();
+        if (message.contains("Coinbase HTTP 401")) {
+            long now = System.currentTimeMillis();
+            if (now - lastOpenOrdersAuthWarningMs > 300_000L) {
+                lastOpenOrdersAuthWarningMs = now;
+                log.warn("Coinbase open orders unavailable: credentials lack order-history access or are unauthorized.");
+            }
+            return Collections.emptyList();
+        }
+        throw new CompletionException(root);
+    }
+
+    private boolean isCoolingDown(Map<String, Long> cooldowns, String product) {
+        return cooldowns.getOrDefault(product, 0L) > System.currentTimeMillis();
+    }
+
+    private void markCoolingDown(Map<String, Long> cooldowns, String product) {
+        cooldowns.put(product, System.currentTimeMillis() + 30_000L);
+    }
+
+    private boolean isCoinbaseRateLimit(Throwable throwable) {
+        String message = unwrap(throwable).getMessage();
+        return message != null && message.contains("Coinbase HTTP 429");
+    }
+
+    private Throwable unwrap(Throwable throwable) {
+        return throwable.getCause() == null ? throwable : throwable.getCause();
     }
 
     // ---------------------------------------------------------------------
@@ -2311,12 +2686,12 @@ public class Coinbase extends Exchange {
 
     @Override
     public boolean supportsLiveTrading() {
-        return hasPrivateEndpointAuth();
+        return !isPaperTrading() && hasPrivateEndpointAuth();
     }
 
     @Override
     public boolean supportsPaperTradingMode() {
-        return false;
+        return true;
     }
 
     @Override
@@ -2972,7 +3347,7 @@ public class Coinbase extends Exchange {
                 return null;
             }
 
-            Position position = new Position();
+            Position position = new Position(tradePair);
             position.setPositionId(firstText(accountNode, "uuid", "id"));
             position.setTradePair(tradePair);
             position.setQuantity(balance);
@@ -3000,7 +3375,7 @@ public class Coinbase extends Exchange {
 
             String currency = firstText(accountNode, "currency", "currency_code");
 
-            Position position = new Position();
+            Position position = new Position(tradePair);
             position.setPositionId(firstText(accountNode, "uuid", "id"));
             position.setQuantity(balance);
             position.setOpenTime(Instant.now());

@@ -2,7 +2,7 @@ package org.investpro.exchange.infrastructure;
 
 public enum ENUM_EXCHANGE_LIST {
     BINANCE_US("BINANCE_US", 1),
-    COINBASE_PRO("COINBASE_PRO ", 2),
+    COINBASE("COINBASE ", 2),
     OANDA("OANDA ", 3),
     IG("IG ", 4),
     KRAKEN("KRAKEN ", 5),

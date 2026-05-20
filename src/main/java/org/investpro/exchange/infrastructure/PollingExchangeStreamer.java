@@ -13,6 +13,11 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class PollingExchangeStreamer {
+    private static final long DEFAULT_TICKER_PERIOD_SECONDS = 10;
+    private static final long DEFAULT_ORDER_BOOK_PERIOD_SECONDS = 15;
+    private static final long DEFAULT_ACCOUNT_PERIOD_SECONDS = 15;
+    private static final long DEFAULT_PRIVATE_PERIOD_SECONDS = 20;
+
     private final Exchange exchange;
     private final ScheduledExecutorService scheduler;
     private final Map<TradePair, ScheduledFuture<?>> tickerTasks = new ConcurrentHashMap<>();
@@ -45,7 +50,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, 1));
+        }, DEFAULT_TICKER_PERIOD_SECONDS));
     }
 
     public void streamOrderBook(TradePair tradePair, ExchangeStreamConsumer consumer) {
@@ -60,7 +65,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, 2));
+        }, DEFAULT_ORDER_BOOK_PERIOD_SECONDS));
     }
 
     public void streamAccount(ExchangeStreamConsumer consumer) {
@@ -89,7 +94,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, 5);
+        }, DEFAULT_ACCOUNT_PERIOD_SECONDS);
     }
 
     public void streamOrders(ExchangeStreamConsumer consumer) {
@@ -108,7 +113,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, 5);
+        }, DEFAULT_PRIVATE_PERIOD_SECONDS);
     }
 
     public void streamPositions(ExchangeStreamConsumer consumer) {
@@ -127,7 +132,7 @@ public class PollingExchangeStreamer {
             } catch (Exception exception) {
                 consumer.onError(exchange.getName(), exception);
             }
-        }, 5);
+        }, DEFAULT_PRIVATE_PERIOD_SECONDS);
     }
 
     public void stopTicker(TradePair tradePair) {

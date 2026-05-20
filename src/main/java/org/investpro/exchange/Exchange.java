@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 @Getter
@@ -41,14 +42,40 @@ public abstract class Exchange implements
     private String userSelectedTradingMode;
     private ExchangeCredentials credentials;
 
-    protected @Nullable MarketDataEngine marketDataEngine;
-    protected @Nullable ExchangeMarketDataAdapter marketDataAdapter;
+    protected  MarketDataEngine marketDataEngine;
+    protected  ExchangeMarketDataAdapter marketDataAdapter;
 
     protected Exchange(@NotNull ExchangeCredentials credentials) {
         this.credentials = credentials;
 
         this.userSelectedTradingMode = credentials.sandbox() ? "PAPER" : "LIVE";
         log.debug(this.getClass().getSimpleName() + " created ", this);
+    }
+
+    public String getResolvedTradingMode() {
+        String selected = userSelectedTradingMode;
+        if (selected == null || selected.isBlank()) {
+            selected = credentials != null && credentials.sandbox() ? "PAPER" : "LIVE";
+        }
+
+        String normalized = selected.strip().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("PAPER")
+                || "SANDBOX".equals(normalized)
+                || "DEMO".equals(normalized)
+                || "TEST".equals(normalized)
+                || "TESTNET".equals(normalized)
+                || "PRACTICE".equals(normalized)) {
+            return "PAPER";
+        }
+        return "LIVE";
+    }
+
+    protected boolean modeRequestsPaperNetwork() {
+        return "PAPER".equals(getResolvedTradingMode());
+    }
+
+    protected boolean modeRequestsLiveNetwork() {
+        return "LIVE".equals(getResolvedTradingMode());
     }
 
     /**
@@ -145,13 +172,25 @@ public abstract class Exchange implements
                         .map(this::fetchOrderBook)
                         .toArray(CompletableFuture[]::new))
                 .thenApply(v -> tradePairs.stream()
-                        .map(pair -> new OrderBook(pair))
+                        .map(OrderBook::new)
                         .toList());
     }
 
     protected UnsupportedOperationException unsupported(String methodName) {
         return new UnsupportedOperationException(
                 "%s does not support %s".formatted(getName(), methodName));
+    }
+
+    public CompletableFuture<List<Order>> fetchAllOrders() {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<List<Order>> fetchPendingOrders() {
+        return CompletableFuture.completedFuture(List.of());
+    }
+
+    public CompletableFuture<String> replaceOrder(String orderId, Order newOrder) {
+        return failedFuture(unsupported("replaceOrder"));
     }
 
     protected static <T> @NotNull CompletableFuture<T> failedFuture(Throwable throwable) {

@@ -1,5 +1,7 @@
 package org.investpro.exchange;
 
+import java.util.Locale;
+
 /**
  * Enumeration of all supported exchanges in InvestPro.
  * Provides display names and factory keys for creating exchange adapters.
@@ -60,8 +62,9 @@ public enum SupportedExchange {
      * @throws IllegalArgumentException if no matching exchange found
      */
     public static SupportedExchange fromFactoryKey(String factoryKey) {
+        String normalized = normalizeFactoryKey(factoryKey);
         for (SupportedExchange exchange : values()) {
-            if (exchange.factoryKey.equalsIgnoreCase(factoryKey)) {
+            if (normalizeFactoryKey(exchange.factoryKey).equals(normalized)) {
                 return exchange;
             }
         }
@@ -82,5 +85,12 @@ public enum SupportedExchange {
             }
         }
         throw new IllegalArgumentException("Unknown exchange: " + displayName);
+    }
+
+    private static String normalizeFactoryKey(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 }

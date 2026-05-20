@@ -25,7 +25,6 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Button;
-import javafx.scene.control.Alert;
 import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
@@ -66,7 +65,7 @@ import org.investpro.utils.FXUtils;
 import org.investpro.utils.LogOnExceptionThreadFactory;
 import org.investpro.utils.ZoomDirection;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
@@ -76,6 +75,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -127,6 +127,23 @@ public class CandleStickChart extends Region {
     private static final double VOLUME_AREA_RATIO = 0.20;
     private static final double PRICE_PADDING_RATIO = 0.12;
     private static final long LOADING_TIMEOUT_MS = 30_000L;
+
+    // ============================================================
+    // Modern InvestPro chart theme
+    // ============================================================
+    private static final Color THEME_BG_TOP = Color.rgb(6, 10, 18);
+    private static final Color THEME_BG_BOTTOM = Color.rgb(13, 20, 33);
+    private static final Color THEME_PANEL = Color.rgb(15, 23, 42, 0.92);
+    private static final Color THEME_PANEL_SOFT = Color.rgb(30, 41, 59, 0.64);
+    private static final Color THEME_GRID_MAJOR = Color.rgb(148, 163, 184, 0.18);
+    private static final Color THEME_GRID_MINOR = Color.rgb(148, 163, 184, 0.08);
+    private static final Color THEME_TEXT = Color.rgb(226, 232, 240);
+    private static final Color THEME_MUTED = Color.rgb(148, 163, 184);
+    private static final Color THEME_BORDER = Color.rgb(51, 65, 85, 0.85);
+    private static final Color THEME_ACCENT = Color.rgb(56, 189, 248);
+    private static final Color THEME_BUY = Color.rgb(34, 197, 94);
+    private static final Color THEME_SELL = Color.rgb(239, 68, 68);
+    private static final Color THEME_WARNING = Color.rgb(245, 158, 11);
 
     private final Exchange exchange;
     private final TradePair tradePair;
@@ -308,8 +325,11 @@ public class CandleStickChart extends Region {
     }
 
     private void configureAxes() {
-        // Peach/Black theme styling
-        String axisStyle = "-fx-text-fill: #f5e6d3; -fx-border-color: #3d2817; -fx-background-color: #2a1810;";
+        String axisStyle = """
+                -fx-background-color: #0f172a;
+                -fx-border-color: #334155;
+                -fx-tick-label-fill: #cbd5e1;
+                """;
         Font axisFont = Font.font(FXUtils.getMonospacedFont(), 12);
 
         xAxis.setManaged(false);
@@ -341,9 +361,9 @@ public class CandleStickChart extends Region {
         yAxis.setStyle(axisStyle);
         extraAxis.setStyle(axisStyle);
 
-        xAxis.setTickLabelFill(Color.rgb(245, 230, 211));
-        yAxis.setTickLabelFill(Color.rgb(245, 230, 211));
-        extraAxis.setTickLabelFill(Color.rgb(245, 230, 211));
+        xAxis.setTickLabelFill(THEME_MUTED);
+        yAxis.setTickLabelFill(THEME_TEXT);
+        extraAxis.setTickLabelFill(THEME_MUTED);
 
         xAxis.setTickLabelFont(axisFont);
         yAxis.setTickLabelFont(axisFont);
@@ -389,54 +409,30 @@ public class CandleStickChart extends Region {
     }
 
     private void setupNewsEventsButton() {
-        newsEventsButton = new Button("📰 Events");
-        newsEventsButton.setStyle(
-                "-fx-font-size: 11; " +
-                        "-fx-padding: 6 12; " +
-                        "-fx-background-color: #1e40af; " +
-                        "-fx-text-fill: #ffffff; " +
-                        "-fx-border-color: #3b82f6; " +
-                        "-fx-border-radius: 4; " +
-                        "-fx-background-radius: 4; " +
-                        "-fx-cursor: hand;");
-
+        newsEventsButton = new Button("Events");
+        updateNewsEventsButtonStyle();
         newsEventsButton.setOnMouseEntered(e -> {
-            if (showChartEvents) {
-                newsEventsButton.setStyle(
-                        "-fx-font-size: 11; " +
-                                "-fx-padding: 6 12; " +
-                                "-fx-background-color: #059669; " +
-                                "-fx-text-fill: #ffffff; " +
-                                "-fx-border-color: #34d399; " +
-                                "-fx-border-radius: 4; " +
-                                "-fx-background-radius: 4; " +
-                                "-fx-cursor: hand;");
-            } else {
-                newsEventsButton.setStyle(
-                        "-fx-font-size: 11; " +
-                                "-fx-padding: 6 12; " +
-                                "-fx-background-color: #1e3a8a; " +
-                                "-fx-text-fill: #ffffff; " +
-                                "-fx-border-color: #3b82f6; " +
-                                "-fx-border-radius: 4; " +
-                                "-fx-background-radius: 4; " +
-                                "-fx-cursor: hand;");
-            }
+            newsEventsButton.setStyle("""
+                    -fx-font-size: 11px;
+                    -fx-font-weight: bold;
+                    -fx-padding: 7 14;
+                    -fx-background-color: #38bdf8;
+                    -fx-text-fill: #020617;
+                    -fx-border-color: #7dd3fc;
+                    -fx-border-radius: 999;
+                    -fx-background-radius: 999;
+                    -fx-cursor: hand;
+                    """);
         });
-
         newsEventsButton.setOnMouseExited(e -> updateNewsEventsButtonStyle());
-
         newsEventsButton.setOnAction(event -> {
             toggleChartEvents();
             updateNewsEventsButtonStyle();
         });
-
-        // Create a container for the button positioned at top-right
         HBox buttonContainer = new HBox(newsEventsButton);
         buttonContainer.setAlignment(Pos.TOP_RIGHT);
-        buttonContainer.setPadding(new Insets(8, 12, 0, 0));
+        buttonContainer.setPadding(new Insets(10, 14, 0, 0));
         buttonContainer.setMouseTransparent(false);
-
         chartStackPane.getChildren().add(buttonContainer);
     }
 
@@ -444,26 +440,35 @@ public class CandleStickChart extends Region {
      * Update news events button style based on visibility state
      */
     private void updateNewsEventsButtonStyle() {
+        if (newsEventsButton == null) {
+            return;
+        }
         if (showChartEvents) {
-            newsEventsButton.setStyle(
-                    "-fx-font-size: 11; " +
-                            "-fx-padding: 6 12; " +
-                            "-fx-background-color: #10b981; " +
-                            "-fx-text-fill: #ffffff; " +
-                            "-fx-border-color: #34d399; " +
-                            "-fx-border-radius: 4; " +
-                            "-fx-background-radius: 4; " +
-                            "-fx-cursor: hand;");
+            newsEventsButton.setText("Events ON");
+            newsEventsButton.setStyle("""
+                    -fx-font-size: 11px;
+                    -fx-font-weight: bold;
+                    -fx-padding: 7 14;
+                    -fx-background-color: #16a34a;
+                    -fx-text-fill: white;
+                    -fx-border-color: #86efac;
+                    -fx-border-radius: 999;
+                    -fx-background-radius: 999;
+                    -fx-cursor: hand;
+                    """);
         } else {
-            newsEventsButton.setStyle(
-                    "-fx-font-size: 11; " +
-                            "-fx-padding: 6 12; " +
-                            "-fx-background-color: #1e40af; " +
-                            "-fx-text-fill: #ffffff; " +
-                            "-fx-border-color: #3b82f6; " +
-                            "-fx-border-radius: 4; " +
-                            "-fx-background-radius: 4; " +
-                            "-fx-cursor: hand;");
+            newsEventsButton.setText("Events OFF");
+            newsEventsButton.setStyle("""
+                    -fx-font-size: 11px;
+                    -fx-font-weight: bold;
+                    -fx-padding: 7 14;
+                    -fx-background-color: #1e293b;
+                    -fx-text-fill: #cbd5e1;
+                    -fx-border-color: #475569;
+                    -fx-border-radius: 999;
+                    -fx-background-radius: 999;
+                    -fx-cursor: hand;
+                    """);
         }
     }
 
@@ -1073,21 +1078,27 @@ public class CandleStickChart extends Region {
     }
 
     private void drawTradingBackground() {
-        // Peach/Black background theme
-        graphicsContext.setFill(Color.rgb(42, 30, 20));
-        graphicsContext.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+        double w = canvas.getWidth();
+        double h = canvas.getHeight();
+        graphicsContext.setFill(THEME_BG_TOP);
+        graphicsContext.fillRect(0, 0, w, h);
+        graphicsContext.setFill(THEME_BG_BOTTOM);
+        graphicsContext.fillRect(0, h * 0.42, w, h * 0.58);
         drawBackgroundImage();
-        graphicsContext.setFill(Color.rgb(50, 35, 25, 0.95));
-        graphicsContext.fillRect(0, 0, canvas.getWidth(), HEADER_HEIGHT);
+        graphicsContext.setFill(THEME_PANEL);
+        graphicsContext.fillRoundRect(8, 8, Math.max(1, w - 16), HEADER_HEIGHT - 10, 14, 14);
+        graphicsContext.setStroke(THEME_BORDER);
+        graphicsContext.setLineWidth(1.0);
+        graphicsContext.strokeRoundRect(8, 8, Math.max(1, w - 16), HEADER_HEIGHT - 10, 14, 14);
+        graphicsContext.setStroke(Color.rgb(125, 211, 252, 0.16));
+        graphicsContext.strokeLine(18, 10, w - 18, 10);
         if (chartOptions.isShowVolume()) {
-            double volumeTop = canvas.getHeight() * (1.0 - VOLUME_AREA_RATIO);
-            graphicsContext.setFill(Color.rgb(35, 25, 15, 0.70));
-            graphicsContext.fillRect(0, volumeTop, canvas.getWidth(), canvas.getHeight() - volumeTop);
-            graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.80));
-            graphicsContext.strokeLine(0, volumeTop, canvas.getWidth(), volumeTop);
+            double volumeTop = h * (1.0 - VOLUME_AREA_RATIO);
+            graphicsContext.setFill(Color.rgb(15, 23, 42, 0.62));
+            graphicsContext.fillRoundRect(8, volumeTop, Math.max(1, w - 16), h - volumeTop - 12, 12, 12);
+            graphicsContext.setStroke(Color.rgb(51, 65, 85, 0.65));
+            graphicsContext.strokeLine(12, volumeTop, w - 12, volumeTop);
         }
-        graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.80));
-        graphicsContext.strokeLine(0, HEADER_HEIGHT, canvas.getWidth(), HEADER_HEIGHT);
     }
 
     private void drawBackgroundImage() {
@@ -1117,17 +1128,17 @@ public class CandleStickChart extends Region {
     private void drawGridLines() {
         graphicsContext.setLineWidth(1.0);
         if (chartOptions.isHorizontalGridLinesVisible()) {
-            graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.42));
             for (Axis.TickMark<Number> tick : yAxis.getTickMarks()) {
                 double y = snapPixel(priceToY(tick.getValue().doubleValue()));
+                graphicsContext.setStroke(THEME_GRID_MAJOR);
                 graphicsContext.strokeLine(0, y, canvas.getWidth(), y);
             }
         }
         if (chartOptions.isVerticalGridLinesVisible()) {
-            graphicsContext.setStroke(Color.rgb(80, 55, 35, 0.25));
             int step = Math.max(1, visibleCandles / 8);
             for (int i = 0; i < visibleCandles; i += step) {
                 double x = candleCenterX(i);
+                graphicsContext.setStroke(i % (step * 2) == 0 ? THEME_GRID_MAJOR : THEME_GRID_MINOR);
                 graphicsContext.strokeLine(x, HEADER_HEIGHT, x, canvas.getHeight());
             }
         }
@@ -1200,41 +1211,62 @@ public class CandleStickChart extends Region {
     }
 
     private void drawChartHeader(CandleData candle) {
-        if (candle == null)
+        if (candle == null) {
             return;
-        graphicsContext
-                .setFont(Font.font(FXUtils.getMonospacedFont(), Math.max(26, Math.min(56, canvas.getWidth() / 12))));
+        }
+        boolean bullish = candle.closePrice() >= candle.openPrice();
+        Color closeColor = bullish ? THEME_BUY : THEME_SELL;
+
+        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(),
+                Math.max(28, Math.min(60, canvas.getWidth() / 12))));
         graphicsContext.setTextAlign(TextAlignment.CENTER);
         graphicsContext.setTextBaseline(VPos.CENTER);
-        graphicsContext.setFill(Color.rgb(248, 250, 252, 0.07));
+        graphicsContext.setFill(Color.rgb(148, 163, 184, 0.055));
         graphicsContext.fillText(tradePair.toString('/'), canvas.getWidth() / 2.0, canvas.getHeight() / 2.0);
-        boolean bullish = candle.closePrice() >= candle.openPrice();
-        Color closeColor = bullish ? Color.rgb(38, 166, 154) : Color.rgb(239, 83, 80);
-        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 13));
+
+        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 15));
         graphicsContext.setTextAlign(TextAlignment.LEFT);
         graphicsContext.setTextBaseline(VPos.CENTER);
-        graphicsContext.setFill(Color.rgb(226, 232, 240));
-        graphicsContext.fillText(tradePair.toString('/'), 14, 18);
-        graphicsContext.setFill(Color.rgb(148, 163, 184));
-        graphicsContext.fillText(exchange.supportsTimeframe(secondsPerCandle), 112, 18);
+        graphicsContext.setFill(THEME_TEXT);
+        graphicsContext.fillText(tradePair.toString('/'), 18, 20);
 
-        // Display market session
+        drawSmallPill(exchange.supportsTimeframe(secondsPerCandle), 118, 20, THEME_ACCENT,
+                Color.rgb(8, 47, 73, 0.95));
+
+        drawHeaderValue("O", candle.openPrice(), 18, THEME_MUTED);
+        drawHeaderValue("H", candle.highPrice(), 145, THEME_BUY);
+        drawHeaderValue("L", candle.lowPrice(), 272, THEME_SELL);
+        drawHeaderValue("C", candle.closePrice(), 399, closeColor);
+
+        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 11));
+        graphicsContext.setFill(THEME_MUTED);
+        graphicsContext.fillText("Vol " + compactNumber(candle.volume()), 530, 40);
+
         String session = getMarketSession();
         Color sessionColor = getSessionColor(session);
-        graphicsContext.setFill(sessionColor);
-        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 11));
-        graphicsContext.fillText(session, canvas.getWidth() - 200, 18);
-
-        drawHeaderValue("O", candle.openPrice(), 14, Color.rgb(203, 213, 225));
-        drawHeaderValue("H", candle.highPrice(), 142, Color.rgb(38, 166, 154));
-        drawHeaderValue("L", candle.lowPrice(), 270, Color.rgb(239, 83, 80));
-        drawHeaderValue("C", candle.closePrice(), 398, closeColor);
-        graphicsContext.setFill(Color.rgb(148, 163, 184));
-        graphicsContext.fillText("Vol %s".formatted(compactNumber(candle.volume())), 526, 40);
-        graphicsContext.fillText("%sChange ".formatted(compactNumber(tradePair.getChange())), 626, 70);
-
+        double badgeX = Math.max(520, canvas.getWidth() - 245);
+        drawSmallPill(session, badgeX, 20, sessionColor, Color.rgb(15, 23, 42, 0.95));
         graphicsContext.setTextAlign(TextAlignment.LEFT);
+    }
 
+    private void drawSmallPill(String text, double x, double centerY, Color accent, Color background) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 11));
+        double width = Math.max(54, text.length() * 7.0 + 18);
+        double height = 20;
+        double y = centerY - height / 2.0;
+        graphicsContext.setFill(background);
+        graphicsContext.fillRoundRect(x, y, width, height, 999, 999);
+        graphicsContext.setStroke(Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), 0.75));
+        graphicsContext.setLineWidth(1.0);
+        graphicsContext.strokeRoundRect(x, y, width, height, 999, 999);
+        graphicsContext.setFill(accent);
+        graphicsContext.setTextAlign(TextAlignment.CENTER);
+        graphicsContext.setTextBaseline(VPos.CENTER);
+        graphicsContext.fillText(text, x + width / 2.0, centerY);
+        graphicsContext.setTextAlign(TextAlignment.LEFT);
     }
 
     private String getMarketSession() {
@@ -1692,21 +1724,23 @@ public class CandleStickChart extends Region {
     private void drawCurrentPriceBadge(CandleData candle) {
         double price = candle.closePrice();
         double y = priceToY(price);
-        if (y < 0 || y > canvas.getHeight())
+        if (y < 0 || y > canvas.getHeight()) {
             return;
+        }
         boolean bullish = candle.closePrice() >= candle.openPrice();
-        Color color = bullish ? Color.rgb(38, 166, 154) : Color.rgb(239, 83, 80);
-        double x = canvas.getWidth() - PRICE_BADGE_WIDTH;
+        Color color = bullish ? THEME_BUY : THEME_SELL;
+        double x = canvas.getWidth() - PRICE_BADGE_WIDTH - 6;
         double badgeY = clamp(y - PRICE_BADGE_HEIGHT / 2.0, HEADER_HEIGHT + 2,
-                canvas.getHeight() - PRICE_BADGE_HEIGHT - 2);
-        graphicsContext.setStroke(Color.rgb(148, 163, 184, 0.40));
+                canvas.getHeight() - PRICE_BADGE_HEIGHT - 8);
+        graphicsContext.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.50));
         graphicsContext.setLineWidth(1);
-        graphicsContext.setLineDashes(5, 5);
-        // Draw price line from left to right edge (fully extending to right)
+        graphicsContext.setLineDashes(6, 6);
         graphicsContext.strokeLine(0, snapPixel(y), canvas.getWidth(), snapPixel(y));
         graphicsContext.setLineDashes();
         graphicsContext.setFill(color);
-        graphicsContext.fillRoundRect(x, badgeY, PRICE_BADGE_WIDTH, PRICE_BADGE_HEIGHT, 5, 5);
+        graphicsContext.fillRoundRect(x, badgeY, PRICE_BADGE_WIDTH, PRICE_BADGE_HEIGHT, 999, 999);
+        graphicsContext.setStroke(Color.rgb(255, 255, 255, 0.20));
+        graphicsContext.strokeRoundRect(x, badgeY, PRICE_BADGE_WIDTH, PRICE_BADGE_HEIGHT, 999, 999);
         graphicsContext.setFill(Color.WHITE);
         graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 12));
         graphicsContext.setTextAlign(TextAlignment.CENTER);
@@ -1759,39 +1793,28 @@ public class CandleStickChart extends Region {
      * where they are in the data timeline and how much data is available.
      */
     private void drawScrollbar() {
-        if (data.isEmpty() || canvas == null || canvas.getWidth() <= 0)
+        if (data.isEmpty() || canvas == null || canvas.getWidth() <= 0) {
             return;
+        }
 
         double scrollbarTop = canvas.getHeight() - SCROLLBAR_HEIGHT - SCROLLBAR_PADDING;
         double trackWidth = canvas.getWidth();
         double trackHeight = SCROLLBAR_HEIGHT;
 
-        // Draw scrollbar track (background)
-        graphicsContext.setFill(Color.rgb(20, 30, 45, 0.6));
-        graphicsContext.fillRect(0, scrollbarTop, trackWidth, trackHeight);
-        graphicsContext.setStroke(Color.rgb(42, 52, 68, 0.5));
-        graphicsContext.setLineWidth(1);
-        graphicsContext.strokeRect(0, scrollbarTop, trackWidth, trackHeight);
+        graphicsContext.setFill(Color.rgb(15, 23, 42, 0.70));
+        graphicsContext.fillRoundRect(8, scrollbarTop, trackWidth - 16, trackHeight, 999, 999);
+        graphicsContext.setStroke(Color.rgb(51, 65, 85, 0.85));
+        graphicsContext.strokeRoundRect(8, scrollbarTop, trackWidth - 16, trackHeight, 999, 999);
 
-        // Calculate scrollbar thumb (handle) position and size
         int totalCandles = data.size();
-        double thumbWidth = Math.max(20, (visibleCandles / (double) totalCandles) * trackWidth);
-        double thumbX = (firstVisibleIndex / (double) Math.max(1, totalCandles - visibleCandles))
-                * (trackWidth - thumbWidth);
+        double thumbWidth = Math.max(28, (visibleCandles / (double) Math.max(1, totalCandles)) * (trackWidth - 16));
+        double denominator = Math.max(1, totalCandles - visibleCandles);
+        double thumbX = 8 + (firstVisibleIndex / denominator) * ((trackWidth - 16) - thumbWidth);
 
-        // Draw scrollbar thumb
-        Color thumbColor = Color.rgb(100, 150, 220, 0.8);
-        graphicsContext.setFill(thumbColor);
-        graphicsContext.fillRect(thumbX, scrollbarTop, thumbWidth, trackHeight);
-
-        // Draw thumb border
-        graphicsContext.setStroke(Color.rgb(150, 180, 255, 0.9));
-        graphicsContext.setLineWidth(1);
-        graphicsContext.strokeRect(thumbX, scrollbarTop, thumbWidth, trackHeight);
-
-        // Add subtle gradient-like shading
-        graphicsContext.setFill(Color.rgb(255, 255, 255, 0.15));
-        graphicsContext.fillRect(thumbX, scrollbarTop, thumbWidth, trackHeight / 2);
+        graphicsContext.setFill(Color.rgb(56, 189, 248, 0.82));
+        graphicsContext.fillRoundRect(thumbX, scrollbarTop, thumbWidth, trackHeight, 999, 999);
+        graphicsContext.setStroke(Color.rgb(186, 230, 253, 0.95));
+        graphicsContext.strokeRoundRect(thumbX, scrollbarTop, thumbWidth, trackHeight, 999, 999);
     }
 
     /**
@@ -1927,30 +1950,18 @@ public class CandleStickChart extends Region {
      * Positioned in top-right corner next to market session info.
      */
     private void drawMarketRegime() {
-        if (canvas == null || currentMarketRegime.isEmpty()) {
+        if (canvas == null) {
+            return;
+        }
+        if (currentMarketRegime == null || currentMarketRegime.isBlank()) {
             calculateMarketRegime();
         }
-
-        double x = canvas.getWidth() - 320;
-        double y = 18;
-
-        // Draw background badge
-        double badgeWidth = 110;
-        double badgeHeight = 20;
-        graphicsContext.setFill(Color.rgb(30, 41, 59, 0.7));
-        graphicsContext.fillRoundRect(x - 5, y - 10, badgeWidth, badgeHeight, 3, 3);
-
-        // Draw border
-        graphicsContext.setStroke(regimeColor);
-        graphicsContext.setLineWidth(1);
-        graphicsContext.strokeRoundRect(x - 5, y - 10, badgeWidth, badgeHeight, 3, 3);
-
-        // Draw regime text
-        graphicsContext.setFill(regimeColor);
-        graphicsContext.setFont(Font.font(FXUtils.getMonospacedFont(), 11));
-        graphicsContext.setTextAlign(TextAlignment.LEFT);
-        graphicsContext.setTextBaseline(VPos.CENTER);
-        graphicsContext.fillText(currentMarketRegime, x, y);
+        String label = currentMarketRegime == null || currentMarketRegime.isBlank()
+                ? "REGIME N/A"
+                : currentMarketRegime;
+        double x = Math.max(340, canvas.getWidth() - 365);
+        double y = 42;
+        drawSmallPill(label, x, y, regimeColor, Color.rgb(15, 23, 42, 0.95));
     }
 
     public void changeZoom(ZoomDirection direction) {
@@ -2088,7 +2099,7 @@ public class CandleStickChart extends Region {
         return "%.2f".formatted(value);
     }
 
-    public void addPriceLine(@Nullable PriceLine priceLine) {
+    public void addPriceLine(PriceLine priceLine) {
         if (priceLine == null || !priceLine.isValid())
             return;
         priceLines.add(priceLine.copy());
@@ -2173,7 +2184,7 @@ public class CandleStickChart extends Region {
         return List.copyOf(indicators);
     }
 
-    public void setBackgroundImage(@Nullable Image image) {
+    public void setBackgroundImage( Image image) {
         this.backgroundImage = image;
         requestChartRedraw();
     }
@@ -2622,10 +2633,14 @@ public class CandleStickChart extends Region {
 
         private static final int MAX_PENDING_TRADES = 2_000;
         private static final int MAX_DRAIN_PER_RUN = 500;
+        private static final long OVERFLOW_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(5);
 
         private final BlockingQueue<Trade> liveTradesQueue = new LinkedBlockingQueue<>(MAX_PENDING_TRADES);
 
         private final AtomicReference<Trade> latestTrade = new AtomicReference<>();
+        private final AtomicLong droppedOldestSinceLastLog = new AtomicLong(0);
+        private final AtomicLong droppedLatestSinceLastLog = new AtomicLong(0);
+        private final AtomicLong lastOverflowLogNanos = new AtomicLong(0);
 
         @Setter
         private volatile boolean ready;
@@ -2643,6 +2658,9 @@ public class CandleStickChart extends Region {
 
             liveTradesQueue.clear();
             latestTrade.set(null);
+            droppedOldestSinceLastLog.set(0);
+            droppedLatestSinceLastLog.set(0);
+            lastOverflowLogNanos.set(0);
 
             log.debug("Removed live trade consumer data for {}", tradePair);
         }
@@ -2655,11 +2673,11 @@ public class CandleStickChart extends Region {
         }
 
         @Override
-        public @Nullable Trade get(TradePair tradePair) {
+        public Trade get(TradePair tradePair) {
             Trade trade = latestTrade.get();
 
             if (trade == null || tradePair == null) {
-                return null;
+                return trade;
             }
 
             return tradePair.equals(trade.getTradePair()) ? trade : null;
@@ -2684,13 +2702,36 @@ public class CandleStickChart extends Region {
             Trade dropped = liveTradesQueue.poll();
 
             if (dropped != null && liveTradesQueue.offer(trade)) {
-                log.warn(
-                        "Live trades queue full for {}. Dropped oldest trade and queued latest. queueSize={}",
-                        tradePair,
-                        liveTradesQueue.size());
+                droppedOldestSinceLastLog.incrementAndGet();
+                logOverflowIfNeeded();
             } else {
-                log.warn("Live trades queue full for {}. Dropping latest trade: {}", tradePair, trade);
+                droppedLatestSinceLastLog.incrementAndGet();
+                logOverflowIfNeeded();
             }
+        }
+
+        private void logOverflowIfNeeded() {
+            long now = System.nanoTime();
+            long last = lastOverflowLogNanos.get();
+
+            if (now - last < OVERFLOW_LOG_INTERVAL_NANOS) {
+                return;
+            }
+
+            if (!lastOverflowLogNanos.compareAndSet(last, now)) {
+                return;
+            }
+
+            long droppedOldest = droppedOldestSinceLastLog.getAndSet(0);
+            long droppedLatest = droppedLatestSinceLastLog.getAndSet(0);
+
+            log.warn(
+                    "Live trades queue saturated for {}. droppedOldest={}, droppedLatest={}, queueSize={}, capacity={}",
+                    tradePair,
+                    droppedOldest,
+                    droppedLatest,
+                    liveTradesQueue.size(),
+                    MAX_PENDING_TRADES);
         }
 
         @Override

@@ -122,6 +122,7 @@ public class SymbolAgent implements Agent {
             case PAPER_TRADING -> state.setLastIssue("Paper validation is waiting for future live paper-trade results.");
             default -> {
                 // ASSIGNED, LIVE_READY, LIVE_TRADING, FAILED, and PAUSED are managed externally.
+                state.setState(SymbolEvaluationState.NOT_STARTED);
             }
         }
 

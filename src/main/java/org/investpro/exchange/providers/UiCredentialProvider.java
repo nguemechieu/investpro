@@ -2,11 +2,16 @@ package org.investpro.exchange.providers;
 
 import org.investpro.exchange.contracts.CredentialProvider;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class UiCredentialProvider implements CredentialProvider {
+
+    private static final Map<String, String> EXCHANGE_ALIASES = buildExchangeAliases();
 
     private final Map<String, String> values = new ConcurrentHashMap<>();
 
@@ -34,7 +39,12 @@ public class UiCredentialProvider implements CredentialProvider {
                 put("COINBASE_PRIVATE_KEY", apiSecret);
             }
 
-            case "binanceus" -> {
+            case "binance" -> {
+                put("BINANCE_API_KEY", apiKey);
+                put("BINANCE_API_SECRET", apiSecret);
+            }
+
+            case "binance_us" -> {
                 put("BINANCE_US_API_KEY", apiKey);
                 put("BINANCE_US_API_SECRET", apiSecret);
             }
@@ -53,6 +63,23 @@ public class UiCredentialProvider implements CredentialProvider {
             case "bitfinex" -> {
                 put("BITFINEX_API_KEY", apiKey);
                 put("BITFINEX_API_SECRET", apiSecret);
+            }
+
+            case "interactive_brokers" -> {
+                put("IBKR_API_KEY", apiKey);
+                put("IBKR_API_SECRET", apiSecret);
+                put("IBKR_ACCOUNT_ID", accountId);
+                put("IBKR_ACCESS_TOKEN", apiSecret);
+                put("IBK_API_KEY", apiKey);
+                put("IBK_API_SECRET", apiSecret);
+                put("IBK_ACCOUNT_ID", accountId);
+                put("IBK_ACCESS_TOKEN", apiSecret);
+            }
+
+            case "stellar_network", "stellar" -> {
+                put("STELLAR_PUBLIC_KEY", accountId != null && !accountId.isBlank() ? accountId : apiKey);
+                put("STELLAR_SECRET_KEY", apiSecret);
+                put("STELLAR_NETWORK", tradingMode);
             }
         }
     }
@@ -83,10 +110,33 @@ public class UiCredentialProvider implements CredentialProvider {
             return "";
         }
 
-        return value
+        String compact = value
                 .trim()
-                .toLowerCase(java.util.Locale.ROOT)
-                .replace(" ", "")
-                .replace("-", "_");
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]", "");
+        return EXCHANGE_ALIASES.getOrDefault(compact, compact);
+    }
+
+    private static Map<String, String> buildExchangeAliases() {
+        Map<String, String> aliases = new HashMap<>();
+
+        addAliases(aliases, "alpaca", "alpaca", "alpacastocks", "alpacaequities", "alpacacrypto");
+        addAliases(aliases, "binance", "binance", "binanceglobal", "binanceinternational");
+        addAliases(aliases, "binance_us", "binanceus", "binanceusa", "binanceamerica", "binanceunitedstates");
+        addAliases(aliases, "bitfinex", "bitfinex", "bitfinexus");
+        addAliases(aliases, "coinbase", "coinbase", "coinbasepro", "coinbaseadvanced", "coinbaseadvancedtrade",
+                "coinbaseat", "coinbasebrokerage");
+        addAliases(aliases, "interactive_brokers", "interactivebrokers", "interactivebroker", "ib",
+                "ibk", "ibkr", "schwab", "charlesschwab");
+        addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
+        addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
+
+        return Collections.unmodifiableMap(aliases);
+    }
+
+    private static void addAliases(Map<String, String> aliases, String canonical, String... values) {
+        for (String value : values) {
+            aliases.put(value, canonical);
+        }
     }
 }

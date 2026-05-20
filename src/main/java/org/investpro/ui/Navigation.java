@@ -29,7 +29,6 @@ import org.investpro.i18n.LocalizationService;
 public class Navigation extends Stage {
     private static final String[] AVAILABLE_EXCHANGES = {
             "COINBASE",
-            "COINBASE PRO",
             "BINANCE US",
             "BINANCE",
             "OANDA",

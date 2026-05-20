@@ -124,11 +124,12 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public boolean isPaperTrading() {
-        // If user explicitly selected trading mode during onboarding, respect that
-        if (getUserSelectedTradingMode() != null && !getUserSelectedTradingMode().isBlank()) {
-            return "PAPER".equalsIgnoreCase(getUserSelectedTradingMode());
+        if (modeRequestsPaperNetwork()) {
+            return true;
         }
-        // Otherwise, default to paper trading for Interactive Brokers
+        if (modeRequestsLiveNetwork()) {
+            return false;
+        }
         return true;
     }
 

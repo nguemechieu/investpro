@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2015, 2016 ControlsFX
  * All rights reserved.
- *
+ * <p>
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
  *     * Neither the name of ControlsFX, any associated website, nor the
  * names of its contributors may be used to endorse or promote products
  * derived from this software without specific prior written permission.
- *
+ * <p>
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -58,7 +58,7 @@ public class ToggleSwitch extends Labeled {
      * Indicates whether this ToggleSwitch is selected.
      */
     private final ReadOnlyBooleanWrapper selected;
-    public final BooleanProperty turnOnTextLonger;
+    final BooleanProperty turnOnTextLonger;
 
     private static final String DEFAULT_STYLE_CLASS = "toggle-switch";
     private static final PseudoClass PSEUDO_CLASS_SELECTED = PseudoClass.getPseudoClass("selected");
@@ -124,7 +124,7 @@ public class ToggleSwitch extends Labeled {
         return selected.getReadOnlyProperty();
     }
 
-    public final void setSelected(boolean selected) {
+    protected final void setSelected(boolean selected) {
         this.selected.set(selected);
     }
 
@@ -155,6 +155,6 @@ public class ToggleSwitch extends Labeled {
 
     @Override
     public String getUserAgentStylesheet() {
-        return Objects.requireNonNull(ToggleSwitch.class.getResource("/app.css")).toExternalForm();
+        return Objects.requireNonNull(ToggleSwitch.class.getResource("/css/toggleswitch.css")).toExternalForm();
     }
 }
