@@ -78,6 +78,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     private volatile TradePair defaultTradePair;
     private volatile String lastErrorMessage = "";
     private volatile long lastErrorLoggedAtMs = 0L;
+    private volatile boolean authenticationFailed = false;
 
     public CoinbaseWebSocketClient(@NotNull URI uri, @NotNull Draft draft, String jwt) {
         super(uri, draft);
@@ -489,7 +490,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             productIds.add(toCoinbaseProductId(tradePair));
         }
 
-        if (!jwt.isBlank()) {
+        if (!jwt.isBlank() && shouldAttachJwt(channel)) {
             message.put("jwt", jwt);
         }
 
@@ -497,6 +498,12 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         log.debug("Sending Coinbase WS payload: {}", payload);
         send(payload);
+    }
+
+    private boolean shouldAttachJwt(@NotNull String channel) {
+        String normalized = channel.trim().toLowerCase(Locale.ROOT);
+        // Public market channels do not require JWT and can fail with AUTHENTICATION FAILURE when token is stale.
+        return normalized.contains("user") || normalized.contains("private") || normalized.contains("auth");
     }
 
     private CoinbaseStream parseCoinbaseStream(String streamName) {
@@ -592,7 +599,15 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         lastErrorMessage = errorMessage;
         lastErrorLoggedAtMs = now;
-        throw  new RuntimeException("Coinbase WebSocket error: \n"+ errorMessage.toUpperCase());
+
+        String upper = errorMessage.toUpperCase(Locale.ROOT);
+        if (upper.contains("AUTHENTICATION FAILURE")) {
+            authenticationFailed = true;
+            log.warn("Coinbase WebSocket authentication failure received. Continuing without interrupting public streams.");
+            return;
+        }
+
+        log.warn("Coinbase WebSocket error: {}", errorMessage);
     }
 
     public static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {
