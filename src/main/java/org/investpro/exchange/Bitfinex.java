@@ -16,7 +16,6 @@ import org.investpro.exchange.credentials.ExchangeSigning;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
-import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
@@ -156,8 +155,12 @@ public class Bitfinex extends Exchange {
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
         List<TradePair> pairs = getTradePairSymbol();
-        return pairs.isEmpty() ? TradePair.of("BTC",
-                "USD") : pairs.getFirst();
+        if (!pairs.isEmpty()) {
+            return pairs.getFirst();
+        }
+        TradePair pair = TradePair.fromSymbol("BTC_USD");
+        pair.setNativeSymbol("BTCUSD");
+        return pair;
     }
 
     @Override
@@ -586,16 +589,12 @@ public class Bitfinex extends Exchange {
                     continue;
                 }
 
-                CryptoCurrency baseCurrency, counterCurrency;
                 String baseAsset = pair.substring(0, 3);
                 String quoteAsset = pair.substring(3);
 
                 try {
-                    // Create currencies
-                    baseCurrency = new CryptoCurrency(baseAsset, baseAsset, baseAsset, 8, baseAsset, baseAsset);
-                    counterCurrency = new CryptoCurrency(quoteAsset, quoteAsset, quoteAsset, 8, quoteAsset, quoteAsset);
-
-                    TradePair tp = new TradePair(baseCurrency, counterCurrency);
+                    TradePair tp = TradePair.fromSymbol(baseAsset + "_" + quoteAsset);
+                    tp.setNativeSymbol(pairString);
                     tradePairs.add(tp);
                     logger.debug("Added trade pair: " + tp);
                 } catch (SQLException | ClassNotFoundException e) {
@@ -1489,7 +1488,9 @@ public class Bitfinex extends Exchange {
                     : normalized;
         }
         try {
-            return TradePair.of(base, quote);
+            TradePair pair = TradePair.fromSymbol(base + "/" + quote);
+            pair.setNativeSymbol(symbol);
+            return pair;
         } catch (SQLException | ClassNotFoundException exception) {
             throw new IllegalArgumentException("Unable to resolve order symbol: " + symbol, exception);
         }

@@ -1,0 +1,7 @@
+org.investpro.indicators.providers.SmaIndicatorProvider
+org.investpro.indicators.providers.EmaIndicatorProvider
+org.investpro.indicators.providers.RsiIndicatorProvider
+org.investpro.indicators.providers.MacdIndicatorProvider
+org.investpro.indicators.providers.BollingerBandsIndicatorProvider
+org.investpro.indicators.providers.AtrIndicatorProvider
+org.investpro.indicators.providers.VwapIndicatorProvider

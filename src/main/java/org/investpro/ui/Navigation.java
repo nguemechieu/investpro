@@ -6,10 +6,13 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import lombok.Getter;
@@ -17,33 +20,44 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
-import org.investpro.exchange.infrastructure.ENUM_EXCHANGE_LIST;
 import org.investpro.i18n.LocalizationService;
+import org.investpro.spi.ExchangeProvider;
+import org.investpro.spi.PluginRegistry;
 
-import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Professional exchange navigation panel for InvestPro.
+ * Professional trading-desk navigation surface for InvestPro.
  *
- * <p>Allows users to select an exchange, quickly switch between major venues,
- * and view connection status. Styling is intentionally delegated to CSS where possible.</p>
+ * <p>Combines venue selection, connection state, and high-frequency workflow
+ * shortcuts in one compact panel. TradingDesk owns the actual actions; this
+ * class stays focused on navigation intent and presentation.</p>
  */
 @Slf4j
 @Getter
 @Setter
 public class Navigation extends StackPane {
 
-    private static final List<ENUM_EXCHANGE_LIST> AVAILABLE_EXCHANGES =
-            Arrays.stream(ENUM_EXCHANGE_LIST.values()).toList();
+    private static final List<String> LEGACY_EXCHANGES = List.of(
+            "COINBASE",
+            "BINANCE_US",
+            "BINANCE",
+            "OANDA",
+            "BITFINEX",
+            "ALPACA",
+            "INTERACTIVE_BROKERS",
+            "STELLAR_NETWORK");
 
     private ComboBox<String> exchangeSelector;
     private Label currentExchangeLabel;
     private Label connectionStatusLabel;
     private Label titleLabel;
+    private Label subtitleLabel;
+    private Label sessionModeLabel;
 
     /**
      * Legacy callback kept for compatibility with older code.
@@ -55,44 +69,82 @@ public class Navigation extends StackPane {
      */
     private Consumer<String> onExchangeSelected;
 
+    /**
+     * Requests that TradingDesk open a workflow or panel by id.
+     */
+    private Consumer<String> onNavigationRequested;
+
     public Navigation() {
         initializeUI();
     }
 
     private void initializeUI() {
-        getStyleClass().add("exchange-navigation");
+        getStyleClass().add("trading-navigation");
 
         VBox root = new VBox(12);
-        root.setAlignment(Pos.TOP_LEFT);
+        root.setFillWidth(true);
         root.setPadding(new Insets(14));
-        root.getStyleClass().addAll("pro-panel", "exchange-navigation-panel");
+        root.getStyleClass().addAll("pro-panel", "trading-navigation-panel");
 
-        titleLabel = new Label("EXCHANGE NAVIGATOR");
-        titleLabel.getStyleClass().addAll("panel-title", "exchange-navigation-title");
-
-        String defaultExchange = resolveDefaultExchange();
-
-        currentExchangeLabel = new Label("Current: " + defaultExchange);
-        currentExchangeLabel.getStyleClass().addAll("exchange-current-label", "desk-metric-value");
-
-        connectionStatusLabel = new Label("Status: Disconnected");
-        connectionStatusLabel.getStyleClass().addAll("connection-status", "disconnected");
-
-        Label selectorLabel = new Label("Select Exchange");
-        selectorLabel.getStyleClass().addAll("panel-meta", "exchange-selector-label");
-
-        exchangeSelector = new ComboBox<>();
-        exchangeSelector.getStyleClass().addAll("terminal-combo-box", "exchange-selector");
-        exchangeSelector.setMaxWidth(Double.MAX_VALUE);
-        exchangeSelector.setPrefWidth(220);
-        exchangeSelector.setTooltip(new Tooltip("Choose the exchange or broker used by InvestPro."));
-
-        exchangeSelector.getItems().setAll(
-                AVAILABLE_EXCHANGES.stream()
-                        .map(Enum::name)
-                        .toList()
+        root.getChildren().setAll(
+                createHeader(),
+                createExchangeCard(),
+                createWorkflowSection(),
+                createMarketSection(),
+                createSystemSection()
         );
 
+        ScrollPane scrollPane = new ScrollPane(root);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.getStyleClass().add("trading-navigation-scroll");
+
+        LocalizationService.applyTranslations(root);
+        getChildren().setAll(scrollPane);
+    }
+
+    private VBox createHeader() {
+        titleLabel = new Label("Trading Desk");
+        titleLabel.getStyleClass().add("trading-navigation-title");
+
+        subtitleLabel = new Label("Command navigation");
+        subtitleLabel.getStyleClass().add("trading-navigation-subtitle");
+
+        sessionModeLabel = new Label("Mode: " + resolveTradingMode());
+        sessionModeLabel.getStyleClass().add("trading-navigation-chip");
+
+        HBox titleRow = new HBox(8, titleLabel, new Region(), sessionModeLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(titleRow.getChildren().get(1), Priority.ALWAYS);
+
+        VBox header = new VBox(4, titleRow, subtitleLabel);
+        header.getStyleClass().add("trading-navigation-header");
+        return header;
+    }
+
+    private VBox createExchangeCard() {
+        String defaultExchange = resolveDefaultExchange();
+
+        currentExchangeLabel = new Label(displayExchangeName(defaultExchange));
+        currentExchangeLabel.getStyleClass().add("trading-navigation-exchange-name");
+
+        connectionStatusLabel = new Label("Disconnected");
+        connectionStatusLabel.getStyleClass().addAll("trading-navigation-status", "disconnected");
+
+        HBox statusRow = new HBox(8, currentExchangeLabel, new Region(), connectionStatusLabel);
+        statusRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(statusRow.getChildren().get(1), Priority.ALWAYS);
+
+        Label selectorLabel = new Label("Venue");
+        selectorLabel.getStyleClass().add("trading-navigation-label");
+
+        exchangeSelector = new ComboBox<>();
+        exchangeSelector.getStyleClass().addAll("terminal-combo-box", "trading-navigation-selector");
+        exchangeSelector.setMaxWidth(Double.MAX_VALUE);
+        exchangeSelector.setTooltip(new Tooltip("Choose the exchange or broker used by InvestPro."));
+        exchangeSelector.getItems().setAll(
+                discoverExchangeIds()
+        );
         exchangeSelector.setValue(defaultExchange);
         exchangeSelector.setOnAction(event -> {
             String selected = exchangeSelector.getValue();
@@ -101,110 +153,147 @@ public class Navigation extends StackPane {
             }
         });
 
-        VBox exchangeButtonsBox = createExchangeButtonsBox();
+        GridPane venueGrid = new GridPane();
+        venueGrid.setHgap(6);
+        venueGrid.setVgap(6);
+        venueGrid.getStyleClass().add("trading-navigation-venue-grid");
+        venueGrid.add(createExchangeButton("OANDA"), 0, 0);
+        venueGrid.add(createExchangeButton("COINBASE"), 1, 0);
+        venueGrid.add(createExchangeButton("BINANCE"), 0, 1);
+        venueGrid.add(createExchangeButton("BINANCE_US"), 1, 1);
+        venueGrid.add(createExchangeButton("BITFINEX"), 0, 2);
 
-        HBox controlButtonsBox = createControlButtonsBox();
-        controlButtonsBox.setMaxWidth(Double.MAX_VALUE);
-
-        Label quickNavLabel = new Label("Quick Navigation");
-        quickNavLabel.getStyleClass().addAll("panel-meta", "exchange-quick-nav-label");
-
-        root.getChildren().setAll(
-                titleLabel,
-                new Separator(),
-                currentExchangeLabel,
-                connectionStatusLabel,
-                new Separator(),
-                selectorLabel,
-                exchangeSelector,
-                quickNavLabel,
-                exchangeButtonsBox,
-                new Separator(),
-                controlButtonsBox
-        );
-
-        VBox.setVgrow(exchangeButtonsBox, Priority.NEVER);
-
-        LocalizationService.applyTranslations(root);
-        getChildren().setAll(root);
-    }
-
-    private VBox createExchangeButtonsBox() {
-        VBox buttonsContainer = new VBox(6);
-        buttonsContainer.getStyleClass().add("exchange-buttons-container");
-        buttonsContainer.setMaxWidth(Double.MAX_VALUE);
-
-        HBox row1 = new HBox(6);
-        row1.setMaxWidth(Double.MAX_VALUE);
-        row1.getChildren().addAll(
-                createExchangeButton("BINANCE", "binance-btn"),
-                createExchangeButton("COINBASE", "coinbase-btn")
-        );
-
-        HBox row2 = new HBox(6);
-        row2.setMaxWidth(Double.MAX_VALUE);
-        row2.getChildren().addAll(
-                createExchangeButton("OANDA", "oanda-btn"),
-                createExchangeButton("BITFINEX", "bitfinex-btn")
-        );
-
-        HBox row3 = new HBox(6);
-        row3.setMaxWidth(Double.MAX_VALUE);
-        row3.getChildren().addAll(
-                createExchangeButton("BINANCE_US", "binance-us-btn")
-        );
-
-        makeButtonsGrow(row1);
-        makeButtonsGrow(row2);
-        makeButtonsGrow(row3);
-
-        buttonsContainer.getChildren().addAll(row1, row2, row3);
-        return buttonsContainer;
-    }
-
-    private void makeButtonsGrow(HBox row) {
-        for (javafx.scene.Node child : row.getChildren()) {
-            HBox.setHgrow(child, Priority.ALWAYS);
-            if (child instanceof Button button) {
-                button.setMaxWidth(Double.MAX_VALUE);
-            }
-        }
-    }
-
-    private Button createExchangeButton(String exchangeName, String styleId) {
-        Button button = new Button(displayExchangeName(exchangeName));
-        button.setId(styleId);
-        button.getStyleClass().addAll("desk-action-button", "exchange-nav-button");
-        button.setPrefHeight(34);
-        button.setMaxWidth(Double.MAX_VALUE);
-        button.setTooltip(new Tooltip("Switch to " + displayExchangeName(exchangeName)));
-        button.setOnAction(event -> selectExchange(exchangeName));
-        return button;
-    }
-
-    private HBox createControlButtonsBox() {
-        HBox controlBox = new HBox(8);
-        controlBox.setAlignment(Pos.CENTER_LEFT);
-        controlBox.getStyleClass().add("exchange-control-buttons");
-        controlBox.setPadding(new Insets(4, 0, 0, 0));
-
-        Button connectButton = new Button("Connect");
-        connectButton.getStyleClass().addAll("success-button", "exchange-connect-button");
-        connectButton.setMaxWidth(Double.MAX_VALUE);
-        connectButton.setTooltip(new Tooltip("Connect to the selected exchange."));
+        Button connectButton = createUtilityButton("Connect", "Connect to the selected venue.");
+        connectButton.getStyleClass().add("success-button");
         connectButton.setOnAction(event -> connectToExchange());
 
-        Button disconnectButton = new Button("Disconnect");
-        disconnectButton.getStyleClass().addAll("danger-button", "exchange-disconnect-button");
-        disconnectButton.setMaxWidth(Double.MAX_VALUE);
-        disconnectButton.setTooltip(new Tooltip("Disconnect from the selected exchange."));
+        Button disconnectButton = createUtilityButton("Disconnect", "Disconnect from the selected venue.");
+        disconnectButton.getStyleClass().add("danger-button");
         disconnectButton.setOnAction(event -> disconnectFromExchange());
 
+        HBox connectionActions = new HBox(8, connectButton, disconnectButton);
+        connectionActions.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(connectButton, Priority.ALWAYS);
         HBox.setHgrow(disconnectButton, Priority.ALWAYS);
 
-        controlBox.getChildren().addAll(connectButton, disconnectButton);
-        return controlBox;
+        VBox card = new VBox(10,
+                sectionTitle("Venue Control"),
+                statusRow,
+                selectorLabel,
+                exchangeSelector,
+                venueGrid,
+                connectionActions
+        );
+        card.getStyleClass().add("trading-navigation-card");
+        return card;
+    }
+
+    private VBox createWorkflowSection() {
+        VBox section = createSection("Trading Workflow");
+        section.getChildren().addAll(
+                createNavButton("Order Ticket", "Place and manage orders", "order-panel", true),
+                createNavButton("Strategy Lab", "Test and compare strategies", "strategy-lab", false),
+                createNavButton("Assignments", "Map strategies to symbols", "strategy-assignment", false),
+                createNavButton("Backtesting", "Run historical simulations", "backtesting", false),
+                createNavButton("Analysis", "Open research and diagnostics", "analysis", false)
+        );
+        return section;
+    }
+
+    private VBox createMarketSection() {
+        VBox section = createSection("Market Intelligence");
+        section.getChildren().addAll(
+                createNavButton("Market Watch", "Symbol-level status board", "market-watch", false),
+                createNavButton("Market Info", "Contract and session details", "market-info", false),
+                createNavButton("News Calendar", "Macro and event calendar", "news-calendar", false),
+                createNavButton("Data Window", "OHLCV details for selected symbol", "data-window", false)
+        );
+        return section;
+    }
+
+    private VBox createSystemSection() {
+        VBox section = createSection("Operations");
+        section.getChildren().addAll(
+                createNavButton("Operations Center", "Feed, engine, risk, logs", "operations-center", true),
+                createNavButton("Plugin Manager", "Discovered extensions and providers", "plugin-manager", false),
+                createNavButton("System Status", "Runtime and agent health", "trading-system-status", false),
+                createNavButton("Resource Monitor", "CPU, memory, and runtime load", "resource-monitor", false),
+                createNavButton("Settings", "Configure accounts and preferences", "settings", false)
+        );
+        return section;
+    }
+
+    private VBox createSection(String title) {
+        VBox section = new VBox(8);
+        section.getStyleClass().add("trading-navigation-section");
+        section.getChildren().add(sectionTitle(title));
+        return section;
+    }
+
+    private Label sectionTitle(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("trading-navigation-section-title");
+        return label;
+    }
+
+    private Button createExchangeButton(String exchangeName) {
+        Button button = new Button(displayExchangeName(exchangeName));
+        button.getStyleClass().add("trading-navigation-venue-button");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setTooltip(new Tooltip("Switch to " + displayExchangeName(exchangeName)));
+        button.setOnAction(event -> selectExchange(exchangeName));
+        GridPane.setHgrow(button, Priority.ALWAYS);
+        return button;
+    }
+
+    private Button createUtilityButton(String text, String tooltip) {
+        Button button = new Button(text);
+        button.getStyleClass().add("trading-navigation-utility-button");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setTooltip(new Tooltip(tooltip));
+        return button;
+    }
+
+    private Button createNavButton(String title, String description, String panelId, boolean emphasized) {
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("trading-navigation-action-title");
+
+        Label descriptionLabel = new Label(description);
+        descriptionLabel.getStyleClass().add("trading-navigation-action-description");
+        descriptionLabel.setWrapText(true);
+
+        VBox text = new VBox(2, titleLabel, descriptionLabel);
+        text.setAlignment(Pos.CENTER_LEFT);
+
+        Label arrow = new Label(">");
+        arrow.getStyleClass().add("trading-navigation-action-arrow");
+
+        HBox content = new HBox(10, text, new Region(), arrow);
+        content.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(content.getChildren().get(1), Priority.ALWAYS);
+
+        Button button = new Button();
+        button.setGraphic(content);
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.getStyleClass().add("trading-navigation-action");
+        if (emphasized) {
+            button.getStyleClass().add("primary-action");
+        }
+        button.setTooltip(new Tooltip(title + ": " + description));
+        button.setOnAction(event -> requestNavigation(panelId));
+        return button;
+    }
+
+    private void requestNavigation(String panelId) {
+        if (panelId == null || panelId.isBlank()) {
+            return;
+        }
+
+        log.info("Navigation requested: {}", panelId);
+
+        if (onNavigationRequested != null) {
+            onNavigationRequested.accept(panelId);
+        }
     }
 
     private void selectExchange(String exchangeName) {
@@ -223,7 +312,7 @@ public class Navigation extends StackPane {
             exchangeSelector.setValue(normalizedExchange);
         }
 
-        currentExchangeLabel.setText("Current: " + displayExchangeName(normalizedExchange));
+        currentExchangeLabel.setText(displayExchangeName(normalizedExchange));
 
         log.info("Exchange selected: {}", normalizedExchange);
 
@@ -247,14 +336,9 @@ public class Navigation extends StackPane {
 
         log.info("Connecting to exchange: {}", currentExchange);
 
-        connectionStatusLabel.setText("Status: Connecting...");
+        connectionStatusLabel.setText("Connecting");
         connectionStatusLabel.getStyleClass().removeAll("connected", "disconnected", "connecting");
         connectionStatusLabel.getStyleClass().add("connecting");
-
-        /*
-         * Real connection should be handled by TradingDesk/SystemCore.
-         * This panel only updates local UI state and notifies callbacks.
-         */
     }
 
     private void disconnectFromExchange() {
@@ -276,10 +360,10 @@ public class Navigation extends StackPane {
             connectionStatusLabel.getStyleClass().removeAll("connected", "disconnected", "connecting");
 
             if (connected) {
-                connectionStatusLabel.setText("Status: Connected");
+                connectionStatusLabel.setText("Connected");
                 connectionStatusLabel.getStyleClass().add("connected");
             } else {
-                connectionStatusLabel.setText("Status: Disconnected");
+                connectionStatusLabel.setText("Disconnected");
                 connectionStatusLabel.getStyleClass().add("disconnected");
             }
         };
@@ -309,15 +393,35 @@ public class Navigation extends StackPane {
         String configured = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
         String normalized = normalizeExchangeName(configured);
 
-        boolean exists = AVAILABLE_EXCHANGES.stream()
-                .map(Enum::name)
+        boolean exists = discoverExchangeIds().stream()
                 .anyMatch(name -> name.equalsIgnoreCase(normalized));
 
         if (exists) {
             return normalized;
         }
 
-        return AVAILABLE_EXCHANGES.isEmpty() ? "OANDA" : AVAILABLE_EXCHANGES.getFirst().name();
+        List<String> exchanges = discoverExchangeIds();
+        return exchanges.isEmpty() ? "OANDA" : exchanges.getFirst();
+    }
+
+    private List<String> discoverExchangeIds() {
+        LinkedHashSet<String> exchanges = new LinkedHashSet<>();
+        try {
+            PluginRegistry.loadDefault().exchangeProviders().stream()
+                    .filter(ExchangeProvider::enabledByDefault)
+                    .map(ExchangeProvider::id)
+                    .map(this::normalizeExchangeName)
+                    .forEach(exchanges::add);
+        } catch (Exception exception) {
+            log.warn("Unable to discover exchange providers. Using legacy navigation list.", exception);
+        }
+        exchanges.addAll(LEGACY_EXCHANGES);
+        return List.copyOf(exchanges);
+    }
+
+    private String resolveTradingMode() {
+        String mode = System.getProperty("investpro.trading.mode", "PAPER");
+        return mode == null || mode.isBlank() ? "PAPER" : mode.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizeExchangeName(String value) {

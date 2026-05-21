@@ -5,7 +5,7 @@
         </encoder>
     </appender>
 
-    <!-- Activity Monitor Appender - captures logs for dashboard display -->
+    <!-- Activity Log Appender - captures logs for dashboard display -->
     <appender name="activityMonitor" class="org.investpro.monitoring.ActivityLogAppender">
     </appender>
 

@@ -230,15 +230,20 @@ public  class StrategySelectionService {
             // Stratified sampling: prioritize core strategies and key variants
             List<String> selected = new ArrayList<>();
 
-            // 1. Always include core strategies
-            selected.addAll(StrategyCatalog.CORE_STRATEGY_NAMES);
+            // 1. Always include core and provider-discovered strategies
+            selected.addAll(StrategyCatalog.availableStrategyNames());
 
             // 2. Sample remaining variants proportionally
             List<String> variants = allStrategies.stream()
-                    .filter(s -> !StrategyCatalog.CORE_STRATEGY_NAMES.contains(s))
+                    .filter(s -> !selected.contains(s))
                     .toList();
 
             int remainingSlots = INITIAL_CANDIDATES - selected.size();
+            if (remainingSlots <= 0 || variants.isEmpty()) {
+                initialCandidates.addAll(selected.stream().limit(INITIAL_CANDIDATES).toList());
+                log.info("Selected {} provider/core strategies as initial candidates", initialCandidates.size());
+                return;
+            }
             double samplingRate = (double) remainingSlots / variants.size();
 
             Random random = new Random(42); // Deterministic seed for reproducibility

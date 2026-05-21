@@ -1,4 +1,4 @@
-package org.investpro.ui;
+package org.investpro.ui.theme;
 
 public record MarketConfiguration(
         String username,

@@ -3,8 +3,11 @@ package org.investpro.strategy;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
+import org.investpro.spi.PluginRegistry;
+import org.investpro.spi.StrategyProvider;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -477,7 +480,21 @@ public final class StrategyCatalog {
 
     @Contract(" -> new")
     public static @NotNull List<String> availableStrategyNames() {
-        return new ArrayList<>(STRATEGY_DEFINITIONS.keySet());
+        LinkedHashSet<String> names = new LinkedHashSet<>(STRATEGY_DEFINITIONS.keySet());
+        names.addAll(providerStrategyNames());
+        return new ArrayList<>(names);
+    }
+
+    public static @NotNull List<String> providerStrategyNames() {
+        try {
+            return PluginRegistry.loadDefault().strategyProviders().stream()
+                    .filter(StrategyProvider::enabledByDefault)
+                    .map(StrategyProvider::displayName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .toList();
+        } catch (Exception exception) {
+            return List.of();
+        }
     }
 
     public static int definitionCount() {

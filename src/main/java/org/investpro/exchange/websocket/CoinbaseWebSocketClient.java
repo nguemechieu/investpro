@@ -18,9 +18,11 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
 import org.java_websocket.drafts.Draft;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -566,18 +568,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     private @NotNull TradePair tradePairFromCoinbaseProductId(String productId) {
         String normalized = normalizeCoinbaseProductId(productId);
 
-        if (!normalized.contains("-")) {
-            throw new IllegalArgumentException("Invalid Coinbase product id: " + productId);
-        }
-
-        String[] parts = normalized.split("-", 2);
-
-        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
-            throw new IllegalArgumentException("Invalid Coinbase product id: " + productId);
-        }
-
         try {
-            return TradePair.of(parts[0], parts[1]);
+            TradePair pair = TradePair.fromSymbol(normalized);
+            pair.setNativeSymbol(normalized);
+            return pair;
         } catch (Exception exception) {
             throw new IllegalArgumentException("Unable to create TradePair from Coinbase product id: " + productId, exception);
         }
@@ -598,7 +592,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         lastErrorMessage = errorMessage;
         lastErrorLoggedAtMs = now;
-        log.error("Coinbase WebSocket error: \n"+ errorMessage.toUpperCase());
+        throw  new RuntimeException("Coinbase WebSocket error: \n"+ errorMessage.toUpperCase());
     }
 
     public static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {
@@ -649,7 +643,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         return summary.toString();
     }
 
-    private  TradePair findTradePair(String productId) {
+    private @Nullable TradePair findTradePair(String productId) {
         if (productId == null || productId.isBlank()) {
             TradePair fallbackPair = defaultTradePair;
 
@@ -657,7 +651,13 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
                 return fallbackPair;
             }
 
-            return null;
+            try {
+                TradePair unknown = TradePair.fromSymbol("UNKNOWN-UNKNOWN");
+                unknown.setNativeSymbol("UNKNOWN-UNKNOWN");
+                return unknown;
+            } catch (SQLException | ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         String normalizedProductId = productId.trim().toUpperCase(Locale.ROOT);

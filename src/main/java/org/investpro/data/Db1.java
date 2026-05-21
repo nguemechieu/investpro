@@ -6,6 +6,8 @@ import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyType;
 import org.investpro.models.currency.FiatCurrency;
+import org.investpro.models.currency.SyntheticCurrency;
+import org.investpro.models.currency.UnknownCurrency;
 
 import org.investpro.models.trading.Order;
 
@@ -594,8 +596,11 @@ public class Db1 implements Db {
                 String upper = code.toUpperCase();
                 yield "JPY".equals(upper) ? 0 : 2;
             }
-            case CRYPTO -> 8; // Crypto and stocks typically have 8 decimal places
-            case NULL -> 0; // Default to 0 for NULL type
+            case FOREX -> 5;
+            case METAL -> 3;
+            case INDEX, STOCK -> 2;
+            case CRYPTO, UNKNOWN -> 8;
+            case NULL -> 0;
         };
     }
 
@@ -607,7 +612,11 @@ public class Db1 implements Db {
         return switch (type) {
             case FIAT -> new FiatCurrency(code, code, code, fractionalDigits, code, code);
             case CRYPTO -> new CryptoCurrency(code, code, code, fractionalDigits, code, code);
-            // Default to CRYPTO for NULL type
+            case FOREX -> new SyntheticCurrency(CurrencyType.FOREX, code, code, code, fractionalDigits, code, code);
+            case METAL -> new SyntheticCurrency(CurrencyType.METAL, code, code, code, fractionalDigits, code, code);
+            case INDEX -> new SyntheticCurrency(CurrencyType.INDEX, code, code, code, fractionalDigits, code, code);
+            case STOCK -> new SyntheticCurrency(CurrencyType.STOCK, code, code, code, fractionalDigits, code, code);
+            case UNKNOWN -> UnknownCurrency.of(code);
             case NULL -> new CryptoCurrency(code, code, code, fractionalDigits, code, code);
         };
     }

@@ -624,11 +624,11 @@ public class BacktestingPanel extends StackPane {
         if (symbols.isEmpty()) {
             try {
                 symbols.addAll(List.of(
-                        TradePair.of("BTC", "USD"),
-                        TradePair.of("ETH", "USD"),
-                        TradePair.of("EUR", "USD"),
-                        TradePair.of("GBP", "USD"),
-                        TradePair.of("USD", "JPY")));
+                        TradePair.fromSymbol("BTC_USD"),
+                        TradePair.fromSymbol("ETH_USD"),
+                        TradePair.fromSymbol("EUR_USD"),
+                        TradePair.fromSymbol("GBP_USD"),
+                        TradePair.fromSymbol("USD_JPY")));
             } catch (Exception exception) {
                 log.warn("Failed to create fallback TradePair list: {}", exception.getMessage());
             }

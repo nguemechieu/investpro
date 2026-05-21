@@ -114,7 +114,7 @@ public abstract class BrokerExchangeAdapter extends Exchange {
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
         List<TradePair> pairs = getTradePairSymbol();
-        return pairs.isEmpty() ? TradePair.of("AAPL", "USD") : pairs.get(0);
+        return pairs.isEmpty() ? TradePair.fromSymbol("AAPL_USD") : pairs.get(0);
     }
 
     @Override

@@ -141,20 +141,19 @@ public abstract class Currency {
 
     public static Currency ofCrypto(String code) throws SQLException {
         Objects.requireNonNull(code, "code must not be null");
-        
+
         // Return null currency for reserved codes
         if (isNullCurrencyCode(code)) {
             return NULL_CRYPTO_CURRENCY;
         }
-        
-        // Check cache first, then database
-        Currency cached = CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
-        if (cached != null) {
-            return cached;
+
+        String normalizedCode = code.trim().toUpperCase();
+        Currency currency = CurrencyRegistry.global().findByCode(normalizedCode).orElse(null);
+        if (currency == null) {
+            currency = CurrencyRegistry.global().findOrUnknown(normalizedCode);
         }
-        
-        Currency fromDb = db1.getCurrency(code);
-        return (fromDb != null && fromDb.currencyType == CurrencyType.CRYPTO) ? fromDb : NULL_CRYPTO_CURRENCY;
+
+        return currency.getCurrencyType() == CurrencyType.CRYPTO ? currency : NULL_CRYPTO_CURRENCY;
     }
     
     /**
@@ -166,20 +165,15 @@ public abstract class Currency {
 
     public static @Nullable Currency of(String code) throws SQLException {
         Objects.requireNonNull(code, "code must not be null");
-        
+
         // Return null currency for reserved codes
         if (isNullCurrencyCode(code)) {
             return NULL_CRYPTO_CURRENCY;
         }
-        
-        // Check cache first, then database
-        Currency cached = CURRENCIES.get(SymmetricPair.of(code, CurrencyType.CRYPTO));
-        if (cached != null) {
-            return cached;
-        }
-        
-        Currency fromDb = db1.getCurrency(code);
-        return (fromDb != null && fromDb.currencyType == CurrencyType.CRYPTO) ? fromDb : NULL_CRYPTO_CURRENCY;
+
+        String normalizedCode = code.trim().toUpperCase();
+        return CurrencyRegistry.global().findByCode(normalizedCode)
+                .orElseGet(() -> CurrencyRegistry.global().findOrUnknown(normalizedCode));
     }
 
     /**
@@ -191,20 +185,19 @@ public abstract class Currency {
      */
     public static Currency ofFiat(@NotNull String code) throws SQLException {
         Objects.requireNonNull(code, "code must not be null");
-        
+
         // Return null currency for reserved codes
         if (isNullCurrencyCode(code)) {
             return NULL_FIAT_CURRENCY;
         }
-        
-        // Check cache first, then database
-        Currency cached = CURRENCIES.get(SymmetricPair.of(code, CurrencyType.FIAT));
-        if (cached != null) {
-            return cached;
+
+        String normalizedCode = code.trim().toUpperCase();
+        Currency currency = CurrencyRegistry.global().findByCode(normalizedCode).orElse(null);
+        if (currency == null) {
+            currency = CurrencyRegistry.global().findOrUnknown(normalizedCode);
         }
-        
-        Currency fromDb = db1.getCurrency(code);
-        return (fromDb != null && fromDb.currencyType == CurrencyType.FIAT) ? fromDb : NULL_FIAT_CURRENCY;
+
+        return currency.getCurrencyType() == CurrencyType.FIAT ? currency : NULL_FIAT_CURRENCY;
     }
 
     /**

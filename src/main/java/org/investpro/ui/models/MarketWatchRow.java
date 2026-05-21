@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.TradingSessionStatus;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.agents.symbol.SymbolTradingMode;
+import org.investpro.models.currency.CurrencyRegistry;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.Nullable;
 
@@ -187,6 +188,24 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
     public String getAssignedStrategy() {
         return assignedStrategy.get();
+    }
+
+    public String getBaseCodeBadge() {
+        TradePair pair = getSymbol();
+        return pair == null ? "" : pair.getBaseCode();
+    }
+
+    public String getCounterCodeBadge() {
+        TradePair pair = getSymbol();
+        return pair == null ? "" : pair.getCounterCode();
+    }
+
+    public String getBaseIconPath() {
+        TradePair pair = getSymbol();
+        if (pair == null) {
+            return CurrencyRegistry.global().iconPathOrDefault("UNKNOWN");
+        }
+        return CurrencyRegistry.global().iconPathOrDefault(pair.getBaseCode());
     }
 
     // ===== Setters for properties =====

@@ -3,9 +3,9 @@ package org.investpro.strategy;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.strategy.impl.BreakoutStrategy;
-import org.investpro.strategy.impl.MeanReversionStrategy;
-import org.investpro.strategy.impl.TrendFollowingStrategy;
+import org.investpro.spi.PluginRegistry;
+import org.investpro.spi.StrategyProvider;
+import org.investpro.spi.StrategyProviderContext;
 import org.investpro.strategy.impl.UnifiedStrategy;
 import org.jetbrains.annotations.NotNull;
 
@@ -90,9 +90,22 @@ public final class StrategyInitializer {
     }
 
     private static void registerLegacyStrategies(@NotNull StrategyRegistry registry) {
-        registerLegacyStrategy(registry, new TrendFollowingStrategy());
-        registerLegacyStrategy(registry, new MeanReversionStrategy());
-        registerLegacyStrategy(registry, new BreakoutStrategy());
+        int registered = 0;
+        try {
+            for (StrategyProvider provider : PluginRegistry.loadDefault().strategyProviders()) {
+                if (provider == null || !provider.enabledByDefault()) {
+                    continue;
+                }
+                TradingStrategy strategy = provider.create(new StrategyProviderContext(null, PluginRegistry.loadDefault(), null, java.util.Map.of()));
+                if (strategy != null) {
+                    registerLegacyStrategy(registry, strategy);
+                    registered++;
+                }
+            }
+            log.info("Registered {} strategy provider instances", registered);
+        } catch (Exception exception) {
+            log.warn("Failed to register strategy providers. Legacy StrategyRegistry definitions remain available.", exception);
+        }
     }
 
     private static void registerLegacyStrategy(

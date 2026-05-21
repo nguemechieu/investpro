@@ -1,4 +1,4 @@
-package org.investpro.ui;
+package org.investpro.ui.panels;
 
 import javafx.animation.Timeline;
 import javafx.application.Platform;

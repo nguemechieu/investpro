@@ -15,8 +15,6 @@ import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
-import org.investpro.models.currency.Currency;
-import org.investpro.models.currency.FiatCurrency;
 import org.investpro.models.trading.Order;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.OpenOrder;
@@ -504,10 +502,8 @@ public class Oanda extends Exchange {
             return tradePair;
         }
 
-        Currency base = new FiatCurrency("EUR", "EUR", "EUR", 2, "EUR", "EUR");
-        Currency quote = new FiatCurrency("USD", "USD", "USD", 2, "USD", "USD");
-
-        tradePair = new TradePair(base, quote);
+        tradePair = TradePair.fromSymbol("EUR_USD");
+        tradePair.setNativeSymbol("EUR_USD");
         tradePair.setTradingSession(OandaTradingSessionFactory.forInstrument("EUR_USD"));
         return tradePair;
     }
@@ -561,9 +557,8 @@ public class Oanda extends Exchange {
                 }
 
                 try {
-                    Currency base = new FiatCurrency(parts[0], parts[0], parts[0], 2, parts[0], parts[0]);
-                    Currency quote = new FiatCurrency(parts[1], parts[1], parts[1], 2, parts[1], parts[1]);
-                    TradePair pair = new TradePair(base, quote);
+                    TradePair pair = TradePair.fromSymbol(name);
+                    pair.setNativeSymbol(name);
                     pair.setTradingSession(OandaTradingSessionFactory.forInstrument(name));
                     pairs.add(pair);
                 } catch (SQLException | ClassNotFoundException exception) {
@@ -3680,14 +3675,14 @@ public class Oanda extends Exchange {
         }
 
         try {
-            Currency base = new FiatCurrency(parts[0], parts[0], parts[0], 2, parts[0], parts[0]);
-            Currency quote = new FiatCurrency(parts[1], parts[1], parts[1], 2, parts[1], parts[1]);
-            TradePair pair = new TradePair(base, quote);
+            TradePair pair = TradePair.fromSymbol(parts[0] + "_" + parts[1]);
+            pair.setNativeSymbol(normalized);
             pair.setTradingSession(OandaTradingSessionFactory.forInstrument(normalized));
             return pair;
         } catch (Exception exception) {
             try {
-                TradePair fallback = new TradePair("EUR", "USD");
+                TradePair fallback = TradePair.fromSymbol("EUR_USD");
+                fallback.setNativeSymbol("EUR_USD");
                 fallback.setTradingSession(OandaTradingSessionFactory.forInstrument("EUR_USD"));
                 return fallback;
             } catch (Exception fallbackException) {

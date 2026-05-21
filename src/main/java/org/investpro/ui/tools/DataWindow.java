@@ -1,4 +1,4 @@
-package org.investpro.ui;
+package org.investpro.ui.tools;
 
 import lombok.extern.slf4j.Slf4j;
 

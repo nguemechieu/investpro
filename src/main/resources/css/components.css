@@ -361,6 +361,27 @@
     -fx-control-inner-background: #111827;
 }
 
+    .currency-icon {
+        -fx-min-width: 14;
+        -fx-min-height: 14;
+        -fx-alignment: center;
+    }
+
+    .currency-icon-pair {
+        -fx-alignment: center-left;
+        -fx-spacing: 4;
+    }
+
+    .currency-code-badge {
+        -fx-background-color: rgba(220, 236, 255, 0.16);
+        -fx-border-color: rgba(220, 236, 255, 0.38);
+        -fx-border-radius: 999;
+        -fx-background-radius: 999;
+        -fx-padding: 1 6;
+        -fx-font-size: 9px;
+        -fx-font-weight: 700;
+        -fx-text-fill: #e8f3ff;
+    }
 .operations-text-area:focused {
     -fx-text-fill: #e2e8f0;
     -fx-background-color: #111827;

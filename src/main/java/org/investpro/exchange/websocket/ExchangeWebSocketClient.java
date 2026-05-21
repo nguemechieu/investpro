@@ -139,7 +139,7 @@ public abstract class ExchangeWebSocketClient extends WebSocketClient {
         log.error(
                 "{} WebSocket error: {}",
                 getClass().getSimpleName(),
-                exception == null ? "Unknown error" : exception.getMessage(),
+                exception == null ? "Unknown error" : exception,
                 exception);
 
         if (reconnectEnabled && !manualClose) {

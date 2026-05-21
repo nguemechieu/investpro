@@ -412,7 +412,7 @@ public class BotTradeDecisionEngine {
             @NotNull MarketRegime regime,
             double signalStrength) {
 
-        List<String> availableStrategies = StrategyCatalog.CORE_STRATEGY_NAMES;
+        List<String> availableStrategies = StrategyCatalog.availableStrategyNames();
         StrategyFitScore bestScore = null;
 
         for (String strategyName : availableStrategies) {

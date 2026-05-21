@@ -8,6 +8,7 @@ import lombok.Getter;
  */
 @Getter
 public enum TabName {
+    NAVIGATION("Navigation", "Trading Desk Navigation", "NAV"),
     MARKET_INFO("MarketInfo", "Market Statistics", "📊"),
     OVERVIEW("Overview", "Trading Overview", "👁️"),
     BALANCES("Balances", "Account Balances", "💰"),

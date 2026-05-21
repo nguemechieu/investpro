@@ -77,13 +77,10 @@ public class SystemOperationsBoard extends BorderPane {
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabPane.getStyleClass().add("operations-tab-pane");
         tabPane.getTabs().addAll(
-                createOverviewTab(),
-                createExchangesTab(),
+                createFeedTab(),
                 createTradingEngineTab(),
                 createRiskTab(),
                 createActivityTab(),
-                createAgentsTab(),
-                createSnapshotsTab(),
                 createErrorsTab());
 
         // Wrap tabPane in VBox to support grow
@@ -173,8 +170,8 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Exchanges tab - List of exchange status
      */
-    private Tab createExchangesTab() {
-        Tab tab = new Tab("Exchanges", null);
+    private Tab createFeedTab() {
+        Tab tab = new Tab("Feed", null);
         tab.setClosable(false);
 
         VBox vbox = new VBox(10);

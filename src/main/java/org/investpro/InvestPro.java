@@ -23,8 +23,8 @@ import org.investpro.persistence.repository.OrderRepository;
 import org.investpro.persistence.repository.RepositoryFactory;
 import org.investpro.persistence.repository.TradeRepository;
 import org.investpro.strategy.StrategyBootstrapper;
-import org.investpro.ui.MarketConfiguration;
-import org.investpro.ui.OnboardingView;
+import org.investpro.ui.theme.MarketConfiguration;
+import org.investpro.ui.OnboardingDesk;
 import org.investpro.ui.TradingDesk;
 import org.jetbrains.annotations.NotNull;
 
@@ -46,8 +46,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * - initialize repositories
  * - show onboarding
  * - open trading terminal
- * - shutdown terminal cleanly
- *
+ * - shutting down terminal cleanly
+ * <p>
  * This class should NOT:
  * - own broker logic
  * - own strategy logic
@@ -168,7 +168,7 @@ public class InvestPro extends Application {
     }
 
     public void showOnboarding() {
-        OnboardingView onboardingView = new OnboardingView(this::showTradingTerminal);
+        OnboardingDesk onboardingView = new OnboardingDesk(this::showTradingTerminal);
         setRootContent(onboardingView);
         primaryStage.setTitle(buildWindowTitle("Onboarding"));
     }

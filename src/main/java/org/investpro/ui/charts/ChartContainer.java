@@ -1,4 +1,4 @@
-package org.investpro.ui;
+package org.investpro.ui.charts;
 
 import javafx.animation.FadeTransition;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -29,7 +29,6 @@ import org.investpro.service.CurrencyService;
 import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
-import org.investpro.ui.charts.CandleStickChart;
 
 import org.investpro.ui.tools.ChartToolbar;
 import org.investpro.ui.utils.CurrencyIconLoader;

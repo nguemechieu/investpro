@@ -229,7 +229,7 @@ public final class CurrencyIconLoader {
             JsonNode root = getObjectMapper().readTree(responseBody);
             JsonNode coins = root.path("coins");
 
-            if (coins.isArray() && coins.size() > 0) {
+            if (coins.isArray() && !coins.isEmpty()) {
                 String coinId = coins.get(0).path("id").asText("");
                 if (!coinId.isBlank()) {
                     COINGECKO_ID_CACHE.put(symbol, coinId);

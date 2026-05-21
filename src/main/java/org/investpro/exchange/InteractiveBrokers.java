@@ -872,7 +872,7 @@ public class InteractiveBrokers extends Exchange {
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
-        return TradePair.of("AAPL", "USD");
+        return TradePair.fromSymbol("AAPL_USD");
     }
 
     @Override
@@ -1435,7 +1435,7 @@ public class InteractiveBrokers extends Exchange {
 
     private void addPair(List<TradePair> pairs, String base, String quote) {
         try {
-            pairs.add(TradePair.of(base, quote));
+            pairs.add(TradePair.fromSymbol(base + "_" + quote));
         } catch (Exception exception) {
             log.debug("Unable to create Interactive Brokers pair {}/{}: {}", base, quote, exception.getMessage());
         }

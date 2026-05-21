@@ -18,7 +18,6 @@ import org.investpro.exchange.credentials.ExchangeSigning;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
-import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
@@ -91,10 +90,14 @@ public class BinanceUs extends Exchange {
     private volatile ScheduledExecutorService listenKeyHeartbeatExecutor;
     private volatile long signedRestCooldownUntilMs;
     private volatile long lastSignedRestRequestMs;
+    private volatile long serverTimeOffsetMs;
+    private volatile long lastServerTimeSyncMs;
     private long publicRestCooldownUntilMs;
     private volatile long lastOrderBookRequestMs;
     private static final long SIGNED_REST_MIN_INTERVAL_MS = 1_200L;
     private static final long SIGNED_REST_429_COOLDOWN_MS = 65_000L;
+    private static final long BINANCE_US_RECV_WINDOW_MS = 30_000L;
+    private static final long BINANCE_US_TIME_SYNC_TTL_MS = 5 * 60_000L;
     private static final long PUBLIC_REST_MIN_INTERVAL_MS = 2_000L;
     private static final long PUBLIC_REST_429_COOLDOWN_MS = 45_000L;
 
@@ -972,7 +975,9 @@ public class BinanceUs extends Exchange {
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
-        return new TradePair("BTC", "USDT");
+        TradePair pair = TradePair.fromSymbol("BTC_USDT");
+        pair.setNativeSymbol("BTCUSDT");
+        return pair;
     }
 
     @Override
@@ -1495,8 +1500,6 @@ public class BinanceUs extends Exchange {
                     continue;
                 }
 
-                CryptoCurrency baseCurrency, counterCurrency;
-
                 // Safely extract fields
                 JsonNode baseAssetNode = symbol.get("baseAsset");
                 JsonNode quoteAssetNode = symbol.get("quoteAsset");
@@ -1510,11 +1513,8 @@ public class BinanceUs extends Exchange {
                 String quoteAsset = quoteAssetNode.asText();
 
                 try {
-                    // Try to create currencies - may fail if currency is not recognized
-                    baseCurrency = new CryptoCurrency(baseAsset, baseAsset, baseAsset, 8, baseAsset, baseAsset);
-                    counterCurrency = new CryptoCurrency(quoteAsset, quoteAsset, quoteAsset, 8, quoteAsset, quoteAsset);
-
-                    TradePair tp = new TradePair(baseCurrency, counterCurrency);
+                    TradePair tp = TradePair.fromSymbol(baseAsset + "_" + quoteAsset);
+                    tp.setNativeSymbol(baseAsset + quoteAsset);
                     tradePairs.add(tp);
                     logger.debug("Added trade pair: %s".formatted(tp));
                 } catch (SQLException | ClassNotFoundException e) {
@@ -2168,9 +2168,29 @@ public class BinanceUs extends Exchange {
 
     private JsonNode sendSignedBinanceUsRequest(String method, String path, Map<String, String> params)
             throws Exception {
+        try {
+            return sendSignedBinanceUsRequestOnce(method, path, params);
+        } catch (RuntimeException exception) {
+            if (!isTimestampOutsideRecvWindow(exception)) {
+                throw exception;
+            }
+
+            logger.warn("Binance US signed request timestamp drift detected on {}. Syncing server time and retrying once.",
+                    path);
+            syncBinanceUsServerTime(true);
+            return sendSignedBinanceUsRequestOnce(method, path, params);
+        }
+    }
+
+    private JsonNode sendSignedBinanceUsRequestOnce(String method, String path, Map<String, String> params)
+            throws Exception {
         waitForSignedRestSlot(path);
+        syncBinanceUsServerTime(false);
+
         Map<String, String> signedParams = new LinkedHashMap<>(params);
-        signedParams.putIfAbsent("timestamp", Long.toString(System.currentTimeMillis()));
+        signedParams.put("recvWindow", Long.toString(BINANCE_US_RECV_WINDOW_MS));
+        signedParams.put("timestamp", Long.toString(binanceUsTimestamp()));
+
         String query = formEncode(signedParams);
         String signature = ExchangeSigning.hmacHex("HmacSHA256", apiSecret, query);
         String signedQuery = query + "&signature=" + signature;
@@ -2194,6 +2214,74 @@ public class BinanceUs extends Exchange {
                     "Binance US API returned HTTP %d: %s".formatted(response.statusCode(), body));
         }
         return body;
+    }
+
+    private long binanceUsTimestamp() {
+        return System.currentTimeMillis() + serverTimeOffsetMs;
+    }
+
+    private void syncBinanceUsServerTime(boolean force) {
+        long now = System.currentTimeMillis();
+        if (!force && now - lastServerTimeSyncMs < BINANCE_US_TIME_SYNC_TTL_MS) {
+            return;
+        }
+
+        synchronized (this) {
+            now = System.currentTimeMillis();
+            if (!force && now - lastServerTimeSyncMs < BINANCE_US_TIME_SYNC_TTL_MS) {
+                return;
+            }
+
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(BINANCE_US_REST_URL + "/api/v3/time"))
+                        .header("User-Agent", "InvestPro/1.0")
+                        .GET()
+                        .build();
+                long before = System.currentTimeMillis();
+                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                long after = System.currentTimeMillis();
+
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    logger.warn("Unable to sync Binance US server time. HTTP {}: {}",
+                            response.statusCode(),
+                            response.body());
+                    lastServerTimeSyncMs = now;
+                    return;
+                }
+
+                JsonNode body = OBJECT_MAPPER.readTree(response.body());
+                long serverTime = body.path("serverTime").asLong(0L);
+                if (serverTime <= 0L) {
+                    logger.warn("Unable to sync Binance US server time. Missing serverTime in response: {}", body);
+                    lastServerTimeSyncMs = now;
+                    return;
+                }
+
+                long localMidpoint = before + ((after - before) / 2L);
+                serverTimeOffsetMs = serverTime - localMidpoint;
+                lastServerTimeSyncMs = after;
+                logger.debug("Binance US server time synced. offsetMs={}", serverTimeOffsetMs);
+            } catch (Exception exception) {
+                lastServerTimeSyncMs = now;
+                logger.warn("Unable to sync Binance US server time; using local clock. {}", exception.getMessage());
+            }
+        }
+    }
+
+    private boolean isTimestampOutsideRecvWindow(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null
+                    && (message.contains("\"code\":-1021")
+                    || message.contains("outside of the recvWindow")
+                    || message.contains("Timestamp for this request"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private boolean isSignedRestCoolingDown() {
@@ -2349,7 +2437,9 @@ public class BinanceUs extends Exchange {
                     : normalized;
         }
         try {
-            return TradePair.of(base, quote);
+            TradePair pair = TradePair.fromSymbol(base + "/" + quote);
+            pair.setNativeSymbol(symbol);
+            return pair;
         } catch (SQLException | ClassNotFoundException exception) {
             throw new IllegalArgumentException("Unable to resolve order symbol: " + symbol, exception);
         }

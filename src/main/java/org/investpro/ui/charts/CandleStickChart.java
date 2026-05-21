@@ -61,7 +61,8 @@ import org.investpro.models.trading.LiveTradesConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.TradingService;
-import org.investpro.ui.ChartContainer;
+import org.investpro.spi.PluginIndicatorFactory;
+import org.investpro.spi.PluginRegistry;
 import org.investpro.ui.tools.ChartOptions;
 import org.investpro.ui.tools.InstantAxisFormatter;
 import org.investpro.ui.tools.MoneyAxisFormatter;
@@ -3236,6 +3237,11 @@ public class CandleStickChart extends Region {
     }
 
     private ChartIndicator createIndicator(String choice) {
+        ChartIndicator pluginIndicator = PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault()).orElse(null);
+        if (pluginIndicator != null) {
+            return pluginIndicator;
+        }
+
         return switch (choice) {
             case "SMA 20" -> new SimpleMovingAverageIndicator(20);
             case "SMA 50" -> new SimpleMovingAverageIndicator(50);

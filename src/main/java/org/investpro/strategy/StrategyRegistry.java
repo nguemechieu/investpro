@@ -2,6 +2,9 @@ package org.investpro.strategy;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.spi.PluginRegistry;
+import org.investpro.spi.StrategyProvider;
+import org.investpro.spi.StrategyProviderContext;
 import org.investpro.strategy.impl.UnifiedStrategy;
 import org.investpro.strategy.impl.UserStrategyAdapter;
 import org.jetbrains.annotations.NotNull;
@@ -44,6 +47,8 @@ public final class StrategyRegistry {
      */
     private final Map<String, StrategyDefinition> definitions = new LinkedHashMap<>();
 
+    private final Map<String, StrategyProvider> pluginProviders = new LinkedHashMap<>();
+
     /**
      * Current active strategy variant name.
      */
@@ -76,6 +81,8 @@ public final class StrategyRegistry {
     }
 
     private void registerBuiltInStrategies() {
+        registerPluginProviders();
+
         for (StrategyDefinition definition : StrategyCatalog.STRATEGY_DEFINITIONS.values()) {
             if (definition == null || isBlank(definition.getName())) {
                 continue;
@@ -91,6 +98,35 @@ public final class StrategyRegistry {
         }
 
         log.info("StrategyRegistry initialized with {} strategy definitions", definitions.size());
+    }
+
+    private void registerPluginProviders() {
+        try {
+            for (StrategyProvider provider : PluginRegistry.loadDefault().strategyProviders()) {
+                if (provider == null || isBlank(provider.id())) {
+                    continue;
+                }
+
+                String providerId = StrategyCatalog.normalizeStrategyName(provider.id());
+                String displayName = StrategyCatalog.normalizeStrategyName(provider.displayName());
+                pluginProviders.putIfAbsent(providerId, provider);
+                pluginProviders.putIfAbsent(displayName, provider);
+
+                definitions.putIfAbsent(displayName, StrategyDefinition.builder()
+                        .name(displayName)
+                        .baseName(displayName)
+                        .parameters(StrategyParameters.builder().build())
+                        .build());
+
+                if (activeName == null && provider.enabledByDefault()) {
+                    activeName = displayName;
+                }
+
+                log.info("Registered strategy provider: id={}, name={}", provider.id(), provider.displayName());
+            }
+        } catch (Exception exception) {
+            log.warn("Failed to register strategy providers. Legacy catalog remains available.", exception);
+        }
     }
 
     /**
@@ -170,6 +206,23 @@ public final class StrategyRegistry {
      */
     @Nullable
     private TradingStrategy instantiateStrategy(@NotNull String name) {
+        StrategyProvider provider = pluginProviders.get(name);
+        if (provider != null) {
+            try {
+                TradingStrategy strategy = provider.create(new StrategyProviderContext(null, PluginRegistry.loadDefault(), null, Map.of()));
+                if (strategy != null) {
+                    strategies.put(name, strategy);
+                    log.debug("Instantiated plugin strategy: id={}, name={}", provider.id(), provider.displayName());
+                    return strategy;
+                }
+            } catch (Exception exception) {
+                log.warn(
+                        "Failed to instantiate plugin strategy provider '{}'. Falling back to catalog if possible.",
+                        provider.id(),
+                        exception);
+            }
+        }
+
         StrategyDefinition definition = definitions.get(name);
 
         if (definition == null) {

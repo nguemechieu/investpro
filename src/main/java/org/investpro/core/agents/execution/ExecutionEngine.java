@@ -911,7 +911,7 @@ public class ExecutionEngine {
         }
 
         try {
-            return TradePair.of(parts[0].trim(), parts[1].trim());
+            return TradePair.fromSymbol(parts[0].trim() + "/" + parts[1].trim());
         } catch (SQLException | ClassNotFoundException exception) {
             throw new IllegalStateException("Failed to create TradePair from symbol: " + symbol, exception);
         }

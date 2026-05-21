@@ -14,6 +14,7 @@ import org.investpro.enums.ContractType;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
+import org.investpro.models.currency.CurrencyRegistry;
 import org.investpro.models.currency.CurrencyNotFoundException;
 import org.investpro.models.currency.CurrencyType;
 import org.investpro.models.currency.FiatCurrency;
@@ -21,8 +22,8 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.investpro.market.InstrumentTradingSession;
@@ -46,10 +47,6 @@ import java.time.ZonedDateTime;
 @Slf4j
 @Data
 public class TradePair extends Pair<Currency, Currency> {
-    static {
-        Currency.registerCurrencies(new ArrayList<>(Currency.CURRENCIES.values()));
-    }
-
     private final Currency baseCurrency;
     private final Currency counterCurrency;
 
@@ -64,6 +61,7 @@ public class TradePair extends Pair<Currency, Currency> {
     private double low24h;
 
     private Instant updatedAt;
+    private String nativeSymbol;
 
     public TradePair(
             @NotNull Currency baseCurrency,
@@ -85,8 +83,8 @@ public class TradePair extends Pair<Currency, Currency> {
             @NotNull String baseCurrency,
             @NotNull String counterCurrency) throws SQLException, ClassNotFoundException {
         this(
-                Objects.requireNonNull(Currency.of(normalizeCode(baseCurrency))),
-                Objects.requireNonNull(Currency.of(normalizeCode(counterCurrency))));
+            CurrencyRegistry.global().findOrUnknown(normalizeCode(baseCurrency)),
+            CurrencyRegistry.global().findOrUnknown(normalizeCode(counterCurrency)));
     }
 
     @Contract("_, _ -> new")
@@ -136,8 +134,8 @@ public class TradePair extends Pair<Currency, Currency> {
         String baseCode = normalizeCode(parts[0]);
         String counterCode = normalizeCode(parts[1]);
 
-        Currency base = Currency.of(baseCode);
-        Currency counter = Currency.of(counterCode);
+        Currency base = CurrencyRegistry.global().findOrUnknown(baseCode);
+        Currency counter = CurrencyRegistry.global().findOrUnknown(counterCode);
 
         validateExpectedCurrencyType(base, baseCode, pairType.getKey(), true);
 
@@ -149,7 +147,45 @@ public class TradePair extends Pair<Currency, Currency> {
 
         assert base != null;
         assert counter != null;
-        return new TradePair(base, counter);
+        TradePair pair = new TradePair(base, counter);
+        pair.setNativeSymbol(text);
+        return pair;
+    }
+
+    public static @NotNull TradePair fromSymbol(String symbol) throws SQLException, ClassNotFoundException {
+        Objects.requireNonNull(symbol, "symbol must not be null");
+        String normalized = symbol.trim().toUpperCase(Locale.ROOT);
+
+        String[] parts = splitAnyPair(normalized);
+        String baseCode = normalizeCode(parts[0]);
+        String counterCode = normalizeCode(parts[1]);
+
+        Currency base = CurrencyRegistry.global().findOrUnknown(baseCode);
+        Currency counter = CurrencyRegistry.global().findOrUnknown(counterCode);
+        TradePair pair = new TradePair(base, counter);
+        pair.setNativeSymbol(symbol);
+        return pair;
+    }
+
+    private static String[] splitAnyPair(String symbol) {
+        if (symbol.contains("-")) {
+            return symbol.split("-", 2);
+        }
+        if (symbol.contains("_")) {
+            return symbol.split("_", 2);
+        }
+        if (symbol.contains("/")) {
+            return symbol.split("/", 2);
+        }
+        if (symbol.contains(":")) {
+            return symbol.split(":", 2);
+        }
+
+        if (symbol.length() >= 6) {
+            return new String[]{symbol.substring(0, 3), symbol.substring(3)};
+        }
+
+        return new String[]{symbol, "USD"};
     }
 
     private static String @NotNull [] splitPair(String tradePair, @NotNull String separator) {
@@ -183,27 +219,23 @@ public class TradePair extends Pair<Currency, Currency> {
         }
 
         if (FiatCurrency.class.equals(expectedType)) {
-            try {
-                if (Currency.of(code) == Currency.NULL_FIAT_CURRENCY) {
-                    try {
-                        throw new CurrencyNotFoundException(CurrencyType.FIAT, code);
-                    } catch (CurrencyNotFoundException e) {
-                        throw new RuntimeException(e);
-                    }
+            if (!(currency instanceof FiatCurrency) || currency.getCurrencyType() == CurrencyType.UNKNOWN) {
+                try {
+                    throw new CurrencyNotFoundException(CurrencyType.FIAT, code);
+                } catch (CurrencyNotFoundException e) {
+                    throw new RuntimeException(e);
                 }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
             }
             return;
         }
 
         if (CryptoCurrency.class.equals(expectedType)) {
-            try {
-                if (Currency.of(code) == Currency.NULL_CRYPTO_CURRENCY) {
+            if (!(currency instanceof CryptoCurrency) || currency.getCurrencyType() == CurrencyType.UNKNOWN) {
+                try {
                     throw new CurrencyNotFoundException(CurrencyType.CRYPTO, code);
+                } catch (CurrencyNotFoundException e) {
+                    throw new RuntimeException(e);
                 }
-            } catch (SQLException | CurrencyNotFoundException e) {
-                throw new RuntimeException(e);
             }
             return;
         }
@@ -218,7 +250,8 @@ public class TradePair extends Pair<Currency, Currency> {
             String code) throws CurrencyNotFoundException {
         if (currency == null
                 || currency == Currency.NULL_FIAT_CURRENCY
-                || currency == Currency.NULL_CRYPTO_CURRENCY) {
+                || currency == Currency.NULL_CRYPTO_CURRENCY
+                || currency.getCurrencyType() == CurrencyType.UNKNOWN) {
             throw new CurrencyNotFoundException(CurrencyType.FIAT, code);
         }
     }

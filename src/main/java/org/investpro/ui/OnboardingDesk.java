@@ -23,6 +23,7 @@ import org.investpro.i18n.SupportedLanguage;
 import org.investpro.service.AuthResult;
 import org.investpro.service.ResetTokenResult;
 import org.investpro.service.UserAuthService;
+import org.investpro.ui.theme.MarketConfiguration;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
@@ -48,7 +49,7 @@ import static org.investpro.i18n.LocalizationService.t;
 @Slf4j
 @Getter
 @Setter
-public class OnboardingView extends StackPane {
+public class OnboardingDesk extends StackPane {
 
     private static final int DEFAULT_WIDTH = 1540;
     private static final int DEFAULT_HEIGHT = 780;
@@ -120,16 +121,13 @@ public class OnboardingView extends StackPane {
 
     private MarketConfiguration configuration;
 
-    public OnboardingView(Consumer<MarketConfiguration> onReady) {
+    public OnboardingDesk(Consumer<MarketConfiguration> onReady) {
         this.onReady = Objects.requireNonNull(onReady, "onReady must not be null");
 
         setPrefSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
         setMinSize(980, 640);
         setStyle("-fx-background-color: " + BG + ";");
         getStyleClass().add("onboarding-view");
-
-        OnboardingStyles.labelStyle(11, "#cbd5e1;", "16");
-
         loadRememberedCredentials();
         getChildren().setAll(createLoginStep());
     }
@@ -956,7 +954,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void saveConfiguration(@NotNull MarketConfiguration configuration) {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         preferences.put("username", safe(configuration.username()));
         preferences.put("marketType", safe(configuration.marketType()));
         preferences.put("venue", safe(configuration.venue()));
@@ -995,7 +993,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void applySavedConfigurationSelection() {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
 
         String savedMarketType = preferences.get("marketType", "Crypto");
         String savedVenue = preferences.get("venue", "US");
@@ -1030,7 +1028,7 @@ public class OnboardingView extends StackPane {
     }
 
     private String loadSavedTradingMode() {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         String savedTradingMode = preferences.get("tradingMode", "PAPER TRADING");
         if ("LIVE".equalsIgnoreCase(savedTradingMode)) {
             return "LIVE";
@@ -1039,7 +1037,7 @@ public class OnboardingView extends StackPane {
     }
 
     private void loadSavedOptionalTokens() {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
 
         if (telegramToken.getText() == null || telegramToken.getText().isBlank()) {
             telegramToken.setText(preferences.get("telegramToken", ""));
@@ -1054,7 +1052,7 @@ public class OnboardingView extends StackPane {
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId,
                                                    String token) {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         preferences.put("exchange_api_key_%s".formatted(exchange), safe(apiKey));
         preferences.put("exchange_api_secret_%s".formatted(exchange), safe(apiSecret));
         preferences.put("exchange_account_id_%s".formatted(exchange), safe(accountId));
@@ -1066,7 +1064,7 @@ public class OnboardingView extends StackPane {
                                                    @NonNull TextField apiKeyField,
                                                    @NonNull PasswordField apiSecretField,
                                                    @NonNull TextField accountIdField) {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingDesk.class);
         apiKeyField.setText(preferences.get("exchange_api_key_%s".formatted(exchange), ""));
         apiSecretField.setText(preferences.get("exchange_api_secret_%s".formatted(exchange), ""));
         accountIdField.setText(preferences.get("exchange_account_id_%s".formatted(exchange), ""));

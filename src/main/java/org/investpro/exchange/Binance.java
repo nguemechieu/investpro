@@ -16,7 +16,6 @@ import org.investpro.exchange.credentials.ExchangeSigning;
 import org.investpro.exchange.models.AuthCheckResult;
 import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
-import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
@@ -638,7 +637,9 @@ public class Binance extends Exchange {
 
     @Override
     public TradePair getSelectedTradePair() throws SQLException, ClassNotFoundException {
-        return TradePair.of("BTC", "USDT");
+        TradePair pair = TradePair.fromSymbol("BTC_USDT");
+        pair.setNativeSymbol("BTCUSDT");
+        return pair;
     }
 
     @Override
@@ -933,8 +934,6 @@ public class Binance extends Exchange {
                     continue;
                 }
 
-                CryptoCurrency baseCurrency, counterCurrency;
-
                 // Safely extract fields
                 JsonNode baseAssetNode = symbol.get("baseAsset");
                 JsonNode quoteAssetNode = symbol.get("quoteAsset");
@@ -948,11 +947,8 @@ public class Binance extends Exchange {
                 String quoteAsset = quoteAssetNode.asText();
 
                 try {
-                    // Try to create currencies - may fail if currency is not recognized
-                    baseCurrency = new CryptoCurrency(baseAsset, baseAsset, baseAsset, 8, baseAsset, baseAsset);
-                    counterCurrency = new CryptoCurrency(quoteAsset, quoteAsset, quoteAsset, 8, quoteAsset, quoteAsset);
-
-                    TradePair tp = new TradePair(baseCurrency, counterCurrency);
+                    TradePair tp = TradePair.fromSymbol(baseAsset + "_" + quoteAsset);
+                    tp.setNativeSymbol(baseAsset + quoteAsset);
                     tradePairs.add(tp);
                     logger.debug("Added trade pair: " + tp);
                 } catch (SQLException | ClassNotFoundException e) {
@@ -1605,7 +1601,9 @@ public class Binance extends Exchange {
                     : normalized;
         }
         try {
-            return TradePair.of(base, quote);
+            TradePair pair = TradePair.fromSymbol(base + "/" + quote);
+            pair.setNativeSymbol(symbol);
+            return pair;
         } catch (SQLException | ClassNotFoundException exception) {
             throw new IllegalArgumentException("Unable to resolve order symbol: " + symbol, exception);
         }

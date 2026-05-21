@@ -1,0 +1,4 @@
+org.investpro.models.currency.providers.FiatCurrencyProvider
+org.investpro.models.currency.providers.CryptoCurrencyProvider
+org.investpro.models.currency.providers.MetalCurrencyProvider
+org.investpro.models.currency.providers.IndexCurrencyProvider

@@ -46,16 +46,19 @@ import org.investpro.i18n.SupportedLanguage;
 
 import org.investpro.indicators.*;
 import org.investpro.licensing.LicenseManager;
-import org.investpro.monitoring.ActivityLogAppender;
 import org.investpro.monitoring.TradingSystemStatusSnapshot;
 import org.investpro.operations.SystemActivityEvent;
 import org.investpro.operations.SystemOperationsService;
 import org.investpro.operations.SystemSnapshot;
+import org.investpro.ui.charts.ChartContainer;
+import org.investpro.ui.theme.MarketConfiguration;
 import org.investpro.ui.theme.ThemeManager;
 import org.investpro.models.market.NewsEvent;
 import org.investpro.service.NewsDataProvider;
 import org.investpro.models.Account;
 import org.investpro.exchange.*;
+import org.investpro.exchange.contracts.CredentialProvider;
+import org.investpro.exchange.factory.ExchangeFactory;
 import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.services.ExchangeService;
 import org.investpro.models.trading.*;
@@ -73,10 +76,12 @@ import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.spi.ExchangeProvider;
+import org.investpro.spi.PluginIndicatorFactory;
+import org.investpro.spi.PluginRegistry;
 import org.investpro.trading.tradability.MarketWatchTradabilityFilter;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityScope;
-import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.ui.charts.CandleStickChart;
@@ -84,6 +89,7 @@ import org.investpro.ui.charts.DepthChart;
 import org.investpro.ui.charts.NewsEventOverlay;
 import org.investpro.ui.operations.SystemOperationsBoard;
 import org.investpro.ui.panels.*;
+import org.investpro.ui.tools.DataWindow;
 import org.investpro.ui.utils.CurrencyIconLoader;
 import org.investpro.utils.DraggableTab;
 import org.investpro.utils.ZoomDirection;
@@ -341,7 +347,6 @@ public class TradingDesk extends BorderPane  {
     private NewsCalendarPanel newsCalendarPanel;
     private MarketInfoPanel marketInfoPanel;
     private SystemOperationsBoard systemOperationsBoard;
-    private ActivityMonitorPanel activityMonitorPanel;
     private ResourceMonitorPanel resourceMonitorPanel;
     private ConsolePanel detachedConsolePanel;
     private BacktestReportPanel backtestReportPanel;
@@ -655,8 +660,8 @@ public class TradingDesk extends BorderPane  {
         Menu systemMenu = new Menu("System");
         systemMenu.getItems().setAll(
                 menuItem("Operations Center", null, this::openSystemOperationsBoard),
+                menuItem("Plugin Manager", null, this::openPluginManagerPanel),
                 menuItem("Trading System Status", null, this::tradingSystemStatus),
-                menuItem("Activity Monitor", null, this::openActivityMonitor),
                 menuItem("System Console", null, this::openSystemConsolePanel),
                 menuItem("Detached Console", null, this::openDetachedConsolePanel),
                 new SeparatorMenuItem(),
@@ -687,6 +692,7 @@ public class TradingDesk extends BorderPane  {
                 menuItem(t("menu.exchangeCredentials"), null, this::showSettingsDialog),
                 menuItem(t("menu.tradingProfile"), null, this::showTradingProfileSettings),
                 new SeparatorMenuItem(),
+                menuItem("Plugin Manager", null, this::openPluginManagerPanel),
                 menuItem("Theme Customization", null, this::openThemeCustomization),
                 menuItem("Theme Settings", null, this::showThemeSettingsDialog),
                 menuItem("Visibility & Layout", null, this::showVisibilitySettingsDialog),
@@ -737,8 +743,11 @@ public class TradingDesk extends BorderPane  {
                 case "strategy-builder" -> openStrategyBuilder();
                 case "strategy-assignment" -> openStrategyAssignmentPanel();
                 case "order-panel" -> openOrderPanel();
+                case "operations-center" -> openSystemOperationsBoard();
+                case "plugin-manager" -> openPluginManagerPanel();
+                case "data-window" -> openDataWindow();
+                case "resource-monitor" -> showResourceMonitor();
                 case "trading-system-status" -> tradingSystemStatus();
-                case "activity-monitor" -> openActivityMonitor();
                 case "console" -> openSystemConsolePanel();
                 case "market-watch" -> openSymbolAgentMarketWatch();
                 case "market-info" -> openMarketInfoPanel();
@@ -1755,11 +1764,13 @@ public class TradingDesk extends BorderPane  {
         marketInfoPanel.updateForPair(selectedPair);
 
         navigatorTabs.getTabs().setAll(
-                createFixedTab(TabName.MARKET_INFO, marketInfoPanel),
+                createFixedTab(TabName.NAVIGATION, createNavigationPanel()),
                 createFixedTab(TabName.OVERVIEW, new ScrollPane(overviewView)),
                 createFixedTab(TabName.BALANCES, createAccountBalancesView()),
                 createFixedTab(TabName.DEPTH, depthChart),
-                createFixedTab(TabName.SYMBOL_STRATEGY, createSymbolStrategyTab()));
+                createFixedTab(TabName.MARKET_INFO, marketInfoPanel)
+
+        );
         navigatorTabs.getStyleClass().add("compact-tabs");
         return navigatorTabs;
     }
@@ -2543,22 +2554,7 @@ public class TradingDesk extends BorderPane  {
             return;
         }
 
-        // Check if window with this title is already open
-        if (openIndependentWindows.containsKey(title)) {
-            Stage existingStage = openIndependentWindows.get(title);
-            if (existingStage != null && existingStage.isShowing()) {
-                // Window already open, bring it to front
-                existingStage.toFront();
-                existingStage.requestFocus();
-                log.info("Brought independent window to front: {}", title);
-                return;
-            } else {
-                // Window was closed, remove from tracking
-                openIndependentWindows.remove(title);
-            }
-        }
 
-        detachFromPreviousScene(content);
 
         Stage stage = new Stage();
         stage.setTitle(title);
@@ -2575,27 +2571,17 @@ public class TradingDesk extends BorderPane  {
 
         // Track window and remove from tracking when closed
         stage.setOnHidden(e -> {
-            detachFromPreviousScene(content);
-            openIndependentWindows.remove(title);
+            stage.close();
             log.info("Independent window closed: {}", title);
         });
 
         stage.show();
-        openIndependentWindows.put(title, stage);
+
 
         log.info("Independent window opened: {}", title);
     }
 
-    private void detachFromPreviousScene(Node content) {
-        if (content == null || content.getScene() == null) {
-            return;
-        }
 
-        Scene previousScene = content.getScene();
-        if (previousScene.getRoot() != null) {
-            previousScene.setRoot(new Pane());
-        }
-    }
 
     private @NotNull Scene getScene(Node content, double width, double height) {
         javafx.scene.Parent sceneContent;
@@ -2657,30 +2643,6 @@ public class TradingDesk extends BorderPane  {
             log.error("Error opening Operations Center", e);
             showWarning("Operations Center", "Unable to open: " + e.getMessage());
         }
-    }
-
-    private void openActivityMonitor() {
-        if (activityMonitorPanel == null) {
-            activityMonitorPanel = new ActivityMonitorPanel();
-
-            // Hook activity monitor into the log appender to receive real-time logs
-            ActivityLogAppender appender =ActivityLogAppender
-                    .getInstance();
-            appender.addListener(logEvent -> {
-                // Extract simple component name from logger name
-                String loggerName = logEvent.loggerName();
-                String component = loggerName.contains(".") ? loggerName.substring(loggerName.lastIndexOf('.') + 1)
-                        : loggerName;
-
-                activityMonitorPanel.recordActivity(
-                        logEvent.severity(),
-                        component,
-                        logEvent.message(),
-                        logEvent.timestamp());
-            });
-        }
-
-        createIndependentWindow("Activity Monitor", activityMonitorPanel, 1000, 600);
     }
 
     private void openThemeCustomization() {
@@ -2762,18 +2724,35 @@ public class TradingDesk extends BorderPane  {
     }
 
     private void openNavigationPanel() {
-
-            navigationPanel = new Navigation();
-            navigationPanel.setOnExchangeChanged(() -> {
-                String selectedExchange = navigationPanel.getSelectedExchange();
-                if (selectedExchange != null && exchangeSelector.getItems().contains(selectedExchange)) {
-                    exchangeSelector.setValue(selectedExchange);
-                    onExchangeChanged();
-                }
-            });
-        stage=new Stage();
-        stage.setScene(new Scene(navigationPanel,400,600));
+        Navigation detachedNavigation = createNavigationPanel(false);
+        stage = new Stage();
+        stage.setTitle("Trading Desk Navigation");
+        stage.setScene(new Scene(detachedNavigation, 420, 720));
         stage.show();
+    }
+
+    private Navigation createNavigationPanel() {
+        return createNavigationPanel(true);
+    }
+
+    private Navigation createNavigationPanel(boolean primaryPanel) {
+        Navigation panel = new Navigation();
+        configureNavigationPanel(panel);
+        if (primaryPanel) {
+            navigationPanel = panel;
+        }
+        return panel;
+    }
+
+    private void configureNavigationPanel(Navigation panel) {
+        panel.setOnExchangeChanged(() -> {
+            String selectedExchange = panel.getSelectedExchange();
+            if (selectedExchange != null && exchangeSelector.getItems().contains(selectedExchange)) {
+                exchangeSelector.setValue(selectedExchange);
+                onExchangeChanged();
+            }
+        });
+        panel.setOnNavigationRequested(this::openRegisteredPanel);
     }
 
     private @NotNull Tab createPositionsTab() {
@@ -2850,7 +2829,7 @@ public class TradingDesk extends BorderPane  {
         return createFixedTab(TabName.RISK_MONITOR, content);
     }
 
-    private @NotNull Tab createJournalTab() {
+    private @NotNull DraggableTab createJournalTab() {
         journalArea.setEditable(false);
         journalArea.setWrapText(true);
         journalArea.setText("InvestPro system journal initialized.\nLayout loaded successfully.\n");
@@ -3608,13 +3587,13 @@ public class TradingDesk extends BorderPane  {
 
     private void updateConnectControl(boolean connected) {
         if (connected) {
-            connectedBrokerLabel.setText(t("status.connected"));
-            connectedBrokerLabel.setStyle(
-                    "-fx-padding: 8 15; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold;");
-            connectedBrokerLabel.setVisible(true);
-            connectedBrokerLabel.setManaged(true);
-            connectButton.setVisible(false);
-            connectButton.setManaged(false);
+            connectButton.setText(t("status.connected"));
+            connectButton.setStyle(
+                "-fx-padding: 8 15; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+            connectButton.setVisible(true);
+            connectButton.setManaged(true);
+            connectedBrokerLabel.setVisible(false);
+            connectedBrokerLabel.setManaged(false);
         } else {
             connectButton.setText(t("toolbar.connect"));
             connectButton.setStyle(
@@ -3653,7 +3632,7 @@ public class TradingDesk extends BorderPane  {
     }
 
     private void configureSelectors(MarketConfiguration configuration) {
-        exchangeSelector.getItems().setAll(SUPPORTED_EXCHANGES);
+        exchangeSelector.getItems().setAll(discoverSupportedExchanges());
         String configuredExchange = normalizeExchangeName(configuration == null
                 ? preferences.get("selected_exchange", "")
                 : safe(configuration.exchange()));
@@ -3701,12 +3680,45 @@ public class TradingDesk extends BorderPane  {
             String selectedMode = tradingModeSelector.getSelectionModel().getSelectedItem();
             if (selectedMode != null && exchange != null) {
                 configuredTradingMode = selectedMode;
+                saveExchangeCredentials(safe(exchangeSelector.getValue()));
                 exchange.setUserSelectedTradingMode(selectedMode);
                 log.info("Trading mode switched to: {}", selectedMode);
                 appendAgentActivity("Trading mode: " + selectedMode);
                 updateStatusBarValues();
+
+                if (hasBrokerAccess()) {
+                    reconnectCurrentExchangeForTradingMode();
+                }
             }
         });
+    }
+
+    private void reconnectCurrentExchangeForTradingMode() {
+        String selectedExchange = safe(exchangeSelector.getSelectionModel().getSelectedItem());
+        if (selectedExchange.isBlank()) {
+            return;
+        }
+
+        if (!hasExchangeCredentials(selectedExchange)) {
+            return;
+        }
+
+        loadExchangeCredentials(selectedExchange);
+        exchange = createExchange(selectedExchange, configuredApiKey, configuredApiSecret, configuredAccountId,
+                configuredTradingMode);
+
+        setTelegramToken(telegramToken);
+
+        new Thread(() -> {
+            try {
+                exchange.connectStream();
+            } catch (Exception streamException) {
+                log.debug("Unable to reconnect stream while switching trading mode", streamException);
+            }
+        }, "WebSocketConnector-ModeSwitch-" + selectedExchange).start();
+
+        journal("Switching %s to %s mode".formatted(selectedExchange, configuredTradingMode));
+        proceedWithConnection();
     }
 
     private void configureOrderTypeSelector() {
@@ -4016,6 +4028,30 @@ public class TradingDesk extends BorderPane  {
 
         if (selectedExchange == null || selectedExchange.isBlank()) {
             showWarning("Connection", "No exchange selected.");
+            return;
+        }
+
+        BrokerSession existingSession = brokerSessions.get(safe(selectedExchange));
+        if (existingSession != null
+                && existingSession.accessGranted()
+                && existingSession.exchange() != null
+                && Boolean.TRUE.equals(existingSession.exchange().isConnected())) {
+            exchange = existingSession.exchange();
+            brokerAccessGranted = true;
+
+            if (configuredTradingMode != null && !configuredTradingMode.isBlank()) {
+                exchange.setUserSelectedTradingMode(configuredTradingMode);
+            }
+
+            if (existingSession.account() != null) {
+                updateAccountSummary(existingSession.account());
+            }
+
+            updateConnectionStatus();
+            updateExchangeVenueLabel();
+            refreshOrderTypeOptions();
+            refreshAccountWorkspace();
+            journal("Reusing active %s connection".formatted(selectedExchange));
             return;
         }
 
@@ -5019,7 +5055,7 @@ public class TradingDesk extends BorderPane  {
 
             // Initialize Navigation panel for exchange selection
             if (navigationPanel == null) {
-                navigationPanel = new Navigation();
+                navigationPanel = createNavigationPanel();
                 log.info("Navigation panel initialized");
             }
 
@@ -5599,11 +5635,11 @@ public class TradingDesk extends BorderPane  {
     private @NotNull List<TradePair> fallbackMarketWatchPairs() {
         try {
             List<TradePair> pairs = new ArrayList<>();
-            pairs.add(new TradePair("BTC", "USD"));
-            pairs.add(new TradePair("ETH", "USD"));
-            pairs.add(new TradePair("SOL", "USD"));
-            pairs.add(new TradePair("EUR", "USD"));
-            pairs.add(new TradePair("AAPL", "USD"));
+            pairs.add(TradePair.fromSymbol("BTC_USD"));
+            pairs.add(TradePair.fromSymbol("ETH_USD"));
+            pairs.add(TradePair.fromSymbol("SOL_USD"));
+            pairs.add(TradePair.fromSymbol("EUR_USD"));
+            pairs.add(TradePair.fromSymbol("AAPL_USD"));
             return pairs;
         } catch (Exception exception) {
             log.debug("Unable to build fallback pairs", exception);
@@ -5759,6 +5795,11 @@ public class TradingDesk extends BorderPane  {
     }
 
     private ChartIndicator createChartIndicator(String choice) {
+        ChartIndicator pluginIndicator = PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault()).orElse(null);
+        if (pluginIndicator != null) {
+            return pluginIndicator;
+        }
+
         return switch (safe(choice)) {
             // Moving Averages
             case "SMA 20" -> new SimpleMovingAverageIndicator(20);
@@ -8352,20 +8393,31 @@ public class TradingDesk extends BorderPane  {
                normalizedAccountId,
                 paperMode);
 
-        Exchange createdExchange = switch (normalizedName) {
-            case "BINANCE US" -> new BinanceUs(credentials);
-            case "BINANCE" -> new Binance(credentials);
-            case "OANDA" -> new Oanda(credentials);
-            case "BITFINEX" -> new Bitfinex(credentials);
-            case "ALPACA" -> new Alpaca(credentials);
-            case "INTERACTIVE BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK", "SCHWAB", "CHARLES SCHWAB" -> new InteractiveBrokers(credentials);
-            case "COINBASE" -> new Coinbase(credentials);
-            case "STELLAR NETWORK", "STELLAR-NETWORK", "STELLAR_NETWORK" -> new StellarNetwork(credentials);
-            default -> {
-                log.warn("Exchange {} is not implemented yet. Falling back to Coinbase.", exchangeName);
-                throw new RuntimeException("UNSUPPORTED EXCHANGE");
-            }
-        };
+        Exchange createdExchange;
+        try {
+            CredentialProvider credentialProvider = key -> credentialValueForPluginFactory(key, credentials);
+            createdExchange = new ExchangeFactory(credentialProvider, PluginRegistry.loadDefault())
+                    .create(normalizedExchangeId(normalizedName));
+        } catch (Exception pluginException) {
+            log.warn(
+                    "PluginRegistry exchange creation failed for {}. Using legacy TradingDesk fallback.",
+                    exchangeName,
+                    pluginException);
+            createdExchange = switch (normalizedName) {
+                case "BINANCE US" -> new BinanceUs(credentials);
+                case "BINANCE" -> new Binance(credentials);
+                case "OANDA" -> new Oanda(credentials);
+                case "BITFINEX" -> new Bitfinex(credentials);
+                case "ALPACA" -> new Alpaca(credentials);
+                case "INTERACTIVE BROKERS", "INTERACTIVE_BROKER", "IBKR", "IBK", "SCHWAB", "CHARLES SCHWAB" -> new InteractiveBrokers(credentials);
+                case "COINBASE" -> new Coinbase(credentials);
+                case "STELLAR NETWORK", "STELLAR-NETWORK", "STELLAR_NETWORK" -> new StellarNetwork(credentials);
+                default -> {
+                    log.warn("Exchange {} is not implemented yet. Falling back to Coinbase.", exchangeName);
+                    throw new RuntimeException("UNSUPPORTED EXCHANGE");
+                }
+            };
+        }
 
         createdExchange.setUserSelectedTradingMode(safe(tradingMode).isBlank() ? "LIVE" : safe(tradingMode));
 
@@ -8383,6 +8435,39 @@ public class TradingDesk extends BorderPane  {
         }
 
         return createdExchange;
+    }
+
+    private List<String> discoverSupportedExchanges() {
+        LinkedHashSet<String> exchanges = new LinkedHashSet<>();
+        try {
+            PluginRegistry.loadDefault().exchangeProviders().stream()
+                    .filter(ExchangeProvider::enabledByDefault)
+                    .map(ExchangeProvider::id)
+                    .map(this::normalizeExchangeName)
+                    .forEach(exchanges::add);
+        } catch (Exception exception) {
+            log.warn("Unable to load exchange providers for selector. Using legacy list.", exception);
+        }
+        exchanges.addAll(Arrays.asList(SUPPORTED_EXCHANGES));
+        return new ArrayList<>(exchanges);
+    }
+
+    private Optional<String> credentialValueForPluginFactory(String key, ExchangeCredentials credentials) {
+        if (key == null || credentials == null) {
+            return Optional.empty();
+        }
+
+        return switch (key) {
+            case "COINBASE_API_KEY", "COINBASE_KEY_NAME" -> Optional.ofNullable(credentials.apiKey());
+            case "COINBASE_API_SECRET", "COINBASE_PRIVATE_KEY" -> Optional.ofNullable(credentials.apiSecret());
+            case "BINANCE_API_KEY", "BINANCE_US_API_KEY", "BITFINEX_API_KEY", "OANDA_API_KEY", "ALPACA_API_KEY" ->
+                    Optional.ofNullable(credentials.apiKey());
+            case "BINANCE_API_SECRET", "BINANCE_US_API_SECRET", "BITFINEX_API_SECRET", "OANDA_API_SECRET", "ALPACA_API_SECRET" ->
+                    Optional.ofNullable(credentials.apiSecret());
+            case "OANDA_ACCOUNT_ID" -> Optional.ofNullable(credentials.accountId());
+            case "OANDA_SANDBOX", "ALPACA_PAPER" -> Optional.of(String.valueOf(credentials.sandbox()));
+            default -> Optional.empty();
+        };
     }
 
     private @NotNull String normalizeExchangeName(String exchangeName) {
@@ -9096,6 +9181,13 @@ public class TradingDesk extends BorderPane  {
         createIndependentWindow("Settings", settingsPanel, 900, 760);
         journal("Settings panel opened");
         log.info("Settings panel opened");
+    }
+
+    private void openPluginManagerPanel() {
+        PluginManagerPanel pluginManagerPanel = new PluginManagerPanel();
+        createIndependentWindow("Plugin Manager", pluginManagerPanel, 980, 680);
+        journal("Plugin Manager opened");
+        log.info("Plugin Manager panel opened");
     }
 
     private void openBacktestReportPanel() {

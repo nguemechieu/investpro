@@ -10,6 +10,7 @@ import org.investpro.enums.TradingSessionStatus;
 import org.investpro.models.trading.TradePair;
 import org.investpro.research.StrategyRankingEngine;
 import org.investpro.risk.TradeRiskContext;
+import org.investpro.spi.PluginRegistry;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +46,7 @@ public class StrategyEngine {
 
     private final TradeExecutionCoordinator tradeExecutionCoordinator;
     private final StrategyRegistry strategyRegistry;
+    private final PluginRegistry pluginRegistry;
 
     private final Map<String, StrategyContext> contextCache = new ConcurrentHashMap<>();
     private final Map<String, StrategySignal> lastSignalCache = new ConcurrentHashMap<>();
@@ -57,7 +59,9 @@ public class StrategyEngine {
                 tradeExecutionCoordinator,
                 "tradeExecutionCoordinator must not be null");
         this.strategyRegistry = StrategyRegistry.getInstance();
+        this.pluginRegistry = PluginRegistry.loadDefault();
         this.strategyRankingEngine = new StrategyRankingEngine();
+        log.info("StrategyEngine initialized with {} strategy providers", pluginRegistry.strategyProviders().size());
     }
 
     // ============================================================================

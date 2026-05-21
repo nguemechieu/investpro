@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry of all tradable instruments and their metadata.
+ * Registry of all tradeable instruments and their metadata.
  * Resolves TradePair to InstrumentMetadata mapping.
  * Enables filtering by broker, venue, asset class, and contract type.
  * <p>

@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 
 /**
  * Logback Appender that captures log events and broadcasts them to listeners.
- * Used by ActivityMonitorPanel to display real-time logs on the dashboard.
+ * Broadcasts log events to any UI surface that wants real-time log data.
  *
  * Register listener via: ActivityLogAppender.getInstance().addListener(...)
  *

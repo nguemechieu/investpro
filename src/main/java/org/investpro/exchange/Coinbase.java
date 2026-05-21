@@ -17,7 +17,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.models.Account;
 import org.investpro.data.InProgressCandleData;
-import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
 import org.investpro.models.trading.TradePair;
@@ -1117,37 +1116,6 @@ public class Coinbase extends Exchange {
         return tradePair.toString('-').toUpperCase(Locale.ROOT);
     }
 
-    private int fractionalDigitsFromIncrement(String increment) {
-        if (increment == null || increment.isBlank()) {
-            return 8;
-        }
-
-        try {
-            BigDecimal decimal = new BigDecimal(increment.strip());
-            return Math.max(0, decimal.stripTrailingZeros().scale());
-        } catch (Exception exception) {
-            return 8;
-        }
-    }
-
-    @Contract("_, _ -> new")
-    private @NotNull CryptoCurrency currencyFromCode(String code, String increment) {
-        String normalized = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
-        int fractionalDigits = fractionalDigitsFromIncrement(increment);
-
-        try {
-            return new CryptoCurrency(
-                    normalized,
-                    normalized,
-                    normalized,
-                    fractionalDigits,
-                    normalized,
-                    normalized);
-        } catch (SQLException | ClassNotFoundException exception) {
-            throw new RuntimeException(exception);
-        }
-    }
-
     private static String firstText(JsonNode node, String... names) {
         if (node == null || names == null) {
             return "";
@@ -1306,14 +1274,15 @@ public class Coinbase extends Exchange {
                 continue;
             }
 
-            String baseIncrement = firstText(product, "base_increment", "base_min_size");
-            String quoteIncrement = firstText(product, "quote_increment", "quote_min_size");
-
-            CryptoCurrency baseCurrency = currencyFromCode(baseCode, baseIncrement);
-            CryptoCurrency counterCurrency = currencyFromCode(quoteCode, quoteIncrement);
-
             try {
-                tradePairs.add(new TradePair(baseCurrency, counterCurrency));
+                String nativeProductId = firstText(product, "product_id", "id", "symbol");
+                String normalizedSymbol = nativeProductId.isBlank()
+                        ? baseCode + "-" + quoteCode
+                        : nativeProductId.replace('/', '-');
+
+                TradePair pair = TradePair.fromSymbol(normalizedSymbol);
+                pair.setNativeSymbol(nativeProductId.isBlank() ? normalizedSymbol : nativeProductId);
+                tradePairs.add(pair);
             } catch (SQLException | ClassNotFoundException exception) {
                 throw new RuntimeException(exception);
             }
@@ -3916,13 +3885,10 @@ public class Coinbase extends Exchange {
     @Contract("_ -> new")
     private @NotNull TradePair parseTradePairFromProductId(String productId)
             throws SQLException, ClassNotFoundException {
-        String[] parts = productId == null ? new String[0] : productId.split("-");
-
-        if (parts.length >= 2) {
-            return new TradePair(parts[0], parts[1]);
-        }
-
-        return new TradePair("UNKNOWN", "UNKNOWN");
+        String normalized = productId == null ? "UNKNOWN-UNKNOWN" : productId.trim().toUpperCase(Locale.ROOT);
+        TradePair pair = TradePair.fromSymbol(normalized);
+        pair.setNativeSymbol(normalized);
+        return pair;
     }
 
     public static <T> @NotNull CompletableFuture<T> failedFuture(Throwable throwable) {

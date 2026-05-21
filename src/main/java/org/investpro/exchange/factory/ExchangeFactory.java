@@ -11,15 +11,19 @@ import org.investpro.exchange.credentials.ExchangeCredentials;
 import org.investpro.exchange.infrastructure.BrokerExchangeAdapter;
 import org.investpro.exchange.infrastructure.BrokerRouter;
 import org.investpro.exchange.infrastructure.ENUM_EXCHANGE_LIST;
+import org.investpro.operations.SystemActivityBus;
+import org.investpro.spi.ExchangeProvider;
+import org.investpro.spi.ExchangeProviderContext;
+import org.investpro.spi.PluginRegistry;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -28,8 +32,11 @@ public final class ExchangeFactory {
     private static final Map<String, String> EXCHANGE_ALIASES = buildExchangeAliases();
 
 
+    private final CredentialProvider credentialProvider;
     private final ExchangeCredentialResolver credentialResolver;
     private final BrokerRouter brokerRouter;
+    private final PluginRegistry pluginRegistry;
+    private final ExchangeProviderContext providerContext;
 
     /**
      * Cache one exchange adapter per normalized exchange id.
@@ -40,9 +47,21 @@ public final class ExchangeFactory {
     private final Map<String, Exchange> exchangeCache = new ConcurrentHashMap<>();
 
     public ExchangeFactory(@NotNull CredentialProvider credentialProvider) {
+        this(credentialProvider, PluginRegistry.loadDefault());
+    }
+
+    public ExchangeFactory(@NotNull CredentialProvider credentialProvider, @NotNull PluginRegistry pluginRegistry) {
         Objects.requireNonNull(credentialProvider, "credentialProvider must not be null");
+        Objects.requireNonNull(pluginRegistry, "pluginRegistry must not be null");
+        this.credentialProvider = credentialProvider;
         this.credentialResolver = new ExchangeCredentialResolver(credentialProvider);
         this.brokerRouter = new BrokerRouter();
+        this.pluginRegistry = pluginRegistry;
+        this.providerContext = new ExchangeProviderContext(
+                credentialProvider,
+                credentialResolver,
+                Map.of(),
+                SystemActivityBus.getInstance());
     }
 
     /**
@@ -52,13 +71,13 @@ public final class ExchangeFactory {
 
     public Exchange getOrCreate(@NotNull String exchangeId) {
         Objects.requireNonNull(exchangeId, "exchangeId must not be null");
-        ENUM_EXCHANGE_LIST exchangeEnum = toEnum(exchangeId);
-        return exchangeCache.computeIfAbsent(exchangeEnum.name(), k -> createNew(exchangeEnum));
+        String cacheKey = cacheKeyFor(exchangeId);
+        return exchangeCache.computeIfAbsent(cacheKey, k -> createUncached(exchangeId));
     }
 
     public Exchange getOrCreate(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
         Objects.requireNonNull(exchangeEnum, "exchangeEnum must not be null");
-        return exchangeCache.computeIfAbsent(exchangeEnum.name(), k -> createNew(exchangeEnum));
+        return getOrCreate(exchangeEnum.name());
     }
 
     /**
@@ -117,27 +136,17 @@ public final class ExchangeFactory {
 
     public Exchange recreate(@NotNull String exchangeId) {
         Objects.requireNonNull(exchangeId, "exchangeId must not be null");
-        ENUM_EXCHANGE_LIST exchangeEnum = toEnum(exchangeId);
-        return recreate(exchangeEnum);
+        String cacheKey = cacheKeyFor(exchangeId);
+        Exchange oldExchange = exchangeCache.remove(cacheKey);
+        disconnectQuietly(cacheKey, oldExchange);
+        Exchange newExchange = createUncached(exchangeId);
+        exchangeCache.put(cacheKey, newExchange);
+        return newExchange;
     }
 
     public Exchange recreate(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
         Objects.requireNonNull(exchangeEnum, "exchangeEnum must not be null");
-        Exchange oldExchange = exchangeCache.remove(exchangeEnum.name());
-        if (oldExchange != null) {
-            try {
-                log.info("Disconnecting old exchange adapter before recreation: {}", exchangeEnum);
-                if (oldExchange instanceof BrokerExchangeAdapter brokerExchangeAdapter) {
-                    brokerExchangeAdapter.stopAllStreams();
-                }
-                oldExchange.disconnect();
-            } catch (Exception exception) {
-                log.warn("Failed to disconnect old exchange adapter: {}", exchangeEnum, exception);
-            }
-        }
-        Exchange newExchange = createNew(exchangeEnum);
-        exchangeCache.put(exchangeEnum.name(), newExchange);
-        return newExchange;
+        return recreate(exchangeEnum.name());
     }
 
     /**
@@ -146,24 +155,14 @@ public final class ExchangeFactory {
 
     public void remove(@NotNull String exchangeId) {
         Objects.requireNonNull(exchangeId, "exchangeId must not be null");
-        ENUM_EXCHANGE_LIST exchangeEnum = toEnum(exchangeId);
-        remove(exchangeEnum);
+        String cacheKey = cacheKeyFor(exchangeId);
+        Exchange exchange = exchangeCache.remove(cacheKey);
+        disconnectQuietly(cacheKey, exchange);
     }
 
     public void remove(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
         Objects.requireNonNull(exchangeEnum, "exchangeEnum must not be null");
-        Exchange exchange = exchangeCache.remove(exchangeEnum.name());
-        if (exchange != null) {
-            try {
-                log.info("Disconnecting and removing exchange adapter: {}", exchangeEnum);
-                if (exchange instanceof BrokerExchangeAdapter brokerExchangeAdapter) {
-                    brokerExchangeAdapter.stopAllStreams();
-                }
-                exchange.disconnect();
-            } catch (Exception exception) {
-                log.warn("Failed to disconnect exchange adapter: {}", exchangeEnum, exception);
-            }
-        }
+        remove(exchangeEnum.name());
     }
 
     /**
@@ -193,13 +192,12 @@ public final class ExchangeFactory {
 
     public boolean hasCached(@NotNull String exchangeId) {
         Objects.requireNonNull(exchangeId, "exchangeId must not be null");
-        ENUM_EXCHANGE_LIST exchangeEnum = toEnum(exchangeId);
-        return hasCached(exchangeEnum);
+        return exchangeCache.containsKey(cacheKeyFor(exchangeId));
     }
 
     public boolean hasCached(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
         Objects.requireNonNull(exchangeEnum, "exchangeEnum must not be null");
-        return exchangeCache.containsKey(exchangeEnum.name());
+        return hasCached(exchangeEnum.name());
     }
 
     public int cachedCount() {
@@ -207,7 +205,20 @@ public final class ExchangeFactory {
     }
 
 
-    private Exchange createNew(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
+    private Exchange createUncached(@NotNull String exchangeId) {
+        Optional<ExchangeProvider> provider = pluginRegistry.findExchangeProvider(exchangeId);
+        if (provider.isPresent()) {
+            ExchangeProvider exchangeProvider = provider.get();
+            log.info("Creating exchange adapter from plugin provider: {}", exchangeProvider.id());
+            return exchangeProvider.create(providerContext);
+        }
+
+        ENUM_EXCHANGE_LIST exchangeEnum = toEnum(exchangeId);
+        log.warn("Using legacy hardcoded ExchangeFactory fallback for {}", exchangeEnum);
+        return createLegacyExchange(exchangeEnum);
+    }
+
+    private Exchange createLegacyExchange(@NotNull ENUM_EXCHANGE_LIST exchangeEnum) {
         ExchangeCredentials credentials = credentialResolver.resolve(exchangeEnum.name().toLowerCase(Locale.ROOT));
         log.info("Creating exchange adapter: {}", exchangeEnum);
         return switch (exchangeEnum) {
@@ -228,6 +239,29 @@ public final class ExchangeFactory {
             case BITSTAMP -> throw new IllegalArgumentException("Bitstamp adapter not implemented yet");
             default -> throw new IllegalArgumentException("Unsupported exchange: " + exchangeEnum);
         };
+    }
+
+    private String cacheKeyFor(String exchangeId) {
+        Optional<ExchangeProvider> provider = pluginRegistry.findExchangeProvider(exchangeId);
+        if (provider.isPresent()) {
+            return PluginRegistry.normalize(provider.get().id());
+        }
+        return toEnum(exchangeId).name();
+    }
+
+    private void disconnectQuietly(String exchangeId, Exchange exchange) {
+        if (exchange == null) {
+            return;
+        }
+        try {
+            log.info("Disconnecting exchange adapter: {}", exchangeId);
+            if (exchange instanceof BrokerExchangeAdapter brokerExchangeAdapter) {
+                brokerExchangeAdapter.stopAllStreams();
+            }
+            exchange.disconnect();
+        } catch (Exception exception) {
+            log.warn("Failed to disconnect exchange adapter: {}", exchangeId, exception);
+        }
     }
 
 

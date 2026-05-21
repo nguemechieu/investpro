@@ -242,7 +242,7 @@ public class TradeFeeRepository {
             TradePair pair = null;
             try {
                 if (base != null && quote != null) {
-                    pair = TradePair.of(base, quote);
+                    pair = TradePair.fromSymbol(base + "_" + quote);
                 }
             } catch (Exception ignored) { /* pair lookup may fail for delisted symbols */ }
 

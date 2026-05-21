@@ -2334,7 +2334,9 @@ public class StellarNetwork extends Exchange {
 
     private TradePair defaultPair() {
         try {
-            return new TradePair("XLM", "USDC");
+            TradePair pair = TradePair.fromSymbol("XLM_USDC");
+            pair.setNativeSymbol("XLM_USDC");
+            return pair;
         } catch (SQLException | ClassNotFoundException exception) {
             throw new IllegalStateException("Unable to create default Stellar trade pair", exception);
         }
@@ -2342,11 +2344,11 @@ public class StellarNetwork extends Exchange {
 
     private List<TradePair> defaultPairs() {
         try {
-            return List.of(
-                    new TradePair("XLM", "USDC"),
-
-                    new TradePair("BTC", "USDC")
-                               );
+            TradePair xlmUsdc = TradePair.fromSymbol("XLM_USDC");
+            xlmUsdc.setNativeSymbol("XLM_USDC");
+            TradePair btcUsdc = TradePair.fromSymbol("BTC_USDC");
+            btcUsdc.setNativeSymbol("BTC_USDC");
+            return List.of(xlmUsdc, btcUsdc);
         } catch (SQLException | ClassNotFoundException exception) {
             return List.of(defaultPair());
         }
@@ -2364,7 +2366,9 @@ public class StellarNetwork extends Exchange {
         String normalized = symbol.trim().toUpperCase(Locale.ROOT).replace('_', '/').replace('-', '/');
         String[] parts = normalized.contains("/") ? normalized.split("/") : new String[]{"XLM", normalized};
         try {
-            return new TradePair(parts[0], parts.length > 1 ? parts[1] : "USDC");
+            TradePair pair = TradePair.fromSymbol(parts[0] + "/" + (parts.length > 1 ? parts[1] : "USDC"));
+            pair.setNativeSymbol(symbol);
+            return pair;
         } catch (SQLException | ClassNotFoundException exception) {
             return defaultPair();
         }
