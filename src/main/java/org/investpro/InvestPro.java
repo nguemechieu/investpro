@@ -4,6 +4,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Background;
@@ -27,8 +28,11 @@ import org.investpro.ui.OnboardingView;
 import org.investpro.ui.TradingDesk;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URL;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * InvestPro - Professional Multi-Exchange Trading Terminal.
@@ -65,6 +69,7 @@ public class InvestPro extends Application {
     private static final String APP_BACKGROUND_RESOURCE = "images/Invest.png";
     private static final String APP_CSS_RESOURCE = "css/app.css";
     private static final String COMPONENTS_CSS_RESOURCE = "css/components.css";
+    private static final AtomicBoolean ERROR_DIALOG_SHOWING = new AtomicBoolean(false);
 
     private Stage primaryStage;
     private Scene mainScene;
@@ -78,11 +83,22 @@ public class InvestPro extends Application {
     private CurrencyRepository currencyRepository;
 
     public static void main(String[] args) {
+        installGlobalExceptionDialog();
         launch(args);
     }
 
     public InvestPro() {
         super();
+    }
+
+    private static void installGlobalExceptionDialog() {
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            log.error("Uncaught exception on {}", thread == null ? "unknown thread" : thread.getName(), throwable);
+            showExceptionDialog(
+                    "Unexpected Error",
+                    "An unexpected application error occurred.",
+                    throwable);
+        });
     }
 
     @Override
@@ -347,16 +363,43 @@ public class InvestPro extends Application {
     }
 
     private void showErrorAlert(String title, String header, Throwable throwable) {
-        Platform.runLater(() -> {
+        showExceptionDialog(title, header, throwable);
+    }
+
+    private static void showExceptionDialog(String title, String header, Throwable throwable) {
+        Runnable showDialog = () -> {
+            if (!ERROR_DIALOG_SHOWING.compareAndSet(false, true)) {
+                return;
+            }
+
             Alert alert = new Alert(Alert.AlertType.ERROR);
             alert.setTitle(title == null || title.isBlank() ? "InvestPro Error" : title);
             alert.setHeaderText(header == null || header.isBlank() ? "An error occurred." : header);
             alert.setContentText(errorMessage(throwable));
-            alert.showAndWait();
-        });
+
+            TextArea details = new TextArea(stackTrace(throwable));
+            details.setEditable(false);
+            details.setWrapText(false);
+            details.setPrefColumnCount(100);
+            details.setPrefRowCount(22);
+            alert.getDialogPane().setExpandableContent(details);
+            alert.getDialogPane().setExpanded(false);
+            alert.setOnHidden(event -> ERROR_DIALOG_SHOWING.set(false));
+            alert.show();
+        };
+
+        try {
+            if (Platform.isFxApplicationThread()) {
+                showDialog.run();
+            } else {
+                Platform.runLater(showDialog);
+            }
+        } catch (IllegalStateException exception) {
+            log.error("{}: {}", header, errorMessage(throwable), throwable);
+        }
     }
 
-    private @NotNull String errorMessage(Throwable throwable) {
+    private static @NotNull String errorMessage(Throwable throwable) {
         if (throwable == null) {
             return "Unknown error";
         }
@@ -372,5 +415,15 @@ public class InvestPro extends Application {
         return message == null || message.isBlank()
                 ? current.getClass().getSimpleName()
                 : message;
+    }
+
+    private static @NotNull String stackTrace(Throwable throwable) {
+        if (throwable == null) {
+            return "No stack trace available.";
+        }
+
+        StringWriter writer = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(writer));
+        return writer.toString();
     }
 }

@@ -8,8 +8,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -19,9 +22,10 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Lookup order:
  * 1. Bundled icons from {@code /currency} or {@code /icons/currencies}
- * 2. CoinGecko API for crypto currencies (cached)
- * 3. java.util.Currency flag fallback for fiat currencies
- * 4. Generic fallback image
+ * 2. Locally cached downloaded icons
+ * 3. CoinGecko API for crypto currencies (saved locally after download)
+ * 4. java.util.Currency flag fallback for fiat currencies
+ * 5. Generic fallback image
  */
 @Slf4j
 public final class CurrencyIconLoader {
@@ -67,6 +71,10 @@ public final class CurrencyIconLoader {
     private static final String FALLBACK_PATH = "/icons/currencies/unknown.png";
     private static final String COINGECKO_API = "https://api.coingecko.com/api/v3";
     private static final long COINGECKO_TIMEOUT_SECONDS = 5;
+    private static final Path LOCAL_ICON_CACHE_DIR = Path.of(
+            System.getProperty("user.home", "."),
+            ".investpro",
+            "currency-icons");
 
     private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, String> COINGECKO_ID_CACHE = new ConcurrentHashMap<>();
@@ -101,13 +109,19 @@ public final class CurrencyIconLoader {
                 return icon;
             }
 
-            // Try 2: Fetch from CoinGecko if crypto
+            // Try 2: Load previously downloaded icon from the local cache
+            icon = tryLoadFromLocalCache(key);
+            if (icon != null && !icon.isError()) {
+                return icon;
+            }
+
+            // Try 3: Fetch from CoinGecko if crypto, then save locally for future runs
             icon = tryLoadFromCoinGecko(key);
             if (icon != null && !icon.isError()) {
                 return icon;
             }
 
-            // Try 3: Fetch fiat currency flag from java.util.Currency
+            // Try 4: Fetch fiat currency flag from java.util.Currency
             icon = tryLoadFiatCurrencyIcon(key);
             if (icon != null && !icon.isError()) {
                 return icon;
@@ -146,7 +160,7 @@ public final class CurrencyIconLoader {
                 return null;
             }
 
-            return loadImageFromUrl(imageUrl);
+            return downloadAndCacheImage(currencyCode, imageUrl);
 
         } catch (Exception e) {
             log.debug("Failed to fetch icon from CoinGecko for {}: {}", currencyCode, e.getMessage());
@@ -259,20 +273,75 @@ public final class CurrencyIconLoader {
         }
     }
 
-    /**
-     * Load image from a URL.
-     */
-    private static Image loadImageFromUrl(String imageUrl) {
+    private static Image tryLoadFromLocalCache(String currencyCode) {
+        Path path = localIconPath(currencyCode);
+        if (!Files.isRegularFile(path)) {
+            return null;
+        }
+
+        try (InputStream stream = Files.newInputStream(path)) {
+            Image image = new Image(stream, 100, 100, true, true);
+            if (image.isError()) {
+                log.debug("Cached currency icon is invalid for {} at {}", currencyCode, path);
+                return null;
+            }
+            return image;
+        } catch (IOException exception) {
+            log.debug("Failed to load cached currency icon for {} from {}: {}",
+                    currencyCode, path, exception.getMessage());
+            return null;
+        }
+    }
+
+    private static Image downloadAndCacheImage(String currencyCode, String imageUrl) {
         if (imageUrl == null || imageUrl.isBlank()) {
             return null;
         }
 
         try {
-            return new Image(new URL(imageUrl).openStream(), 100, 100, true, true);
-        } catch (Exception e) {
-            log.debug("Failed to load image from URL {}: {}", imageUrl, e.getMessage());
+            OkHttpClient client = getHttpClient();
+            Request request = new Request.Builder()
+                    .url(imageUrl)
+                    .header("User-Agent", "InvestPro/1.0")
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    return null;
+                }
+
+                byte[] imageBytes = response.body().bytes();
+                if (imageBytes.length == 0) {
+                    return null;
+                }
+
+                Image image = new Image(new ByteArrayInputStream(imageBytes), 100, 100, true, true);
+                if (image.isError()) {
+                    return null;
+                }
+
+                saveToLocalCache(currencyCode, imageBytes);
+                return image;
+            }
+        } catch (Exception exception) {
+            log.debug("Failed to download currency icon from URL {}: {}", imageUrl, exception.getMessage());
             return null;
         }
+    }
+
+    private static void saveToLocalCache(String currencyCode, byte[] imageBytes) {
+        try {
+            Files.createDirectories(LOCAL_ICON_CACHE_DIR);
+            Files.write(localIconPath(currencyCode), imageBytes);
+        } catch (IOException exception) {
+            log.debug("Failed to cache currency icon for {}: {}", currencyCode, exception.getMessage());
+        }
+    }
+
+    private static Path localIconPath(String currencyCode) {
+        String safeCode = currencyCode == null ? "unknown" : currencyCode.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9._-]", "_");
+        return LOCAL_ICON_CACHE_DIR.resolve(safeCode + ".png");
     }
 
     private static Image loadFallback() {
@@ -286,11 +355,12 @@ public final class CurrencyIconLoader {
 
     private static Image tryLoadFromResources(String resourcePath) {
         try {
-            InputStream stream = CurrencyIconLoader.class.getResourceAsStream(resourcePath);
+            try (InputStream stream = CurrencyIconLoader.class.getResourceAsStream(resourcePath)) {
             if (stream == null) {
                 return null;
             }
             return new Image(stream);
+            }
         } catch (Exception e) {
             log.debug("Failed to load icon from {}: {}", resourcePath, e.getMessage());
             return null;

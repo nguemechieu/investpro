@@ -32,6 +32,7 @@ import org.investpro.service.TradingService;
 import org.investpro.ui.charts.CandleStickChart;
 
 import org.investpro.ui.tools.ChartToolbar;
+import org.investpro.ui.utils.CurrencyIconLoader;
 import org.investpro.utils.CandleDataSupplier;
 
 import java.io.IOException;
@@ -256,7 +257,7 @@ public class ChartContainer extends Region {
 
     private CandleStickChart createChart(int durationSeconds) {
         CandleDataSupplier supplier = exchange.getCandleDataSupplier(durationSeconds, tradePair);
-        return new CandleStickChart(
+        CandleStickChart chart = new CandleStickChart(
                 exchange,
                 supplier,
                 tradePair,
@@ -266,6 +267,24 @@ public class ChartContainer extends Region {
                 tradingService,
                 widthProperty(),
                 heightProperty());
+        applyDefaultBackgroundImage(chart);
+        return chart;
+    }
+
+    private void applyDefaultBackgroundImage(CandleStickChart chart) {
+        if (chart == null) {
+            return;
+        }
+
+        String baseCode = tradePair.getBaseCode();
+        if (baseCode == null || baseCode.isBlank()) {
+            return;
+        }
+
+        Image image = CurrencyIconLoader.loadCurrencyIcon(baseCode);
+        if (image != null && !image.isError()) {
+            chart.setBackgroundImage(image);
+        }
     }
 
     private void applyChartBindings(CandleStickChart chart) {
