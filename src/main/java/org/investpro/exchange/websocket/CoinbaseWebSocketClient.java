@@ -13,7 +13,6 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
-import org.investpro.models.currency.Currency;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
@@ -22,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 
 
 import java.net.URI;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -761,7 +759,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         return tradePair.toString('-').trim().toUpperCase(Locale.ROOT);
     }
 
-    private  TradePair findAnyRegisteredPair() {
+    private TradePair findAnyRegisteredPair() {
         synchronized (liveTradeConsumers) {
             for (TradePair pair : liveTradeConsumers.keySet()) {
                 if (pair != null) {
@@ -770,11 +768,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             }
         }
 
-        try {
-            return new TradePair(Currency.NULL_FIAT_CURRENCY,Currency.NULL_FIAT_CURRENCY);
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+        return null;
     }
 
     private record CoinbaseStream(String channel, TradePair tradePair) {

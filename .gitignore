@@ -34,25 +34,26 @@ build/
 ### VS Code ###
 .vscode/
 
-<<<<<<< HEAD
-### Mac OS ###
-.DS_Store
-# Project exclude paths
-/out/
-
-
-investpro_db.sql
-investpro.log
-=======
 ### Python predictor ###
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
 venv/
+pytest-cache-files-*/
 
 ### Mac OS ###
 .DS_Store
->>>>>>> 1756ddf9b68124c75651c19dd1fde8d4ecf06186
+
+# Project exclude paths
+/out/
+
+investpro_db.sql
+investpro_db.sql-shm
+investpro_db.sql-wal
+investpro.log
+
+# Generated historical backtest/prefetch artifacts
+data/historical/*_*_*_*_*.json
 
 .fake
