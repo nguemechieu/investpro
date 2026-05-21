@@ -3,7 +3,7 @@ package org.investpro.service;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.research.StrategyBacktestResult;
 import org.investpro.strategy.StrategyAssignment;
-import org.investpro.repository.StrategyAssignmentRepository;
+import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.enums.timeframe.Timeframe;

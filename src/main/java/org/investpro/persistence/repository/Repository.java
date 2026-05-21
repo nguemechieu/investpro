@@ -1,4 +1,4 @@
-package org.investpro.repository;
+package org.investpro.persistence.repository;
 
 import java.sql.SQLException;
 import java.util.List;

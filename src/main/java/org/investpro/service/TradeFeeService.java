@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.ExchangeFeeSchedule;
 import org.investpro.models.trading.TradeFee;
 import org.investpro.models.trading.TradePair;
-import org.investpro.persistence.repository.TradeFeeRepository;
+import org.investpro.persistence.TradeFeeRepository;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

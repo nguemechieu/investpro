@@ -72,6 +72,10 @@ public class TelegramNotifier {
     private volatile boolean chatgptEnabled = false;
     private BiConsumer<String, String> orderCommentHandler;
     private TelegramCommandHandler commandHandler;
+    /**
+     * -- GETTER --
+     *  Check if polling is currently enabled
+     */
     private volatile boolean pollingEnabled = false;
     private volatile Thread pollingThread;
 
@@ -295,9 +299,9 @@ public class TelegramNotifier {
      * Send typing/action indicator to show the user that the bot is processing their request.
      * Useful for long-running operations to give visual feedback.
      */
-    public boolean sendChatAction(String targetChatId, ENUM_CHAT_ACTION action) {
+    public void sendChatAction(String targetChatId, ENUM_CHAT_ACTION action) {
         if (targetChatId == null || targetChatId.isBlank() || action == null) {
-            return false;
+            return;
         }
 
         try {
@@ -305,10 +309,9 @@ public class TelegramNotifier {
             String body = "chat_id=%s&action=%s".formatted(
                     encode(targetChatId),
                     encode(actionValue));
-            return postForm("sendChatAction", body);
+            postForm("sendChatAction", body);
         } catch (Exception e) {
             log.debug("Error sending chat action: {}", e.getMessage());
-            return false;
         }
     }
 
@@ -1122,13 +1125,6 @@ public class TelegramNotifier {
                 Thread.currentThread().interrupt();
             }
         }
-    }
-
-    /**
-     * Check if polling is currently enabled
-     */
-    public boolean isPollingEnabled() {
-        return pollingEnabled;
     }
 
     private static String rootMessage(Throwable throwable) {

@@ -59,10 +59,10 @@ import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import org.investpro.exchange.services.ExchangeService;
 import org.investpro.models.trading.*;
 import org.investpro.market.MarketDataEngine;
-import org.investpro.repository.CurrencyRepository;
-import org.investpro.repository.OrderRepository;
+import org.investpro.persistence.repository.CurrencyRepository;
+import org.investpro.persistence.repository.OrderRepository;
 
-import org.investpro.repository.TradeRepository;
+import org.investpro.persistence.repository.TradeRepository;
 import org.investpro.risk.PositionHealthScore;
 import org.investpro.service.CurrencyService;
 import org.investpro.service.NotificationService;
@@ -72,7 +72,7 @@ import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategySignal;
-import org.investpro.repository.StrategyAssignmentRepository;
+import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.ui.charts.CandleStickChart;
 import org.investpro.ui.charts.DepthChart;
 import org.investpro.ui.charts.NewsEventOverlay;
@@ -226,6 +226,8 @@ public class TradingDesk extends BorderPane {
     private final Label equityValueLabel = valueLabel("#3b82f6");
     private final Label marginUsedValueLabel = valueLabel("#ef4444");
     private final Label freeMarginValueLabel = valueLabel("#f59e0b");
+    private final ObservableList<AssetBalanceRow> accountBalanceRows = FXCollections.observableArrayList();
+    private final TableView<AssetBalanceRow> accountBalancesTable = new TableView<>(accountBalanceRows);
 
     private final Label connectionStatusLabel = new Label(t("status.disconnected"));
     private final Label symbolCountLabel = new Label(t("label.symbols", 0));
@@ -340,6 +342,9 @@ public class TradingDesk extends BorderPane {
     private final Map<String, Stage> openIndependentWindows = new java.util.HashMap<>();
 
     private record BrokerSession(Exchange exchange, boolean accessGranted, Account account) {
+    }
+
+    private record AssetBalanceRow(String asset, double balance, double equity, double margin, double freeMargin) {
     }
 
     public TradingDesk(
@@ -1876,18 +1881,19 @@ public class TradingDesk extends BorderPane {
         Label title = new Label("Balances");
         title.getStyleClass().add("panel-title");
 
-        GridPane grid = new GridPane();
-        grid.setHgap(16);
-        grid.setVgap(12);
-        grid.getStyleClass().add("account-metrics");
-        grid.addRow(0, metricLabel("Total Balance"), balanceValueLabel);
-        grid.addRow(1, metricLabel("Available Balance"), availableValueLabel);
-        grid.addRow(2, metricLabel("Equity"), equityValueLabel);
-        grid.addRow(3, metricLabel("Margin Used"), marginUsedValueLabel);
-        grid.addRow(4, metricLabel("Free Margin"), freeMarginValueLabel);
+        accountBalancesTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        accountBalancesTable.setPlaceholder(new Label("No balance data available"));
+        accountBalancesTable.getStyleClass().add("compact-table");
+        accountBalancesTable.getColumns().setAll(
+                tableColumn("Asset", AssetBalanceRow::asset, 90),
+                tableColumn("Balance", row -> number(row.balance()), 130),
+                tableColumn("Equity", row -> number(row.equity()), 130),
+                tableColumn("Margin", row -> number(row.margin()), 130),
+                tableColumn("Free Margin", row -> number(row.freeMargin()), 140));
 
         updateAccountBalance();
-        container.getChildren().setAll(title, grid);
+        VBox.setVgrow(accountBalancesTable, Priority.ALWAYS);
+        container.getChildren().setAll(title, accountBalancesTable);
         container.getStyleClass().add("pro-panel");
         return container;
     }
@@ -1915,7 +1921,19 @@ public class TradingDesk extends BorderPane {
             equityValueLabel.setText("$0.00");
             marginUsedValueLabel.setText("$0.00");
             freeMarginValueLabel.setText("$0.00");
+            accountBalanceRows.clear();
             return;
+        }
+
+        try {
+            currentExchange.fetchAccount()
+                    .thenAccept(account -> runOnFx(() -> accountBalanceRows.setAll(toAssetBalanceRows(account))))
+                    .exceptionally(exception -> {
+                        log.debug("Asset balances unavailable from account snapshot", exception);
+                        return null;
+                    });
+        } catch (Exception exception) {
+            log.debug("Asset balances unavailable from account snapshot", exception);
         }
 
         safeAccountDouble(() -> currentExchange.fetchTotalBalance("USD"))
@@ -1933,11 +1951,58 @@ public class TradingDesk extends BorderPane {
                     equityValueLabel.setText("$%s".formatted(money(values[2])));
                     marginUsedValueLabel.setText("$%s".formatted(money(values[3])));
                     freeMarginValueLabel.setText("$%s".formatted(money(values[4])));
+                    if (accountBalanceRows.isEmpty()) {
+                        accountBalanceRows.setAll(List.of(new AssetBalanceRow(
+                                "USD",
+                                values[0],
+                                values[2],
+                                values[3],
+                                values[4])));
+                    }
                 }))
                 .exceptionally(exception -> {
                     log.warn("Failed to update account balances", exception);
                     return null;
                 });
+    }
+
+    private @NotNull List<AssetBalanceRow> toAssetBalanceRows(Account account) {
+        if (account == null) {
+            return List.of();
+        }
+
+        Map<String, Double> balances = account.getBalances() == null ? Map.of() : account.getBalances();
+        Map<String, Double> availableBalances = account.getAvailableBalances() == null ? Map.of() : account.getAvailableBalances();
+        Map<String, Double> lockedBalances = account.getLockedBalances() == null ? Map.of() : account.getLockedBalances();
+
+        Set<String> assets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        assets.addAll(balances.keySet());
+        assets.addAll(availableBalances.keySet());
+        assets.addAll(lockedBalances.keySet());
+
+        if (assets.isEmpty()) {
+            return List.of();
+        }
+
+        List<AssetBalanceRow> rows = new ArrayList<>(assets.size());
+        for (String asset : assets) {
+            double balance = sanitizeAmount(balances.get(asset));
+            double margin = sanitizeAmount(lockedBalances.get(asset));
+            double free = sanitizeAmount(availableBalances.get(asset));
+
+            if (free <= 0.0 && balance > margin) {
+                free = balance - margin;
+            }
+
+            double equity = Math.max(0.0, balance + margin);
+            rows.add(new AssetBalanceRow(asset, balance, equity, margin, free));
+        }
+
+        return rows;
+    }
+
+    private double sanitizeAmount(Double value) {
+        return value != null && Double.isFinite(value) ? Math.max(0.0, value) : 0.0;
     }
 
     private CompletableFuture<Double> safeAccountDouble(
@@ -2881,27 +2946,38 @@ public class TradingDesk extends BorderPane {
         });
         lastCol.setPrefWidth(72);
 
-        TableColumn<TradePair, String> changeCol = new TableColumn<>("Change %");
-        changeCol.setCellValueFactory(cd -> {
+        TableColumn<TradePair, String> sessionCol = new TableColumn<>("Session");
+        sessionCol.setCellValueFactory(cd -> {
             TradePair p = cd.getValue();
-            return new SimpleStringProperty(p == null ? "" : formatSignedPercent(p.getChangePercent(), 2));
+            if (p == null) {
+                return new SimpleStringProperty("");
+            }
+            var status = p.getTradingSessionStatus();
+            return new SimpleStringProperty(status == null ? "-" : status.name());
         });
-        changeCol.setCellFactory(col -> new TableCell<>() {
+        sessionCol.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String s, boolean empty) {
                 super.updateItem(s, empty);
-                if (empty || s == null || s.isBlank()) {
+                if (empty || s == null || s.isBlank() || s.equals("-")) {
                     setText(null);
                     setStyle("");
                     return;
                 }
                 setText(s);
-                setAlignment(Pos.CENTER_RIGHT);
-                setStyle("-fx-font-family: monospace; -fx-text-fill: " + (s.startsWith("-") ? "#ef4444" : "#10b981") + ";");
+                setAlignment(Pos.CENTER);
+                String color = switch(s) {
+                    case "OPEN" -> "#10b981";
+                    case "CLOSED" -> "#ef4444";
+                    case "PREMARKET" -> "#f59e0b";
+                    case "AFTERHOURS" -> "#8b5cf6";
+                    default -> "#cbd5e1";
+                };
+                setStyle("-fx-font-family: monospace; -fx-text-fill: " + color + ";");
             }
         });
-        changeCol.setPrefWidth(74);
+        sessionCol.setPrefWidth(80);
 
-        table.getColumns().addAll(symbolCol, bidCol, askCol, spreadCol, lastCol, changeCol);
+        table.getColumns().addAll(symbolCol, bidCol, askCol, spreadCol, lastCol, sessionCol);
 
         // ── Row factory: alternating rows + context menu + double-click ───────
         table.setRowFactory(view -> {
@@ -3130,8 +3206,14 @@ public class TradingDesk extends BorderPane {
         table.setPlaceholder(new Label("No account history"));
         table.getColumns().setAll(
                 tableColumn("Date", order -> String.valueOf(order.getDate()), 150),
-                tableColumn("Type", Order::getType, 90),
-                tableColumn("Side", order -> String.valueOf(order.getSide()), 70),
+                tableColumn("Side", order -> {
+                    String type = safe(order.getType());
+                    String side = safe(String.valueOf(order.getSide()));
+                    if (type.isBlank()) {
+                        return side;
+                    }
+                    return side.isBlank() ? type : "%s (%s)".formatted(side, type);
+                }, 110),
                 tableColumn("Symbol", Order::getSymbol, 110),
                 tableColumn("Qty", order -> number(order.getQuantity()), 90),
                 tableColumn("Price", order -> price(order.getPrice()), 90),
@@ -9511,9 +9593,6 @@ public class TradingDesk extends BorderPane {
         }
     }
 
-    private record TradeStat(double profit, double notional, Instant timestamp) {
-    }
-
     private record StrategyStats(
             int totalTrades,
             int winningTrades,
@@ -9688,3 +9767,5 @@ public class TradingDesk extends BorderPane {
         stage.show();
     }
 }
+ 
+ 

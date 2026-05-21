@@ -1,4 +1,4 @@
-package org.investpro.repository;
+package org.investpro.persistence.repository;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyAssignment;

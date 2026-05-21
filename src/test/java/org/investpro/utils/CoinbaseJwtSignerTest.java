@@ -3,6 +3,7 @@ package org.investpro.utils;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
 import com.nimbusds.jwt.SignedJWT;
+import org.investpro.exchange.coinbase.CoinbaseJwtSigner;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -91,7 +92,7 @@ class CoinbaseJwtSignerTest {
                 .uri(URI.create("https://api.coinbase.com/api/v3/brokerage/accounts"))
                 .timeout(Duration.ofSeconds(30))
                 .header("Accept", "application/json")
-                .header("Authorization", signer.buildAuthorizationHeader("GET", "/api/v3/brokerage/accounts"))
+                .header("Authorization", signer.buildAuthorizationHeader("GET", "https://api.coinbase.com","/api/v3/brokerage/accounts"))
                 .GET()
                 .build();
 

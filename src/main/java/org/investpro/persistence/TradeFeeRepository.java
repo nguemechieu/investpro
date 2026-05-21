@@ -1,10 +1,10 @@
-package org.investpro.persistence.repository;
+package org.investpro.persistence;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.Db1;
 import org.investpro.models.trading.TradeFee;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.RepositoryFactory;
+import org.investpro.persistence.repository.RepositoryFactory;
 
 import java.sql.*;
 import java.time.Instant;

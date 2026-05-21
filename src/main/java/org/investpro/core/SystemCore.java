@@ -33,14 +33,12 @@ import org.investpro.monitoring.SystemHealthSnapshot;
 import org.investpro.monitoring.SystemMonitorService;
 import org.investpro.monitoring.SystemEventRecorder;
 import org.investpro.monitoring.SignalMonitorService;
-import org.investpro.repository.HistoricalDataRepository;
-import org.investpro.repository.HistoricalDataRepositoryImpl;
+import org.investpro.persistence.repository.HistoricalDataRepository;
+import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.risk.RiskManagementSystem;
-import org.investpro.repository.RepositoryFactory;
+import org.investpro.persistence.repository.RepositoryFactory;
 import org.investpro.service.TradingService;
 import org.investpro.event.EventBusManager;
-import org.investpro.event.EventPersistenceListener;
-import org.investpro.persistence.repository.EventLogRepositoryImpl;
 
 import org.investpro.research.LiveTradingMetricsTracker;
 import org.investpro.strategy.*;

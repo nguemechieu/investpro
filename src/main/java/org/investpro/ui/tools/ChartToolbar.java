@@ -154,6 +154,7 @@ public class ChartToolbar extends Region {
                 new ToolbarButton(Tool.CIRCLE),
                 new ToolbarButton(Tool.FIBONACCI),
                 new ToolbarButton(Tool.MEASURE),
+                new ToolbarButton(Tool.RISK_REWARD),
                 new ToolbarButton(Tool.ERASE_OBJECTS),
                 verticalSeparator(),
 
@@ -162,6 +163,7 @@ public class ChartToolbar extends Region {
                 new ToolbarButton(Tool.FIT_CHART),
                 verticalSeparator(),
 
+                new ToolbarButton(Tool.EVENTS),
                 new ToolbarButton(Tool.INDICATORS),
                 new ToolbarButton(Tool.SCREENSHOT),
                 new ToolbarButton(Tool.PRINT),
@@ -299,6 +301,16 @@ public class ChartToolbar extends Region {
                     candleStickChart.activateRectangleTool();
                 });
 
+                case TRIANGLE -> toolButton.setOnAction(event -> {
+                    activateDrawingTool(toolButton, Tool.TRIANGLE);
+                    candleStickChart.activateTriangleTool();
+                });
+
+                case CIRCLE -> toolButton.setOnAction(event -> {
+                    activateDrawingTool(toolButton, Tool.CIRCLE);
+                    candleStickChart.activateCircleTool();
+                });
+
                 case FIBONACCI -> toolButton.setOnAction(event -> {
                     activateDrawingTool(toolButton, Tool.FIBONACCI);
                     candleStickChart.activateFibonacciTool();
@@ -309,11 +321,23 @@ public class ChartToolbar extends Region {
                     candleStickChart.activateMeasureTool();
                 });
 
+                case RISK_REWARD -> toolButton.setOnAction(event -> {
+                    activateDrawingTool(toolButton, Tool.RISK_REWARD);
+                    candleStickChart.activateRiskRewardTool();
+                });
+
+                case ERASE_OBJECTS -> toolButton.setOnAction(event -> {
+                    activateDrawingTool(toolButton, Tool.ERASE_OBJECTS);
+                    candleStickChart.activateEraseObjectsTool();
+                });
+
                 case ZOOM_IN -> toolButton.setOnAction(event -> candleStickChart.zoomIn());
 
                 case ZOOM_OUT -> toolButton.setOnAction(event -> candleStickChart.zoomOut());
 
                 case FIT_CHART -> toolButton.setOnAction(event -> candleStickChart.fitChart());
+
+                case EVENTS -> toolButton.setOnAction(event -> candleStickChart.toggleChartEvents());
 
                 case INDICATORS -> toolButton.setOnAction(event -> candleStickChart.openIndicatorDialog());
 
@@ -373,12 +397,14 @@ public class ChartToolbar extends Region {
         CIRCLE("/img/circle.png", "○", "Circle"),
         FIBONACCI("/img/fibonacci.png", "Φ", "Fibonacci Retracement"),
         MEASURE("/img/ruler-solid.png", "↔", "Measure"),
+        RISK_REWARD("/img/sliders-solid.png", "RR", "Risk Reward"),
         ERASE_OBJECTS("/img/eraser-solid.png", "⌫", "Erase Chart Objects"),
 
         ZOOM_IN("/img/search-plus-solid.png", "+", "Zoom In"),
         ZOOM_OUT("/img/search-minus-solid.png", "−", "Zoom Out"),
         FIT_CHART("/img/expand-solid.png", "⛶", "Fit Chart"),
 
+        EVENTS("/img/calendar-days-solid.png", "Ev", "Toggle Events"),
         INDICATORS("/img/chart-line-solid.png", "ƒ", "Indicators"),
         SCREENSHOT("/img/screenshot.png", "▣", "Screenshot"),
         PRINT("/img/print-solid.png", "⎙", "Print Chart"),
@@ -404,7 +430,9 @@ public class ChartToolbar extends Region {
                     || this == TRIANGLE
                     || this == CIRCLE
                     || this == FIBONACCI
-                    || this == MEASURE;
+                    || this == MEASURE
+                    || this == RISK_REWARD
+                    || this == ERASE_OBJECTS;
         }
     }
 

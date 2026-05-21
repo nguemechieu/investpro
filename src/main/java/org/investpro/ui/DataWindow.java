@@ -114,6 +114,22 @@ public class DataWindow extends VBox {
             double low,
             double close,
             double volume) {
+        updateCandle(tradePair, timeframe, timestamp, open, high, low, close, volume, 0);
+    }
+
+    /**
+     * Update candle data with optional previous close for daily % change calculation.
+     */
+    public void updateCandle(
+            TradePair tradePair,
+            String timeframe,
+            Instant timestamp,
+            double open,
+            double high,
+            double low,
+            double close,
+            double volume,
+            double previousClose) {
         runOnFx(() -> {
             this.currentTradePair = tradePair;
             this.currentTimeframe = safe(timeframe);
@@ -123,10 +139,21 @@ public class DataWindow extends VBox {
 
             Map<String, Object> values = new LinkedHashMap<>();
             values.put("Time", timestamp == null ? "-" : TIME_FORMATTER.format(timestamp));
-            values.put("Open", formatPrice(open));
-            values.put("High", formatPrice(high));
-            values.put("Low", formatPrice(low));
-            values.put("Close", formatPrice(close));
+            
+            // Organized OHLC display
+            values.put("O", formatPrice(open));
+            values.put("H", formatPrice(high));
+            values.put("L", formatPrice(low));
+            values.put("C", formatPrice(close));
+            
+            // Daily % change
+            double dailyChange = 0;
+            if (previousClose > 0 && Double.isFinite(close)) {
+                dailyChange = ((close - previousClose) / previousClose) * 100;
+            }
+            String changeStr = Double.isFinite(dailyChange) ? String.format("%+.2f%%", dailyChange) : "-";
+            values.put("Δ%", changeStr);
+            
             values.put("Volume", formatVolume(volume));
 
             setRows(values);
@@ -182,10 +209,11 @@ public class DataWindow extends VBox {
             rows.clear();
 
             rows.add(new DataRow("Time", "-"));
-            rows.add(new DataRow("Open", "-"));
-            rows.add(new DataRow("High", "-"));
-            rows.add(new DataRow("Low", "-"));
-            rows.add(new DataRow("Close", "-"));
+            rows.add(new DataRow("O", "-"));
+            rows.add(new DataRow("H", "-"));
+            rows.add(new DataRow("L", "-"));
+            rows.add(new DataRow("C", "-"));
+            rows.add(new DataRow("Δ%", "-"));
             rows.add(new DataRow("Volume", "-"));
         });
     }

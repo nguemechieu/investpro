@@ -26,6 +26,7 @@ public class NewsBias {
     private int neutralCount ;
     private double averageImpact;
     private String latestTimestamp ;
+    @Builder.Default
     Map<String, Object> metadata = new LinkedHashMap<>();
 
     public Map<String, Object> toMap() {

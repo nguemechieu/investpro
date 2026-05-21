@@ -24,7 +24,7 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
-import org.investpro.utils.CoinbaseJwtSigner;
+import org.investpro.exchange.coinbase.CoinbaseJwtSigner;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.investpro.exchange.coinbase.CoinbaseCandleDataSupplier;
@@ -687,7 +687,18 @@ public class Coinbase extends Exchange {
 
     private String authorizationHeader(String method, String url) {
         if (jwtSigner != null) {
-            return jwtSigner.buildAuthorizationHeaderForUrl(method, url);
+            URI uri = URI.create(url);
+
+            String pathOnly = uri.getPath();
+
+            // IMPORTANT:
+            // Coinbase REST JWT should be signed with method + host + path.
+            // Do not include query params in the JWT URI.
+            return jwtSigner.buildAuthorizationHeader(
+                    method,
+                    uri.getHost(),
+                    pathOnly
+            );
         }
 
         String token = bearerToken();
@@ -1862,8 +1873,8 @@ public class Coinbase extends Exchange {
         Map<String, Double> totalBalances = new LinkedHashMap<>();
         Map<String, Double> availableBalances = new LinkedHashMap<>();
         Map<String, Double> lockedBalances = new LinkedHashMap<>();
+        String firstAccountId = "";
         String primaryAccountId = "";
-        String primaryCurrency = "USD";
 
         for (JsonNode accountNode : accounts) {
             String currency = firstText(accountNode, "currency", "currency_code");
@@ -1872,13 +1883,11 @@ public class Coinbase extends Exchange {
             }
 
             String accountId = firstText(accountNode, "uuid", "id");
-            if (primaryAccountId.isBlank()) {
-                primaryAccountId = accountId;
-                primaryCurrency = currency;
+            if (firstAccountId.isBlank()) {
+                firstAccountId = accountId;
             }
             if ("USD".equalsIgnoreCase(currency)) {
                 primaryAccountId = accountId;
-                primaryCurrency = currency;
             }
 
             double available = coinbaseMoneyValue(accountNode.path("available_balance"));
@@ -1894,8 +1903,16 @@ public class Coinbase extends Exchange {
             throw new IllegalStateException("Coinbase account response did not include usable balances.");
         }
 
+        String valuationCurrency = preferredValuationCurrency(totalBalances);
+        if (primaryAccountId.isBlank()) {
+            primaryAccountId = accountIdForCurrency(accounts, valuationCurrency);
+        }
+        if (primaryAccountId.isBlank()) {
+            primaryAccountId = firstAccountId;
+        }
+
         Account account = Account.coinbase(primaryAccountId.isBlank() ? "coinbase-live" : primaryAccountId,
-                primaryCurrency);
+                valuationCurrency);
         account.setUsername("Coinbase Live");
         account.setBrokerName("Coinbase Advanced Trade");
         account.setExchangeId("coinbase");
@@ -1906,26 +1923,82 @@ public class Coinbase extends Exchange {
         account.setAvailableBalances(availableBalances);
         account.setLockedBalances(lockedBalances);
 
-        double usdTotal = totalBalances.getOrDefault("USD", totalBalances.values().stream()
-                .mapToDouble(Double::doubleValue)
-                .sum());
-        double usdAvailable = availableBalances.getOrDefault("USD", availableBalances.values().stream()
-                .mapToDouble(Double::doubleValue)
-                .sum());
-        double usdLocked = lockedBalances.getOrDefault("USD", lockedBalances.values().stream()
-                .mapToDouble(Double::doubleValue)
-                .sum());
+        double cashTotal = balanceForCurrency(totalBalances, valuationCurrency);
+        double cashAvailable = balanceForCurrency(availableBalances, valuationCurrency);
+        double cashLocked = balanceForCurrency(lockedBalances, valuationCurrency);
 
-        account.setTotalBalance(usdTotal);
-        account.setAvailableBalance(usdAvailable);
-        account.setLockedBalance(usdLocked);
-        account.setCash(usdAvailable);
-        account.setBuyingPower(usdAvailable);
-        account.setPortfolioValue(usdTotal);
-        account.setEquity(usdTotal);
+        account.setTotalBalance(cashTotal);
+        account.setAvailableBalance(cashAvailable);
+        account.setLockedBalance(cashLocked);
+        account.setCash(cashAvailable);
+        account.setBuyingPower(cashAvailable);
+        account.setPortfolioValue(cashTotal);
+        account.setEquity(cashTotal);
+        account.setOpenOrderCount(fetchOpenOrderCountSafely());
         account.setUpdatedAt(Instant.now());
         account.getMetadata().put("accountCount", accounts.size());
+        account.getMetadata().put("valuationCurrency", valuationCurrency);
+        account.getMetadata().put("balanceValuation",
+                "Coinbase account totals are shown in the selected cash currency; asset balances remain itemized.");
         return account;
+    }
+
+    private String preferredValuationCurrency(Map<String, Double> balances) {
+        for (String currency : List.of("USD", "USDC", "USDT", "USDS", "DAI")) {
+            String key = findCurrencyKey(balances, currency);
+            if (!key.isBlank() && balances.getOrDefault(key, 0.0) > 0.0) {
+                return key;
+            }
+        }
+        for (String currency : List.of("USD", "USDC", "USDT", "USDS", "DAI")) {
+            String key = findCurrencyKey(balances, currency);
+            if (!key.isBlank()) {
+                return key;
+            }
+        }
+        return "USD";
+    }
+
+    private String findCurrencyKey(Map<String, Double> balances, String currency) {
+        if (balances == null || currency == null) {
+            return "";
+        }
+        for (String key : balances.keySet()) {
+            if (key.equalsIgnoreCase(currency)) {
+                return key;
+            }
+        }
+        return "";
+    }
+
+    private double balanceForCurrency(Map<String, Double> balances, String currency) {
+        String key = findCurrencyKey(balances, currency);
+        return key.isBlank() ? 0.0 : balances.getOrDefault(key, 0.0);
+    }
+
+    private String accountIdForCurrency(JsonNode accounts, String desiredCurrency) {
+        if (accounts == null || desiredCurrency == null || desiredCurrency.isBlank()) {
+            return "";
+        }
+        for (JsonNode accountNode : accounts) {
+            String currency = firstText(accountNode, "currency", "currency_code");
+            if (currency.equalsIgnoreCase(desiredCurrency)) {
+                return firstText(accountNode, "uuid", "id");
+            }
+        }
+        return "";
+    }
+
+    private int fetchOpenOrderCountSafely() {
+        if (isPaperTrading() || !hasPrivateEndpointAuth()) {
+            return 0;
+        }
+        try {
+            return fetchAllOpenOrders().join().size();
+        } catch (Exception exception) {
+            log.debug("Unable to include Coinbase open order count in account summary", exception);
+            return 0;
+        }
     }
 
     private double coinbaseMoneyValue(JsonNode moneyNode) {
@@ -1948,7 +2021,49 @@ public class Coinbase extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchTotalBalance(String currencyCode) {
-        return fetchAccountsBalance(currencyCode, "hold");
+        if (!hasPrivateEndpointAuth()) {
+            return CompletableFuture.completedFuture(0.0);
+        }
+
+        return listAccountsRaw()
+                .thenApply(Coinbase::readJson)
+                .thenApply(root -> {
+                    JsonNode accounts = root.path("accounts");
+
+                    if (!accounts.isArray()) {
+                        return 0.0;
+                    }
+
+                    if (currencyCode == null || currencyCode.isBlank()) {
+                        Map<String, Double> balances = new LinkedHashMap<>();
+                        for (JsonNode account : accounts) {
+                            String currency = firstText(account, "currency", "currency_code");
+                            if (!currency.isBlank()) {
+                                balances.put(currency,
+                                        coinbaseMoneyValue(account.path("available_balance"))
+                                                + coinbaseMoneyValue(account.path("hold")));
+                            }
+                        }
+                        return balanceForCurrency(balances, preferredValuationCurrency(balances));
+                    }
+
+                    double total = 0.0;
+
+                    for (JsonNode account : accounts) {
+                        String currency = firstText(account, "currency", "currency_code");
+
+                        if (currencyCode != null
+                                && !currencyCode.isBlank()
+                                && !currency.equalsIgnoreCase(currencyCode)) {
+                            continue;
+                        }
+
+                        total += coinbaseMoneyValue(account.path("available_balance"));
+                        total += coinbaseMoneyValue(account.path("hold"));
+                    }
+
+                    return total;
+                });
     }
 
     @Override
@@ -2363,25 +2478,13 @@ public class Coinbase extends Exchange {
 
     @Override
     public CompletableFuture<List<OpenOrder>> fetchOpenOrders(TradePair tradePair) {
-        if (tradePair == null) {
-            return failedFuture(new IllegalArgumentException("tradePair must not be null"));
-        }
-
         if (isPaperTrading()) {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         requirePrivateEndpointAuth("Coinbase open orders");
 
-        String url = "%s/orders/historical/batch?product_id=%s&order_status=OPEN"
-                .formatted(REST_BASE_URL, encode(productId(tradePair)));
-
-        HttpRequest request = authenticatedRequest("GET", url)
-                .GET()
-                .build();
-
-        return sendAsync(request)
-                .thenApply(this::parseOpenOrders)
+        return fetchOpenOrdersPage(openOrdersUrl(tradePair), new ArrayList<>())
                 .exceptionally(this::emptyOpenOrdersOnAuthFailure);
     }
 
@@ -2393,41 +2496,49 @@ public class Coinbase extends Exchange {
 
         requirePrivateEndpointAuth("Coinbase all open orders");
 
-        String url = "%s/orders/historical/batch".formatted(REST_BASE_URL);
-        OpenOrder openOrder2 = new OpenOrder();
+        return fetchOpenOrdersPage(openOrdersUrl(null), new ArrayList<>())
+                .exceptionally(this::emptyOpenOrdersOnAuthFailure);
+    }
+
+    private String openOrdersUrl(TradePair tradePair) {
+        List<String> query = new ArrayList<>();
+        query.add("order_status=OPEN");
+        query.add("limit=100");
+
+        if (tradePair != null) {
+            query.add("product_ids=%s".formatted(encode(productId(tradePair))));
+        }
+
+        return "%s/orders/historical/batch?%s".formatted(REST_BASE_URL, String.join("&", query));
+    }
+
+    private CompletableFuture<List<OpenOrder>> fetchOpenOrdersPage(String url, List<OpenOrder> openOrders) {
         HttpRequest request = authenticatedRequest("GET", url)
                 .GET()
                 .build();
-        CompletableFuture<List<Order>> orders0 = fetchAllOrders();
-        CompletableFuture<List<OpenOrder>> openOrders0 =CompletableFuture.completedFuture(new ArrayList<>());
-        try {
-            for (Order openOrder:orders0.get()){
 
-                if (openOrder.getStatus().toUpperCase().equals("OPEN")){
+        return sendAsync(request).thenCompose(body -> {
+            JsonNode root = readJson(body);
+            JsonNode ordersNode = root.has("orders") ? root.get("orders") : root;
+            openOrders.addAll(parseOpenOrders(ordersNode));
 
-
-
-                    openOrder2.setOrderType(OpenOrder.OrderType.valueOf(openOrder.getOrderType()));
-                    openOrder2.setFilledSize(openOrder.getFilledQuantity());
-                    openOrder2.setPrice(openOrder.getPrice());
-                    openOrder2.setOrderId(String.valueOf(openOrder.getId()));
-                    openOrder2.setSize(openOrder.getQuantity());
-                    openOrders0.get().add(openOrder2);
-                    openOrder2.setCreatedAt(openOrder.getCreatedAt());
-                    openOrder2.setUpdatedAt(openOrder.getUpdatedAt());
-                    openOrder2.setSide(openOrder.getSide());
-                    openOrder2.setTradePair(openOrder.getTradePair());
-                    openOrder2.setTimestamp(openOrder.getTimeInForce());
-                    openOrders0.get().add(openOrder2);
-                }
-
+            String cursor = firstText(root, "cursor", "next_cursor");
+            boolean hasNext = root.path("has_next").asBoolean(false) && !cursor.isBlank();
+            if (!hasNext) {
+                return CompletableFuture.completedFuture(openOrders);
             }
 
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+            return fetchOpenOrdersPage("%s&cursor=%s".formatted(openOrdersUrlWithoutCursor(url), encode(cursor)),
+                    openOrders);
+        });
+    }
 
-        return openOrders0;
+    private String openOrdersUrlWithoutCursor(String url) {
+        int cursorStart = url.indexOf("&cursor=");
+        if (cursorStart < 0) {
+            return url;
+        }
+        return url.substring(0, cursorStart);
     }
 
     @Override

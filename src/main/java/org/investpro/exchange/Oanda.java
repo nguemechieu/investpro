@@ -717,6 +717,16 @@ public class Oanda extends Exchange {
             return failedFuture(new IllegalArgumentException("tradePair must not be null"));
         }
 
+        // Reject malformed symbols (XXX, ¤¤¤) before making HTTP requests
+        String baseCode = tradePair.getBaseCode();
+        String counterCode = tradePair.getCounterCode();
+        
+        if (baseCode.equals("XXX") || baseCode.equals("¤¤¤") || 
+            counterCode.equals("XXX") || counterCode.equals("¤¤¤")) {
+            log.debug("Skipping OANDA order book fetch for malformed symbol: {}", tradePair);
+            return CompletableFuture.completedFuture(new OrderBook(tradePair));
+        }
+
         // Attempt 1: Try orderBook endpoint
         String orderBookUrl = "%s/v3/instruments/%s/orderBook".formatted(oandaApiUrl(), tradePair.toString('_'));
         HttpRequest orderBookRequest = requestBuilder(orderBookUrl).GET().build();

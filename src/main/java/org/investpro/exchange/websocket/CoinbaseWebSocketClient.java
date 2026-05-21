@@ -13,14 +13,16 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.models.currency.Currency;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
 import org.java_websocket.drafts.Draft;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -73,11 +75,11 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     private final Set<TradePair> pendingSubscriptions =
             Collections.synchronizedSet(new HashSet<>());
 
-    private volatile @Nullable TradePair defaultTradePair;
+    private volatile TradePair defaultTradePair;
     private volatile String lastErrorMessage = "";
     private volatile long lastErrorLoggedAtMs = 0L;
 
-    public CoinbaseWebSocketClient(@NotNull URI uri, @NotNull Draft draft, @Nullable String jwt) {
+    public CoinbaseWebSocketClient(@NotNull URI uri, @NotNull Draft draft, String jwt) {
         super(uri, draft);
         this.jwt = jwt == null ? "" : jwt.trim();
     }
@@ -139,6 +141,12 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         String type = messageJson.path("type").asText("");
         String channel = messageJson.path("channel").asText("");
+
+        // Skip logging malformed messages with empty type/channel
+        if (type.isBlank() && channel.isBlank()) {
+            log.trace("Ignoring Coinbase WS message with empty type and channel");
+            return;
+        }
 
         log.debug("Coinbase WS message type={} channel={}", type, channel);
 
@@ -459,17 +467,17 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         }
     }
 
-    protected void sendSubscribe(@Nullable TradePair tradePair, @NotNull String channel) {
+    protected void sendSubscribe( TradePair tradePair, @NotNull String channel) {
         sendSubscriptionMessage("subscribe", tradePair, channel);
     }
 
-    protected void sendUnsubscribe(@Nullable TradePair tradePair, @NotNull String channel) {
+    protected void sendUnsubscribe( TradePair tradePair, @NotNull String channel) {
         sendSubscriptionMessage("unsubscribe", tradePair, channel);
     }
 
     private void sendSubscriptionMessage(
             @NotNull String type,
-            @Nullable TradePair tradePair,
+             TradePair tradePair,
             @NotNull String channel
     ) {
         ObjectNode message = OBJECT_MAPPER.createObjectNode()
@@ -491,7 +499,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         send(payload);
     }
 
-    private @Nullable CoinbaseStream parseCoinbaseStream(String streamName) {
+    private CoinbaseStream parseCoinbaseStream(String streamName) {
         try {
             if (streamName == null || streamName.isBlank()) {
                 return null;
@@ -592,10 +600,10 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         lastErrorMessage = errorMessage;
         lastErrorLoggedAtMs = now;
-        log.error("Coinbase WebSocket error: {}", errorMessage);
+        throw  new RuntimeException("Coinbase WebSocket error: "+ errorMessage);
     }
 
-    static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {
+    public static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {
         JsonNode events = messageJson.path("events");
 
         if (!events.isArray()) {
@@ -643,7 +651,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         return summary.toString();
     }
 
-    private @Nullable TradePair findTradePair(String productId) {
+    private  TradePair findTradePair(String productId) {
         if (productId == null || productId.isBlank()) {
             TradePair fallbackPair = defaultTradePair;
 
@@ -673,7 +681,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         return null;
     }
 
-    public @Nullable TradePair getTradePair() {
+    public  TradePair getTradePair() {
         return defaultTradePair;
     }
 
@@ -753,7 +761,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         return tradePair.toString('-').trim().toUpperCase(Locale.ROOT);
     }
 
-    private @Nullable TradePair findAnyRegisteredPair() {
+    private  TradePair findAnyRegisteredPair() {
         synchronized (liveTradeConsumers) {
             for (TradePair pair : liveTradeConsumers.keySet()) {
                 if (pair != null) {
@@ -762,7 +770,11 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             }
         }
 
-        return null;
+        try {
+            return new TradePair(Currency.NULL_FIAT_CURRENCY,Currency.NULL_FIAT_CURRENCY);
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private record CoinbaseStream(String channel, TradePair tradePair) {

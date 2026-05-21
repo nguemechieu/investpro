@@ -8,7 +8,7 @@ import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategySelectionService;
 import org.investpro.models.trading.TradePair;
 import org.investpro.enums.timeframe.Timeframe;
-import org.investpro.repository.StrategyAssignmentRepository;
+import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

@@ -17,7 +17,6 @@ import javafx.event.EventHandler;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.geometry.VPos;
-import javafx.geometry.Insets;
 import javafx.print.PrinterJob;
 import javafx.scene.Cursor;
 import javafx.scene.SnapshotParameters;
@@ -25,7 +24,6 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
@@ -36,7 +34,6 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Line;
@@ -97,6 +94,7 @@ import static org.investpro.ui.charts.ChartColors.PLACE_HOLDER_FILL_COLOR;
 @Getter
 @Setter
 @Slf4j
+@SuppressWarnings({"unused", "SameParameterValue"})
 public class CandleStickChart extends Region {
     private static final DateTimeFormatter SCREENSHOT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final DateTimeFormatter CROSSHAIR_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -183,6 +181,9 @@ public class CandleStickChart extends Region {
     private ChartInteractionTool activeInteractionTool = ChartInteractionTool.CURSOR;
     private ChartDrawing drawingPreview;
     private ChartPoint drawingAnchor;
+    private int selectedDrawingIndex = -1;
+    private ChartPoint movingAnchor;
+    private ChartDrawing movingDrawingOriginal;
     private final List<ChartIndicator> indicators = new ArrayList<>();
     private final List<ChartEvent> chartEvents = Collections.synchronizedList(new ArrayList<>());
     private boolean showChartEvents = true; // Toggle for displaying events
@@ -204,7 +205,6 @@ public class CandleStickChart extends Region {
     private Canvas canvas;
     private GraphicsContext graphicsContext;
     private StackPane chartStackPane;
-    private Button newsEventsButton;
 
     private volatile boolean disposed;
     private volatile boolean paging;
@@ -431,68 +431,6 @@ public class CandleStickChart extends Region {
         extraAxisExtension.setMouseTransparent(true);
     }
 
-    private void setupNewsEventsButton() {
-        newsEventsButton = new Button("Events");
-        updateNewsEventsButtonStyle();
-        newsEventsButton.setOnMouseEntered(e -> newsEventsButton.setStyle("""
-                -fx-font-size: 11px;
-                -fx-font-weight: bold;
-                -fx-padding: 7 14;
-                -fx-background-color: #38bdf8;
-                -fx-text-fill: #020617;
-                -fx-border-color: #7dd3fc;
-                -fx-border-radius: 999;
-                -fx-background-radius: 999;
-                -fx-cursor: hand;
-                """));
-        newsEventsButton.setOnMouseExited(e -> updateNewsEventsButtonStyle());
-        newsEventsButton.setOnAction(event -> {
-            toggleChartEvents();
-            updateNewsEventsButtonStyle();
-        });
-        HBox buttonContainer = new HBox(newsEventsButton);
-        buttonContainer.setAlignment(Pos.TOP_RIGHT);
-        buttonContainer.setPadding(new Insets(10, 14, 0, 0));
-        buttonContainer.setMouseTransparent(false);
-        chartStackPane.getChildren().add(buttonContainer);
-    }
-
-    /**
-     * Update news events button style based on visibility state
-     */
-    private void updateNewsEventsButtonStyle() {
-        if (newsEventsButton == null) {
-            return;
-        }
-        if (showChartEvents) {
-            newsEventsButton.setText("Events ON");
-            newsEventsButton.setStyle("""
-                    -fx-font-size: 11px;
-                    -fx-font-weight: bold;
-                    -fx-padding: 7 14;
-                    -fx-background-color: #16a34a;
-                    -fx-text-fill: white;
-                    -fx-border-color: #86efac;
-                    -fx-border-radius: 999;
-                    -fx-background-radius: 999;
-                    -fx-cursor: hand;
-                    """);
-        } else {
-            newsEventsButton.setText("Events OFF");
-            newsEventsButton.setStyle("""
-                    -fx-font-size: 11px;
-                    -fx-font-weight: bold;
-                    -fx-padding: 7 14;
-                    -fx-background-color: #1e293b;
-                    -fx-text-fill: #cbd5e1;
-                    -fx-border-color: #475569;
-                    -fx-border-radius: 999;
-                    -fx-background-radius: 999;
-                    -fx-cursor: hand;
-                    """);
-        }
-    }
-
     private void initializeFirstLayout(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight) {
         BooleanProperty gotFirstSize = new SimpleBooleanProperty(false);
         ChangeListener<Number> sizeListener = new SizeChangeListener(gotFirstSize, containerWidth, containerHeight);
@@ -516,12 +454,11 @@ public class CandleStickChart extends Region {
             // Create overlay canvas for trade visualization
             tradeOverlayCanvas = new Canvas(Math.max(1, chartWidth - LEFT_AXIS_WIDTH - RIGHT_AXIS_WIDTH),
                     Math.max(1, chartHeight - TIME_AXIS_HEIGHT));
+            tradeOverlayCanvas.setMouseTransparent(true);
 
             chartStackPane = new StackPane(canvas, tradeOverlayCanvas, loadingIndicatorContainer);
             chartStackPane.setManaged(false);
             getChildren().addFirst(chartStackPane);
-
-            setupNewsEventsButton();
 
             canvas.setFocusTraversable(true);
             canvas.setOnMouseEntered(event -> {
@@ -577,6 +514,10 @@ public class CandleStickChart extends Region {
                 return;
             }
             if (event.getButton() == MouseButton.PRIMARY) {
+                if (selectDrawingAt(event.getX(), event.getY())) {
+                    event.consume();
+                    return;
+                }
                 // Handle left-click for candle selection
                 CandleData selectedCandle = getCandleAtPosition(event.getX());
                 if (selectedCandle != null && candleSelectionCallback != null) {
@@ -591,7 +532,15 @@ public class CandleStickChart extends Region {
 
         if (eventFiltersInstalled.compareAndSet(false, true)) {
             chartStackPane.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+                if (event.getButton() == MouseButton.PRIMARY && eraseDrawing(event)) {
+                    event.consume();
+                    return;
+                }
                 if (event.getButton() == MouseButton.PRIMARY && beginDrawing(event)) {
+                    event.consume();
+                    return;
+                }
+                if (event.getButton() == MouseButton.PRIMARY && beginMoveDrawing(event)) {
                     event.consume();
                     return;
                 }
@@ -603,6 +552,8 @@ public class CandleStickChart extends Region {
             chartStackPane.addEventFilter(MouseEvent.MOUSE_RELEASED,
                     event -> {
                         if (event.getButton() == MouseButton.PRIMARY && finishDrawing(event)) {
+                            event.consume();
+                        } else if (event.getButton() == MouseButton.PRIMARY && finishMoveDrawing()) {
                             event.consume();
                         }
                         mousePrevX = -1;
@@ -961,6 +912,10 @@ public class CandleStickChart extends Region {
         double canvasH = Math.max(1.0, totalH - TIME_AXIS_HEIGHT);
         canvas.setWidth(canvasW);
         canvas.setHeight(canvasH);
+        if (tradeOverlayCanvas != null) {
+            tradeOverlayCanvas.setWidth(canvasW);
+            tradeOverlayCanvas.setHeight(canvasH);
+        }
         chartStackPane.resizeRelocate(canvasX, 0, canvasW, canvasH);
         chartStackPane.setMinSize(canvasW, canvasH);
         chartStackPane.setPrefSize(canvasW, canvasH);
@@ -1417,7 +1372,8 @@ public class CandleStickChart extends Region {
             drawings.add(drawingPreview);
         }
 
-        for (ChartDrawing drawing : drawings) {
+        for (int index = 0; index < drawings.size(); index++) {
+            ChartDrawing drawing = drawings.get(index);
             if (drawing == null || !drawing.isDrawable()) {
                 continue;
             }
@@ -1441,14 +1397,48 @@ public class CandleStickChart extends Region {
                 case HORIZONTAL_LINE -> graphicsContext.strokeLine(0, snapPixel(y1), canvas.getWidth(), snapPixel(y1));
                 case VERTICAL_LINE -> graphicsContext.strokeLine(snapPixel(x1), HEADER_HEIGHT, snapPixel(x1), canvas.getHeight());
                 case RECTANGLE -> drawDrawingRectangle(x1, y1, x2, y2, drawing.color());
-                case FIBONACCI -> drawFibonacciRetracement(x1, y1, x2, y2, drawing);
+                case TRIANGLE -> drawDrawingTriangle(x1, y1, x2, y2, drawing.color());
+                case CIRCLE -> drawDrawingCircle(x1, y1, x2, y2, drawing.color());
+                case FIBONACCI -> drawFibonacciRetracement(x1, x2, drawing);
                 case MEASURE -> drawMeasurement(x1, y1, x2, y2, drawing);
+                case RISK_REWARD -> drawRiskReward(x1, y1, x2, y2, drawing);
                 default -> {
                 }
             }
 
+            if (!drawing.preview() && index == selectedDrawingIndex) {
+                drawDrawingSelectionHandles(x1, y1, x2, y2, drawing);
+            }
+
             graphicsContext.setLineDashes();
         }
+    }
+
+    private void drawDrawingSelectionHandles(double x1, double y1, double x2, double y2, ChartDrawing drawing) {
+        graphicsContext.setGlobalAlpha(1.0);
+        graphicsContext.setStroke(Color.web("#f8fafc"));
+        graphicsContext.setFill(Color.web("#0f172a"));
+        graphicsContext.setLineWidth(1.2);
+
+        double size = 8.0;
+        drawHandle(x1, y1, size);
+        drawHandle(x2, y2, size);
+
+        if (drawing.type() == ChartInteractionTool.RECTANGLE
+                || drawing.type() == ChartInteractionTool.TRIANGLE
+                || drawing.type() == ChartInteractionTool.CIRCLE
+                || drawing.type() == ChartInteractionTool.RISK_REWARD
+                || drawing.type() == ChartInteractionTool.MEASURE
+                || drawing.type() == ChartInteractionTool.TRENDLINE) {
+            drawHandle(x1, y2, size);
+            drawHandle(x2, y1, size);
+        }
+    }
+
+    private void drawHandle(double x, double y, double size) {
+        double half = size / 2.0;
+        graphicsContext.fillRoundRect(snapPixel(x - half), snapPixel(y - half), size, size, 3, 3);
+        graphicsContext.strokeRoundRect(snapPixel(x - half), snapPixel(y - half), size, size, 3, 3);
     }
 
     private void drawDrawingRectangle(double x1, double y1, double x2, double y2, Color color) {
@@ -1464,7 +1454,37 @@ public class CandleStickChart extends Region {
         graphicsContext.strokeRect(snapPixel(x), snapPixel(y), width, height);
     }
 
-    private void drawFibonacciRetracement(double x1, double y1, double x2, double y2, ChartDrawing drawing) {
+    private void drawDrawingTriangle(double x1, double y1, double x2, double y2, Color color) {
+        double left = Math.min(x1, x2);
+        double right = Math.max(x1, x2);
+        double top = Math.min(y1, y2);
+        double bottom = Math.max(y1, y2);
+        double apexX = left + ((right - left) / 2.0);
+
+        double[] xPoints = {apexX, right, left};
+        double[] yPoints = {top, bottom, bottom};
+        graphicsContext.setGlobalAlpha(0.12);
+        graphicsContext.setFill(color);
+        graphicsContext.fillPolygon(xPoints, yPoints, 3);
+        graphicsContext.setGlobalAlpha(1.0);
+        graphicsContext.setStroke(color);
+        graphicsContext.strokePolygon(xPoints, yPoints, 3);
+    }
+
+    private void drawDrawingCircle(double x1, double y1, double x2, double y2, Color color) {
+        double x = Math.min(x1, x2);
+        double y = Math.min(y1, y2);
+        double width = Math.abs(x2 - x1);
+        double height = Math.abs(y2 - y1);
+        graphicsContext.setGlobalAlpha(0.12);
+        graphicsContext.setFill(color);
+        graphicsContext.fillOval(x, y, width, height);
+        graphicsContext.setGlobalAlpha(1.0);
+        graphicsContext.setStroke(color);
+        graphicsContext.strokeOval(snapPixel(x), snapPixel(y), width, height);
+    }
+
+    private void drawFibonacciRetracement(double x1, double x2, ChartDrawing drawing) {
         double left = Math.min(x1, x2);
         double right = Math.max(x1, x2);
         double topPrice = Math.max(drawing.startPrice(), drawing.endPrice());
@@ -1498,6 +1518,52 @@ public class CandleStickChart extends Region {
                 formatDuration(secondsDelta));
         drawLabelBadge(label, Math.min(x1, x2) + Math.abs(x2 - x1) / 2.0, Math.min(y1, y2) - 18,
                 Math.max(130, label.length() * 7.2), 22, drawing.color());
+    }
+
+    private void drawRiskReward(double x1, double y1, double x2, double y2, ChartDrawing drawing) {
+        double left = Math.min(x1, x2);
+        double right = Math.max(x1, x2);
+        double width = Math.max(24.0, right - left);
+        double rewardTop = Math.min(y1, y2);
+        double rewardBottom = Math.max(y1, y2);
+        double riskHeight = Math.max(1.0, Math.abs(y2 - y1));
+        double riskTop;
+        double riskBottom;
+
+        if (drawing.endPrice() >= drawing.startPrice()) {
+            riskTop = y1;
+            riskBottom = y1 + riskHeight;
+        } else {
+            riskTop = y1 - riskHeight;
+            riskBottom = y1;
+        }
+
+        riskTop = clamp(riskTop, HEADER_HEIGHT, canvas.getHeight());
+        riskBottom = clamp(riskBottom, HEADER_HEIGHT, canvas.getHeight());
+        double riskY = Math.min(riskTop, riskBottom);
+        double riskH = Math.max(1.0, Math.abs(riskBottom - riskTop));
+        double rewardY = Math.min(rewardTop, rewardBottom);
+        double rewardH = Math.max(1.0, Math.abs(rewardBottom - rewardTop));
+
+        graphicsContext.setGlobalAlpha(0.18);
+        graphicsContext.setFill(Color.web("#22c55e"));
+        graphicsContext.fillRect(left, rewardY, width, rewardH);
+        graphicsContext.setFill(Color.web("#ef4444"));
+        graphicsContext.fillRect(left, riskY, width, riskH);
+        graphicsContext.setGlobalAlpha(1.0);
+
+        graphicsContext.setLineDashes();
+        graphicsContext.setStroke(Color.web("#e2e8f0"));
+        graphicsContext.setLineWidth(1.2);
+        graphicsContext.strokeRect(snapPixel(left), snapPixel(rewardY), width, rewardH);
+        graphicsContext.strokeRect(snapPixel(left), snapPixel(riskY), width, riskH);
+        graphicsContext.setStroke(Color.web("#f8fafc"));
+        graphicsContext.strokeLine(left, snapPixel(y1), left + width, snapPixel(y1));
+
+        double reward = Math.abs(drawing.endPrice() - drawing.startPrice());
+        String label = "R:R 1.00 | " + formatPrice(reward);
+        drawLabelBadge(label, left + width / 2.0, Math.min(rewardY, riskY) - 14,
+                Math.max(112, label.length() * 7.2), 22, Color.web("#e2e8f0"));
     }
 
     private void drawLabelBadge(String text, double centerX, double centerY, double width, double height, Color accent) {
@@ -2062,7 +2128,8 @@ public class CandleStickChart extends Region {
         String label = currentMarketRegime == null || currentMarketRegime.isBlank()
                 ? "REGIME N/A"
                 : currentMarketRegime;
-        double x = Math.max(340, canvas.getWidth() - 365);
+        // Position regime label at top-left corner for better organization
+        double x = 20;
         double y = 42;
         drawSmallPill(label, x, y, regimeColor, Color.rgb(15, 23, 42, 0.95));
     }
@@ -2231,11 +2298,11 @@ public class CandleStickChart extends Region {
         return "%dm".formatted(minutes);
     }
 
-        public void addPriceLine(PriceLine priceLine) {
-        if (priceLine == null || !priceLine.isValid())
-            return;
-        priceLines.add(priceLine.copy());
-        requestChartRedraw();
+    private void addPriceLine(PriceLine priceLine) {
+        if (priceLine != null && priceLine.isValid()) {
+            priceLines.add(priceLine.copy());
+            requestChartRedraw();
+        }
     }
 
     public void addSupportPriceLine(double price) {
@@ -2314,6 +2381,14 @@ public class CandleStickChart extends Region {
         setActiveInteractionTool(ChartInteractionTool.RECTANGLE);
     }
 
+    public void activateTriangleTool() {
+        setActiveInteractionTool(ChartInteractionTool.TRIANGLE);
+    }
+
+    public void activateCircleTool() {
+        setActiveInteractionTool(ChartInteractionTool.CIRCLE);
+    }
+
     public void activateFibonacciTool() {
         setActiveInteractionTool(ChartInteractionTool.FIBONACCI);
     }
@@ -2322,10 +2397,21 @@ public class CandleStickChart extends Region {
         setActiveInteractionTool(ChartInteractionTool.MEASURE);
     }
 
+    public void activateRiskRewardTool() {
+        setActiveInteractionTool(ChartInteractionTool.RISK_REWARD);
+    }
+
+    public void activateEraseObjectsTool() {
+        setActiveInteractionTool(ChartInteractionTool.ERASE_OBJECTS);
+    }
+
     public void clearChartDrawings() {
         chartDrawings.clear();
         drawingPreview = null;
         drawingAnchor = null;
+        movingAnchor = null;
+        movingDrawingOriginal = null;
+        selectedDrawingIndex = -1;
         requestChartRedraw();
     }
 
@@ -2333,6 +2419,8 @@ public class CandleStickChart extends Region {
         activeInteractionTool = tool == null ? ChartInteractionTool.CURSOR : tool;
         drawingPreview = null;
         drawingAnchor = null;
+        movingAnchor = null;
+        movingDrawingOriginal = null;
         showTransientNotice(activeInteractionTool.notice());
         requestChartRedraw();
     }
@@ -2341,15 +2429,61 @@ public class CandleStickChart extends Region {
         return activeInteractionTool != null && activeInteractionTool.isDrawingTool();
     }
 
+    private boolean isMoveMode() {
+        return activeInteractionTool == ChartInteractionTool.CURSOR;
+    }
+
+    private boolean isEraseMode() {
+        return activeInteractionTool == ChartInteractionTool.ERASE_OBJECTS;
+    }
+
     private boolean beginDrawing(MouseEvent event) {
         if (!isDrawingToolActive() || canvas == null || data.isEmpty()) {
             return false;
         }
 
+        selectedDrawingIndex = -1;
+
         chartStackPane.requestFocus();
         canvas.requestFocus();
         drawingAnchor = chartPointFromMouse(event);
         drawingPreview = ChartDrawing.from(activeInteractionTool, drawingAnchor, drawingAnchor, true);
+        requestChartRedraw();
+        return true;
+    }
+
+    private boolean beginMoveDrawing(MouseEvent event) {
+        if (!isMoveMode() || canvas == null || data.isEmpty()) {
+            return false;
+        }
+
+        int hitIndex = findDrawingIndexAt(event.getX(), event.getY());
+        if (hitIndex < 0) {
+            return false;
+        }
+
+        selectedDrawingIndex = hitIndex;
+        movingDrawingOriginal = chartDrawings.get(hitIndex);
+        movingAnchor = chartPointFromMouse(event);
+        requestChartRedraw();
+        return true;
+    }
+
+    private boolean eraseDrawing(MouseEvent event) {
+        if (!isEraseMode() || canvas == null || data.isEmpty()) {
+            return false;
+        }
+
+        int hitIndex = findDrawingIndexAt(event.getX(), event.getY());
+        if (hitIndex < 0) {
+            return false;
+        }
+
+        chartDrawings.remove(hitIndex);
+        selectedDrawingIndex = -1;
+        movingAnchor = null;
+        movingDrawingOriginal = null;
+        showTransientNotice("Drawing erased");
         requestChartRedraw();
         return true;
     }
@@ -2361,6 +2495,19 @@ public class CandleStickChart extends Region {
 
         ChartPoint current = chartPointFromMouse(event);
         drawingPreview = ChartDrawing.from(activeInteractionTool, drawingAnchor, current, true);
+        requestChartRedraw();
+        return true;
+    }
+
+    private boolean updateMoveDrawing(MouseEvent event) {
+        if (movingAnchor == null || movingDrawingOriginal == null || selectedDrawingIndex < 0) {
+            return false;
+        }
+
+        ChartPoint current = chartPointFromMouse(event);
+        long deltaTime = current.time() - movingAnchor.time();
+        double deltaPrice = current.price() - movingAnchor.price();
+        chartDrawings.set(selectedDrawingIndex, movingDrawingOriginal.movedBy(deltaTime, deltaPrice));
         requestChartRedraw();
         return true;
     }
@@ -2383,6 +2530,43 @@ public class CandleStickChart extends Region {
         return true;
     }
 
+    private boolean finishMoveDrawing() {
+        if (movingAnchor == null || movingDrawingOriginal == null || selectedDrawingIndex < 0) {
+            return false;
+        }
+
+        movingAnchor = null;
+        movingDrawingOriginal = null;
+        requestChartRedraw();
+        return true;
+    }
+
+    private boolean selectDrawingAt(double canvasX, double canvasY) {
+        int hitIndex = findDrawingIndexAt(canvasX, canvasY);
+        if (hitIndex < 0) {
+            if (selectedDrawingIndex >= 0) {
+                selectedDrawingIndex = -1;
+                requestChartRedraw();
+            }
+            return false;
+        }
+
+        selectedDrawingIndex = hitIndex;
+        requestChartRedraw();
+        showTransientNotice("Drawing selected. Drag to move.");
+        return true;
+    }
+
+    private int findDrawingIndexAt(double canvasX, double canvasY) {
+        for (int index = chartDrawings.size() - 1; index >= 0; index--) {
+            ChartDrawing drawing = chartDrawings.get(index);
+            if (drawing != null && drawing.hitTest(canvasX, canvasY, this)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
     private ChartPoint chartPointFromMouse(MouseEvent event) {
         double x = clamp(event.getX(), 0, canvas.getWidth());
         double y = clamp(event.getY(), 0, canvas.getHeight());
@@ -2395,8 +2579,12 @@ public class CandleStickChart extends Region {
         HORIZONTAL_LINE("Horizontal line", "Click a price level"),
         VERTICAL_LINE("Vertical line", "Click a time level"),
         RECTANGLE("Rectangle", "Drag to draw a rectangle"),
+        TRIANGLE("Triangle", "Drag to draw a triangle"),
+        CIRCLE("Circle", "Drag to draw a circle"),
         FIBONACCI("Fibonacci", "Drag swing high to low"),
-        MEASURE("Measure", "Drag to measure move");
+        MEASURE("Measure", "Drag to measure move"),
+        RISK_REWARD("Risk Reward", "Drag entry to target"),
+        ERASE_OBJECTS("Erase", "Click a drawing to erase it");
 
         private final String label;
         private final String notice;
@@ -2407,7 +2595,7 @@ public class CandleStickChart extends Region {
         }
 
         private boolean isDrawingTool() {
-            return this != CURSOR;
+            return this != CURSOR && this != ERASE_OBJECTS;
         }
 
         private String label() {
@@ -2455,8 +2643,11 @@ public class CandleStickChart extends Region {
                 case HORIZONTAL_LINE -> Color.web("#f59e0b");
                 case VERTICAL_LINE -> Color.web("#a78bfa");
                 case RECTANGLE -> Color.web("#22c55e");
+                case TRIANGLE -> Color.web("#06b6d4");
+                case CIRCLE -> Color.web("#ec4899");
                 case FIBONACCI -> Color.web("#f97316");
                 case MEASURE -> Color.web("#e2e8f0");
+                case RISK_REWARD -> Color.web("#e2e8f0");
                 default -> Color.web("#94a3b8");
             };
         }
@@ -2469,6 +2660,156 @@ public class CandleStickChart extends Region {
                     && Double.isFinite(endPrice)
                     && startTime > 0
                     && endTime > 0;
+        }
+
+        private ChartDrawing movedBy(long deltaTime, double deltaPrice) {
+            if (type == null) {
+                return this;
+            }
+
+            long newStartTime = Math.max(1L, startTime + deltaTime);
+            long newEndTime = Math.max(1L, endTime + deltaTime);
+            double newStartPrice = Math.max(0.0, startPrice + deltaPrice);
+            double newEndPrice = Math.max(0.0, endPrice + deltaPrice);
+
+            return switch (type) {
+                case HORIZONTAL_LINE -> new ChartDrawing(type, startTime, newStartPrice, endTime, newStartPrice, color, preview);
+                case VERTICAL_LINE -> new ChartDrawing(type, newStartTime, startPrice, newStartTime, endPrice, color, preview);
+                default -> new ChartDrawing(type, newStartTime, newStartPrice, newEndTime, newEndPrice, color, preview);
+            };
+        }
+
+        private boolean hitTest(double canvasX, double canvasY, CandleStickChart chart) {
+            if (!isDrawable()) {
+                return false;
+            }
+
+            double x1 = chart.timeToX(startTime);
+            double y1 = chart.priceToY(startPrice);
+            double x2 = chart.timeToX(endTime);
+            double y2 = chart.priceToY(endPrice);
+            double tolerance = preview ? 10.0 : 8.0;
+
+            return switch (type) {
+                case HORIZONTAL_LINE -> Math.abs(canvasY - y1) <= tolerance;
+                case VERTICAL_LINE -> Math.abs(canvasX - x1) <= tolerance;
+                case TRENDLINE, MEASURE -> distanceToSegment(canvasX, canvasY, x1, y1, x2, y2) <= tolerance;
+                case RECTANGLE -> containsRectangle(canvasX, canvasY, x1, y1, x2, y2, tolerance);
+                case TRIANGLE -> containsTriangle(canvasX, canvasY, x1, y1, x2, y2, tolerance);
+                case CIRCLE -> containsEllipse(canvasX, canvasY, x1, y1, x2, y2, tolerance);
+                case RISK_REWARD -> containsRiskReward(canvasX, canvasY, x1, y1, x2, y2, tolerance);
+                case FIBONACCI -> containsFibonacci(canvasX, canvasY, x1, x2, chart, tolerance);
+                default -> false;
+            };
+        }
+
+        private static double distanceToSegment(double px, double py, double x1, double y1, double x2, double y2) {
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+            if (dx == 0.0 && dy == 0.0) {
+                return Math.hypot(px - x1, py - y1);
+            }
+
+            double t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+            t = Math.max(0.0, Math.min(1.0, t));
+            double projectionX = x1 + t * dx;
+            double projectionY = y1 + t * dy;
+            return Math.hypot(px - projectionX, py - projectionY);
+        }
+
+        private static boolean containsRectangle(double px, double py, double x1, double y1, double x2, double y2, double tolerance) {
+            double left = Math.min(x1, x2) - tolerance;
+            double right = Math.max(x1, x2) + tolerance;
+            double top = Math.min(y1, y2) - tolerance;
+            double bottom = Math.max(y1, y2) + tolerance;
+            return px >= left && px <= right && py >= top && py <= bottom;
+        }
+
+        private static boolean containsTriangle(double px, double py, double x1, double y1, double x2, double y2,
+                double tolerance) {
+            double left = Math.min(x1, x2);
+            double right = Math.max(x1, x2);
+            double top = Math.min(y1, y2);
+            double bottom = Math.max(y1, y2);
+            double apexX = left + ((right - left) / 2.0);
+
+            if (px < left - tolerance || px > right + tolerance || py < top - tolerance || py > bottom + tolerance) {
+                return false;
+            }
+
+            return pointInTriangle(px, py, apexX, top, right, bottom, left, bottom)
+                    || distanceToSegment(px, py, apexX, top, right, bottom) <= tolerance
+                    || distanceToSegment(px, py, right, bottom, left, bottom) <= tolerance
+                    || distanceToSegment(px, py, left, bottom, apexX, top) <= tolerance;
+        }
+
+        private static boolean pointInTriangle(double px, double py, double ax, double ay, double bx, double by,
+                double cx, double cy) {
+            double area = triangleArea(ax, ay, bx, by, cx, cy);
+            if (area == 0.0) {
+                return false;
+            }
+            double area1 = triangleArea(px, py, bx, by, cx, cy);
+            double area2 = triangleArea(ax, ay, px, py, cx, cy);
+            double area3 = triangleArea(ax, ay, bx, by, px, py);
+            return Math.abs(area - (area1 + area2 + area3)) <= 0.5;
+        }
+
+        private static double triangleArea(double ax, double ay, double bx, double by, double cx, double cy) {
+            return Math.abs((ax * (by - cy) + bx * (cy - ay) + cx * (ay - by)) / 2.0);
+        }
+
+        private static boolean containsEllipse(double px, double py, double x1, double y1, double x2, double y2,
+                double tolerance) {
+            double left = Math.min(x1, x2);
+            double right = Math.max(x1, x2);
+            double top = Math.min(y1, y2);
+            double bottom = Math.max(y1, y2);
+            double radiusX = Math.max((right - left) / 2.0, tolerance);
+            double radiusY = Math.max((bottom - top) / 2.0, tolerance);
+            double centerX = left + radiusX;
+            double centerY = top + radiusY;
+
+            double normalized = Math.pow((px - centerX) / (radiusX + tolerance), 2)
+                    + Math.pow((py - centerY) / (radiusY + tolerance), 2);
+            return normalized <= 1.0;
+        }
+
+        private static boolean containsRiskReward(double px, double py, double x1, double y1, double x2, double y2,
+                double tolerance) {
+            double left = Math.min(x1, x2) - tolerance;
+            double right = Math.max(x1, x2) + tolerance;
+            double rewardDistance = Math.abs(y2 - y1);
+            double top = Math.min(Math.min(y1, y2), y1 - rewardDistance) - tolerance;
+            double bottom = Math.max(Math.max(y1, y2), y1 + rewardDistance) + tolerance;
+            return px >= left && px <= right && py >= top && py <= bottom;
+        }
+
+        private boolean containsFibonacci(double px, double py, double x1, double x2, CandleStickChart chart,
+                double tolerance) {
+            double top = Math.max(startPrice, endPrice);
+            double bottom = Math.min(startPrice, endPrice);
+            double range = top - bottom;
+            if (!Double.isFinite(range) || range <= 0.0) {
+                return false;
+            }
+
+            double left = Math.min(x1, x2) - tolerance;
+            double right = Math.max(x1, x2) + tolerance;
+            if (px < left || px > right) {
+                return false;
+            }
+
+            double[] levels = { 0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0 };
+            for (double level : levels) {
+                double price = top - (range * level);
+                double y = chart.priceToY(price);
+                if (Math.abs(py - y) <= tolerance) {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 
@@ -2955,6 +3296,13 @@ public class CandleStickChart extends Region {
             hoveredPrice = -1;
             hoveredTime = -1;
 
+            // Reset drawing interaction state
+            selectedDrawingIndex = -1;
+            movingAnchor = null;
+            movingDrawingOriginal = null;
+            drawingPreview = null;
+            drawingAnchor = null;
+
             // Reset market regime
             currentMarketRegime = "RANGING";
             regimeColor = Color.rgb(148, 163, 184);
@@ -3018,6 +3366,10 @@ public class CandleStickChart extends Region {
     private class MouseDraggedHandler implements EventHandler<MouseEvent> {
         @Override
         public void handle(MouseEvent event) {
+            if (updateMoveDrawing(event)) {
+                event.consume();
+                return;
+            }
             if (updateDrawing(event)) {
                 event.consume();
                 return;

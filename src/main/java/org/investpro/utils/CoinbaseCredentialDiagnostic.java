@@ -1,6 +1,7 @@
 package org.investpro.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.exchange.coinbase.CoinbaseJwtSigner;
 
 /**
  * Diagnostic tool to validate Coinbase API credentials before authentication.

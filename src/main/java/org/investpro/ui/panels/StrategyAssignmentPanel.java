@@ -12,7 +12,7 @@ import org.investpro.core.SystemCore;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.StrategyAssignment;
-import org.investpro.repository.StrategyAssignmentRepository;
+import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.lab.StrategyLabService;

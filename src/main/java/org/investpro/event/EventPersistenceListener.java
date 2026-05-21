@@ -2,7 +2,7 @@ package org.investpro.event;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
-import org.investpro.persistence.repository.EventLogRepositoryImpl;
+import org.investpro.persistence.EventLogRepositoryImpl;
 
 import java.util.function.Consumer;
 
@@ -13,6 +13,7 @@ import java.util.function.Consumer;
  * published event is automatically stored for audit and replay purposes.
  */
 @Slf4j
+@SuppressWarnings("unused")
 public class EventPersistenceListener implements Consumer<AgentEvent> {
 
     private final EventLogRepositoryImpl repository;

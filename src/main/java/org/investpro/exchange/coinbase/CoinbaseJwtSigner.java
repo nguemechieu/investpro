@@ -1,4 +1,4 @@
-package org.investpro.utils;
+package org.investpro.exchange.coinbase;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -146,8 +146,9 @@ public final class CoinbaseJwtSigner {
     /**
      * Convenience helper for HTTP Authorization header value.
      */
-    public String buildAuthorizationHeader(String method, String requestPath) {
-        return "Bearer %s".formatted(buildRestJwt(method, requestPath));
+    public String buildAuthorizationHeader(String method, String host, String path) {
+        String jwt = buildRestJwt(method, host, path);
+        return "Bearer " + jwt;
     }
 
     /**

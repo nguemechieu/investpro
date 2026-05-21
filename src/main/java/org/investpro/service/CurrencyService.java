@@ -2,7 +2,7 @@ package org.investpro.service;
 
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyType;
-import org.investpro.repository.CurrencyRepository;
+import org.investpro.persistence.repository.CurrencyRepository;
 
 import java.sql.SQLException;
 import java.util.List;

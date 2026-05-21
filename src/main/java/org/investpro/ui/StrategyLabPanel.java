@@ -15,7 +15,7 @@ import org.investpro.core.SystemCore;
 import org.investpro.data.CandleData;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.StrategyAssignmentRepository;
+import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategySelectionService;
@@ -459,14 +459,14 @@ public class StrategyLabPanel extends BorderPane {
         // Add Assign column
         TableColumn<StrategyPerformanceReport, Void> assignCol = new TableColumn<>("Action");
         assignCol.setPrefWidth(100);
-        assignCol.setCellFactory(col -> new javafx.scene.control.TableCell<StrategyPerformanceReport, Void>() {
+        assignCol.setCellFactory(col -> new javafx.scene.control.TableCell<>() {
             private final Button assignButton = new Button("Assign");
 
             {
                 assignButton.setStyle(
                         "-fx-padding: 3px 10px; -fx-font-size: 10px; " +
-                        "-fx-background-color: #1e3a5f; -fx-text-fill: " + CLR_ACCENT + "; " +
-                        "-fx-border-color: " + CLR_ACCENT + "; -fx-border-radius: 3; -fx-cursor: hand;");
+                                "-fx-background-color: #1e3a5f; -fx-text-fill: " + CLR_ACCENT + "; " +
+                                "-fx-border-color: " + CLR_ACCENT + "; -fx-border-radius: 3; -fx-cursor: hand;");
                 assignButton.setOnAction(event -> {
                     StrategyPerformanceReport report = getTableView().getItems().get(getIndex());
                     if (report != null) {

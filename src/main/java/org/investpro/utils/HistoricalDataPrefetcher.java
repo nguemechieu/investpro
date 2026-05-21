@@ -7,7 +7,7 @@ import org.investpro.exchange.binance.BinanceCandleDataSupplier;
 import org.investpro.exchange.bitfinex.BitfinexCandleDataSupplier;
 import org.investpro.exchange.coinbase.CoinbaseCandleDataSupplier;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.HistoricalDataRepository;
+import org.investpro.persistence.repository.HistoricalDataRepository;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

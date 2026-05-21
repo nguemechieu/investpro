@@ -1,8 +1,8 @@
-package org.investpro.persistence.repository;
+package org.investpro.persistence;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
-import org.investpro.repository.RepositoryFactory;
+import org.investpro.persistence.repository.RepositoryFactory;
 import org.investpro.data.Db1;
 
 import java.sql.Connection;

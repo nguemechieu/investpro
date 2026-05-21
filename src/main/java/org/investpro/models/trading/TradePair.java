@@ -235,6 +235,17 @@ public class TradePair extends Pair<Currency, Currency> {
                             .formatted(baseCode, counterCode));
         }
 
+        // Reject null/placeholder currency codes (XXX, ¤¤¤)
+        if (baseCode.equals("XXX") || baseCode.equals("¤¤¤")) {
+            throw new IllegalArgumentException(
+                    "Base currency code '%s' is a reserved null currency code and cannot be traded".formatted(baseCode));
+        }
+
+        if (counterCode.equals("XXX") || counterCode.equals("¤¤¤")) {
+            throw new IllegalArgumentException(
+                    "Counter currency code '%s' is a reserved null currency code and cannot be traded".formatted(counterCode));
+        }
+
         if (baseCode.equalsIgnoreCase(counterCode)) {
             throw new IllegalArgumentException(
                     "baseCurrency and counterCurrency must be different: %s".formatted(baseCode));

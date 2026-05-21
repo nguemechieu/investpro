@@ -1,4 +1,4 @@
-package org.investpro.repository;
+package org.investpro.persistence.repository;
 
 import org.investpro.data.Db1;
 import org.investpro.models.trading.Order;

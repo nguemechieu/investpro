@@ -6,8 +6,8 @@ import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.HistoricalDataRepository;
-import org.investpro.repository.HistoricalDataRepositoryImpl;
+import org.investpro.persistence.repository.HistoricalDataRepository;
+import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 
 import java.time.LocalDateTime;
 import java.util.*;

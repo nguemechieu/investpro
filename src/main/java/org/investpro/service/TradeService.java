@@ -5,7 +5,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.TradeRepository;
+import org.investpro.persistence.repository.TradeRepository;
 import org.investpro.utils.Side;
 
 import java.sql.SQLException;

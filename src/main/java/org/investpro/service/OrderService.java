@@ -2,7 +2,7 @@ package org.investpro.service;
 
 import org.investpro.models.trading.Order;
 import org.investpro.models.trading.TradePair;
-import org.investpro.repository.OrderRepository;
+import org.investpro.persistence.repository.OrderRepository;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -199,7 +199,7 @@ public class OrderService implements CrudService<Order, String> {
     /**
      * Mark an order as pending and persist it.
      */
-    public Order markPending(Order order) throws SQLException, ClassNotFoundException {
+    public Order markPending(Order order) throws SQLException {
         requireOrder(order);
         order.setStatus(ORDER_STATUS_PENDING);
         return repository.save(order);
