@@ -173,8 +173,9 @@ InvestPro provides:
 
 - `AgentRuntime` manages trading agent lifecycle.
 - `AgentEventBus` decouples system components through events.
-- `SymbolAgent` evaluates market state per symbol.
+- `SymbolAgent` evaluates market state per symbol (in `symbol/` package).
 - `SymbolAgentManager` controls active symbol agents.
+- `PortfolioAgent` manages capital allocation and exposure (in `portfolio/` package).
 - Auto-trading starts **OFF** by default and must be explicitly enabled.
 
 ### Risk Management
@@ -189,9 +190,11 @@ InvestPro provides:
 
 ### AI-Assisted Analysis
 
-- `AiReasoningService` interface for pluggable AI providers.
+- `AiReasoningService` interface for pluggable AI providers (in `ai/` package).
 - `OpenAiReasoningService` for optional GPT-assisted trade review.
 - `LocalAiReasoningService` fallback for offline operation.
+- `ReasoningAgent` in `reasoning/` for structured decision reasoning.
+- `AiAuditLogger` records AI decisions for auditability.
 - AI can approve, reject, or explain signals.
 - AI **does not execute trades directly**.
 
@@ -199,7 +202,7 @@ InvestPro provides:
 
 - Interactive candlestick charts.
 - Multi-timeframe analysis.
-- Indicators such as MA, EMA, RSI, MACD, Bollinger Bands, ATR, and more.
+- Rich `indicators/` package: MA, EMA, RSI, MACD, Bollinger Bands, ATR, ADX, CCI, VWAP, Ichimoku, Stochastic, OBV, Parabolic SAR, Zigzag, Fibonacci, and more.
 - Zoom and pan support.
 - Support/resistance and annotation-ready chart structure.
 
@@ -217,6 +220,7 @@ InvestPro provides:
 - Browser access to the desktop UI.
 - PostgreSQL support for production-style deployments.
 - SQLite support for local development and event logs.
+- Plugin architecture via Java `ServiceLoader` SPI for extensions (exchanges, strategies, indicators, risk modules).
 
 ---
 
@@ -249,22 +253,45 @@ InvestPro provides:
 
 ```text
 src/main/java/org/investpro/
-├── ai/                     # AI reasoning services
-├── core/                   # SystemCore, SmartBot, agents, runtime
-│   ├── agents/             # AgentRuntime, AgentEventBus, SymbolAgent
+├── ai/                     # AI trade review interface, OpenAI/local providers, audit logging
+│   ├── learning/           # Machine learning helpers
+│   └── ml/                 # ML model integration
+├── backtesting/            # BacktestingService, BacktestConfig, BacktestResult, simulators
+├── config/                 # Application and environment configuration
+├── core/                   # SystemCore, notification services, Telegram handlers
+│   ├── agents/             # AgentRuntime, AgentEventBus, Agent, AgentRegistry
 │   ├── bot/                # SmartBot controller
-│   └── agents/execution/   # ExecutionEngine, TradeExecutionCoordinator
-├── data/                   # CandleData, Db1, local data helpers
-├── decision/               # BotTradeDecisionEngine, signal filters
+│   ├── controller/         # Application controllers
+│   ├── execution/          # ExecutionEngine, TradeExecutionCoordinator
+│   └── pipeline/           # TradeDecisionPipeline, risk context builders
+├── credential/             # API credential management
+├── data/                   # CandleData and local data helpers
+├── decision/               # BotTradeDecisionEngine, signal-to-decision filters
+├── dependency/             # Dependency wiring utilities
+├── enums/                  # Application-wide enumerations
 ├── event/                  # EventBusManager, event persistence
-├── exchange/               # Exchange adapters and factory
+├── exchange/               # Exchange adapters (Binance, Coinbase, OANDA, Alpaca, IB, etc.)
+├── i18n/                   # Internationalization and translations
+├── indicators/             # Technical indicators: MA, EMA, RSI, MACD, Bollinger, ATR, etc.
+├── licensing/              # License management
+├── market/                 # Market data models and services
 ├── models/                 # TradePair, Order, Account, Ticker, Trade
 ├── monitoring/             # SystemMonitorService, SignalMonitorService
-├── repository/             # SQLite/PostgreSQL repositories
+├── operations/             # Operational support utilities
+├── persistence/            # SQLite/PostgreSQL repositories and event log persistence
+├── portfolio/              # PortfolioAgent, capital allocator, exposure and heat management
+├── reasoning/              # OpenAIReasoningClient, ReasoningAgent, ReasoningDecision
+├── research/               # Market research helpers
 ├── risk/                   # RiskManagementSystem and risk decisions
-├── strategy/               # StrategyEngine, StrategyCatalog, StrategyLab
-├── trading/tradability/    # Universal symbol tradability model and filters
-└── ui/                     # JavaFX windows, panels, charts, controls
+├── service/                # Domain services: OrderService, TradeService, CurrencyService, etc.
+├── signal/                 # Signal, SignalAgent
+├── spi/                    # Service provider interfaces for plugins
+├── strategy/               # StrategyEngine, StrategyCatalog, StrategyLab, user strategies
+├── symbol/                 # SymbolAgent, SymbolAgentManager, symbol state
+├── trading/                # PreTradeValidation, pre-trade checklist
+│   └── tradability/        # Universal symbol tradability model and filters
+├── ui/                     # JavaFX windows, panels, charts, controls
+└── utils/                  # Shared utility classes
 ```
 
 ---
@@ -1084,4 +1111,3 @@ You may obtain a copy of the License at
 <p align="center">
   <sub>Built with Java 21 · JavaFX 21.0.6 · Apache Maven · Open source under Apache 2.0</sub>
 </p>
-
