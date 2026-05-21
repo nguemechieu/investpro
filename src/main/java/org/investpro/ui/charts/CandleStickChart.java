@@ -1843,14 +1843,50 @@ public class CandleStickChart extends Region {
 
         for (ChartIndicator indicator : List.copyOf(indicators)) {
             java.util.Map<String, double[]> values = indicator.getValues();
-            if (values.isEmpty() || !indicator.isCalculated())
+            if (values == null || values.isEmpty() || !indicator.isCalculated())
                 continue;
 
+            boolean priceOverlay = isPriceOverlayIndicator(indicator.getName());
             java.util.Map<String, javafx.scene.paint.Color> lineColors = getIndicatorColors(indicator.getName());
 
             for (java.util.Map.Entry<String, double[]> entry : values.entrySet()) {
                 String lineName = entry.getKey();
                 double[] lineValues = entry.getValue();
+                if (lineValues == null || lineValues.length == 0) {
+                    continue;
+                }
+
+                double minValue = Double.POSITIVE_INFINITY;
+                double maxValue = Double.NEGATIVE_INFINITY;
+                if (!priceOverlay) {
+                    for (CandleData candle : visible) {
+                        int dataIndex = indexOfOpenTime(allCandles, candle.openTime());
+                        if (dataIndex < 0 || dataIndex >= lineValues.length) {
+                            continue;
+                        }
+                        double candidate = lineValues[dataIndex];
+                        if (Double.isNaN(candidate) || Double.isInfinite(candidate)) {
+                            continue;
+                        }
+                        minValue = Math.min(minValue, candidate);
+                        maxValue = Math.max(maxValue, candidate);
+                    }
+
+                    if (!Double.isFinite(minValue) || !Double.isFinite(maxValue)) {
+                        continue;
+                    }
+
+                    double range = maxValue - minValue;
+                    double padding = Math.max(1.0, Math.max(Math.abs(maxValue), Math.abs(minValue)) * 0.05);
+                    if (range < 1e-9) {
+                        minValue -= padding;
+                        maxValue += padding;
+                    } else {
+                        minValue -= padding;
+                        maxValue += padding;
+                    }
+                }
+
                 javafx.scene.paint.Color color = lineColors.getOrDefault(lineName, javafx.scene.paint.Color.CYAN);
 
                 double lastX = -1, lastY = -1;
@@ -1868,7 +1904,7 @@ public class CandleStickChart extends Region {
                         continue;
                     }
 
-                    double y = priceToY(value);
+                    double y = priceOverlay ? priceToY(value) : indicatorToY(value, minValue, maxValue);
                     double x = candleCenterX(i);
 
                     if (lastX >= 0 && lastY >= 0) {
@@ -1884,9 +1920,35 @@ public class CandleStickChart extends Region {
         }
     }
 
+    private boolean isPriceOverlayIndicator(String indicatorName) {
+        String normalized = normalizeIndicatorName(indicatorName);
+        return normalized.startsWith("SMA")
+                || normalized.startsWith("EMA")
+                || normalized.startsWith("BOLLINGERBANDS")
+                || normalized.startsWith("VWAP")
+                || normalized.startsWith("ICHIMOKU")
+                || normalized.startsWith("PARABOLICSAR")
+                || normalized.startsWith("FIBONACCIRETRACEMENT")
+                || normalized.startsWith("ZIGZAG")
+                || normalized.startsWith("FRACTAL");
+    }
+
+    private String normalizeIndicatorName(String indicatorName) {
+        return indicatorName == null ? "" : indicatorName.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
+    }
+
+    private double indicatorToY(double value, double minValue, double maxValue) {
+        double chartHeight = Math.max(1.0, canvas.getHeight() - 24.0);
+        double topPadding = 12.0;
+        double range = Math.max(1e-9, maxValue - minValue);
+        double ratio = (value - minValue) / range;
+        ratio = clamp(ratio, 0.0, 1.0);
+        return topPadding + ((1.0 - ratio) * chartHeight);
+    }
+
     private java.util.Map<String, javafx.scene.paint.Color> getIndicatorColors(String indicatorName) {
         java.util.Map<String, javafx.scene.paint.Color> colors = new java.util.HashMap<>();
-        switch (indicatorName) {
+        switch (normalizeIndicatorName(indicatorName)) {
             case "SMA20" -> colors.put("SMA", javafx.scene.paint.Color.web("#87CEEB"));
             case "EMA12" -> colors.put("EMA", javafx.scene.paint.Color.web("#FFA500"));
             case "RSI14" -> colors.put("RSI", javafx.scene.paint.Color.web("#9370DB"));
@@ -1900,13 +1962,13 @@ public class CandleStickChart extends Region {
                 colors.put("UpperBand", javafx.scene.paint.Color.web("#95a5a6"));
                 colors.put("LowerBand", javafx.scene.paint.Color.web("#95a5a6"));
             }
-            case "Stochastic14" -> {
+            case "STOCHASTIC" -> {
                 colors.put("K", javafx.scene.paint.Color.web("#e74c3c"));
                 colors.put("D", javafx.scene.paint.Color.web("#3498db"));
             }
             case "ATR14" -> colors.put("ATR", javafx.scene.paint.Color.web("#e91e63"));
-            case "Parabolic SAR" -> colors.put("SAR", javafx.scene.paint.Color.web("#f1c40f"));
-            case "Fibonacci Retracement" -> {
+            case "PARABOLICSAR" -> colors.put("SAR", javafx.scene.paint.Color.web("#f1c40f"));
+            case "FIBONACCIRETRACEMENT" -> {
                 colors.put("0%", javafx.scene.paint.Color.web("#7f8c8d"));
                 colors.put("23.6%", javafx.scene.paint.Color.web("#95a5a6"));
                 colors.put("38.2%", javafx.scene.paint.Color.web("#bdc3c7"));
@@ -1921,19 +1983,19 @@ public class CandleStickChart extends Region {
                 colors.put("ADX", javafx.scene.paint.Color.web("#3498db"));
             }
             case "CCI" -> colors.put("CCI", javafx.scene.paint.Color.web("#f39c12"));
-            case "Zigzag" -> colors.put("Zigzag", javafx.scene.paint.Color.web("#e74c3c"));
-            case "Fractal" -> {
+            case "ZIGZAG" -> colors.put("Zigzag", javafx.scene.paint.Color.web("#e74c3c"));
+            case "FRACTAL" -> {
                 colors.put("UpFractal", javafx.scene.paint.Color.web("#2ecc71"));
                 colors.put("DnFractal", javafx.scene.paint.Color.web("#e74c3c"));
             }
-            case "Ichimoku Cloud" -> {
+            case "ICHIMOKU" -> {
                 colors.put("TenkanSen", javafx.scene.paint.Color.web("#3498db"));
                 colors.put("KijunSen", javafx.scene.paint.Color.web("#f39c12"));
                 colors.put("SenkouSpanA", javafx.scene.paint.Color.web("#2ecc71"));
                 colors.put("SenkouSpanB", javafx.scene.paint.Color.web("#e74c3c"));
                 colors.put("ChikouSpan", javafx.scene.paint.Color.web("#9370DB"));
             }
-            case "Volume Weighted Average Price" -> colors.put("VWAP", javafx.scene.paint.Color.web("#1abc9c"));
+            case "VWAP" -> colors.put("VWAP", javafx.scene.paint.Color.web("#1abc9c"));
             default -> colors.put("Line", javafx.scene.paint.Color.CYAN);
         }
         return colors;
@@ -3237,23 +3299,7 @@ public class CandleStickChart extends Region {
     }
 
     private ChartIndicator createIndicator(String choice) {
-        ChartIndicator pluginIndicator = PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault()).orElse(null);
-        if (pluginIndicator != null) {
-            return pluginIndicator;
-        }
-
-        return switch (choice) {
-            case "SMA 20" -> new SimpleMovingAverageIndicator(20);
-            case "SMA 50" -> new SimpleMovingAverageIndicator(50);
-            case "EMA 12" -> new ExponentialMovingAverageIndicator(12);
-            case "EMA 26" -> new ExponentialMovingAverageIndicator(26);
-            case "Bollinger Bands" -> new BollingerBandsIndicator();
-            case "MACD" -> new MACDIndicator();
-            case "RSI 14" -> new RSIIndicator(14);
-            case "ATR 14" -> new ATRIndicator(14);
-            case "VWAP" -> new VWAPIndicator();
-            default -> null;
-        };
+        return PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault()).orElse(null);
     }
 
     public void addIndicator(ChartIndicator indicator) {

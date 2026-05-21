@@ -71,10 +71,13 @@ import org.investpro.risk.PositionHealthScore;
 import org.investpro.service.CurrencyService;
 import org.investpro.service.NotificationService;
 import org.investpro.service.OrderService;
+import org.investpro.strategy.StrategyDefinition;
+import org.investpro.strategy.StrategyParameters;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyAssignment;
+import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.spi.ExchangeProvider;
 import org.investpro.spi.PluginIndicatorFactory;
@@ -5770,8 +5773,11 @@ public class TradingDesk extends BorderPane  {
             return;
         }
 
+        List<String> choices = new ArrayList<>();
+        choices.add("Clear Indicators");
+        choices.addAll(PluginIndicatorFactory.supportedChoices());
 
-        ChoiceDialog<String> dialog = new ChoiceDialog<>();
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(choices.get(1), choices);
         dialog.setTitle(t("dialog.indicators.title"));
         dialog.setHeaderText(t("dialog.indicators.header"));
         dialog.setContentText(t("dialog.indicators.content"));
@@ -5783,7 +5789,13 @@ public class TradingDesk extends BorderPane  {
                 return;
             }
 
-            ChartIndicator indicator = createChartIndicator(choice);
+            Map<String, String> config = promptIndicatorConfiguration(choice);
+            if (config == null) {
+                return;
+            }
+
+            PluginIndicatorFactory.saveConfig(choice, config);
+            ChartIndicator indicator = createChartIndicator(choice, config);
             if (indicator == null) {
                 showWarning("Indicators", "Unsupported indicator: " + choice);
                 return;
@@ -5794,53 +5806,68 @@ public class TradingDesk extends BorderPane  {
         });
     }
 
-    private ChartIndicator createChartIndicator(String choice) {
-        ChartIndicator pluginIndicator = PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault()).orElse(null);
-        if (pluginIndicator != null) {
-            return pluginIndicator;
+    private Map<String, String> promptIndicatorConfiguration(String choice) {
+        List<PluginIndicatorFactory.IndicatorParameter> parameters = PluginIndicatorFactory.parametersFor(choice);
+        Map<String, String> defaults = PluginIndicatorFactory.loadConfig(choice);
+
+        if (parameters.isEmpty()) {
+            return new LinkedHashMap<>(defaults);
         }
 
-        return switch (safe(choice)) {
-            // Moving Averages
-            case "SMA 20" -> new SimpleMovingAverageIndicator(20);
-            case "SMA 50" -> new SimpleMovingAverageIndicator(50);
-            case "SMA 200" -> new SimpleMovingAverageIndicator(200);
-            case "EMA 12" -> new ExponentialMovingAverageIndicator(12);
-            case "EMA 26" -> new ExponentialMovingAverageIndicator(26);
+        Dialog<Map<String, String>> dialog = new Dialog<>();
+        dialog.setTitle(choice + " settings");
+        dialog.setHeaderText("Adjust parameters before adding the indicator.");
+        dialog.initOwner(getScene() != null ? getScene().getWindow() : null);
 
-            // Momentum Indicators
-            case "RSI 14" -> new RSIIndicator(14);
-            case "Stochastic" -> new StochasticIndicator();
-            case "CCI 20" -> new CCIIndicator(20);
-            case "MACD" -> new MACDIndicator();
+        ButtonType addButton = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButton, ButtonType.CANCEL);
 
-            // Volatility Indicators
-            case "Bollinger Bands" -> new BollingerBandsIndicator();
-            case "ATR 14" -> new ATRIndicator(14);
-            case "Volatility" -> new VolatilityIndicator();
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(16));
 
-            // Volume Indicators
-            case "VWAP" -> new VWAPIndicator();
-            case "OBV" -> new OBVIndicator();
-            case "Volume" -> new VolumeIndicator();
+        Map<String, TextField> fields = new LinkedHashMap<>();
+        int row = 0;
+        for (PluginIndicatorFactory.IndicatorParameter parameter : parameters) {
+            Label label = new Label(parameter.label());
+            TextField field = new TextField(defaults.getOrDefault(parameter.key(), parameter.defaultValue()));
+            field.setPromptText(parameter.description());
+            field.setMaxWidth(Double.MAX_VALUE);
+            grid.add(label, 0, row);
+            grid.add(field, 1, row);
+            GridPane.setHgrow(field, Priority.ALWAYS);
+            fields.put(parameter.key(), field);
+            row++;
+        }
 
-            // Trend Indicators
-            case "ADX 14" -> new ADXIndicator(14);
-            case "Ichimoku" -> new IchimokuIndicator(9, 26, 52); // Standard periods: conversion 9, base 26, span 52
-            case "Parabolic SAR" -> new ParabolicSARIndicator(0.02, 0.2); // Standard AF: initial 0.02, max 0.2
+        ScrollPane scrollPane = new ScrollPane(grid);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefViewportWidth(420);
+        scrollPane.setPrefViewportHeight(Math.min(360, 72 + parameters.size() * 44));
+        dialog.getDialogPane().setContent(scrollPane);
 
-            // Retracement Levels
-            case "Fibonacci Retracement" -> new FibonacciRetracementIndicator(20); // 20-period lookback
-            case "Zigzag" -> new ZigzagIndicator(5.0); // 5% threshold
+        dialog.setResultConverter(button -> {
+            if (button != addButton) {
+                return null;
+            }
 
-            // Pattern Recognition
-            case "Fractal" -> new FractalIndicator(5); // 5-bar fractal pattern
+            Map<String, String> values = new LinkedHashMap<>();
+            for (Map.Entry<String, TextField> entry : fields.entrySet()) {
+                values.put(entry.getKey(), entry.getValue().getText().trim());
+            }
+            return values;
+        });
 
-            // Utility
-            case "Clear Indicators" -> null;
+        return dialog.showAndWait().orElse(null);
+    }
 
-            default -> null;
-        };
+    private ChartIndicator createChartIndicator(String choice) {
+        return createChartIndicator(choice, PluginIndicatorFactory.loadConfig(choice));
+    }
+
+    private ChartIndicator createChartIndicator(String choice, Map<String, String> config) {
+        return PluginIndicatorFactory.create(choice, PluginRegistry.loadDefault(), config).orElse(null);
     }
 
     private void openNewsCalendarPanel() {
@@ -6334,86 +6361,400 @@ public class TradingDesk extends BorderPane  {
         Label title = new Label("Market Research");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
 
+        Label venueLabel = new Label();
+        venueLabel.setStyle("-fx-text-fill: #93c5fd; -fx-font-size: 12; -fx-font-weight: bold;");
+
+        Label updatedLabel = new Label();
+        updatedLabel.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11;");
+
+        Button refreshButton = new Button("Refresh Research Data");
+        refreshButton.setStyle("-fx-padding: 6 16; -fx-background-color: #3b82f6; -fx-text-fill: white;");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox header = new HBox(10, title, venueLabel, spacer, updatedLabel, refreshButton);
+        header.setAlignment(Pos.CENTER_LEFT);
+
         TabPane researchTabs = new TabPane();
         researchTabs.setStyle("-fx-control-inner-background: #0f3460;");
         researchTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab sentimentTab = new Tab("Sentiment Analysis", createSentimentAnalysisTab());
-        Tab correlationTab = new Tab("Correlation Matrix", createCorrelationTab());
-        Tab economicTab = new Tab("Economic Calendar", createEconomicCalendarTab());
-        Tab volatilityTab = new Tab("Volatility Analysis", createVolatilityTab());
+        ResearchTabContent sentiment = createSentimentAnalysisTab();
+        ResearchTabContent correlation = createCorrelationTab();
+        ResearchTabContent economic = createEconomicCalendarTab();
+        ResearchTabContent volatility = createVolatilityTab();
+
+        Tab sentimentTab = new Tab("Sentiment Analysis", sentiment.content());
+        Tab correlationTab = new Tab("Correlation Matrix", correlation.content());
+        Tab economicTab = new Tab("Economic Calendar", economic.content());
+        Tab volatilityTab = new Tab("Volatility Analysis", volatility.content());
 
         researchTabs.getTabs().addAll(sentimentTab, correlationTab, economicTab, volatilityTab);
-        panel.getChildren().addAll(title, researchTabs);
+
+        Runnable refreshAllTabs = () -> {
+            venueLabel.setText(buildResearchVenueStatus());
+            updatedLabel.setText("Updated " + LocalDateTime.now().format(STATUS_TIME_FORMAT));
+            sentiment.refreshAction().run();
+            correlation.refreshAction().run();
+            economic.refreshAction().run();
+            volatility.refreshAction().run();
+        };
+
+        refreshButton.setOnAction(event -> refreshAllTabs.run());
+        refreshAllTabs.run();
+
+        AtomicReference<ScheduledFuture<?>> autoRefreshFuture = new AtomicReference<>();
+        panel.sceneProperty().addListener((sceneObs, oldScene, newScene) -> {
+            if (newScene == null) {
+                ScheduledFuture<?> future = autoRefreshFuture.getAndSet(null);
+                if (future != null) {
+                    future.cancel(false);
+                }
+                return;
+            }
+
+            newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> {
+                if (!(newWindow instanceof Stage stage)) {
+                    return;
+                }
+
+                ScheduledFuture<?> existingFuture = autoRefreshFuture.getAndSet(
+                        autoRefreshExecutor.scheduleAtFixedRate(
+                                () -> runOnFx(refreshAllTabs),
+                                15,
+                                45,
+                                TimeUnit.SECONDS));
+                if (existingFuture != null) {
+                    existingFuture.cancel(false);
+                }
+
+                stage.setOnHidden(event -> {
+                    ScheduledFuture<?> future = autoRefreshFuture.getAndSet(null);
+                    if (future != null) {
+                        future.cancel(false);
+                    }
+                    log.info("Independent window closed: {}", stage.getTitle());
+                });
+            });
+        });
+
+        panel.getChildren().addAll(header, researchTabs);
         VBox.setVgrow(researchTabs, Priority.ALWAYS);
 
         return panel;
     }
 
-    private VBox createSentimentAnalysisTab() {
+    private ResearchTabContent createSentimentAnalysisTab() {
         VBox tab = new VBox(12);
         tab.setPadding(new Insets(12));
-        Label label = new Label("Market Sentiment Index: " + getMarketSentimentIndex() + "/100");
-        label.setStyle("-fx-text-fill: #10b981; -fx-font-size: 14;");
+
+        Label label = new Label("Market Sentiment Index");
+        label.setStyle("-fx-text-fill: #10b981; -fx-font-size: 14; -fx-font-weight: bold;");
+
+        Label source = new Label("Source: live exchange tickers + RSS/news bias provider");
+        source.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11;");
+
         ListView<String> sentimentList = new ListView<>();
-        sentimentList.getItems().addAll(
+        sentimentList.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
+        tab.getChildren().addAll(label, source, sentimentList);
+        VBox.setVgrow(sentimentList, Priority.ALWAYS);
+
+        Runnable refresh = () -> refreshSentimentAnalysisAsync(label, sentimentList);
+
+        return new ResearchTabContent(tab, refresh);
+    }
+
+    private void refreshSentimentAnalysisAsync(Label label, ListView<String> sentimentList) {
+        label.setText("Market Sentiment Index: loading...");
+        sentimentList.getItems().setAll("Loading market sentiment...");
+
+        CompletableFuture.supplyAsync(() -> List.of(
+                "Market Sentiment Index: " + getMarketSentimentIndex() + "/100",
                 "Overall Market Sentiment: " + getOverallMarketSentiment(),
                 "Investor Confidence: " + getInvestorConfidence(),
-                "Market Fear Index (VIX): " + getMarketVIX(),
+                "Market Fear Index (VIX Proxy): " + getMarketVIX(),
                 "Bitcoin Dominance: " + getBitcoinDominance(),
-                "Trading Volume: " + getTradingVolume());
-        sentimentList.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
-        tab.getChildren().addAll(label, sentimentList);
-        VBox.setVgrow(sentimentList, Priority.ALWAYS);
-        return tab;
+                "Trading Volume: " + getTradingVolume(),
+                buildNewsBiasLine(),
+                buildUpcomingEventPressureLine()), autoRefreshExecutor)
+                .whenComplete((lines, throwable) -> runOnFx(() -> {
+                    if (throwable != null) {
+                        label.setText("Market Sentiment Index: unavailable");
+                        sentimentList.getItems().setAll(
+                                "Unable to load market sentiment right now.",
+                                rootMessage(throwable));
+                        return;
+                    }
+
+                    if (lines == null || lines.isEmpty()) {
+                        label.setText("Market Sentiment Index: unavailable");
+                        sentimentList.getItems().setAll("No market sentiment data available.");
+                        return;
+                    }
+
+                    label.setText(lines.getFirst());
+                    sentimentList.getItems().setAll(lines.subList(1, lines.size()));
+                }));
     }
 
-    private VBox createCorrelationTab() {
+    private ResearchTabContent createCorrelationTab() {
         VBox tab = new VBox(12);
         tab.setPadding(new Insets(12));
-        Label label = new Label("Asset Correlation Matrix");
-        label.setStyle("-fx-text-fill: #3b82f6; -fx-font-size: 14;");
-        TableView<String[]> correlationTable = new TableView<>();
-        correlationTable.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
-        tab.getChildren().addAll(label, correlationTable);
-        VBox.setVgrow(correlationTable, Priority.ALWAYS);
-        return tab;
+
+        Label label = new Label("Live Co-Movement Matrix (24h Change Similarity)");
+        label.setStyle("-fx-text-fill: #3b82f6; -fx-font-size: 14; -fx-font-weight: bold;");
+
+        Label source = new Label("Source: connected venue tickers from market watch");
+        source.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11;");
+
+        TextArea matrixArea = new TextArea();
+        matrixArea.setEditable(false);
+        matrixArea.setWrapText(false);
+        matrixArea.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #e5e7eb; -fx-font-family: Consolas;");
+
+        tab.getChildren().addAll(label, source, matrixArea);
+        VBox.setVgrow(matrixArea, Priority.ALWAYS);
+
+        Runnable refresh = () -> matrixArea.setText(buildLiveCorrelationMatrixText());
+
+        return new ResearchTabContent(tab, refresh);
     }
 
-    private VBox createEconomicCalendarTab() {
+    private ResearchTabContent createEconomicCalendarTab() {
         VBox tab = new VBox(12);
         tab.setPadding(new Insets(12));
+
         Label label = new Label("Upcoming Economic Events");
-        label.setStyle("-fx-text-fill: #f59e0b; -fx-font-size: 14;");
-        ListView<String> eventList = new ListView<>();
-        eventList.getItems().addAll(
-                "2026-05-15 | Federal Funds Rate Decision | Expected: 5.25% | Impact: High",
-                "2026-05-20 | CPI Release | Expected: 3.2% | Impact: High",
-                "2026-05-25 | Employment Report | Expected: 150K jobs | Impact: Very High",
-                "2026-06-01 | Manufacturing PMI | Expected: 52.1 | Impact: Medium",
-                "2026-06-05 | Unemployment Rate | Expected: 3.9% | Impact: High");
-        eventList.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
-        tab.getChildren().addAll(label, eventList);
-        VBox.setVgrow(eventList, Priority.ALWAYS);
-        return tab;
+        label.setStyle("-fx-text-fill: #f59e0b; -fx-font-size: 14; -fx-font-weight: bold;");
+
+        Label summary = new Label();
+        summary.setStyle("-fx-text-fill: #fcd34d; -fx-font-size: 11;");
+
+        TableView<NewsEvent> eventsTable = new TableView<>();
+        eventsTable.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
+        eventsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+
+        TableColumn<NewsEvent, String> timeCol = new TableColumn<>("Time");
+        timeCol.setCellValueFactory(cell -> {
+            Instant eventTime = cell.getValue() == null ? null : cell.getValue().getEventTime();
+            String value = eventTime == null
+                    ? "-"
+                    : DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                            .withZone(ZoneId.systemDefault())
+                            .format(eventTime);
+            return new ReadOnlyStringWrapper(value);
+        });
+
+        TableColumn<NewsEvent, String> currencyCol = new TableColumn<>("Currency");
+        currencyCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue() == null ? "-" : safe(cell.getValue().getCurrency())));
+
+        TableColumn<NewsEvent, String> impactCol = new TableColumn<>("Impact");
+        impactCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue() == null || cell.getValue().getImportance() == null
+                        ? "-"
+                        : cell.getValue().getImportance().name()));
+
+        TableColumn<NewsEvent, String> sentimentCol = new TableColumn<>("Sentiment");
+        sentimentCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue() == null || cell.getValue().getSentiment() == null
+                        ? "-"
+                        : cell.getValue().getSentiment().name()));
+
+        TableColumn<NewsEvent, String> titleCol = new TableColumn<>("Event");
+        titleCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue() == null ? "-" : safe(cell.getValue().getTitle())));
+
+        eventsTable.getColumns().setAll(timeCol, currencyCol, impactCol, sentimentCol, titleCol);
+
+        tab.getChildren().addAll(label, summary, eventsTable);
+        VBox.setVgrow(eventsTable, Priority.ALWAYS);
+
+        Runnable refresh = () -> {
+            newsDataProvider.loadSampleCalendarIfEmpty();
+            List<NewsEvent> events = newsDataProvider.getUpcomingNewsEvents();
+            eventsTable.getItems().setAll(events);
+
+            long highImpact = events.stream()
+                    .filter(event -> event != null && (event.getImportance() == NewsEvent.Importance.HIGH
+                            || event.getImportance() == NewsEvent.Importance.CRITICAL))
+                    .count();
+            summary.setText("Events: %d | High Impact: %d | Immediate (60m): %d".formatted(
+                    events.size(),
+                    highImpact,
+                    newsDataProvider.getImmediateUpcomingEvents().size()));
+        };
+
+        return new ResearchTabContent(tab, refresh);
     }
 
-    private VBox createVolatilityTab() {
+    private ResearchTabContent createVolatilityTab() {
         VBox tab = new VBox(12);
         tab.setPadding(new Insets(12));
+
         Label label = new Label("Volatility Metrics");
-        label.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 14;");
+        label.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 14; -fx-font-weight: bold;");
+
+        Label source = new Label("Source: live market watch prices and 24h change from connected venue");
+        source.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11;");
+
         ListView<String> volatilityList = new ListView<>();
-        volatilityList.getItems().addAll(
-                "S&P 500 Volatility (VIX): 18.5 (Normal)",
-                "Bitcoin Volatility: 52.3% (High)",
-                "Ethereum Volatility: 48.7% (High)",
-                "Forex Volatility (EURUSD): 12.1% (Low)",
-                "30-Day Realized Volatility Trend: Increasing");
         volatilityList.setStyle("-fx-control-inner-background: #16213e; -fx-text-fill: #ffffff;");
-        tab.getChildren().addAll(label, volatilityList);
+
+        tab.getChildren().addAll(label, source, volatilityList);
         VBox.setVgrow(volatilityList, Priority.ALWAYS);
-        return tab;
+
+        Runnable refresh = () -> volatilityList.getItems().setAll(buildVolatilityMetricsLines());
+
+        return new ResearchTabContent(tab, refresh);
+    }
+
+    private String buildResearchVenueStatus() {
+        String venue = exchange == null ? safe(exchangeSelector == null ? null : exchangeSelector.getValue())
+                : safe(exchange.getDisplayName());
+        if (venue.isBlank()) {
+            venue = "No venue selected";
+        }
+        String connectionState = hasBrokerAccess() ? "Connected" : "Disconnected";
+        String dataState = marketSnapshot().hasMarketData() ? "Live data" : "Cached/limited data";
+        return "Venue: %s (%s, %s)".formatted(venue, connectionState, dataState);
+    }
+
+    private String buildNewsBiasLine() {
+        TradePair selected = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            return "News Bias: Select a symbol to load RSS sentiment";
+        }
+
+        String symbol = safe(selected.getBaseCode()).isBlank() ? safe(selected.getSymbol()) : safe(selected.getBaseCode());
+        if (symbol.isBlank()) {
+            return "News Bias: Symbol unavailable";
+        }
+
+        Map<String, Object> result = newsDataProvider.fetchAndSummarizeNews(
+                symbol,
+                inferResearchBrokerType(),
+                10,
+                18.0);
+
+        Object biasObj = result.get("bias");
+        if (!(biasObj instanceof Map<?, ?> bias)) {
+            return "News Bias: unavailable";
+        }
+
+        String direction = safe(bias.get("direction") instanceof String value ? value : "neutral")
+            .toUpperCase(Locale.ROOT);
+        double score = bias.get("score") instanceof Number number ? number.doubleValue() : 0.0;
+        double confidence = bias.get("confidence") instanceof Number number ? number.doubleValue() : 0.0;
+        int events = result.get("events") instanceof List<?> list ? list.size() : 0;
+
+        return "News Bias (%s): %s | score %.2f | confidence %.0f%% | articles %d"
+                .formatted(symbol, direction, score, confidence * 100.0, events);
+    }
+
+    private String buildUpcomingEventPressureLine() {
+        newsDataProvider.loadSampleCalendarIfEmpty();
+        int immediate = newsDataProvider.getImmediateUpcomingEvents().size();
+        long highImpact = newsDataProvider.getUpcomingNewsEvents().stream()
+                .filter(event -> event != null && (event.getImportance() == NewsEvent.Importance.HIGH
+                        || event.getImportance() == NewsEvent.Importance.CRITICAL))
+                .count();
+        return "Event Pressure: %d events in 60m | %d high-impact events this week".formatted(immediate, highImpact);
+    }
+
+    private String inferResearchBrokerType() {
+        String venue = exchange == null ? safe(exchangeSelector == null ? null : exchangeSelector.getValue())
+                : safe(exchange.getDisplayName());
+        String normalized = venue.toLowerCase(Locale.ROOT);
+        if (normalized.contains("binance") || normalized.contains("coinbase") || normalized.contains("bitfinex")
+                || normalized.contains("kraken") || normalized.contains("stellar")) {
+            return "crypto";
+        }
+        if (normalized.contains("oanda") || normalized.contains("forex") || normalized.contains("fx")) {
+            return "forex";
+        }
+        return "stock";
+    }
+
+    private String buildLiveCorrelationMatrixText() {
+        List<TradePair> pairs = new ArrayList<>();
+        if (marketWatchItems != null) {
+            pairs.addAll(marketWatchItems.stream().filter(Objects::nonNull).limit(6).toList());
+        }
+        if (pairs.isEmpty() && symbolSelector != null && symbolSelector.getValue() != null) {
+            pairs.add(symbolSelector.getValue());
+        }
+
+        if (pairs.size() < 2) {
+            return "Not enough live symbols to build matrix. Add more symbols to Market Watch.";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("    ");
+        for (TradePair pair : pairs) {
+            builder.append(String.format("%10s", safe(pair.getSymbol())));
+        }
+        builder.append('\n');
+
+        for (TradePair rowPair : pairs) {
+            double rowChange = finite(rowPair.getChangePercent());
+            builder.append(String.format("%4s", safe(rowPair.getSymbol())));
+            for (TradePair colPair : pairs) {
+                double colChange = finite(colPair.getChangePercent());
+                double similarity;
+                if (rowPair == colPair) {
+                    similarity = 1.0;
+                } else {
+                    double denom = Math.max(1.0, Math.abs(rowChange) + Math.abs(colChange));
+                    similarity = clamp(1.0 - (Math.abs(rowChange - colChange) / denom), -1.0, 1.0);
+                }
+                builder.append(String.format("%10.2f", similarity));
+            }
+            builder.append('\n');
+        }
+
+        builder.append("\nNote: matrix values are live co-movement similarity derived from 24h change percentages.");
+        return builder.toString();
+    }
+
+    private List<String> buildVolatilityMetricsLines() {
+        MarketSnapshot snapshot = marketSnapshot();
+        List<String> lines = new ArrayList<>();
+
+        if (!snapshot.hasMarketData()) {
+            return List.of(
+                    "Volatility data currently unavailable from live venue.",
+                    "Connect an exchange or refresh symbols to populate real-time metrics.");
+        }
+
+        lines.add("Synthetic Market Volatility (VIX proxy): " + formatNumber(snapshot.syntheticVix(), 1));
+        lines.add("Breadth: " + formatPercent(snapshot.positiveBreadth() * 100.0));
+        lines.add("Average 24h Change: " + formatSignedPercent(snapshot.averageChangePercent(), 2));
+        lines.add("Quote Volume (24h): " + formatCurrencyCompact(snapshot.totalQuoteVolume()));
+
+        List<TradePair> movers = marketWatchItems == null
+                ? List.of()
+                : marketWatchItems.stream()
+                        .filter(Objects::nonNull)
+                        .sorted(Comparator.comparingDouble(pair -> -Math.abs(finite(pair.getChangePercent()))))
+                        .limit(3)
+                        .toList();
+
+        if (movers.isEmpty()) {
+            lines.add("Top Movers: no market watch symbols available");
+        } else {
+            lines.add("Top Movers (|24h change|):");
+            for (TradePair mover : movers) {
+                lines.add("- %s: %s".formatted(
+                        safe(mover.getSymbol()),
+                        formatSignedPercent(finite(mover.getChangePercent()), 2)));
+            }
+        }
+
+        return lines;
+    }
+
+    private record ResearchTabContent(VBox content, Runnable refreshAction) {
     }
 
     private void openStrategyResearch() {
@@ -9260,9 +9601,64 @@ public class TradingDesk extends BorderPane  {
 
         filterBox.getChildren().addAll(filterLabel, filterCombo);
 
+        ObservableList<String> allStrategies = FXCollections.observableArrayList(StrategyCatalog.availableStrategyNames());
+        FilteredList<String> filteredStrategies = new FilteredList<>(allStrategies, ignored -> true);
+
         ListView<String> strategyList = new ListView<>();
-        strategyList.getItems().addAll(StrategyCatalog.availableStrategyNames());
+        strategyList.setItems(filteredStrategies);
         strategyList.setCellFactory(param -> new StrategyListCell());
+
+        filterCombo.valueProperty().addListener((obs, oldValue, newValue) ->
+                filteredStrategies.setPredicate(strategy -> matchesStrategyFilter(strategy, newValue)));
+        if (!filteredStrategies.isEmpty()) {
+            strategyList.getSelectionModel().selectFirst();
+        }
+
+        Label assignmentIndicator = new Label();
+        assignmentIndicator.setWrapText(true);
+        assignmentIndicator.setStyle(
+            "-fx-text-fill: #93c5fd; -fx-background-color: #16213e; -fx-border-color: #374151; -fx-border-width: 1; -fx-padding: 10;");
+
+        Runnable refreshAssignmentIndicator = () -> assignmentIndicator
+            .setText(buildCurrentAssignmentIndicatorText());
+        refreshAssignmentIndicator.run();
+
+        javafx.beans.value.ChangeListener<TradePair> symbolRefreshListener = (obs, oldValue, newValue) ->
+                refreshAssignmentIndicator.run();
+        javafx.beans.value.ChangeListener<Timeframe> timeframeRefreshListener = (obs, oldValue, newValue) ->
+                refreshAssignmentIndicator.run();
+
+        if (symbolSelector != null) {
+            symbolSelector.getSelectionModel().selectedItemProperty().addListener(symbolRefreshListener);
+        }
+        if (timeframeSelector != null) {
+            timeframeSelector.getSelectionModel().selectedItemProperty().addListener(timeframeRefreshListener);
+        }
+
+        strategyList.sceneProperty().addListener((sceneObs, oldScene, newScene) -> {
+            if (newScene == null) {
+                return;
+            }
+            newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> {
+                if (!(newWindow instanceof Stage stage)) {
+                    return;
+                }
+                stage.setOnHidden(event -> {
+                    if (symbolSelector != null) {
+                        symbolSelector.getSelectionModel().selectedItemProperty().removeListener(symbolRefreshListener);
+                    }
+                    if (timeframeSelector != null) {
+                        timeframeSelector.getSelectionModel().selectedItemProperty()
+                                .removeListener(timeframeRefreshListener);
+                    }
+                    stage.close();
+                    log.info("Independent window closed: {}", stage.getTitle());
+                });
+            });
+        });
+
+        strategyList.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) ->
+            refreshAssignmentIndicator.run());
 
         HBox actionBox = new HBox(12);
         actionBox.setPadding(new Insets(12));
@@ -9270,22 +9666,182 @@ public class TradingDesk extends BorderPane  {
 
         Button viewBtn = new Button("View Details");
         viewBtn.setStyle("-fx-padding: 6 16; -fx-background-color: #3b82f6; -fx-text-fill: white;");
-        viewBtn.setOnAction(e -> showInfo("Strategy Details", "Strategy details panel loading..."));
+        viewBtn.disableProperty().bind(strategyList.getSelectionModel().selectedItemProperty().isNull());
+        viewBtn.setOnAction(e -> {
+            String selectedStrategy = strategyList.getSelectionModel().getSelectedItem();
+            if (selectedStrategy == null || selectedStrategy.isBlank()) {
+                showWarning("Strategy Details", "Select a strategy first.");
+                return;
+            }
+            showInfo("Strategy Details", buildStrategyDetails(selectedStrategy));
+        });
 
         Button selectBtn = new Button("Select Strategy");
         selectBtn.setStyle("-fx-padding: 6 16; -fx-background-color: #10b981; -fx-text-fill: white;");
-        selectBtn.setOnAction(e -> showInfo("Strategy Selected", "Strategy selected for trading."));
+        selectBtn.disableProperty().bind(strategyList.getSelectionModel().selectedItemProperty().isNull());
+        selectBtn.setOnAction(e -> {
+            String selectedStrategy = strategyList.getSelectionModel().getSelectedItem();
+            if (selectedStrategy == null || selectedStrategy.isBlank()) {
+                showWarning("Select Strategy", "Select a strategy first.");
+                return;
+            }
+
+            TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+            if (selectedPair == null) {
+                showWarning("Select Strategy", "Select a symbol in the main toolbar first.");
+                return;
+            }
+
+            Timeframe selectedTimeframe = timeframeSelector == null
+                    ? null
+                    : timeframeSelector.getSelectionModel().getSelectedItem();
+            if (selectedTimeframe == null) {
+                showWarning("Select Strategy", "Select a timeframe in the main toolbar first.");
+                return;
+            }
+
+            try {
+                StrategyAssignment assignment = StrategySelectionService.getInstance().manuallyAssign(
+                        selectedPair.toString('/'),
+                        selectedTimeframe,
+                        selectedStrategy,
+                        true,
+                        "Manual selection from Available Strategies");
+
+                journal("Manual strategy selected: " + assignment.getStrategyId() + " for "
+                        + selectedPair.toString('/') + " / " + selectedTimeframe.getCode());
+                showInfo(
+                        "Strategy Selected",
+                        "Assigned \"%s\" to %s on %s.".formatted(
+                                assignment.getStrategyId(),
+                                selectedPair.toString('/'),
+                                selectedTimeframe.getCode()));
+                refreshAssignmentIndicator.run();
+            } catch (Exception exception) {
+                log.error("Manual strategy selection failed", exception);
+                showWarning("Select Strategy", "Unable to assign strategy: " + rootMessage(exception));
+            }
+        });
+
+        strategyList.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                String selectedStrategy = strategyList.getSelectionModel().getSelectedItem();
+                if (selectedStrategy != null && !selectedStrategy.isBlank()) {
+                    showInfo("Strategy Details", buildStrategyDetails(selectedStrategy));
+                }
+            }
+        });
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         actionBox.getChildren().addAll(viewBtn, selectBtn, spacer);
 
-        strategiesView.getChildren().addAll(title, filterBox, strategyList, actionBox);
+        strategiesView.getChildren().addAll(title, filterBox, assignmentIndicator, strategyList, actionBox);
         VBox.setVgrow(strategyList, javafx.scene.layout.Priority.ALWAYS);
 
         createIndependentWindow("Available Strategies", strategiesView, 900, 700);
         journal("Strategy list opened");
+    }
+
+    private @NotNull String buildCurrentAssignmentIndicatorText() {
+        TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getSelectionModel().getSelectedItem();
+        Timeframe selectedTimeframe = timeframeSelector == null ? null : timeframeSelector.getSelectionModel().getSelectedItem();
+
+        if (selectedPair == null || selectedTimeframe == null) {
+            return "Current assignment: select symbol and timeframe in the main toolbar.";
+        }
+
+        String symbol = selectedPair.toString('/');
+        StrategyAssignment assignment = StrategyAssignmentRepository.getInstance().getActive(symbol, selectedTimeframe);
+        if (assignment == null || assignment.getStrategyId() == null || assignment.getStrategyId().isBlank()) {
+            return "Current assignment for %s on %s: none".formatted(symbol, selectedTimeframe.getCode());
+        }
+
+        String mode = assignment.getMode() == null ? "Unknown" : assignment.getMode().getDisplayName();
+        String assignedAt = assignment.getAssignedAt() == null ? "Unknown" : assignment.getAssignedAt().toString();
+
+        return "Current assignment for %s on %s: %s (Mode: %s, Assigned: %s)".formatted(
+                symbol,
+                selectedTimeframe.getCode(),
+            assignment.getStrategyId(),
+            mode,
+            assignedAt);
+    }
+
+    private boolean matchesStrategyFilter(String strategyName, String selectedFilter) {
+        if (strategyName == null || strategyName.isBlank()) {
+            return false;
+        }
+        if (selectedFilter == null || "All".equalsIgnoreCase(selectedFilter)) {
+            return true;
+        }
+
+        String normalized = strategyName.toLowerCase(Locale.ROOT);
+        return switch (selectedFilter) {
+            case "Trend-based" -> normalized.contains("trend")
+                    || normalized.contains("ema")
+                    || normalized.contains("momentum")
+                    || normalized.contains("pullback")
+                    || normalized.contains("donchian")
+                    || normalized.contains("macd");
+            case "Oscillator-based" -> normalized.contains("rsi")
+                    || normalized.contains("oscillator")
+                    || normalized.contains("stoch")
+                    || normalized.contains("macd");
+            case "Mean Reversion" -> normalized.contains("mean reversion")
+                    || normalized.contains("range fade")
+                    || normalized.contains("reversion")
+                    || normalized.contains("bollinger")
+                    || normalized.contains("reversal")
+                    || normalized.contains("failure swing");
+            case "Breakout" -> normalized.contains("breakout")
+                    || normalized.contains("squeeze")
+                    || normalized.contains("compression");
+            default -> true;
+        };
+    }
+
+    private @NotNull String buildStrategyDetails(String strategyName) {
+        StrategyDefinition definition = StrategyCatalog.definition(strategyName);
+        StrategyParameters params = definition.getParameters();
+
+        String symbol = symbolSelector == null || symbolSelector.getSelectionModel().getSelectedItem() == null
+                ? "(none selected)"
+                : symbolSelector.getSelectionModel().getSelectedItem().toString('/');
+
+        Timeframe timeframe = timeframeSelector == null
+                ? null
+                : timeframeSelector.getSelectionModel().getSelectedItem();
+
+        String timeframeCode = timeframe == null ? "(none selected)" : timeframe.getCode();
+        String activeAssignment = "None";
+
+        if (timeframe != null && symbolSelector != null && symbolSelector.getSelectionModel().getSelectedItem() != null) {
+            StrategyAssignment assignment = StrategyAssignmentRepository.getInstance().getActive(symbol, timeframe);
+            if (assignment != null && assignment.getStrategyId() != null && !assignment.getStrategyId().isBlank()) {
+                activeAssignment = assignment.getStrategyId();
+            }
+        }
+
+        return "Name: " + definition.getName() + "\n"
+                + "Base: " + definition.getBaseName() + "\n"
+                + "\n"
+                + "Parameters\n"
+                + "- RSI Period: " + params.getRsiPeriod() + "\n"
+                + "- EMA Fast: " + params.getEmaFast() + "\n"
+                + "- EMA Slow: " + params.getEmaSlow() + "\n"
+                + "- ATR Period: " + params.getAtrPeriod() + "\n"
+                + "- Breakout Lookback: " + params.getBreakoutLookback() + "\n"
+                + "- Oversold Threshold: " + String.format("%.2f", params.getOversoldThreshold()) + "\n"
+                + "- Overbought Threshold: " + String.format("%.2f", params.getOverboughtThreshold()) + "\n"
+                + "- Min Confidence: " + String.format("%.2f", params.getMinConfidence()) + "\n"
+                + "- Signal Amount: " + String.format("%.2f", params.getSignalAmount()) + "\n"
+                + "\n"
+                + "Current Context\n"
+                + "- Selected Symbol: " + symbol + "\n"
+                + "- Selected Timeframe: " + timeframeCode + "\n"
+                + "- Active Assignment: " + activeAssignment;
     }
 
     private void importStrategy() {

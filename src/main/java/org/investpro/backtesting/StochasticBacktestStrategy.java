@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.indicators.StochasticIndicator;
+import org.investpro.spi.PluginIndicatorFactory;
 import java.util.*;
 
 /**
@@ -23,16 +24,20 @@ public class StochasticBacktestStrategy extends BacktestStrategy {
 
     public StochasticBacktestStrategy(BacktestConfig config) {
         super("Stochastic Strategy", config);
-        this.stochasticIndicator = new StochasticIndicator(14, 3, 3);
-        this.kUpperBand = 80.0;
-        this.kLowerBand = 20.0;
-        this.dUpperBand = 80.0;
-        this.dLowerBand = 20.0;
+        Map<String, String> indicatorConfig = PluginIndicatorFactory.loadConfig("Stochastic");
+        this.stochasticIndicator = new StochasticIndicator(
+                parseInt(indicatorConfig, "kPeriod", 14),
+                parseInt(indicatorConfig, "kSlowPeriod", 3),
+                parseInt(indicatorConfig, "dPeriod", 3));
+        this.kUpperBand = parseDouble(indicatorConfig, "kUpperBand", 80.0);
+        this.kLowerBand = parseDouble(indicatorConfig, "kLowerBand", 20.0);
+        this.dUpperBand = parseDouble(indicatorConfig, "dUpperBand", 80.0);
+        this.dLowerBand = parseDouble(indicatorConfig, "dLowerBand", 20.0);
 
         // Store parameters
-        setParameter("kPeriod", 14);
-        setParameter("kSlowPeriod", 3);
-        setParameter("dPeriod", 3);
+        setParameter("kPeriod", parseInt(indicatorConfig, "kPeriod", 14));
+        setParameter("kSlowPeriod", parseInt(indicatorConfig, "kSlowPeriod", 3));
+        setParameter("dPeriod", parseInt(indicatorConfig, "dPeriod", 3));
         setParameter("kUpperBand", kUpperBand);
         setParameter("kLowerBand", kLowerBand);
     }
@@ -132,5 +137,21 @@ public class StochasticBacktestStrategy extends BacktestStrategy {
     public void setDBands(double upper, double lower) {
         this.dUpperBand = upper;
         this.dLowerBand = lower;
+    }
+
+    private static int parseInt(Map<String, String> config, String key, int defaultValue) {
+        try {
+            return Integer.parseInt(config.getOrDefault(key, String.valueOf(defaultValue)).trim());
+        } catch (Exception exception) {
+            return defaultValue;
+        }
+    }
+
+    private static double parseDouble(Map<String, String> config, String key, double defaultValue) {
+        try {
+            return Double.parseDouble(config.getOrDefault(key, String.valueOf(defaultValue)).trim());
+        } catch (Exception exception) {
+            return defaultValue;
+        }
     }
 }
