@@ -21,6 +21,10 @@ import org.controlsfx.control.ToggleSwitch;
 public class ChartOptions {
     @Getter
     private final VBox optionsPane;
+    private ChartOption verticalGridOption;
+    private ChartOption horizontalGridOption;
+    private ChartOption showVolumeOption;
+    private ChartOption alignOpenCloseOption;
 
     public ChartOptions() {
         optionsPane = new VBox();
@@ -31,16 +35,20 @@ public class ChartOptions {
         int numOptions = 0;
         optionsGrid.setVgap(10);
         optionsGrid.setHgap(20);
-        for (BooleanProperty optionProperty : List.of(
-                verticalGridLinesVisible, horizontalGridLinesVisible, showVolume, alignOpenClose)) {
-            ChartOption newOption = new ChartOption(optionProperty);
-            int optionIndex = numOptions++;
-            optionsGrid.add(newOption.optionLabel, 0, optionIndex);
-            optionsGrid.add(newOption.optionSwitch, 1, optionIndex);
-            optionProperty.bind(newOption.optionSwitch.selectedProperty());
-        }
+        verticalGridOption = addOptionRow(optionsGrid, numOptions++, verticalGridLinesVisible);
+        horizontalGridOption = addOptionRow(optionsGrid, numOptions++, horizontalGridLinesVisible);
+        showVolumeOption = addOptionRow(optionsGrid, numOptions++, showVolume);
+        alignOpenCloseOption = addOptionRow(optionsGrid, numOptions++, alignOpenClose);
         optionsPane.getChildren().setAll(optionsGrid);
         optionsPane.setPadding(new Insets(14, 16, 16, 16));
+    }
+
+    private ChartOption addOptionRow(GridPane grid, int index, BooleanProperty optionProperty) {
+        ChartOption option = new ChartOption(optionProperty);
+        grid.add(option.optionLabel, 0, index);
+        grid.add(option.optionSwitch, 1, index);
+        optionProperty.bind(option.optionSwitch.selectedProperty());
+        return option;
     }
 
     /**
@@ -66,6 +74,12 @@ public class ChartOptions {
         return verticalGridLinesVisible.getReadOnlyProperty();
     }
 
+    public void setVerticalGridLinesVisible(boolean visible) {
+        if (verticalGridOption != null) {
+            verticalGridOption.optionSwitch.setSelected(visible);
+        }
+    }
+
     /**
      * {@literal true} if horizontal grid lines should be drawn at major tick marks along the y-axis
      */
@@ -87,6 +101,12 @@ public class ChartOptions {
 
     public final ReadOnlyBooleanProperty horizontalGridLinesVisibleProperty() {
         return horizontalGridLinesVisible.getReadOnlyProperty();
+    }
+
+    public void setHorizontalGridLinesVisible(boolean visible) {
+        if (horizontalGridOption != null) {
+            horizontalGridOption.optionSwitch.setSelected(visible);
+        }
     }
 
     /**
@@ -112,6 +132,12 @@ public class ChartOptions {
         return showVolume.getReadOnlyProperty();
     }
 
+    public void setShowVolume(boolean visible) {
+        if (showVolumeOption != null) {
+            showVolumeOption.optionSwitch.setSelected(visible);
+        }
+    }
+
     /**
      * {@literal true} if the close price of candle at index N should be aligned (the same as) with the open price
      * of the candle at index N+1.
@@ -134,6 +160,12 @@ public class ChartOptions {
 
     public final ReadOnlyBooleanProperty alignOpenCloseProperty() {
         return alignOpenClose.getReadOnlyProperty();
+    }
+
+    public void setAlignOpenClose(boolean enabled) {
+        if (alignOpenCloseOption != null) {
+            alignOpenCloseOption.optionSwitch.setSelected(enabled);
+        }
     }
 
     private static class ChartOption {

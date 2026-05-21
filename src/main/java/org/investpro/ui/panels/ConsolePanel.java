@@ -90,9 +90,7 @@ public class ConsolePanel extends BorderPane {
         append("DEBUG", message);
     }
 
-    public void appendLine(String message) {
-        append("INFO", message);
-    }
+
 
     public void clear() {
         outputArea.clear();

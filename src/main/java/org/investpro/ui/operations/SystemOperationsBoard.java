@@ -163,6 +163,7 @@ public class SystemOperationsBoard extends BorderPane {
 
         ScrollPane scrollPane = new ScrollPane(grid);
         scrollPane.setFitToWidth(true);
+        scrollPane.getStyleClass().add("operations-scroll-pane");
         scrollPane.setStyle("-fx-background: transparent; -fx-padding: 0;");
         tab.setContent(scrollPane);
 

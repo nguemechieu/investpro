@@ -154,7 +154,7 @@ public class SystemCore {
     private SystemCoreDependencies systemCoreDependencies;
     private SymbolExecutionFilter symbolExecutionFilter;
     private EventBusManager eventBusManager;
-        private final java.util.Set<TradePair> symbolAgents =
+        private final java.util.Set<String> symbolAgents =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
@@ -514,7 +514,8 @@ public class SystemCore {
 
             symbolAgentManager.ensureSymbol(symbol);
 
-            if (symbolAgents.add(symbol)) {
+            String symbolKey = symbolAgentKey(symbol);
+            if (symbolAgents.add(symbolKey)) {
                 runtime.registerSymbol(symbol, symbolAgentManager);
                 registered++;
                 log.debug("SymbolAgent registered in runtime for {}", symbol.toString('/'));
@@ -524,6 +525,10 @@ public class SystemCore {
         if (registered > 0) {
             log.info("✅ {} symbol agents active (market watch fed)", symbolAgents.size());
         }
+    }
+
+    private static @NotNull String symbolAgentKey(@NotNull TradePair symbol) {
+        return symbol.toString('/').trim().toUpperCase(Locale.ROOT);
     }
 
     public void stop() {

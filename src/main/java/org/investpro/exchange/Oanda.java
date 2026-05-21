@@ -47,10 +47,15 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.channels.UnresolvedAddressException;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
@@ -96,6 +101,8 @@ public class Oanda extends Exchange {
     private static final String ACCOUNT_POSITION_ROUTE = "/v3/accounts/%s/positions/%s";
     private static final String ACCOUNT_POSITION_CLOSE_ROUTE = "/v3/accounts/%s/positions/%s/close";
     private static final String ACCOUNT_TRANSACTIONS_ROUTE = "/v3/accounts/%s/transactions";
+    private static final long CONNECTIVITY_LOG_INTERVAL_MS = 60_000L;
+    private static final long ACCOUNT_CONNECTIVITY_FAILURE_TTL_MS = 30_000L;
 
     private final HttpClient httpClient;
     private final PollingExchangeStreamer pollingStreamer;
@@ -149,6 +156,8 @@ public class Oanda extends Exchange {
     private final AtomicLong cacheAccountMisses = new AtomicLong(0);
     private long last429TimeMs = 0L;
     private String last429Endpoint = "";
+    private volatile long lastConnectivityLogMs = 0L;
+    private volatile long accountConnectivityUnavailableUntilMs = 0L;
 
     private static final Random jitterRandom = new Random();
 
@@ -565,7 +574,11 @@ public class Oanda extends Exchange {
             return pairs;
 
         } catch (Exception exception) {
-            log.error("Failed to load OANDA trade pairs", exception);
+            if (isConnectivityException(exception)) {
+                logConnectivityFailure("OANDA trade pair load", oandaRoute(ACCOUNT_INSTRUMENTS_ROUTE, resolvedAccountId), exception);
+            } else {
+                log.error("Failed to load OANDA trade pairs", exception);
+            }
             return Collections.emptyList();
         }
     }
@@ -1124,7 +1137,7 @@ public class Oanda extends Exchange {
                         String time = priceNode.path("time").asText("");
                         orderBook.setTimestamp(parseInstantOrNow(time));
 
-                        log.info(
+                        log.debug(
                                 "OANDA synthetic order book from pricing succeeded for {}: bestBid={}, bestAsk={}, bidLevels={}, askLevels={}",
                                 tradePair,
                                 bids.get(0).getPrice(),
@@ -1143,6 +1156,15 @@ public class Oanda extends Exchange {
                         );
                         return emptyOrderBook(tradePair);
                     }
+                })
+                .exceptionally(exception -> {
+                    if (isConnectivityException(exception)) {
+                        logConnectivityFailure("OANDA pricing fallback", url, exception);
+                    } else {
+                        log.warn("OANDA pricing fallback failed for {}: {}", tradePair, rootCause(exception).getMessage());
+                        log.debug("OANDA pricing fallback failure details for {}", tradePair, exception);
+                    }
+                    return emptyOrderBook(tradePair);
                 });
     }
 
@@ -1204,7 +1226,12 @@ public class Oanda extends Exchange {
         try {
             return fetchTicker(tradePair).join();
         } catch (Exception exception) {
-            log.warn("OANDA live price fetch failed for {}", tradePair, exception);
+            if (isConnectivityException(exception)) {
+                logConnectivityFailure("OANDA live price fetch", toInstrument(tradePair), exception);
+            } else {
+                log.warn("OANDA live price fetch failed for {}: {}", tradePair, rootCause(exception).getMessage());
+                log.debug("OANDA live price fetch failure details for {}", tradePair, exception);
+            }
             return emptyTicker();
         }
     }
@@ -1285,6 +1312,11 @@ public class Oanda extends Exchange {
 
         String url = oandaRoute(ACCOUNT_SUMMARY_ROUTE, account);
 
+        if (isAccountConnectivityBackoffActive()) {
+            log.debug("Skipping OANDA account details fetch during connectivity backoff: {}", extractEndpoint(url));
+            return null;
+        }
+
         HttpRequest request = requestBuilder(url)
                 .GET()
                 .build();
@@ -1299,7 +1331,8 @@ public class Oanda extends Exchange {
 
             JsonNode accountNode = OBJECT_MAPPER.readTree(response.body()).path("account");
 
-            Account userAccount = new Account(this, accountNode.path("alias").asText("OANDA Account"), "");
+            Account userAccount = new Account();
+            userAccount.setExchange(this);
             userAccount.setEmail(accountNode.path("id").asText(account));
             userAccount.setUsername(accountNode.path("id").asText(account));
             userAccount.setAccountId(accountNode.path("id").asText(account));
@@ -1352,14 +1385,32 @@ public class Oanda extends Exchange {
             return userAccount;
 
         } catch (Exception exception) {
-            log.error("Failed to fetch OANDA account details", exception);
+            if (isConnectivityException(exception)) {
+                accountConnectivityUnavailableUntilMs = System.currentTimeMillis() + ACCOUNT_CONNECTIVITY_FAILURE_TTL_MS;
+                logConnectivityFailure("OANDA account details", url, exception);
+            } else {
+                log.error("Failed to fetch OANDA account details", exception);
+            }
             return null;
         }
     }
 
     @Override
     public CompletableFuture<Account> fetchAccount() {
-        return CompletableFuture.supplyAsync(this::getUserAccountDetails, oandaExecutor);
+        synchronized (this) {
+            if (inflightAccountRequest != null && !inflightAccountRequest.isDone()) {
+                return inflightAccountRequest;
+            }
+
+            inflightAccountRequest = CompletableFuture
+                    .supplyAsync(this::getUserAccountDetails, oandaExecutor)
+                    .whenComplete((account, exception) -> {
+                        synchronized (Oanda.this) {
+                            inflightAccountRequest = null;
+                        }
+                    });
+            return inflightAccountRequest;
+        }
     }
 
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
@@ -3413,7 +3464,11 @@ public class Oanda extends Exchange {
             return "";
 
         } catch (Exception exception) {
-            logger.warn("OANDA account discovery failed", exception);
+            if (isConnectivityException(exception)) {
+                logConnectivityFailure("OANDA account discovery", url, exception);
+            } else {
+                logger.warn("OANDA account discovery failed", exception);
+            }
             return "";
         }
     }
@@ -3425,6 +3480,57 @@ public class Oanda extends Exchange {
                 .header("Authorization", "Bearer %s".formatted(apiKey))
                 .header("Accept-Datetime-Format", "RFC3339")
                 .header("User-Agent", "InvestPro/1.0");
+    }
+
+    private boolean isAccountConnectivityBackoffActive() {
+        return System.currentTimeMillis() < accountConnectivityUnavailableUntilMs;
+    }
+
+    static boolean isConnectivityException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof ConnectException
+                    || current instanceof UnknownHostException
+                    || current instanceof UnresolvedAddressException
+                    || current instanceof NoRouteToHostException
+                    || current instanceof SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private void logConnectivityFailure(String operation, String url, Throwable throwable) {
+        long now = System.currentTimeMillis();
+        Throwable root = rootCause(throwable);
+        String message = root.getMessage() == null || root.getMessage().isBlank()
+                ? root.getClass().getSimpleName()
+                : root.getMessage();
+
+        if (now - lastConnectivityLogMs >= CONNECTIVITY_LOG_INTERVAL_MS) {
+            lastConnectivityLogMs = now;
+            log.warn(
+                    "{} unavailable at {}: {}. Suppressing repeated connectivity stack traces for {} seconds.",
+                    operation,
+                    extractEndpoint(url),
+                    message,
+                    CONNECTIVITY_LOG_INTERVAL_MS / 1000);
+            log.debug("{} connectivity failure details", operation, throwable);
+            return;
+        }
+
+        log.debug("{} unavailable at {}: {}", operation, extractEndpoint(url), message);
+    }
+
+    private static Throwable rootCause(Throwable throwable) {
+        Throwable current = throwable;
+        Throwable root = throwable;
+        while (current != null) {
+            root = current;
+            current = current.getCause();
+        }
+        return root == null ? new RuntimeException("unknown") : root;
     }
 
     private HttpResponse<String> send(HttpRequest request) throws IOException {

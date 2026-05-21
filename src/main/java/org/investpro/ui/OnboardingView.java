@@ -519,9 +519,7 @@ public class OnboardingView extends StackPane {
                 .map(SupportedExchange::getDisplayName)
                 .forEach(exchangeBox.getItems()::add);
 
-        marketTypeBox.getSelectionModel().select("Crypto");
-        venueBox.getSelectionModel().select("US");
-        exchangeBox.getSelectionModel().select(SupportedExchange.COINBASE.getDisplayName());
+        applySavedConfigurationSelection();
 
         styleComboBox(marketTypeBox);
         styleComboBox(venueBox);
@@ -580,7 +578,7 @@ public class OnboardingView extends StackPane {
         SupportedExchange selectedExchange = SupportedExchange.fromDisplayName(selectedExchangeName);
 
         selectedTradingModeChoiceBox.getItems().setAll("PAPER TRADING", "LIVE");
-        selectedTradingModeChoiceBox.setValue("PAPER TRADING");
+        selectedTradingModeChoiceBox.setValue(loadSavedTradingMode());
         styleChoiceBox(selectedTradingModeChoiceBox);
 
         TextField apiKeyField = new TextField();
@@ -598,6 +596,7 @@ public class OnboardingView extends StackPane {
         styleInputField(openAiField, "OpenAI API Key (optional)");
 
         loadRememberedExchangeCredentials(selectedExchangeName, apiKeyField, apiSecretField, accountIdField);
+        loadSavedOptionalTokens();
 
         GridPane credGrid = formGrid();
         credGrid.addRow(0, createLabel(apiKeyLabel(selectedExchange)), apiKeyField);
@@ -993,6 +992,62 @@ public class OnboardingView extends StackPane {
     private void loadRememberedCredentials() {
         rememberMeCheckBox.setSelected(authService.isRememberMeEnabled());
         authService.rememberedUsername().ifPresent(usernameField::setText);
+    }
+
+    private void applySavedConfigurationSelection() {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+
+        String savedMarketType = preferences.get("marketType", "Crypto");
+        String savedVenue = preferences.get("venue", "US");
+        String savedExchange = preferences.get("exchange", SupportedExchange.COINBASE.getFactoryKey());
+
+        marketTypeBox.getSelectionModel().select(
+                marketTypeBox.getItems().contains(savedMarketType) ? savedMarketType : "Crypto");
+        venueBox.getSelectionModel().select(
+                venueBox.getItems().contains(savedVenue) ? savedVenue : "US");
+
+        String savedExchangeDisplayName = resolveExchangeDisplayName(savedExchange);
+        exchangeBox.getSelectionModel().select(
+                exchangeBox.getItems().contains(savedExchangeDisplayName)
+                        ? savedExchangeDisplayName
+                        : SupportedExchange.COINBASE.getDisplayName());
+    }
+
+    private String resolveExchangeDisplayName(String savedExchange) {
+        if (savedExchange == null || savedExchange.isBlank()) {
+            return SupportedExchange.COINBASE.getDisplayName();
+        }
+
+        try {
+            return SupportedExchange.fromFactoryKey(savedExchange).getDisplayName();
+        } catch (IllegalArgumentException ignored) {
+            try {
+                return SupportedExchange.fromDisplayName(savedExchange).getDisplayName();
+            } catch (IllegalArgumentException ignoredAgain) {
+                return SupportedExchange.COINBASE.getDisplayName();
+            }
+        }
+    }
+
+    private String loadSavedTradingMode() {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+        String savedTradingMode = preferences.get("tradingMode", "PAPER TRADING");
+        if ("LIVE".equalsIgnoreCase(savedTradingMode)) {
+            return "LIVE";
+        }
+        return "PAPER TRADING";
+    }
+
+    private void loadSavedOptionalTokens() {
+        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
+
+        if (telegramToken.getText() == null || telegramToken.getText().isBlank()) {
+            telegramToken.setText(preferences.get("telegramToken", ""));
+        }
+
+        if (openAiField.getText() == null || openAiField.getText().isBlank()) {
+            openAiField.setText(preferences.get("open_ai_api_key", ""));
+        }
     }
 
 

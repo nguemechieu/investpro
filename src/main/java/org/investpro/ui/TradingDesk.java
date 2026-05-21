@@ -36,6 +36,7 @@ import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.data.CandleData;
 import org.investpro.enums.SystemState;
 import org.investpro.enums.RiskStatus;
+import org.investpro.enums.TradingSessionStatus;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.exchange.consumers.UiExchangeStreamConsumer;
 import org.investpro.exchange.consumers.DesktopExchangeStreamBridge;
@@ -3030,8 +3031,8 @@ public class TradingDesk extends BorderPane  {
                 String color = switch(s) {
                     case "OPEN" -> "#10b981";
                     case "CLOSED" -> "#ef4444";
-                    case "PREMARKET" -> "#f59e0b";
-                    case "AFTERHOURS" -> "#8b5cf6";
+                    case "BREAK" -> "#f59e0b";
+                    case "UNKNOWN" -> "#94a3b8";
                     default -> "#cbd5e1";
                 };
                 setStyle("-fx-font-family: monospace; -fx-text-fill: " + color + ";");
@@ -10000,6 +10001,13 @@ public class TradingDesk extends BorderPane  {
             double realizedPnlToday = account != null ? account.getRealizedPnlToday() : 0.0;
             var isAutoTrading = systemCore.getSmartBot() != null && systemCore.getSmartBot().isAutoTradingEnabled();
             List<CandleData> candleList = new ArrayList<>(systemCore.getHistoricalDataRepository().findAll());
+                TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getValue();
+                TradingSessionStatus sessionStatus = selectedPair == null
+                    ? TradingSessionStatus.UNKNOWN
+                    : selectedPair.getTradingSessionStatus();
+                String normalizedSession = sessionStatus.name();
+                boolean marketOpen = sessionStatus == TradingSessionStatus.OPEN;
+
             // Build a comprehensive trading system status snapshot
             TradingSystemStatusSnapshot snapshot = TradingSystemStatusSnapshot.builder()
                     // System State
@@ -10082,11 +10090,11 @@ public class TradingDesk extends BorderPane  {
                     .openOrderCount(0)
 
                     // Market Sessions
-                    .primaryMarketStatus("OPEN")
-                    .sessionName("Regular Trading")
-                    .timeToMarketCloseSeconds(3600)
-                    .timeToMarketOpenSeconds(0)
-                    .liquidityCondition("GOOD")
+                    .primaryMarketStatus(normalizedSession)
+                    .sessionName(normalizedSession)
+                    .timeToMarketCloseSeconds(marketOpen ? 3600 : 0)
+                    .timeToMarketOpenSeconds(marketOpen ? 0 : 3600)
+                    .liquidityCondition(marketOpen ? "GOOD" : "UNKNOWN")
                     .rolloverRiskActive(false)
                     .newsLockoutActive(false)
 

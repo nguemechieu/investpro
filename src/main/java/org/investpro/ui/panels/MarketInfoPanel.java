@@ -49,11 +49,7 @@ import java.util.concurrent.CompletableFuture;
 @Setter
 public class MarketInfoPanel extends ScrollPane {
 
-    private static final Color BG = Color.web("#0f172a");
-    private static final Color CARD = Color.web("#111827");
-    private static final Color CARD_2 = Color.web("#172033");
-    private static final Color BORDER = Color.web("#263244");
-    private static final Color TEXT = Color.web("#e5e7eb");
+     private static final Color TEXT = Color.web("#e5e7eb");
     private static final Color MUTED = Color.web("#94a3b8");
     private static final Color BLUE = Color.web("#3b82f6");
     private static final Color GREEN = Color.web("#10b981");

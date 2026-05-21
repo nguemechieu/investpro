@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.enums.TradingSessionStatus;
 import org.investpro.core.agents.symbol.SymbolAgentState;
 import org.investpro.core.agents.symbol.SymbolTradingMode;
 import org.investpro.models.trading.TradePair;
@@ -219,6 +220,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         if (state == null) {
             agentState.set("Unknown");
             tradingMode.set("Unknown");
+            session.set("UNKNOWN");
             activeStrategy.set("");
             assignedStrategy.set("");
             activeTimeframe.set("");
@@ -271,6 +273,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
         SymbolTradingMode mode = state.getTradingMode();
         tradingMode.set(mode.getDisplayName());
+        session.set(resolveSessionLabel(pair));
 
         activeStrategy.set(state.getActiveStrategyName() != null ? state.getActiveStrategyName() : "");
         assignedStrategy.set(state.getAssignedStrategyName() != null ? state.getAssignedStrategyName() : "");
@@ -291,6 +294,19 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
         lastUpdated = System.currentTimeMillis();
 
+    }
+
+    private String resolveSessionLabel(@Nullable TradePair pair) {
+        TradingSessionStatus status = pair == null
+                ? TradingSessionStatus.UNKNOWN
+                : pair.getTradingSessionStatus();
+
+        return switch (status) {
+            case OPEN -> "OPEN";
+            case CLOSED -> "CLOSED";
+            case BREAK -> "BREAK";
+            case UNKNOWN -> "UNKNOWN";
+        };
     }
 
     /**

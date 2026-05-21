@@ -4,6 +4,9 @@ import org.investpro.exchange.models.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.net.ConnectException;
+import java.nio.channels.UnresolvedAddressException;
+
 import static org.assertj.core.api.Assertions.*;
 
 /**
@@ -179,5 +182,14 @@ class OandaAdapterContractTest {
                 .build();
 
         assertThat(hypothetical.getMarketDepthType()).isEqualTo(MarketDepthType.FULL_ORDER_BOOK);
+    }
+
+    @Test
+    @DisplayName("OANDA classifies unresolved address failures as connectivity issues")
+    void testUnresolvedAddressIsConnectivityIssue() {
+        ConnectException exception = new ConnectException();
+        exception.initCause(new UnresolvedAddressException());
+
+        assertThat(Oanda.isConnectivityException(exception)).isTrue();
     }
 }

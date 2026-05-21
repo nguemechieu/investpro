@@ -17,13 +17,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class SymbolAgentManager {
 
-    private final Map<TradePair, SymbolAgentState> symbolStates = new ConcurrentHashMap<>();
+    private final Map<String, SymbolAgentState> symbolStates = new ConcurrentHashMap<>();
 
     /**
      * Get the current state of a symbol.
      */
     public Optional<SymbolAgentState> getState(@NotNull TradePair symbol) {
-        return Optional.ofNullable(symbolStates.get(symbol));
+        return Optional.ofNullable(symbolStates.get(symbolKey(symbol)));
     }
 
     /**
@@ -38,7 +38,7 @@ public class SymbolAgentManager {
      * started.
      */
     public SymbolAgentState ensureSymbol(@NotNull TradePair symbol) {
-        return symbolStates.computeIfAbsent(symbol, this::defaultState);
+        return symbolStates.computeIfAbsent(symbolKey(symbol), ignored -> defaultState(symbol));
     }
 
     /**
@@ -63,7 +63,7 @@ public class SymbolAgentManager {
             state.setSymbol(symbol);
         }
         state.updateTimestamp();
-        symbolStates.put(symbol, state);
+        symbolStates.put(symbolKey(symbol), state);
         log.debug("Updated symbol state: {} -> {}", symbol, state.getTradingMode());
     }
 
@@ -71,7 +71,7 @@ public class SymbolAgentManager {
      * Remove the state of a symbol.
      */
     public void removeState(@NotNull TradePair symbol) {
-        symbolStates.remove(symbol);
+        symbolStates.remove(symbolKey(symbol));
     }
 
     /**
@@ -129,6 +129,10 @@ public class SymbolAgentManager {
      */
     public void clear() {
         symbolStates.clear();
+    }
+
+    private static @NotNull String symbolKey(@NotNull TradePair symbol) {
+        return symbol.toString('/').trim().toUpperCase(Locale.ROOT);
     }
 
     private SymbolAgentState defaultState(@NotNull TradePair symbol) {

@@ -14,6 +14,7 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableNumberValue;
 import javafx.beans.value.ObservableValue;
 import javafx.event.EventHandler;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.geometry.VPos;
@@ -23,7 +24,14 @@ import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.Axis;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
@@ -47,8 +55,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.investpro.data.CandleData;
 import org.investpro.data.CandleDataPager;
+import org.investpro.enums.TradingSessionStatus;
 import org.investpro.exchange.Exchange;
-import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.LiveTradesConsumer;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
@@ -77,6 +85,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.prefs.Preferences;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.investpro.ui.charts.ChartColors.AXIS_TICK_LABEL_COLOR;
@@ -119,6 +128,9 @@ public class CandleStickChart extends Region {
     private static final double VOLUME_AREA_RATIO = 0.20;
     private static final double PRICE_PADDING_RATIO = 0.12;
     private static final long LOADING_TIMEOUT_MS = 30_000L;
+    private static final int MAX_PERSISTED_DRAWINGS = 250;
+    private static final String DRAWING_FORMAT_VERSION = "v1";
+    private static final Preferences CHART_PREFERENCES = Preferences.userRoot().node("org/investpro/chart");
 
     // ============================================================
     // Modern InvestPro chart theme
@@ -143,6 +155,7 @@ public class CandleStickChart extends Region {
     private final TradingService tradingService;
 
     private final ChartOptions chartOptions;
+    private final String chartSettingsKeyPrefix;
     private final CandleDataPager candleDataPager;
     private final Consumer<List<CandleData>> candlePageConsumer;
 
@@ -156,6 +169,9 @@ public class CandleStickChart extends Region {
     private final ProgressIndicator progressIndicator = new ProgressIndicator(-1);
     private final Text loadingStatusText = new Text("Loading...");
     private final VBox loadingIndicatorContainer = new VBox(8, progressIndicator, loadingStatusText);
+    private final ToggleGroup leftToolToggleGroup = new ToggleGroup();
+    private final EnumMap<ChartInteractionTool, ToggleButton> leftToolButtons = new EnumMap<>(ChartInteractionTool.class);
+    private ScrollPane leftToolPalette;
 
     private final AtomicBoolean loading = new AtomicBoolean(false);
     private final AtomicBoolean drawRequested = new AtomicBoolean(false);
@@ -207,6 +223,7 @@ public class CandleStickChart extends Region {
     private StackPane chartStackPane;
 
     private volatile boolean disposed;
+    private volatile boolean restoringPreferences;
     private volatile boolean paging;
     private volatile long loadingStartTime = -1L;
 
@@ -280,10 +297,13 @@ public class CandleStickChart extends Region {
         this.secondsPerCandle = Math.max(1, secondsPerCandle);
         this.telegramToken = telegramToken == null ? "" : telegramToken.trim();
         this.tradingService = tradingService;
+        this.chartSettingsKeyPrefix = buildChartSettingsPrefix();
 
         this.chartOptions = new ChartOptions();
         this.candleDataPager = new CandleDataPager(this, candleDataSupplier);
         this.candlePageConsumer = new CandlePageConsumer();
+
+        restoreChartPreferences();
 
         // Initialize trade visualization overlay
         this.tradeVisualizationOverlay = new TradeVisualizationOverlay();
@@ -301,14 +321,194 @@ public class CandleStickChart extends Region {
         configureAxes();
         configureLoadingOverlay();
         configureAxisExtension();
+        configureLeftToolPalette();
 
-        getChildren().addAll(xAxis, yAxis, extraAxis, extraAxisExtension);
+        getChildren().addAll(xAxis, yAxis, extraAxis, extraAxisExtension, leftToolPalette);
 
         initializeFirstLayout(containerWidth, containerHeight);
         initializeOptionListeners();
 
         if (liveSyncing) {
             initializeLiveSyncing();
+        }
+    }
+
+    private String buildChartSettingsPrefix() {
+        String exchangeName = sanitizeForPreferenceKey(exchange == null ? "unknown" : exchange.getName());
+        String symbol = sanitizeForPreferenceKey(tradePair == null ? "unknown" : tradePair.toString('-'));
+        return exchangeName + "." + symbol + "." + secondsPerCandle;
+    }
+
+    private String sanitizeForPreferenceKey(String value) {
+        if (value == null || value.isBlank()) {
+            return "unknown";
+        }
+        return value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "_");
+    }
+
+    private String prefKey(String suffix) {
+        return chartSettingsKeyPrefix + "." + suffix;
+    }
+
+    private void restoreChartPreferences() {
+        restoringPreferences = true;
+        try {
+            chartOptions.setVerticalGridLinesVisible(CHART_PREFERENCES.getBoolean(prefKey("grid.vertical"),
+                    chartOptions.isVerticalGridLinesVisible()));
+            chartOptions.setHorizontalGridLinesVisible(CHART_PREFERENCES.getBoolean(prefKey("grid.horizontal"),
+                    chartOptions.isHorizontalGridLinesVisible()));
+            chartOptions.setShowVolume(CHART_PREFERENCES.getBoolean(prefKey("showVolume"), chartOptions.isShowVolume()));
+            chartOptions.setAlignOpenClose(
+                    CHART_PREFERENCES.getBoolean(prefKey("alignOpenClose"), chartOptions.isAlignOpenClose()));
+
+            showCrosshair = CHART_PREFERENCES.getBoolean(prefKey("crosshair"), showCrosshair);
+            showPriceLines = CHART_PREFERENCES.getBoolean(prefKey("showPriceLines"), showPriceLines);
+            showChartEvents = CHART_PREFERENCES.getBoolean(prefKey("showChartEvents"), showChartEvents);
+            showTradeOverlay = CHART_PREFERENCES.getBoolean(prefKey("showTradeOverlay"), showTradeOverlay);
+            autoTradeEnabled = CHART_PREFERENCES.getBoolean(prefKey("autoTrade"), autoTradeEnabled);
+            backgroundImageOpacity = clamp(CHART_PREFERENCES.getDouble(prefKey("backgroundOpacity"), backgroundImageOpacity),
+                    0.0,
+                    1.0);
+
+            visibleCandles = clampInt(
+                    CHART_PREFERENCES.getInt(prefKey("visibleCandles"), visibleCandles),
+                    MIN_VISIBLE_CANDLES,
+                    MAX_VISIBLE_CANDLES);
+
+            String interactionTool = CHART_PREFERENCES.get(prefKey("interactionTool"), ChartInteractionTool.CURSOR.name());
+            try {
+                activeInteractionTool = ChartInteractionTool.valueOf(interactionTool);
+            } catch (IllegalArgumentException ignored) {
+                activeInteractionTool = ChartInteractionTool.CURSOR;
+            }
+
+            restorePersistedDrawings();
+        } finally {
+            restoringPreferences = false;
+        }
+    }
+
+    private void persistChartPreferences() {
+        if (restoringPreferences) {
+            return;
+        }
+
+        CHART_PREFERENCES.putBoolean(prefKey("grid.vertical"), chartOptions.isVerticalGridLinesVisible());
+        CHART_PREFERENCES.putBoolean(prefKey("grid.horizontal"), chartOptions.isHorizontalGridLinesVisible());
+        CHART_PREFERENCES.putBoolean(prefKey("showVolume"), chartOptions.isShowVolume());
+        CHART_PREFERENCES.putBoolean(prefKey("alignOpenClose"), chartOptions.isAlignOpenClose());
+
+        CHART_PREFERENCES.putBoolean(prefKey("crosshair"), showCrosshair);
+        CHART_PREFERENCES.putBoolean(prefKey("showPriceLines"), showPriceLines);
+        CHART_PREFERENCES.putBoolean(prefKey("showChartEvents"), showChartEvents);
+        CHART_PREFERENCES.putBoolean(prefKey("showTradeOverlay"), showTradeOverlay);
+        CHART_PREFERENCES.putBoolean(prefKey("autoTrade"), autoTradeEnabled);
+        CHART_PREFERENCES.putDouble(prefKey("backgroundOpacity"), backgroundImageOpacity);
+        CHART_PREFERENCES.putInt(prefKey("visibleCandles"), visibleCandles);
+        CHART_PREFERENCES.put(prefKey("interactionTool"), activeInteractionTool == null
+                ? ChartInteractionTool.CURSOR.name()
+                : activeInteractionTool.name());
+
+        persistChartDrawings();
+    }
+
+    private void restorePersistedDrawings() {
+        chartDrawings.clear();
+
+        String serialized = CHART_PREFERENCES.get(prefKey("drawings"), "");
+        if (serialized == null || serialized.isBlank()) {
+            return;
+        }
+
+        String[] tokens = serialized.split(";");
+        for (String token : tokens) {
+            if (chartDrawings.size() >= MAX_PERSISTED_DRAWINGS) {
+                break;
+            }
+
+            ChartDrawing drawing = parsePersistedDrawing(token);
+            if (drawing != null) {
+                chartDrawings.add(drawing);
+            }
+        }
+    }
+
+    private void persistChartDrawings() {
+        if (restoringPreferences) {
+            return;
+        }
+
+        if (chartDrawings.isEmpty()) {
+            CHART_PREFERENCES.remove(prefKey("drawings"));
+            return;
+        }
+
+        StringJoiner joiner = new StringJoiner(";");
+        int persistedCount = 0;
+
+        for (ChartDrawing drawing : chartDrawings) {
+            if (drawing == null || drawing.preview() || !drawing.isDrawable()) {
+                continue;
+            }
+
+            joiner.add(serializeDrawing(drawing));
+            persistedCount++;
+
+            if (persistedCount >= MAX_PERSISTED_DRAWINGS) {
+                break;
+            }
+        }
+
+        if (persistedCount == 0) {
+            CHART_PREFERENCES.remove(prefKey("drawings"));
+            return;
+        }
+
+        CHART_PREFERENCES.put(prefKey("drawings"), joiner.toString());
+    }
+
+    private String serializeDrawing(ChartDrawing drawing) {
+        return DRAWING_FORMAT_VERSION
+            + "|" + drawing.type().name()
+                + "|" + drawing.startTime()
+                + "|" + drawing.startPrice()
+                + "|" + drawing.endTime()
+                + "|" + drawing.endPrice();
+    }
+
+    private ChartDrawing parsePersistedDrawing(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+
+        String[] parts = token.split("\\|", -1);
+        if (parts.length != 5 && parts.length != 6) {
+            return null;
+        }
+
+        try {
+            int offset = 0;
+            if (parts.length == 6) {
+                if (!DRAWING_FORMAT_VERSION.equals(parts[0])) {
+                    return null;
+                }
+                offset = 1;
+            }
+
+            ChartInteractionTool type = ChartInteractionTool.valueOf(parts[offset]);
+            if (!type.isDrawingTool()) {
+                return null;
+            }
+
+            long startTime = Long.parseLong(parts[offset + 1]);
+            double startPrice = Double.parseDouble(parts[offset + 2]);
+            long endTime = Long.parseLong(parts[offset + 3]);
+            double endPrice = Double.parseDouble(parts[offset + 4]);
+
+            ChartDrawing drawing = ChartDrawing.persisted(type, startTime, startPrice, endTime, endPrice);
+            return drawing.isDrawable() ? drawing : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 
@@ -448,6 +648,116 @@ public class CandleStickChart extends Region {
         extraAxisExtension.setMouseTransparent(true);
     }
 
+    private void configureLeftToolPalette() {
+        VBox buttonColumn = new VBox(6);
+        buttonColumn.setPadding(new Insets(8));
+        buttonColumn.setStyle("-fx-background-color: transparent;");
+
+        buttonColumn.getChildren().addAll(
+                createToolToggle("\u25a3", "Cursor", this::activateCursorTool, ChartInteractionTool.CURSOR),
+                createToolAction("\u2573", "Crosshair", this::toggleCrosshair),
+                new Separator(),
+                createToolToggle("/", "Trendline", this::activateTrendlineTool, ChartInteractionTool.TRENDLINE),
+                createToolToggle("\u2500", "Horizontal Line", this::activateHorizontalLineTool, ChartInteractionTool.HORIZONTAL_LINE),
+                createToolToggle("\u2502", "Vertical Line", this::activateVerticalLineTool, ChartInteractionTool.VERTICAL_LINE),
+                createToolToggle("\u25ad", "Rectangle", this::activateRectangleTool, ChartInteractionTool.RECTANGLE),
+                createToolToggle("\u25b3", "Triangle", this::activateTriangleTool, ChartInteractionTool.TRIANGLE),
+                createToolToggle("\u25ef", "Circle", this::activateCircleTool, ChartInteractionTool.CIRCLE),
+                createToolToggle("F", "Fibonacci", this::activateFibonacciTool, ChartInteractionTool.FIBONACCI),
+                createToolToggle("M", "Measure", this::activateMeasureTool, ChartInteractionTool.MEASURE),
+                createToolToggle("R", "Long/Short (Risk/Reward)", this::activateRiskRewardTool, ChartInteractionTool.RISK_REWARD),
+                createToolToggle("E", "Erase Objects", this::activateEraseObjectsTool, ChartInteractionTool.ERASE_OBJECTS),
+                new Separator(),
+                createToolAction("T", "Text (coming soon)", () -> showTransientNotice("Text tool is coming soon")),
+                createToolAction("A", "Arrow (coming soon)", () -> showTransientNotice("Arrow tool is coming soon")),
+                createToolAction("B", "Brush (coming soon)", () -> showTransientNotice("Brush tool is coming soon")),
+                createToolAction("P", "Path (coming soon)", () -> showTransientNotice("Path tool is coming soon")),
+                createToolAction("G", "Magnet (coming soon)", () -> showTransientNotice("Magnet mode is coming soon")),
+                new Separator(),
+                createToolAction("C", "Clear drawings", this::clearChartDrawings)
+        );
+
+        leftToolPalette = new ScrollPane(buttonColumn);
+        leftToolPalette.setManaged(false);
+        leftToolPalette.setFitToWidth(true);
+        leftToolPalette.setFitToHeight(true);
+        leftToolPalette.setPannable(true);
+        leftToolPalette.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        leftToolPalette.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        leftToolPalette.setFocusTraversable(false);
+        leftToolPalette.setStyle("""
+                -fx-background-color: rgba(15, 23, 42, 0.92);
+                -fx-background-insets: 0;
+                -fx-border-color: rgba(71, 85, 105, 0.85);
+                -fx-border-width: 1;
+                -fx-border-radius: 10;
+                -fx-background-radius: 10;
+                """);
+
+        syncLeftToolPaletteSelection();
+    }
+
+    private ToggleButton createToolToggle(
+            String label,
+            String tooltip,
+            Runnable action,
+            ChartInteractionTool tool) {
+        ToggleButton button = new ToggleButton(label);
+        styleToolButton(button, tooltip);
+        button.setToggleGroup(leftToolToggleGroup);
+        button.setOnAction(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+        if (tool != null) {
+            leftToolButtons.put(tool, button);
+        }
+        return button;
+    }
+
+    private Button createToolAction(String label, String tooltip, Runnable action) {
+        Button button = new Button(label);
+        styleToolButton(button, tooltip);
+        button.setOnAction(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+        return button;
+    }
+
+    private void styleToolButton(ButtonBase button, String tooltip) {
+        button.setMinSize(30, 30);
+        button.setPrefSize(30, 30);
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setFocusTraversable(false);
+        button.setTooltip(new Tooltip(tooltip));
+        button.setStyle("""
+                -fx-background-color: rgba(30, 41, 59, 0.92);
+                -fx-text-fill: #e2e8f0;
+                -fx-font-size: 12px;
+                -fx-font-weight: bold;
+                -fx-background-radius: 7;
+                -fx-border-color: rgba(71, 85, 105, 0.75);
+                -fx-border-width: 1;
+                -fx-border-radius: 7;
+                -fx-cursor: hand;
+                """);
+    }
+
+    private void syncLeftToolPaletteSelection() {
+        if (leftToolButtons.isEmpty()) {
+            return;
+        }
+
+        leftToolButtons.values().forEach(button -> button.setSelected(false));
+        ToggleButton selected = leftToolButtons.get(activeInteractionTool);
+        if (selected != null) {
+            selected.setSelected(true);
+        }
+    }
+
     private void initializeFirstLayout(ObservableNumberValue containerWidth, ObservableNumberValue containerHeight) {
         BooleanProperty gotFirstSize = new SimpleBooleanProperty(false);
         ChangeListener<Number> sizeListener = new SizeChangeListener(gotFirstSize, containerWidth, containerHeight);
@@ -508,15 +818,25 @@ public class CandleStickChart extends Region {
         });
 
         chartOptions.horizontalGridLinesVisibleProperty()
-                .addListener((observable, oldValue, newValue) -> requestChartRedraw());
+                .addListener((observable, oldValue, newValue) -> {
+                    persistChartPreferences();
+                    requestChartRedraw();
+                });
         chartOptions.verticalGridLinesVisibleProperty()
-                .addListener((observable, oldValue, newValue) -> requestChartRedraw());
+                .addListener((observable, oldValue, newValue) -> {
+                    persistChartPreferences();
+                    requestChartRedraw();
+                });
         chartOptions.showVolumeProperty().addListener((observable, oldValue, newValue) -> {
+            persistChartPreferences();
             layoutChart();
             requestChartRedraw();
         });
         chartOptions.alignOpenCloseProperty().addListener((observable,
-                oldValue, newValue) -> requestChartRedraw());
+                oldValue, newValue) -> {
+                    persistChartPreferences();
+                    requestChartRedraw();
+                });
     }
 
     private void initializeEventHandlers() {
@@ -821,7 +1141,11 @@ public class CandleStickChart extends Region {
 
 
     private void setVisibleCandleCount(int requestedVisible) {
+        int previousVisible = visibleCandles;
         visibleCandles = Math.max(1, Math.min(data.size(), requestedVisible));
+        if (previousVisible != visibleCandles) {
+            persistChartPreferences();
+        }
         updateCandleWidthFromVisibleCount();
     }
 
@@ -943,6 +1267,18 @@ public class CandleStickChart extends Region {
         double volumeY = canvasH - volumeH;
         extraAxis.resizeRelocate(0, volumeY, leftAxisWidth, volumeH);
         extraAxis.setVisible(chartOptions.isShowVolume());
+        if (leftToolPalette != null) {
+            if (chartOptions.isShowVolume() && leftAxisWidth > 0) {
+                double toolX = 4;
+                double toolY = 8;
+                double toolW = Math.max(34, leftAxisWidth - 8);
+                double toolH = Math.max(120, volumeY - 12);
+                leftToolPalette.setVisible(true);
+                leftToolPalette.resizeRelocate(toolX, toolY, toolW, toolH);
+            } else {
+                leftToolPalette.setVisible(false);
+            }
+        }
         extraAxisExtension.setStartX(leftAxisWidth);
         extraAxisExtension.setEndX(leftAxisWidth);
         extraAxisExtension.setStartY(volumeY);
@@ -1224,125 +1560,22 @@ public class CandleStickChart extends Region {
     }
 
     private String getMarketSession() {
-        java.time.ZoneId marketZone = detectMarketTimeZone();
-        java.time.LocalTime currentTime = java.time.LocalTime.now(marketZone);
-        java.time.LocalDateTime currentDateTime = java.time.LocalDateTime.now(marketZone);
-        java.time.DayOfWeek dayOfWeek = currentDateTime.getDayOfWeek();
+        TradingSessionStatus status = tradePair == null
+                ? TradingSessionStatus.UNKNOWN
+                : tradePair.getTradingSessionStatus();
 
-        // Check if it's a weekend
-        if (dayOfWeek == java.time.DayOfWeek.SATURDAY || dayOfWeek == java.time.DayOfWeek.SUNDAY) {
-            return "CLOSED (Weekend)";
-        }
-
-        // NYSE/NASDAQ: 9:30 AM - 4:00 PM ET
-        if (isStockMarketPair()) {
-            if (currentTime.isAfter(java.time.LocalTime.of(9, 30))
-                    && currentTime.isBefore(java.time.LocalTime.of(16, 0))) {
-                return "NYSE/NASDAQ OPEN";
-            } else if (currentTime.isAfter(java.time.LocalTime.of(4, 0))
-                    && currentTime.isBefore(java.time.LocalTime.of(9, 30))) {
-                return "NYSE/NASDAQ PREMARKET";
-            } else if (currentTime.isAfter(java.time.LocalTime.of(16, 0))
-                    && currentTime.isBefore(java.time.LocalTime.of(20, 0))) {
-                return "NYSE/NASDAQ AFTERHOURS";
-            } else {
-                return "NYSE/NASDAQ CLOSED";
-            }
-        }
-
-        // Forex: 24/5 (Monday-Friday)
-        if (isForexPair()) {
-            return "FOREX OPEN (24h)";
-        }
-
-        // Crypto: 24/7
-        if (isCryptoPair()) {
-            return "CRYPTO OPEN (24/7)";
-        }
-
-        // Check for London Stock Exchange: 8:00 AM - 4:30 PM GMT
-        if (isLondonMarketPair()) {
-            if (currentTime.isAfter(java.time.LocalTime.of(8, 0))
-                    && currentTime.isBefore(java.time.LocalTime.of(16, 30))) {
-                return "LSE OPEN";
-            } else if (currentTime.isAfter(java.time.LocalTime.of(7, 0))
-                    && currentTime.isBefore(java.time.LocalTime.of(8, 0))) {
-                return "LSE PREMARKET";
-            } else {
-                return "LSE CLOSED";
-            }
-        }
-
-        return "MARKET CLOSED";
-    }
-
-    private java.time.ZoneId detectMarketTimeZone() {
-        // Detect timezone based on trading pair
-        if (isStockMarketPair()) {
-            return java.time.ZoneId.of("America/New_York");
-        } else if (isLondonMarketPair()) {
-            return java.time.ZoneId.of("Europe/London");
-        } else if (isForexPair()) {
-            return java.time.ZoneId.of("Europe/London"); // Forex trades in London time
-        }
-        return java.time.ZoneId.systemDefault();
-    }
-
-    private boolean isStockMarketPair() {
-        String base = tradePair.getBaseCurrency().getSymbol().toUpperCase();
-        String counter = tradePair.getCounterCurrency().getSymbol().toUpperCase();
-        // Check for common stock indicators (company symbols with major fiat quotes)
-        return (counter.equals("USD") || counter.equals("EUR")) &&
-                (base.length() <= 5 && !isCryptoSymbol(base) && !isForexSymbol(base));
-    }
-
-    private boolean isForexPair() {
-        String base = tradePair.getBaseCurrency().getSymbol().toUpperCase();
-        String counter = tradePair.getCounterCurrency().getSymbol().toUpperCase();
-        // Forex pairs are typically fiat-against-fiat symbols.
-        return isForexSymbol(base) && isForexSymbol(counter);
-    }
-
-    private boolean isCryptoPair() {
-        String base = tradePair.getBaseCurrency().getSymbol().toUpperCase();
-        String counter = tradePair.getCounterCurrency().getSymbol().toUpperCase();
-        return isCryptoSymbol(base) || isCryptoSymbol(counter);
-    }
-
-    private boolean isLondonMarketPair() {
-        String base = tradePair.getBaseCurrency().getSymbol().toUpperCase();
-        String counter = tradePair.getCounterCurrency().getSymbol().toUpperCase();
-        // Check for London market pairs (GBP-quoted or UK-related indices)
-        return (counter.equals("GBP") && base.length() <= 5 && !isCryptoSymbol(base)) ||
-                base.contains("FTSE") || base.contains("LSE");
-    }
-
-    private boolean isCryptoSymbol(String symbol) {
-        // Common crypto symbols
-         for(org.investpro.models.currency.Currency cryptoCurrency: CryptoCurrency.CURRENCIES.values()){
-
-             if(cryptoCurrency.getSymbol().equals(symbol)){
-                 return true;
-             }
-         }
-         return false;
-    }
-
-    private boolean isForexSymbol(String symbol) {
-        // Common forex currency codes
-
-        for (java.util.Currency currency: Currency.getAvailableCurrencies()) {
-            if (currency.getSymbol().equals(symbol)) {
-                return true;
-            }
-        }
-        return false;
+        return switch (status) {
+            case OPEN -> "OPEN";
+            case CLOSED -> "CLOSED";
+            case BREAK -> "BREAK";
+            case UNKNOWN -> "UNKNOWN";
+        };
     }
 
     private Color getSessionColor(String session) {
         if (session.contains("OPEN")) {
             return Color.rgb(76, 175, 80); // Green for open
-        } else if (session.contains("PREMARKET") || session.contains("AFTERHOURS")) {
+        } else if (session.contains("BREAK")) {
             return Color.rgb(255, 152, 0); // Orange for pre/after hours
         } else {
             return Color.rgb(244, 67, 54); // Red for closed
@@ -1872,6 +2105,7 @@ public class CandleStickChart extends Region {
     public void setShowChartEvents(boolean show) {
         if (showChartEvents != show) {
             showChartEvents = show;
+            persistChartPreferences();
             requestChartRedraw();
         }
     }
@@ -2375,6 +2609,7 @@ public class CandleStickChart extends Region {
 
     public void setPriceLinesVisible(boolean visible) {
         showPriceLines = visible;
+        persistChartPreferences();
         requestChartRedraw();
     }
 
@@ -2429,15 +2664,18 @@ public class CandleStickChart extends Region {
         movingAnchor = null;
         movingDrawingOriginal = null;
         selectedDrawingIndex = -1;
+        persistChartDrawings();
         requestChartRedraw();
     }
 
     private void setActiveInteractionTool(ChartInteractionTool tool) {
         activeInteractionTool = tool == null ? ChartInteractionTool.CURSOR : tool;
+        syncLeftToolPaletteSelection();
         drawingPreview = null;
         drawingAnchor = null;
         movingAnchor = null;
         movingDrawingOriginal = null;
+        persistChartPreferences();
         showTransientNotice(activeInteractionTool.notice());
         requestChartRedraw();
     }
@@ -2500,6 +2738,7 @@ public class CandleStickChart extends Region {
         selectedDrawingIndex = -1;
         movingAnchor = null;
         movingDrawingOriginal = null;
+        persistChartDrawings();
         showTransientNotice("Drawing erased");
         requestChartRedraw();
         return true;
@@ -2538,6 +2777,7 @@ public class CandleStickChart extends Region {
         ChartDrawing drawing = ChartDrawing.from(activeInteractionTool, drawingAnchor, current, false);
         if (drawing.isDrawable()) {
             chartDrawings.add(drawing);
+            persistChartDrawings();
             showTransientNotice(activeInteractionTool.label() + " added");
         }
 
@@ -2554,6 +2794,7 @@ public class CandleStickChart extends Region {
 
         movingAnchor = null;
         movingDrawingOriginal = null;
+        persistChartDrawings();
         requestChartRedraw();
         return true;
     }
@@ -2635,6 +2876,23 @@ public class CandleStickChart extends Region {
             double endPrice,
             Color color,
             boolean preview) {
+
+        private static ChartDrawing persisted(
+            ChartInteractionTool type,
+            long startTime,
+            double startPrice,
+            long endTime,
+            double endPrice) {
+            ChartInteractionTool safeType = type == null ? ChartInteractionTool.CURSOR : type;
+            return new ChartDrawing(
+                safeType,
+                startTime,
+                startPrice,
+                endTime,
+                endPrice,
+                colorFor(safeType),
+                false);
+        }
 
         private static ChartDrawing from(
                 ChartInteractionTool type,
@@ -3011,6 +3269,13 @@ public class CandleStickChart extends Region {
 
     public void setBackgroundImage( Image image) {
         this.backgroundImage = image;
+        persistChartPreferences();
+        requestChartRedraw();
+    }
+
+    public void setBackgroundImageOpacity(double opacity) {
+        this.backgroundImageOpacity = clamp(opacity, 0.0, 1.0);
+        persistChartPreferences();
         requestChartRedraw();
     }
 
@@ -3038,6 +3303,7 @@ public class CandleStickChart extends Region {
             crosshairMouseX = -1;
             crosshairMouseY = -1;
         }
+        persistChartPreferences();
         requestChartRedraw();
     }
 
@@ -3089,6 +3355,7 @@ public class CandleStickChart extends Region {
 
     public void setAutoTradeEnabled(boolean enabled) {
         autoTradeEnabled = enabled;
+        persistChartPreferences();
         showTransientNotice(enabled ? "Auto-trade enabled" : "Auto-trade disabled");
         requestChartRedraw();
     }
@@ -3896,6 +4163,7 @@ public class CandleStickChart extends Region {
         if (tradeOverlayCanvas != null) {
             tradeOverlayCanvas.setVisible(show);
         }
+        persistChartPreferences();
         requestChartRedraw();
     }
 
