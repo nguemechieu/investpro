@@ -25,9 +25,9 @@ This document provides step-by-step guidance for refactoring InvestPro into a cl
 
 ## Architecture Layers
 
-### Layer 1: Application (`org.investpro.app`)
+### Layer 1: Application (`org.investpro`)
 
-**InvestProApplication.java**
+**InvestPro.java / InvestProLauncher.java**
 ```
 Responsibilities:
 - JavaFX Application entry point
@@ -101,7 +101,7 @@ Public API:
 - publishSystemEvent(...)
 
 CRITICAL BUG TO AVOID:
-```java
+```
 public boolean isStarted() {
     return started.get();  // NOT !started.get()
 }
@@ -316,7 +316,6 @@ Supported order types:
 
 Public API:
 - executeApprovedOrder(StrategySignal, TradeRiskContext, FinalRiskGate.OrderApprovalDecision)
-- executeApprovedOrder(StrategySignal, TradeRiskContext, FinalRiskGate.OrderApprovalDecision)  // strategy signal with full context
 - execute(PositionActionIntent)
 
 Must NOT:
@@ -535,8 +534,8 @@ Core Methods:
 - getCandleDataSupplier(int seconds, TradePair pair): CandleDataSupplier
 
 Order Methods (use TradePair):
-- placeMarketOrder(TradePair, StrategySignal)  // strategy signal provides BUY/SELL/HOLD direction
-- placeLimitOrder(TradePair, StrategySignal, double price)  // strategy signal provides context
+- placeMarketOrder(TradePair, StrategySignal)
+- placeLimitOrder(TradePair, StrategySignal, double price)
 
 Position Methods (use string symbol when existing API requires):
 - closePosition(String symbol, String positionId)
@@ -678,14 +677,8 @@ Must use:
 
 ## Java Compatibility
 
-- **Use Java 17**
-- **Avoid Java 21-only methods**:
-  - ❌ list.getFirst()
-  - ✅ list.get(0)
-  - ❌ list.addFirst(item)
-  - ✅ list.add(0, item)
-  - ❌ list.removeLast()
-  - ✅ list.remove(list.size() - 1)
+- **Targets Java 21** (LTS)
+- **Use modern Java 21 idioms** where appropriate, but ensure compatibility with the build environment
 
 ---
 
@@ -771,4 +764,3 @@ When complete, the system should:
    - Add metrics collection to ExecutionEngine
    - Add performance tracking to StrategyEngine
    - Add state machine logging to SmartBot
-
