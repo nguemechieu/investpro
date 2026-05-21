@@ -16,10 +16,13 @@ import org.investpro.persistence.repository.StrategyAssignmentRepository;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.lab.StrategyLabService;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
@@ -153,7 +156,24 @@ public class StrategyAssignmentPanel extends VBox{
                 symbolLabel.setStyle("-fx-text-fill: #a0aec0;");
                 symbolCombo = new ComboBox<>();
                 if (systemCore.getExchange() != null) {
-                        symbolCombo.getItems().addAll(systemCore.getExchange().getTradePairSymbol());
+                        List<TradePair> symbols = new ArrayList<>(systemCore.getExchange().getTradePairSymbol());
+                        try {
+                                UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
+                                                systemCore.getExchange(),
+                                                null);
+                                List<SymbolTradability> statuses = tradabilityService.getTradability(symbols).get();
+                                List<TradePair> filtered = statuses.stream()
+                                                .filter(java.util.Objects::nonNull)
+                                                .filter(SymbolTradability::marketDataAllowed)
+                                                .map(SymbolTradability::tradePair)
+                                                .filter(java.util.Objects::nonNull)
+                                                .distinct()
+                                                .toList();
+                                symbolCombo.getItems().addAll(filtered.isEmpty() ? symbols : filtered);
+                        } catch (Exception exception) {
+                                log.warn("Unable to apply tradability filter in StrategyAssignmentPanel", exception);
+                                symbolCombo.getItems().addAll(symbols);
+                        }
                 }
                 symbolCombo.setPrefWidth(250);
                 symbolCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");

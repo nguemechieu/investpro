@@ -28,6 +28,9 @@ public enum ENUM_EXCHANGE_LIST {
     ),
     INTERACTIVE_BROKERS(
             "INTERACTIVE BROKERS", 16
+    ),
+    STELLAR_NETWORK(
+            "STELLAR NETWORK", 17
     );
 
 

@@ -54,17 +54,13 @@ public class OnboardingView extends StackPane {
     private static final int DEFAULT_HEIGHT = 780;
 
     private static final String BG = "#020617";
-    private static final String SURFACE = "#0f172a";
-    private static final String SURFACE_2 = "#111827";
-    private static final String PANEL = "rgba(15, 23, 42, 0.86)";
+
     private static final String CARD = "rgba(15, 23, 42, 0.94)";
     private static final String BORDER = "rgba(71, 85, 105, 0.88)";
     private static final String TEXT = "#e2e8f0";
     private static final String MUTED = "#94a3b8";
-    private static final String MUTED_2 = "#64748b";
     private static final String ACCENT = "#38bdf8";
     private static final String PRIMARY = "#2563eb";
-    private static final String PRIMARY_HOVER = "#1d4ed8";
     private static final String SUCCESS = "#10b981";
     private static final String WARNING = "#f59e0b";
     private static final String DANGER = "#ef4444";
@@ -372,20 +368,6 @@ public class OnboardingView extends StackPane {
         return createButton(text, "#1e40af");
     }
 
-    private @NotNull Button createGhostButton(String text) {
-        Button button = new Button(text);
-        button.setStyle("""
-                -fx-padding: 8 10;
-                -fx-background-color: transparent;
-                -fx-text-fill: #93c5fd;
-                -fx-font-size: 11;
-                -fx-font-weight: bold;
-                -fx-background-radius: 10;
-                -fx-cursor: hand;
-                """);
-        button.setMinWidth(96);
-        return button;
-    }
 
     private @NotNull Button createButton(String text, String color) {
         Button button = new Button(text);
@@ -896,7 +878,7 @@ public class OnboardingView extends StackPane {
     private void showForgotPasswordDialog(Label validation) {
         TextInputDialog lookupDialog = new TextInputDialog(usernameField.getText());
 
-        lookupDialog.setTitle("Forgot Password");
+        lookupDialog.setTitle("Forgot Your Password?");
         lookupDialog.setHeaderText("Find your InvestPro account");
         lookupDialog.setContentText("Username or email:");
         lookupDialog.setGraphic(null);
@@ -1013,23 +995,7 @@ public class OnboardingView extends StackPane {
         authService.rememberedUsername().ifPresent(usernameField::setText);
     }
 
-    private void forgetCredentials() {
-        Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
-        authService.forgetRememberedUser();
 
-        for (String exchange : Arrays.stream(SupportedExchange.values()).map(SupportedExchange::getDisplayName).toList()) {
-            preferences.remove("exchange_api_key_%s".formatted(exchange));
-            preferences.remove("exchange_api_secret_%s".formatted(exchange));
-            preferences.remove("exchange_account_id_%s".formatted(exchange));
-            preferences.remove("exchange_venue_%s".formatted(exchange));
-            preferences.remove("telegram_token_%s".formatted(exchange));
-        }
-
-        flushPreferences(preferences);
-        usernameField.clear();
-        passwordField.clear();
-        rememberMeCheckBox.setSelected(false);
-    }
 
     private void saveRememberedExchangeCredentials(String exchange, String apiKey, String apiSecret, String accountId,
                                                    String token) {
@@ -1042,9 +1008,9 @@ public class OnboardingView extends StackPane {
     }
 
     private void loadRememberedExchangeCredentials(String exchange,
-                                                   TextField apiKeyField,
-                                                   PasswordField apiSecretField,
-                                                   TextField accountIdField) {
+                                                   @NonNull TextField apiKeyField,
+                                                   @NonNull PasswordField apiSecretField,
+                                                   @NonNull TextField accountIdField) {
         Preferences preferences = Preferences.userNodeForPackage(OnboardingView.class);
         apiKeyField.setText(preferences.get("exchange_api_key_%s".formatted(exchange), ""));
         apiSecretField.setText(preferences.get("exchange_api_secret_%s".formatted(exchange), ""));

@@ -19,8 +19,12 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.risk.RiskDecision;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -167,7 +171,17 @@ public class DefaultTradingAgentModule implements AgentModule {
     private TradePair resolveTradePair(SystemCoreDependencies dependencies, StrategySignal signal) {
         if (dependencies.exchange() != null) {
             try {
-                for (TradePair pair : dependencies.exchange().getTradePairSymbol()) {
+                List<TradePair> exchangePairs = new ArrayList<>(dependencies.exchange().getTradePairSymbol());
+                UniversalTradabilityService tradabilityService = new UniversalTradabilityService(dependencies.exchange(), null);
+                List<SymbolTradability> statuses = tradabilityService.getTradability(exchangePairs).get();
+                List<TradePair> botTradablePairs = statuses.stream()
+                        .filter(Objects::nonNull)
+                        .filter(SymbolTradability::canBeUsedForBotTrading)
+                        .map(SymbolTradability::tradePair)
+                        .filter(Objects::nonNull)
+                        .toList();
+
+                for (TradePair pair : botTradablePairs) {
                     if (pair != null && signal.getSymbol() != null
                             && pair.toString('/').equalsIgnoreCase(signal.getSymbol())) {
                         return pair;

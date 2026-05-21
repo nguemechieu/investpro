@@ -7,11 +7,14 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.licensing.LicenseManager;
 import org.investpro.licensing.LicenseStatus;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Stack;
 
 /**
  * UI Panel for displaying and managing application license.
@@ -20,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
  * @author NOEL NGUEMECHIEU
  */
 @Slf4j
-public final class LicensePanel extends VBox {
+public final class LicensePanel extends StackPane {
     private static final String PRIMARY_BG = "#0f172a";
     private static final String CARD_BG = "#1e293b";
     private static final String TEXT_PRIMARY = "#f1f5f9";
@@ -41,8 +44,7 @@ public final class LicensePanel extends VBox {
     }
 
     private void initializeUI() {
-        setPrefHeight(400);
-        setSpacing(16);
+
         setPadding(new Insets(20));
         setStyle("-fx-background-color: " + PRIMARY_BG + ";");
 

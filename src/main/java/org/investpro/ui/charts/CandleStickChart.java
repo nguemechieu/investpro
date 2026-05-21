@@ -328,8 +328,7 @@ public class CandleStickChart extends Region {
 
         xAxis.setManaged(false);
         yAxis.setManaged(false);
-        yAxis.setTickLabelFormatter(tradePair.getCounterCurrency().getSymbol());
-
+        yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
         extraAxis.setManaged(false);
         extraAxisExtension.setManaged(false);
 
@@ -337,6 +336,20 @@ public class CandleStickChart extends Region {
         xAxis.setAnimated(false);
         yAxis.setAnimated(false);
         extraAxis.setAnimated(false);
+
+
+        extraAxis.setSide(Side.LEFT);
+        xAxis.setForceZeroInRange(false);
+        yAxis.setForceZeroInRange(false);
+        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        xAxis.setForceZeroInRange(true);
+        yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
+        yAxis.setForceZeroInRange(true);
+
+        extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getBaseCurrency()));
+        yAxis.setTickLabelFont(axisFont);
+        xAxis.setTickLabelFont(axisFont);
+        extraAxis.setTickLabelFont(axisFont);
 
         /*
          * This chart uses manual bounds because it is canvas-based.
@@ -357,6 +370,10 @@ public class CandleStickChart extends Region {
          * Price should not force zero because forex/crypto/stocks need tight scaling.
          */
         yAxis.configureForPriceAxis();
+        yAxis.setAnimationDurationMillis(2000);
+        yAxis.setAnimated(false);
+        xAxis.setAnimationDurationMillis(2000);
+        xAxis.setAnimated(false);
 
         /*
          * Left-side volume axis.
@@ -377,7 +394,7 @@ public class CandleStickChart extends Region {
         );
 
         extraAxis.setTickLabelFormatter(
-                new MoneyAxisFormatter(tradePair.getBaseCurrency())
+                new MoneyAxisFormatter(tradePair.getCounterCurrency())
         );
 
         xAxis.setStyle(axisStyle);
@@ -2646,8 +2663,7 @@ public class CandleStickChart extends Region {
                 case TRIANGLE -> Color.web("#06b6d4");
                 case CIRCLE -> Color.web("#ec4899");
                 case FIBONACCI -> Color.web("#f97316");
-                case MEASURE -> Color.web("#e2e8f0");
-                case RISK_REWARD -> Color.web("#e2e8f0");
+                case MEASURE, RISK_REWARD -> Color.web("#e2e8f0");
                 default -> Color.web("#94a3b8");
             };
         }

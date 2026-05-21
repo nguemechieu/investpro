@@ -8,6 +8,7 @@ import org.investpro.ai.PositionActionIntent;
 import org.investpro.core.SystemCore;
 import org.investpro.data.Db1;
 import org.investpro.exchange.Exchange;
+import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
 import org.investpro.persistence.repository.CurrencyRepository;
 import org.investpro.persistence.repository.CurrencyRepositoryImpl;
@@ -23,6 +24,9 @@ import org.investpro.service.OrderService;
 import org.investpro.service.TradeService;
 import org.investpro.service.TradingService;
 import org.investpro.strategy.StrategySignal;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityScope;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +35,7 @@ import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * ExecutionEngine - operator layer of TradeAdviser / InvestPro.
@@ -64,6 +69,7 @@ public class ExecutionEngine {
 
     private BehaviourGuardService behaviourGuardService;
     private BehaviourGuardConfig behaviourGuardConfig;
+    private UniversalTradabilityService universalTradabilityService;
 
 
 
@@ -74,8 +80,14 @@ public class ExecutionEngine {
             SystemCore systemCore
     ) {
         this.exchange = exchange;
+        this.universalTradabilityService = exchange == null ? null : new UniversalTradabilityService(exchange, null);
         this.symbolFilter = symbolFilter == null ? new SymbolExecutionFilter(true) : symbolFilter;
         initializeServices(db,systemCore);
+    }
+
+    public void setExchange(@Nullable Exchange exchange) {
+        this.exchange = exchange;
+        this.universalTradabilityService = exchange == null ? null : new UniversalTradabilityService(exchange, null);
     }
     private void initializeServices(@Nullable Db1 db, SystemCore systemCore) {
         this.tradeRepository = new TradeRepositoryImpl(db);
@@ -570,6 +582,13 @@ public class ExecutionEngine {
                 positionSize
         );
 
+        SymbolTradability tradability = recheckOrderTradability(symbol, OpenOrder.OrderType.MARKET);
+        if (tradability == null || !tradability.orderSubmissionAllowed() || !tradability.marketOrderAllowed()) {
+            String reason = tradability == null ? "tradability unavailable" : tradability.reason();
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                "Order blocked by tradability policy for " + symbol + ": " + reason));
+        }
+
         return exchange.placeMarketOrder(symbol, side, positionSize);
     }
 
@@ -593,7 +612,30 @@ public class ExecutionEngine {
                 limitPrice
         );
 
+        SymbolTradability tradability = recheckOrderTradability(symbol, OpenOrder.OrderType.LIMIT);
+        if (tradability == null || !tradability.orderSubmissionAllowed() || !tradability.limitOrderAllowed()) {
+            String reason = tradability == null ? "tradability unavailable" : tradability.reason();
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                    "Order blocked by tradability policy for " + symbol + ": " + reason));
+        }
+
         return exchange.placeLimitOrder(symbol, side, positionSize, limitPrice);
+    }
+
+    private SymbolTradability recheckOrderTradability(@NotNull TradePair symbol, @NotNull OpenOrder.OrderType orderType) {
+        if (universalTradabilityService == null) {
+            return null;
+        }
+
+        try {
+            SymbolTradability status = universalTradabilityService
+                    .getTradability(symbol, TradabilityScope.ORDER_SUBMISSION, true)
+                    .get(5, TimeUnit.SECONDS);
+            return status;
+        } catch (Exception exception) {
+            log.warn("ExecutionEngine: Tradability recheck failed for symbol={} type={}", symbol, orderType, exception);
+            return null;
+        }
     }
 
     /**

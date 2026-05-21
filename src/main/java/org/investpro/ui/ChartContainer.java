@@ -154,7 +154,7 @@ public class ChartContainer extends Region {
     private Button chartActionButton(String tooltip, String iconPath, Runnable action) {
         Button button = new Button();
         button.setTooltip(new Tooltip(tooltip));
-        ImageView icon = loadIcon(iconPath, 15);
+        ImageView icon = loadIcon(iconPath);
         if (icon == null) {
             button.setText(tooltip);
         } else {
@@ -175,15 +175,15 @@ public class ChartContainer extends Region {
         return button;
     }
 
-    private ImageView loadIcon(String path, double size) {
+    private ImageView loadIcon(String path) {
         try {
             var stream = ChartContainer.class.getResourceAsStream(path);
             if (stream == null) {
                 return null;
             }
             ImageView imageView = new ImageView(new Image(stream));
-            imageView.setFitWidth(size);
-            imageView.setFitHeight(size);
+            imageView.setFitWidth(15);
+            imageView.setFitHeight(15);
             imageView.setPreserveRatio(true);
             return imageView;
         } catch (Exception exception) {

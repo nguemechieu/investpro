@@ -43,6 +43,9 @@ import org.investpro.event.EventBusManager;
 import org.investpro.research.LiveTradingMetricsTracker;
 import org.investpro.strategy.*;
 import org.investpro.strategy.lab.StrategyLabService;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityScope;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.ui.panels.SettingsPanel;
 
 import org.jetbrains.annotations.NotNull;
@@ -151,15 +154,17 @@ public class SystemCore {
     private SystemCoreDependencies systemCoreDependencies;
     private SymbolExecutionFilter symbolExecutionFilter;
     private EventBusManager eventBusManager;
-    private final java.util.Map<TradePair, org.investpro.core.agents.symbol.SymbolAgent> symbolAgents =
-            new java.util.concurrent.ConcurrentHashMap<>();
+        private final java.util.Set<TradePair> symbolAgents =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private final LiveTradingMetricsTracker liveMetricsTracker = new LiveTradingMetricsTracker();
+    private final UniversalTradabilityService universalTradabilityService;
 
     public SystemCore(@NotNull Exchange exchange, Properties config, String open_ai_api_key)
             throws SQLException, ClassNotFoundException {
 
         this.exchange = Objects.requireNonNull(exchange, "exchange cannot be null");
+        this.universalTradabilityService = new UniversalTradabilityService(this.exchange, null);
 
         this.config = config == null ? new Properties() : config;
 
@@ -492,26 +497,39 @@ public class SystemCore {
      * Safe to call multiple times — existing agents are kept, new ones added.
      */
     public void initializeSymbolAgents(java.util.Collection<TradePair> symbols) {
-        if (symbols == null || symbols.isEmpty() || smartBot == null) return;
-        for (TradePair symbol : symbols) {
-            symbolAgents.computeIfAbsent(symbol, s -> {
-                SymbolAgent agent =
-                        new SymbolAgent(s, symbolAgentManager);
-
-                log.debug("SymbolAgent registered in runtime for {}", s.toString('/'));
-                return agent;
-            });
+        if (symbols == null || symbols.isEmpty() || smartBot == null || symbolAgentManager == null) {
+            return;
         }
-        log.info("✅ {} symbol agents active", symbolAgents.size());
+
+        AgentRuntime runtime = smartBot.getRuntime();
+        if (runtime == null) {
+            return;
+        }
+
+        int registered = 0;
+        for (TradePair symbol : symbols) {
+            if (symbol == null) {
+                continue;
+            }
+
+            symbolAgentManager.ensureSymbol(symbol);
+
+            if (symbolAgents.add(symbol)) {
+                runtime.registerSymbol(symbol, symbolAgentManager);
+                registered++;
+                log.debug("SymbolAgent registered in runtime for {}", symbol.toString('/'));
+            }
+        }
+
+        if (registered > 0) {
+            log.info("✅ {} symbol agents active (market watch fed)", symbolAgents.size());
+        }
     }
 
     public void stop() {
         stopStreaming();
 
-        // Stop per-symbol agents
-        symbolAgents.values().forEach(agent -> {
-            try { agent.stop(); } catch (Exception ignored) {}
-        });
+        // Symbol agents are owned/stopped by SmartBot runtime.
         symbolAgents.clear();
 
         // Stop live metrics tracking
@@ -669,9 +687,17 @@ public class SystemCore {
             return;
         }
 
-        stopStreaming();
-
         StreamingMode safeMode = mode == null ? StreamingMode.EVERYTHING : mode;
+        selectedPairs = filterSymbolsForStreaming(selectedPairs, safeMode);
+        if (selectedPairs.isEmpty()) {
+            log.warn("Cannot start streaming: selected symbols are not tradable for mode {}", safeMode);
+            notifyAllChannels(
+                "Streaming not started",
+                "Streaming was not started because selected symbols are restricted for mode " + safeMode.name());
+            return;
+        }
+
+        stopStreaming();
         this.currentStreamingMode = safeMode;
 
         this.selectedTradePair = selectedPairs.iterator().next();
@@ -718,13 +744,24 @@ public class SystemCore {
             return;
         }
 
+        StreamingMode safeMode = mode == null ? StreamingMode.EVERYTHING : mode;
+        Set<TradePair> filtered = filterSymbolsForStreaming(Set.of(tradePair), safeMode);
+        if (filtered.isEmpty()) {
+            log.warn("Cannot start streaming: symbol {} is restricted for mode {}", tradePairText(tradePair), safeMode);
+            notifyAllChannels(
+                "Streaming not started",
+                "Selected symbol is restricted for mode " + safeMode.name() + ": " + tradePairText(tradePair));
+            return;
+        }
+
+        TradePair resolvedPair = filtered.iterator().next();
+
         stopStreaming();
 
-        StreamingMode safeMode = mode == null ? StreamingMode.EVERYTHING : mode;
         this.currentStreamingMode = safeMode;
-        this.selectedTradePair = tradePair;
+        this.selectedTradePair = resolvedPair;
 
-        activeSubscription = buildSubscription(tradePair, safeMode);
+        activeSubscription = buildSubscription(resolvedPair, safeMode);
         streamConsumer = createAgentStreamConsumer();
 
         try {
@@ -734,7 +771,7 @@ public class SystemCore {
             String message = "Streaming started using %s mode=%s for %s".formatted(
                     exchange.getStreamTransport(),
                     safeMode.name(),
-                    tradePairText(tradePair));
+                    tradePairText(resolvedPair));
 
             publishSystemEvent("SYSTEM_CORE_STREAMING_STARTED", message);
             notifyAllChannels("Streaming started", "\uD83D\uDCE1 %s".formatted(message));
@@ -775,6 +812,41 @@ public class SystemCore {
                     "Streaming failed",
                     "\u274C Failed to start streaming: %s".formatted(rootMessage(exception)));
             log.error("Failed to start streaming", exception);
+        }
+    }
+
+    private Set<TradePair> filterSymbolsForStreaming(Set<TradePair> symbols, StreamingMode mode) {
+        if (symbols == null || symbols.isEmpty()) {
+            return Set.of();
+        }
+
+        TradabilityScope scope = switch (mode) {
+            case MARKET_DATA, TICKER_ONLY, TRADES_ONLY, ORDER_BOOK_ONLY -> TradabilityScope.MARKET_DATA;
+            default -> TradabilityScope.BOT_TRADING;
+        };
+
+        try {
+            List<SymbolTradability> statuses = universalTradabilityService.getTradability(new ArrayList<>(symbols)).get();
+            Set<String> allowedSymbols = new HashSet<>();
+
+            for (SymbolTradability status : statuses) {
+                if (status == null || status.tradePair() == null) {
+                    continue;
+                }
+                boolean allowed = scope == TradabilityScope.MARKET_DATA
+                        ? status.marketDataAllowed()
+                        : status.canBeUsedForBotTrading();
+                if (allowed) {
+                    allowedSymbols.add(status.tradePair().toString('/').toUpperCase(Locale.ROOT));
+                }
+            }
+
+            return symbols.stream()
+                    .filter(pair -> pair != null && allowedSymbols.contains(pair.toString('/').toUpperCase(Locale.ROOT)))
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        } catch (Exception exception) {
+            log.warn("Unable to filter symbols for streaming mode {}", mode, exception);
+            return Set.of();
         }
     }
 

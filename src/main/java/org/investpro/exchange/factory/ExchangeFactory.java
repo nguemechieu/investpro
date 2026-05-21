@@ -218,6 +218,7 @@ public final class ExchangeFactory {
             case COINBASE -> new Coinbase(credentials);
             case INTERACTIVE_BROKERS -> new InteractiveBrokers(credentials);
             case OANDA -> new Oanda(credentials);
+            case STELLAR_NETWORK -> new StellarNetwork(credentials);
             case POLONIEX -> throw new IllegalArgumentException("Poloniex adapter not implemented yet");
             case IG -> throw new IllegalArgumentException("IG adapter not implemented yet");
             case KRAKEN -> throw new IllegalArgumentException("Kraken adapter not implemented yet");

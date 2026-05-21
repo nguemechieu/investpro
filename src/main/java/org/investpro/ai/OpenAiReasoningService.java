@@ -17,7 +17,7 @@ import java.util.Map;
  * Uses GPT-4 Turbo to review trades with real AI reasoning.
  * <p>
  * Features:
- * - Reads API key from OPENAI_API_KEY environment variable
+ * - Uses API key passed by caller, with env var as fallback
  * - Fails safely if API key is not configured
  * - Requests structured JSON output for reliable parsing
  * - Returns ESCALATE_TO_MANUAL_REVIEW on errors
@@ -36,13 +36,12 @@ public class OpenAiReasoningService implements AiReasoningService {
     private final LocalAiReasoningService fallback; // Fallback if API fails
 
     /**
-     * Create OpenAI service. Reads API key from OPENAI_API_KEY environment
-     * variable.
-     * If key is not configured, service will not be available but will not crash.
+     * Create OpenAI service.
+     * Uses the supplied key first and falls back to OPENAI_API_KEY.
      */
     @SuppressWarnings("unused")
     public OpenAiReasoningService(String apiKey) {
-        this.apiKey = System.getenv("OPENAI_API_KEY");
+        this.apiKey = (apiKey != null && !apiKey.isBlank()) ? apiKey : System.getenv("OPENAI_API_KEY");
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(TIMEOUT_SECONDS))
                 .build();

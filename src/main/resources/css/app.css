@@ -1,7 +1,7 @@
 /* ============================================================================
    INVESTPRO PROFESSIONAL TRADING TERMINAL
-   MT4 / MetaTrader Inspired Dark Theme
-   Optimized for readability, chart visibility, and bottom terminal workflow
+   MT5 / MetaTrader-Inspired Dark Theme
+   Optimized for JavaFX, chart visibility, Market Watch, and bottom terminal flow
    ============================================================================ */
 
 
@@ -11,7 +11,6 @@
 
 .root {
     /* Core backgrounds */
-
     -dark-bg: #070b12;
     -workspace-bg: #0b1120;
     -surface-bg: #111827;
@@ -19,7 +18,7 @@
     -elevated-bg: #1f2937;
     -header-bg: #243244;
     -terminal-bg: #0f172a;
-    
+
     /* Component backgrounds */
     -btn-bg: #141f31;
     -input-bg: #0f172a;
@@ -73,148 +72,22 @@
     /* Font */
     -fx-font-family: "Segoe UI", "Inter", "Arial", sans-serif;
     -fx-font-size: 12px;
-    -fx-font-size-sm: 11px;
-    -fx-font-size-lg: 13px;
-    -fx-font-weight: 700;
     -fx-background-color: -dark-bg;
     -fx-text-fill: -text-primary;
 }
 
 
 /* ============================================================================
-   GLOBAL WINDOW / LAYOUT
+   GLOBAL LAYOUT
    ============================================================================ */
-.candle-chart-container {
-    -fx-background-color: #0a0e17;
-}
 
-.chart-container-root {
-    -fx-background-color: #0a0e17;
-}
-
-.chart-toolbar-container {
-    -fx-background-color: #101827;
-    -fx-border-color: #263246;
-    -fx-border-width: 0 0 1 0;
-}
-
-.chart-host {
-    -fx-background-color: #0a0e17;
-}
-
-.chart-timeframe-label {
-    -fx-text-fill: #9aa7ba;
-    -fx-font-weight: bold;
-}
-
-.chart-timeframe-selector {
-    -fx-background-color: #0f1724;
-    -fx-border-color: #2a3548;
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
-    -fx-text-fill: #e5edf7;
-}
-
-.candle-chart-toolbar {
-    -fx-alignment: center-left;
-    -fx-spacing: 6;
-    -fx-background-color: transparent;
-}
-
-.candle-chart-toolbar-button {
-    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
-    -fx-border-color: #34445f;
-    -fx-border-width: 1;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-    -fx-text-fill: #e5edf7;
-    -fx-font-size: 11px;
-    -fx-font-weight: 700;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
-}
-
-.candle-chart-toolbar-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
-    -fx-border-color: #60a5fa;
-}
-
-.candle-chart-toolbar-button:armed,
-.candle-chart-toolbar-button:active,
-.candle-chart-toolbar-button:active {
-    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
-    -fx-border-color: #93c5fd;
-    -fx-text-fill: white;
-}
-
-.candle-chart-toolbar-button:active {
-    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
-    -fx-border-color: #93c5fd;
-}
-
-.candle-chart-toolbar-button.clear-objects-button {
-    -fx-border-color: #7f1d1d;
-}
-
-.candle-chart-toolbar-button.clear-objects-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #7f1d1d, #450a0a);
-    -fx-border-color: #f87171;
-}
-
-.chart-options-pane {
-    -fx-background-color: #0b1220;
-    -fx-border-color: #263449;
-    -fx-border-width: 1;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-    -fx-spacing: 10;
-}
-
-.chart-options-grid {
-    -fx-hgap: 18;
-    -fx-vgap: 12;
-}
-
-.chart-options-label {
-    -fx-text-fill: #dbeafe;
-    -fx-font-size: 12px;
-    -fx-font-weight: 600;
-}
-
-.chart-options-switch {
-    -fx-cursor: hand;
-}
-
-.chart-options-switch .text {
-    -fx-fill: #94a3b8;
-    -fx-font-size: 11px;
-}
-
-.chart-options-switch:selected .thumb-area {
-    -fx-background-color: #2563eb;
-}
-
-.chart-action-button {
-    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
-    -fx-border-color: #34445f;
-    -fx-border-width: 1;
-    -fx-background-radius: 999;
-    -fx-border-radius: 999;
-    -fx-padding: 5;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
-}
-
-.chart-action-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
-    -fx-border-color: #60a5fa;
-}
 AnchorPane,
 BorderPane,
 SplitPane,
 VBox,
 HBox,
-StackPane {
+StackPane,
+GridPane {
     -fx-background-color: transparent;
 }
 
@@ -222,7 +95,8 @@ StackPane {
 .trade-view-root,
 .trading-window,
 .trading-window-pro,
-.terminal-root {
+.terminal-root,
+.mt5-root {
     -fx-background-color: -dark-bg;
 }
 
@@ -230,14 +104,31 @@ StackPane {
     -fx-background-color: #070b12;
 }
 
-.pro-panel {
+.split-pane {
+    -fx-background-color: -dark-bg;
+    -fx-padding: 0;
+}
+
+.split-pane-divider {
+    -fx-background-color: -border-strong;
+    -fx-padding: 0 1 0 1;
+}
+
+.split-pane:vertical > .split-pane-divider {
+    -fx-padding: 1 0 1 0;
+}
+
+.pro-panel,
+.mt5-panel {
     -fx-background-color: #0b1120;
     -fx-border-color: #263246;
     -fx-border-width: 1;
 }
 
 .panel-header,
-.workspace-header {
+.workspace-header,
+.mt5-panel-header,
+.mt5-chart-header {
     -fx-background-color: linear-gradient(to bottom, #162033, #0f1724);
     -fx-border-color: #263246;
     -fx-border-width: 0 0 1 0;
@@ -257,220 +148,20 @@ StackPane {
 }
 
 .panel-meta,
-.workspace-subtitle {
+.workspace-subtitle,
+.mt5-chart-meta,
+.mt5-status-chip {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 11px;
-}
-
-.terminal-brand {
-    -fx-text-fill: white;
-    -fx-font-size: 15px;
-    -fx-font-weight: 900;
-}
-
-.terminal-mode-badge {
-    -fx-background-color: rgba(34, 197, 94, 0.18);
-    -fx-border-color: #22c55e;
-    -fx-border-width: 1;
-    -fx-background-radius: 4;
-    -fx-border-radius: 4;
-    -fx-padding: 4 8 4 8;
-    -fx-text-fill: #bbf7d0;
-    -fx-font-size: 10px;
-    -fx-font-weight: 900;
-}
-
-.main-trading-toolbar {
-    -fx-padding: 8 10 8 10;
-    -fx-spacing: 8;
-}
-
-.desk-command-strip {
-    -fx-padding: 7 10 8 10;
-    -fx-spacing: 8;
-    -fx-background-color: linear-gradient(to bottom, #101827, #0b1120);
-    -fx-border-color: #263246;
-    -fx-border-width: 1 0 1 0;
-}
-
-.desk-metric {
-    -fx-padding: 5 9 5 9;
-    -fx-background-color: #0f1724;
-    -fx-border-color: rgba(148, 163, 184, 0.24);
-    -fx-border-width: 1;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-    -fx-min-width: 92;
-}
-
-.desk-metric-title {
-    -fx-text-fill: #94a3b8;
-    -fx-font-size: 10px;
-    -fx-font-weight: 700;
-}
-
-.desk-metric-value {
-    -fx-text-fill: #e5edf7;
-    -fx-font-size: 11px;
-    -fx-font-weight: 900;
-}
-
-.desk-positive {
-    -fx-text-fill: #4ade80;
-}
-
-.desk-warning {
-    -fx-text-fill: #fbbf24;
-}
-
-.desk-negative {
-    -fx-text-fill: #f87171;
-}
-
-.desk-updated-label {
-    -fx-text-fill: #94a3b8;
-    -fx-font-size: 10px;
-    -fx-font-weight: 700;
-}
-
-.desk-action-button {
-    -fx-background-color: #141f31;
-    -fx-border-color: #2a3548;
-    -fx-border-width: 1;
-    -fx-background-radius: 5;
-    -fx-border-radius: 5;
-    -fx-text-fill: #dbe6f3;
-    -fx-font-size: 11px;
-    -fx-font-weight: 800;
-    -fx-padding: 6 10 6 10;
-    -fx-cursor: hand;
-}
-
-.desk-action-button:hover {
-    -fx-background-color: #1b2a40;
-    -fx-border-color: #60a5fa;
-}
-
-.chart-workspace {
-    -fx-background-color: #070b12;
-    -fx-border-color: #263246;
-    -fx-border-width: 0 0 0 1;
-}
-
-.workspace-scroll-pane,
-.workspace-scroll-pane > .viewport {
-    -fx-background-color: #070b12;
-}
-
-.left-rail {
-    -fx-background-color: #070b12;
-}
-
-.compact-tabs .tab {
-    -fx-padding: 6 10 6 10;
-}
-
-.terminal-button {
-    -fx-padding: 5 10 5 10;
-    -fx-font-size: 11px;
-    -fx-background-radius: 4;
-    -fx-border-radius: 4;
-}
-
-.primary-button {
-    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
-    -fx-border-color: #60a5fa;
-    -fx-text-fill: white;
-}
-
-.mini-symbol-row {
-    -fx-background-color: #08111f;
-    -fx-border-color: rgba(51, 65, 85, 0.65);
-    -fx-border-width: 0 0 1 0;
-}
-
-.mini-symbol-row:hover {
-    -fx-background-color: #111c2d;
-}
-
-.symbol-name {
-    -fx-font-weight: 900;
-    -fx-text-fill: #93c5fd;
-}
-
-.symbol-bid {
-    -fx-text-fill: #86efac;
-    -fx-font-size: 11px;
-}
-
-.symbol-ask {
-    -fx-text-fill: #fca5a5;
-    -fx-font-size: 11px;
-}
-
-.account-metrics {
-    -fx-background-color: #08111f;
-    -fx-padding: 12;
-    -fx-border-color: #263246;
-    -fx-border-width: 1;
-}
-
-.metric-label {
-    -fx-font-size: 11px;
-    -fx-text-fill: #94a3b8;
-}
-
-.metric-value {
-    -fx-font-size: 16px;
-    -fx-font-weight: 900;
-}
-
-.pnl-strip {
-    -fx-background-color: #08111f;
-    -fx-border-color: #263246;
-    -fx-border-width: 1;
-}
-
-.order-book-pane {
-    -fx-padding: 8;
-}
-
-.book-bid-title {
-    -fx-text-fill: #86efac;
-}
-
-.book-ask-title {
-    -fx-text-fill: #fca5a5;
-}
-
-.bid-table .table-cell {
-    -fx-text-fill: #bbf7d0;
-}
-
-.ask-table .table-cell {
-    -fx-text-fill: #fecaca;
-}
-
-.split-pane {
-    -fx-background-color: -dark-bg;
-    -fx-padding: 0;
-}
-
-.split-pane-divider {
-    -fx-background-color: -border-strong;
-    -fx-padding: 0 1 0 1;
-}
-
-.split-pane:vertical > .split-pane-divider {
-    -fx-padding: 1 0 1 0;
 }
 
 
 /* ============================================================================
-   MENU BAR - MT4 STYLE
+   MENU BAR
    ============================================================================ */
 
-.menu-bar {
+.menu-bar,
+.mt5-menu-bar {
     -fx-background-color: linear-gradient(to bottom, #1f2937, #111827);
     -fx-border-color: -border-color;
     -fx-border-width: 0 0 1 0;
@@ -540,10 +231,12 @@ StackPane {
 
 
 /* ============================================================================
-   TOOLBAR
+   TOOLBARS
    ============================================================================ */
 
-.tool-bar {
+.tool-bar,
+.main-trading-toolbar,
+.mt5-toolbar {
     -fx-background-color: linear-gradient(to bottom, #1e293b, #111827);
     -fx-border-color: -border-color;
     -fx-border-width: 0 0 1 0;
@@ -551,10 +244,33 @@ StackPane {
     -fx-spacing: 8;
 }
 
-.tool-bar .label {
+.tool-bar .label,
+.main-trading-toolbar .label,
+.mt5-toolbar .label {
     -fx-text-fill: -text-secondary;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
+}
+
+.mt5-top-section {
+    -fx-background-color: #101827;
+    -fx-border-color: #263449;
+    -fx-border-width: 0 0 1 0;
+}
+
+.mt5-brand,
+.terminal-brand {
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: 900;
+}
+
+.desk-command-strip {
+    -fx-padding: 7 10 8 10;
+    -fx-spacing: 8;
+    -fx-background-color: linear-gradient(to bottom, #101827, #0b1120);
+    -fx-border-color: #263246;
+    -fx-border-width: 1 0 1 0;
 }
 
 .separator {
@@ -594,7 +310,37 @@ StackPane {
     -fx-cursor: default;
 }
 
-/* Dedicated trading buttons */
+.mt5-toolbar-button,
+.mt5-command-button,
+.desk-action-button,
+.terminal-button {
+    -fx-background-color: #141f31;
+    -fx-border-color: #2a3548;
+    -fx-border-width: 1;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-text-fill: #dbe6f3;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+    -fx-padding: 6 10 6 10;
+    -fx-cursor: hand;
+}
+
+.mt5-toolbar-button:hover,
+.mt5-command-button:hover,
+.desk-action-button:hover,
+.terminal-button:hover {
+    -fx-background-color: #1b2a40;
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
+}
+
+.primary-button {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #60a5fa;
+    -fx-text-fill: white;
+}
+
 .button.buy-button,
 .buy-button {
     -fx-background-color: linear-gradient(to bottom, #22c55e, #15803d);
@@ -649,12 +395,17 @@ StackPane {
 
 
 /* ============================================================================
-   COMBOBOX / CHOICEBOX / TEXT INPUTS
+   INPUTS / COMBOBOXES
    ============================================================================ */
 
 .combo-box,
 .choice-box,
-.text-field {
+.text-field,
+.mt5-compact-combo,
+.mt5-amount-field,
+.mt5-market-search,
+.terminal-combo-box,
+.chart-timeframe-selector {
     -fx-background-color: #0f172a;
     -fx-border-color: -border-strong;
     -fx-border-width: 1;
@@ -667,7 +418,12 @@ StackPane {
 
 .combo-box:focused,
 .choice-box:focused,
-.text-field:focused {
+.text-field:focused,
+.mt5-compact-combo:focused,
+.mt5-amount-field:focused,
+.mt5-market-search:focused,
+.terminal-combo-box:focused,
+.chart-timeframe-selector:focused {
     -fx-border-color: -primary-light;
     -fx-effect: dropshadow(gaussian, rgba(96, 165, 250, 0.35), 8, 0, 0, 0);
 }
@@ -713,7 +469,7 @@ StackPane {
 
 
 /* ============================================================================
-   LABELS / BADGES
+   LABELS / BADGES / METRICS
    ============================================================================ */
 
 .label {
@@ -733,7 +489,8 @@ StackPane {
 .price-badge,
 .connection-status,
 .trade-view-live-badge,
-.trade-view-static-badge {
+.trade-view-static-badge,
+.terminal-mode-badge {
     -fx-padding: 4 9 4 9;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
@@ -747,7 +504,8 @@ StackPane {
     -fx-text-fill: #bfdbfe;
 }
 
-.trade-view-live-badge {
+.trade-view-live-badge,
+.terminal-mode-badge {
     -fx-background-color: rgba(34, 197, 94, 0.20);
     -fx-border-color: -success;
     -fx-text-fill: #bbf7d0;
@@ -770,9 +528,60 @@ StackPane {
     -fx-text-fill: -text-secondary;
 }
 
+.desk-metric {
+    -fx-padding: 5 9 5 9;
+    -fx-background-color: #0f1724;
+    -fx-border-color: rgba(148, 163, 184, 0.24);
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-min-width: 92;
+}
+
+.desk-metric-title {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
+.desk-metric-value {
+    -fx-text-fill: #e5edf7;
+    -fx-font-size: 11px;
+    -fx-font-weight: 900;
+}
+
+.desk-positive,
+.trading-positive,
+.symbol-up {
+    -fx-text-fill: -profit-color;
+    -fx-font-weight: 900;
+}
+
+.desk-warning {
+    -fx-text-fill: -warning;
+    -fx-font-weight: 900;
+}
+
+.desk-negative,
+.trading-negative,
+.symbol-down {
+    -fx-text-fill: -loss-color;
+    -fx-font-weight: 900;
+}
+
+.symbol-flat {
+    -fx-text-fill: -text-secondary;
+}
+
+.desk-updated-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+
 
 /* ============================================================================
-   TAB PANE - GENERAL
+   TAB PANES / TERMINAL
    ============================================================================ */
 
 .tab-pane {
@@ -822,14 +631,14 @@ StackPane {
     -fx-text-fill: white;
 }
 
-
-/* ============================================================================
-   BOTTOM SYSTEM CONSOLE / MT4 TERMINAL
-   ============================================================================ */
+.compact-tabs .tab {
+    -fx-padding: 6 10 6 10;
+}
 
 .system-console,
 .terminal-console,
-.bottom-terminal {
+.bottom-terminal,
+.mt5-terminal {
     -fx-background-color: #0b1120;
     -fx-border-color: -border-strong;
     -fx-border-width: 1 0 0 0;
@@ -872,12 +681,24 @@ StackPane {
     -fx-text-fill: #fde68a;
 }
 
+.terminal-scroll-pane,
+.terminal-scroll-pane > .viewport,
+.terminal-scroll-content {
+    -fx-background-color: #020617;
+}
+
+.terminal-scroll-content {
+    -fx-padding: 8;
+}
+
 
 /* ============================================================================
-   TABLE VIEW - MARKET WATCH / DATA TABLES
+   TABLES / MARKET WATCH / ORDER BOOK
    ============================================================================ */
 
-.table-view {
+.table-view,
+.tree-table-view,
+.mt5-market-watch-table {
     -fx-background-color: #020617;
     -fx-border-color: -border-color;
     -fx-border-width: 1;
@@ -886,94 +707,38 @@ StackPane {
     -fx-control-inner-background-alt: #0b1120;
 }
 
-.table-view .placeholder .label {
+.table-view .placeholder .label,
+.tree-table-view .placeholder .label {
     -fx-text-fill: -text-muted;
     -fx-font-size: 12px;
 }
 
-.table-view .column-header-background {
+.table-view .column-header-background,
+.tree-table-view .column-header-background {
     -fx-background-color: #1e293b;
     -fx-border-color: -border-strong;
     -fx-border-width: 0 0 1 0;
 }
 
 .table-view .column-header,
-.table-view .filler {
+.table-view .filler,
+.tree-table-view .column-header,
+.tree-table-view .filler {
     -fx-background-color: #1e293b;
     -fx-border-color: -border-color;
     -fx-border-width: 0 1 1 0;
     -fx-padding: 7 5 7 5;
 }
 
-.table-view .column-header .label {
-    -fx-text-fill: #e0f2fe;
-    -fx-font-size: 12px;
-    -fx-font-weight: 900;
-    -fx-alignment: CENTER_LEFT;
-}
-
-.table-row-cell {
-    -fx-background-color: #020617;
-    -fx-border-color: rgba(51, 65, 85, 0.65);
-    -fx-border-width: 0 0 1 0;
-    -fx-cell-size: 28px;
-}
-
-.table-row-cell:odd {
-    -fx-background-color: #08111f;
-}
-
-.table-row-cell:hover {
-    -fx-background-color: #1e293b;
-}
-
-.table-row-cell:selected {
-    -fx-background-color: #1d4ed8;
-}
-
-.table-cell {
-    -fx-text-fill: #f8fafc;
-    -fx-font-size: 12px;
-    -fx-padding: 5 7 5 7;
-    -fx-alignment: CENTER_LEFT;
-    -fx-font-family: "Segoe UI", "Arial", sans-serif;
-}
-
-.table-row-cell:selected .table-cell {
-    -fx-text-fill: white;
-}
-
-
-/* ============================================================================
-   TREE TABLE VIEW - TRADE / EXPOSURE / HISTORY
-   ============================================================================ */
-
-.tree-table-view {
-    -fx-background-color: #020617;
-    -fx-border-color: -border-color;
-    -fx-border-width: 1;
-    -fx-table-cell-border-color: rgba(51, 65, 85, 0.85);
-    -fx-control-inner-background: #020617;
-    -fx-control-inner-background-alt: #0b1120;
-}
-
-.tree-table-view .column-header-background {
-    -fx-background-color: #1e293b;
-}
-
-.tree-table-view .column-header,
-.tree-table-view .filler {
-    -fx-background-color: #1e293b;
-    -fx-border-color: -border-color;
-    -fx-border-width: 0 1 1 0;
-}
-
+.table-view .column-header .label,
 .tree-table-view .column-header .label {
     -fx-text-fill: #e0f2fe;
-    -fx-font-weight: 900;
     -fx-font-size: 12px;
+    -fx-font-weight: 900;
+    -fx-alignment: CENTER_LEFT;
 }
 
+.table-row-cell,
 .tree-table-row-cell {
     -fx-background-color: #020617;
     -fx-border-color: rgba(51, 65, 85, 0.65);
@@ -981,31 +746,104 @@ StackPane {
     -fx-cell-size: 28px;
 }
 
+.table-row-cell:odd,
 .tree-table-row-cell:odd {
     -fx-background-color: #08111f;
 }
 
+.table-row-cell:hover,
 .tree-table-row-cell:hover {
     -fx-background-color: #1e293b;
 }
 
+.table-row-cell:selected,
 .tree-table-row-cell:selected {
     -fx-background-color: #1d4ed8;
 }
 
+.table-cell,
 .tree-table-cell {
     -fx-text-fill: #f8fafc;
     -fx-font-size: 12px;
     -fx-padding: 5 7 5 7;
+    -fx-alignment: CENTER_LEFT;
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
 }
 
+.table-row-cell:selected .table-cell,
 .tree-table-row-cell:selected .tree-table-cell {
     -fx-text-fill: white;
 }
 
+.market-watch,
+.navigator-pane {
+    -fx-background-color: #0b1120;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1;
+}
+
+.market-watch-title,
+.navigator-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+    -fx-text-fill: white;
+    -fx-padding: 4 0 4 0;
+}
+
+.mini-symbol-row {
+    -fx-background-color: #08111f;
+    -fx-border-color: rgba(51, 65, 85, 0.65);
+    -fx-border-width: 0 0 1 0;
+}
+
+.mini-symbol-row:hover {
+    -fx-background-color: #111c2d;
+}
+
+.symbol-name {
+    -fx-font-weight: 900;
+    -fx-text-fill: #93c5fd;
+}
+
+.symbol-bid {
+    -fx-text-fill: #86efac;
+    -fx-font-size: 11px;
+}
+
+.symbol-ask {
+    -fx-text-fill: #fca5a5;
+    -fx-font-size: 11px;
+}
+
+.order-book-pane,
+.mt5-order-book {
+    -fx-background-color: #0b1120;
+    -fx-padding: 8;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.book-bid-title {
+    -fx-text-fill: #86efac;
+    -fx-font-weight: 900;
+}
+
+.book-ask-title {
+    -fx-text-fill: #fca5a5;
+    -fx-font-weight: 900;
+}
+
+.bid-table .table-cell {
+    -fx-text-fill: #bbf7d0;
+}
+
+.ask-table .table-cell {
+    -fx-text-fill: #fecaca;
+}
+
 
 /* ============================================================================
-   LIST VIEW - NEWS / SIGNALS / EXPERTS / MAILBOX
+   LIST VIEW
    ============================================================================ */
 
 .list-view {
@@ -1039,12 +877,42 @@ StackPane {
 
 
 /* ============================================================================
-   CHART AREA - HIGH VISIBILITY
+   CHART CONTAINER / CHART WORKSPACE
    ============================================================================ */
+
+.candle-chart-container,
+.chart-container-root,
+.chart-host,
+.chart-workspace,
+.mt5-chart-workspace,
+.chart-terminal-stack {
+    -fx-background-color: #070b12;
+}
+
+.chart-toolbar-container {
+    -fx-background-color: #101827;
+    -fx-border-color: #263246;
+    -fx-border-width: 0 0 1 0;
+}
+
+.chart-workspace {
+    -fx-border-color: #263246;
+    -fx-border-width: 0 0 0 1;
+}
+
+.workspace-scroll-pane,
+.workspace-scroll-pane > .viewport {
+    -fx-background-color: #070b12;
+}
+
+.left-rail {
+    -fx-background-color: #070b12;
+}
 
 .chart,
 .candle-chart,
-.trade-view-chart-host {
+.trade-view-chart-host,
+.candlestick-chart {
     -fx-background-color: -chart-bg;
     -fx-padding: 8;
 }
@@ -1072,6 +940,16 @@ StackPane {
     -fx-font-weight: 700;
 }
 
+.axis-tick-mark {
+    -fx-stroke: #64748b;
+    -fx-stroke-width: 1;
+}
+
+.axis-minor-tick-mark {
+    -fx-stroke: #334155;
+    -fx-stroke-width: 1;
+}
+
 .chart-title {
     -fx-text-fill: white;
     -fx-font-size: 15px;
@@ -1089,7 +967,33 @@ StackPane {
     -fx-text-fill: -text-primary;
 }
 
-/* Candles */
+.mt5-chart-symbol {
+    -fx-text-fill: #f8fafc;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+}
+
+.mt5-chart-empty-state,
+.mt5-terminal-placeholder {
+    -fx-background-color: #050915;
+    -fx-padding: 24;
+}
+
+.mt5-empty-title {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.mt5-empty-subtitle {
+    -fx-text-fill: #94a3b8;
+}
+
+
+/* ============================================================================
+   CANDLESTICK NODES
+   ============================================================================ */
+
 .candlestick-bar.close-above-open {
     -fx-background-color: rgba(34, 197, 94, 0.95);
     -fx-border-color: #86efac;
@@ -1113,6 +1017,12 @@ StackPane {
     -fx-opacity: 0.95;
 }
 
+.candlestick-candle {
+    -fx-background-color: #334155;
+    -fx-stroke: #cbd5e1;
+    -fx-stroke-width: 1px;
+}
+
 .candlestick-tooltip-label {
     -fx-background-color: #020617;
     -fx-border-color: -primary-light;
@@ -1126,51 +1036,190 @@ StackPane {
 
 
 /* ============================================================================
-   MARKET WATCH / NAVIGATOR STYLE
+   CHART TOOLBAR
    ============================================================================ */
 
-.market-watch,
-.navigator-pane {
-    -fx-background-color: #0b1120;
-    -fx-border-color: -border-color;
+.candle-chart-toolbar-wrapper {
+    -fx-background-color: transparent;
+}
+
+.candle-chart-toolbar {
+    -fx-alignment: center-left;
+    -fx-spacing: 6;
+    -fx-background-color: transparent;
+}
+
+.candle-chart-toolbar-separator {
+    -fx-background-color: #334155;
+    -fx-opacity: 0.55;
+}
+
+.candle-chart-toolbar-button {
+    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
+    -fx-border-color: #34445f;
     -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-text-fill: #e5edf7;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
 }
 
-.market-watch-title,
-.navigator-title {
-    -fx-font-size: 13px;
-    -fx-font-weight: 900;
+.candle-chart-toolbar-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
+    -fx-border-color: #60a5fa;
+}
+
+.candle-chart-toolbar-button:armed,
+.candle-chart-toolbar-button:active {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #93c5fd;
     -fx-text-fill: white;
-    -fx-padding: 4 0 4 0;
 }
 
-.symbol-up {
-    -fx-text-fill: -profit-color;
-    -fx-font-weight: 900;
+.candle-chart-toolbar-button.drawing-tool-button {
+    -fx-border-color: #334155;
 }
 
-.symbol-down {
-    -fx-text-fill: -loss-color;
-    -fx-font-weight: 900;
+.candle-chart-toolbar-button.drawing-tool-button:active {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+    -fx-border-color: #93c5fd;
+    -fx-text-fill: white;
 }
 
-.symbol-flat {
-    -fx-text-fill: -text-secondary;
+.candle-chart-toolbar-button.erase-objects-button {
+    -fx-border-color: #7f1d1d;
+}
+
+.candle-chart-toolbar-button.erase-objects-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #7f1d1d, #450a0a);
+    -fx-border-color: #f87171;
+    -fx-text-fill: #fee2e2;
+}
+
+.candle-chart-toolbar-button.erase-objects-button:armed {
+    -fx-background-color: linear-gradient(to bottom, #dc2626, #7f1d1d);
+    -fx-border-color: #fecaca;
+    -fx-text-fill: white;
+}
+
+.chart-action-button {
+    -fx-background-color: linear-gradient(to bottom, #1d293d, #111827);
+    -fx-border-color: #34445f;
+    -fx-border-width: 1;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-padding: 5;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 8, 0.2, 0, 1);
+}
+
+.chart-action-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #263755, #18243a);
+    -fx-border-color: #60a5fa;
+}
+
+.chart-timeframe-label {
+    -fx-text-fill: #9aa7ba;
+    -fx-font-weight: bold;
 }
 
 
 /* ============================================================================
-   STATUS BAR
+   CHART OPTIONS POPOVER
    ============================================================================ */
 
+.chart-options-pane {
+    -fx-background-color: #0b1220;
+    -fx-border-color: #263449;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-spacing: 10;
+    -fx-padding: 12;
+}
+
+.chart-options-grid {
+    -fx-hgap: 18;
+    -fx-vgap: 12;
+}
+
+.chart-options-label {
+    -fx-text-fill: #dbeafe;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.chart-options-switch {
+    -fx-cursor: hand;
+}
+
+.chart-options-switch .text {
+    -fx-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+.chart-options-switch:selected .thumb-area {
+    -fx-background-color: #2563eb;
+}
+
+
+/* ============================================================================
+   TIMEFRAME BUTTONS
+   ============================================================================ */
+
+.mt5-timeframe-strip {
+    -fx-spacing: 2;
+    -fx-alignment: center-left;
+}
+
+.timeframe-button,
+.mt5-timeframe-button {
+    -fx-background-color: #0f172a;
+    -fx-text-fill: -text-primary;
+    -fx-border-color: -border-strong;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+    -fx-font-weight: 800;
+    -fx-padding: 5 9 5 9;
+    -fx-font-size: 11px;
+}
+
+.timeframe-button:hover,
+.mt5-timeframe-button:hover {
+    -fx-background-color: #1e293b;
+    -fx-border-color: -primary-light;
+}
+
+.timeframe-button:selected,
+.timeframe-button.active,
+.mt5-timeframe-button-active,
+.mt5-timeframe-button:selected {
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-border-color: -primary-light;
+}
+
+
+/* ============================================================================
+   QUICK TRADE / STATUS BAR
+   ============================================================================ */
+
+.mt5-quick-trade,
+.mt5-status-bar,
 .status-bar {
     -fx-background-color: linear-gradient(to bottom, #111827, #020617);
     -fx-border-color: -border-color;
     -fx-border-width: 1 0 0 0;
     -fx-padding: 5 10 5 10;
+    -fx-spacing: 6;
 }
 
-.status-bar .label {
+.status-bar .label,
+.mt5-status-bar .label {
     -fx-text-fill: -text-secondary;
     -fx-font-size: 12px;
 }
@@ -1185,10 +1234,60 @@ StackPane {
     -fx-font-weight: 900;
 }
 
+.paper-mode-chip {
+    -fx-text-fill: #38bdf8;
+    -fx-font-weight: 900;
+}
+
+.live-mode-chip {
+    -fx-text-fill: #22c55e;
+    -fx-font-weight: 900;
+}
+
 
 /* ============================================================================
-   WEBVIEW / MARKET RESEARCH AREA
+   ACCOUNT / PNL PANELS
    ============================================================================ */
+
+.account-metrics {
+    -fx-background-color: #08111f;
+    -fx-padding: 12;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.metric-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94a3b8;
+}
+
+.metric-value {
+    -fx-font-size: 16px;
+    -fx-font-weight: 900;
+}
+
+.pnl-strip {
+    -fx-background-color: #08111f;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+
+/* ============================================================================
+   ALERTS / ERRORS / HYPERLINKS / WEBVIEW
+   ============================================================================ */
+
+.trade-view-error {
+    -fx-text-fill: #fecaca;
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+    -fx-background-color: rgba(127, 29, 29, 0.35);
+    -fx-border-color: #ef4444;
+    -fx-border-width: 1;
+    -fx-padding: 18;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
 
 .web-view,
 .web-view .scroll-bar {
@@ -1262,24 +1361,7 @@ StackPane {
 
 
 /* ============================================================================
-   ALERTS / ERRORS
-   ============================================================================ */
-
-.trade-view-error {
-    -fx-text-fill: #fecaca;
-    -fx-font-size: 14px;
-    -fx-font-weight: 800;
-    -fx-background-color: rgba(127, 29, 29, 0.35);
-    -fx-border-color: #ef4444;
-    -fx-border-width: 1;
-    -fx-padding: 18;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-}
-
-
-/* ============================================================================
-   LEGACY COMPATIBILITY WITH EXISTING CLASSES
+   LEGACY COMPATIBILITY CLASSES WITHOUT GLOBAL OVERRIDES
    ============================================================================ */
 
 .tradeToolbar {
@@ -1289,284 +1371,139 @@ StackPane {
     -fx-padding: 7 10 7 10;
 }
 
-.trading-positive {
-    -fx-text-fill: -profit-color;
-    -fx-font-weight: 900;
-}
-
-.trading-negative {
-    -fx-text-fill: -loss-color;
-    -fx-font-weight: 900;
-}
-
 .trade-pair-label {
     -fx-font-size: 14px;
     -fx-font-weight: 900;
     -fx-text-fill: -primary-light;
 }
 
-.timeframe-button {
-    -fx-padding: 6 11 6 11;
-    -fx-background-color: #0f172a;
-    -fx-text-fill: -text-primary;
-    -fx-border-color: -border-strong;
+.gridPane {
+    -fx-padding: 10;
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5px;
+}
+
+.chart-tab {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.chart-tab:selected {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.trading-tab-pane {
+    -fx-padding: 0;
+    -fx-background-color: #0b1120;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.fx-background-color {
+    -fx-background-color: red;
+}
+
+
+/* ============================================================================
+   OPTIONAL TAB COLOR CLASSES
+   ============================================================================ */
+
+.trade-tab,
+.account-tab,
+.position-tab,
+.order-tab,
+.news-tab,
+.market-data-tab,
+.historical-data-tab {
+    -fx-text-fill: white;
+    -fx-text-align: center;
+    -fx-background-radius: 5;
+    -fx-background-insets: 0;
+}
+
+.trade-tab {
+    -fx-background-color: #116798;
+    -fx-border-color: #ac7446;
+    -fx-border-width: 2;
+}
+
+.account-tab {
+    -fx-background-color: #1d70cc;
+}
+
+.position-tab {
+    -fx-background-color: #2959ea;
+}
+
+.order-tab {
+    -fx-background-color: #3385ff;
+}
+
+.news-tab {
+    -fx-background-color: #166534;
+}
+
+.market-data-tab {
+    -fx-background-color: #1f917c;
+}
+
+.historical-data-tab {
+    -fx-background-color: #0a3463;
+}
+.exchange-navigation {
+    -fx-background-color: #070b12;
+}
+
+.exchange-navigation-panel {
+    -fx-background-color: #0b1120;
+    -fx-border-color: #263246;
+    -fx-border-width: 1;
+}
+
+.exchange-navigation-title {
+    -fx-text-fill: #60a5fa;
+    -fx-font-size: 13px;
+    -fx-font-weight: 900;
+}
+
+.exchange-current-label {
+    -fx-padding: 8;
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
     -fx-border-radius: 4;
     -fx-background-radius: 4;
-    -fx-cursor: hand;
-    -fx-font-weight: 800;
 }
 
-.timeframe-button:hover {
-    -fx-background-color: #1e293b;
-    -fx-border-color: -primary-light;
-}
-
-.timeframe-button:selected,
-.timeframe-button.active {
-    -fx-background-color: -primary-color;
-    -fx-text-fill: white;
-    -fx-border-color: -primary-light;
-}
-
-.chart-workspace {
-    -fx-background-color: linear-gradient(to bottom, #020617, #0f172a);
-}
-
-.workspace-header {
-    -fx-padding: 10 14;
-    -fx-spacing: 12;
-    -fx-background-color: rgba(15, 23, 42, 0.96);
-    -fx-border-color: rgba(51, 65, 85, 0.85);
-    -fx-border-width: 0 0 1 0;
-}
-
-.workspace-title {
-    -fx-text-fill: #e2e8f0;
-    -fx-font-size: 15px;
-    -fx-font-weight: bold;
-}
-
-.workspace-subtitle {
-    -fx-text-fill: #94a3b8;
+.exchange-selector {
     -fx-font-size: 11px;
 }
 
-.workspace-control-label {
-    -fx-text-fill: #94a3b8;
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
-}
-
-.workspace-header-actions {
-    -fx-alignment: center-right;
-}
-
-.chart-terminal-stack {
-    -fx-background-color: #020617;
-}
-
-.workspace-scroll-pane {
-    -fx-background-color: transparent;
-    -fx-background: transparent;
-}
-
-.workspace-scroll-pane > .viewport {
-    -fx-background-color: transparent;
-}
-
-.terminal-scroll-pane,
-.terminal-scroll-pane > .viewport,
-.terminal-scroll-content {
-    -fx-background-color: #020617;
-}
-
-.terminal-scroll-content {
+.exchange-nav-button {
+    -fx-font-size: 10px;
     -fx-padding: 8;
 }
 
-.terminal-button {
-    -fx-background-color: #1e293b;
-    -fx-text-fill: #e2e8f0;
-    -fx-border-color: #334155;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-padding: 6 12;
-    -fx-cursor: hand;
-}
-
-.terminal-button:hover {
-    -fx-background-color: #334155;
-    -fx-border-color: #38bdf8;
-    -fx-text-fill: #ffffff;
-}
-
-.terminal-combo-box {
-    -fx-background-color: #0f172a;
-    -fx-border-color: #334155;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-}
-
-/* ============================================================================
-   OPTIONAL: APPLY TO YOUR NEW TRADINGWINDOW COMPONENTS
-   Add these style classes in Java:
-   - statusBar.getStyleClass().add("status-bar");
-   - console.getStyleClass().add("system-console");
-   - buyButton.getStyleClass().add("buy-button");
-   - sellButton.getStyleClass().add("sell-button");
-   - autoTradeButton.getStyleClass().add("auto-button");
-   ============================================================================ */
-
-/* ============================================================================
-   MT5-style InvestPro terminal shell
-   ============================================================================ */
-.mt5-root {
-    -fx-background-color: #050915;
+.exchange-control-buttons .button {
     -fx-font-size: 11px;
+    -fx-padding: 8;
 }
 
-.mt5-top-section,
-.mt5-menu-bar,
-.mt5-toolbar {
-    -fx-background-color: #101827;
-    -fx-border-color: #263449;
-    -fx-border-width: 0 0 1 0;
+.connection-status.connecting {
+    -fx-text-fill: #f59e0b;
+    -fx-font-weight: 900;
 }
 
-.mt5-toolbar {
-    -fx-padding: 4 6;
-    -fx-spacing: 5;
+.connection-status.connected {
+    -fx-text-fill: #10b981;
+    -fx-font-weight: 900;
 }
 
-.mt5-brand {
-    -fx-text-fill: #e5eefb;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-}
-
-.mt5-toolbar-button,
-.mt5-command-button {
-    -fx-background-color: #172033;
-    -fx-text-fill: #d7e1ee;
-    -fx-border-color: #2c3a52;
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
-    -fx-padding: 4 8;
-    -fx-font-size: 11px;
-    -fx-cursor: hand;
-}
-
-.mt5-toolbar-button:hover,
-.mt5-command-button:hover {
-    -fx-background-color: #22304a;
-    -fx-border-color: #4ea5ff;
-}
-
-.mt5-compact-combo,
-.mt5-amount-field,
-.mt5-market-search {
-    -fx-background-color: #090f1d;
-    -fx-text-fill: #e6edf7;
-    -fx-border-color: #2c3a52;
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
-    -fx-padding: 3 6;
-    -fx-font-size: 11px;
-}
-
-.mt5-timeframe-strip {
-    -fx-spacing: 2;
-    -fx-alignment: center-left;
-}
-
-.mt5-timeframe-button {
-    -fx-background-color: transparent;
-    -fx-text-fill: #9fb0c4;
-    -fx-border-color: #2c3a52;
-    -fx-border-radius: 2;
-    -fx-background-radius: 2;
-    -fx-padding: 3 6;
-    -fx-font-size: 10px;
-}
-
-.mt5-timeframe-button-active,
-.mt5-timeframe-button:selected {
-    -fx-background-color: #1d4ed8;
-    -fx-text-fill: white;
-    -fx-border-color: #60a5fa;
-}
-
-.mt5-panel {
-    -fx-background-color: #0b1220;
-    -fx-border-color: #263449;
-}
-
-.mt5-panel-header,
-.mt5-chart-header {
-    -fx-background-color: #111a2b;
-    -fx-border-color: #263449;
-    -fx-border-width: 0 0 1 0;
-    -fx-padding: 5 8;
-}
-
-.mt5-market-watch-table,
-.mt5-market-watch-table .column-header-background,
-.mt5-terminal,
-.mt5-order-book,
-.mt5-chart-workspace {
-    -fx-background-color: #050915;
-}
-
-.mt5-row-even {
-    -fx-background-color: #08101e;
-}
-
-.mt5-row-odd {
-    -fx-background-color: #0d1728;
-}
-
-.mt5-chart-symbol {
-    -fx-text-fill: #f8fafc;
-    -fx-font-weight: bold;
-    -fx-font-size: 13px;
-}
-
-.mt5-chart-meta,
-.mt5-status-chip,
-.panel-meta {
-    -fx-text-fill: #9fb0c4;
-    -fx-font-size: 11px;
-}
-
-.mt5-chart-empty-state,
-.mt5-terminal-placeholder {
-    -fx-background-color: #050915;
-    -fx-padding: 24;
-}
-
-.mt5-empty-title {
-    -fx-text-fill: #e2e8f0;
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-}
-
-.mt5-empty-subtitle {
-    -fx-text-fill: #94a3b8;
-}
-
-.mt5-quick-trade,
-.mt5-status-bar {
-    -fx-background-color: #0b1220;
-    -fx-border-color: #263449;
-    -fx-border-width: 1 0 0 0;
-    -fx-padding: 5 8;
-    -fx-spacing: 6;
-}
-
-.paper-mode-chip {
-    -fx-text-fill: #38bdf8;
-}
-
-.live-mode-chip {
-    -fx-text-fill: #22c55e;
+.connection-status.disconnected {
+    -fx-text-fill: #ef4444;
+    -fx-font-weight: 900;
 }

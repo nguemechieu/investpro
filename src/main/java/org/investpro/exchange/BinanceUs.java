@@ -20,6 +20,8 @@ import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
@@ -1531,6 +1533,156 @@ public class BinanceUs extends Exchange {
     @Override
     public List<TradePair> getTradablePairs() {
         return getTradePairSymbol();
+    }
+
+    @Override
+    public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, JsonNode> exchangeInfo = loadExchangeInfoBySymbol();
+            return pairs.stream()
+                    .filter(Objects::nonNull)
+                    .map(pair -> mapBinanceUsTradability(pair, exchangeInfo.get(binanceUsSymbol(pair))))
+                    .toList();
+        });
+    }
+
+    @Override
+    public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
+        if (pair == null) {
+            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, JsonNode> exchangeInfo = loadExchangeInfoBySymbol();
+            return mapBinanceUsTradability(pair, exchangeInfo.get(binanceUsSymbol(pair)));
+        });
+    }
+
+    private Map<String, JsonNode> loadExchangeInfoBySymbol() {
+        String url = BINANCE_US_REST_URL + "/api/v3/exchangeInfo";
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "InvestPro/1.0")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            JsonNode symbols = root.path("symbols");
+            if (!symbols.isArray()) {
+                return Map.of();
+            }
+
+            Map<String, JsonNode> bySymbol = new LinkedHashMap<>();
+            for (JsonNode symbolNode : symbols) {
+                String symbol = symbolNode.path("symbol").asText("");
+                if (!symbol.isBlank()) {
+                    bySymbol.put(symbol, symbolNode);
+                }
+            }
+            return bySymbol;
+        } catch (Exception exception) {
+            logger.warn("Unable to load Binance US exchangeInfo for tradability mapping", exception);
+            return Map.of();
+        }
+    }
+
+    private String binanceUsSymbol(TradePair pair) {
+        return pair == null ? "" : (pair.getBaseCode() + pair.getCounterCode()).toUpperCase(Locale.ROOT);
+    }
+
+    private SymbolTradability mapBinanceUsTradability(TradePair pair, JsonNode symbolNode) {
+        if (pair == null) {
+            return defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null");
+        }
+        if (symbolNode == null || symbolNode.isMissingNode()) {
+            return defaultTradability(pair, TradabilityStatus.PERMISSION_DENIED,
+                    "Binance US symbol not available for this account/region");
+        }
+
+        String statusValue = symbolNode.path("status").asText("UNKNOWN").toUpperCase(Locale.ROOT);
+        TradabilityStatus status = switch (statusValue) {
+            case "TRADING" -> TradabilityStatus.FULLY_TRADABLE;
+            case "HALT" -> TradabilityStatus.HALTED;
+            case "BREAK" -> TradabilityStatus.MARKET_CLOSED;
+            default -> TradabilityStatus.DISABLED;
+        };
+
+        Set<String> orderTypes = new HashSet<>();
+        JsonNode orderTypesNode = symbolNode.path("orderTypes");
+        if (orderTypesNode.isArray()) {
+            orderTypesNode.forEach(node -> orderTypes.add(node.asText("").toUpperCase(Locale.ROOT)));
+        }
+
+        boolean marketAllowed = orderTypes.contains("MARKET");
+        boolean limitAllowed = orderTypes.contains("LIMIT");
+        boolean stopAllowed = orderTypes.contains("STOP_LOSS") || orderTypes.contains("STOP_LOSS_LIMIT");
+
+        boolean minQtyValid = true;
+        JsonNode filtersNode = symbolNode.path("filters");
+        if (filtersNode.isArray()) {
+            for (JsonNode filterNode : filtersNode) {
+                String type = filterNode.path("filterType").asText("");
+                if ("LOT_SIZE".equalsIgnoreCase(type)) {
+                    minQtyValid = safeDecimal(filterNode.path("minQty").asText("0")) > 0.0;
+                }
+                if ("NOTIONAL".equalsIgnoreCase(type) || "MIN_NOTIONAL".equalsIgnoreCase(type)) {
+                    minQtyValid = minQtyValid && safeDecimal(filterNode.path("minNotional").asText("0")) > 0.0;
+                }
+            }
+        }
+
+        if (!minQtyValid && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.MIN_SIZE_INVALID;
+        }
+
+        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
+        if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.API_KEY_RESTRICTED;
+        }
+
+        boolean marginAllowed = symbolNode.path("isMarginTradingAllowed").asBoolean(false);
+
+        return new SymbolTradability(
+                getExchangeId(),
+                pair,
+                symbolNode.path("symbol").asText(binanceUsSymbol(pair)),
+                status,
+                true,
+                true,
+                true,
+                true,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                marketAllowed,
+                limitAllowed,
+                stopAllowed,
+                false,
+                marginAllowed,
+                supportsLeverage(),
+                status == TradabilityStatus.FULLY_TRADABLE
+                        ? "Binance US symbol is tradable"
+                        : "Binance US symbol status=" + statusValue,
+                Instant.now(),
+                Map.of(
+                        "status", statusValue,
+                        "orderTypes", orderTypes,
+                        "marginAllowed", marginAllowed));
+    }
+
+    private double safeDecimal(String value) {
+        try {
+            return Double.parseDouble(value == null ? "0" : value.trim());
+        } catch (Exception ignored) {
+            return 0.0;
+        }
     }
 
     @Override

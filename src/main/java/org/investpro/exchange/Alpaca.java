@@ -18,6 +18,8 @@ import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.exchange.websocket.AlpacaWebSocket;
 import org.investpro.exchange.websocket.ExchangeWebSocketClient;
 import org.investpro.models.trading.*;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
@@ -1007,6 +1009,101 @@ public class Alpaca extends Exchange {
     @Override
     public List<TradePair> getTradablePairs() {
         return List.of();
+    }
+
+    @Override
+    public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> pairs.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(this::mapAlpacaTradability)
+                .toList());
+    }
+
+    @Override
+    public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
+        if (pair == null) {
+            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+        }
+        return CompletableFuture.supplyAsync(() -> mapAlpacaTradability(pair));
+    }
+
+    private SymbolTradability mapAlpacaTradability(TradePair pair) {
+        String assetSymbol = alpacaAssetSymbol(pair);
+        try {
+            HttpRequest request = alpacaRequest("/v2/assets/" + assetSymbol)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode body = OBJECT_MAPPER.readTree(response.body());
+
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                return defaultTradability(pair, TradabilityStatus.PERMISSION_DENIED,
+                        "Alpaca asset is unavailable for this account: " + assetSymbol);
+            }
+
+            boolean tradable = body.path("tradable").asBoolean(false);
+            boolean active = "active".equalsIgnoreCase(body.path("status").asText(""));
+            boolean marginable = body.path("marginable").asBoolean(false);
+            boolean shortable = body.path("shortable").asBoolean(false);
+            boolean fractionable = body.path("fractionable").asBoolean(false);
+
+            TradabilityStatus status = tradable && active
+                    ? TradabilityStatus.FULLY_TRADABLE
+                    : (active ? TradabilityStatus.DISABLED : TradabilityStatus.INACTIVE);
+
+            boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
+            if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
+                status = TradabilityStatus.API_KEY_RESTRICTED;
+            }
+
+            String reason = status == TradabilityStatus.FULLY_TRADABLE
+                    ? "Alpaca asset is tradable"
+                    : "Alpaca asset is restricted: status=%s, tradable=%s"
+                            .formatted(body.path("status").asText("unknown"), tradable);
+
+            return new SymbolTradability(
+                    getExchangeId(),
+                    pair,
+                    body.path("symbol").asText(assetSymbol),
+                    status,
+                    true,
+                    true,
+                    true,
+                    true,
+                    orderSubmissionAllowed,
+                    orderSubmissionAllowed,
+                    orderSubmissionAllowed,
+                    true,
+                    true,
+                    true,
+                    false,
+                    marginable,
+                    shortable,
+                    reason,
+                    Instant.now(),
+                    Map.of(
+                            "assetStatus", body.path("status").asText("unknown"),
+                            "tradable", tradable,
+                            "fractionable", fractionable,
+                            "marginable", marginable,
+                            "shortable", shortable));
+        } catch (Exception exception) {
+            log.debug("Unable to load Alpaca asset tradability for {}", assetSymbol, exception);
+            return defaultTradability(pair, TradabilityStatus.UNKNOWN,
+                    "Unable to verify Alpaca asset tradability for " + assetSymbol);
+        }
+    }
+
+    private String alpacaAssetSymbol(TradePair pair) {
+        if (pair == null || pair.getBaseCode() == null) {
+            return "";
+        }
+        return pair.getBaseCode().trim().toUpperCase(java.util.Locale.ROOT);
     }
 
     @Override

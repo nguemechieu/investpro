@@ -24,6 +24,8 @@ import org.investpro.models.trading.Position;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.Trade;
 import org.investpro.models.trading.TradePair;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
@@ -52,20 +54,10 @@ import java.net.http.HttpResponse;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Random;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -581,6 +573,125 @@ public class Oanda extends Exchange {
     @Override
     public List<TradePair> getTradablePairs() {
         return getTradePairSymbol();
+    }
+
+    @Override
+    public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Set<String> accountInstruments = getTradePairSymbol().stream()
+                    .map(this::toInstrument)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            return pairs.stream()
+                    .filter(Objects::nonNull)
+                    .map(pair -> mapOandaTradability(pair, accountInstruments))
+                    .toList();
+        });
+    }
+
+    @Override
+    public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
+        if (pair == null) {
+            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Set<String> accountInstruments = getTradePairSymbol().stream()
+                    .map(this::toInstrument)
+                    .collect(java.util.stream.Collectors.toSet());
+            return mapOandaTradability(pair, accountInstruments);
+        });
+    }
+
+    private SymbolTradability mapOandaTradability(TradePair pair, Set<String> accountInstruments) {
+        String instrument = toInstrument(pair);
+        boolean instrumentAllowed = accountInstruments.contains(instrument);
+
+        if (!instrumentAllowed) {
+            return new SymbolTradability(
+                    getExchangeId(),
+                    pair,
+                    instrument,
+                    TradabilityStatus.PERMISSION_DENIED,
+                    true,
+                    true,
+                    true,
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    true,
+                    false,
+                    supportsLeverage(),
+                    supportsLeverage(),
+                    "Instrument is not enabled for this OANDA account",
+                    Instant.now(),
+                    Map.of("instrument", instrument));
+        }
+
+        TradabilityStatus status = TradabilityStatus.FULLY_TRADABLE;
+        String reason = "OANDA instrument is tradable";
+
+        if (pair.getTradingSessionStatus() != null && !pair.getTradingSessionStatus().isTradable()) {
+            status = TradabilityStatus.MARKET_CLOSED;
+            reason = "OANDA market session is currently closed";
+        }
+
+        Ticker ticker = null;
+        try {
+            ticker = fetchTicker(pair).get(3, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            log.debug("Could not fetch OANDA tradability ticker for {}", pair, exception);
+        }
+
+        if (status == TradabilityStatus.FULLY_TRADABLE) {
+            boolean hasLiquidity = ticker != null
+                    && Double.isFinite(ticker.getBidPrice())
+                    && Double.isFinite(ticker.getAskPrice())
+                    && ticker.getBidPrice() > 0.0
+                    && ticker.getAskPrice() > 0.0;
+
+            if (!hasLiquidity) {
+                status = TradabilityStatus.LIQUIDITY_UNAVAILABLE;
+                reason = "No OANDA pricing liquidity is currently available";
+            }
+        }
+
+        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
+        if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.API_KEY_RESTRICTED;
+            reason = "OANDA API/account cannot currently submit orders";
+        }
+
+        return new SymbolTradability(
+                getExchangeId(),
+                pair,
+                instrument,
+                status,
+                true,
+                true,
+                true,
+                true,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                true,
+                true,
+                true,
+                false,
+                supportsLeverage(),
+                supportsLeverage(),
+                reason,
+                Instant.now(),
+                Map.of(
+                        "instrument", instrument,
+                        "session", String.valueOf(pair.getTradingSessionStatus())));
     }
 
     @Override

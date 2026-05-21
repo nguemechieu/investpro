@@ -31,6 +31,7 @@ public class AgentRuntime {
     private AgentContext context;
 
     private boolean running;
+    private SymbolAgent agent;
 
     public static @NotNull AgentRuntime createDefault() {
         AgentRuntime runtime = new AgentRuntime();
@@ -72,7 +73,7 @@ public class AgentRuntime {
         boolean alreadyRegistered = agents.stream()
                 .anyMatch(a -> agentName.equals(a.name()));
         if (alreadyRegistered) return;
-        SymbolAgent agent = new SymbolAgent(symbol, symbolAgentManager);
+        agent = new SymbolAgent(symbol, symbolAgentManager);
         agents.add(agent);
         if (running && context != null) {
             context.getEventBus().subscribe(AgentEvent.MARKET_TICK, agent::onEvent);
@@ -80,13 +81,9 @@ public class AgentRuntime {
                 agent.start(context);
                 log.info("SymbolAgent started: {}", agent.name());
             } catch (Exception e) {
-                log.error("Failed to start SymbolAgent {}", agent.name(), e);
+                throw  new RuntimeException("Failed to start SymbolAgent {}"+ agent.name(), e);
             }
         }
-    }
-
-    public List<Agent> getAgents() {
-        return Collections.unmodifiableList(agents);
     }
 
     public void start(AgentContext context) {
@@ -97,16 +94,20 @@ public class AgentRuntime {
         context.getEventBus().start();
 
         for (Agent agent : agents) {
-            context.getEventBus().subscribeAll(agent::onEvent);
 
             try {
+                context.getEventBus().subscribeAll(agent::onEvent);
+
                 agent.start(context);
                 log.info("Agent started: {}", agent.name());
+                running = true;
             } catch (Exception exception) {
                 log.error("Failed to start agent {}", agent.name(), exception);
+
+            running = false;
             }
         }
-        running = true;
+
     }
 
     public void stop() {

@@ -24,6 +24,8 @@ import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.strategy.lab.StrategyLabSnapshot;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
 import org.investpro.strategy.lab.StrategyVote;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
 import org.jetbrains.annotations.NotNull;
@@ -163,7 +165,22 @@ public class StrategyLabPanel extends BorderPane {
         if (systemCore.getExchange() != null) {
             List<TradePair> symbols = systemCore.getExchange().getTradePairSymbol();
             if (symbols != null) {
-                symbolCombo.getItems().setAll(symbols);
+                try {
+                    UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
+                            systemCore.getExchange(),
+                            null);
+                    List<SymbolTradability> statuses = tradabilityService.getTradability(symbols).get(8, TimeUnit.SECONDS);
+                    List<TradePair> filtered = new ArrayList<>();
+                    for (SymbolTradability status : statuses) {
+                        if (status != null && status.tradePair() != null && status.marketDataAllowed()) {
+                            filtered.add(status.tradePair());
+                        }
+                    }
+                    symbolCombo.getItems().setAll(filtered.isEmpty() ? symbols : filtered);
+                } catch (Exception exception) {
+                    log.warn("Unable to apply tradability filter in StrategyLabPanel", exception);
+                    symbolCombo.getItems().setAll(symbols);
+                }
             }
         }
 

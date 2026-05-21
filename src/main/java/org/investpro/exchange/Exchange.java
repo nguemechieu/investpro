@@ -10,12 +10,15 @@ import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.TradePair;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.market.ExchangeMarketDataAdapter;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -154,6 +157,99 @@ public abstract class Exchange implements
     public boolean canSubmitOrders() {
         return Boolean.TRUE.equals(isConnected())
                 && (canSubmitLiveOrders() || (supportsPaperTradingMode() && isPaperTrading()));
+    }
+
+    public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.allOf(
+                pairs.stream()
+                        .map(this::fetchTradabilityStatus)
+                        .toArray(CompletableFuture[]::new))
+                .thenApply(unused -> pairs.stream()
+                        .map(pair -> fetchTradabilityStatus(pair).join())
+                        .toList());
+    }
+
+    public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
+        if (pair == null) {
+            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+        }
+
+        boolean supportsPair = supportsTradePair(pair);
+        boolean marketOpen = marketDataEngine == null || marketDataEngine.isTradableNow(pair);
+        TradabilityStatus status = supportsPair
+                ? (marketOpen ? TradabilityStatus.FULLY_TRADABLE : TradabilityStatus.MARKET_CLOSED)
+                : TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE;
+
+        boolean liveAllowed = supportsPair && marketOpen && canSubmitOrders();
+        boolean orderAllowed = supportsPair && canSubmitOrders();
+
+        SymbolTradability tradability = new SymbolTradability(
+                getExchangeId(),
+                pair,
+                pair.toString('/'),
+                status,
+                supportsPair,
+                supportsPair,
+                supportsPair,
+                supportsPair,
+                liveAllowed,
+                liveAllowed,
+                orderAllowed,
+                supportsPair,
+                supportsPair,
+                supportsPair && supportsStopLossTakeProfit(),
+                false,
+                supportsPair && supportsLeverage(),
+                supportsPair && supportsLeverage(),
+                supportsPair ? (marketOpen ? "Tradable by default exchange policy" : "Market/session closed")
+                        : "Instrument is not supported by this exchange",
+                Instant.now(),
+                Map.of("source", "exchange-default"));
+
+        return CompletableFuture.completedFuture(tradability);
+    }
+
+    public boolean canTradeSymbol(TradePair pair) {
+        SymbolTradability status = fetchTradabilityStatus(pair).join();
+        return status != null && status.isFullyTradable();
+    }
+
+    public boolean canBotTradeSymbol(TradePair pair) {
+        SymbolTradability status = fetchTradabilityStatus(pair).join();
+        return status != null && status.canBeUsedForBotTrading();
+    }
+
+    protected SymbolTradability defaultTradability(TradePair pair, TradabilityStatus status, String reason) {
+        boolean supportsPair = pair != null && supportsTradePair(pair);
+        boolean marketOpen = pair == null || marketDataEngine == null || marketDataEngine.isTradableNow(pair);
+        boolean orderAllowed = supportsPair && canSubmitOrders();
+        boolean liveAllowed = supportsPair && marketOpen && orderAllowed;
+
+        return new SymbolTradability(
+                getExchangeId(),
+                pair,
+                pair == null ? "" : pair.toString('/'),
+                status,
+                supportsPair,
+                supportsPair,
+                true,
+                true,
+                liveAllowed,
+                liveAllowed,
+                orderAllowed,
+                supportsPair,
+                supportsPair,
+                supportsPair && supportsStopLossTakeProfit(),
+                false,
+                supportsPair && supportsLeverage(),
+                supportsPair && supportsLeverage(),
+                reason == null ? "" : reason,
+                Instant.now(),
+                Map.of("source", "exchange-default-helper"));
     }
 
     /**

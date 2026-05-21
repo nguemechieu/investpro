@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 @Setter
-public class AnalysisPanel extends VBox {
+public class AnalysisPanel extends StackPane{
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -163,7 +163,7 @@ public class AnalysisPanel extends VBox {
         this.dataProvider = new AnalysisDataProvider(systemCore);
 
         setPadding(new Insets(16));
-        setSpacing(12);
+
         setStyle("-fx-background-color: " + BG + "; -fx-text-fill: " + TEXT + ";");
         getStyleClass().add("analysis-panel");
 

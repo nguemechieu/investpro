@@ -35,6 +35,8 @@ import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UnifiedStrategy;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.HistoricalDataPrefetcher;
 import org.investpro.utils.MARKET_TYPES;
@@ -71,7 +73,7 @@ import static org.investpro.utils.Side.SELL;
 @Slf4j
 @Getter
 @Setter
-public class BacktestingPanel extends VBox {
+public class BacktestingPanel extends StackPane {
 
     private ComboBox<String> strategyCombo;
     private ComboBox<TradePair> symbolCombo;
@@ -144,7 +146,7 @@ public class BacktestingPanel extends VBox {
         this.systemCore = systemCore;
         this.symbolAgentManager = systemCore == null ? null : systemCore.getSymbolAgentManager();
         setPadding(new Insets(16));
-        setSpacing(12);
+
         setStyle("-fx-background-color: #1a1a2e; -fx-text-fill: #ffffff;");
         getStyleClass().add("backtest-panel");
 
@@ -636,6 +638,28 @@ public class BacktestingPanel extends VBox {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+
+        if (!symbols.isEmpty() && systemCore != null && systemCore.getExchange() != null) {
+            try {
+                UniversalTradabilityService tradabilityService = new UniversalTradabilityService(
+                        systemCore.getExchange(),
+                        null);
+
+                List<SymbolTradability> statuses = tradabilityService.getTradability(symbols).get();
+                Set<String> marketDataSymbols = new HashSet<>();
+                for (SymbolTradability status : statuses) {
+                    if (status != null && status.tradePair() != null && status.marketDataAllowed()) {
+                        marketDataSymbols.add(status.tradePair().toString('/').toUpperCase(Locale.ROOT));
+                    }
+                }
+
+                symbols = symbols.stream()
+                        .filter(pair -> marketDataSymbols.contains(pair.toString('/').toUpperCase(Locale.ROOT)))
+                        .toList();
+            } catch (Exception exception) {
+                log.warn("Failed to apply tradability filter for backtesting symbols: {}", exception.getMessage());
+            }
+        }
 
         symbolCombo.setItems(FXCollections.observableArrayList(symbols));
 

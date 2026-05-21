@@ -22,13 +22,11 @@ public class TradingSystemStatusPanel extends VBox {
 
     private final TradingSystemStatusSnapshot snapshot;
     private final TabPane tabPane;
-    private final Label systemOverviewLabel;
     private final Label systemHealthLabel;
 
     public TradingSystemStatusPanel(TradingSystemStatusSnapshot snapshot) {
         this.snapshot = snapshot;
         this.tabPane = new TabPane();
-        this.systemOverviewLabel = new Label();
         this.systemHealthLabel = new Label();
 
         initializePanel();

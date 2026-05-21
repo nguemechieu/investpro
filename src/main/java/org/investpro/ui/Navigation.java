@@ -1,114 +1,115 @@
 package org.investpro.ui;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-
+import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.investpro.config.AppConfig;
 import org.investpro.config.AppConfigKeys;
+import org.investpro.exchange.infrastructure.ENUM_EXCHANGE_LIST;
 import org.investpro.i18n.LocalizationService;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.function.Consumer;
+
 /**
- * Navigation panel for switching between exchanges and managing exchange
- * connections.
- * Provides UI controls for selecting different crypto exchanges and viewing
- * exchange status.
+ * Professional exchange navigation panel for InvestPro.
+ *
+ * <p>Allows users to select an exchange, quickly switch between major venues,
+ * and view connection status. Styling is intentionally delegated to CSS where possible.</p>
  */
 @Slf4j
 @Getter
 @Setter
-public class Navigation extends Stage {
-    private static final String[] AVAILABLE_EXCHANGES = {
-            "COINBASE",
-            "BINANCE US",
-            "BINANCE",
-            "OANDA",
-            "BITFINEX",
-            "BITFINEX US",
-            "ALPACA",
-            "INTERACTIVE BROKERS",
-            "KRAKEN",
-            "BITTREX",
-            "BITMEX",
-            "BITSTAMP",
-            "KUCOIN",
-            "KUCOIN US",
-            "POLONIEX",
-            "IG",
-            "STELLAR NETWORK"
-    };
+public class Navigation extends StackPane {
+
+    private static final List<ENUM_EXCHANGE_LIST> AVAILABLE_EXCHANGES =
+            Arrays.stream(ENUM_EXCHANGE_LIST.values()).toList();
 
     private ComboBox<String> exchangeSelector;
     private Label currentExchangeLabel;
     private Label connectionStatusLabel;
+    private Label titleLabel;
+
+    /**
+     * Legacy callback kept for compatibility with older code.
+     */
     private Runnable onExchangeChanged;
+
+    /**
+     * Better callback that receives the selected exchange name.
+     */
+    private Consumer<String> onExchangeSelected;
 
     public Navigation() {
         initializeUI();
     }
 
-    /**
-     * Initialize the navigation UI with exchange selector and controls
-     */
     private void initializeUI() {
-        VBox root = new VBox(10);
-        root.setPadding(new Insets(15));
-        root.setStyle("-fx-background-color: #0f172a; -fx-text-fill: #e5e7eb;");
+        getStyleClass().add("exchange-navigation");
 
-        // Title
-        Label titleLabel = new Label("EXCHANGE NAVIGATOR");
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3b82f6;");
+        VBox root = new VBox(12);
+        root.setAlignment(Pos.TOP_LEFT);
+        root.setPadding(new Insets(14));
+        root.getStyleClass().addAll("pro-panel", "exchange-navigation-panel");
 
-        // Current Exchange Display
-        String defaultExchangeForLabel = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
-        currentExchangeLabel = new Label("Current: " + defaultExchangeForLabel);
-        currentExchangeLabel.setStyle("-fx-font-size: 12; -fx-padding: 8; -fx-background-color: #1e293b; "
-                + "-fx-border-color: #334155; -fx-border-width: 1; -fx-border-radius: 4;");
+        titleLabel = new Label("EXCHANGE NAVIGATOR");
+        titleLabel.getStyleClass().addAll("panel-title", "exchange-navigation-title");
 
-        // Connection Status
+        String defaultExchange = resolveDefaultExchange();
+
+        currentExchangeLabel = new Label("Current: " + defaultExchange);
+        currentExchangeLabel.getStyleClass().addAll("exchange-current-label", "desk-metric-value");
+
         connectionStatusLabel = new Label("Status: Disconnected");
-        connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #ef4444;");
+        connectionStatusLabel.getStyleClass().addAll("connection-status", "disconnected");
 
-        // Exchange Selector
-        Label selectorLabel = new Label("Select Exchange:");
-        selectorLabel.setStyle("-fx-font-size: 11; -fx-font-weight: bold;");
+        Label selectorLabel = new Label("Select Exchange");
+        selectorLabel.getStyleClass().addAll("panel-meta", "exchange-selector-label");
 
         exchangeSelector = new ComboBox<>();
-        exchangeSelector.getItems().setAll(AVAILABLE_EXCHANGES);
-        // Use DEFAULT_EXCHANGE from AppConfig instead of hardcoding the first element
-        String defaultExchange = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
-        if (AVAILABLE_EXCHANGES.length > 0) {
-            if (java.util.Arrays.asList(AVAILABLE_EXCHANGES).contains(defaultExchange)) {
-                exchangeSelector.setValue(defaultExchange);
-            } else {
-                // Fall back to first element if default is not in available list
-                exchangeSelector.setValue(AVAILABLE_EXCHANGES[0]);
-            }
-        }
-        exchangeSelector.setPrefWidth(200);
-        exchangeSelector.setStyle("-fx-font-size: 11;");
-        exchangeSelector.setOnAction(event -> handleExchangeSelection());
+        exchangeSelector.getStyleClass().addAll("terminal-combo-box", "exchange-selector");
+        exchangeSelector.setMaxWidth(Double.MAX_VALUE);
+        exchangeSelector.setPrefWidth(220);
+        exchangeSelector.setTooltip(new Tooltip("Choose the exchange or broker used by InvestPro."));
 
-        // Navigation Buttons
+        exchangeSelector.getItems().setAll(
+                AVAILABLE_EXCHANGES.stream()
+                        .map(Enum::name)
+                        .toList()
+        );
+
+        exchangeSelector.setValue(defaultExchange);
+        exchangeSelector.setOnAction(event -> {
+            String selected = exchangeSelector.getValue();
+            if (selected != null && !selected.isBlank()) {
+                selectExchange(selected);
+            }
+        });
+
         VBox exchangeButtonsBox = createExchangeButtonsBox();
 
-        // Control Buttons
         HBox controlButtonsBox = createControlButtonsBox();
+        controlButtonsBox.setMaxWidth(Double.MAX_VALUE);
 
-        // Separator
-        Separator separator = new Separator();
+        Label quickNavLabel = new Label("Quick Navigation");
+        quickNavLabel.getStyleClass().addAll("panel-meta", "exchange-quick-nav-label");
 
-        // Add all components
-        root.getChildren().addAll(
+        root.getChildren().setAll(
                 titleLabel,
                 new Separator(),
                 currentExchangeLabel,
@@ -116,172 +117,232 @@ public class Navigation extends Stage {
                 new Separator(),
                 selectorLabel,
                 exchangeSelector,
-                new Label("Quick Navigation:"),
+                quickNavLabel,
                 exchangeButtonsBox,
-                separator,
-                controlButtonsBox);
+                new Separator(),
+                controlButtonsBox
+        );
 
-        VBox.setVgrow(root, Priority.ALWAYS);
+        VBox.setVgrow(exchangeButtonsBox, Priority.NEVER);
 
-        // Set stage properties
-        this.setTitle("Exchange Navigator");
-        this.setWidth(250);
-        this.setHeight(500);
-        this.setScene(new javafx.scene.Scene(root));
-        root.setStyle("-fx-base: #0f172a;");
         LocalizationService.applyTranslations(root);
+        getChildren().setAll(root);
     }
 
-    /**
-     * Create quick navigation buttons for major exchanges
-     */
     private VBox createExchangeButtonsBox() {
-        VBox buttonsContainer = new VBox(5);
-        buttonsContainer.setPadding(new Insets(5));
+        VBox buttonsContainer = new VBox(6);
+        buttonsContainer.getStyleClass().add("exchange-buttons-container");
+        buttonsContainer.setMaxWidth(Double.MAX_VALUE);
 
-        // Row 1
-        HBox row1 = new HBox(5);
+        HBox row1 = new HBox(6);
+        row1.setMaxWidth(Double.MAX_VALUE);
         row1.getChildren().addAll(
                 createExchangeButton("BINANCE", "binance-btn"),
-                createExchangeButton("COINBASE", "coinbase-btn"));
-        HBox.setHgrow(row1.getChildren().get(0), Priority.ALWAYS);
-        HBox.setHgrow(row1.getChildren().get(1), Priority.ALWAYS);
+                createExchangeButton("COINBASE", "coinbase-btn")
+        );
 
-        // Row 2
-        HBox row2 = new HBox(5);
+        HBox row2 = new HBox(6);
+        row2.setMaxWidth(Double.MAX_VALUE);
         row2.getChildren().addAll(
                 createExchangeButton("OANDA", "oanda-btn"),
-                createExchangeButton("BITFINEX", "bitfinex-btn"));
-        HBox.setHgrow(row2.getChildren().get(0), Priority.ALWAYS);
-        HBox.setHgrow(row2.getChildren().get(1), Priority.ALWAYS);
+                createExchangeButton("BITFINEX", "bitfinex-btn")
+        );
 
-        // Row 3
-        HBox row3 = new HBox(5);
-        Button binanceUsBtn = createExchangeButton("BINANCE US", "binance-us-btn");
-        row3.getChildren().add(binanceUsBtn);
-        HBox.setHgrow(binanceUsBtn, Priority.ALWAYS);
+        HBox row3 = new HBox(6);
+        row3.setMaxWidth(Double.MAX_VALUE);
+        row3.getChildren().addAll(
+                createExchangeButton("BINANCE_US", "binance-us-btn")
+        );
+
+        makeButtonsGrow(row1);
+        makeButtonsGrow(row2);
+        makeButtonsGrow(row3);
 
         buttonsContainer.getChildren().addAll(row1, row2, row3);
         return buttonsContainer;
     }
 
-    /**
-     * Create a single exchange navigation button
-     */
+    private void makeButtonsGrow(HBox row) {
+        for (javafx.scene.Node child : row.getChildren()) {
+            HBox.setHgrow(child, Priority.ALWAYS);
+            if (child instanceof Button button) {
+                button.setMaxWidth(Double.MAX_VALUE);
+            }
+        }
+    }
+
     private Button createExchangeButton(String exchangeName, String styleId) {
-        Button button = new Button(exchangeName);
+        Button button = new Button(displayExchangeName(exchangeName));
         button.setId(styleId);
-        button.setPrefHeight(35);
-        button.setStyle("-fx-font-size: 10; -fx-padding: 8; -fx-background-color: #1e293b; "
-                + "-fx-text-fill: #e5e7eb; -fx-border-color: #3b82f6; -fx-border-width: 1; "
-                + "-fx-border-radius: 4; -fx-cursor: hand;");
-        button.setOnMouseEntered(e -> button.setStyle("-fx-font-size: 10; -fx-padding: 8; "
-                + "-fx-background-color: #3b82f6; -fx-text-fill: #ffffff; -fx-border-color: #2563eb; "
-                + "-fx-border-width: 1; -fx-border-radius: 4; -fx-cursor: hand;"));
-        button.setOnMouseExited(e -> button.setStyle("-fx-font-size: 10; -fx-padding: 8; "
-                + "-fx-background-color: #1e293b; -fx-text-fill: #e5e7eb; -fx-border-color: #3b82f6; "
-                + "-fx-border-width: 1; -fx-border-radius: 4; -fx-cursor: hand;"));
+        button.getStyleClass().addAll("desk-action-button", "exchange-nav-button");
+        button.setPrefHeight(34);
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setTooltip(new Tooltip("Switch to " + displayExchangeName(exchangeName)));
         button.setOnAction(event -> selectExchange(exchangeName));
         return button;
     }
 
-    /**
-     * Create control buttons for exchange operations
-     */
     private HBox createControlButtonsBox() {
         HBox controlBox = new HBox(8);
-        controlBox.setPadding(new Insets(8));
+        controlBox.setAlignment(Pos.CENTER_LEFT);
+        controlBox.getStyleClass().add("exchange-control-buttons");
+        controlBox.setPadding(new Insets(4, 0, 0, 0));
 
         Button connectButton = new Button("Connect");
-        connectButton.setPrefWidth(100);
-        connectButton.setStyle("-fx-font-size: 11; -fx-padding: 8; -fx-background-color: #10b981; "
-                + "-fx-text-fill: #ffffff; -fx-border-radius: 4; -fx-cursor: hand;");
+        connectButton.getStyleClass().addAll("success-button", "exchange-connect-button");
+        connectButton.setMaxWidth(Double.MAX_VALUE);
+        connectButton.setTooltip(new Tooltip("Connect to the selected exchange."));
         connectButton.setOnAction(event -> connectToExchange());
 
         Button disconnectButton = new Button("Disconnect");
-        disconnectButton.setPrefWidth(100);
-        disconnectButton.setStyle("-fx-font-size: 11; -fx-padding: 8; -fx-background-color: #ef4444; "
-                + "-fx-text-fill: #ffffff; -fx-border-radius: 4; -fx-cursor: hand;");
+        disconnectButton.getStyleClass().addAll("danger-button", "exchange-disconnect-button");
+        disconnectButton.setMaxWidth(Double.MAX_VALUE);
+        disconnectButton.setTooltip(new Tooltip("Disconnect from the selected exchange."));
         disconnectButton.setOnAction(event -> disconnectFromExchange());
+
+        HBox.setHgrow(connectButton, Priority.ALWAYS);
+        HBox.setHgrow(disconnectButton, Priority.ALWAYS);
 
         controlBox.getChildren().addAll(connectButton, disconnectButton);
         return controlBox;
     }
 
-    /**
-     * Handle exchange selection from combo box
-     */
-    private void handleExchangeSelection() {
-        String selected = exchangeSelector.getValue();
-        selectExchange(selected);
-    }
-
-    /**
-     * Select a specific exchange and update UI
-     */
     private void selectExchange(String exchangeName) {
-        exchangeSelector.setValue(exchangeName);
-        currentExchangeLabel.setText("Current: " + exchangeName);
-        log.info("Exchange selected: {}", exchangeName);
+        if (exchangeName == null || exchangeName.isBlank()) {
+            return;
+        }
 
-        // Call the callback if set
+        String normalizedExchange = normalizeExchangeName(exchangeName);
+
+        if (!exchangeSelector.getItems().contains(normalizedExchange)) {
+            log.warn("Exchange '{}' is not available in selector items: {}", normalizedExchange, exchangeSelector.getItems());
+            return;
+        }
+
+        if (!Objects.equals(exchangeSelector.getValue(), normalizedExchange)) {
+            exchangeSelector.setValue(normalizedExchange);
+        }
+
+        currentExchangeLabel.setText("Current: " + displayExchangeName(normalizedExchange));
+
+        log.info("Exchange selected: {}", normalizedExchange);
+
+        if (onExchangeSelected != null) {
+            onExchangeSelected.accept(normalizedExchange);
+        }
+
         if (onExchangeChanged != null) {
             onExchangeChanged.run();
         }
     }
 
-    /**
-     * Connect to the currently selected exchange
-     */
     private void connectToExchange() {
-        String currentExchange = exchangeSelector.getValue();
+        String currentExchange = getSelectedExchange();
+
+        if (currentExchange == null || currentExchange.isBlank()) {
+            setConnectionStatus(false);
+            log.warn("Cannot connect because no exchange is selected.");
+            return;
+        }
+
         log.info("Connecting to exchange: {}", currentExchange);
+
         connectionStatusLabel.setText("Status: Connecting...");
-        connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #f59e0b;");
-        // Connection logic would be handled by the trading window
+        connectionStatusLabel.getStyleClass().removeAll("connected", "disconnected", "connecting");
+        connectionStatusLabel.getStyleClass().add("connecting");
+
+        /*
+         * Real connection should be handled by TradingDesk/SystemCore.
+         * This panel only updates local UI state and notifies callbacks.
+         */
     }
 
-    /**
-     * Disconnect from the currently selected exchange
-     */
     private void disconnectFromExchange() {
-        String currentExchange = exchangeSelector.getValue();
+        String currentExchange = getSelectedExchange();
         log.info("Disconnecting from exchange: {}", currentExchange);
-        connectionStatusLabel.setText("Status: Disconnected");
-        connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #ef4444;");
+        setConnectionStatus(false);
     }
 
-    /**
-     * Get the currently selected exchange
-     */
     public String getSelectedExchange() {
-        return exchangeSelector.getValue();
+        return exchangeSelector == null ? null : exchangeSelector.getValue();
     }
 
-    /**
-     * Set the callback for when exchange changes
-     */
-    public void setOnExchangeChanged(Runnable callback) {
-        this.onExchangeChanged = callback;
-    }
-
-    /**
-     * Update connection status indicator
-     */
     public void setConnectionStatus(boolean connected) {
-        if (connected) {
-            connectionStatusLabel.setText("Status: Connected");
-            connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #10b981;");
+        Runnable update = () -> {
+            if (connectionStatusLabel == null) {
+                return;
+            }
+
+            connectionStatusLabel.getStyleClass().removeAll("connected", "disconnected", "connecting");
+
+            if (connected) {
+                connectionStatusLabel.setText("Status: Connected");
+                connectionStatusLabel.getStyleClass().add("connected");
+            } else {
+                connectionStatusLabel.setText("Status: Disconnected");
+                connectionStatusLabel.getStyleClass().add("disconnected");
+            }
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            update.run();
         } else {
-            connectionStatusLabel.setText("Status: Disconnected");
-            connectionStatusLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #ef4444;");
+            Platform.runLater(update);
         }
     }
 
-    /**
-     * Update the current exchange display label
-     */
     public void setCurrentExchange(String exchangeName) {
-        currentExchangeLabel.setText("Current: " + exchangeName);
+        if (exchangeName == null || exchangeName.isBlank()) {
+            return;
+        }
+
+        Runnable update = () -> selectExchange(exchangeName);
+
+        if (Platform.isFxApplicationThread()) {
+            update.run();
+        } else {
+            Platform.runLater(update);
+        }
+    }
+
+    private String resolveDefaultExchange() {
+        String configured = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
+        String normalized = normalizeExchangeName(configured);
+
+        boolean exists = AVAILABLE_EXCHANGES.stream()
+                .map(Enum::name)
+                .anyMatch(name -> name.equalsIgnoreCase(normalized));
+
+        if (exists) {
+            return normalized;
+        }
+
+        return AVAILABLE_EXCHANGES.isEmpty() ? "OANDA" : AVAILABLE_EXCHANGES.getFirst().name();
+    }
+
+    private String normalizeExchangeName(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String normalized = value.trim()
+                .replace(" ", "_")
+                .replace("-", "_")
+                .toUpperCase(Locale.ROOT);
+
+        if ("BINANCEUS".equals(normalized)) {
+            return "BINANCE_US";
+        }
+
+        return normalized;
+    }
+
+    private String displayExchangeName(String exchangeName) {
+        if (exchangeName == null || exchangeName.isBlank()) {
+            return "";
+        }
+
+        return exchangeName.trim()
+                .replace("_", " ");
     }
 }

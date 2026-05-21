@@ -11,7 +11,6 @@ import java.util.Locale;
 public enum SupportedExchange {
     BINANCE_US("Binance US", "binance-us"),
     COINBASE("Coinbase", "coinbase"),
-    COINBASE_PRO("Coinbase Pro", "coinbase-pro"),
     OANDA("OANDA", "oanda"),
     IG("IG", "ig"),
     KRAKEN("Kraken", "kraken"),

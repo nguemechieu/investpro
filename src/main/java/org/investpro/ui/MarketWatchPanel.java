@@ -7,10 +7,7 @@ import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
-import javafx.scene.layout.Region;
+import javafx.scene.layout.*;
 import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
@@ -42,7 +39,7 @@ import java.util.*;
 @Setter
 @Slf4j
 
-public class MarketWatchPanel extends BorderPane {
+public class MarketWatchPanel extends StackPane {
 
     private final SystemCore systemCore;
     private SymbolAgentManager symbolAgentManager;
@@ -115,7 +112,7 @@ public class MarketWatchPanel extends BorderPane {
         content.setStyle("-fx-background-color: #0a0e27;");
         VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
 
-        this.setCenter(content);
+        this.getChildren().add(content);
         this.setPadding(new Insets(4));
         this.setStyle("-fx-background-color: #0a0e27;");
     }

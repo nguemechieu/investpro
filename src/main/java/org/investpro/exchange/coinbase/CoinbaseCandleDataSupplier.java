@@ -23,6 +23,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
@@ -103,20 +104,48 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                                 .uri(URI.create(uriStr))
                                 .GET().build(),
                         HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
                 .thenApply(response -> {
-                    logger.debug("Coinbase candles response: {}", response);
+                    String body = response.body();
+
+                    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                        logger.warn("Coinbase candles request failed for {} {}: status={}, body={}",
+                                tradePair,
+                                granularity.apiName(),
+                                response.statusCode(),
+                                abbreviate(body));
+                        return Collections.emptyList();
+                    }
+
+                    if (body == null || body.isBlank()) {
+                        logger.warn("Coinbase candles request returned an empty body for {} {}", tradePair, granularity.apiName());
+                        return Collections.emptyList();
+                    }
+
+                    String trimmed = body.trim();
+                    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+                        logger.warn("Coinbase candles request returned non-JSON data for {} {}: {}",
+                                tradePair,
+                                granularity.apiName(),
+                                abbreviate(trimmed));
+                        return Collections.emptyList();
+                    }
+
+                    logger.debug("Coinbase candles response: {}", body);
 
                     JsonNode res;
                     try {
-                        res = OBJECT_MAPPER.readTree(response);
+                        res = OBJECT_MAPPER.readTree(body);
                     } catch (JsonProcessingException ex) {
-                        throw new RuntimeException(ex);
+                        logger.warn("Unable to parse Coinbase candles response for {} {}: {}",
+                                tradePair,
+                                granularity.apiName(),
+                                ex.getOriginalMessage());
+                        return Collections.emptyList();
                     }
 
-                    if (res.has("message")) {
+                    if (res.has("message") || res.has("error")) {
                         logger.error("CoinbaseCandleDataSupplier.get() {}",
-                                res.get("message").asText());
+                                res.has("message") ? res.get("message").asText() : res.get("error").asText());
                         return Collections.emptyList();
                     }
 
@@ -144,10 +173,26 @@ public class CoinbaseCandleDataSupplier extends CandleDataSupplier {
                         candleData.sort(Comparator.comparingInt(CandleData::openTime));
                         return candleData;
                     } else {
-                        logger.error("CoinbaseCandleDataSupplier.get(){}", response);
+                        logger.error("CoinbaseCandleDataSupplier.get() empty candle payload for {} {}: {}",
+                                tradePair,
+                                granularity.apiName(),
+                                abbreviate(body));
                         return Collections.emptyList();
                     }
                 });
+    }
+
+    private String abbreviate(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String trimmed = value.trim().replaceAll("\\s+", " ");
+        if (trimmed.length() <= 240) {
+            return trimmed;
+        }
+
+        return trimmed.substring(0, 240) + "...";
     }
 
     private String encode(String value) {

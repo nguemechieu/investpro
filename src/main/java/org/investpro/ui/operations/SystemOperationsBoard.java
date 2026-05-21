@@ -12,11 +12,14 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.layout.Priority;
 import javafx.util.Duration;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.operations.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +31,8 @@ import java.util.stream.Collectors;
  * Monitors system health, exchange status, trading engine, risk, and activity
  * logs.
  */
+@Getter
+@Setter
 @Slf4j
 public class SystemOperationsBoard extends BorderPane {
 
@@ -47,6 +52,10 @@ public class SystemOperationsBoard extends BorderPane {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_TIME;
     private static final int REFRESH_INTERVAL_MS = 2000; // 2 seconds
+        private static final ObjectMapper SNAPSHOT_MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .enable(SerializationFeature.INDENT_OUTPUT);
 
     public SystemOperationsBoard() {
         this.operationsService = SystemOperationsService.getInstance();
@@ -518,9 +527,7 @@ public class SystemOperationsBoard extends BorderPane {
 
     private void displaySnapshot(SystemSnapshot snapshot) {
         try {
-            ObjectMapper mapper = new ObjectMapper()
-                    .enable(SerializationFeature.INDENT_OUTPUT);
-            String json = mapper.writeValueAsString(snapshot);
+            String json = SNAPSHOT_MAPPER.writeValueAsString(snapshot);
             snapshotJsonArea.setText(json);
         } catch (Exception e) {
             snapshotJsonArea.setText("Error: " + e.getMessage());

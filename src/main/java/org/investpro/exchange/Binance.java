@@ -18,6 +18,8 @@ import org.investpro.exchange.models.ExchangeCapability;
 import org.investpro.exchange.models.MarketDepthType;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.trading.*;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.utils.CandleDataSupplier;
@@ -44,10 +46,14 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
@@ -968,6 +974,167 @@ public class Binance extends Exchange {
     }
 
     @Override
+    public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, JsonNode> exchangeInfo = loadExchangeInfoBySymbol();
+            return pairs.stream()
+                    .filter(Objects::nonNull)
+                    .map(pair -> mapBinanceTradability(pair, exchangeInfo.get(binanceSymbol(pair))))
+                    .toList();
+        });
+    }
+
+    @Override
+    public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
+        if (pair == null) {
+            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, JsonNode> exchangeInfo = loadExchangeInfoBySymbol();
+            return mapBinanceTradability(pair, exchangeInfo.get(binanceSymbol(pair)));
+        });
+    }
+
+    private Map<String, JsonNode> loadExchangeInfoBySymbol() {
+        String url = "https://api.binance.com/api/v3/exchangeInfo";
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "InvestPro/1.0")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode root = OBJECT_MAPPER.readTree(response.body());
+            JsonNode symbols = root.path("symbols");
+            if (!symbols.isArray()) {
+                return Map.of();
+            }
+
+            Map<String, JsonNode> bySymbol = new LinkedHashMap<>();
+            for (JsonNode symbolNode : symbols) {
+                String symbol = symbolNode.path("symbol").asText("");
+                if (!symbol.isBlank()) {
+                    bySymbol.put(symbol, symbolNode);
+                }
+            }
+            return bySymbol;
+        } catch (Exception exception) {
+            logger.warn("Unable to load Binance exchangeInfo for tradability mapping", exception);
+            return Map.of();
+        }
+    }
+
+    private String binanceSymbol(TradePair pair) {
+        return pair == null ? "" : (pair.getBaseCode() + pair.getCounterCode()).toUpperCase(Locale.ROOT);
+    }
+
+    private SymbolTradability mapBinanceTradability(TradePair pair, JsonNode symbolNode) {
+        if (pair == null) {
+            return defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null");
+        }
+        if (symbolNode == null || symbolNode.isMissingNode()) {
+            return defaultTradability(pair, TradabilityStatus.PERMISSION_DENIED,
+                    "Binance symbol not available for this account/region");
+        }
+
+        String statusValue = symbolNode.path("status").asText("UNKNOWN").toUpperCase(Locale.ROOT);
+        TradabilityStatus status = switch (statusValue) {
+            case "TRADING" -> TradabilityStatus.FULLY_TRADABLE;
+            case "HALT" -> TradabilityStatus.HALTED;
+            case "BREAK" -> TradabilityStatus.MARKET_CLOSED;
+            default -> TradabilityStatus.DISABLED;
+        };
+
+        Set<String> permissions = new HashSet<>();
+        JsonNode permissionNode = symbolNode.path("permissions");
+        if (permissionNode.isArray()) {
+            permissionNode.forEach(node -> permissions.add(node.asText("").toUpperCase(Locale.ROOT)));
+        }
+        boolean spotAllowed = permissions.isEmpty() || permissions.contains("SPOT");
+        if (!spotAllowed && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.PERMISSION_DENIED;
+        }
+
+        Set<String> orderTypes = new HashSet<>();
+        JsonNode orderTypesNode = symbolNode.path("orderTypes");
+        if (orderTypesNode.isArray()) {
+            orderTypesNode.forEach(node -> orderTypes.add(node.asText("").toUpperCase(Locale.ROOT)));
+        }
+
+        boolean marketAllowed = orderTypes.contains("MARKET");
+        boolean limitAllowed = orderTypes.contains("LIMIT");
+        boolean stopAllowed = orderTypes.contains("STOP_LOSS") || orderTypes.contains("STOP_LOSS_LIMIT");
+
+        boolean minQtyValid = true;
+        JsonNode filtersNode = symbolNode.path("filters");
+        if (filtersNode.isArray()) {
+            for (JsonNode filterNode : filtersNode) {
+                String type = filterNode.path("filterType").asText("");
+                if ("LOT_SIZE".equalsIgnoreCase(type)) {
+                    minQtyValid = safeDecimal(filterNode.path("minQty").asText("0")) > 0.0;
+                }
+                if ("NOTIONAL".equalsIgnoreCase(type) || "MIN_NOTIONAL".equalsIgnoreCase(type)) {
+                    minQtyValid = minQtyValid && safeDecimal(filterNode.path("minNotional").asText("0")) > 0.0;
+                }
+            }
+        }
+
+        if (!minQtyValid && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.MIN_SIZE_INVALID;
+        }
+
+        boolean orderSubmissionAllowed = status == TradabilityStatus.FULLY_TRADABLE && canSubmitOrders();
+        if (!canSubmitOrders() && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.API_KEY_RESTRICTED;
+        }
+
+        boolean marginAllowed = permissions.contains("MARGIN") || symbolNode.path("isMarginTradingAllowed").asBoolean(false);
+
+        return new SymbolTradability(
+                getExchangeId(),
+                pair,
+                symbolNode.path("symbol").asText(binanceSymbol(pair)),
+                status,
+                true,
+                true,
+                true,
+                true,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                marketAllowed,
+                limitAllowed,
+                stopAllowed,
+                false,
+                marginAllowed,
+                supportsLeverage(),
+                status == TradabilityStatus.FULLY_TRADABLE
+                        ? "Binance symbol is tradable"
+                        : "Binance symbol status=" + statusValue,
+                Instant.now(),
+                Map.of(
+                        "status", statusValue,
+                        "permissions", permissions,
+                        "orderTypes", orderTypes,
+                        "marginAllowed", marginAllowed));
+    }
+
+    private double safeDecimal(String value) {
+        try {
+            return Double.parseDouble(value == null ? "0" : value.trim());
+        } catch (Exception ignored) {
+            return 0.0;
+        }
+    }
+
+    @Override
     public boolean supportsTradePair(TradePair tradePair) {
         return tradePair != null;
     }
@@ -1413,12 +1580,6 @@ public class Binance extends Exchange {
         return body;
     }
 
-    private static String binanceSymbol(TradePair tradePair) {
-        if (tradePair == null) {
-            throw new IllegalArgumentException("tradePair must not be null");
-        }
-        return (tradePair.getBaseCode() + tradePair.getCounterCode()).toUpperCase(java.util.Locale.ROOT);
-    }
 
     @Contract("null, _ -> fail")
     private static @NotNull TradePair tradePairFromSymbol(String symbol, String defaultQuote) {

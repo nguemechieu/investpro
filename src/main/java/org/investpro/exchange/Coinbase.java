@@ -40,10 +40,12 @@ import org.investpro.exchange.infrastructure.ExchangeStreamSubscription;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.investpro.market.MarketDataCache;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.TradabilityStatus;
 import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -60,6 +62,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.zip.GZIPInputStream;
+import java.util.stream.StreamSupport;
 
 import static java.time.format.DateTimeFormatter.ISO_INSTANT;
 
@@ -111,7 +114,7 @@ public class Coinbase extends Exchange {
 
     private record CacheEntry<T>(T value, long expiresAtMs) {
         boolean expired() {
-            return System.currentTimeMillis() >= expiresAtMs;
+            return Instant.now().getEpochSecond() >= expiresAtMs;
         }
     }
 
@@ -291,9 +294,7 @@ public class Coinbase extends Exchange {
         if (modeRequestsPaperNetwork()) {
             return true;
         }
-        if (modeRequestsLiveNetwork()) {
-            return false;
-        }
+        modeRequestsLiveNetwork();
         return false;
     }
 
@@ -829,7 +830,7 @@ public class Coinbase extends Exchange {
                 }
 
                 if (attempt < maxAttempts - 1) {
-                    long backoffMs = retryDelayMs(httpResponse, attempt, productId);
+                    long backoffMs = retryDelayMs(httpResponse, attempt);
                     log.warn("Coinbase rate limited for {}. Retrying in {}ms ({}/{})",
                             request.uri(), backoffMs, attempt + 1, maxAttempts);
                     sleepBeforeRetry(request, backoffMs);
@@ -946,7 +947,7 @@ public class Coinbase extends Exchange {
                                 }
 
                                 if (attempt < maxAttempts - 1) {
-                                    long backoffMs = retryDelayMs(httpResponse, attempt, productId);
+                                    long backoffMs = retryDelayMs(httpResponse, attempt);
                                     log.warn("Coinbase rate limited for {}. Retrying in {}ms ({}/{})",
                                             request.uri(), backoffMs, attempt + 1, maxAttempts);
                                     return CompletableFuture
@@ -975,14 +976,14 @@ public class Coinbase extends Exchange {
                         }));
     }
 
-    private long retryDelayMs(HttpResponse<?> response, int attempt, @Nullable String productId) {
+    private long retryDelayMs(@NonNull HttpResponse<?> response, int attempt) {
         Duration retryAfterHint = null;
         Optional<String> retryAfter = response.headers().firstValue("Retry-After");
         if (retryAfter.isPresent()) {
             try {
                 retryAfterHint = Duration.ofSeconds(Math.max(1L, Long.parseLong(retryAfter.get().trim())));
             } catch (NumberFormatException ignored) {
-                retryAfterHint = null;
+                retryAfterHint = Duration.ofDays(0);
             }
         }
         return marketRestLimiter.backoffWithJitterMs(attempt, retryAfterHint);
@@ -1011,10 +1012,6 @@ public class Coinbase extends Exchange {
                 || path.contains("/candles");
     }
 
-    public CoinbaseMarketDataService getMarketDataService() {
-        return marketDataService;
-    }
-
     public CoinbaseMarketDataService.MarketDataSnapshot getLatestSnapshot(TradePair pair) {
         return marketDataService.getLatestSnapshot(pair);
     }
@@ -1037,7 +1034,7 @@ public class Coinbase extends Exchange {
             return OBJECT_MAPPER.readTree(sanitized);
 
         } catch (JsonProcessingException exception) {
-            String preview = previewBody(body, 500);
+            String preview = previewBody(body);
 
             log.error(
                     "Failed to parse Coinbase JSON response. Body preview: {}",
@@ -1050,7 +1047,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private static @NotNull String previewBody(String body, int maxLength) {
+    private static @NotNull String previewBody(String body) {
         if (body == null) {
             return "[null]";
         }
@@ -1060,11 +1057,11 @@ public class Coinbase extends Exchange {
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
 
-        if (compact.length() <= maxLength) {
+        if (compact.length() <= 1000) {
             return compact;
         }
 
-        return compact.substring(0, maxLength) + "...";
+        return compact.substring(0, 1000) + "...";
     }
 
     /**
@@ -1332,6 +1329,194 @@ public class Coinbase extends Exchange {
     }
 
     @Override
+    public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
+        if (pairs == null || pairs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, JsonNode> products = fetchCoinbaseProductsById();
+            return pairs.stream()
+                    .filter(Objects::nonNull)
+                    .map(pair -> mapCoinbaseTradability(pair, products.get(productId(pair))))
+                    .toList();
+        });
+    }
+
+    @Override
+    public CompletableFuture<SymbolTradability> fetchTradabilityStatus(TradePair pair) {
+        if (pair == null) {
+            return CompletableFuture.completedFuture(defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            JsonNode product = fetchCoinbaseProduct(productId(pair));
+            return mapCoinbaseTradability(pair, product);
+        });
+    }
+    private Map<String, JsonNode> fetchCoinbaseProductsById() {
+        String url = PUBLIC_PRODUCTS_URL + "?get_tradability_status=true";
+
+        try {
+            HttpRequest request = authenticatedRequest("GET", url)
+                    .GET()
+                    .build();
+
+            String response = send(request);
+            JsonNode root = readJson(response);
+
+            JsonNode products = root.has("products") ? root.get("products") : root;
+
+            if (products == null || !products.isArray()) {
+                log.warn("Coinbase products response did not contain a products array.");
+                return Map.of();
+            }
+
+            return StreamSupport.stream(products.spliterator(), false)
+                    .filter(Objects::nonNull)
+                    .filter(JsonNode::isObject)
+                    .filter(node -> node.hasNonNull("product_id"))
+                    .filter(node -> !node.path("product_id").asText("").isBlank())
+                    .collect(java.util.stream.Collectors.toMap(
+                            node -> node.path("product_id").asText(),
+                            node -> node,
+                            (left, right) -> left,
+                            LinkedHashMap::new
+                    ));
+
+        } catch (Exception exception) {
+            log.warn("Failed to fetch Coinbase products with tradability status: {}", exception.getMessage());
+            return Map.of();
+        }
+    }
+
+    private JsonNode fetchCoinbaseProduct(String productId) {
+        if (productId == null || productId.isBlank()) {
+            return null;
+        }
+
+        Map<String, JsonNode> products = fetchCoinbaseProductsById();
+        return products.get(productId);
+    }
+
+    private SymbolTradability mapCoinbaseTradability(TradePair pair, JsonNode product) {
+        if (pair == null) {
+            return defaultTradability(null, TradabilityStatus.UNKNOWN, "Trade pair is null");
+        }
+
+        if (product == null || product.isMissingNode()) {
+            return defaultTradability(pair, TradabilityStatus.PERMISSION_DENIED,
+                    "Product is not available to this Coinbase account");
+        }
+
+        boolean isDisabled = product.path("is_disabled").asBoolean(false);
+        boolean tradingDisabled = product.path("trading_disabled").asBoolean(false);
+        boolean viewOnly = product.path("view_only").asBoolean(false);
+        boolean cancelOnly = product.path("cancel_only").asBoolean(false);
+        boolean limitOnly = product.path("limit_only").asBoolean(false);
+        boolean postOnly = product.path("post_only").asBoolean(false);
+        boolean auctionOnly = product.path("auction_mode").asBoolean(false);
+
+        String productType = product.path("product_type").asText("SPOT").toUpperCase(Locale.ROOT);
+        boolean productTypeSupported = productType.contains("SPOT") || productType.contains("FUTURE")
+                || productType.contains("PERPETUAL") || productType.contains("DERIVATIVE");
+
+        BigDecimal baseMinSize = safeDecimal(product.path("base_min_size").asText("0"));
+        BigDecimal quoteMinSize = safeDecimal(product.path("quote_min_size").asText("0"));
+        boolean minSizeValid = baseMinSize.signum() > 0 && quoteMinSize.signum() > 0;
+
+        TradabilityStatus status;
+        String reason;
+
+        if (!productTypeSupported) {
+            status = TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE;
+            reason = "Unsupported Coinbase product type: " + productType;
+        } else if (!minSizeValid) {
+            status = TradabilityStatus.MIN_SIZE_INVALID;
+            reason = "Invalid Coinbase minimum order sizes";
+        } else if (isDisabled) {
+            status = TradabilityStatus.DISABLED;
+            reason = "Coinbase product is disabled";
+        } else if (tradingDisabled) {
+            status = TradabilityStatus.HALTED;
+            reason = "Coinbase trading is disabled for this product";
+        } else if (viewOnly) {
+            status = TradabilityStatus.VIEW_ONLY;
+            reason = "Coinbase product is view-only for this account";
+        } else if (cancelOnly) {
+            status = TradabilityStatus.CANCEL_ONLY;
+            reason = "Coinbase product is cancel-only";
+        } else if (auctionOnly) {
+            status = TradabilityStatus.AUCTION_ONLY;
+            reason = "Coinbase product is currently in auction mode";
+        } else if (postOnly) {
+            status = TradabilityStatus.POST_ONLY;
+            reason = "Coinbase product is post-only";
+        } else if (limitOnly) {
+            status = TradabilityStatus.LIMIT_ONLY;
+            reason = "Coinbase product supports limit-only trading";
+        } else {
+            status = TradabilityStatus.FULLY_TRADABLE;
+            reason = "Coinbase product is tradable";
+        }
+
+        boolean supportsOrders = canSubmitOrders();
+        boolean orderSubmissionAllowed = supportsOrders
+                && status != TradabilityStatus.VIEW_ONLY
+                && status != TradabilityStatus.DISABLED
+                && status != TradabilityStatus.HALTED
+                && status != TradabilityStatus.CANCEL_ONLY
+                && status != TradabilityStatus.AUCTION_ONLY
+                && status != TradabilityStatus.UNSUPPORTED_PRODUCT_TYPE
+                && status != TradabilityStatus.MIN_SIZE_INVALID;
+
+        if (!supportsOrders && status == TradabilityStatus.FULLY_TRADABLE) {
+            status = TradabilityStatus.API_KEY_RESTRICTED;
+            reason = "Coinbase API key/account is not authorized for order submission";
+        }
+
+        return new SymbolTradability(
+                getExchangeId(),
+                pair,
+                product.path("product_id").asText(pair.toString('/')),
+                status,
+                true,
+                true,
+                true,
+                true,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                orderSubmissionAllowed,
+                status != TradabilityStatus.LIMIT_ONLY && status != TradabilityStatus.POST_ONLY,
+                status != TradabilityStatus.CANCEL_ONLY,
+                supportsStopLossTakeProfit(),
+                false,
+                supportsLeverage(),
+                supportsLeverage(),
+                reason,
+                Instant.now(),
+                Map.of(
+                        "is_disabled", isDisabled,
+                        "trading_disabled", tradingDisabled,
+                        "view_only", viewOnly,
+                        "cancel_only", cancelOnly,
+                        "limit_only", limitOnly,
+                        "post_only", postOnly,
+                        "auction_mode", auctionOnly,
+                        "product_type", productType,
+                        "base_min_size", baseMinSize.toPlainString(),
+                        "quote_min_size", quoteMinSize.toPlainString()));
+    }
+
+    private BigDecimal safeDecimal(String value) {
+        try {
+            return new BigDecimal(value == null ? "0" : value.trim());
+        } catch (Exception ignored) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    @Override
     public boolean supportsTradePair(TradePair tradePair) {
         if (tradePair == null) {
             return false;
@@ -1499,7 +1684,7 @@ public class Coinbase extends Exchange {
                 if (!snapshotBids.isEmpty() || !snapshotAsks.isEmpty()) {
                     // Sort: bids descending, asks ascending
                     snapshotBids.sort((a, b) -> Double.compare(b.getPrice(), a.getPrice()));
-                    snapshotAsks.sort((a, b) -> Double.compare(a.getPrice(), b.getPrice()));
+                    snapshotAsks.sort(Comparator.comparingDouble(OrderBook.PriceLevel::getPrice));
                     int limit = 50;
                     List<OrderBook.PriceLevel> bids = snapshotBids.size() > limit ? snapshotBids.subList(0, limit) : snapshotBids;
                     List<OrderBook.PriceLevel> asks = snapshotAsks.size() > limit ? snapshotAsks.subList(0, limit) : snapshotAsks;
@@ -2016,7 +2201,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public CompletableFuture<Double> fetchAvailableBalance(String currencyCode) {
-        return fetchAccountsBalance(currencyCode, "available_balance");
+        return fetchAccountsBalance(currencyCode);
     }
 
     @Override
@@ -2052,9 +2237,7 @@ public class Coinbase extends Exchange {
                     for (JsonNode account : accounts) {
                         String currency = firstText(account, "currency", "currency_code");
 
-                        if (currencyCode != null
-                                && !currencyCode.isBlank()
-                                && !currency.equalsIgnoreCase(currencyCode)) {
+                        if (!currencyCode.isBlank() && !currency.equalsIgnoreCase(currencyCode)) {
                             continue;
                         }
 
@@ -2081,7 +2264,7 @@ public class Coinbase extends Exchange {
         return CompletableFuture.completedFuture(0.0);
     }
 
-    private CompletableFuture<Double> fetchAccountsBalance(String currencyCode, String field) {
+    private CompletableFuture<Double> fetchAccountsBalance(String currencyCode) {
         if (!hasPrivateEndpointAuth()) {
             return CompletableFuture.completedFuture(0.0);
         }
@@ -2106,10 +2289,10 @@ public class Coinbase extends Exchange {
                             continue;
                         }
 
-                        JsonNode valueNode = account.path(field).path("value");
+                        JsonNode valueNode = account.path("available_balance").path("value");
 
                         if (valueNode.isMissingNode()) {
-                            valueNode = account.path(field);
+                            valueNode = account.path("available_balance");
                         }
 
                         total += parseDouble(valueNode.asText("0"), 0.0);
@@ -3607,7 +3790,7 @@ public class Coinbase extends Exchange {
         return positions;
     }
 
-    private @Nullable Position parsePositionFromAccount(JsonNode accountNode, TradePair tradePair) {
+    private  Position parsePositionFromAccount(JsonNode accountNode, TradePair tradePair) {
         try {
             double balance = accountBalance(accountNode);
 
@@ -3633,7 +3816,7 @@ public class Coinbase extends Exchange {
         }
     }
 
-    private @Nullable Position parsePositionFromAccountAll(JsonNode accountNode) {
+    private Position parsePositionFromAccountAll(JsonNode accountNode) {
         try {
             double balance = accountBalance(accountNode);
 
@@ -3688,9 +3871,7 @@ public class Coinbase extends Exchange {
                 for (JsonNode fillNode : fillsNode) {
                     Trade trade = parseTradeFromFill(fillNode, tradePair);
 
-                    if (trade != null) {
-                        trades.add(trade);
-                    }
+                    trades.add(trade);
                 }
             }
         } catch (Exception exception) {
@@ -3700,7 +3881,7 @@ public class Coinbase extends Exchange {
         return trades;
     }
 
-    private @Nullable Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
+    private  Trade parseTradeFromFill(JsonNode fillNode, TradePair tradePair) {
         try {
             double price = parseDouble(firstText(fillNode, "price"), 0.0);
             double size = parseDouble(firstText(fillNode, "size"), 0.0);
@@ -3728,7 +3909,7 @@ public class Coinbase extends Exchange {
             return trade;
         } catch (Exception exception) {
             log.debug("Failed to parse Coinbase trade from fill: {}", fillNode, exception);
-            return null;
+            return  new Trade();
         }
     }
 

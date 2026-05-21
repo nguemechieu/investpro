@@ -28,6 +28,8 @@ import org.investpro.strategy.StrategyParameters;
 import org.investpro.strategy.lab.StrategyBacktestRequest;
 import org.investpro.strategy.lab.StrategyBacktestRunner;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -615,6 +617,25 @@ public class StrategyBuilderPanel extends VBox {
 
         if (tradePairs == null) {
             return Optional.empty();
+        }
+
+        try {
+            UniversalTradabilityService tradabilityService = new UniversalTradabilityService(systemCore.getExchange(), null);
+            List<SymbolTradability> statuses = tradabilityService.getTradability(tradePairs).get();
+            Set<String> marketDataAllowed = statuses.stream()
+                    .filter(Objects::nonNull)
+                    .filter(SymbolTradability::marketDataAllowed)
+                    .map(SymbolTradability::tradePair)
+                    .filter(Objects::nonNull)
+                    .map(pair -> pair.toString('/').toUpperCase(Locale.ROOT))
+                    .collect(Collectors.toSet());
+
+            tradePairs = tradePairs.stream()
+                    .filter(Objects::nonNull)
+                    .filter(pair -> marketDataAllowed.contains(pair.toString('/').toUpperCase(Locale.ROOT)))
+                    .toList();
+        } catch (Exception exception) {
+            log.warn("Unable to apply tradability filter in StrategyBuilderPanel", exception);
         }
 
         return tradePairs.stream()

@@ -32,7 +32,7 @@ import java.util.List;
  * Design: Modern card-based layout with visual hierarchy and color coding
  */
 @Slf4j
-public class NewsCalendarPanel extends AnchorPane{
+public class NewsCalendarPanel extends StackPane{
     private final NewsDataProvider newsDataProvider;
    // private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm");
     private final DateTimeFormatter timeOnlyFormatter = DateTimeFormatter.ofPattern("HH:mm");

@@ -16,12 +16,16 @@ import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
 import org.investpro.service.NewsDataProvider;
+import org.investpro.trading.tradability.SymbolTradability;
+import org.investpro.trading.tradability.UniversalTradabilityService;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -44,13 +48,13 @@ import static org.investpro.i18n.LocalizationService.t;
  * <p>
  * Important:
  * This panel currently validates and logs the order.
- * Wire onExecuteOrder(...) to your TradeExecutionCoordinator to place real
+ * Wire onExecuteOrder to your TradeExecutionCoordinator to place real
  * orders safely.
  */
 @Slf4j
 @Getter
 @Setter
-public class OrderPanel extends BorderPane {
+public class OrderPanel extends StackPane {
 
     private ComboBox<String> symbolCombo;
     private ComboBox<OpenOrder.OrderType> orderTypeCombo;
@@ -86,20 +90,52 @@ public class OrderPanel extends BorderPane {
     private SystemCore systemCore;
 
     public OrderPanel(SystemCore systemCore) {
-        setPrefSize(800, 580);
+        this(systemCore, null);
+    }
+
+    public OrderPanel(@NonNull SystemCore systemCore, TradePair selectedTradePair) {
+
         setPadding(new Insets(0));
         setStyle("-fx-background-color: #0f172a;");
+
+        setPrefSize(600,600);
 
         this.systemCore = systemCore;
 
         try {
-            setupUI(systemCore.getExchange().getTradePairSymbol(), systemCore.getSelectedTradePair());
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-        try {
-            updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(systemCore.getSelectedTradePair()).get());
-        } catch (InterruptedException | ExecutionException e) {
+            List<TradePair> symbols = new ArrayList<>(systemCore.getExchange().getTradePairSymbol());
+            try {
+                UniversalTradabilityService tradabilityService = new UniversalTradabilityService(systemCore.getExchange(), null);
+                List<SymbolTradability> statuses = tradabilityService.getTradability(symbols).get();
+                List<TradePair> filtered = statuses.stream()
+                        .filter(java.util.Objects::nonNull)
+                        .filter(SymbolTradability::marketDataAllowed)
+                        .map(SymbolTradability::tradePair)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .toList();
+                if (!filtered.isEmpty()) {
+                    symbols = filtered;
+                }
+            } catch (Exception exception) {
+                log.warn("Unable to apply tradability filter in OrderPanel", exception);
+            }
+
+            TradePair initialTradePair = selectedTradePair != null
+                    ? selectedTradePair
+                    : systemCore.getSelectedTradePair();
+            if (initialTradePair == null && !symbols.isEmpty()) {
+                initialTradePair = symbols.getFirst();
+            }
+
+            setupUI(symbols, initialTradePair);
+
+            if (initialTradePair != null) {
+                updatePricesFromOrderBook(systemCore.getExchange().fetchOrderBook(initialTradePair).get());
+            } else {
+                log.warn("OrderPanel opened without a selected symbol; skipping initial order book fetch");
+            }
+        } catch (SQLException | ClassNotFoundException | InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
         try {
@@ -110,11 +146,12 @@ public class OrderPanel extends BorderPane {
     }
 
     private void setupUI(List<TradePair> availableSymbols, TradePair selectedSymbol) {
-        setTop(createHeader(selectedSymbol));
+        HBox header = createHeader(selectedSymbol);
 
         HBox mainContent = new HBox(18);
         mainContent.setPadding(new Insets(18));
         mainContent.setStyle("-fx-background-color: #0f172a;");
+        mainContent.setFillHeight(true);
 
         VBox leftPanel = createLeftPanel(selectedSymbol);
         leftPanel.setPrefWidth(430);
@@ -125,11 +162,18 @@ public class OrderPanel extends BorderPane {
 
         mainContent.getChildren().addAll(leftPanel, createDivider(), rightPanel);
 
-        setCenter(mainContent);
-        setBottom(createBottomPanel());
+    HBox bottom = createBottomPanel();
+
+    Separator horizontalDivider = new Separator();
+    horizontalDivider.setStyle("-fx-opacity: 0.25;");
+
+    VBox root = new VBox(0, header, horizontalDivider, mainContent, bottom);
+    root.setFillWidth(true);
+    VBox.setVgrow(mainContent, Priority.ALWAYS);
 
         updateUIForOrderType();
         updateSummary();
+    getChildren().setAll(root);
 
     }
 
@@ -481,7 +525,9 @@ public class OrderPanel extends BorderPane {
             styleInput(takeProfitSpinner);
         }
 
-        placeOrderButton.setText(isMarket ? "PLACE MARKET" : "PLACE ORDER");
+        if (placeOrderButton != null) {
+            placeOrderButton.setText(isMarket ? "PLACE MARKET" : "PLACE ORDER");
+        }
 
         updateActionButtonStyles();
     }
