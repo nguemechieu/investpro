@@ -468,6 +468,39 @@ Recommendation for open position:
 
 ### Layer 7: Exchange Adapters
 
+### Layer 7.5: Universal Tradability Layer
+
+**Purpose**
+```
+Provide one cross-venue policy surface for symbol eligibility so UI, bot, and execution
+follow the same rules regardless of exchange-specific flags.
+```
+
+**Core Components**
+```
+- UniversalTradabilityService
+- SymbolTradability
+- TradabilityScope
+- TradabilityStatus
+- MarketWatchTradabilityFilter
+```
+
+**Scope Rules**
+```
+- UI / Market Watch: allow symbols with marketDataAllowed=true
+- Bot Runtime: allow symbols with botTradingAllowed=true
+- Live Order Submit: require orderSubmissionAllowed=true at submit time
+- Backtesting: allow symbols with marketDataAllowed=true even if liveTradingAllowed=false
+```
+
+**Integration Points**
+```
+- TradingDesk: filter selector, tradability column, submit-time guard
+- SystemCore: scope-aware streaming symbol filtering
+- ExecutionEngine: final order-submission tradability recheck
+- Strategy/Backtesting panels: market-data eligibility filtering
+```
+
 **ExchangeCapabilities** (immutable record)
 ```java
 public record ExchangeCapabilities(

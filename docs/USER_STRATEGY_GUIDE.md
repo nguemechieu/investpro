@@ -139,3 +139,14 @@ Move a file to `disabled/` to keep it installed but inactive. Failed or unsafe p
 - Return `HOLD` when uncertain or when inputs are missing.
 - Throwing from a plugin will not crash InvestPro; the runtime catches errors, logs them, and continues.
 - Live execution is always gated by behavior controls, risk checks, and the execution engine.
+
+## Symbol Availability Rules
+
+InvestPro applies universal symbol tradability checks before symbol lists are used by each workflow.
+
+- **UI browsing / market data views:** symbols with `marketDataAllowed=true`.
+- **Backtesting:** symbols with `marketDataAllowed=true`, even if live trading is disabled for that symbol.
+- **Bot trading:** symbols with `botTradingAllowed=true` only.
+- **Live order submission:** revalidated at submit time and requires `orderSubmissionAllowed=true`.
+
+This means a strategy can be valid for research and backtesting while still being blocked from live execution until the venue allows order submission for that symbol.

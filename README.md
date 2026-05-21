@@ -151,6 +151,15 @@ InvestPro provides:
 - Small-account mode for conservative sizing.
 - Symbol cooldown logic to reduce open/close thrashing.
 
+### Symbol Tradability Controls
+
+- InvestPro uses `UniversalTradabilityService` to normalize per-symbol permissions across exchanges and brokers.
+- Market watch and research views can include symbols where `marketDataAllowed=true`.
+- Bot symbol selection is restricted to `botTradingAllowed=true` symbols.
+- Live order submission performs an immediate recheck requiring `orderSubmissionAllowed=true` before sending an order.
+- Backtesting accepts symbols with `marketDataAllowed=true`, even when live trading is disabled for that symbol.
+- Tradability metadata is surfaced in UI filters and columns so restrictions are visible before execution.
+
 ### Strategy Engine
 
 - Pluggable `TradingStrategy` interface.
@@ -254,6 +263,7 @@ src/main/java/org/investpro/
 ├── repository/             # SQLite/PostgreSQL repositories
 ├── risk/                   # RiskManagementSystem and risk decisions
 ├── strategy/               # StrategyEngine, StrategyCatalog, StrategyLab
+├── trading/tradability/    # Universal symbol tradability model and filters
 └── ui/                     # JavaFX windows, panels, charts, controls
 ```
 
