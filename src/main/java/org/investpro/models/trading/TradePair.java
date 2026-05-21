@@ -159,7 +159,7 @@ public class TradePair extends Pair<Currency, Currency> {
                         "Cannot parse compact trade pair shorter than 6 characters: %s".formatted(tradePair));
             }
 
-            return new String[] {
+            return new String[]{
                     tradePair.substring(0, 3),
                     tradePair.substring(3)
             };
@@ -501,10 +501,15 @@ public class TradePair extends Pair<Currency, Currency> {
 
     public TradingSessionStatus getTradingSessionStatus() {
         if (tradingSession == null) {
-            return TradingSessionStatus.UNKNOWN;
+            return isCryptoPair() ? TradingSessionStatus.OPEN : TradingSessionStatus.UNKNOWN;
         }
 
         return tradingSession.getStatus(ZonedDateTime.now());
+    }
+
+    private boolean isCryptoPair() {
+        return baseCurrency instanceof CryptoCurrency
+                || counterCurrency instanceof CryptoCurrency;
     }
 
     /**
@@ -535,32 +540,5 @@ public class TradePair extends Pair<Currency, Currency> {
         this.contractType = contractType != null ? contractType : ContractType.SPOT;
     }
 
-    /**
-     * Note: CandleData, OrderBook, and Timeframe should NOT be stored in TradePair.
-     * Use MarketDataCache and InstrumentMarketState instead.
-     * These are managed by MarketDataEngine and accessed via MarketDataCache.
-     */
 
-    /**
-     * Deprecated: Use InstrumentMarketState and MarketDataCache instead.
-     * Timeframe is now managed by MarketDataEngine.
-     */
-    @Deprecated
-    private Timeframe timeFrame;
-
-    /**
-     * Deprecated: Use getters from InstrumentMarketState instead.
-     */
-    @Deprecated
-    public Timeframe getTimeFrame() {
-        return timeFrame;
-    }
-
-    /**
-     * Deprecated: Use InstrumentMarketState#updateCandles() instead.
-     */
-    @Deprecated
-    public void setTimeFrame(Timeframe timeFrame) {
-        this.timeFrame = timeFrame;
-    }
 }

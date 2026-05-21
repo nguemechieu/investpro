@@ -600,7 +600,7 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
 
         lastErrorMessage = errorMessage;
         lastErrorLoggedAtMs = now;
-        throw  new RuntimeException("Coinbase WebSocket error: "+ errorMessage);
+        throw  new RuntimeException("Coinbase WebSocket error: \n"+ errorMessage.toUpperCase());
     }
 
     public static @NotNull String formatSubscriptionAcknowledgement(@NotNull JsonNode messageJson) {
