@@ -2,7 +2,7 @@
 
 **Last Updated**: May 2026  
 **Version**: 1.0  
-**Target**: Java 17+, Maven 3.8+
+**Target**: Java 21+, Maven 3.6+
 
 ---
 
@@ -11,11 +11,11 @@
 ### 1.1 Prerequisites
 
 ```bash
-# Check Java version (must be 17+)
+# Check Java version (must be 21+)
 java -version
 # openjdk version "21.0.1" 2023-10-17 LTS
 
-# Check Maven version (must be 3.8+)
+# Check Maven version (must be 3.6+)
 mvn --version
 # Apache Maven 3.9.5
 
@@ -28,7 +28,7 @@ git --version
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/investpro.git
+git clone https://github.com/nguemechieu/investpro.git
 cd investpro
 
 # Create .env file for local development
@@ -53,7 +53,7 @@ nano .env
 #### IntelliJ IDEA
 ```
 1. File → Open → Select investpro folder
-2. Configure SDK: File → Project Structure → SDK → Select JDK 17+
+2. Configure SDK: File → Project Structure → SDK → Select JDK 21+
 3. Configure JavaFX:
    - Download JavaFX SDK from openjfx.io
    - Preferences → Java → JavaFX
@@ -104,18 +104,17 @@ investpro/
 ├── src/
 │   ├── main/
 │   │   ├── java/org/investpro/
-│   │   │   ├── app/                      # Entry point
 │   │   │   ├── core/                     # Application core
 │   │   │   │   ├── agents/               # Agent framework
 │   │   │   │   ├── execution/            # Trade execution
 │   │   │   │   └── bot/                  # SmartBot runtime
-│   │   │   ├── decision/                 # Signal decision engine ✨ NEW
+│   │   │   ├── decision/                 # Signal decision engine
 │   │   │   ├── strategy/                 # Strategy engine
 │   │   │   ├── exchange/                 # Exchange adapters
 │   │   │   ├── models/                   # Domain models
 │   │   │   ├── risk/                     # Risk management
 │   │   │   ├── ai/                       # AI reasoning
-│   │   │   ├── repository/               # Data access
+│   │   │   ├── persistence/              # Data access (repositories)
 │   │   │   ├── service/                  # Business services
 │   │   │   ├── monitoring/               # System monitoring
 │   │   │   ├── indicators/               # Technical indicators
@@ -135,10 +134,10 @@ investpro/
 │           └── test-data/
 ├── docs/                                  # Documentation
 │   ├── ARCHITECTURE.md
-│   ├── SYSTEM_ARCHITECTURE.md             # ✨ NEW
-│   ├── UML_CLASS_DIAGRAMS.md              # ✨ NEW
-│   ├── SEQUENCE_DIAGRAMS.md               # ✨ NEW
-│   ├── PRODUCTION_READY.md                # ✨ NEW
+│   ├── SYSTEM_ARCHITECTURE.md
+│   ├── UML_CLASS_DIAGRAMS.md
+│   ├── SEQUENCE_DIAGRAMS.md
+│   ├── PRODUCTION_READY.md
 │   └── ...
 ├── pom.xml                               # Maven configuration
 ├── Dockerfile
@@ -357,7 +356,6 @@ class BotTradeDecisionEngineTest {
     }
     
     private Ticker createMockTicker(double bid, double ask, double last) {
-        // Mock ticker with specific prices
         Ticker mock = mock(Ticker.class);
         when(mock.getBidPrice()).thenReturn(bid);
         when(mock.getAskPrice()).thenReturn(ask);
@@ -399,7 +397,6 @@ class TradeExecutionIntegrationTest {
         // Assert
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getOrderId()).isNotBlank();
-        // Verify database updated
         Optional<Trade> trade = tradeRepository.findById(result.getOrderId());
         assertTrue(trade.isPresent());
     }
@@ -510,12 +507,6 @@ private boolean hasBlockingIssues;
 /**
  * Evaluates a trading signal against market conditions and risk parameters.
  *
- * This method implements the core decision logic, answering 12 critical questions
- * about whether to execute a trade:
- * 1. What kind of market are we on?
- * 2. What market regime are we in?
- * ... (and so on)
- *
  * @param tradePair The trading pair (e.g., BTC/USDT)
  * @param side BUY or SELL
  * @param ticker Current market ticker with bid/ask/last prices
@@ -546,11 +537,6 @@ public class BotTradeDecisionEngine {
 public class RiskManagementSystem {
     // Responsible ONLY for risk assessment
 }
-
-// ❌ Bad: Multiple responsibilities
-public class TradeManager {
-    // Does signal evaluation, risk checking, execution, AND monitoring
-}
 ```
 
 #### O - Open/Closed
@@ -564,8 +550,6 @@ public class EMAStrategy extends Strategy {
     @Override
     public StrategySignal evaluate(Ticker ticker) { ... }
 }
-
-// New strategy: just extend, no modification to existing code
 ```
 
 #### L - Liskov Substitution
@@ -578,7 +562,7 @@ List<Exchange> exchanges = List.of(
 );
 
 for (Exchange exchange : exchanges) {
-    Ticker ticker = exchange.getTicker(pair); // Works for all
+    Ticker ticker = exchange.getTicker(pair);
 }
 ```
 
@@ -593,13 +577,7 @@ public interface Streamable {
     void subscribe(Consumer<MarketUpdate> listener);
 }
 
-// Not forced to implement everything
 public class BinanceExchange implements Tradeable, Streamable { }
-
-// ❌ Bad: Fat interface
-public interface Exchange {
-    // 50+ methods you might not need
-}
 ```
 
 #### D - Dependency Inversion
@@ -611,11 +589,6 @@ public class TradeExecutionCoordinator {
     
     // Dependencies injected, not created
 }
-
-// ❌ Bad: Direct dependency on concrete classes
-public class TradeExecutor {
-    private final OpenAiReasoningService aiService = new OpenAiReasoningService();
-}
 ```
 
 ### 6.5 Error Handling
@@ -624,25 +597,18 @@ public class TradeExecutor {
 // ✅ Good: Specific exceptions, proper logging
 public BotTradeDecision evaluateSignal(...) {
     try {
-        // Validation
         if (signalStrength < 0 || signalStrength > 1) {
             throw new IllegalArgumentException(
                 "Signal strength must be between 0.0 and 1.0, got: " + signalStrength
             );
         }
         
-        if (ticker == null) {
-            throw new NullPointerException("Ticker cannot be null");
-        }
-        
-        // Processing
         MarketRegime regime = detectMarketRegime(ticker);
         if (regime == null) {
             log.warn("Could not detect market regime, using UNKNOWN");
             regime = MarketRegime.UNKNOWN;
         }
         
-        // Return result
         return new BotTradeDecision(...);
         
     } catch (IllegalArgumentException | NullPointerException e) {
@@ -654,16 +620,6 @@ public BotTradeDecision evaluateSignal(...) {
             List.of("Unexpected error: " + e.getMessage()),
             List.of(e.toString())
         );
-    }
-}
-
-// ❌ Bad: Swallowing exceptions
-public BotTradeDecision evaluateSignal(...) {
-    try {
-        // ...
-    } catch (Exception e) {
-        // Silent failure - very bad!
-        return null;
     }
 }
 ```
@@ -692,7 +648,6 @@ public class MyCustomAgent implements Agent {
     
     @Override
     public void start(AgentContext ctx) {
-        // Subscribe to events you care about
         ctx.getEventBus().subscribe(MarketEvent.class, this::onMarketEvent);
         log.info("MyCustomAgent started");
     }
@@ -710,7 +665,6 @@ public class MyCustomAgent implements Agent {
     }
     
     private void onMarketEvent(MarketEvent event) {
-        // Process event and publish results
         CustomEvent result = new CustomEvent(...);
         context.getEventBus().publish(result);
     }
@@ -720,18 +674,6 @@ public class MyCustomAgent implements Agent {
 @Override
 public void configure(AgentRegistry registry, AgentContext context) {
     registry.register(new MyCustomAgent(context));
-}
-
-// 3. Test the agent
-@Test
-void testMyCustomAgent_OnMarketEvent_PublishesResult() {
-    AgentContext context = mockContext();
-    MyCustomAgent agent = new MyCustomAgent(context);
-    
-    agent.start(context);
-    agent.onEvent(new MarketEvent(...));
-    
-    verify(context.getEventBus()).publish(any(CustomEvent.class));
 }
 ```
 
@@ -751,22 +693,13 @@ public class MyStrategy extends Strategy {
             return StrategySignal.hold(getName());
         }
         
-        // Your strategy logic
         double sma20 = calculateSMA(candles, 20);
         double currentPrice = ticker.getLastPrice();
         
         if (currentPrice > sma20) {
-            return StrategySignal.buy(
-                getName(),
-                0.85, // strength
-                "Price above SMA20"
-            );
+            return StrategySignal.buy(getName(), 0.85, "Price above SMA20");
         } else if (currentPrice < sma20 * 0.98) {
-            return StrategySignal.sell(
-                getName(),
-                0.75,
-                "Price significantly below SMA20"
-            );
+            return StrategySignal.sell(getName(), 0.75, "Price significantly below SMA20");
         } else {
             return StrategySignal.hold(getName());
         }
@@ -783,20 +716,6 @@ public class MyStrategy extends Strategy {
 
 // 2. Register in StrategyCatalog
 catalog.register(new MyStrategy());
-
-// 3. Test the strategy
-@Test
-void testMyStrategy_WhenPriceAboveSMA_ReturnsBuySignal() {
-    MyStrategy strategy = new MyStrategy();
-    
-    Ticker ticker = createMockTicker(100.0); // Price above SMA
-    List<CandleData> candles = createMockCandles(20, 95.0); // SMA20 = 95
-    
-    StrategySignal signal = strategy.evaluate(ticker, candles);
-    
-    assertEquals(Side.BUY, signal.getSide());
-    assertThat(signal.getStrength()).isGreaterThan(0.8);
-}
 ```
 
 ### 7.3 Adding a New Exchange
@@ -816,19 +735,14 @@ public class MyExchangeAdapter implements Exchange {
     
     @Override
     public Ticker getTicker(TradePair pair) {
-        // Call API and parse response
         String response = httpClient.get("/ticker/" + pair.getSymbol());
         return parseTicker(response);
     }
     
     @Override
     public OrderPlacementResult placeOrder(Order order) {
-        // Validate order
-        // Call API
-        // Return result
+        // Validate order, call API, return result
     }
-    
-    // ... implement all abstract methods
 }
 
 // 2. Register in ExchangeFactory
@@ -837,22 +751,10 @@ public class ExchangeFactory {
         return switch(name) {
             case "BINANCE" -> new BinanceExchange(apiKey, apiSecret);
             case "COINBASE" -> new CoinbaseExchange(apiKey, apiSecret);
-            case "MYEXCHANGE" -> new MyExchangeAdapter(apiKey, apiSecret); // NEW
+            case "MYEXCHANGE" -> new MyExchangeAdapter(apiKey, apiSecret);
             default -> throw new IllegalArgumentException("Unknown exchange");
         };
     }
-}
-
-// 3. Test the adapter
-@Test
-void testMyExchangeAdapter_GetTicker_ReturnsValidTicker() {
-    MyExchangeAdapter exchange = new MyExchangeAdapter(apiKey, apiSecret);
-    
-    Ticker ticker = exchange.getTicker(new TradePair("BTC", "USD"));
-    
-    assertNotNull(ticker);
-    assertTrue(ticker.getBidPrice() > 0);
-    assertTrue(ticker.getAskPrice() > 0);
 }
 ```
 
@@ -897,12 +799,8 @@ void debugTradeDecisionFlow() {
     StrategySignal signal = new StrategySignal(...);
     Ticker ticker = createTestTicker();
     
-    // Breakpoint here to inspect decision engine flow
     BotTradeDecision decision = engine.evaluateSignal(...);
-    
     // Step through evaluateSignal() method
-    // Watch: regime, assetType, costEstimate, expectation
-    // Check: willTrade(), hasBlockingIssues()
 }
 
 // Debugging risk evaluation
@@ -912,10 +810,7 @@ void debugRiskEvaluation() {
     StrategySignal signal = new StrategySignal(...);
     Account account = createTestAccount(10000.0);
     
-    // Breakpoint to debug risk checks
     RiskDecision decision = riskMgmt.evaluateTrade(signal, ticker);
-    
-    // Watch: balance, position size, leverage, margin, correlation
 }
 ```
 
@@ -929,12 +824,6 @@ void debugRiskEvaluation() {
 # Start app with profiler agent
 java -agentpath:/path/to/jprofiler/bin/linux-x64/libjprofilerti.so=port=8849 \
   -jar investpro.jar
-
-# Connect profiler and analyze:
-# - CPU usage
-# - Memory allocation
-# - Thread activity
-# - I/O operations
 ```
 
 ### 9.2 JVM Metrics Monitoring
@@ -985,30 +874,22 @@ Example:
 # 2. Update CHANGELOG
 # Add entry with date and changes
 
-# 3. Update README if needed
-# Add new features to features list
-
-# 4. Commit
+# 3. Commit
 git add .
 git commit -m "chore: bump version to 1.1.0"
 
-# 5. Create release tag
-git tag -a v1.1.0 -m "Release version 1.1.0
+# 4. Create release tag
+git tag -a v1.1.0 -m "Release version 1.1.0"
 
-Highlights:
-- New BotTradeDecisionEngine
-- AI-powered trade evaluation
-- Improved risk management"
-
-# 6. Build and publish
+# 5. Build and publish
 ./mvnw clean deploy
 
-# 7. Push to GitHub
+# 6. Push to GitHub
 git push origin develop
 git push origin main
 git push origin --tags
 
-# 8. Create GitHub Release
+# 7. Create GitHub Release
 # Go to GitHub → Releases → Draft New Release
 # Select tag v1.1.0
 # Add release notes
@@ -1054,13 +935,6 @@ feat(decision): add BotTradeDecisionEngine with 12-question framework
 Implements institutional-grade signal evaluation with comprehensive
 risk assessment, cost estimation, and expectancy calculation.
 
-Includes:
-- Market regime detection
-- Asset type classification
-- Strategy fit scoring
-- Cost and expectation estimation
-- Full audit trail
-
 Fixes #890
 ```
 
@@ -1081,8 +955,8 @@ Fixes #890
 ## 13. Resources
 
 - **Documentation**: [docs/](./docs/)
-- **Issue Tracker**: [GitHub Issues](https://github.com/yourusername/investpro/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/investpro/discussions)
+- **Issue Tracker**: [GitHub Issues](https://github.com/nguemechieu/investpro/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/nguemechieu/investpro/discussions)
 - **Javadoc**: `./mvnw javadoc:javadoc` → `target/site/apidocs/index.html`
 - **Architecture**: [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
 - **Production**: [PRODUCTION_READY.md](./PRODUCTION_READY.md)
