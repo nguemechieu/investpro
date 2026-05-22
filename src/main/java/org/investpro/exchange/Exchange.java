@@ -10,6 +10,7 @@ import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.TradePair;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.market.ExchangeMarketDataAdapter;
+import org.investpro.trading.tradability.ExchangeInstrumentService;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
@@ -255,7 +256,7 @@ public abstract class Exchange implements
     /**
      * Default batch implementation: fetch order books for multiple trading pairs.
      * Can be overridden by subclasses for optimized batch operations.
-     * 
+     *
      * @param tradePairs list of trading pairs
      * @return CompletableFuture containing list of order books
      */
@@ -316,4 +317,29 @@ public abstract class Exchange implements
             double slippage);
 
     public abstract AuthResult AuthCheckResult(String selectedExchange);
+
+    /**
+     * Returns the instrument service for this exchange, or null if not overridden.
+     * Override in exchange adapters to provide pair discovery and tradeability checks.
+     */
+    public ExchangeInstrumentService instrumentService() {
+        return null;
+    }
+
+    /**
+     * Returns the full list of tradeable pairs for this exchange asynchronously.
+     * Default delegates to {@link #getTradablePairs()}.
+     */
+    public CompletableFuture<List<TradePair>> getTradeablePairsAsync() {
+        return CompletableFuture.supplyAsync(this::getTradablePairs);
+    }
+
+    /**
+     * Checks if a specific pair is tradeable for this account.
+     * Default delegates to {@link #fetchTradabilityStatus(TradePair)}.
+     */
+    public CompletableFuture<Boolean> isTradeablePair(TradePair pair) {
+        return fetchTradabilityStatus(pair)
+                .thenApply(st -> st != null && st.status() == TradabilityStatus.FULLY_TRADABLE);
+    }
 }
