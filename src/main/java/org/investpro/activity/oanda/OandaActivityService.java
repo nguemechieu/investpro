@@ -25,8 +25,8 @@ import java.util.concurrent.CompletableFuture;
  * Syncs OANDA transactions into {@link BrokerActivityEvent}s.
  *
  * <p>Cursor = lastTransactionID (OANDA integer string).
- * Endpoint: GET /v3/accounts/{accountID}/transactions/sinceid?id={lastTransactionID}
- * Initial endpoint: GET /v3/accounts/{accountID}/transactions?from={from}
+ * Sync endpoint: GET /v3/accounts/{accountID}/transactions/sinceid?id={lastTransactionID}
+ * Initial endpoint: GET /v3/accounts/{accountID}/transactions?from={isoTime}
  */
 @Slf4j
 public class OandaActivityService extends AbstractExchangeActivityService {
@@ -38,8 +38,21 @@ public class OandaActivityService extends AbstractExchangeActivityService {
     private final String apiKey;
     private final String apiBaseUrl;
 
+    /**
+     * Primary constructor.
+     *
+     * @param oanda             OANDA exchange adapter (may be null in tests)
+     * @param accountId         OANDA account ID (e.g. "101-001-12345678-001")
+     * @param http              shared HttpClient
+     * @param apiKey            OANDA bearer token
+     * @param apiBaseUrl        API root, e.g. "https://api-fxtrade.oanda.com"
+     * @param activityRepository broker event store
+     * @param checkpointRepository cursor store
+     * @param projectionService event projection engine
+     */
     public OandaActivityService(
             Oanda oanda,
+            String accountId,
             HttpClient http,
             String apiKey,
             String apiBaseUrl,
@@ -47,32 +60,55 @@ public class OandaActivityService extends AbstractExchangeActivityService {
             ActivityCheckpointRepository checkpointRepository,
             ActivityProjectionService projectionService
     ) {
-        super(OandaActivityMapper.EXCHANGE_ID,
-                oanda != null ? oanda.getAccountId() : null,
-                activityRepository,
-                checkpointRepository,
-                projectionService);
+        super(OandaActivityMapper.EXCHANGE_ID, accountId, activityRepository, checkpointRepository, projectionService);
         this.oanda = oanda;
         this.http = http;
         this.apiKey = apiKey;
         this.apiBaseUrl = apiBaseUrl;
     }
 
+    /** Legacy constructor for callers that supply only the Oanda adapter. */
+    public OandaActivityService(
+            Oanda oanda,
+            BrokerActivityRepository activityRepository,
+            ActivityCheckpointRepository checkpointRepository,
+            ActivityProjectionService projectionService
+    ) {
+        super(OandaActivityMapper.EXCHANGE_ID, null, activityRepository, checkpointRepository, projectionService);
+        this.oanda = oanda;
+        this.http = null;
+        this.apiKey = null;
+        this.apiBaseUrl = null;
+    }
+
     @Override
     public CompletableFuture<ActivitySyncResult> syncActivitySince(String cursor) {
         Instant startedAt = Instant.now();
         String resolvedAccountId = accountId;
+
+        if (http == null || apiKey == null || apiKey.isBlank()) {
+            return CompletableFuture.completedFuture(ActivitySyncResult.builder()
+                    .exchangeId(exchangeId)
+                    .accountId(resolvedAccountId)
+                    .startedAt(startedAt)
+                    .finishedAt(Instant.now())
+                    .previousCursor(cursor)
+                    .latestCursor(cursor)
+                    .successful(false)
+                    .warning("OandaActivityService: HTTP client or API key not configured")
+                    .build());
+        }
+
         if (resolvedAccountId == null || resolvedAccountId.isBlank()) {
-            return CompletableFuture.completedFuture(
-                    ActivitySyncResult.builder()
-                            .exchangeId(exchangeId)
-                            .startedAt(startedAt)
-                            .finishedAt(Instant.now())
-                            .previousCursor(cursor)
-                            .latestCursor(cursor)
-                            .successful(false)
-                            .warning("OANDA account ID not configured")
-                            .build());
+            return CompletableFuture.completedFuture(ActivitySyncResult.builder()
+                    .exchangeId(exchangeId)
+                    .startedAt(startedAt)
+                    .finishedAt(Instant.now())
+                    .previousCursor(cursor)
+                    .latestCursor(cursor)
+                    .successful(false)
+                    .warning("OANDA account ID not configured")
+                    .build());
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -90,34 +126,17 @@ public class OandaActivityService extends AbstractExchangeActivityService {
 
                 if (response.statusCode() == 401 || response.statusCode() == 403) {
                     log.warn("OANDA activity sync: auth error {} for account {}", response.statusCode(), resolvedAccountId);
-                    return ActivitySyncResult.builder()
-                            .exchangeId(exchangeId)
-                            .accountId(resolvedAccountId)
-                            .startedAt(startedAt)
-                            .finishedAt(Instant.now())
-                            .previousCursor(cursor)
-                            .latestCursor(cursor)
-                            .successful(false)
-                            .error("HTTP " + response.statusCode() + ": authentication failure")
-                            .build();
+                    return errorResult(cursor, resolvedAccountId, startedAt,
+                            "HTTP " + response.statusCode() + ": authentication failure");
                 }
 
                 if (response.statusCode() != 200) {
-                    log.warn("OANDA activity sync: unexpected HTTP {} for account {}", response.statusCode(), resolvedAccountId);
-                    return ActivitySyncResult.builder()
-                            .exchangeId(exchangeId)
-                            .accountId(resolvedAccountId)
-                            .startedAt(startedAt)
-                            .finishedAt(Instant.now())
-                            .previousCursor(cursor)
-                            .latestCursor(cursor)
-                            .successful(false)
-                            .error("HTTP " + response.statusCode())
-                            .build();
+                    log.warn("OANDA activity sync: unexpected HTTP {} for {}", response.statusCode(), resolvedAccountId);
+                    return errorResult(cursor, resolvedAccountId, startedAt, "HTTP " + response.statusCode());
                 }
 
-                List<BrokerActivityEvent> events = parseTransactions(response.body(), resolvedAccountId);
-                log.info("OANDA activity sync: {} transactions fetched for account {}", events.size(), resolvedAccountId);
+                List<BrokerActivityEvent> events = parseTransactions(response.body());
+                log.info("OANDA activity sync: {} transactions for account {}", events.size(), resolvedAccountId);
                 return processFetchedEvents(cursor, events, startedAt);
 
             } catch (InterruptedException ex) {
@@ -135,26 +154,25 @@ public class OandaActivityService extends AbstractExchangeActivityService {
         return oanda != null && Boolean.TRUE.equals(oanda.isConnected());
     }
 
-    /** Accept pre-mapped transactions (e.g. from a WebSocket push or transaction client). */
+    /** Accept pre-mapped transactions (e.g. from a WebSocket push). */
     public ActivitySyncResult acceptMappedTransactions(List<BrokerActivityEvent> events, String previousCursor) {
         return processFetchedEvents(previousCursor, events, Instant.now());
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // ── Private helpers ────────────────────────────────────────────────────────────
 
-    private String buildSyncUrl(String accountId, String cursor) {
+    private String buildSyncUrl(String acctId, String cursor) {
         String base = (apiBaseUrl == null || apiBaseUrl.isBlank())
                 ? "https://api-fxtrade.oanda.com"
                 : apiBaseUrl;
         if (cursor != null && !cursor.isBlank()) {
-            return base + "/v3/accounts/" + accountId + "/transactions/sinceid?id=" + cursor;
+            return base + "/v3/accounts/" + acctId + "/transactions/sinceid?id=" + cursor;
         }
-        // No cursor: fetch last 7 days
-        String from = Instant.now().minusSeconds(7 * 24 * 3600).toString();
-        return base + "/v3/accounts/" + accountId + "/transactions?from=" + from;
+        String from = Instant.now().minusSeconds(7L * 24 * 3600).toString();
+        return base + "/v3/accounts/" + acctId + "/transactions?from=" + from;
     }
 
-    private List<BrokerActivityEvent> parseTransactions(String body, String resolvedAccountId) {
+    private List<BrokerActivityEvent> parseTransactions(String body) {
         List<BrokerActivityEvent> events = new ArrayList<>();
         try {
             JsonNode root = MAPPER.readTree(body);
@@ -162,12 +180,8 @@ public class OandaActivityService extends AbstractExchangeActivityService {
             if (txns.isMissingNode()) txns = root.path("transaction");
             if (txns.isArray()) {
                 for (JsonNode txn : txns) {
-                    try {
-                        BrokerActivityEvent event = OandaActivityMapper.mapTransaction(txn);
-                        events.add(event);
-                    } catch (Exception e) {
-                        log.warn("Failed to map OANDA transaction: {}", txn, e);
-                    }
+                    try { events.add(OandaActivityMapper.mapTransaction(txn)); }
+                    catch (Exception e) { log.warn("Skipping unmappable OANDA transaction: {}", txn, e); }
                 }
             } else if (txns.isObject()) {
                 events.add(OandaActivityMapper.mapTransaction(txns));
@@ -178,10 +192,10 @@ public class OandaActivityService extends AbstractExchangeActivityService {
         return events;
     }
 
-    private ActivitySyncResult errorResult(String cursor, String accountId, Instant startedAt, String message) {
+    private ActivitySyncResult errorResult(String cursor, String acctId, Instant startedAt, String message) {
         return ActivitySyncResult.builder()
                 .exchangeId(exchangeId)
-                .accountId(accountId)
+                .accountId(acctId)
                 .startedAt(startedAt)
                 .finishedAt(Instant.now())
                 .previousCursor(cursor)
