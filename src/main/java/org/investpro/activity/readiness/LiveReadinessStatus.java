@@ -1,8 +1,3 @@
 package org.investpro.activity.readiness;
 
-public enum LiveReadinessStatus {
-    PASS,
-    WARN,
-    FAIL,
-    UNKNOWN
-}
+public enum LiveReadinessStatus { READY, DEGRADED, NOT_READY, UNKNOWN }
