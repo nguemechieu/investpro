@@ -4,8 +4,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -24,43 +22,42 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import static org.investpro.i18n.LocalizationService.t;
 
 /**
- * Compact Order Panel — single-column order ticket.
+ * Compact Order Panel - single-column order ticket.
  *
- * Layout (top → bottom):
- *   ┌─────────────────────────────┐
- *   │ Symbol badge  │ BID ASK SPR │  ← quote bar
- *   ├─────────────────────────────┤
- *   │ [  BUY  ] [  SELL  ]        │  ← side toggle
- *   │ Order Type  ▼               │
- *   │ Volume  [___]               │
- *   │ Price   [___]  (limit only) │
- *   │ Take Profit [___]           │
- *   │ Stop Loss   [___]           │
- *   │ Expiry  [___]  (limit only) │
- *   ├─────────────────────────────┤
- *   │ Summary line                │
- *   ├─────────────────────────────┤
- *   │  [PLACE ORDER]  [CLEAR]     │
- *   └─────────────────────────────┘
+ * Layout (top to bottom):
+ *   +---------------------------------+
+ *   | Symbol badge  | BID ASK SPR     |  <- quote bar
+ *   +---------------------------------+
+ *   | [  BUY  ] [  SELL  ]            |  <- side toggle
+ *   | Order Type  v                   |
+ *   | Volume  [___]                   |
+ *   | Price   [___]  (limit only)     |
+ *   | Take Profit [___]               |
+ *   | Stop Loss   [___]               |
+ *   | Expiry  [___]  (limit only)     |
+ *   +---------------------------------+
+ *   | Summary line                    |
+ *   +---------------------------------+
+ *   |  [PLACE ORDER]  [CLEAR]         |
+ *   +---------------------------------+
  */
 @Slf4j
 @Getter
 @Setter
 public class OrderPanel extends VBox {
 
-    // ── Controls ──────────────────────────────────────────────────────────
-    private ComboBox<String>          symbolCombo;
+    // ---- Controls -----------------------------------------------------------
+    private ComboBox<String>              symbolCombo;
     private ComboBox<OpenOrder.OrderType> orderTypeCombo;
-    private Spinner<Double>           volumeSpinner;
-    private Spinner<Double>           takeProfitSpinner;
-    private Spinner<Double>           stopLossSpinner;
-    private TextField                 priceField;
-    private DatePicker                expirationDatePicker;
+    private Spinner<Double>               volumeSpinner;
+    private Spinner<Double>               takeProfitSpinner;
+    private Spinner<Double>               stopLossSpinner;
+    private TextField                     priceField;
+    private DatePicker                    expirationDatePicker;
 
     // Quote labels
     private Label bidLabel;
@@ -80,14 +77,14 @@ public class OrderPanel extends VBox {
     private Label summaryLabel;
 
     // State
-    private Side     selectedSide  = Side.BUY;
-    private double   currentPrice  = 0.0;
-    private double   bidPrice      = 0.0;
-    private double   askPrice      = 0.0;
+    private Side   selectedSide  = Side.BUY;
+    private double currentPrice  = 0.0;
+    private double bidPrice      = 0.0;
+    private double askPrice      = 0.0;
 
     private final SystemCore systemCore;
 
-    // ── Constructors ──────────────────────────────────────────────────────
+    // ---- Constructors -------------------------------------------------------
 
     public OrderPanel(SystemCore systemCore) {
         this(systemCore, null);
@@ -123,7 +120,7 @@ public class OrderPanel extends VBox {
         catch (Exception e) { log.debug("Localization skipped: {}", e.getMessage()); }
     }
 
-    // ── Data loading ──────────────────────────────────────────────────────
+    // ---- Data loading -------------------------------------------------------
 
     private List<TradePair> loadSymbols() {
         try {
@@ -150,7 +147,7 @@ public class OrderPanel extends VBox {
         }
     }
 
-    // ── UI construction ───────────────────────────────────────────────────
+    // ---- UI construction ----------------------------------------------------
 
     private void buildUI(List<TradePair> symbols, TradePair initial) {
         getChildren().setAll(
@@ -169,7 +166,7 @@ public class OrderPanel extends VBox {
 
     /** Top bar: symbol badge + bid / ask / spread chips. */
     private HBox buildQuoteBar(TradePair initial) {
-        symbolBadge = new Label(initial != null ? displaySymbol(initial) : "\u2014");
+        symbolBadge = new Label(initial != null ? displaySymbol(initial) : "-");
         symbolBadge.setStyle(
                 "-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #38bdf8; " +
                 "-fx-background-color: rgba(56,189,248,0.1); " +
@@ -179,9 +176,9 @@ public class OrderPanel extends VBox {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         HBox chips = new HBox(6,
-                quoteChip("BID",  bidPrice,  "#10b981"),
-                quoteChip("ASK",  askPrice,  "#ef4444"),
-                quoteChip("SPR",  Math.abs(askPrice - bidPrice), "#f59e0b"));
+                quoteChip("BID", bidPrice,  "#10b981"),
+                quoteChip("ASK", askPrice,  "#ef4444"),
+                quoteChip("SPR", Math.abs(askPrice - bidPrice), "#f59e0b"));
         chips.setAlignment(Pos.CENTER_RIGHT);
 
         HBox bar = new HBox(8, symbolBadge, spacer, chips);
@@ -206,22 +203,22 @@ public class OrderPanel extends VBox {
         Label val = new Label(fmt(value));
         val.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + accent + ";");
 
-        if ("BID".equals(label))  bidLabel    = val;
-        else if ("ASK".equals(label))  askLabel = val;
+        if ("BID".equals(label))       bidLabel    = val;
+        else if ("ASK".equals(label))  askLabel    = val;
         else if ("SPR".equals(label))  spreadLabel = val;
 
         chip.getChildren().addAll(lbl, val);
         return new StackPane(chip);
     }
 
-    /** Side toggle + form fields. */
+    /** Side toggle + form fields wrapped in a ScrollPane. */
     private ScrollPane buildForm(List<TradePair> symbols, TradePair initial) {
-        // ── Side toggle ──
-        buyToggle  = sideBtn("\u25b2 BUY",  "#10b981");
-        sellToggle = sideBtn("\u25bc SELL", "#ef4444");
+        // Side toggle
+        buyToggle  = sideBtn("BUY",  "#10b981");
+        sellToggle = sideBtn("SELL", "#ef4444");
         buyToggle.setOnAction(e  -> selectSide(Side.BUY));
         sellToggle.setOnAction(e -> selectSide(Side.SELL));
-        HBox.setHgrow(buyToggle, Priority.ALWAYS);
+        HBox.setHgrow(buyToggle,  Priority.ALWAYS);
         HBox.setHgrow(sellToggle, Priority.ALWAYS);
         buyToggle.setMaxWidth(Double.MAX_VALUE);
         sellToggle.setMaxWidth(Double.MAX_VALUE);
@@ -229,7 +226,7 @@ public class OrderPanel extends VBox {
         HBox sideRow = new HBox(6, buyToggle, sellToggle);
         sideRow.setFillHeight(true);
 
-        // ── Symbol combo ──
+        // Symbol combo
         symbolCombo = new ComboBox<>();
         if (symbols != null) {
             symbolCombo.getItems().addAll(
@@ -242,11 +239,11 @@ public class OrderPanel extends VBox {
         applyInputStyle(symbolCombo);
         symbolCombo.setOnAction(e -> {
             if (symbolBadge != null)
-                symbolBadge.setText(symbolCombo.getValue() == null ? "\u2014" : symbolCombo.getValue());
+                symbolBadge.setText(symbolCombo.getValue() == null ? "-" : symbolCombo.getValue());
             updateSummary();
         });
 
-        // ── Order type ──
+        // Order type
         orderTypeCombo = new ComboBox<>();
         orderTypeCombo.getItems().addAll(OpenOrder.OrderType.values());
         orderTypeCombo.setValue(OpenOrder.OrderType.MARKET);
@@ -254,28 +251,28 @@ public class OrderPanel extends VBox {
         applyInputStyle(orderTypeCombo);
         orderTypeCombo.setOnAction(e -> { updateUIForOrderType(); updateSummary(); });
 
-        // ── Volume ──
+        // Volume
         volumeSpinner = dblSpinner(1.0, 0.1);
         volumeSpinner.valueProperty().addListener((o, ov, nv) -> updateSummary());
 
-        // ── Price (limit/stop only) ──
+        // Price (limit/stop only)
         priceField = new TextField(fmt(currentPrice));
         priceField.setMaxWidth(Double.MAX_VALUE);
         applyInputStyle(priceField);
         priceField.textProperty().addListener((o, ov, nv) -> updateSummary());
 
-        // ── TP / SL ──
+        // Take Profit / Stop Loss
         takeProfitSpinner = dblSpinner(0.0, 10.0);
         stopLossSpinner   = dblSpinner(0.0, 10.0);
         takeProfitSpinner.valueProperty().addListener((o, ov, nv) -> updateSummary());
         stopLossSpinner.valueProperty().addListener((o, ov, nv) -> updateSummary());
 
-        // ── Expiry (limit/stop only) ──
+        // Expiry (limit/stop only)
         expirationDatePicker = new DatePicker(LocalDate.now().plusDays(1));
         expirationDatePicker.setMaxWidth(Double.MAX_VALUE);
         applyInputStyle(expirationDatePicker);
 
-        // ── Grid layout ──
+        // Grid layout
         GridPane grid = new GridPane();
         grid.setVgap(8);
         grid.setHgap(8);
@@ -285,13 +282,13 @@ public class OrderPanel extends VBox {
         fieldCol.setFillWidth(true);
         grid.getColumnConstraints().addAll(labelCol, fieldCol);
 
-        addRow(grid, 0, "Symbol",     symbolCombo);
-        addRow(grid, 1, "Type",       orderTypeCombo);
-        addRow(grid, 2, "Volume",     volumeSpinner);
-        addRow(grid, 3, "Price",      priceField);
-        addRow(grid, 4, "Take Profit",takeProfitSpinner);
-        addRow(grid, 5, "Stop Loss",  stopLossSpinner);
-        addRow(grid, 6, "Expiry",     expirationDatePicker);
+        addRow(grid, 0, "Symbol",      symbolCombo);
+        addRow(grid, 1, "Type",        orderTypeCombo);
+        addRow(grid, 2, "Volume",      volumeSpinner);
+        addRow(grid, 3, "Price",       priceField);
+        addRow(grid, 4, "Take Profit", takeProfitSpinner);
+        addRow(grid, 5, "Stop Loss",   stopLossSpinner);
+        addRow(grid, 6, "Expiry",      expirationDatePicker);
 
         VBox content = new VBox(10, sideRow, grid);
         content.setPadding(new Insets(12));
@@ -309,8 +306,7 @@ public class OrderPanel extends VBox {
     private HBox buildSummaryRow() {
         summaryLabel = new Label("Configure order above");
         summaryLabel.setWrapText(true);
-        summaryLabel.setStyle(
-                "-fx-font-size: 11px; -fx-text-fill: #94a3b8;");
+        summaryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #94a3b8;");
 
         HBox row = new HBox(summaryLabel);
         row.setPadding(new Insets(8, 12, 8, 12));
@@ -339,7 +335,7 @@ public class OrderPanel extends VBox {
         return row;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
+    // ---- Helpers ------------------------------------------------------------
 
     private void addRow(GridPane grid, int row, String labelText, Control control) {
         Label lbl = new Label(labelText);
@@ -475,21 +471,24 @@ public class OrderPanel extends VBox {
     private void updateSummary() {
         if (summaryLabel == null) return;
         String sym  = symbolCombo != null ? symbolCombo.getValue() : "N/A";
-        double vol  = volumeSpinner  != null ? safeD(volumeSpinner.getValue())  : 0;
+        double vol  = volumeSpinner     != null ? safeD(volumeSpinner.getValue())     : 0;
         double tp   = takeProfitSpinner != null ? safeD(takeProfitSpinner.getValue()) : 0;
         double sl   = stopLossSpinner   != null ? safeD(stopLossSpinner.getValue())   : 0;
         OpenOrder.OrderType type = orderTypeCombo != null
                 ? orderTypeCombo.getValue() : OpenOrder.OrderType.MARKET;
+        String priceTxt = type == OpenOrder.OrderType.MARKET
+                ? "market"
+                : (priceField != null ? priceField.getText() : "-");
 
         summaryLabel.setText("%s %s  %s  vol=%.2f  TP=%s  SL=%s".formatted(
                 selectedSide, type,
                 sym == null ? "N/A" : sym,
                 vol,
-                tp <= 0 ? "\u2014" : fmt(tp),
-                sl <= 0 ? "\u2014" : fmt(sl)));
+                tp <= 0 ? "-" : fmt(tp),
+                sl <= 0 ? "-" : fmt(sl)));
     }
 
-    // ── Order execution ───────────────────────────────────────────────────
+    // ---- Order execution ----------------------------------------------------
 
     private void onExecuteOrder(Side side) {
         try {
@@ -516,7 +515,7 @@ public class OrderPanel extends VBox {
                 return;
             }
 
-            log.info("Order: sym={} type={} side={} vol={} price={} tp={} sl={}",
+            log.info("Order -> sym={} type={} side={} vol={} price={} tp={} sl={}",
                     sym, type, side, vol, price, tp, sl);
             showSuccess("%s %s  %s x %.4f @ %s".formatted(side, type, sym, vol,
                     type == OpenOrder.OrderType.MARKET ? "market" : fmt(price)));
@@ -548,15 +547,15 @@ public class OrderPanel extends VBox {
         updateSummary();
     }
 
-    // ── Price update ──────────────────────────────────────────────────────
+    // ---- Price update -------------------------------------------------------
 
     private void updatePricesFromOrderBook(OrderBook orderBook) {
         if (orderBook == null
                 || orderBook.getBids() == null || orderBook.getBids().isEmpty()
                 || orderBook.getAsks() == null || orderBook.getAsks().isEmpty()) return;
 
-        this.bidPrice    = orderBook.getBids().getFirst().getPrice();
-        this.askPrice    = orderBook.getAsks().getFirst().getPrice();
+        this.bidPrice     = orderBook.getBids().getFirst().getPrice();
+        this.askPrice     = orderBook.getAsks().getFirst().getPrice();
         this.currentPrice = (bidPrice + askPrice) / 2.0;
 
         if (bidLabel    != null) bidLabel.setText(fmt(bidPrice));
@@ -565,7 +564,7 @@ public class OrderPanel extends VBox {
         if (priceField  != null && !priceField.isDisable()) priceField.setText(fmt(currentPrice));
     }
 
-    // ── Dialogs ───────────────────────────────────────────────────────────
+    // ---- Dialogs ------------------------------------------------------------
 
     private void showError(String msg) {
         Alert a = new Alert(Alert.AlertType.ERROR);
@@ -583,7 +582,7 @@ public class OrderPanel extends VBox {
         a.showAndWait();
     }
 
-    // ── Formatting ────────────────────────────────────────────────────────
+    // ---- Formatting ---------------------------------------------------------
 
     private String fmt(double v) {
         return Double.isFinite(v) ? String.format("%.5f", v) : "0.00000";
