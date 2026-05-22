@@ -271,7 +271,13 @@ public abstract class Exchange implements
                         .map(this::fetchOrderBook)
                         .toArray(CompletableFuture[]::new))
                 .thenApply(v -> tradePairs.stream()
-                        .map(OrderBook::new)
+                        .map(p -> {
+                            try {
+                                return new OrderBook(p);
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to create OrderBook for " + p, e);
+                            }
+                        })
                         .toList());
     }
 
@@ -331,7 +337,13 @@ public abstract class Exchange implements
      * Default delegates to {@link #getTradablePairs()}.
      */
     public CompletableFuture<List<TradePair>> getTradeablePairsAsync() {
-        return CompletableFuture.supplyAsync(this::getTradablePairs);
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return getTradablePairs();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load tradeable pairs for " + getName(), e);
+            }
+        });
     }
 
     /**
