@@ -45,7 +45,13 @@ public class CoinbaseInstrumentService implements ExchangeInstrumentService {
     @Override
     public CompletableFuture<List<TradePair>> refreshTradeablePairs() {
         cache.forceInvalidate(EXCHANGE_ID, ACCOUNT_ID);
-        return CompletableFuture.supplyAsync(exchange::getTradablePairs)
+        return CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return exchange.getTradablePairs();
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to fetch tradeable pairs for " + EXCHANGE_ID, e);
+                    }
+                })
                 .thenApply(pairs -> {
                     cache.put(EXCHANGE_ID, ACCOUNT_ID, pairs);
                     log.info("[{}] Refreshed {} tradeable pairs", EXCHANGE_ID, pairs.size());
