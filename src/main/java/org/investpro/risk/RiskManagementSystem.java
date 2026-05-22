@@ -3,6 +3,7 @@ package org.investpro.risk;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.enums.*;
+import org.investpro.market.BisMarketStructureService;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -179,7 +180,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
 
         // Decision: Approved if no blockers
         boolean approved = blockers.isEmpty();
-        String approvalReason = approved ? "✓ Setup meets all risk criteria" : "✗ Critical blocker(s) present";
+        String approvalReason = approved ? "\u2713 Setup meets all risk criteria" : "\u2717 Critical blocker(s) present";
 
         // Calculate final position sizing
         double riskMultiplier = calculateRiskMultiplier(context);
@@ -267,6 +268,17 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         // Capital protection adjustment
         multiplier *= Math.min(1.0, context.getCapitalProtection().getCapitalRetention());
 
+        // Market structure (BIS liquidity tier) adjustment
+        if (context.getSymbol() != null) {
+            double structureMultiplier = BisMarketStructureService.getInstance()
+                    .getLiquidityRiskMultiplier(context.getSymbol());
+            if (structureMultiplier < 1.0) {
+                log.debug("MarketStructure risk multiplier applied: {} for {}",
+                        structureMultiplier, context.getSymbol());
+                multiplier *= structureMultiplier;
+            }
+        }
+
         return multiplier;
     }
 
@@ -349,13 +361,13 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
 
         StringBuilder sb = new StringBuilder();
 
-        sb.append(approved ? "✓ TRADE APPROVED\n" : "✗ TRADE BLOCKED\n");
+        sb.append(approved ? "\u2713 TRADE APPROVED\n" : "\u2717 TRADE BLOCKED\n");
         sb.append("\n");
 
         if (!blockers.isEmpty()) {
             sb.append("BLOCKERS:\n");
             for (String blocker : blockers) {
-                sb.append("  • ").append(blocker).append("\n");
+                sb.append("  \u2022 ").append(blocker).append("\n");
             }
             sb.append("\n");
         }
@@ -363,7 +375,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         if (!warnings.isEmpty()) {
             sb.append("WARNINGS:\n");
             for (String warning : warnings) {
-                sb.append("  ⚠ ").append(warning).append("\n");
+                sb.append("  \u26a0 ").append(warning).append("\n");
             }
             sb.append("\n");
         }
@@ -371,7 +383,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         if (!recommendations.isEmpty()) {
             sb.append("RECOMMENDATIONS:\n");
             for (String rec : recommendations) {
-                sb.append("  → %s".formatted(re)).append(rec).append("\n");
+                sb.append("  \u2192 %s".formatted(re)).append(rec).append("\n");
             }
         }
         RiskReport report = generateRiskReport(context, RiskDecision.builder().build());
@@ -407,7 +419,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
                 .executionStrategyName(decision.getRecommendedExecutionStrategy().getDisplayName())
                 .systemDesignName(context.getSystemDesign().getDisplayName())
                 .approved(decision.isApproved())
-                .decisionStatus(decision.isApproved() ? "✓ APPROVED" : "✗ BLOCKED")
+                .decisionStatus(decision.isApproved() ? "\u2713 APPROVED" : "\u2717 BLOCKED")
                 .finalPositionSize(decision.getFinalPositionSize())
                 .finalLeverage(decision.getFinalLeverage())
                 .riskMultiplier(decision.getRiskMultiplier())
@@ -440,7 +452,7 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
         }
         StringBuilder sb = new StringBuilder();
         for (String item : items) {
-            sb.append("  • ").append(item).append("\n");
+            sb.append("  \u2022 ").append(item).append("\n");
         }
         return sb.toString();
     }
