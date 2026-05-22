@@ -344,6 +344,22 @@ public class NewsDataProvider {
             rssNewsService.clearCache();
         }
 
+        /**
+         * Fetch general market news from multiple top-tier financial RSS feeds
+         * (Reuters, CNBC, MarketWatch, ForexLive, FX Street, BBC Business, etc.).
+         *
+         * @param limit Maximum number of articles to return
+         * @return List of news articles with sentiment scores
+         */
+        public List<Map<String, Object>> fetchGeneralMarketNews(int limit) {
+                try {
+                        return rssNewsService.fetchGeneralMarketNews(limit);
+                } catch (Exception e) {
+                        log.warn("Failed to fetch general market news: {}", e.getMessage());
+                        return new ArrayList<>();
+                }
+        }
+
         private void notifyListeners(NewsEvent event, String action) {
                 listeners.forEach(listener -> listener.onNewsEventChange(event, action));
         }
