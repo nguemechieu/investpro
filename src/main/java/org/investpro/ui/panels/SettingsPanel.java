@@ -20,6 +20,8 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import lombok.Getter;
@@ -28,10 +30,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.i18n.LocalizationService;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
+
 import java.util.Properties;
 import java.util.prefs.Preferences;
 
@@ -58,7 +61,7 @@ import static org.investpro.i18n.LocalizationService.t;
 @Slf4j
 @Getter
 @Setter
-public class SettingsPanel extends VBox {
+public class SettingsPanel extends StackPane {
 
     private static final Preferences PREFS = Preferences.userNodeForPackage(SettingsPanel.class);
 
@@ -122,9 +125,7 @@ public class SettingsPanel extends VBox {
     public SettingsPanel(SystemCore systemCore) {
         this.systemCore = systemCore;
 
-        setPadding(new Insets(16));
-        setSpacing(12);
-        setStyle("-fx-background-color: " + COLOR_BG + "; -fx-text-fill: " + COLOR_TEXT + ";");
+        setStyle("-fx-background-color: " + COLOR_BG + ";");
         getStyleClass().add("settings-panel");
 
         setupUi();
@@ -133,40 +134,56 @@ public class SettingsPanel extends VBox {
     }
 
     private void setupUi() {
-        Label titleLabel = new Label("System Settings");
+        Label titleLabel = new Label("⚙  System Settings");
         titleLabel.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: " + COLOR_TEXT + ";");
+
+        HBox header = new HBox(titleLabel);
+        header.setPadding(new Insets(16, 16, 8, 16));
+        header.setStyle("-fx-background-color: " + COLOR_BG + ";");
 
         VBox systemSafetySection = createSystemSafetySection();
         VBox streamingSection = createStreamingSection();
         VBox openAiSection = createOpenAiSection();
         VBox telegramSection = createTelegramSection();
         VBox emailSection = createEmailSection();
-        HBox buttonBox = createButtonBox();
+
+        TabPane tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabPane.getTabs().addAll(
+                sectionTab("🛡  Safety & Execution", systemSafetySection),
+                sectionTab("📡  Streaming", streamingSection),
+                sectionTab("🤖  OpenAI", openAiSection),
+                sectionTab("✈  Telegram", telegramSection),
+                sectionTab("✉  Email", emailSection)
+        );
 
         statusLabel = new Label("Ready");
         setStatusNeutral("Ready");
 
-        VBox content = new VBox(12,
-                titleLabel,
-                new Separator(),
-                systemSafetySection,
-                new Separator(),
-                streamingSection,
-                new Separator(),
-                openAiSection,
-                new Separator(),
-                telegramSection,
-                new Separator(),
-                emailSection,
-                new Separator());
-        content.setPadding(new Insets(8));
+        HBox buttonBox = createButtonBox();
+        VBox footer = new VBox(6, new Separator(), buttonBox, statusLabel);
+        footer.setPadding(new Insets(8, 16, 12, 16));
+        footer.setStyle("-fx-background-color: " + COLOR_BG + ";");
 
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        VBox root = new VBox(header, tabPane, footer);
+        VBox.setVgrow(tabPane, Priority.ALWAYS);
 
-        getChildren().addAll(scrollPane, new Separator(), buttonBox, statusLabel);
-        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        AnchorPane anchor = new AnchorPane(root);
+        AnchorPane.setTopAnchor(root, 0.0);
+        AnchorPane.setBottomAnchor(root, 0.0);
+        AnchorPane.setLeftAnchor(root, 0.0);
+        AnchorPane.setRightAnchor(root, 0.0);
+        anchor.setStyle("-fx-background-color: " + COLOR_BG + ";");
+
+        getChildren().add(anchor);
+    }
+
+    private Tab sectionTab(String title, VBox content) {
+        content.setPadding(new Insets(16));
+        ScrollPane sp = new ScrollPane(content);
+        sp.setFitToWidth(true);
+        sp.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-background: " + COLOR_BG + ";");
+        return new Tab(title, sp);
     }
 
     private VBox createSystemSafetySection() {
@@ -933,7 +950,7 @@ public class SettingsPanel extends VBox {
     /**
      * Applies system settings using InvestPro-neutral keys.
      *
-     * <p>All previous tradeadviser.* keys have been removed.</p>
+     * <p>All previous investpro.* keys have been removed.</p>
      */
     private void applySettingsAsSystemProperties(@NotNull SystemSafetySettings settings) {
         System.setProperty(SETTINGS_PREFIX + ".strategy.requireBacktestBeforeLive", String.valueOf(settings.requireBacktestBeforeLive()));
@@ -950,7 +967,7 @@ public class SettingsPanel extends VBox {
         System.setProperty(SETTINGS_PREFIX + ".execution.symbolCooldownSeconds", String.valueOf(settings.symbolCooldownSeconds()));
     }
 
-    private void addRow(GridPane grid, int row, String label, Control control) {
+    private void addRow(@NonNull GridPane grid, int row, String label, Control control) {
         Label labelNode = new Label(label);
         labelNode.setStyle("-fx-text-fill: " + COLOR_MUTED + ";");
         control.setStyle(inputStyle());
@@ -958,7 +975,7 @@ public class SettingsPanel extends VBox {
         grid.add(control, 1, row);
     }
 
-    private void addRow(GridPane grid, int row, String label, Label valueLabel) {
+    private void addRow(@NonNull GridPane grid, int row, String label, Label valueLabel) {
         Label labelNode = new Label(label);
         labelNode.setStyle("-fx-text-fill: " + COLOR_MUTED + ";");
         grid.add(labelNode, 0, row);
