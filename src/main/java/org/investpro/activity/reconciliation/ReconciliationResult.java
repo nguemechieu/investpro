@@ -12,18 +12,11 @@ import java.util.List;
 public class ReconciliationResult {
     String exchangeId;
     String accountId;
-    @Builder.Default Instant startedAt = Instant.now();
-    @Builder.Default Instant finishedAt = Instant.now();
-    @Singular List<ReconciliationMismatch> mismatches;
-    int repaired;
+    Instant reconciledAt;
+    int eventsChecked;
     boolean successful;
-    String error;
+    @Singular List<ReconciliationMismatch> mismatches;
 
-    public int getMismatchCount() {
-        return mismatches == null ? 0 : mismatches.size();
-    }
-
-    public boolean isClean() {
-        return successful && getMismatchCount() == 0;
-    }
+    public boolean isClean() { return successful && getMismatchCount() == 0; }
+    public int getMismatchCount() { return mismatches == null ? 0 : mismatches.size(); }
 }
