@@ -8,328 +8,326 @@ import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
 
 import java.math.BigDecimal;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
-/**
- * SQLite-backed {@link BrokerActivityRepository}. Idempotent saves: duplicate
- * eventId per exchangeId is silently ignored (INSERT OR IGNORE).
- */
 @Slf4j
 public class SqliteBrokerActivityRepository implements BrokerActivityRepository {
 
-    private final SqliteSchemaManager db;
+    private final SqliteSchemaManager schema;
 
-    public SqliteBrokerActivityRepository(SqliteSchemaManager db) {
-        this.db = db;
+    public SqliteBrokerActivityRepository(SqliteSchemaManager schema) {
+        this.schema = schema;
     }
 
-    // ── Write ──────────────────────────────────────────────────────────────────
+    @Override
+    public synchronized void save(BrokerActivityEvent event) {
+        if (event == null) return;
+        try {
+            upsert(schema.getConnection(), event);
+        } catch (SQLException e) {
+            log.error("SqliteBrokerActivityRepository.save failed for event={}", event.getEventId(), e);
+        }
+    }
 
     @Override
-    public void save(BrokerActivityEvent e) {
-        if (e == null) return;
+    public synchronized void saveAll(List<BrokerActivityEvent> events) {
+        if (events == null || events.isEmpty()) return;
+        try {
+            Connection conn = schema.getConnection();
+            conn.setAutoCommit(false);
+            try {
+                for (BrokerActivityEvent e : events) {
+                    if (e != null) upsert(conn, e);
+                }
+                conn.commit();
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            log.error("SqliteBrokerActivityRepository.saveAll failed", e);
+        }
+    }
+
+    private void upsert(Connection conn, BrokerActivityEvent e) throws SQLException {
         String sql = """
-                INSERT OR IGNORE INTO broker_activity_events(
-                    exchange_id, account_id, event_id, native_type, activity_type,
-                    order_id, trade_id, position_id, trade_pair, side,
-                    requested_qty, filled_qty, remaining_qty, price, avg_fill_price,
-                    realized_pnl, unrealized_pnl, fee, fee_currency, financing,
-                    funding_fee, commission, balance_before, balance_after, balance_ccy,
-                    margin_used, margin_avail, event_time, received_at,
-                    cursor_val, source, raw_json, terminal, error_event,
-                    reason, projected
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                INSERT OR IGNORE INTO broker_activity_events
+                (exchange_id, event_id, account_id, native_event_type, activity_type, order_id, trade_id, position_id,
+                 trade_pair, side, requested_qty, filled_qty, remaining_qty, price, avg_fill_price, realized_pnl,
+                 fee, fee_currency, financing, commission, unrealized_pnl, balance_before, balance_after,
+                 balance_currency, margin_used, margin_available, event_time, received_at, cursor, source,
+                 raw_json, terminal_event, error_event, projected, projection_error, reason)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """;
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, e.getExchangeId());
-            ps.setString(2, e.getAccountId());
-            ps.setString(3, e.getEventId());
+            ps.setString(2, e.getEventId());
+            ps.setString(3, e.getAccountId());
             ps.setString(4, e.getNativeEventType());
-            ps.setString(5, e.getActivityType().name());
+            ps.setString(5, e.getActivityType() == null ? null : e.getActivityType().name());
             ps.setString(6, e.getOrderId());
             ps.setString(7, e.getTradeId());
             ps.setString(8, e.getPositionId());
-            ps.setString(9, pairStr(e.getTradePair()));
+            ps.setString(9, e.getTradePair() == null ? null : e.getTradePair().toString());
             ps.setString(10, e.getSide() == null ? null : e.getSide().name());
-            ps.setString(11, bdStr(e.getRequestedQuantity()));
-            ps.setString(12, bdStr(e.getFilledQuantity()));
-            ps.setString(13, bdStr(e.getRemainingQuantity()));
-            ps.setString(14, bdStr(e.getPrice()));
-            ps.setString(15, bdStr(e.getAverageFillPrice()));
-            ps.setString(16, bdStr(e.getRealizedPnl()));
-            ps.setString(17, bdStr(e.getUnrealizedPnl()));
-            ps.setString(18, bdStr(e.getFee()));
-            ps.setString(19, e.getFeeCurrency());
-            ps.setString(20, bdStr(e.getFinancing()));
-            ps.setString(21, bdStr(e.getFundingFee()));
-            ps.setString(22, bdStr(e.getCommission()));
-            ps.setString(23, bdStr(e.getBalanceBefore()));
-            ps.setString(24, bdStr(e.getBalanceAfter()));
-            ps.setString(25, e.getBalanceCurrency());
-            ps.setString(26, bdStr(e.getMarginUsed()));
-            ps.setString(27, bdStr(e.getMarginAvailable()));
-            ps.setString(28, e.getEventTime().toString());
-            ps.setString(29, e.getReceivedAt().toString());
-            ps.setString(30, e.getCursor());
-            ps.setString(31, e.getSource());
-            ps.setString(32, e.getRawJson());
-            ps.setInt(33, e.isTerminalEvent() ? 1 : 0);
-            ps.setInt(34, e.isErrorEvent() ? 1 : 0);
-            ps.setString(35, e.getReason());
-            ps.setInt(36, e.isProjected() ? 1 : 0);
+            ps.setString(11, bd(e.getRequestedQuantity()));
+            ps.setString(12, bd(e.getFilledQuantity()));
+            ps.setString(13, bd(e.getRemainingQuantity()));
+            ps.setString(14, bd(e.getPrice()));
+            ps.setString(15, bd(e.getAverageFillPrice()));
+            ps.setString(16, bd(e.getRealizedPnl()));
+            ps.setString(17, bd(e.getFee()));
+            ps.setString(18, e.getFeeCurrency());
+            ps.setString(19, bd(e.getFinancing()));
+            ps.setString(20, bd(e.getCommission()));
+            ps.setString(21, bd(e.getUnrealizedPnl()));
+            ps.setString(22, bd(e.getBalanceBefore()));
+            ps.setString(23, bd(e.getBalanceAfter()));
+            ps.setString(24, e.getBalanceCurrency());
+            ps.setString(25, bd(e.getMarginUsed()));
+            ps.setString(26, bd(e.getMarginAvailable()));
+            ps.setString(27, e.getEventTime() == null ? null : e.getEventTime().toString());
+            ps.setString(28, e.getReceivedAt() == null ? null : e.getReceivedAt().toString());
+            ps.setString(29, e.getCursor());
+            ps.setString(30, e.getSource());
+            ps.setString(31, e.getRawJson());
+            ps.setInt(32, e.isTerminalEvent() ? 1 : 0);
+            ps.setInt(33, e.isErrorEvent() ? 1 : 0);
+            ps.setInt(34, e.isProjected() ? 1 : 0);
+            ps.setString(35, e.getProjectionError());
+            ps.setString(36, e.getReason());
             ps.executeUpdate();
-        } catch (SQLException ex) {
-            log.error("Failed to save broker activity event {}/{}", e.getExchangeId(), e.getEventId(), ex);
-            throw new RuntimeException(ex);
         }
     }
 
-    @Override
-    public void saveAll(List<BrokerActivityEvent> events) {
-        if (events == null) return;
-        events.forEach(this::save);
+    private static String bd(BigDecimal val) {
+        return val == null ? null : val.toPlainString();
     }
 
     @Override
-    public void markProjected(String exchangeId, String eventId, Instant projectedAt) {
-        String sql = "UPDATE broker_activity_events SET projected=1, projected_at=?, projection_err=NULL WHERE exchange_id=? AND event_id=?";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, projectedAt == null ? Instant.now().toString() : projectedAt.toString());
-            ps.setString(2, exchangeId);
-            ps.setString(3, eventId);
-            ps.executeUpdate();
-        } catch (SQLException ex) {
-            log.error("markProjected failed for {}/{}", exchangeId, eventId, ex);
-        }
-    }
-
-    @Override
-    public void markProjectionFailed(String exchangeId, String eventId, String reason) {
-        String sql = "UPDATE broker_activity_events SET projected=0, projection_err=? WHERE exchange_id=? AND event_id=?";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, reason);
-            ps.setString(2, exchangeId);
-            ps.setString(3, eventId);
-            ps.executeUpdate();
-        } catch (SQLException ex) {
-            log.error("markProjectionFailed for {}/{}", exchangeId, eventId, ex);
-        }
-    }
-
-    // ── Read ───────────────────────────────────────────────────────────────────
-
-    @Override
-    public Optional<BrokerActivityEvent> findByEventId(String exchangeId, String eventId) {
-        String sql = "SELECT * FROM broker_activity_events WHERE exchange_id=? AND event_id=? LIMIT 1";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+    public synchronized Optional<BrokerActivityEvent> findByEventId(String exchangeId, String eventId) {
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE exchange_id=? AND event_id=?")) {
             ps.setString(1, exchangeId);
             ps.setString(2, eventId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? Optional.of(map(rs)) : Optional.empty();
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) return Optional.of(map(rs));
             }
-        } catch (SQLException ex) {
-            log.error("findByEventId failed", ex);
-            return Optional.empty();
+        } catch (SQLException e) {
+            log.error("findByEventId failed", e);
         }
+        return Optional.empty();
     }
 
     @Override
-    public List<BrokerActivityEvent> findByTradePair(TradePair pair) {
-        String sql = "SELECT * FROM broker_activity_events WHERE trade_pair=? ORDER BY event_time";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, pairStr(pair));
-            return queryList(ps);
-        } catch (SQLException ex) {
-            log.error("findByTradePair failed", ex);
-            return List.of();
-        }
-    }
-
-    @Override
-    public List<BrokerActivityEvent> findByOrderId(String exchangeId, String accountId, String orderId) {
-        String sql = accountId == null
-                ? "SELECT * FROM broker_activity_events WHERE exchange_id=? AND order_id=? ORDER BY event_time"
-                : "SELECT * FROM broker_activity_events WHERE exchange_id=? AND account_id=? AND order_id=? ORDER BY event_time";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, exchangeId);
-            if (accountId != null) { ps.setString(2, accountId); ps.setString(3, orderId); }
-            else { ps.setString(2, orderId); }
-            return queryList(ps);
-        } catch (SQLException ex) {
-            log.error("findByOrderId failed", ex);
-            return List.of();
-        }
-    }
-
-    @Override
-    public List<BrokerActivityEvent> findByTradeId(String exchangeId, String accountId, String tradeId) {
-        String sql = accountId == null
-                ? "SELECT * FROM broker_activity_events WHERE exchange_id=? AND trade_id=? ORDER BY event_time"
-                : "SELECT * FROM broker_activity_events WHERE exchange_id=? AND account_id=? AND trade_id=? ORDER BY event_time";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, exchangeId);
-            if (accountId != null) { ps.setString(2, accountId); ps.setString(3, tradeId); }
-            else { ps.setString(2, tradeId); }
-            return queryList(ps);
-        } catch (SQLException ex) {
-            log.error("findByTradeId failed", ex);
-            return List.of();
-        }
-    }
-
-    @Override
-    public List<BrokerActivityEvent> findByPositionId(String exchangeId, String accountId, String positionId) {
-        String sql = accountId == null
-                ? "SELECT * FROM broker_activity_events WHERE exchange_id=? AND position_id=? ORDER BY event_time"
-                : "SELECT * FROM broker_activity_events WHERE exchange_id=? AND account_id=? AND position_id=? ORDER BY event_time";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, exchangeId);
-            if (accountId != null) { ps.setString(2, accountId); ps.setString(3, positionId); }
-            else { ps.setString(2, positionId); }
-            return queryList(ps);
-        } catch (SQLException ex) {
-            log.error("findByPositionId failed", ex);
-            return List.of();
-        }
-    }
-
-    @Override
-    public List<BrokerActivityEvent> findByTimeRange(String exchangeId, String accountId, Instant from, Instant to) {
-        Instant start = from == null ? Instant.EPOCH : from;
-        Instant end = to == null ? Instant.now() : to;
-        String sql = accountId == null
-                ? "SELECT * FROM broker_activity_events WHERE exchange_id=? AND event_time>=? AND event_time<=? ORDER BY event_time"
-                : "SELECT * FROM broker_activity_events WHERE exchange_id=? AND account_id=? AND event_time>=? AND event_time<=? ORDER BY event_time";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, exchangeId);
-            if (accountId != null) { ps.setString(2, accountId); ps.setString(3, start.toString()); ps.setString(4, end.toString()); }
-            else { ps.setString(2, start.toString()); ps.setString(3, end.toString()); }
-            return queryList(ps);
-        } catch (SQLException ex) {
-            log.error("findByTimeRange failed", ex);
-            return List.of();
-        }
-    }
-
-    @Override
-    public List<BrokerActivityEvent> findUnprojectedEvents(String exchangeId, String accountId, int limit) {
-        String sql = accountId == null
-                ? "SELECT * FROM broker_activity_events WHERE exchange_id=? AND projected=0 AND projection_err IS NULL ORDER BY event_time LIMIT ?"
-                : "SELECT * FROM broker_activity_events WHERE exchange_id=? AND account_id=? AND projected=0 AND projection_err IS NULL ORDER BY event_time LIMIT ?";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, exchangeId);
-            if (accountId != null) { ps.setString(2, accountId); ps.setInt(3, limit <= 0 ? Integer.MAX_VALUE : limit); }
-            else { ps.setInt(2, limit <= 0 ? Integer.MAX_VALUE : limit); }
-            return queryList(ps);
-        } catch (SQLException ex) {
-            log.error("findUnprojectedEvents failed", ex);
-            return List.of();
-        }
-    }
-
-    @Override
-    public boolean exists(String exchangeId, String eventId) {
-        String sql = "SELECT 1 FROM broker_activity_events WHERE exchange_id=? AND event_id=? LIMIT 1";
-        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
-            ps.setString(1, exchangeId);
-            ps.setString(2, eventId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException ex) {
-            return false;
-        }
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
-    private List<BrokerActivityEvent> queryList(PreparedStatement ps) throws SQLException {
+    public synchronized List<BrokerActivityEvent> findByTradePair(TradePair pair) {
         List<BrokerActivityEvent> result = new ArrayList<>();
-        try (ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) result.add(map(rs));
+        if (pair == null) return result;
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE trade_pair=?")) {
+            ps.setString(1, pair.toString());
+            try (var rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        } catch (SQLException e) {
+            log.error("findByTradePair failed", e);
         }
         return result;
     }
 
-    private static BrokerActivityEvent map(ResultSet rs) throws SQLException {
-        return BrokerActivityEvent.builder()
+    @Override
+    public synchronized List<BrokerActivityEvent> findByOrderId(String exchangeId, String accountId, String orderId) {
+        List<BrokerActivityEvent> result = new ArrayList<>();
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE exchange_id=? AND order_id=?")) {
+            ps.setString(1, exchangeId);
+            ps.setString(2, orderId);
+            try (var rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        } catch (SQLException e) {
+            log.error("findByOrderId failed", e);
+        }
+        return result;
+    }
+
+    @Override
+    public synchronized List<BrokerActivityEvent> findByTradeId(String exchangeId, String accountId, String tradeId) {
+        List<BrokerActivityEvent> result = new ArrayList<>();
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE exchange_id=? AND trade_id=?")) {
+            ps.setString(1, exchangeId);
+            ps.setString(2, tradeId);
+            try (var rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        } catch (SQLException e) {
+            log.error("findByTradeId failed", e);
+        }
+        return result;
+    }
+
+    @Override
+    public synchronized List<BrokerActivityEvent> findByPositionId(String exchangeId, String accountId, String positionId) {
+        List<BrokerActivityEvent> result = new ArrayList<>();
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE exchange_id=? AND position_id=?")) {
+            ps.setString(1, exchangeId);
+            ps.setString(2, positionId);
+            try (var rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        } catch (SQLException e) {
+            log.error("findByPositionId failed", e);
+        }
+        return result;
+    }
+
+    @Override
+    public synchronized List<BrokerActivityEvent> findByTimeRange(String exchangeId, String accountId, Instant from, Instant to) {
+        List<BrokerActivityEvent> result = new ArrayList<>();
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE exchange_id=? AND event_time >= ? AND event_time <= ?")) {
+            ps.setString(1, exchangeId);
+            ps.setString(2, from == null ? Instant.EPOCH.toString() : from.toString());
+            ps.setString(3, to == null ? Instant.now().toString() : to.toString());
+            try (var rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        } catch (SQLException e) {
+            log.error("findByTimeRange failed", e);
+        }
+        return result;
+    }
+
+    @Override
+    public synchronized List<BrokerActivityEvent> findUnprojectedEvents(String exchangeId, String accountId, int limit) {
+        List<BrokerActivityEvent> result = new ArrayList<>();
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT * FROM broker_activity_events WHERE exchange_id=? AND projected=0 LIMIT ?")) {
+            ps.setString(1, exchangeId);
+            ps.setInt(2, limit);
+            try (var rs = ps.executeQuery()) {
+                while (rs.next()) result.add(map(rs));
+            }
+        } catch (SQLException e) {
+            log.error("findUnprojectedEvents failed", e);
+        }
+        return result;
+    }
+
+    @Override
+    public synchronized void markProjected(String exchangeId, String eventId, Instant projectedAt) {
+        try (var ps = schema.getConnection().prepareStatement(
+                "UPDATE broker_activity_events SET projected=1 WHERE exchange_id=? AND event_id=?")) {
+            ps.setString(1, exchangeId);
+            ps.setString(2, eventId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("markProjected failed", e);
+        }
+    }
+
+    @Override
+    public synchronized void markProjectionFailed(String exchangeId, String eventId, String reason) {
+        try (var ps = schema.getConnection().prepareStatement(
+                "UPDATE broker_activity_events SET projected=0, projection_error=? WHERE exchange_id=? AND event_id=?")) {
+            ps.setString(1, reason);
+            ps.setString(2, exchangeId);
+            ps.setString(3, eventId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("markProjectionFailed failed", e);
+        }
+    }
+
+    @Override
+    public synchronized boolean exists(String exchangeId, String eventId) {
+        try (var ps = schema.getConnection().prepareStatement(
+                "SELECT 1 FROM broker_activity_events WHERE exchange_id=? AND event_id=? LIMIT 1")) {
+            ps.setString(1, exchangeId);
+            ps.setString(2, eventId);
+            try (var rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            log.error("exists failed", e);
+        }
+        return false;
+    }
+
+    private BrokerActivityEvent map(ResultSet rs) throws SQLException {
+        BrokerActivityEvent.BrokerActivityEventBuilder b = BrokerActivityEvent.builder()
                 .exchangeId(rs.getString("exchange_id"))
-                .accountId(rs.getString("account_id"))
                 .eventId(rs.getString("event_id"))
-                .nativeEventType(rs.getString("native_type"))
-                .activityType(parseType(rs.getString("activity_type")))
+                .accountId(rs.getString("account_id"))
+                .nativeEventType(rs.getString("native_event_type"))
                 .orderId(rs.getString("order_id"))
                 .tradeId(rs.getString("trade_id"))
                 .positionId(rs.getString("position_id"))
-                .tradePair(parsePair(rs.getString("trade_pair")))
-                .side(parseSide(rs.getString("side")))
-                .requestedQuantity(bd(rs.getString("requested_qty")))
-                .filledQuantity(bd(rs.getString("filled_qty")))
-                .remainingQuantity(bd(rs.getString("remaining_qty")))
-                .price(bd(rs.getString("price")))
-                .averageFillPrice(bd(rs.getString("avg_fill_price")))
-                .realizedPnl(bd(rs.getString("realized_pnl")))
-                .unrealizedPnl(bd(rs.getString("unrealized_pnl")))
-                .fee(bd(rs.getString("fee")))
                 .feeCurrency(rs.getString("fee_currency"))
-                .financing(bd(rs.getString("financing")))
-                .fundingFee(bd(rs.getString("funding_fee")))
-                .commission(bd(rs.getString("commission")))
-                .balanceBefore(bd(rs.getString("balance_before")))
-                .balanceAfter(bd(rs.getString("balance_after")))
-                .balanceCurrency(rs.getString("balance_ccy"))
-                .marginUsed(bd(rs.getString("margin_used")))
-                .marginAvailable(bd(rs.getString("margin_avail")))
-                .eventTime(parseInstant(rs.getString("event_time")))
-                .receivedAt(parseInstant(rs.getString("received_at")))
-                .cursor(rs.getString("cursor_val"))
+                .balanceCurrency(rs.getString("balance_currency"))
+                .cursor(rs.getString("cursor"))
                 .source(rs.getString("source"))
                 .rawJson(rs.getString("raw_json"))
-                .terminalEvent(rs.getInt("terminal") == 1)
+                .terminalEvent(rs.getInt("terminal_event") == 1)
                 .errorEvent(rs.getInt("error_event") == 1)
-                .reason(rs.getString("reason"))
                 .projected(rs.getInt("projected") == 1)
-                .projectionError(rs.getString("projection_err"))
-                .build();
+                .projectionError(rs.getString("projection_error"))
+                .reason(rs.getString("reason"));
+
+        String actType = rs.getString("activity_type");
+        if (actType != null) {
+            try { b.activityType(BrokerActivityType.valueOf(actType)); } catch (IllegalArgumentException ignored) {}
+        }
+
+        String sideStr = rs.getString("side");
+        if (sideStr != null) {
+            try { b.side(Side.valueOf(sideStr)); } catch (IllegalArgumentException ignored) {}
+        }
+
+        String pairStr = rs.getString("trade_pair");
+        if (pairStr != null) {
+            try {
+                String[] parts = pairStr.split("/");
+                if (parts.length == 2) b.tradePair(TradePair.of(parts[0], parts[1]));
+            } catch (Exception ignored) {}
+        }
+
+        b.requestedQuantity(parseBd(rs.getString("requested_qty")));
+        b.filledQuantity(parseBd(rs.getString("filled_qty")));
+        b.remainingQuantity(parseBd(rs.getString("remaining_qty")));
+        b.price(parseBd(rs.getString("price")));
+        b.averageFillPrice(parseBd(rs.getString("avg_fill_price")));
+        b.realizedPnl(parseBd(rs.getString("realized_pnl")));
+        b.fee(parseBd(rs.getString("fee")));
+        b.financing(parseBd(rs.getString("financing")));
+        b.commission(parseBd(rs.getString("commission")));
+        b.unrealizedPnl(parseBd(rs.getString("unrealized_pnl")));
+        b.balanceBefore(parseBd(rs.getString("balance_before")));
+        b.balanceAfter(parseBd(rs.getString("balance_after")));
+        b.marginUsed(parseBd(rs.getString("margin_used")));
+        b.marginAvailable(parseBd(rs.getString("margin_available")));
+
+        String evTime = rs.getString("event_time");
+        if (evTime != null) { try { b.eventTime(Instant.parse(evTime)); } catch (Exception ignored) {} }
+        String recAt = rs.getString("received_at");
+        if (recAt != null) { try { b.receivedAt(Instant.parse(recAt)); } catch (Exception ignored) {} }
+
+        return b.build();
     }
 
-    private static BrokerActivityType parseType(String s) {
-        if (s == null) return BrokerActivityType.UNKNOWN;
-        try { return BrokerActivityType.valueOf(s); } catch (IllegalArgumentException e) { return BrokerActivityType.UNKNOWN; }
-    }
-
-    private static TradePair parsePair(String s) {
+    private static BigDecimal parseBd(String s) {
         if (s == null || s.isBlank()) return null;
-        try {
-            String[] parts = s.split("[/_]", 2);
-            if (parts.length == 2) return TradePair.of(parts[0], parts[1]);
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    private static Side parseSide(String s) {
-        if (s == null) return null;
-        try { return Side.valueOf(s); } catch (IllegalArgumentException e) { return null; }
-    }
-
-    private static Instant parseInstant(String s) {
-        if (s == null) return Instant.now();
-        try { return Instant.parse(s); } catch (Exception e) { return Instant.now(); }
-    }
-
-    private static BigDecimal bd(String s) {
-        if (s == null || s.isBlank()) return BigDecimal.ZERO;
-        try { return new BigDecimal(s); } catch (Exception e) { return BigDecimal.ZERO; }
-    }
-
-    private static String bdStr(BigDecimal v) {
-        return v == null ? null : v.toPlainString();
-    }
-
-    private static String pairStr(TradePair pair) {
-        if (pair == null) return null;
-        return pair.getBaseCode() + "/" + pair.getCounterCode();
+        try { return new BigDecimal(s); } catch (NumberFormatException e) { return null; }
     }
 }
