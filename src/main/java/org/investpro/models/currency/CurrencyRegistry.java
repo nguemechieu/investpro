@@ -201,6 +201,7 @@ public final class CurrencyRegistry {
             case CRYPTO -> "/icons/crypto/";
             case METAL -> "/icons/metals/";
             case INDEX -> "/icons/indices/";
+            case FIAT, FOREX -> "/icons/fiat/";
             default -> "/icons/currencies/";
         };
 
