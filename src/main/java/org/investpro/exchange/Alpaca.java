@@ -106,12 +106,12 @@ public class Alpaca extends Exchange {
 
     @Override
     public boolean isSandbox() {
-        return false;
+        return modeRequestsExternalPaperNetwork();
     }
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaperMode() || modeRequestsExternalPaperNetwork()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {
@@ -146,7 +146,7 @@ public class Alpaca extends Exchange {
                 .exchangeName("ALPACA")
                 .exchangeId("alpaca")
                 .displayName("Alpaca Trading")
-                .apiBaseUrl(isPaperTrading() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL)
+                .apiBaseUrl(modeRequestsExternalPaperNetwork() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL)
 
                 // Market coverage - Alpaca specializes in US equities/stocks
                 .supportsCrypto(false)
@@ -163,7 +163,7 @@ public class Alpaca extends Exchange {
                 // Trading support
                 .supportsLiveTrading(!isPaperTrading())
                 .supportsPaperTradingMode(true)
-                .supportsSandbox(isPaperTrading())
+                .supportsSandbox(modeRequestsExternalPaperNetwork())
                 .supportsMarketOrders(true)
                 .supportsLimitOrders(true)
                 .supportsStopOrders(true)
@@ -709,6 +709,7 @@ public class Alpaca extends Exchange {
      * Parses Alpaca open orders response into a list of OpenOrder objects.
      * Handles both array format and single object format.
      */
+    @SuppressWarnings("unused")
     private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
         List<OpenOrder> openOrders = new ArrayList<>();
 
@@ -1319,7 +1320,7 @@ public class Alpaca extends Exchange {
         if (configured != null && !configured.isBlank()) {
             return configured.strip();
         }
-        return isPaperTrading() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL;
+        return modeRequestsExternalPaperNetwork() ? ALPACA_PAPER_URL : ALPACA_LIVE_URL;
     }
 
     private static String alpacaSymbol(TradePair tradePair) {

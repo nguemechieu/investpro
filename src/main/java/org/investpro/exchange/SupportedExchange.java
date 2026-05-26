@@ -25,7 +25,8 @@ public enum SupportedExchange {
     BINANCE("Binance", "binance"),
     ALPACA("Alpaca", "alpaca"),
     INTERACTIVE_BROKERS("Interactive Brokers", "interactive-brokers"),
-    STELLAR_NETWORK("Stellar Network", "stellar-network");
+    STELLAR_NETWORK("Stellar Network", "stellar-network"),
+    SOLANA_NETWORK("Solana Network", "solana-network");
 
     private final String displayName;
     private final String factoryKey;

@@ -15,6 +15,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -22,8 +23,8 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.backtesting.InstitutionalBacktestMetrics;
 import org.investpro.core.SystemCore;
-import org.investpro.core.agents.symbol.SymbolAgentManager;
-import org.investpro.core.agents.symbol.SymbolAgentState;
+import org.investpro.symbol.SymbolAgentManager;
+import org.investpro.symbol.SymbolAgentState;
 import org.investpro.data.CandleData;
 import org.investpro.i18n.LocalizationService;
 import org.investpro.models.trading.TradePair;
@@ -48,6 +49,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -58,7 +60,7 @@ import static org.investpro.utils.Side.SELL;
 
 /**
  * Backtesting Panel.
- *
+ * <p>
  * Executes historical strategy backtests using:
  * - selected TradePair
  * - selected strategy
@@ -116,6 +118,8 @@ public class BacktestingPanel extends StackPane {
     private static final double DEFAULT_INITIAL_EQUITY = 10_000.0;
     private static final double DEFAULT_QUANTITY = 1.0;
     private static final int MAX_BARS_HELD = 50;
+    private static final DateTimeFormatter PRICE_CHART_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /**
      * Extra bars needed after strategy warmup so the strategy has enough room
@@ -425,12 +429,15 @@ public class BacktestingPanel extends StackPane {
 
     private LineChart<Number, Number> createPriceActionChart() {
         NumberAxis xAxis = new NumberAxis();
-        xAxis.setLabel("Candle #");
+        xAxis.setLabel("Timestamp");
         xAxis.setForceZeroInRange(false);
+        xAxis.setTickLabelRotation(-30);
+        xAxis.setTickLabelFormatter(new GregorianTimestampAxisFormatter());
         xAxis.setStyle("-fx-text-fill: #a0aec0; -fx-tick-label-fill: #a0aec0;");
 
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel("Price");
+        yAxis.setSide(javafx.geometry.Side.RIGHT);
         yAxis.setForceZeroInRange(false);
         yAxis.setStyle("-fx-text-fill: #a0aec0; -fx-tick-label-fill: #a0aec0;");
 
@@ -514,7 +521,8 @@ public class BacktestingPanel extends StackPane {
 
     private @NotNull List<String> loadStrategyNames() {
         try {
-            List<String> strategies = new ArrayList<>(StrategyCatalog.availableStrategyNames());
+            LinkedHashSet<String> strategies = new LinkedHashSet<>(StrategyCatalog.availableStrategyNames());
+            strategies.addAll(StrategyRegistry.getInstance().listStrategyNames());
 
             // Add user-developed strategies if any are registered
             try {
@@ -533,7 +541,7 @@ public class BacktestingPanel extends StackPane {
             }
 
             if (!strategies.isEmpty()) {
-                return strategies;
+                return new ArrayList<>(strategies);
             }
         } catch (Exception exception) {
             log.debug("StrategyCatalog.availableStrategyNames() unavailable: {}", exception.getMessage());
@@ -1664,6 +1672,52 @@ public class BacktestingPanel extends StackPane {
         }
     }
 
+    private double candleXValue(List<CandleData> candles, int index) {
+        if (candles == null || index < 0 || index >= candles.size()) {
+            return -1.0;
+        }
+        return candleEpochMillis(candles.get(index));
+    }
+
+    private double candleEpochMillis(CandleData candle) {
+        long timestamp = candleTimestamp(candle);
+        if (timestamp <= 0L) {
+            return -1.0;
+        }
+        if (timestamp < 10_000_000_000L) {
+            timestamp *= 1000L;
+        }
+        return timestamp;
+    }
+
+    private static final class GregorianTimestampAxisFormatter extends StringConverter<Number> {
+        @Override
+        public String toString(Number value) {
+            if (value == null) {
+                return "";
+            }
+            long epochMillis = value.longValue();
+            if (epochMillis <= 0L) {
+                return "";
+            }
+            if (epochMillis < 10_000_000_000L) {
+                epochMillis *= 1000L;
+            }
+            try {
+                return Instant.ofEpochMilli(epochMillis)
+                        .atZone(ZoneId.systemDefault())
+                        .format(PRICE_CHART_TIME_FORMAT);
+            } catch (Exception ignored) {
+                return "";
+            }
+        }
+
+        @Override
+        public Number fromString(String value) {
+            return 0L;
+        }
+    }
+
     private String displayTradePair(TradePair pair) {
         if (pair == null) {
             return "";
@@ -1784,7 +1838,7 @@ public class BacktestingPanel extends StackPane {
             if (candle == null || candle.closePrice() <= 0.0) {
                 continue;
             }
-            priceSeries.getData().add(new XYChart.Data<>(i, candle.closePrice()));
+            priceSeries.getData().add(new XYChart.Data<>(candleEpochMillis(candle), candle.closePrice()));
         }
 
         priceActionChart.getData().add(priceSeries);
@@ -1795,30 +1849,33 @@ public class BacktestingPanel extends StackPane {
                     continue;
                 }
 
-                addTradeMarker(trade.getEntryIndex(), trade.getPrice(), trade.getSide() == BUY ? "BUY" : "SELL",
+                double entryX = candleXValue(candles, trade.getEntryIndex());
+                double exitX = candleXValue(candles, trade.getExitIndex());
+
+                addTradeMarker(entryX, trade.getPrice(), trade.getSide() == BUY ? "BUY" : "SELL",
                         trade.getSide() == BUY ? "#22c55e" : "#ef4444",
                         "%s entry @ %.5f".formatted(trade.getSide(), trade.getPrice()));
 
-                addTradeMarker(trade.getExitIndex(), trade.getExitPrice(), "EXIT",
+                addTradeMarker(exitX, trade.getExitPrice(), "EXIT",
                         trade.getProfit() >= 0.0 ? "#38bdf8" : "#f59e0b",
                         "Exit @ %.5f | P&L %.2f | %s".formatted(trade.getExitPrice(), trade.getProfit(),
                                 trade.getReason()));
 
-                addTradeConnector(trade);
+                addTradeConnector(trade, entryX, exitX);
             }
         }
 
         Platform.runLater(() -> stylePriceActionChart(priceSeries));
     }
 
-    private void addTradeMarker(int index, double price, String name, String color, String tooltipText) {
-        if (index < 0 || price <= 0.0) {
+    private void addTradeMarker(double xValue, double price, String name, String color, String tooltipText) {
+        if (xValue <= 0.0 || price <= 0.0) {
             return;
         }
 
         XYChart.Series<Number, Number> marker = new XYChart.Series<>();
         marker.setName(name);
-        XYChart.Data<Number, Number> point = new XYChart.Data<>(index, price);
+        XYChart.Data<Number, Number> point = new XYChart.Data<>(xValue, price);
         marker.getData().add(point);
         priceActionChart.getData().add(marker);
 
@@ -1837,15 +1894,15 @@ public class BacktestingPanel extends StackPane {
         });
     }
 
-    private void addTradeConnector(BacktestTrade trade) {
-        if (trade.getEntryIndex() < 0 || trade.getExitIndex() < 0) {
+    private void addTradeConnector(BacktestTrade trade, double entryX, double exitX) {
+        if (trade.getEntryIndex() < 0 || trade.getExitIndex() < 0 || entryX <= 0.0 || exitX <= 0.0) {
             return;
         }
 
         XYChart.Series<Number, Number> connector = new XYChart.Series<>();
         connector.setName("Trade");
-        connector.getData().add(new XYChart.Data<>(trade.getEntryIndex(), trade.getPrice()));
-        connector.getData().add(new XYChart.Data<>(trade.getExitIndex(), trade.getExitPrice()));
+        connector.getData().add(new XYChart.Data<>(entryX, trade.getPrice()));
+        connector.getData().add(new XYChart.Data<>(exitX, trade.getExitPrice()));
         priceActionChart.getData().add(connector);
 
         Platform.runLater(() -> {

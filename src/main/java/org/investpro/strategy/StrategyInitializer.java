@@ -16,7 +16,7 @@ import org.jetbrains.annotations.NotNull;
  * - register legacy concrete strategies
  * - register catalog-driven strategy definitions
  * - avoid instantiating every catalog variant
- *
+ * <p>
  * The StrategyRegistry should lazily instantiate UnifiedStrategy variants
  * when a specific strategy name is requested.
  */

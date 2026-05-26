@@ -10,6 +10,7 @@ import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.TradePair;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.market.ExchangeMarketDataAdapter;
+import org.investpro.trading.tradability.ExchangeInstrumentService;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.TradabilityStatus;
 import org.investpro.service.AuthResult;
@@ -23,6 +24,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Getter
 @Setter
@@ -75,6 +77,28 @@ public abstract class Exchange implements
 
     protected boolean modeRequestsPaperNetwork() {
         return "PAPER".equals(getResolvedTradingMode());
+    }
+
+    protected boolean modeRequestsLocalPaperMode() {
+        String selected = userSelectedTradingMode;
+        if (selected == null || selected.isBlank()) {
+            selected = credentials != null && credentials.sandbox() ? "SANDBOX" : "LIVE";
+        }
+        String normalized = selected.strip().toUpperCase(Locale.ROOT);
+        return normalized.startsWith("PAPER");
+    }
+
+    protected boolean modeRequestsExternalPaperNetwork() {
+        String selected = userSelectedTradingMode;
+        if (selected == null || selected.isBlank()) {
+            return credentials != null && credentials.sandbox();
+        }
+        String normalized = selected.strip().toUpperCase(Locale.ROOT);
+        return "SANDBOX".equals(normalized)
+                || "DEMO".equals(normalized)
+                || "TEST".equals(normalized)
+                || "TESTNET".equals(normalized)
+                || "PRACTICE".equals(normalized);
     }
 
     protected boolean modeRequestsLiveNetwork() {
@@ -316,4 +340,35 @@ public abstract class Exchange implements
             double slippage);
 
     public abstract AuthResult AuthCheckResult(String selectedExchange);
+
+    /**
+     * Returns the instrument service for this exchange, or null if not overridden.
+     * Override in exchange adapters to provide pair discovery and tradeability checks.
+     */
+    public ExchangeInstrumentService instrumentService() {
+        return null;
+    }
+
+    /**
+     * Returns the full list of tradeable pairs for this exchange asynchronously.
+     * Default delegates to {@link #getTradablePairs()}.
+     */
+    public CompletableFuture<List<TradePair>> getTradeablePairsAsync() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return getTradablePairs();
+            } catch (Exception exception) {
+                throw new CompletionException(exception);
+            }
+        });
+    }
+
+    /**
+     * Checks if a specific pair is tradeable for this account.
+     * Default delegates to {@link #fetchTradabilityStatus(TradePair)}.
+     */
+    public CompletableFuture<Boolean> isTradeablePair(TradePair pair) {
+        return fetchTradabilityStatus(pair)
+                .thenApply(st -> st != null && st.status() == TradabilityStatus.FULLY_TRADABLE);
+    }
 }

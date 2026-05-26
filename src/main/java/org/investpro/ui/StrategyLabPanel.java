@@ -20,6 +20,7 @@ import org.investpro.strategy.StrategyAssignment;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.lab.StrategyConsensusResult;
+import org.investpro.strategy.lab.StrategyLabControlPanel;
 import org.investpro.strategy.lab.StrategyLabService;
 import org.investpro.strategy.lab.StrategyLabSnapshot;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
@@ -113,6 +114,7 @@ public class StrategyLabPanel extends BorderPane {
         refreshUI();
     }
 
+    @SuppressWarnings("unused")
     private static final String BG_DEEP    = "-fx-background-color: #07090f;";
     private static final String BG_PANEL   = "#0a0e27";
     private static final String BG_CARD    = "#111827";
@@ -378,7 +380,8 @@ public class StrategyLabPanel extends BorderPane {
                 createAssignmentTab(),
                 createRankingTab(),
                 createVotingTab(),
-                createConsensusTab());
+                createConsensusTab(),
+                createSchedulerTab());
 
         return tabPane;
     }
@@ -914,11 +917,16 @@ public class StrategyLabPanel extends BorderPane {
                         selectedTimeframe,
                         candles,
                         List.of(strategyName)))
-                .whenComplete((ignored, throwable) -> runOnFx(() -> {
+                .whenComplete((assignment, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Test failed: " + rootMessage(throwable));
+                    } else if (assignment != null) {
+                        appendLog("Real-candle test completed and assigned: " + assignment.getStrategyId()
+                                + " (score " + String.format("%.1f", assignment.getScoreAtAssignment()) + ").");
+                        refreshUI();
                     } else {
-                        appendLog("Real-candle test completed.");
+                        appendLog("Real-candle test completed, but no strategy could be assigned. "
+                                + "Check trade count, score, and candle history.");
                         refreshUI();
                     }
 
@@ -936,11 +944,16 @@ public class StrategyLabPanel extends BorderPane {
                         selectedTimeframe,
                         candles,
                         new ArrayList<>(StrategyCatalog.availableStrategyNames())))
-                .whenComplete((ignored, throwable) -> runOnFx(() -> {
+                .whenComplete((assignment, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Tests failed: " + rootMessage(throwable));
+                    } else if (assignment != null) {
+                        appendLog("All real-candle tests completed and assigned: " + assignment.getStrategyId()
+                                + " (score " + String.format("%.1f", assignment.getScoreAtAssignment()) + ").");
+                        refreshUI();
                     } else {
-                        appendLog("All real-candle tests completed.");
+                        appendLog("All real-candle tests completed, but no strategy could be assigned. "
+                                + "Check trade count, score, and candle history.");
                         refreshUI();
                     }
 
@@ -1208,6 +1221,15 @@ public class StrategyLabPanel extends BorderPane {
         } else {
             Platform.runLater(runnable);
         }
+    }
+
+    /**
+     * Creates the ⚙ Scheduler tab that hosts the {@link StrategyLabControlPanel}.
+     */
+    private Tab createSchedulerTab() {
+        Tab tab = new Tab("⚙ Scheduler");
+        tab.setContent(new StrategyLabControlPanel());
+        return tab;
     }
 
     private String rootMessage(Throwable throwable) {

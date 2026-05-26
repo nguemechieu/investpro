@@ -245,8 +245,8 @@ public class StellarNetwork extends Exchange {
         balances.put("XLM", 1_000.0);
         balances.put("EURC", 0.0);
 
-        trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
-        trustedAssetIssuers.put("USD", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+        trustedAssetIssuers.put("USDC", modeRequestsExternalPaperNetwork() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+        trustedAssetIssuers.put("USD", modeRequestsExternalPaperNetwork() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
 
         log.info("Stellar paper account initialized with 1000 USDC and 1000 XLM");
     }
@@ -260,7 +260,9 @@ public class StellarNetwork extends Exchange {
             throw new IllegalStateException(result.getMessage());
         }
         connected = true;
-        log.info("Connected to Stellar {} through {}", isPaperTrading() ? "paper/testnet" : "live/mainnet", horizonUrl());
+        log.info("Connected to Stellar {} through {}",
+                modeRequestsExternalPaperNetwork() ? "sandbox/testnet" : (isPaperTrading() ? "local paper/mainnet" : "live/mainnet"),
+                horizonUrl());
     }
 
     @Override
@@ -305,12 +307,12 @@ public class StellarNetwork extends Exchange {
 
     @Override
     public boolean isSandbox() {
-        return isPaperTrading();
+        return modeRequestsExternalPaperNetwork();
     }
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaperMode() || modeRequestsExternalPaperNetwork()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {
@@ -320,8 +322,7 @@ public class StellarNetwork extends Exchange {
     }
 
     protected boolean modeRequestsPaperNetwork() {
-        String mode = trimToNull(getUserSelectedTradingMode());
-        return ("PAPER".equalsIgnoreCase(mode) || "SANDBOX".equalsIgnoreCase(mode) || "TESTNET".equalsIgnoreCase(mode));
+        return modeRequestsLocalPaperMode() || modeRequestsExternalPaperNetwork();
     }
 
     protected boolean modeRequestsLiveNetwork() {
@@ -340,11 +341,11 @@ public class StellarNetwork extends Exchange {
     }
 
     private String horizonUrl() {
-        return isPaperTrading() ? STELLAR_TEST_URL : STELLAR_API_URL;
+        return modeRequestsExternalPaperNetwork() ? STELLAR_TEST_URL : STELLAR_API_URL;
     }
 
     private Network stellarNetwork() {
-        return isPaperTrading() ? Network.TESTNET : Network.PUBLIC;
+        return modeRequestsExternalPaperNetwork() ? Network.TESTNET : Network.PUBLIC;
     }
 
     public boolean hasCredentials() {
@@ -487,8 +488,8 @@ public class StellarNetwork extends Exchange {
 
                 trustedAssetIssuers.clear();
                 trustedAssetIssuers.putAll(liveIssuers);
-                trustedAssetIssuers.put("USDC", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
-                trustedAssetIssuers.put("USD", isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+                trustedAssetIssuers.put("USDC", modeRequestsExternalPaperNetwork() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
+                trustedAssetIssuers.put("USD", modeRequestsExternalPaperNetwork() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER);
 
                 return buildAccount(accountResponse.getAccountId());
             } catch (Exception exception) {
@@ -2249,7 +2250,7 @@ public class StellarNetwork extends Exchange {
         }
 
         if ("USDC".equalsIgnoreCase(normalized) || "USD".equalsIgnoreCase(normalized)) {
-            return isPaperTrading() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER;
+            return modeRequestsExternalPaperNetwork() ? TESTNET_USDC_ISSUER : MAINNET_USDC_ISSUER;
         }
 
 

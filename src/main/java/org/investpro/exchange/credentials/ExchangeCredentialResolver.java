@@ -27,6 +27,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
             case "alpaca" -> resolveAlpaca();
             case "interactive_brokers" -> resolveInteractiveBrokers();
             case "stellar_network" -> resolveStellar();
+            case "solana_network" -> resolveSolana();
             default -> new ExchangeCredentials(id, null, null, null, null, null, null, false);
         };
     }
@@ -145,6 +146,32 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
         );
     }
 
+    private ExchangeCredentials resolveSolana() {
+        String walletAddress = firstPresent(
+                provider.getOrNull("SOLANA_WALLET_ADDRESS"),
+                provider.getOrNull("SOLANA_PUBLIC_KEY"),
+                provider.getOrNull("SOLANA_NETWORK_API_KEY"),
+                provider.getOrNull("SOLANA_NETWORK_ACCOUNT_ID"),
+                provider.getOrNull("SOLANA_API_KEY"));
+        String privateKey = firstPresent(
+                provider.getOrNull("SOLANA_PRIVATE_KEY"),
+                provider.getOrNull("SOLANA_NETWORK_API_SECRET"),
+                provider.getOrNull("SOLANA_API_SECRET"));
+        String mode = firstPresent(
+                provider.getOrNull("SOLANA_NETWORK"),
+                provider.getOrNull("SOLANA_NETWORK_TRADING_MODE"));
+        return new ExchangeCredentials(
+                "solana_network",
+                walletAddress,
+                privateKey,
+                null,
+                privateKey,
+                null,
+                walletAddress,
+                isPaperNetwork(mode)
+        );
+    }
+
     private String firstPresent(String... values) {
         if (values == null) {
             return null;
@@ -158,14 +185,18 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
     }
 
     private boolean isPaperStellarNetwork(String network) {
+        return isPaperNetwork(network);
+    }
+
+    private boolean isPaperNetwork(String network) {
         if (network == null || network.isBlank()) {
             return false;
         }
         String normalized = network.trim();
         return "TESTNET".equalsIgnoreCase(normalized)
                 || "SANDBOX".equalsIgnoreCase(normalized)
-                || "PAPER".equalsIgnoreCase(normalized)
-                || "PAPER TRADING".equalsIgnoreCase(normalized);
+                || "PRACTICE".equalsIgnoreCase(normalized)
+                || "DEMO".equalsIgnoreCase(normalized);
     }
 
     private String normalize(String exchangeId) {
@@ -193,6 +224,7 @@ public record ExchangeCredentialResolver(CredentialProvider provider) {
                 "ibk", "ibkr", "schwab", "charlesschwab");
         addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
         addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
+        addAliases(aliases, "solana_network", "solana", "solananetwork", "sol", "solanaecosystem");
 
         return Collections.unmodifiableMap(aliases);
     }

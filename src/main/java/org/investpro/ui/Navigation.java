@@ -7,7 +7,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Separator;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -33,9 +32,11 @@ import java.util.function.Consumer;
 /**
  * Professional trading-desk navigation surface for InvestPro.
  *
- * <p>Combines venue selection, connection state, and high-frequency workflow
+ * <p>
+ * Combines venue selection, connection state, and high-frequency workflow
  * shortcuts in one compact panel. TradingDesk owns the actual actions; this
- * class stays focused on navigation intent and presentation.</p>
+ * class stays focused on navigation intent and presentation.
+ * </p>
  */
 @Slf4j
 @Getter
@@ -50,7 +51,8 @@ public class Navigation extends StackPane {
             "BITFINEX",
             "ALPACA",
             "INTERACTIVE_BROKERS",
-            "STELLAR_NETWORK");
+            "STELLAR_NETWORK",
+            "SOLANA_NETWORK");
 
     private ComboBox<String> exchangeSelector;
     private Label currentExchangeLabel;
@@ -69,10 +71,14 @@ public class Navigation extends StackPane {
      */
     private Consumer<String> onExchangeSelected;
 
+    private Consumer<String> onConnectRequested;
+    private Consumer<String> onDisconnectRequested;
+
     /**
      * Requests that TradingDesk open a workflow or panel by id.
      */
     private Consumer<String> onNavigationRequested;
+    private boolean syncingExchangeState;
 
     public Navigation() {
         initializeUI();
@@ -91,8 +97,7 @@ public class Navigation extends StackPane {
                 createExchangeCard(),
                 createWorkflowSection(),
                 createMarketSection(),
-                createSystemSection()
-        );
+                createSystemSection());
 
         ScrollPane scrollPane = new ScrollPane(root);
         scrollPane.setFitToWidth(true);
@@ -143,10 +148,12 @@ public class Navigation extends StackPane {
         exchangeSelector.setMaxWidth(Double.MAX_VALUE);
         exchangeSelector.setTooltip(new Tooltip("Choose the exchange or broker used by InvestPro."));
         exchangeSelector.getItems().setAll(
-                discoverExchangeIds()
-        );
+                discoverExchangeIds());
         exchangeSelector.setValue(defaultExchange);
         exchangeSelector.setOnAction(event -> {
+            if (syncingExchangeState) {
+                return;
+            }
             String selected = exchangeSelector.getValue();
             if (selected != null && !selected.isBlank()) {
                 selectExchange(selected);
@@ -162,6 +169,7 @@ public class Navigation extends StackPane {
         venueGrid.add(createExchangeButton("BINANCE"), 0, 1);
         venueGrid.add(createExchangeButton("BINANCE_US"), 1, 1);
         venueGrid.add(createExchangeButton("BITFINEX"), 0, 2);
+        venueGrid.add(createExchangeButton("SOLANA_NETWORK"), 1, 2);
 
         Button connectButton = createUtilityButton("Connect", "Connect to the selected venue.");
         connectButton.getStyleClass().add("success-button");
@@ -182,8 +190,7 @@ public class Navigation extends StackPane {
                 selectorLabel,
                 exchangeSelector,
                 venueGrid,
-                connectionActions
-        );
+                connectionActions);
         card.getStyleClass().add("trading-navigation-card");
         return card;
     }
@@ -192,11 +199,11 @@ public class Navigation extends StackPane {
         VBox section = createSection("Trading Workflow");
         section.getChildren().addAll(
                 createNavButton("Order Ticket", "Place and manage orders", "order-panel", true),
+                createNavButton("Account Activity", "Balances, positions, orders", "account-activity", false),
                 createNavButton("Strategy Lab", "Test and compare strategies", "strategy-lab", false),
                 createNavButton("Assignments", "Map strategies to symbols", "strategy-assignment", false),
                 createNavButton("Backtesting", "Run historical simulations", "backtesting", false),
-                createNavButton("Analysis", "Open research and diagnostics", "analysis", false)
-        );
+                createNavButton("Analysis", "Open research and diagnostics", "analysis", false));
         return section;
     }
 
@@ -206,8 +213,7 @@ public class Navigation extends StackPane {
                 createNavButton("Market Watch", "Symbol-level status board", "market-watch", false),
                 createNavButton("Market Info", "Contract and session details", "market-info", false),
                 createNavButton("News Calendar", "Macro and event calendar", "news-calendar", false),
-                createNavButton("Data Window", "OHLCV details for selected symbol", "data-window", false)
-        );
+                createNavButton("Data Window", "OHLCV details for selected symbol", "data-window", false));
         return section;
     }
 
@@ -218,8 +224,7 @@ public class Navigation extends StackPane {
                 createNavButton("Plugin Manager", "Discovered extensions and providers", "plugin-manager", false),
                 createNavButton("System Status", "Runtime and agent health", "trading-system-status", false),
                 createNavButton("Resource Monitor", "CPU, memory, and runtime load", "resource-monitor", false),
-                createNavButton("Settings", "Configure accounts and preferences", "settings", false)
-        );
+                createNavButton("Settings", "Configure accounts and preferences", "settings", false));
         return section;
     }
 
@@ -304,7 +309,8 @@ public class Navigation extends StackPane {
         String normalizedExchange = normalizeExchangeName(exchangeName);
 
         if (!exchangeSelector.getItems().contains(normalizedExchange)) {
-            log.warn("Exchange '{}' is not available in selector items: {}", normalizedExchange, exchangeSelector.getItems());
+            log.warn("Exchange '{}' is not available in selector items: {}", normalizedExchange,
+                    exchangeSelector.getItems());
             return;
         }
 
@@ -339,11 +345,18 @@ public class Navigation extends StackPane {
         connectionStatusLabel.setText("Connecting");
         connectionStatusLabel.getStyleClass().removeAll("connected", "disconnected", "connecting");
         connectionStatusLabel.getStyleClass().add("connecting");
+
+        if (onConnectRequested != null) {
+            onConnectRequested.accept(currentExchange);
+        }
     }
 
     private void disconnectFromExchange() {
         String currentExchange = getSelectedExchange();
         log.info("Disconnecting from exchange: {}", currentExchange);
+        if (onDisconnectRequested != null) {
+            onDisconnectRequested.accept(currentExchange);
+        }
         setConnectionStatus(false);
     }
 
@@ -375,6 +388,34 @@ public class Navigation extends StackPane {
         }
     }
 
+    public void syncExchangeState(String exchangeName, boolean connected) {
+        if (exchangeName == null || exchangeName.isBlank()) {
+            setConnectionStatus(connected);
+            return;
+        }
+
+        Runnable update = () -> {
+            String normalizedExchange = normalizeExchangeName(exchangeName);
+            if (!exchangeSelector.getItems().contains(normalizedExchange)) {
+                exchangeSelector.getItems().add(normalizedExchange);
+            }
+            syncingExchangeState = true;
+            try {
+                exchangeSelector.setValue(normalizedExchange);
+            } finally {
+                syncingExchangeState = false;
+            }
+            currentExchangeLabel.setText(displayExchangeName(normalizedExchange));
+            setConnectionStatus(connected);
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            update.run();
+        } else {
+            Platform.runLater(update);
+        }
+    }
+
     public void setCurrentExchange(String exchangeName) {
         if (exchangeName == null || exchangeName.isBlank()) {
             return;
@@ -390,7 +431,7 @@ public class Navigation extends StackPane {
     }
 
     private String resolveDefaultExchange() {
-        String configured = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "OANDA");
+        String configured = AppConfig.get(AppConfigKeys.DEFAULT_EXCHANGE, "");
         String normalized = normalizeExchangeName(configured);
 
         boolean exists = discoverExchangeIds().stream()
@@ -401,7 +442,7 @@ public class Navigation extends StackPane {
         }
 
         List<String> exchanges = discoverExchangeIds();
-        return exchanges.isEmpty() ? "OANDA" : exchanges.getFirst();
+        return exchanges.isEmpty() ? "" : exchanges.getFirst();
     }
 
     private List<String> discoverExchangeIds() {

@@ -22,6 +22,7 @@ import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.TradePair;
 import org.investpro.persistence.repository.HistoricalDataRepository;
 import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
+import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyDefinition;
 import org.investpro.strategy.StrategyRegistry;
 import org.investpro.strategy.StrategyParameters;
@@ -30,11 +31,16 @@ import org.investpro.strategy.lab.StrategyBacktestRunner;
 import org.investpro.strategy.lab.StrategyPerformanceReport;
 import org.investpro.trading.tradability.SymbolTradability;
 import org.investpro.trading.tradability.UniversalTradabilityService;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
+
+import org.investpro.utils.CandleDataSupplier;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 /**
@@ -118,12 +124,14 @@ public class StrategyBuilderPanel extends VBox {
         INDICATOR_DEFAULTS = Collections.unmodifiableMap(m);
     }
 
-    private static String[] p(String name, String def) {
+    @Contract(value = "_, _ -> new", pure = true)
+    private static String @NonNull [] p(String name, String def) {
         return new String[]{name, def};
     }
 
-    @SafeVarargs
-    private static List<String[]> defaults(String[]... entries) {
+
+    @Contract(pure = true)
+    private static @NonNull List<String[]> defaults(String[]... entries) {
         return List.of(entries);
     }
 
@@ -282,7 +290,7 @@ public class StrategyBuilderPanel extends VBox {
         parametersTable.setPrefHeight(200);
 
         section.getChildren().addAll(sectionTitle, pickerRow,
-                styledLabel("Configured Indicators / Parameters (double-click Value to edit):"),
+                styledLabel(),
                 parametersTable);
         VBox.setVgrow(parametersTable, Priority.ALWAYS);
         return section;
@@ -347,17 +355,18 @@ public class StrategyBuilderPanel extends VBox {
         return table;
     }
 
-    private VBox createStrategyLogicSection() {
+    private @NonNull VBox createStrategyLogicSection() {
         VBox section = styledSection("#f59e0b");
         section.getChildren().add(sectionHeader("Strategy Description & Rules"));
 
         strategyDescriptionArea = new TextArea();
         strategyDescriptionArea.setPromptText(
-                "Describe your strategy's entry/exit logic here.\n" +
-                "e.g.:\n" +
-                "  Entry: RSI < oversold AND price above EMA(200)\n" +
-                "  Exit:  RSI > 60 OR ATR stop hit\n" +
-                "  Risk:  1% account risk per trade");
+                """
+                        Describe your strategy's entry/exit logic here.
+                        e.g.:
+                          Entry: RSI < oversold AND price above EMA(200)
+                          Exit:  RSI > 60 OR ATR stop hit
+                          Risk:  1% account risk per trade""");
         strategyDescriptionArea.setWrapText(true);
         strategyDescriptionArea.setPrefHeight(130);
         strategyDescriptionArea.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
@@ -599,6 +608,7 @@ public class StrategyBuilderPanel extends VBox {
         }
 
         USER_DEFINED_STRATEGIES.put(definition.getName().toLowerCase(Locale.ROOT), definition);
+        StrategyCatalog.registerRuntimeDefinition(definition);
         StrategyRegistry.getInstance().registerDefinition(definition);
     }
 
@@ -659,8 +669,18 @@ public class StrategyBuilderPanel extends VBox {
         };
 
         List<CandleData> candles = fetchHistoricalCandles(repository, pair, startTime, endTime, timeframe.getCode());
+
+        // If repository is empty, fall back to live fetch from exchange supplier
+        if (candles.size() < 50 && systemCore != null && systemCore.getExchange() != null) {
+            log.info("Repository has {} candles for {}/{}, fetching from exchange...",
+                    candles.size(), pair.toString('/'), timeframe.getCode());
+            candles = fetchCandlesFromExchange(pair, timeframe, startTime, endTime, repository);
+        }
+
         if (candles.size() < 50) {
-            throw new IllegalStateException("Not enough historical candles for backtest: " + candles.size());
+            throw new IllegalStateException(
+                    "Not enough historical candles for backtest: " + candles.size() +
+                    ". Try a different timeframe or ensure data is available for " + pair.toString('/') + ".");
         }
 
         StrategyBacktestRequest request = StrategyBacktestRequest.builder()
@@ -674,6 +694,42 @@ public class StrategyBuilderPanel extends VBox {
         return new StrategyBacktestRunner().run(request);
     }
 
+    private List<CandleData> fetchCandlesFromExchange(
+            TradePair pair,
+            Timeframe timeframe,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            HistoricalDataRepository repository) {
+        try {
+            CandleDataSupplier supplier = systemCore.getExchange()
+                    .getCandleDataSupplier(timeframe.getSeconds(), pair);
+            if (supplier == null) {
+                log.warn("Exchange returned null CandleDataSupplier for {}/{}", pair.toString('/'), timeframe.getCode());
+                return List.of();
+            }
+
+            Future<List<CandleData>> future = supplier.get();
+            List<CandleData> fetched = future.get();
+
+            if (fetched != null && !fetched.isEmpty()) {
+                log.info("Fetched {} candles from exchange for {}/{}", fetched.size(), pair.toString('/'), timeframe.getCode());
+                // Persist for future backtest runs
+                try {
+                    repository.saveHistoricalData(pair, startTime, endTime, timeframe.getCode(), fetched);
+                } catch (Exception saveEx) {
+                    log.warn("Could not persist fetched candles: {}", saveEx.getMessage());
+                }
+                return fetched;
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("Candle fetch interrupted for {}/{}", pair.toString('/'), timeframe.getCode());
+        } catch (Exception ex) {
+            log.warn("Failed to fetch candles from exchange for {}/{}: {}", pair.toString('/'), timeframe.getCode(), ex.getMessage());
+        }
+        return List.of();
+    }
+
     private List<CandleData> fetchHistoricalCandles(
             HistoricalDataRepository repository,
             TradePair pair,
@@ -683,12 +739,6 @@ public class StrategyBuilderPanel extends VBox {
         try {
             Optional<List<CandleData>> result = repository.getHistoricalData(pair, startTime, endTime, timeframeCode);
             return result.orElseGet(List::of);
-        } catch (java.sql.SQLException exception) {
-            log.warn("Failed to load historical candles for {}/{}: {}",
-                pair == null ? "UNKNOWN" : pair.toString('/'),
-                timeframeCode,
-                exception.getMessage());
-            return List.of();
         } catch (Exception exception) {
             log.warn("Failed to load historical candles for {}/{}: {}",
                     pair == null ? "UNKNOWN" : pair.toString('/'),
@@ -730,19 +780,19 @@ public class StrategyBuilderPanel extends VBox {
         return v;
     }
 
-    private Label sectionHeader(String text) {
+    private @NonNull Label sectionHeader(String text) {
         Label l = new Label(text);
         l.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
         return l;
     }
 
-    private Label styledLabel(String text) {
-        Label l = new Label(text);
+    private @NonNull Label styledLabel() {
+        Label l = new Label("Configured Indicators / Parameters (double-click Value to edit):");
         l.setStyle("-fx-text-fill: #a0aec0; -fx-font-size: 11px;");
         return l;
     }
 
-    private HBox createLabeledInput(String label, Control input) {
+    private @NonNull HBox createLabeledInput(String label, Control input) {
         Label lbl = new Label(label);
         lbl.setStyle("-fx-text-fill: #a0aec0; -fx-min-width: 130px;");
         HBox box = new HBox(8, lbl, input);
@@ -751,11 +801,11 @@ public class StrategyBuilderPanel extends VBox {
         return box;
     }
 
-    private void styleInput(TextField tf) {
+    private void styleInput(@NonNull TextField tf) {
         tf.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff; -fx-prompt-text-fill: #6b7280;");
     }
 
-    private Button styledBtn(String text, String color) {
+    private @NonNull Button styledBtn(String text, String color) {
         Button b = new Button(text);
         b.setStyle("-fx-padding: 10px 22px; -fx-font-size: 13px; -fx-background-color: " + color + "; -fx-text-fill: white;");
         return b;

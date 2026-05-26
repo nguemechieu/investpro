@@ -81,6 +81,14 @@ public class UiCredentialProvider implements CredentialProvider {
                 put("STELLAR_SECRET_KEY", apiSecret);
                 put("STELLAR_NETWORK", tradingMode);
             }
+
+            case "solana_network", "solana" -> {
+                put("SOLANA_WALLET_ADDRESS", accountId != null && !accountId.isBlank() ? accountId : apiKey);
+                put("SOLANA_PUBLIC_KEY", accountId != null && !accountId.isBlank() ? accountId : apiKey);
+                put("SOLANA_API_KEY", apiKey);
+                put("SOLANA_API_SECRET", apiSecret);
+                put("SOLANA_NETWORK", tradingMode);
+            }
         }
     }
 
@@ -130,6 +138,7 @@ public class UiCredentialProvider implements CredentialProvider {
                 "ibk", "ibkr", "schwab", "charlesschwab");
         addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
         addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
+        addAliases(aliases, "solana_network", "solana", "solananetwork", "sol", "solanaecosystem");
 
         return Collections.unmodifiableMap(aliases);
     }

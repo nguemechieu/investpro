@@ -6,37 +6,135 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.spi.StrategyProvider;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public final class StrategyCatalog {
 
 
 
     public static final List<String> CORE_STRATEGY_NAMES = List.of(
+            // Core defaults
             "Trend Following",
             "Mean Reversion",
             "Breakout",
             "AI Hybrid",
-            "EMA Cross",
-            "Momentum Continuation",
-            "Pullback Trend",
-            "Volatility Breakout",
-            "MACD Trend",
-            "Range Fade",
-            "Donchian Trend",
-            "Bollinger Squeeze",
-            "ATR Compression Breakout",
-            "RSI Failure Swing",
-            "Volume Spike Reversal",
             "ML Model",
-            "Adaptive Momentum Pullback"
-    );
 
-    public static final Map<String, StrategyDefinition> STRATEGY_DEFINITIONS = buildCatalog();
+            // Moving average / trend systems
+            "EMA Cross",
+            "SMA Cross",
+            "Triple EMA Trend",
+            "Adaptive Moving Average",
+            "Keltner Trend",
+            "SuperTrend",
+            "Parabolic SAR Trend",
+            "Ichimoku Cloud Trend",
+            "Donchian Trend",
+            "ADX Trend Strength",
+
+            // Momentum systems
+            "Momentum Continuation",
+            "Adaptive Momentum Pullback",
+            "RSI Momentum",
+            "MACD Trend",
+            "Stochastic Momentum",
+            "Rate Of Change Momentum",
+            "CCI Momentum",
+            "Williams R Momentum",
+
+            // Pullback systems
+            "Pullback Trend",
+            "EMA Pullback",
+            "VWAP Pullback",
+            "Fibonacci Pullback",
+            "Support Resistance Pullback",
+            "Trendline Pullback",
+
+            // Volatility systems
+            "Volatility Breakout",
+            "ATR Compression Breakout",
+            "Bollinger Squeeze",
+            "Keltner Squeeze",
+            "Opening Range Breakout",
+            "Session Range Breakout",
+            "High Low Breakout",
+            "Volatility Expansion",
+            "ATR Channel Breakout",
+
+            // Reversion / range systems
+            "Range Fade",
+            "Bollinger Mean Reversion",
+            "RSI Mean Reversion",
+            "Stochastic Mean Reversion",
+            "VWAP Mean Reversion",
+            "Z Score Reversion",
+            "Support Resistance Fade",
+            "Liquidity Sweep Reversal",
+
+            // Volume / order-flow inspired
+            "Volume Spike Reversal",
+            "Volume Breakout",
+            "OBV Trend",
+            "Money Flow Index",
+            "Accumulation Distribution",
+            "VWAP Trend",
+            "Volume Weighted Momentum",
+
+            // Price action
+            "Inside Bar Breakout",
+            "Outside Bar Reversal",
+            "Pin Bar Reversal",
+            "Engulfing Candle Reversal",
+            "Higher High Higher Low Trend",
+            "Lower High Lower Low Trend",
+            "Market Structure Break",
+            "Fair Value Gap Continuation",
+            "Supply Demand Bounce",
+
+            // Session / forex-focused
+            "London Breakout",
+            "New York Reversal",
+            "Asian Range Breakout",
+            "London New York Continuation",
+            "Session VWAP Reversion",
+            "Carry Trend",
+
+            // Crypto-focused
+            "Crypto Momentum Expansion",
+            "Crypto Volatility Scalper",
+            "Funding Rate Bias",
+            "Perpetual Trend Following",
+            "Altcoin Rotation",
+            "Bitcoin Dominance Rotation",
+
+            // Equity / index-focused
+            "Gap Fill",
+            "Gap And Go",
+            "Index Momentum Rotation",
+            "Sector Rotation",
+            "Earnings Momentum",
+            "Opening Drive",
+            "Power Hour Continuation",
+
+            // Risk / portfolio-aware
+            "Low Volatility Trend",
+            "Risk Parity Rotation",
+            "Correlation Breakout",
+            "Drawdown Recovery",
+            "Defensive Rotation",
+
+            // Advanced / AI hybrid ideas
+            "Regime Adaptive Strategy",
+            "Consensus Multi Signal",
+            "Ensemble Strategy",
+            "AI Risk Filtered Momentum",
+            "AI Volatility Regime",
+            "Hybrid Trend Reversion",
+            "News Sentiment Momentum",
+            "Macro Momentum"
+    );
+    public static final Map<String, StrategyDefinition> STRATEGY_DEFINITIONS =
+            Collections.synchronizedMap(new LinkedHashMap<>(buildCatalog()));
 
     public static final Map<String, String> STRATEGY_VARIANT_BASE_MAP = buildVariantBaseMap();
 
@@ -381,7 +479,98 @@ public final class StrategyCatalog {
 
     private static Map<String, String> buildAliases() {
         Map<String, String> aliases = new LinkedHashMap<>();
+        aliases.put("SMA", "SMA Cross");
+        aliases.put("SMA_CROSS", "SMA Cross");
 
+        aliases.put("TRIPLE EMA", "Triple EMA Trend");
+        aliases.put("TRIPLE_EMA", "Triple EMA Trend");
+
+        aliases.put("AMA", "Adaptive Moving Average");
+        aliases.put("ADAPTIVE MA", "Adaptive Moving Average");
+
+        aliases.put("KELTNER", "Keltner Trend");
+        aliases.put("SUPERTREND", "SuperTrend");
+        aliases.put("SAR", "Parabolic SAR Trend");
+        aliases.put("PARABOLIC SAR", "Parabolic SAR Trend");
+        aliases.put("ICHIMOKU", "Ichimoku Cloud Trend");
+        aliases.put("ADX", "ADX Trend Strength");
+
+        aliases.put("RSI MOMENTUM", "RSI Momentum");
+        aliases.put("STOCHASTIC", "Stochastic Momentum");
+        aliases.put("ROC", "Rate Of Change Momentum");
+        aliases.put("CCI", "CCI Momentum");
+        aliases.put("WILLIAMS", "Williams R Momentum");
+
+        aliases.put("EMA PULLBACK", "EMA Pullback");
+        aliases.put("VWAP PULLBACK", "VWAP Pullback");
+        aliases.put("FIB PULLBACK", "Fibonacci Pullback");
+        aliases.put("FIBONACCI", "Fibonacci Pullback");
+        aliases.put("SUPPORT RESISTANCE PULLBACK", "Support Resistance Pullback");
+        aliases.put("TRENDLINE PULLBACK", "Trendline Pullback");
+
+        aliases.put("KELTNER SQUEEZE", "Keltner Squeeze");
+        aliases.put("OPENING RANGE", "Opening Range Breakout");
+        aliases.put("ORB", "Opening Range Breakout");
+        aliases.put("SESSION BREAKOUT", "Session Range Breakout");
+        aliases.put("HIGH LOW BREAKOUT", "High Low Breakout");
+        aliases.put("ATR CHANNEL", "ATR Channel Breakout");
+
+        aliases.put("BOLLINGER MEAN", "Bollinger Mean Reversion");
+        aliases.put("RSI REVERSION", "RSI Mean Reversion");
+        aliases.put("STOCHASTIC REVERSION", "Stochastic Mean Reversion");
+        aliases.put("VWAP REVERSION", "VWAP Mean Reversion");
+        aliases.put("Z SCORE", "Z Score Reversion");
+        aliases.put("LIQUIDITY SWEEP", "Liquidity Sweep Reversal");
+
+        aliases.put("VOLUME BREAKOUT", "Volume Breakout");
+        aliases.put("OBV", "OBV Trend");
+        aliases.put("MFI", "Money Flow Index");
+        aliases.put("ADL", "Accumulation Distribution");
+        aliases.put("VWAP TREND", "VWAP Trend");
+
+        aliases.put("INSIDE BAR", "Inside Bar Breakout");
+        aliases.put("OUTSIDE BAR", "Outside Bar Reversal");
+        aliases.put("PIN BAR", "Pin Bar Reversal");
+        aliases.put("ENGULFING", "Engulfing Candle Reversal");
+        aliases.put("MARKET STRUCTURE", "Market Structure Break");
+        aliases.put("MSB", "Market Structure Break");
+        aliases.put("FVG", "Fair Value Gap Continuation");
+        aliases.put("SUPPLY DEMAND", "Supply Demand Bounce");
+
+        aliases.put("LONDON", "London Breakout");
+        aliases.put("NY REVERSAL", "New York Reversal");
+        aliases.put("ASIAN RANGE", "Asian Range Breakout");
+        aliases.put("CARRY", "Carry Trend");
+
+        aliases.put("CRYPTO MOMENTUM", "Crypto Momentum Expansion");
+        aliases.put("CRYPTO SCALPER", "Crypto Volatility Scalper");
+        aliases.put("FUNDING", "Funding Rate Bias");
+        aliases.put("PERP TREND", "Perpetual Trend Following");
+        aliases.put("ALTCOIN", "Altcoin Rotation");
+        aliases.put("BTC DOMINANCE", "Bitcoin Dominance Rotation");
+
+        aliases.put("GAP FILL", "Gap Fill");
+        aliases.put("GAP AND GO", "Gap And Go");
+        aliases.put("INDEX ROTATION", "Index Momentum Rotation");
+        aliases.put("SECTOR ROTATION", "Sector Rotation");
+        aliases.put("EARNINGS", "Earnings Momentum");
+        aliases.put("OPENING DRIVE", "Opening Drive");
+        aliases.put("POWER HOUR", "Power Hour Continuation");
+
+        aliases.put("LOW VOL", "Low Volatility Trend");
+        aliases.put("RISK PARITY", "Risk Parity Rotation");
+        aliases.put("CORRELATION", "Correlation Breakout");
+        aliases.put("DRAWDOWN RECOVERY", "Drawdown Recovery");
+        aliases.put("DEFENSIVE", "Defensive Rotation");
+
+        aliases.put("REGIME", "Regime Adaptive Strategy");
+        aliases.put("CONSENSUS", "Consensus Multi Signal");
+        aliases.put("ENSEMBLE", "Ensemble Strategy");
+        aliases.put("AI MOMENTUM", "AI Risk Filtered Momentum");
+        aliases.put("AI REGIME", "AI Volatility Regime");
+        aliases.put("HYBRID", "Hybrid Trend Reversion");
+        aliases.put("NEWS", "News Sentiment Momentum");
+        aliases.put("MACRO", "Macro Momentum");
         aliases.put("DEFAULT", "Trend Following");
         aliases.put("EMA_RSI", "Trend Following");
         aliases.put("TREND", "Trend Following");
@@ -459,11 +648,40 @@ public final class StrategyCatalog {
             return definition;
         }
 
-        return StrategyDefinition.builder()
+        Optional<StrategyDefinition> caseInsensitive = STRATEGY_DEFINITIONS.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(normalized))
+                .map(Map.Entry::getValue)
+                .findFirst();
+
+        return caseInsensitive.orElseGet(() -> StrategyDefinition.builder()
                 .name(normalized)
                 .baseName(resolveBaseStrategyName(normalized))
                 .parameters(StrategyParameters.builder().build())
-                .build();
+                .build());
+
+    }
+
+    /**
+     * Registers a runtime strategy definition created by the desktop Strategy Builder
+     * or loaded from user extensions. Runtime definitions are intentionally kept in
+     * the same catalog map so Strategy Lab, Backtesting, and assignment screens see
+     * the strategy immediately without restarting the application.
+     */
+    public static synchronized void registerRuntimeDefinition(@NotNull StrategyDefinition definition) {
+        if (definition.getName() == null || definition.getName().isBlank()) {
+            return;
+        }
+
+        String normalized = normalizeStrategyName(definition.getName());
+        STRATEGY_DEFINITIONS.put(normalized, StrategyDefinition.builder()
+                .name(normalized)
+                .baseName(definition.getBaseName() == null || definition.getBaseName().isBlank()
+                        ? normalized
+                        : definition.getBaseName())
+                .parameters(definition.getParameters() == null
+                        ? StrategyParameters.builder().build()
+                        : definition.getParameters())
+                .build());
     }
 
     public static String resolveBaseStrategyName(String strategyName) {

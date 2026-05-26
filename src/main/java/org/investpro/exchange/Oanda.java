@@ -30,6 +30,8 @@ import org.investpro.utils.CandleDataSupplier;
 import org.investpro.utils.MARKET_TYPES;
 import org.investpro.utils.Side;
 import org.investpro.exchange.oanda.OandaCandleDataSupplier;
+import org.investpro.exchange.oanda.OandaInstrumentSpec;
+import org.investpro.exchange.oanda.OandaProductMetadataService;
 import org.investpro.exchange.oanda.OandaTransactionClient;
 import org.investpro.exchange.oanda.OandaTradingSessionFactory;
 import org.investpro.exchange.oanda.OandaRateLimiter;
@@ -42,6 +44,7 @@ import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
 import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -65,10 +68,12 @@ import java.util.function.Consumer;
 
 @Slf4j
 @EqualsAndHashCode(callSuper = true)
-
 @Getter
 @Setter
-
+@SuppressWarnings({
+        "unused",           // OANDA REST API surface methods retained for completeness
+        "SpellCheckingInspection" // "Oanda"/"OANDA" are proper nouns (the brokerage firm)
+})
 public class Oanda extends Exchange {
 
    private  static  final Logger logger=log;
@@ -129,15 +134,55 @@ public class Oanda extends Exchange {
             this.expiresAt = System.currentTimeMillis() + ttlMs;
         }
 
-        boolean isExpired() {
-            return System.currentTimeMillis() > expiresAt;
+        boolean isValid() {
+            return System.currentTimeMillis() <= expiresAt;
         }
     }
 
     private final ConcurrentHashMap<String, CacheEntry<Map<String, Ticker>>> pricingCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry<Account>> accountCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry<List<TradePair>>> tradePairsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry<List<Position>>> positionsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry<List<OpenOrder>>> openOrdersCache = new ConcurrentHashMap<>();
+
+    /** Order history cache: key = accountId + instrument (or "ALL"), TTL = 60 s. */
+    private final ConcurrentHashMap<String, CacheEntry<List<Order>>> orderHistoryCache = new ConcurrentHashMap<>();
+
+    /** Scheduler for periodic order-history refresh. */
+    private final ScheduledExecutorService orderHistoryScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "oanda-order-history-scheduler");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** How often (seconds) the scheduler background-refreshes the order history cache. */
+    private static final long ORDER_HISTORY_REFRESH_INTERVAL_S = 120L;  // increased from 60 → 120
+
+    /** TTL for a cached order-history result – must be >= refresh interval to avoid gaps. */
+    private static final long ORDER_HISTORY_CACHE_TTL_MS = 180_000L;  // 3 min
+
+    /** Exponential backoff constants for 429 rate-limit retry. */
+    private static final long BACKOFF_INITIAL_MS = 1_000L;
+    private static final long BACKOFF_MAX_MS     = 30_000L;
+
+    /**
+     * Circuit-breaker state for order-history 504 errors.
+     *
+     * <p>When OANDA returns consecutive 504 gateway-timeout responses the scheduler
+     * backs off exponentially (base 120 s, doubling each time, max 10 min) instead
+     * of hammering the gateway every 60 s. The circuit resets on the first success.
+     */
+    private final AtomicInteger consecutive504Count = new AtomicInteger(0);
+    private volatile long orderHistoryPausedUntilMs = 0L;
+    private static final int    ORDER_HISTORY_504_THRESHOLD   = 2;          // open circuit after N consecutive 504s
+    private static final long   ORDER_HISTORY_BACKOFF_BASE_MS = 120_000L;   // 2 min base
+    private static final long   ORDER_HISTORY_MAX_BACKOFF_MS  = 600_000L;   // 10 min ceiling
+
+    /** Instrument specs keyed by OANDA name (e.g. "CAD_SGD"). Populated on first instrument fetch. */
+    private final ConcurrentHashMap<String, OandaInstrumentSpec> instrumentSpecCache = new ConcurrentHashMap<>();
+
+    /** Metadata service wired to the live spec cache. */
+    private final OandaProductMetadataService metadataService;
 
     // Request coalescing - reuse in-flight requests
     private CompletableFuture<Account> inflightAccountRequest = null;
@@ -196,6 +241,17 @@ public class Oanda extends Exchange {
 
         this.pollingStreamer = new PollingExchangeStreamer(this);
 
+        // Wire metadata service to the live instrument spec cache
+        this.metadataService = new OandaProductMetadataService();
+        this.metadataService.setSpecSupplier(instrumentSpecCache::get);
+
+        // Schedule periodic order-history refresh to avoid hammering OANDA and getting 504s
+        orderHistoryScheduler.scheduleAtFixedRate(
+                this::refreshAllOrderHistoryCaches,
+                ORDER_HISTORY_REFRESH_INTERVAL_S,
+                ORDER_HISTORY_REFRESH_INTERVAL_S,
+                TimeUnit.SECONDS);
+
         try {
             this.websocketClient = new OandaWebSocketClient(
                     URI.create(oandaStreamUrl() + "/v3/accounts/%s/pricing/stream".formatted(this.accountId)),
@@ -213,11 +269,11 @@ public class Oanda extends Exchange {
     }
 
     private String oandaApiUrl() {
-        return isPaperTrading() ? OANDA_PRACTICE_API_URL : OANDA_LIVE_API_URL;
+        return modeRequestsExternalPaperNetwork() ? OANDA_PRACTICE_API_URL : OANDA_LIVE_API_URL;
     }
 
     private String oandaStreamUrl() {
-        return isPaperTrading() ? OANDA_PRACTICE_STREAM_URL : OANDA_LIVE_STREAM_URL;
+        return modeRequestsExternalPaperNetwork() ? OANDA_PRACTICE_STREAM_URL : OANDA_LIVE_STREAM_URL;
     }
 
     private String oandaRoute(String routeTemplate, Object... args) {
@@ -257,18 +313,18 @@ public class Oanda extends Exchange {
 
     @Override
     public boolean isSandbox() {
-        return true;
+        return modeRequestsExternalPaperNetwork();
     }
 
     @Override
     public boolean isPaperTrading() {
-        if (modeRequestsPaperNetwork()) {
+        if (modeRequestsLocalPaperMode() || modeRequestsExternalPaperNetwork()) {
             return true;
         }
         if (modeRequestsLiveNetwork()) {
             return false;
         }
-        return isSandbox();
+        return false;
     }
 
     @Override
@@ -520,6 +576,12 @@ public class Oanda extends Exchange {
             return Collections.emptyList();
         }
 
+        String cacheKey = "trade-pairs:" + resolvedAccountId;
+        CacheEntry<List<TradePair>> cachedEntry = tradePairsCache.get(cacheKey);
+        if (cachedEntry != null && cachedEntry.isValid()) {
+            return List.copyOf(cachedEntry.value);
+        }
+
         String url = oandaRoute(ACCOUNT_INSTRUMENTS_ROUTE, resolvedAccountId);
 
         HttpRequest request = requestBuilder(url)
@@ -531,6 +593,9 @@ public class Oanda extends Exchange {
 
             if (!isSuccess(response)) {
                 log.warn("OANDA instruments failed HTTP {}: {}", response.statusCode(), response.body());
+                if (cachedEntry != null) {
+                    return List.copyOf(cachedEntry.value);
+                }
                 return Collections.emptyList();
             }
 
@@ -556,6 +621,23 @@ public class Oanda extends Exchange {
                     continue;
                 }
 
+                // Parse and cache full instrument specification from API response
+                OandaInstrumentSpec spec = OandaInstrumentSpec.from(
+                        name,
+                        instrument.path("displayName").asText(name),
+                        instrument.path("displayPrecision").asInt(5),
+                        instrument.path("marginRate").asText("0.02"),
+                        instrument.path("maximumOrderUnits").asText("100000000"),
+                        instrument.path("maximumPositionSize").asText("0"),
+                        instrument.path("maximumTrailingStopDistance").asText("1.00000"),
+                        instrument.path("minimumTradeSize").asText("1"),
+                        instrument.path("minimumTrailingStopDistance").asText("0.00050"),
+                        instrument.path("pipLocation").asInt(-4),
+                        instrument.path("tradeUnitsPrecision").asInt(0),
+                        instrument.path("type").asText("CURRENCY")
+                );
+                instrumentSpecCache.put(name, spec);
+
                 try {
                     TradePair pair = TradePair.fromSymbol(name);
                     pair.setNativeSymbol(name);
@@ -566,6 +648,7 @@ public class Oanda extends Exchange {
                 }
             }
 
+            setCached(cacheKey, List.copyOf(pairs), 10 * 60_000L, tradePairsCache);
             return pairs;
 
         } catch (Exception exception) {
@@ -573,6 +656,9 @@ public class Oanda extends Exchange {
                 logConnectivityFailure("OANDA trade pair load", oandaRoute(ACCOUNT_INSTRUMENTS_ROUTE, resolvedAccountId), exception);
             } else {
                 log.error("Failed to load OANDA trade pairs", exception);
+            }
+            if (cachedEntry != null) {
+                return List.copyOf(cachedEntry.value);
             }
             return Collections.emptyList();
         }
@@ -594,9 +680,11 @@ public class Oanda extends Exchange {
                     .map(this::toInstrument)
                     .collect(java.util.stream.Collectors.toSet());
 
+            // In batch mode skip per-symbol ticker fetches — just check instrument membership.
+            // Per-symbol ticker calls (68 × 3 s timeout each) would guarantee a timeout.
             return pairs.stream()
                     .filter(Objects::nonNull)
-                    .map(pair -> mapOandaTradability(pair, accountInstruments))
+                    .map(pair -> mapOandaTradabilityFast(pair, accountInstruments))
                     .toList();
         });
     }
@@ -700,6 +788,46 @@ public class Oanda extends Exchange {
                 Map.of(
                         "instrument", instrument,
                         "session", String.valueOf(pair.getTradingSessionStatus())));
+    }
+
+    /**
+     * Fast (no ticker fetch) tradability check for batch use.
+     * Returns FULLY_TRADABLE for listed instruments, PERMISSION_DENIED otherwise.
+     * Avoids per-symbol HTTP calls so batch checks over 60+ symbols don't time out.
+     */
+    private SymbolTradability mapOandaTradabilityFast(TradePair pair, Set<String> accountInstruments) {
+        String instrument = toInstrument(pair);
+        boolean instrumentAllowed = accountInstruments.contains(instrument);
+
+        if (!instrumentAllowed) {
+            return new SymbolTradability(
+                    getExchangeId(), pair, instrument,
+                    TradabilityStatus.PERMISSION_DENIED,
+                    true, true, true, true,
+                    false, false, false,
+                    true, true, true,
+                    false, supportsLeverage(), supportsLeverage(),
+                    "Instrument is not enabled for this OANDA account",
+                    Instant.now(),
+                    Map.of("instrument", instrument));
+        }
+
+        boolean orderSubmissionAllowed = canSubmitOrders();
+        TradabilityStatus status = orderSubmissionAllowed
+                ? TradabilityStatus.FULLY_TRADABLE
+                : TradabilityStatus.API_KEY_RESTRICTED;
+        String reason = orderSubmissionAllowed
+                ? "OANDA instrument is tradable"
+                : "OANDA API/account cannot currently submit orders";
+
+        return new SymbolTradability(
+                getExchangeId(), pair, instrument, status,
+                true, true, true, true,
+                orderSubmissionAllowed, orderSubmissionAllowed, orderSubmissionAllowed,
+                true, true, true,
+                false, supportsLeverage(), supportsLeverage(),
+                reason, Instant.now(),
+                Map.of("instrument", instrument));
     }
 
     @Override
@@ -1135,8 +1263,8 @@ public class Oanda extends Exchange {
                         log.debug(
                                 "OANDA synthetic order book from pricing succeeded for {}: bestBid={}, bestAsk={}, bidLevels={}, askLevels={}",
                                 tradePair,
-                                bids.get(0).getPrice(),
-                                asks.get(0).getPrice(),
+                                bids.getFirst().getPrice(),
+                                asks.getFirst().getPrice(),
                                 bids.size(),
                                 asks.size()
                         );
@@ -1283,7 +1411,7 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<Ticker>> getTicker(TradePair pair) {
-        return fetchTickers((List<TradePair>) pair);
+        return fetchTickers(List.of(pair));
     }
 
     // ---------------------------------------------------------------------
@@ -1320,7 +1448,14 @@ public class Oanda extends Exchange {
             HttpResponse<String> response = sendCritical(request);
 
             if (!isSuccess(response)) {
-                log.warn("OANDA account summary failed HTTP {}: {}", response.statusCode(), response.body());
+                int status = response.statusCode();
+                String body = response.body();
+                log.warn("OANDA account summary failed HTTP {}: {}", status, body);
+                if (status == 401 || status == 403) {
+                    throw new IllegalStateException(
+                            "OANDA authentication failed (HTTP %d). Verify your API token is valid and has the required permissions. Server: %s"
+                                    .formatted(status, body));
+                }
                 return null;
             }
 
@@ -1371,7 +1506,7 @@ public class Oanda extends Exchange {
             userAccount.setConnected(true);
             userAccount.setSandbox(accountNode.path("id").asText("").startsWith("101-")); // OANDA sandbox accounts
             userAccount.setCreatedBy(createdByUserAtStr);                                                                                          // start with 101-
-            userAccount.setPaperTrading(userAccount.isSandbox());
+            userAccount.setPaperTrading(isPaperTrading());
 
             // Cache the account
             setAccountCached(cacheKey, userAccount);
@@ -1792,6 +1927,109 @@ public class Oanda extends Exchange {
 
     @Override
     public CompletableFuture<List<Order>> fetchOrderHistory(TradePair tradePair, Instant since) {
+        String cacheKey = buildOrderHistoryCacheKey(tradePair);
+        CacheEntry<List<Order>> cached = orderHistoryCache.get(cacheKey);
+
+        if (cached != null && cached.isValid()) {
+            // Serve from cache; filter by 'since' locally
+            return CompletableFuture.completedFuture(filterBySince(cached.value, since));
+        }
+
+        if (isOrderHistoryCircuitOpen()) {
+            if (cached != null) {
+                log.debug("OANDA order-history circuit open; serving stale cache for {}", cacheKey);
+                return CompletableFuture.completedFuture(filterBySince(cached.value, since));
+            }
+            log.debug("OANDA order-history circuit open and no cache exists for {}; returning empty history", cacheKey);
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        // Cache miss or expired — fetch live, store result, and return
+        return doFetchOrderHistory(tradePair).thenApply(orders -> {
+            if ((orders == null || orders.isEmpty()) && isOrderHistoryCircuitOpen() && cached != null) {
+                log.debug("OANDA order-history fetch failed during circuit open; preserving stale cache for {}", cacheKey);
+                return filterBySince(cached.value, since);
+            }
+            orderHistoryCache.put(cacheKey, new CacheEntry<>(orders == null ? List.of() : orders, ORDER_HISTORY_CACHE_TTL_MS));
+            return filterBySince(orders, since);
+        });
+    }
+
+    /** Background task run by the scheduler: re-fetches each previously queried cache key. */
+    private void refreshAllOrderHistoryCaches() {
+        if (resolveAccountId().isBlank()) return;
+
+        // Circuit-breaker: skip refresh if we are in a 504 backoff window
+        long now = System.currentTimeMillis();
+        if (isOrderHistoryCircuitOpen()) {
+            long remainingS = (orderHistoryPausedUntilMs - now) / 1000;
+            log.debug("OANDA order-history refresh paused (504 circuit open) for {}s more", remainingS);
+            return;
+        }
+
+        List<String> keys = new ArrayList<>(orderHistoryCache.keySet());
+        // Stagger: fire one key per 2s to avoid bursting all requests simultaneously
+        for (int i = 0; i < keys.size(); i++) {
+            final String key = keys.get(i);
+            final long delayMs = (long) i * 2_000L;
+            orderHistoryScheduler.schedule(() -> {
+                try {
+                    if (isOrderHistoryCircuitOpen()) {
+                        log.debug("Skipping delayed order-history refresh for {} because 504 circuit is open", key);
+                        return;
+                    }
+                    TradePair pair = "ALL".equals(key) ? null : instrumentToTradePair(key);
+                    doFetchOrderHistory(pair).thenAccept(orders ->
+                            orderHistoryCache.put(key, new CacheEntry<>(orders, ORDER_HISTORY_CACHE_TTL_MS)))
+                            .exceptionally(ex -> {
+                                log.debug("Background order-history refresh failed for {}: {}", key, ex.getMessage());
+                                return null;
+                            });
+                } catch (Exception e) {
+                    log.debug("Skipping order-history refresh for key {}: {}", key, e.getMessage());
+                }
+            }, delayMs, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private boolean isOrderHistoryCircuitOpen() {
+        return System.currentTimeMillis() < orderHistoryPausedUntilMs;
+    }
+
+    /** Called when doFetchOrderHistory receives HTTP 504. Applies exponential backoff. */
+    private void handleOrderHistory504() {
+        int count = consecutive504Count.incrementAndGet();
+        if (count >= ORDER_HISTORY_504_THRESHOLD) {
+            long backoffMs = Math.min(
+                    ORDER_HISTORY_BACKOFF_BASE_MS * (1L << Math.min(count - ORDER_HISTORY_504_THRESHOLD, 6)),
+                    ORDER_HISTORY_MAX_BACKOFF_MS);
+            orderHistoryPausedUntilMs = System.currentTimeMillis() + backoffMs;
+            log.warn("OANDA order-history circuit OPEN after {} consecutive 504s — pausing {}s",
+                    count, backoffMs / 1000);
+        }
+    }
+
+    /** Called when doFetchOrderHistory succeeds — resets the circuit. */
+    private void resetOrderHistory504Circuit() {
+        if (consecutive504Count.getAndSet(0) > 0) {
+            orderHistoryPausedUntilMs = 0L;
+            log.info("OANDA order-history circuit RESET — 504 backoff cleared");
+        }
+    }
+
+    private String buildOrderHistoryCacheKey(TradePair tradePair) {
+        return tradePair == null ? "ALL" : toInstrument(tradePair);
+    }
+
+    private static List<Order> filterBySince(List<Order> orders, Instant since) {
+        if (since == null || orders == null || orders.isEmpty()) return orders == null ? List.of() : orders;
+        return orders.stream()
+                .filter(o -> o.getDate() == null || !o.getDate().toInstant().isBefore(since))
+                .toList();
+    }
+
+    /** Actual HTTP call to OANDA /v3/accounts/{id}/orders — called only by cache logic, never directly. */
+    private CompletableFuture<List<Order>> doFetchOrderHistory(TradePair tradePair) {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
@@ -1809,25 +2047,31 @@ public class Oanda extends Exchange {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (!isSuccess(response)) {
-                        log.warn("OANDA order history failed HTTP {}: {}", response.statusCode(), response.body());
-                        return Collections.emptyList();
+                        int status = response.statusCode();
+                        if (status == 504) {
+                            // Gateway timeout — trip the circuit breaker
+                            handleOrderHistory504();
+                            log.warn("OANDA order history HTTP 504 (gateway timeout) — consecutive={} circuit={}",
+                                    consecutive504Count.get(),
+                                    orderHistoryPausedUntilMs > System.currentTimeMillis() ? "OPEN" : "closed");
+                        } else {
+                            log.warn("OANDA order history failed HTTP {}: {}", status, response.body());
+                        }
+                        return Collections.<Order>emptyList();
                     }
 
+                    // Successful response — reset the 504 circuit breaker
+                    resetOrderHistory504Circuit();
                     try {
                         JsonNode orders = OBJECT_MAPPER.readTree(response.body()).path("orders");
                         if (!orders.isArray() || orders.isEmpty()) {
-                            return Collections.emptyList();
+                            return Collections.<Order>emptyList();
                         }
 
                         List<Order> result = new ArrayList<>();
 
                         for (JsonNode node : orders) {
                             Instant createdAt = parseInstant(node.path("createTime").asText(""));
-
-                            if (since != null && createdAt.isBefore(since)) {
-                                continue;
-                            }
-
                             double signedUnits = node.path("units").asDouble(0.0);
                             Order order = new Order();
                             order.setId(parseLong(node.path("id").asText("0")));
@@ -1846,6 +2090,10 @@ public class Oanda extends Exchange {
                     } catch (Exception exception) {
                         throw new RuntimeException(exception);
                     }
+                })
+                .exceptionally(ex -> {
+                    log.warn("OANDA order history request failed: {}", ex.getMessage());
+                    return Collections.emptyList();
                 });
     }
 
@@ -1919,7 +2167,7 @@ public class Oanda extends Exchange {
         return fetchPositions(tradePair)
                 .thenApply(positions -> positions == null || positions.isEmpty()
                         ? Optional.empty()
-                        : Optional.ofNullable(positions.get(0)));
+                        : Optional.ofNullable(positions.getFirst()));
     }
 
     @Override
@@ -2089,14 +2337,24 @@ public class Oanda extends Exchange {
             double stopLoss,
             double takeProfit,
             double slippage) {
-        boolean valid = tradePair != null
-                && supportsMarketType(marketType)
-                && size > 0
-                && stopLoss >= 0
-                && takeProfit >= 0
-                && slippage >= 0;
 
-        return CompletableFuture.completedFuture(valid);
+        if (tradePair == null || !supportsMarketType(marketType) || size <= 0
+                || stopLoss < 0 || takeProfit < 0 || slippage < 0) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        OandaInstrumentSpec spec = resolveSpec(tradePair);
+        if (spec != null) {
+            double minUnits = spec.minimumTradeSize().doubleValue();
+            double maxUnits = spec.maximumOrderUnits().doubleValue();
+            if (size < minUnits || (maxUnits > 0 && size > maxUnits)) {
+                log.warn("OANDA order size {} outside allowed range [{}, {}] for {}",
+                        size, minUnits, maxUnits, tradePair);
+                return CompletableFuture.completedFuture(false);
+            }
+        }
+
+        return CompletableFuture.completedFuture(true);
     }
 
     @Override
@@ -2105,7 +2363,15 @@ public class Oanda extends Exchange {
             return 0.0;
         }
 
-        return Math.max(getMinOrderAmount(tradePair), Math.round(Math.abs(amount)));
+        OandaInstrumentSpec spec = resolveSpec(tradePair);
+        double minUnits = spec != null ? spec.minimumTradeSize().doubleValue() : 1.0;
+        int unitsPrecision = spec != null ? spec.tradeUnitsPrecision() : 0;
+
+        double abs = Math.abs(amount);
+        double rounded = unitsPrecision == 0
+                ? Math.round(abs)
+                : roundToDecimalPlaces(abs, unitsPrecision);
+        return Math.max(minUnits, rounded);
     }
 
     @Override
@@ -2114,12 +2380,15 @@ public class Oanda extends Exchange {
             return 0.0;
         }
 
-        return Math.max(0.0, price);
+        OandaInstrumentSpec spec = resolveSpec(tradePair);
+        int dp = spec != null ? spec.displayPrecision() : 5;
+        return roundToDecimalPlaces(Math.max(0.0, price), dp);
     }
 
     @Override
     public double getMinOrderAmount(TradePair tradePair) {
-        return 1.0;
+        OandaInstrumentSpec spec = resolveSpec(tradePair);
+        return spec != null ? spec.minimumTradeSize().doubleValue() : 1.0;
     }
 
     @Override
@@ -2129,7 +2398,48 @@ public class Oanda extends Exchange {
 
     @Override
     public double getMaxLeverage(TradePair tradePair) {
+        OandaInstrumentSpec spec = resolveSpec(tradePair);
+        if (spec != null) {
+            return spec.effectiveLeverage().doubleValue();
+        }
         return 50.0;
+    }
+
+    @Override
+    public int getDisplayPrecision(TradePair tradePair) {
+        OandaInstrumentSpec spec = resolveSpec(tradePair);
+        return spec != null ? spec.displayPrecision() : 5;
+    }
+
+    /**
+     * Returns the {@link OandaInstrumentSpec} for the given trade pair, or {@code null}
+     * if the pair has not been loaded from the API yet.
+     */
+    public OandaInstrumentSpec getInstrumentSpec(TradePair tradePair) {
+        return resolveSpec(tradePair);
+    }
+
+    /**
+     * Returns full {@link org.investpro.exchange.core.InstrumentMetadata} for the given trade pair,
+     * using live instrument spec data when available.
+     */
+    public org.investpro.exchange.core.InstrumentMetadata getMetadata(TradePair tradePair) {
+        if (tradePair == null) return null;
+        return metadataService.getMetadata(toInstrument(tradePair));
+    }
+
+    /** Looks up the spec cache by OANDA instrument name derived from the trade pair. */
+    private OandaInstrumentSpec resolveSpec(TradePair tradePair) {
+        if (tradePair == null) return null;
+        String instrument = toInstrument(tradePair);
+        return instrumentSpecCache.get(instrument);
+    }
+
+    /** Rounds a double to the specified number of decimal places. */
+    private static double roundToDecimalPlaces(double value, int decimalPlaces) {
+        if (decimalPlaces < 0) return value;
+        double factor = Math.pow(10, decimalPlaces);
+        return Math.round(value * factor) / factor;
     }
 
     @Override
@@ -2325,7 +2635,7 @@ public class Oanda extends Exchange {
         }
 
         if (subscription.isFills()) {
-            streamFills(consumer);
+            pollingStreamer.streamFills(subscription.getTradePairs(), consumer);
         }
     }
 
@@ -2429,7 +2739,7 @@ public class Oanda extends Exchange {
 
     @Override
     public void streamFills(ExchangeStreamConsumer consumer) {
-        logger.debug("OANDA streamFills currently no-op; transaction HTTP stream can be added later.");
+        logger.debug("OANDA streamFills requires subscription trade pairs; use stream(subscription, consumer).");
     }
 
     @Override
@@ -2474,7 +2784,7 @@ public class Oanda extends Exchange {
 
     @Override
     public void stopFillsStream() {
-        logger.debug("OANDA stopFillsStream no-op");
+        pollingStreamer.stopFills();
     }
 
     @Override
@@ -3041,7 +3351,7 @@ public class Oanda extends Exchange {
                         String inst = posNode.path("instrument").asText("");
                         addPositionLeg(positions, instrumentToTradePair(inst), inst, posNode.path("long"), Side.BUY);
                         addPositionLeg(positions, instrumentToTradePair(inst), inst, posNode.path("short"), Side.SELL);
-                        return positions.isEmpty() ? Optional.empty() : Optional.of(positions.get(0));
+                        return positions.isEmpty() ? Optional.empty() : Optional.of(positions.getFirst());
                     } catch (Exception e) {
                         logger.error("Failed to parse OANDA position details", e);
                         return Optional.empty();
@@ -3329,7 +3639,7 @@ public class Oanda extends Exchange {
         account.setUpdatedAt(Instant.now());
         account.setConnected(true);
         account.setSandbox(accountId.startsWith("101-"));
-        account.setPaperTrading(account.isSandbox());
+        account.setPaperTrading(isPaperTrading());
         return account;
     }
 
@@ -3362,7 +3672,7 @@ public class Oanda extends Exchange {
 
     private <T> T getCached(String key, ConcurrentHashMap<String, CacheEntry<T>> cache) {
         CacheEntry<T> entry = cache.get(key);
-        if (entry != null && !entry.isExpired()) {
+        if (entry != null && entry.isValid()) {
             return entry.value;
         }
         cache.remove(key);
@@ -3531,7 +3841,7 @@ public class Oanda extends Exchange {
     private HttpResponse<String> send(HttpRequest request) throws IOException {
         totalOandaRequests.incrementAndGet();
         try {
-            return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3, 1000L, 30000L));
+            return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3));
         } catch (Exception e) {
             if (e instanceof IOException || e instanceof InterruptedException) {
                 throw (IOException) (e instanceof IOException ? e : new IOException(e));
@@ -3543,7 +3853,7 @@ public class Oanda extends Exchange {
     private HttpResponse<String> sendCritical(HttpRequest request) throws IOException {
         totalOandaRequests.incrementAndGet();
         try {
-            return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 5, 1000L, 30000L));
+            return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 5));
         } catch (Exception e) {
             if (e instanceof IOException || e instanceof InterruptedException) {
                 throw (IOException) (e instanceof IOException ? e : new IOException(e));
@@ -3565,15 +3875,11 @@ public class Oanda extends Exchange {
      * 
      * @param request        The HTTP request to send
      * @param maxRetries     Maximum retries (3 for polling, 5 for critical)
-     * @param initialDelayMs Base delay (1000ms)
-     * @param maxDelayMs     Max delay cap (30000ms)
      * @return The HTTP response
      */
     private HttpResponse<String> sendWithExponentialBackoffSync(
             HttpRequest request,
-            int maxRetries,
-            long initialDelayMs,
-            long maxDelayMs) throws IOException, InterruptedException {
+            int maxRetries) throws IOException, InterruptedException {
 
         int attemptCount = 0;
         long lastLogTime = 0;
@@ -3604,13 +3910,13 @@ public class Oanda extends Exchange {
             // Check for Retry-After header
             long delayMs = parseRetryAfterHeader(response);
             if (delayMs <= 0) {
-                // Calculate exponential backoff: 1000 * 2^attempt
-                delayMs = Math.min(initialDelayMs * (long) Math.pow(2, attemptCount), maxDelayMs);
+                // Calculate exponential backoff: BACKOFF_INITIAL_MS * 2^attempt
+                delayMs = Math.min(BACKOFF_INITIAL_MS * (long) Math.pow(2, attemptCount), BACKOFF_MAX_MS);
             }
 
             // Add jitter to prevent thundering herd: ±250-750ms
             long jitter = 250 + jitterRandom.nextLong(501);
-            delayMs = Math.min(delayMs + jitter, maxDelayMs);
+            delayMs = Math.min(delayMs + jitter, BACKOFF_MAX_MS);
 
             long now = System.currentTimeMillis();
             if (now - lastLogTime > 60000) { // Log once per minute
@@ -3621,6 +3927,7 @@ public class Oanda extends Exchange {
                 last429Endpoint = extractEndpoint(request.uri().toString());
             }
 
+            //noinspection BusyWait -- intentional exponential backoff sleep, not a polling loop
             Thread.sleep(delayMs);
             attemptCount++;
         }
@@ -3754,12 +4061,14 @@ public class Oanda extends Exchange {
         }
     }
 
-    private String toOandaGranularity(int seconds) {
+    @Contract(pure = true)
+    private @NonNull String toOandaGranularity(int seconds) {
         return switch (seconds) {
             case 5 -> "S5";
             case 10 -> "S10";
             case 15 -> "S15";
             case 30 -> "S30";
+            case 60 -> "M1";
             case 120 -> "M2";
             case 240 -> "M4";
             case 300 -> "M5";
@@ -3775,7 +4084,7 @@ public class Oanda extends Exchange {
             case 43200 -> "H12";
             case 86400 -> "D";
             case 604800 -> "W";
-            default -> "M1";
+            default -> "MN";
         };
     }
 
@@ -3901,11 +4210,11 @@ public class Oanda extends Exchange {
      * Convenience method with default backoff parameters.
      * Initial delay: 1000ms, Max delay: 30 seconds, Max retries: 3 (polling)
      */
-    private CompletableFuture<HttpResponse<String>> sendWithExponentialBackoff(HttpRequest request) {
+    private @NonNull CompletableFuture<HttpResponse<String>> sendWithExponentialBackoff(HttpRequest request) {
         totalOandaRequests.incrementAndGet();
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3, 1000L, 30000L));
+                return rateLimiter.execute(() -> sendWithExponentialBackoffSync(request, 3));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

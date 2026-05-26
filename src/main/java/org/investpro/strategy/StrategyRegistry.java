@@ -166,6 +166,7 @@ public final class StrategyRegistry {
 
         String normalized = StrategyCatalog.normalizeStrategyName(definition.getName());
 
+        StrategyCatalog.registerRuntimeDefinition(definition);
         definitions.put(normalized, definition);
 
         if (activeName == null) {

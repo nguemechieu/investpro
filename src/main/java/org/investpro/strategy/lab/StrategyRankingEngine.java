@@ -32,7 +32,6 @@ public class StrategyRankingEngine {
         // Score each report if not already scored
         for (StrategyPerformanceReport report : reports) {
             if (report.getScore() == 0.0 && report.getTotalTrades() > 0) {
-                double newScore = score(report);
                 // Score is already calculated in report, but we recalculate if needed
                 // The report builder should have already set it
             }
@@ -50,12 +49,12 @@ public class StrategyRankingEngine {
         for (int i = 0; i < Math.min(5, sorted.size()); i++) {
             StrategyPerformanceReport report = sorted.get(i);
             log.info(
-                    "#{}: {} - Score: {:.1f}, WinRate: {:.1%}, Return: {:.1f}%, Trades: {}",
+                    "#{}: {} - Score: {}, WinRate: {}, Return: {}%, Trades: {}",
                     i + 1,
                     report.getStrategyName(),
-                    report.getScore(),
-                    report.getWinRate(),
-                    report.getTotalReturn(),
+                    "%.1f".formatted(report.getScore()),
+                    "%.1f%%".formatted(report.getWinRate() * 100.0),
+                    "%.1f".formatted(report.getTotalReturn()),
                     report.getTotalTrades());
         }
 

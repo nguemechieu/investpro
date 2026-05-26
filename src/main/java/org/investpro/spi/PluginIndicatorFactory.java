@@ -272,6 +272,7 @@ public final class PluginIndicatorFactory {
         return normalize(choice).replace(' ', '_');
     }
 
+    @SuppressWarnings("unused")
     private record IndicatorRequest(String providerId, Map<String, String> config) {
     }
 

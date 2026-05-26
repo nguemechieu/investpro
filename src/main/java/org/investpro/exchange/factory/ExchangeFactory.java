@@ -20,7 +20,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,6 +31,7 @@ public final class ExchangeFactory {
     private static final Map<String, String> EXCHANGE_ALIASES = buildExchangeAliases();
 
 
+    @SuppressWarnings("unused")
     private final CredentialProvider credentialProvider;
     private final ExchangeCredentialResolver credentialResolver;
     private final BrokerRouter brokerRouter;
@@ -230,6 +230,7 @@ public final class ExchangeFactory {
             case INTERACTIVE_BROKERS -> new InteractiveBrokers(credentials);
             case OANDA -> new Oanda(credentials);
             case STELLAR_NETWORK -> new StellarNetwork(credentials);
+            case SOLANA_NETWORK -> new SolanaNetwork(credentials);
             case POLONIEX -> throw new IllegalArgumentException("Poloniex adapter not implemented yet");
             case IG -> throw new IllegalArgumentException("IG adapter not implemented yet");
             case KRAKEN -> throw new IllegalArgumentException("Kraken adapter not implemented yet");
@@ -292,6 +293,7 @@ public final class ExchangeFactory {
                 "ibk", "ibkr", "schwab", "charlesschwab");
         addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
         addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
+        addAliases(aliases, "solana_network", "solana", "solananetwork", "sol", "solanaecosystem");
 
         addAliases(aliases, "bittrex", "bittrex");
         addAliases(aliases, "bitmex", "bitmex");
