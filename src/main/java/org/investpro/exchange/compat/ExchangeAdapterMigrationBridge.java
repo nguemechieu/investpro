@@ -3,14 +3,9 @@ package org.investpro.exchange.compat;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.models.ExchangeCapability;
-import org.investpro.exchange.models.ExchangeFeature;
 import org.investpro.exchange.normalization.NormalizedMarketSnapshot;
 import org.investpro.exchange.registry.ExchangeCapabilityRegistry;
-import org.investpro.exchange.runtime.ExchangeRuntimeState;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Migration bridge that integrates legacy {@link Exchange} subclasses with the
@@ -21,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * to gain:
  * <ul>
  *   <li>Capability-aware queries ({@code findByFeature}, {@code findSupporting})</li>
- *   <li>Runtime state tracking ({@link ExchangeRuntimeState})</li>
+ *   <li>Runtime state tracking ({@link org.investpro.exchange.runtime.ExchangeRuntimeState})</li>
  *   <li>Normalized market snapshot compatibility</li>
  * </ul>
  *
@@ -148,12 +143,13 @@ public final class ExchangeAdapterMigrationBridge {
                 .supportsLiveTrading(exchange.supportsLiveTrading())
                 .supportsPaperTradingMode(exchange.supportsPaperTradingMode())
                 .supportsOrderBook(exchange.supportsOrderBook())
-                .supportsStopLoss(exchange.supportsStopLossTakeProfit())
-                .supportsTakeProfit(exchange.supportsStopLossTakeProfit())
+                .supportsStopLossTakeProfit(exchange.supportsStopLossTakeProfit())
                 .supportsMarginTrading(exchange.supportsLeverage())
                 .supportsWebSocket(exchange.supportsAccountStreaming()
                         || exchange.supportsOrderStreaming()
                         || exchange.supportsTickerStreaming())
+                .supportsPositions(exchange.supportsPositions())
+                .supportsAccountTrades(exchange.supportsAccountTrades())
                 .build();
     }
 }
