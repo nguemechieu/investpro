@@ -7,6 +7,7 @@ import org.investpro.exchange.resilience.ExchangeCircuitBreaker;
 import org.investpro.exchange.resilience.ExchangeConnectivityManager;
 import org.investpro.exchange.resilience.StaleCacheManager;
 import org.investpro.exchange.resilience.model.EndpointType;
+import org.investpro.utils.NETWORK_RESPONSE;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +36,9 @@ import java.util.function.Consumer;
  * snapshot is returned instead of triggering a retry storm. This
  * eliminates the repeated HTTP 504 failures that previously caused the
  * circuit breaker to cycle open on every polling interval.
+ *
+ * <p>All HTTP status checks use {@link NETWORK_RESPONSE} for named,
+ * self-documenting comparisons instead of raw integer literals.
  *
  * <p>When {@code connectivityManager} is {@code null} (legacy mode),
  * the client behaves exactly as before: direct HTTP with no circuit protection.
@@ -157,9 +161,11 @@ public final class OandaTransactionClient {
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                 .thenAccept(response -> {
-                    if (!isSuccess(response.statusCode())) {
+                    int status = response.statusCode();
+                    if (!isSuccess(status)) {
                         throw new RuntimeException(
-                                "OANDA transaction stream failed HTTP %d".formatted(response.statusCode()));
+                                "OANDA transaction stream failed %s (%d)"
+                                        .formatted(describeStatus(status), status));
                     }
                     consumeStream(response.body(), onMessage, errorHandler);
                 })
@@ -173,7 +179,7 @@ public final class OandaTransactionClient {
 
     /**
      * Sends a history (non-critical) request through the circuit breaker.
-     * Falls back to stale cache on circuit-open or 504/gateway errors.
+     * Falls back to stale cache on circuit-open or gateway errors.
      */
     private CompletableFuture<List<JsonNode>> sendHistoryRequest(String url) {
         if (connectivityManager == null) {
@@ -206,21 +212,41 @@ public final class OandaTransactionClient {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     int status = response.statusCode();
-                    if (status == 504) {
+
+                    if (isGatewayTimeout(status)) {
                         if (connectivityManager != null) {
                             connectivityManager.recordFailure(EndpointType.ORDER_HISTORY,
-                                    new RuntimeException("HTTP 504 Gateway Timeout"));
+                                    new RuntimeException(NETWORK_RESPONSE.GATEWAY_TIME_OUT.name()));
                         }
                         throw new RuntimeException(
-                                "OANDA transaction request failed HTTP 504: Gateway Timeout");
+                                "OANDA transaction request failed %s (%d)"
+                                        .formatted(NETWORK_RESPONSE.GATEWAY_TIME_OUT.name(), status));
                     }
+
+                    if (isUnauthorized(status)) {
+                        throw new RuntimeException(
+                                "OANDA authentication failed %s (%d) — check API token"
+                                        .formatted(NETWORK_RESPONSE.UNAUTHORIZE_REQUEST.name(), status));
+                    }
+
+                    if (isTooManyRequests(status)) {
+                        log.warn("OANDA rate limit hit: {} ({})",
+                                NETWORK_RESPONSE.TOO_MANY_REQUEST_SEND.name(), status);
+                        throw new RuntimeException(
+                                "OANDA rate limited %s (%d)"
+                                        .formatted(NETWORK_RESPONSE.TOO_MANY_REQUEST_SEND.name(), status));
+                    }
+
                     if (!isSuccess(status)) {
-                        throw new RuntimeException("OANDA transaction request failed HTTP %d: %s"
-                                .formatted(status, response.body()));
+                        throw new RuntimeException(
+                                "OANDA transaction request failed %s (%d): %s"
+                                        .formatted(describeStatus(status), status, response.body()));
                     }
+
                     if (connectivityManager != null) {
                         connectivityManager.recordSuccess(EndpointType.ORDER_HISTORY);
                     }
+
                     try {
                         return objectMapper.readTree(response.body());
                     } catch (Exception ex) {
@@ -266,8 +292,38 @@ public final class OandaTransactionClient {
         }
     }
 
-    private boolean isSuccess(int statusCode) {
-        return statusCode >= 200 && statusCode < 300;
+    // ── NETWORK_RESPONSE helpers ──────────────────────────────────────────────
+
+    private static boolean isSuccess(int status) {
+        return status == NETWORK_RESPONSE.SERVER_OK.getResponseCode()
+            || status == NETWORK_RESPONSE.CREATED.getResponseCode()
+            || status == NETWORK_RESPONSE.ACCEPTED.getResponseCode()
+            || status == NETWORK_RESPONSE.NO_CONTENT.getResponseCode();
+    }
+
+    private static boolean isGatewayTimeout(int status) {
+        return status == NETWORK_RESPONSE.GATEWAY_TIME_OUT.getResponseCode();
+    }
+
+    private static boolean isUnauthorized(int status) {
+        return status == NETWORK_RESPONSE.UNAUTHORIZE_REQUEST.getResponseCode();
+    }
+
+    private static boolean isTooManyRequests(int status) {
+        return status == NETWORK_RESPONSE.TOO_MANY_REQUEST_SEND.getResponseCode();
+    }
+
+    /**
+     * Returns the {@link NETWORK_RESPONSE} enum name for a given HTTP status code,
+     * or {@code "UNKNOWN"} if not present in the enum.
+     */
+    private static String describeStatus(int status) {
+        for (NETWORK_RESPONSE r : NETWORK_RESPONSE.values()) {
+            if (r.getResponseCode() == status) {
+                return r.name();
+            }
+        }
+        return "UNKNOWN";
     }
 
     private static String encode(String value) {
