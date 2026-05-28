@@ -9,6 +9,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -16,6 +19,7 @@ import java.util.stream.Collectors;
  * Handles:
  * - Economic calendar events with blackout periods
  * - Real-time RSS news fetching with sentiment scoring
+ * - ForexFactory weekly economic calendar (live JSON feed)
  * - News bias summarization (buy/sell/neutral)
  * - Signal generation from news
  */
@@ -27,11 +31,11 @@ public class NewsDataProvider {
         private final List<NewsEvent> newsEvents = new CopyOnWriteArrayList<>();
         private final List<NewsEventListener> listeners = new CopyOnWriteArrayList<>();
         private final RssNewsService rssNewsService;
+        private final ForexFactoryCalendarService forexFactoryCalendarService;
 
+        private boolean newsBlackoutEnabled = true;
 
-        private boolean newsBlackoutEnabled = true; // Master toggle for news lockout
-
-        // Calendar of major economic indicators by currency
+        @SuppressWarnings("unused")
         private static final Map<String, String[]> MAJOR_INDICATORS = Map.ofEntries(
                         Map.entry("USD", new String[] {
                                         "FOMC Meeting", "Non-Farm Payroll", "CPI", "Consumer Sentiment",
@@ -50,32 +54,81 @@ public class NewsDataProvider {
                                         "Nikkei 225", "Manufacturing PMI"
                         }));
 
-        /**
-         * Default constructor - initializes with default RSS news service.
-         */
+        /** Default constructor — uses default RSS and ForexFactory services. */
         public NewsDataProvider() {
                 this.rssNewsService = new RssNewsService();
+                this.forexFactoryCalendarService = new ForexFactoryCalendarService();
         }
 
-        /**
-         * Constructor with custom RSS news service.
-         */
+        /** Constructor with custom RSS news service. */
         public NewsDataProvider(RssNewsService rssNewsService) {
                 this.rssNewsService = rssNewsService != null ? rssNewsService : new RssNewsService();
+                this.forexFactoryCalendarService = new ForexFactoryCalendarService();
+        }
+
+        // ------------------------------------------------------------------
+        // FOREXFACTORY CALENDAR
+        // ------------------------------------------------------------------
+
+        /**
+         * Fetches this week's economic calendar from ForexFactory and merges the
+         * events into the local calendar, skipping exact duplicates (same title + time).
+         *
+         * <p>This is an async, non-blocking call. Events are added as they arrive.
+         */
+        public void loadForexFactoryCalendar() {
+                log.info("Loading ForexFactory calendar...");
+                forexFactoryCalendarService.fetchThisWeekAsync().thenAccept(events -> {
+                        int added = 0;
+                        for (NewsEvent event : events) {
+                                if (!isDuplicate(event)) {
+                                        addNewsEvent(event);
+                                        added++;
+                                }
+                        }
+                        log.info("ForexFactory calendar: {} new events merged (total: {})", added, newsEvents.size());
+                }).exceptionally(ex -> {
+                        log.warn("ForexFactory calendar load failed: {}", ex.getMessage());
+                        return null;
+                });
         }
 
         /**
-         * Add a news event to the calendar.
+         * Starts a scheduled refresh of the ForexFactory calendar.
+         *
+         * <p>An initial fetch is performed immediately, then repeated every
+         * {@code intervalHours} hours. The scheduler is daemon-threaded and
+         * will stop automatically when the JVM exits.
+         *
+         * @param intervalHours refresh interval in hours (minimum 1)
          */
+        public ScheduledExecutorService startForexFactoryAutoRefresh(int intervalHours) {
+                long interval = Math.max(1, intervalHours);
+                ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                        Thread t = new Thread(r, "ff-calendar-refresh");
+                        t.setDaemon(true);
+                        return t;
+                });
+                scheduler.scheduleAtFixedRate(
+                        this::loadForexFactoryCalendar,
+                        0, interval, TimeUnit.HOURS
+                );
+                log.info("ForexFactory auto-refresh started (every {}h)", interval);
+                return scheduler;
+        }
+
+        // ------------------------------------------------------------------
+        // CALENDAR MANAGEMENT
+        // ------------------------------------------------------------------
+
+        /** Adds a news event to the calendar. */
         public void addNewsEvent(NewsEvent event) {
                 newsEvents.add(event);
                 log.info("News event added: {} at {}", event.getTitle(), event.getEventTime());
                 notifyListeners(event, "ADDED");
         }
 
-        /**
-         * Get all upcoming news events for the visible economic calendar window.
-         */
+        /** Returns all upcoming events within a 7-day window. */
         public List<NewsEvent> getUpcomingNewsEvents() {
                 Instant now = Instant.now();
                 Instant calendarWindowEnd = now.plus(7, ChronoUnit.DAYS);
@@ -93,9 +146,7 @@ public class NewsDataProvider {
                 }
         }
 
-        /**
-         * Get high-impact news events for a specific currency.
-         */
+        /** Returns high-impact events for a specific currency. */
         public List<NewsEvent> getHighImpactEvents(String currency) {
                 return newsEvents.stream()
                                 .filter(event -> event.getCurrency().equals(currency))
@@ -105,30 +156,20 @@ public class NewsDataProvider {
                                 .collect(Collectors.toList());
         }
 
-        /**
-         * Check if trading is currently blocked by news events.
-         */
+        /** Returns {@code true} if any blackout window is currently active. */
         public boolean isNewsBlackoutActive() {
-                if (!newsBlackoutEnabled) {
-                        return false;
-                }
-
-                return newsEvents.stream()
-                                .anyMatch(NewsEvent::isBlackoutActive);
+                if (!newsBlackoutEnabled) return false;
+                return newsEvents.stream().anyMatch(NewsEvent::isBlackoutActive);
         }
 
-        /**
-         * Get currently active blackout events (blocking trades).
-         */
+        /** Returns all events with an active blackout window. */
         public List<NewsEvent> getActiveBlackoutEvents() {
                 return newsEvents.stream()
                                 .filter(NewsEvent::isBlackoutActive)
                                 .collect(Collectors.toList());
         }
 
-        /**
-         * Get events happening soon (within next 60 minutes).
-         */
+        /** Returns events occurring within the next 60 minutes. */
         public List<NewsEvent> getImmediateUpcomingEvents() {
                 Instant now = Instant.now();
                 Instant oneHourLater = now.plus(60, ChronoUnit.MINUTES);
@@ -140,9 +181,7 @@ public class NewsDataProvider {
                                 .collect(Collectors.toList());
         }
 
-        /**
-         * Get news events affecting a specific trading pair currency.
-         */
+        /** Returns all events affecting a specific currency. */
         public List<NewsEvent> getEventsForCurrency(String currency) {
                 return newsEvents.stream()
                                 .filter(event -> event.getCurrency().equalsIgnoreCase(currency))
@@ -150,9 +189,7 @@ public class NewsDataProvider {
                                 .collect(Collectors.toList());
         }
 
-        /**
-         * Get news events in a time range (for chart display).
-         */
+        /** Returns events within a time range (for chart markers). */
         public List<NewsEvent> getEventsInRange(Instant startTime, Instant endTime) {
                 return newsEvents.stream()
                                 .filter(event -> !event.getEventTime().isBefore(startTime) &&
@@ -161,14 +198,10 @@ public class NewsDataProvider {
                                 .collect(Collectors.toList());
         }
 
-        /**
-         * Add a sample calendar for testing and demonstration.
-         */
+        /** Loads static sample events for testing when no live calendar is available. */
         public void loadSampleCalendar() {
-                // Sample upcoming events
                 Instant now = Instant.now();
 
-                // USD Events (next week)
                 addNewsEvent(new NewsEvent(
                                 "Federal Reserve Interest Rate Decision",
                                 "USD",
@@ -183,7 +216,6 @@ public class NewsDataProvider {
                                 NewsEvent.Importance.CRITICAL,
                                 NewsEvent.Sentiment.NEUTRAL));
 
-                // EUR Events
                 addNewsEvent(new NewsEvent(
                                 "ECB Monetary Policy Decision",
                                 "EUR",
@@ -191,7 +223,6 @@ public class NewsDataProvider {
                                 NewsEvent.Importance.CRITICAL,
                                 NewsEvent.Sentiment.NEUTRAL));
 
-                // GBP Events
                 addNewsEvent(new NewsEvent(
                                 "UK Retail Sales Data",
                                 "GBP",
@@ -202,9 +233,7 @@ public class NewsDataProvider {
                 log.info("Sample economic calendar loaded with {} events", newsEvents.size());
         }
 
-        /**
-         * Mark event as processed.
-         */
+        /** Marks an event as processed (prevents duplicate signal generation). */
         public void markEventProcessed(String eventId) {
                 newsEvents.stream()
                                 .filter(e -> e.getEventId().equals(eventId))
@@ -214,9 +243,7 @@ public class NewsDataProvider {
                                 });
         }
 
-        /**
-         * Get all events that should generate trading signals.
-         */
+        /** Returns unprocessed events eligible for signal generation. */
         public List<NewsEvent> getSignalGeneratingEvents() {
                 return newsEvents.stream()
                                 .filter(NewsEvent::isGenerateSignal)
@@ -224,16 +251,10 @@ public class NewsDataProvider {
                                 .collect(Collectors.toList());
         }
 
-        /**
-         * Register listener for news event changes.
-         */
         public void addNewsEventListener(NewsEventListener listener) {
                 listeners.add(listener);
         }
 
-        /**
-         * Remove listener.
-         */
         public void removeNewsEventListener(NewsEventListener listener) {
                 listeners.remove(listener);
         }
@@ -242,14 +263,6 @@ public class NewsDataProvider {
         // RSS NEWS FETCHING AND SENTIMENT ANALYSIS
         // ------------------------------------------------------------------
 
-        /**
-         * Fetch real-time RSS news for a symbol with sentiment scoring.
-         *
-         * @param symbol     Symbol/asset code (e.g., BTC, EUR_USD, AAPL, SPY)
-         * @param brokerType Exchange/broker type (crypto, forex, stock, etc.)
-         * @param limit      Maximum number of news articles to fetch (1-50)
-         * @return List of news events with sentiment scores
-         */
         public List<Map<String, Object>> fetchSymbolNews(String symbol, String brokerType, int limit) {
                 try {
                         return rssNewsService.fetchSymbolNews(symbol, brokerType, limit);
@@ -259,19 +272,9 @@ public class NewsDataProvider {
                 }
         }
 
-        /**
-         * Fetch news for multiple symbols concurrently.
-         *
-         * @param symbols        List of symbols to fetch news for
-         * @param brokerType     Broker/exchange type
-         * @param limitPerSymbol Maximum articles per symbol
-         * @return Map of symbol -> news events
-         */
         public Map<String, List<Map<String, Object>>> fetchMultipleSymbolsNews(List<String> symbols,
                         String brokerType, int limitPerSymbol) {
-                if (symbols == null || symbols.isEmpty()) {
-                        return new HashMap<>();
-                }
+                if (symbols == null || symbols.isEmpty()) return new HashMap<>();
 
                 Map<String, List<Map<String, Object>>> results = new HashMap<>();
                 for (String symbol : symbols) {
@@ -280,26 +283,10 @@ public class NewsDataProvider {
                 return results;
         }
 
-        /**
-         * Summarize news events into directional bias.
-         *
-         * @param events      List of news event maps from fetchSymbolNews
-         * @param maxAgeHours Only consider news older than this many hours (default 18)
-         * @return NewsBias with direction (buy/sell/neutral) and confidence
-         */
         public NewsBias summarizeNewsBias(List<Map<String, Object>> events, double maxAgeHours) {
                 return summarizeNewsBias(events, maxAgeHours, 0.20, -0.20);
         }
 
-        /**
-         * Summarize news events with custom thresholds.
-         *
-         * @param events        List of news event maps from fetchSymbolNews
-         * @param maxAgeHours   Only consider news older than this many hours
-         * @param buyThreshold  Score threshold for buy signal (default 0.20)
-         * @param sellThreshold Score threshold for sell signal (default -0.20)
-         * @return NewsBias with direction (buy/sell/neutral) and confidence
-         */
         public NewsBias summarizeNewsBias(List<Map<String, Object>> events, double maxAgeHours,
                         double buyThreshold, double sellThreshold) {
                 try {
@@ -315,15 +302,6 @@ public class NewsDataProvider {
                 }
         }
 
-        /**
-         * Convenience method: fetch news and return both events + bias in one call.
-         *
-         * @param symbol      Symbol to fetch news for
-         * @param brokerType  Broker/exchange type
-         * @param limit       Maximum articles
-         * @param maxAgeHours Max age of news to consider for bias
-         * @return Map containing: symbol, events (list), bias (NewsBias)
-         */
         public Map<String, Object> fetchAndSummarizeNews(String symbol, String brokerType,
                         int limit, double maxAgeHours) {
                 List<Map<String, Object>> events = fetchSymbolNews(symbol, brokerType, limit);
@@ -333,24 +311,13 @@ public class NewsDataProvider {
                 result.put("symbol", symbol != null ? symbol.toUpperCase().strip() : "");
                 result.put("events", events);
                 result.put("bias", bias.toMap());
-
                 return result;
         }
 
-        /**
-         * Clear the news cache (useful after symbol changes or periodic refresh).
-         */
         public void clearNewsCache() {
-            rssNewsService.clearCache();
+                rssNewsService.clearCache();
         }
 
-        /**
-         * Fetch general market news from multiple top-tier financial RSS feeds
-         * (Reuters, CNBC, MarketWatch, ForexLive, FX Street, BBC Business, etc.).
-         *
-         * @param limit Maximum number of articles to return
-         * @return List of news articles with sentiment scores
-         */
         public List<Map<String, Object>> fetchGeneralMarketNews(int limit) {
                 try {
                         return rssNewsService.fetchGeneralMarketNews(limit);
@@ -360,29 +327,29 @@ public class NewsDataProvider {
                 }
         }
 
-        private void notifyListeners(NewsEvent event, String action) {
-                listeners.forEach(listener -> listener.onNewsEventChange(event, action));
-        }
-
-        /**
-         * Get total active blackouts.
-         */
         public int getActiveBlackoutCount() {
-                return (int) newsEvents.stream()
-                                .filter(NewsEvent::isBlackoutActive)
-                                .count();
+                return (int) newsEvents.stream().filter(NewsEvent::isBlackoutActive).count();
         }
 
-        /**
-         * Clear all events (for testing).
-         */
         public void clearAll() {
                 newsEvents.clear();
         }
 
-        /**
-         * Listener interface for news event changes.
-         */
+        // ------------------------------------------------------------------
+        // Internal helpers
+        // ------------------------------------------------------------------
+
+        private boolean isDuplicate(NewsEvent incoming) {
+                return newsEvents.stream().anyMatch(existing ->
+                        existing.getTitle().equalsIgnoreCase(incoming.getTitle()) &&
+                        existing.getEventTime().equals(incoming.getEventTime()));
+        }
+
+        private void notifyListeners(NewsEvent event, String action) {
+                listeners.forEach(listener -> listener.onNewsEventChange(event, action));
+        }
+
+        /** Listener interface for news event changes. */
         public interface NewsEventListener {
                 void onNewsEventChange(NewsEvent event, String action);
         }
