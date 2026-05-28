@@ -6,10 +6,12 @@ import org.investpro.core.agents.AgentEventBus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Periodic reconciliation engine that verifies the runtime’s internal state
@@ -33,7 +35,7 @@ public final class ExchangeReconciliationEngine {
     /** Default reconciliation interval (5 minutes). */
     private static final long DEFAULT_INTERVAL_SECONDS = 300;
 
-    private final String exchangeName;
+    private String exchangeName = "OANDA";
     @Nullable
     private final AgentEventBus eventBus;
     private final long intervalSeconds;
@@ -72,9 +74,9 @@ public final class ExchangeReconciliationEngine {
      * @param orderFetcher     supplier for live open order data
      */
     public void start(
-            @NotNull java.util.function.Supplier<CompletableFuture<Map<String, Double>>> balanceFetcher,
-            @NotNull java.util.function.Supplier<CompletableFuture<Map<String, Integer>>> positionFetcher,
-            @NotNull java.util.function.Supplier<CompletableFuture<Integer>> orderFetcher
+            @NotNull Supplier<CompletableFuture<Map<String, Double>>> balanceFetcher,
+            @NotNull Supplier<CompletableFuture<Map<String, Integer>>> positionFetcher,
+            @NotNull Supplier<CompletableFuture<Integer>> orderFetcher
     ) {
         if (running) return;
         running = true;
@@ -104,9 +106,9 @@ public final class ExchangeReconciliationEngine {
 
     /** Triggers an immediate reconciliation (non-blocking). */
     public void triggerNow(
-            @NotNull java.util.function.Supplier<CompletableFuture<Map<String, Double>>> balanceFetcher,
-            @NotNull java.util.function.Supplier<CompletableFuture<Map<String, Integer>>> positionFetcher,
-            @NotNull java.util.function.Supplier<CompletableFuture<Integer>> orderFetcher
+            @NotNull Supplier<CompletableFuture<Map<String, Double>>> balanceFetcher,
+            @NotNull Supplier<CompletableFuture<Map<String, Integer>>> positionFetcher,
+            @NotNull Supplier<CompletableFuture<Integer>> orderFetcher
     ) {
         scheduler.submit(() -> runReconciliation(balanceFetcher, positionFetcher, orderFetcher));
     }
@@ -114,9 +116,9 @@ public final class ExchangeReconciliationEngine {
     // ─────────────────────────────────────────────────────────────────────────────────
 
     private void runReconciliation(
-            java.util.function.Supplier<CompletableFuture<Map<String, Double>>> balanceFetcher,
-            java.util.function.Supplier<CompletableFuture<Map<String, Integer>>> positionFetcher,
-            java.util.function.Supplier<CompletableFuture<Integer>> orderFetcher
+            Supplier<CompletableFuture<Map<String, Double>>> balanceFetcher,
+            Supplier<CompletableFuture<Map<String, Integer>>> positionFetcher,
+            Supplier<CompletableFuture<Integer>> orderFetcher
     ) {
         Instant startedAt = Instant.now();
         try {
@@ -184,7 +186,7 @@ public final class ExchangeReconciliationEngine {
                             livePositions.size(),
                             liveOpenOrders,
                             driftDetected ? "YES" : "NO",
-                            java.time.Duration.between(startedAt, completedAt).toMillis()
+                            Duration.between(startedAt, completedAt).toMillis()
                     );
         }
     }

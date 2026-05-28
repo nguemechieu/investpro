@@ -223,7 +223,7 @@ public final class ExchangeOperationsBoard extends VBox {
         endpointTable.getColumns().addAll(nameCol, critCol, circuitCol, latencyCol, failCol, successCol);
         endpointTable.setStyle("-fx-background-color: #21252b; -fx-control-inner-background: #21252b;");
         endpointTable.setPrefHeight(200);
-        endpointTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        endpointTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         // Pre-populate rows
         for (EndpointType ep : EndpointType.values()) {

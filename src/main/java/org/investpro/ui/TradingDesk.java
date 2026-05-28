@@ -5373,17 +5373,28 @@ public class TradingDesk extends BorderPane  {
             return;
         }
 
-        try {
-            List<SymbolTradability> statuses = universalTradabilityService.getTradability(pairs).get(8, TimeUnit.SECONDS);
-            for (SymbolTradability status : statuses) {
-                if (status == null || status.tradePair() == null) {
-                    continue;
-                }
-                tradabilityBySymbol.put(symbolKey(status.tradePair()), status);
-            }
-        } catch (Exception exception) {
-            log.warn("Unable to refresh tradability snapshot for {} symbols", pairs.size(), exception);
-        }
+        // Run off the JavaFX thread to avoid blocking the UI — results are applied back on FX thread
+        universalTradabilityService.getTradability(pairs)
+                .whenComplete((statuses, ex) -> {
+                    if (ex != null) {
+                        log.warn("Unable to refresh tradability snapshot for {} symbols", pairs.size(), ex);
+                        return;
+                    }
+                    Platform.runLater(() -> {
+                        for (SymbolTradability status : statuses) {
+                            if (status == null || status.tradePair() == null) continue;
+                            tradabilityBySymbol.put(symbolKey(status.tradePair()), status);
+                        }
+                        // Re-apply filter now that tradability data is available
+                        List<TradePair> universe = new java.util.ArrayList<>(marketWatchUniverse);
+                        if (!universe.isEmpty()) {
+                            List<TradePair> filtered = applyTradabilityFilter(universe);
+                            if (filtered.isEmpty()) filtered = universe;
+                            marketWatchItems.setAll(filtered);
+                            symbolCountLabel.setText(t("label.symbols", filtered.size()));
+                        }
+                    });
+                });
     }
 
     private String symbolKey(TradePair pair) {

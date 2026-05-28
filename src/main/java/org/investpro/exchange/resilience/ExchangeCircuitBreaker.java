@@ -44,8 +44,8 @@ public final class ExchangeCircuitBreaker {
     private static final int DEFAULT_FAILURE_THRESHOLD = 3;
     private static final int DEFAULT_PROBE_TIMEOUT_SECONDS = 10;
 
-    private final String exchangeName;
-    private final EndpointType endpoint;
+    private String exchangeName = "OANDA";
+    private EndpointType endpoint = EndpointType.ORDER_HISTORY;
     private final int failureThreshold;
     @Nullable
     private final AgentEventBus eventBus;

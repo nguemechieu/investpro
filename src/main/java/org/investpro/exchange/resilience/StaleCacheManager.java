@@ -34,7 +34,7 @@ import java.util.function.Supplier;
 @Slf4j
 public final class StaleCacheManager<T> {
 
-    private final String cacheName;
+    private String cacheName = "";
     private final EndpointType endpoint;
     private final Duration maxFreshAge;
     @Nullable

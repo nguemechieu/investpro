@@ -44,7 +44,7 @@ public final class WebSocketOrchestrator {
     private static final Duration DEFAULT_FALLBACK_DELAY = Duration.ofSeconds(30);
     private static final Duration HEALTH_CHECK_INTERVAL = Duration.ofSeconds(10);
 
-    private final String exchangeName;
+    private String exchangeName;
     @Nullable
     private final AgentEventBus eventBus;
     @Nullable
