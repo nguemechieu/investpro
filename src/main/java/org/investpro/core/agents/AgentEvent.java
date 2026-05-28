@@ -68,6 +68,24 @@ public record AgentEvent(
 
     public static final String ERROR = "ERROR";
 
+    // ── Exchange resilience events ─────────────────────────────────────────────
+    /** Emitted when an exchange WebSocket or REST connection is established. */
+    public static final String EXCHANGE_CONNECTED       = "EXCHANGE_CONNECTED";
+    /** Emitted when an exchange connection is lost. */
+    public static final String EXCHANGE_DISCONNECTED    = "EXCHANGE_DISCONNECTED";
+    /** Emitted when a specific endpoint degrades below the health threshold. */
+    public static final String ENDPOINT_DEGRADED        = "ENDPOINT_DEGRADED";
+    /** Emitted when an endpoint circuit breaker transitions to OPEN state. */
+    public static final String CIRCUIT_OPENED           = "CIRCUIT_OPENED";
+    /** Emitted when an endpoint circuit breaker recovers to CLOSED state. */
+    public static final String CIRCUIT_RECOVERED        = "CIRCUIT_RECOVERED";
+    /** Emitted when the overall exchange health grade changes (GREEN/YELLOW/ORANGE/RED). */
+    public static final String EXCHANGE_HEALTH_CHANGED  = "EXCHANGE_HEALTH_CHANGED";
+    /** Emitted when a stale cached response is served instead of a live fetch. */
+    public static final String STALE_CACHE_SERVED       = "STALE_CACHE_SERVED";
+    /** Emitted when a reconciliation cycle completes (balances, positions, orders). */
+    public static final String RECONCILIATION_COMPLETED = "RECONCILIATION_COMPLETED";
+
     public AgentEvent {
         type = Objects.requireNonNull(type, "type must not be null").trim();
 
@@ -145,19 +163,12 @@ public record AgentEvent(
         return new AgentEvent(ERROR, source, throwable, Instant.now(), metadata);
     }
 
-
-
     public Object metadataValue(String key) {
         if (key == null || key.isBlank()) {
             return null;
         }
-
         return metadata.get(key);
     }
-
-
-
-
 
     public boolean isError() {
         return Objects.equals(type, ERROR);
