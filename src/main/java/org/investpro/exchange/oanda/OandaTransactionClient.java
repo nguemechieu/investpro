@@ -195,13 +195,18 @@ public final class OandaTransactionClient {
         }
     }
 
+    /**
+     * Returns the stale cached order history if available, otherwise an empty list.
+     *
+     * <p>Uses {@link StaleCacheManager#getOrServeStale} with a no-op empty-list supplier
+     * so callers get the last known data without triggering a new HTTP request.
+     */
     private CompletableFuture<List<JsonNode>> serveStaleCache(String reason) {
         log.warn("OandaTransactionClient: serving stale cache — {}", reason);
-        if (orderHistoryCache != null) {
-            List<JsonNode> cached = orderHistoryCache.getStaleIfPresent();
-            if (cached != null) {
-                return CompletableFuture.completedFuture(cached);
-            }
+        if (orderHistoryCache != null && orderHistoryCache.hasCachedValue()) {
+            // Return whatever is in cache (fresh or stale); background refresh uses empty-list no-op
+            return orderHistoryCache.getOrServeStale(
+                    () -> CompletableFuture.completedFuture(List.of()));
         }
         log.warn("OandaTransactionClient: no stale cache available, returning empty list");
         return CompletableFuture.completedFuture(List.of());
