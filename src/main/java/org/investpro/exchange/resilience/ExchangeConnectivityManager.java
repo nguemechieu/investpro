@@ -104,6 +104,45 @@ public final class ExchangeConnectivityManager {
     }
 
     /**
+     * Records a failure directly against an endpoint's circuit breaker and health monitor.
+     *
+     * <p>Use this when status-code checks inside a supplier detect errors that should
+     * be counted (e.g. HTTP 504 inside {@code OandaTransactionClient.sendJson}).
+     * The circuit breaker accumulates the failure count and may open the circuit.
+     *
+     * @param endpoint the endpoint that failed
+     * @param cause    the exception representing the failure
+     */
+    public void recordFailure(@NotNull EndpointType endpoint, @NotNull Throwable cause) {
+        ExchangeCircuitBreaker breaker = circuitBreakers.get(endpoint);
+        if (breaker != null) {
+            breaker.recordFailure(cause);
+            healthMonitor.updateCircuitState(endpoint, breaker.getState());
+        }
+        healthMonitor.recordFailure(endpoint, cause);
+        telemetry.recordFailure(endpoint, 0L);
+    }
+
+    /**
+     * Records a successful response directly against an endpoint's circuit breaker
+     * and health monitor.
+     *
+     * <p>Resets the consecutive-failure counter and may transition the circuit from
+     * HALF_OPEN back to CLOSED.
+     *
+     * @param endpoint the endpoint that succeeded
+     */
+    public void recordSuccess(@NotNull EndpointType endpoint) {
+        ExchangeCircuitBreaker breaker = circuitBreakers.get(endpoint);
+        if (breaker != null) {
+            breaker.recordSuccess();
+            healthMonitor.updateCircuitState(endpoint, breaker.getState());
+        }
+        healthMonitor.recordSuccess(endpoint, 0L);
+        telemetry.recordSuccess(endpoint, 0L);
+    }
+
+    /**
      * Returns the current connectivity state of the exchange.
      *
      * @return current state
@@ -196,11 +235,11 @@ public final class ExchangeConnectivityManager {
     private @NotNull ExchangeConnectivityState deriveState(
             @NotNull Map<EndpointType, EndpointHealthSnapshot> snapshots
     ) {
-        boolean anyCircuitOpen = snapshots.values().stream()
-                .anyMatch(s -> s.circuitState() == CircuitState.OPEN);
         boolean criticalCircuitOpen = snapshots.entrySet().stream()
                 .filter(e -> e.getKey().critical)
                 .anyMatch(e -> e.getValue().circuitState() == CircuitState.OPEN);
+        boolean anyCircuitOpen = snapshots.values().stream()
+                .anyMatch(s -> s.circuitState() == CircuitState.OPEN);
         boolean anyFailing = snapshots.values().stream()
                 .anyMatch(s -> s.consecutiveFailures() > 0);
 
