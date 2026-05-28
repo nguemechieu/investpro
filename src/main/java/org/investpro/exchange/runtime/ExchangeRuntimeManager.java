@@ -121,7 +121,7 @@ public final class ExchangeRuntimeManager {
         ExchangeRuntimeState previousState = stateRef.getAndSet(newState);
         if (previousState == newState) return;
 
-        log.info("Exchange '{}' state: {} → {}", exchangeName, previousState, newState);
+        log.info("Exchange '{}' state: {} \u2192 {}", exchangeName, previousState, newState);
         refreshMetadata(exchangeName, newState);
         publishStateEvent(exchangeName, previousState, newState);
     }
@@ -228,7 +228,7 @@ public final class ExchangeRuntimeManager {
         log.info("ExchangeRuntimeManager stopped");
     }
 
-    // ─ Private helpers ──────────────────────────────────────────────────────
+    // ─ Private helpers ──────────────────────────────────────────────
 
     private void runHealthCycle() {
         for (String exchangeName : states.keySet()) {
@@ -279,16 +279,14 @@ public final class ExchangeRuntimeManager {
             @NotNull ExchangeRuntimeState next
     ) {
         if (eventBus == null) return;
-        // AgentEvent constants EXCHANGE_CONNECTED/DISCONNECTED/HEALTH_CHANGED are EXCHANGE_STATUS enums;
-        // use .name() to get their String representation for the event type.
         String eventType = switch (next) {
-            case CONNECTED -> AgentEvent.EXCHANGE_CONNECTED.name();
-            case DISCONNECTED -> AgentEvent.EXCHANGE_DISCONNECTED.name();
-            case DEGRADED -> "EXCHANGE_DEGRADED";
-            case AUTH_FAILED -> "EXCHANGE_AUTH_FAILED";
-            case STALE -> "EXCHANGE_STALE";
-            case CIRCUIT_OPEN -> AgentEvent.CIRCUIT_OPENED;
-            default -> AgentEvent.EXCHANGE_HEALTH_CHANGED.name();
+            case CONNECTED     -> AgentEvent.EXCHANGE_CONNECTED;
+            case DISCONNECTED  -> AgentEvent.EXCHANGE_DISCONNECTED;
+            case DEGRADED      -> AgentEvent.EXCHANGE_DEGRADED;
+            case AUTH_FAILED   -> AgentEvent.EXCHANGE_AUTH_FAILED;
+            case STALE         -> AgentEvent.WEBSOCKET_STALE;
+            case CIRCUIT_OPEN  -> AgentEvent.CIRCUIT_OPENED;
+            default            -> AgentEvent.EXCHANGE_HEALTH_CHANGED;
         };
         Map<String, Object> eventMeta = Map.of(
                 "exchange", exchangeName,
