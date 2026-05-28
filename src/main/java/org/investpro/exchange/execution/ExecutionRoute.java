@@ -3,91 +3,58 @@ package org.investpro.exchange.execution;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Immutable record representing the selected execution path for an order.
+ * Immutable description of the route selected by {@link org.investpro.exchange.routing.SmartExecutionRouter}.
  *
- * <p>A route is produced by {@link org.investpro.exchange.routing.SmartExecutionRouter}
- * after scoring available exchanges and venues.  It captures the estimated
- * execution quality (fill price, fees, slippage, latency) so the result can be
- * compared against actuals for post-trade analytics.
- *
- * <p>Use {@link #selected} for the common case where a specific exchange is chosen,
- * or construct the record directly for full control.
+ * <p>Contains scoring metadata so callers can audit why a route was chosen.
  */
 public record ExecutionRoute(
         @NotNull String routeId,
         @NotNull String requestId,
         @NotNull ExecutionVenue venue,
         @NotNull String exchangeName,
-        @Nullable String venueSubId,
-        double estimatedFillPrice,
-        double estimatedFees,
-        double estimatedSlippageBps,
-        long estimatedLatencyMs,
-        double liquidityScore,
-        @NotNull String routingReason,
-        @NotNull Instant routedAt
+        @Nullable BigDecimal estimatedSpreadBps,
+        @Nullable BigDecimal estimatedFeeBps,
+        @Nullable BigDecimal estimatedSlippageBps,
+        @Nullable Long estimatedLatencyMs,
+        @Nullable BigDecimal availableLiquidity,
+        double routeScore,
+        @NotNull Instant selectedAt
 ) {
 
-    // ── Static factory methods ────────────────────────────────────────────────
-
-    /**
-     * Creates an {@link ExecutionRoute} with the minimal information known at
-     * routing time.  Slippage, latency, and liquidity receive default estimates.
-     *
-     * @param requestId          links back to the originating {@link ExecutionRequest}
-     * @param venue              the selected execution venue type
-     * @param exchangeName       the selected exchange name (e.g., "COINBASE")
-     * @param estimatedFillPrice estimated fill price at time of routing
-     * @param estimatedFees      estimated fee amount in quote currency
-     * @return a new {@link ExecutionRoute}
-     */
-    public static @NotNull ExecutionRoute selected(
-            @NotNull String requestId,
-            @NotNull ExecutionVenue venue,
-            @NotNull String exchangeName,
-            double estimatedFillPrice,
-            double estimatedFees
-    ) {
-        return new ExecutionRoute(
-                UUID.randomUUID().toString(),
-                requestId,
-                venue,
-                exchangeName,
-                null,
-                estimatedFillPrice,
-                estimatedFees,
-                0.0,
-                50L,
-                0.5,
-                "Best available exchange by composite score",
-                Instant.now()
-        );
+    public ExecutionRoute {
+        Objects.requireNonNull(routeId, "routeId");
+        Objects.requireNonNull(requestId, "requestId");
+        Objects.requireNonNull(venue, "venue");
+        Objects.requireNonNull(exchangeName, "exchangeName");
+        Objects.requireNonNull(selectedAt, "selectedAt");
     }
 
-    // ── Instance query methods ────────────────────────────────────────────────
+    /** Returns estimated spread in bps if available. */
+    public Optional<BigDecimal> getEstimatedSpreadBps() { return Optional.ofNullable(estimatedSpreadBps); }
 
-    /**
-     * Returns a brief human-readable summary of this route.
-     *
-     * @return formatted summary string
-     */
-    public @NotNull String summary() {
-        return "ExecutionRoute[%s req=%s %s/%s%s fillPx=%.4f fees=%.4f slipBps=%.2f latMs=%d liq=%.2f]"
-                .formatted(
-                        routeId.substring(0, 8),
-                        requestId.substring(0, 8),
-                        venue.getDisplayName(),
-                        exchangeName,
-                        venueSubId != null ? "/" + venueSubId : "",
-                        estimatedFillPrice,
-                        estimatedFees,
-                        estimatedSlippageBps,
-                        estimatedLatencyMs,
-                        liquidityScore
-                );
+    /** Returns estimated fee in bps if available. */
+    public Optional<BigDecimal> getEstimatedFeeBps() { return Optional.ofNullable(estimatedFeeBps); }
+
+    /** Returns estimated slippage in bps if available. */
+    public Optional<BigDecimal> getEstimatedSlippageBps() { return Optional.ofNullable(estimatedSlippageBps); }
+
+    /** Returns estimated latency in ms if available. */
+    public Optional<Long> getEstimatedLatencyMs() { return Optional.ofNullable(estimatedLatencyMs); }
+
+    /** Returns available liquidity at the time of routing. */
+    public Optional<BigDecimal> getAvailableLiquidity() { return Optional.ofNullable(availableLiquidity); }
+
+    /** Returns the total cost estimate (spread + fee + slippage) in bps. */
+    public Optional<BigDecimal> totalCostBps() {
+        if (estimatedSpreadBps == null || estimatedFeeBps == null || estimatedSlippageBps == null) {
+            return Optional.empty();
+        }
+        return Optional.of(estimatedSpreadBps.add(estimatedFeeBps).add(estimatedSlippageBps));
     }
 }

@@ -2,26 +2,54 @@ package org.investpro.exchange.distributed;
 
 import org.investpro.exchange.execution.ExecutionRequest;
 import org.investpro.exchange.execution.ExecutionResult;
-import org.investpro.exchange.runtime.ExchangeRuntimeState;
+import org.investpro.exchange.normalization.NormalizedMarketSnapshot;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Design-only interface for a remote exchange worker process.
+ * Design-only interface for a remote exchange worker node.
  *
- * <p><b>This interface is design-only and has no production implementation yet.</b>
+ * <p>In a distributed deployment, each exchange adapter can run as an
+ * independent worker process (JVM, container, or serverless function).
+ * This interface defines the contract that the central orchestrator uses
+ * to communicate with remote workers.
+ *
+ * <p><b>Implementation deferred</b>: networking and serialization are not
+ * yet implemented. Future implementations may use gRPC, Kafka, or REST.
  */
 public interface RemoteExchangeWorker {
 
-    CompletableFuture<ExecutionResult> execute(ExecutionRequest request);
+    /** Returns the unique worker identifier. */
+    @NotNull String workerId();
 
-    CompletableFuture<ExchangeRuntimeState> getWorkerState();
+    /** Returns the name of the exchange this worker handles. */
+    @NotNull String exchangeName();
 
-    String getWorkerId();
+    /** Returns true if this worker is currently reachable and processing requests. */
+    boolean isAlive();
 
-    String getExchangeName();
+    /**
+     * Requests the latest normalized market snapshot from the remote worker.
+     *
+     * @param symbol the trading pair symbol
+     * @return future resolving to a snapshot, or empty if unavailable
+     */
+    CompletableFuture<Optional<NormalizedMarketSnapshot>> fetchSnapshot(@NotNull String symbol);
 
-    boolean isAvailable();
+    /**
+     * Submits an execution request to the remote worker for processing.
+     *
+     * @param request the trade execution request
+     * @return future resolving to the execution result
+     */
+    CompletableFuture<ExecutionResult> submitExecution(@NotNull ExecutionRequest request);
 
+    /**
+     * Gracefully shuts down the remote worker connection.
+     *
+     * <p>After this call, {@link #isAlive()} must return false.
+     */
     void shutdown();
 }

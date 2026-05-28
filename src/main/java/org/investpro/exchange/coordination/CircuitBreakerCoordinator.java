@@ -3,128 +3,133 @@ package org.investpro.exchange.coordination;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEventBus;
 import org.investpro.exchange.resilience.ExchangeCircuitBreaker;
-import org.investpro.exchange.resilience.model.EndpointType;
-import org.investpro.exchange.resilience.model.ExchangeConnectivityState;
 import org.investpro.exchange.resilience.model.CircuitState;
-import org.investpro.exchange.throttle.ExchangeThrottleProfile;
+import org.investpro.exchange.resilience.model.EndpointType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages a fleet of {@link ExchangeCircuitBreaker} instances, one per
- * (exchange, endpoint) pair.
+ * Coordinates multiple {@link ExchangeCircuitBreaker} instances for a single exchange.
+ *
+ * <p>One coordinator is created per exchange. It holds one circuit breaker
+ * per {@link EndpointType} and provides aggregate health queries across all
+ * circuits.
+ *
+ * <p>Typical usage:
+ * <pre>{@code
+ *   var coord = CircuitBreakerCoordinator.forExchange("Coinbase", eventBus);
+ *   var result = coord.execute(EndpointType.PRICING, () -> client.getPrice("BTC-USD"));
+ * }</pre>
  */
 @Slf4j
-public class CircuitBreakerCoordinator {
+public final class CircuitBreakerCoordinator {
 
-    private static final EndpointType[] MANAGED_ENDPOINTS = {
-            EndpointType.PRICING,
-            EndpointType.EXECUTION,
-            EndpointType.BALANCES,
-            EndpointType.ORDER_HISTORY
-    };
+    private final String exchangeName;
+    private final Map<EndpointType, ExchangeCircuitBreaker> breakers;
 
-    private final Map<String, Map<EndpointType, ExchangeCircuitBreaker>> circuits =
-            new ConcurrentHashMap<>();
-
-    private final Map<String, ExchangeThrottleProfile> throttleProfiles =
-            new ConcurrentHashMap<>();
-
-    @Nullable
-    private final AgentEventBus eventBus;
-
-    public CircuitBreakerCoordinator(@Nullable AgentEventBus eventBus) {
-        this.eventBus = eventBus;
-    }
-
-    public void registerExchange(
-            @NotNull String exchangeName,
-            @NotNull ExchangeThrottleProfile profile
+    private CircuitBreakerCoordinator(
+            String exchangeName,
+            Map<EndpointType, ExchangeCircuitBreaker> breakers
     ) {
-        circuits.computeIfAbsent(exchangeName, name -> {
-            Map<EndpointType, ExchangeCircuitBreaker> map = new EnumMap<>(EndpointType.class);
-            for (EndpointType endpoint : MANAGED_ENDPOINTS) {
-                map.put(endpoint, new ExchangeCircuitBreaker(name, endpoint, eventBus));
-            }
-            log.info("CircuitBreakerCoordinator: registered {} with {} endpoint breakers",
-                    name, MANAGED_ENDPOINTS.length);
-            return map;
-        });
-        throttleProfiles.put(exchangeName, profile);
+        this.exchangeName = exchangeName;
+        this.breakers = breakers;
     }
 
-    public @NotNull Optional<ExchangeCircuitBreaker> getCircuitBreaker(
+    /**
+     * Creates a coordinator covering all {@link EndpointType} values for an exchange.
+     *
+     * @param exchangeName exchange identifier
+     * @param eventBus     optional event bus for circuit state events
+     * @return new coordinator
+     */
+    public static CircuitBreakerCoordinator forExchange(
             @NotNull String exchangeName,
-            @NotNull EndpointType endpoint
+            @Nullable AgentEventBus eventBus
     ) {
-        Map<EndpointType, ExchangeCircuitBreaker> map = circuits.get(exchangeName);
-        if (map == null) return Optional.empty();
-        return Optional.ofNullable(map.get(endpoint));
-    }
-
-    public boolean isExecutionAllowed(@NotNull String exchangeName) {
-        return getCircuitBreaker(exchangeName, EndpointType.EXECUTION)
-                .map(ExchangeCircuitBreaker::isRequestAllowed)
-                .orElse(true);
-    }
-
-    public boolean isPricingAllowed(@NotNull String exchangeName) {
-        return getCircuitBreaker(exchangeName, EndpointType.PRICING)
-                .map(ExchangeCircuitBreaker::isRequestAllowed)
-                .orElse(true);
-    }
-
-    public @NotNull ExchangeConnectivityState getAggregateState(@NotNull String exchangeName) {
-        Map<EndpointType, ExchangeCircuitBreaker> map = circuits.get(exchangeName);
-        if (map == null) return ExchangeConnectivityState.DISCONNECTED;
-
-        ExchangeCircuitBreaker executionBreaker = map.get(EndpointType.EXECUTION);
-        if (executionBreaker != null && executionBreaker.getState() == CircuitState.OPEN) {
-            return ExchangeConnectivityState.CIRCUIT_OPEN;
+        Map<EndpointType, ExchangeCircuitBreaker> map = new ConcurrentHashMap<>();
+        for (EndpointType endpoint : EndpointType.values()) {
+            map.put(endpoint, new ExchangeCircuitBreaker(exchangeName, endpoint, eventBus));
         }
-
-        boolean anyOpen = map.values().stream()
-                .anyMatch(cb -> cb.getState() == CircuitState.OPEN);
-        return anyOpen ? ExchangeConnectivityState.DEGRADED : ExchangeConnectivityState.CONNECTED;
+        return new CircuitBreakerCoordinator(exchangeName, map);
     }
 
-    public @NotNull Map<String, ExchangeConnectivityState> getAggregateStateAll() {
-        Map<String, ExchangeConnectivityState> result = new HashMap<>();
-        for (String exchange : circuits.keySet()) {
-            result.put(exchange, getAggregateState(exchange));
-        }
-        return Map.copyOf(result);
+    /**
+     * Returns the circuit breaker for a specific endpoint, creating one lazily if absent.
+     *
+     * @param endpoint the endpoint type
+     * @return the circuit breaker for that endpoint
+     */
+    public @NotNull ExchangeCircuitBreaker breaker(@NotNull EndpointType endpoint) {
+        return breakers.computeIfAbsent(
+                endpoint,
+                ep -> new ExchangeCircuitBreaker(exchangeName, ep, null)
+        );
     }
 
-    public void recordSuccess(@NotNull String exchangeName, @NotNull EndpointType endpoint) {
-        getCircuitBreaker(exchangeName, endpoint).ifPresent(ExchangeCircuitBreaker::recordSuccess);
+    /**
+     * Returns true if ALL circuits are in {@link CircuitState#CLOSED} (healthy).
+     */
+    public boolean isFullyHealthy() {
+        return breakers.values().stream().allMatch(b -> b.getState() == CircuitState.CLOSED);
     }
 
-    public void recordFailure(
-            @NotNull String exchangeName,
-            @NotNull EndpointType endpoint,
-            @NotNull Throwable cause
-    ) {
-        getCircuitBreaker(exchangeName, endpoint)
-                .ifPresent(cb -> cb.recordFailure(cause));
+    /**
+     * Returns true if ANY circuit is in {@link CircuitState#OPEN} (degraded/unavailable).
+     */
+    public boolean hasOpenCircuit() {
+        return breakers.values().stream().anyMatch(b -> b.getState() == CircuitState.OPEN);
     }
 
-    public void shutdown() {
-        circuits.values().stream()
-                .flatMap(map -> map.values().stream())
-                .forEach(cb -> {
-                    try {
-                        cb.shutdown();
-                    } catch (Exception e) {
-                        log.warn("Error shutting down circuit breaker: {}", e.getMessage());
-                    }
-                });
-        log.info("CircuitBreakerCoordinator: all circuit breakers shut down");
+    /**
+     * Returns true if the specific endpoint circuit is healthy (CLOSED).
+     *
+     * @param endpoint the endpoint to check
+     */
+    public boolean isHealthy(@NotNull EndpointType endpoint) {
+        ExchangeCircuitBreaker cb = breakers.get(endpoint);
+        return cb != null && cb.getState() == CircuitState.CLOSED;
+    }
+
+    /**
+     * Returns the aggregate health ratio: proportion of CLOSED circuits in [0.0, 1.0].
+     */
+    public double aggregateHealthRatio() {
+        if (breakers.isEmpty()) return 1.0;
+        long closed = breakers.values().stream()
+                .filter(b -> b.getState() == CircuitState.CLOSED)
+                .count();
+        return (double) closed / breakers.size();
+    }
+
+    /**
+     * Returns the circuit state for a specific endpoint.
+     *
+     * @param endpoint the endpoint to query
+     * @return optional circuit state (empty if no breaker registered)
+     */
+    public Optional<CircuitState> circuitState(@NotNull EndpointType endpoint) {
+        ExchangeCircuitBreaker cb = breakers.get(endpoint);
+        return cb == null ? Optional.empty() : Optional.of(cb.getState());
+    }
+
+    /** Returns the exchange name this coordinator manages. */
+    public String getExchangeName() { return exchangeName; }
+
+    /** Returns a snapshot map of all endpoint → circuit states. */
+    public Map<EndpointType, CircuitState> allStates() {
+        Map<EndpointType, CircuitState> result = new EnumMap<>(EndpointType.class);
+        breakers.forEach((ep, cb) -> result.put(ep, cb.getState()));
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "CircuitBreakerCoordinator{exchange='" + exchangeName
+                + "', health=" + String.format("%.0f%%", aggregateHealthRatio() * 100) + "}";
     }
 }

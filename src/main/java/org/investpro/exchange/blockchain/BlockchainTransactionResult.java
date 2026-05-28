@@ -4,99 +4,97 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Immutable record representing the outcome of a blockchain transaction submission.
+ * Immutable result of an on-chain transaction submission.
+ *
+ * <p>Captures the transaction signature (Solana) or hash (Stellar/EVM),
+ * confirmation depth, gas/fee units consumed, and optional error details.
+ *
+ * <p><b>Design-only</b>: networking implementation deferred to a future phase.
  */
 public record BlockchainTransactionResult(
         @NotNull String transactionId,
         @NotNull String networkId,
-        boolean confirmed,
-        int confirmations,
-        long slot,
-        long feePaid,
+        @NotNull TransactionOutcome outcome,
+        @Nullable String signature,
+        @Nullable Long feeUnitsConsumed,
+        int confirmationDepth,
         @Nullable String errorCode,
         @Nullable String errorMessage,
         @NotNull Instant submittedAt,
-        @Nullable Instant confirmedAt,
-        @NotNull String networkType,
-        @Nullable String explorerUrl
+        @Nullable Instant confirmedAt
 ) {
 
-    public static @NotNull BlockchainTransactionResult pending(
-            @NotNull String transactionId,
-            @NotNull String networkId,
-            @NotNull String networkType
-    ) {
-        return new BlockchainTransactionResult(
-                transactionId, networkId,
-                false, 0, 0L, 0L,
-                null, null,
-                Instant.now(), null,
-                networkType, null
-        );
+    /**
+     * Outcome of a blockchain transaction submission.
+     */
+    public enum TransactionOutcome {
+        /** Transaction confirmed on-chain with required depth. */
+        CONFIRMED,
+        /** Transaction submitted but confirmation not yet received. */
+        PENDING,
+        /** Transaction reverted or rejected by the network. */
+        FAILED,
+        /** Simulation failed; transaction not submitted. */
+        SIMULATION_FAILED,
+        /** Timeout waiting for confirmation. */
+        TIMEOUT
     }
 
-    public static @NotNull BlockchainTransactionResult confirmed(
-            @NotNull String transactionId,
-            @NotNull String networkId,
-            int confirmations,
-            long slot,
-            long feePaid,
-            @NotNull String networkType,
-            @Nullable String explorerUrl
-    ) {
-        Instant now = Instant.now();
-        return new BlockchainTransactionResult(
-                transactionId, networkId,
-                true, confirmations, slot, feePaid,
-                null, null,
-                now, now,
-                networkType, explorerUrl
-        );
+    public BlockchainTransactionResult {
+        Objects.requireNonNull(transactionId, "transactionId");
+        Objects.requireNonNull(networkId, "networkId");
+        Objects.requireNonNull(outcome, "outcome");
+        Objects.requireNonNull(submittedAt, "submittedAt");
     }
 
-    public static @NotNull BlockchainTransactionResult failed(
-            @NotNull String transactionId,
-            @NotNull String networkId,
-            @Nullable String errorCode,
-            @Nullable String errorMessage,
-            @NotNull String networkType
-    ) {
-        return new BlockchainTransactionResult(
-                transactionId, networkId,
-                false, 0, 0L, 0L,
-                errorCode, errorMessage,
-                Instant.now(), null,
-                networkType, null
-        );
-    }
+    /** Returns the on-chain signature or hash if available. */
+    public Optional<String> getSignature() { return Optional.ofNullable(signature); }
 
-    public boolean isPending() {
-        return !confirmed && errorCode == null;
-    }
+    /** Returns the fee units consumed (lamports/stroops/gas) if reported. */
+    public Optional<Long> getFeeUnitsConsumed() { return Optional.ofNullable(feeUnitsConsumed); }
 
-    public boolean isConfirmed() {
-        return confirmed;
-    }
+    /** Returns the error code if the transaction failed. */
+    public Optional<String> getErrorCode() { return Optional.ofNullable(errorCode); }
 
+    /** Returns the error message if the transaction failed. */
+    public Optional<String> getErrorMessage() { return Optional.ofNullable(errorMessage); }
+
+    /** Returns the confirmation timestamp if confirmed. */
+    public Optional<Instant> getConfirmedAt() { return Optional.ofNullable(confirmedAt); }
+
+    /** Returns true if the transaction is confirmed on-chain. */
+    public boolean isConfirmed() { return outcome == TransactionOutcome.CONFIRMED; }
+
+    /** Returns true if the transaction is in a terminal failure state. */
     public boolean isFailed() {
-        return !confirmed && errorCode != null;
+        return outcome == TransactionOutcome.FAILED
+                || outcome == TransactionOutcome.SIMULATION_FAILED
+                || outcome == TransactionOutcome.TIMEOUT;
     }
 
-    public @NotNull String summary() {
-        String state = confirmed ? "CONFIRMED" : (isFailed() ? "FAILED" : "PENDING");
-        return "BlockchainTx[%s %s/%s %s confirmations=%d slot=%d feePaid=%d]"
-                .formatted(
-                        transactionId.length() > 16
-                                ? transactionId.substring(0, 16) + "..."
-                                : transactionId,
-                        networkType,
-                        networkId,
-                        state,
-                        confirmations,
-                        slot,
-                        feePaid
-                );
+    // ── Factory methods ─────────────────────────────────────────────────────────
+
+    public static BlockchainTransactionResult confirmed(
+            String txId, String networkId, String signature, long feeUnits, int depth
+    ) {
+        return new BlockchainTransactionResult(
+                txId, networkId, TransactionOutcome.CONFIRMED,
+                signature, feeUnits, depth, null, null,
+                Instant.now().minusMillis(200), Instant.now()
+        );
+    }
+
+    public static BlockchainTransactionResult failed(
+            String txId, String networkId, String errorCode, String errorMessage
+    ) {
+        return new BlockchainTransactionResult(
+                txId, networkId, TransactionOutcome.FAILED,
+                null, null, 0, errorCode, errorMessage,
+                Instant.now(), null
+        );
     }
 }

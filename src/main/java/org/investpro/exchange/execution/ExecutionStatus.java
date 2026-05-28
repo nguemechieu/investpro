@@ -1,70 +1,52 @@
 package org.investpro.exchange.execution;
 
 /**
- * Lifecycle status of an execution request.
+ * Lifecycle status of a trade execution request.
  *
- * <p>Statuses progress from {@link #PENDING} through submission and fill states.
- * Terminal statuses ({@link #isTerminal()} returns {@code true}) indicate that
- * no further state transitions are expected for that order.
- *
- * <p>Typical happy-path transitions:
+ * <p>State transitions:
  * <pre>
- *   PENDING → ROUTING → SUBMITTED → FILLED
- * </pre>
- *
- * <p>Failure paths:
- * <pre>
- *   PENDING → ROUTING → SUBMITTED → REJECTED
- *   PENDING → ROUTING → SUBMITTED → CANCELLED
- *   PENDING → ROUTING → ERROR
- *   SUBMITTED → PARTIAL_FILL → CANCELLED
+ *   PENDING → ROUTING → SUBMITTED → PARTIAL_FILL → FILLED
+ *                              ↘ REJECTED
+ *                              ↘ CANCELLED
+ *                              ↘ ERROR
  * </pre>
  */
 public enum ExecutionStatus {
 
-    /** Request has been created but not yet routed to a venue. */
+    /** Request has been created but routing has not started. */
     PENDING(false),
 
-    /** Router is evaluating available venues and selecting the best path. */
+    /** Smart router is selecting the best execution venue. */
     ROUTING(false),
 
-    /** Order has been submitted to the target exchange and is awaiting acknowledgement. */
+    /** Order has been submitted to the exchange/venue. Awaiting acknowledgement. */
     SUBMITTED(false),
 
-    /**
-     * Order has been partially filled.  The remaining open quantity is still
-     * working at the exchange.  This is a non-terminal intermediate state.
-     */
+    /** Partial fill received; awaiting the remainder. */
     PARTIAL_FILL(false),
 
-    /** Order has been completely filled.  Terminal — no further changes expected. */
+    /** Order fully filled. Terminal state. */
     FILLED(true),
 
-    /** Order was rejected by the exchange (e.g., insufficient funds, invalid params). Terminal. */
+    /** Order rejected by the exchange or router. Terminal state. */
     REJECTED(true),
 
-    /** Order was cancelled — either by the system, the user, or the exchange. Terminal. */
+    /** Order cancelled by user or system. Terminal state. */
     CANCELLED(true),
 
-    /**
-     * A system-level or infrastructure error occurred during routing or submission.
-     * Terminal — the caller should inspect the error code and message for details.
-     */
+    /** Unexpected error during submission or confirmation. Terminal state. */
     ERROR(true);
 
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private final boolean terminal;
+    /** True if no further state transitions are expected. */
+    public final boolean terminal;
 
     ExecutionStatus(boolean terminal) {
         this.terminal = terminal;
     }
 
-    /**
-     * Returns {@code true} if this status represents a final state from which
-     * no further order lifecycle transitions are expected.
-     */
-    public boolean isTerminal() {
-        return terminal;
-    }
+    /** Returns true if this is a terminal status. */
+    public boolean isTerminal() { return terminal; }
+
+    /** Returns true if the execution completed successfully (fully or partially). */
+    public boolean isSuccessful() { return this == FILLED || this == PARTIAL_FILL; }
 }

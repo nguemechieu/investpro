@@ -2,28 +2,41 @@ package org.investpro.exchange.distributed;
 
 import org.investpro.exchange.execution.ExecutionRequest;
 import org.investpro.exchange.execution.ExecutionResult;
-import org.investpro.exchange.runtime.ExchangeRuntimeState;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Design-only interface for a cloud-hosted execution node.
  *
- * <p><b>Design-only interface for future cloud execution node implementations.</b>
+ * <p>A cloud execution node is a dedicated compute unit that accepts execution
+ * requests routed from the central {@code SmartExecutionRouter}. It may run
+ * in a different availability zone or region to reduce latency to a specific
+ * exchange's co-location point.
+ *
+ * <p><b>Implementation deferred</b>: cloud deployment and networking are not
+ * yet implemented.
  */
 public interface CloudExecutionNode {
 
-    String getNodeId();
+    /** Returns the cloud node identifier (e.g., "aws-us-east-1-coinbase"). */
+    @NotNull String nodeId();
 
-    String getRegion();
+    /** Returns the exchanges this node is co-located or optimised for. */
+    @NotNull List<String> supportedExchanges();
 
-    List<String> getSupportedExchanges();
+    /** Returns the estimated round-trip latency to this node in ms. */
+    long estimatedLatencyMs();
 
+    /** Returns true if the node is healthy and accepting requests. */
     boolean isHealthy();
 
-    CompletableFuture<ExecutionResult> routeExecution(ExecutionRequest request);
-
-    CompletableFuture<Map<String, ExchangeRuntimeState>> getNodeRuntimeStates();
+    /**
+     * Routes an execution request to this cloud node.
+     *
+     * @param request the trade execution request
+     * @return future resolving to the execution result
+     */
+    CompletableFuture<ExecutionResult> route(@NotNull ExecutionRequest request);
 }

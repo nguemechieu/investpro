@@ -1,93 +1,78 @@
 package org.investpro.exchange.blockchain;
 
-import org.investpro.exchange.resilience.model.ExchangeHealthGrade;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Immutable snapshot of the health of a blockchain network connection.
+ * Snapshot of the health of a blockchain RPC connection.
+ *
+ * <p>Created periodically by a health-check probe against the configured RPC
+ * endpoint. Can be exposed via {@code ExchangeDiagnosticsService} or
+ * {@code SystemOperationsBoard}.
+ *
+ * <p><b>Design-only</b>: probe implementation deferred to a future phase.
  */
 public record BlockchainHealthState(
         @NotNull String networkId,
-        @NotNull String networkType,
-        boolean rpcHealthy,
-        long currentSlot,
-        long slotLag,
-        double avgConfirmationMs,
-        double rpcLatencyMs,
-        int activeRpcEndpoints,
-        @NotNull Instant capturedAt,
-        @Nullable String errorMessage
+        @NotNull RpcHealth rpcHealth,
+        @Nullable Long currentSlotOrLedger,
+        @Nullable Long slotLag,
+        @Nullable Long avgConfirmationMs,
+        @Nullable Long rpcLatencyMs,
+        boolean backupRpcActive,
+        @NotNull Instant checkedAt
 ) {
 
-    public static @NotNull BlockchainHealthState healthy(
+    /** Health level of the RPC endpoint connection. */
+    public enum RpcHealth {
+        /** RPC responding within expected latency. */
+        HEALTHY,
+        /** RPC responding but with elevated latency or slot lag. */
+        DEGRADED,
+        /** RPC not responding or returning errors. */
+        UNAVAILABLE,
+        /** Health check not yet performed. */
+        UNKNOWN
+    }
+
+    public BlockchainHealthState {
+        Objects.requireNonNull(networkId, "networkId");
+        Objects.requireNonNull(rpcHealth, "rpcHealth");
+        Objects.requireNonNull(checkedAt, "checkedAt");
+    }
+
+    /** Returns the current slot (Solana) or ledger sequence (Stellar) if available. */
+    public Optional<Long> getCurrentSlotOrLedger() { return Optional.ofNullable(currentSlotOrLedger); }
+
+    /** Returns the slot lag (local vs. cluster tip) if measurable. */
+    public Optional<Long> getSlotLag() { return Optional.ofNullable(slotLag); }
+
+    /** Returns average confirmation time in ms if measured. */
+    public Optional<Long> getAvgConfirmationMs() { return Optional.ofNullable(avgConfirmationMs); }
+
+    /** Returns the RPC round-trip latency in ms if measured. */
+    public Optional<Long> getRpcLatencyMs() { return Optional.ofNullable(rpcLatencyMs); }
+
+    /** Returns true if the primary RPC is healthy. */
+    public boolean isHealthy() { return rpcHealth == RpcHealth.HEALTHY; }
+
+    /** Factory: unknown state before first probe. */
+    public static BlockchainHealthState unknown(@NotNull String networkId) {
+        return new BlockchainHealthState(networkId, RpcHealth.UNKNOWN,
+                null, null, null, null, false, Instant.now());
+    }
+
+    /** Factory: healthy probe result. */
+    public static BlockchainHealthState healthy(
             @NotNull String networkId,
-            @NotNull String networkType,
-            long currentSlot,
-            double avgConfirmationMs,
-            double rpcLatencyMs
+            long slot,
+            long latencyMs
     ) {
-        return new BlockchainHealthState(
-                networkId, networkType,
-                true, currentSlot, 0L,
-                avgConfirmationMs, rpcLatencyMs,
-                1, Instant.now(), null
-        );
-    }
-
-    public static @NotNull BlockchainHealthState degraded(
-            @NotNull String networkId,
-            @NotNull String networkType,
-            long currentSlot,
-            long slotLag,
-            double rpcLatencyMs
-    ) {
-        return new BlockchainHealthState(
-                networkId, networkType,
-                true, currentSlot, slotLag,
-                0.0, rpcLatencyMs,
-                1, Instant.now(), null
-        );
-    }
-
-    public static @NotNull BlockchainHealthState unhealthy(
-            @NotNull String networkId,
-            @NotNull String networkType,
-            @NotNull String errorMessage
-    ) {
-        return new BlockchainHealthState(
-                networkId, networkType,
-                false, 0L, Long.MAX_VALUE,
-                0.0, 0.0,
-                0, Instant.now(), errorMessage
-        );
-    }
-
-    public boolean isFullySynced() {
-        return rpcHealthy && slotLag < 10;
-    }
-
-    public @NotNull ExchangeHealthGrade grade() {
-        if (!rpcHealthy) return ExchangeHealthGrade.RED;
-        if (isFullySynced()) return ExchangeHealthGrade.GREEN;
-        if (slotLag < 50)   return ExchangeHealthGrade.YELLOW;
-        if (slotLag < 200)  return ExchangeHealthGrade.ORANGE;
-        return ExchangeHealthGrade.RED;
-    }
-
-    public @NotNull String summary() {
-        return "BlockchainHealth[%s/%s %s slot=%d lag=%d avgConfMs=%.0f rpcMs=%.0f rpcEndpoints=%d]"
-                .formatted(
-                        networkType,
-                        networkId,
-                        grade().name(),
-                        currentSlot,
-                        slotLag,
-                        avgConfirmationMs,
-                        rpcLatencyMs,
-                        activeRpcEndpoints
-                );
+        return new BlockchainHealthState(networkId, RpcHealth.HEALTHY,
+                slot, 0L, null, latencyMs, false, Instant.now());
     }
 }

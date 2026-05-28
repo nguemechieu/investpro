@@ -10,74 +10,63 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * Typed cache wrapper for account balance snapshots.
+ * Typed stale-safe cache for account balance snapshots.
+ *
+ * <p>Balance data is less time-sensitive than pricing, so the default max-fresh
+ * age is 30 seconds. Stale balances are served under the same contract as
+ * {@link MarketSnapshotCache} to prevent cascade failures during account
+ * endpoint outages.
+ *
+ * <p>The snapshot is typed as {@code Map<String, java.math.BigDecimal>}
+ * (currency symbol → balance), matching the typical return type of exchange
+ * balance APIs.
  */
-public class BalanceSnapshotCache {
+public final class BalanceSnapshotCache {
 
-    private final ConcurrentHashMap<String, StaleCacheManager<Map<String, Double>>> caches =
-            new ConcurrentHashMap<>();
+    private static final Duration DEFAULT_MAX_FRESH_AGE = Duration.ofSeconds(30);
 
-    @Nullable
-    private final AgentEventBus eventBus;
-    @Nullable
-    private final ExchangeTelemetryEngine telemetry;
-    private final Duration maxFreshAge;
+    private final StaleCacheManager<Map<String, java.math.BigDecimal>> delegate;
 
     public BalanceSnapshotCache(
+            @NotNull String exchangeName,
             @Nullable AgentEventBus eventBus,
-            @Nullable ExchangeTelemetryEngine telemetry,
-            @NotNull Duration maxFreshAge
+            @Nullable ExchangeTelemetryEngine telemetry
     ) {
-        this.eventBus = eventBus;
-        this.telemetry = telemetry;
-        this.maxFreshAge = maxFreshAge;
+        this(exchangeName, DEFAULT_MAX_FRESH_AGE, eventBus, telemetry);
     }
 
-    public @NotNull CompletableFuture<Map<String, Double>> getOrFetch(
+    public BalanceSnapshotCache(
             @NotNull String exchangeName,
-            @NotNull Supplier<CompletableFuture<Map<String, Double>>> fetcher
+            @NotNull Duration maxFreshAge,
+            @Nullable AgentEventBus eventBus,
+            @Nullable ExchangeTelemetryEngine telemetry
     ) {
-        return cacheFor(exchangeName).getOrServeStale(fetcher);
+        this.delegate = new StaleCacheManager<>(
+                exchangeName + "-balance-snapshot",
+                EndpointType.ACCOUNT,
+                maxFreshAge,
+                eventBus,
+                telemetry
+        );
     }
 
-    public void store(
-            @NotNull String exchangeName,
-            @NotNull Map<String, Double> balances
+    /**
+     * Returns a fresh or stale balance map, scheduling a background refresh if stale.
+     *
+     * @param freshFetcher supplier that fetches a fresh balance map from the exchange
+     * @return future resolving to the (possibly stale) balance map
+     */
+    public CompletableFuture<Map<String, java.math.BigDecimal>> get(
+            @NotNull Supplier<CompletableFuture<Map<String, java.math.BigDecimal>>> freshFetcher
     ) {
-        cacheFor(exchangeName).store(balances);
+        return delegate.getOrServeStale(freshFetcher);
     }
 
-    public void markStale(@NotNull String exchangeName) {
-        cacheFor(exchangeName).markStale();
-    }
-
-    public boolean isStale(@NotNull String exchangeName) {
-        return cacheFor(exchangeName).isStale();
-    }
-
-    public boolean hasCachedValue(@NotNull String exchangeName) {
-        return cacheFor(exchangeName).hasCachedValue();
-    }
-
-    public void shutdown() {
-        caches.values().forEach(StaleCacheManager::shutdown);
-    }
-
-    private @NotNull StaleCacheManager<Map<String, Double>> cacheFor(
-            @NotNull String exchangeName
-    ) {
-        String key = exchangeName.toUpperCase() + ":BALANCES";
-        return caches.computeIfAbsent(key, k ->
-                new StaleCacheManager<>(
-                        k,
-                        EndpointType.BALANCES,
-                        maxFreshAge,
-                        eventBus,
-                        telemetry
-                ));
+    /** Forces the cache to be invalidated on the next access. */
+    public void invalidate() {
+        delegate.invalidate();
     }
 }

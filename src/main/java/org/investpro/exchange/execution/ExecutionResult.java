@@ -3,154 +3,133 @@ package org.investpro.exchange.execution;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.UUID;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Immutable record representing the outcome of an executed order.
+ * Immutable outcome of an executed trade.
  *
- * <p>Results are produced after the execution engine receives a fill confirmation
- * (or error) from the target exchange.  Use the static factory methods for
- * common result types:
- * <ul>
- *   <li>{@link #success} — fully filled order</li>
- *   <li>{@link #failure} — rejected or error order</li>
- *   <li>{@link #pending} — submitted but not yet confirmed</li>
- * </ul>
+ * <p>Captures fill details, slippage, fees, and venue information for
+ * post-trade analysis, reconciliation, and the {@link org.investpro.exchange.reconciliation}
+ * pipeline.
  */
 public record ExecutionResult(
         @NotNull String resultId,
         @NotNull String requestId,
-        @NotNull String routeId,
         @NotNull ExecutionStatus status,
-        @Nullable String orderId,
-        @Nullable String exchangeOrderId,
-        double filledQuantity,
-        double averageFillPrice,
-        double totalFees,
-        double slippageBps,
-        @Nullable String errorCode,
-        @Nullable String errorMessage,
-        int httpStatus,
-        @NotNull Instant submittedAt,
-        @Nullable Instant completedAt,
         @NotNull ExecutionVenue venue,
-        @NotNull String exchangeName
+        @NotNull String exchangeName,
+        @Nullable String orderId,
+        @NotNull List<FillRecord> fills,
+        @Nullable BigDecimal totalFeesPaid,
+        @Nullable BigDecimal slippageBps,
+        @Nullable String rejectionReason,
+        @NotNull Instant completedAt
 ) {
 
-    // ── Static factory methods ────────────────────────────────────────────────
+    /**
+     * Individual fill record within an execution.
+     *
+     * @param fillId   exchange-assigned fill identifier
+     * @param price    fill price
+     * @param quantity fill quantity
+     * @param filledAt fill timestamp
+     */
+    public record FillRecord(
+            @NotNull String fillId,
+            @NotNull BigDecimal price,
+            @NotNull BigDecimal quantity,
+            @NotNull Instant filledAt
+    ) {}
 
-    public static @NotNull ExecutionResult success(
+    public ExecutionResult {
+        Objects.requireNonNull(resultId, "resultId");
+        Objects.requireNonNull(requestId, "requestId");
+        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(venue, "venue");
+        Objects.requireNonNull(exchangeName, "exchangeName");
+        Objects.requireNonNull(completedAt, "completedAt");
+        fills = fills == null ? List.of() : List.copyOf(fills);
+    }
+
+    /** Returns the total quantity filled across all fill records. */
+    public BigDecimal totalFilledQuantity() {
+        return fills.stream()
+                .map(FillRecord::quantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Returns the volume-weighted average fill price, or empty if no fills. */
+    public Optional<BigDecimal> averageFillPrice() {
+        if (fills.isEmpty()) return Optional.empty();
+        BigDecimal totalQty = totalFilledQuantity();
+        if (totalQty.compareTo(BigDecimal.ZERO) == 0) return Optional.empty();
+        BigDecimal notional = fills.stream()
+                .map(f -> f.price().multiply(f.quantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return Optional.of(notional.divide(totalQty, 8, RoundingMode.HALF_UP));
+    }
+
+    /** Returns the exchange order ID if available. */
+    public Optional<String> getOrderId() { return Optional.ofNullable(orderId); }
+
+    /** Returns total fees paid if known. */
+    public Optional<BigDecimal> getTotalFeesPaid() { return Optional.ofNullable(totalFeesPaid); }
+
+    /** Returns slippage in bps if measurable. */
+    public Optional<BigDecimal> getSlippageBps() { return Optional.ofNullable(slippageBps); }
+
+    /** Returns the rejection reason if status is {@link ExecutionStatus#REJECTED}. */
+    public Optional<String> getRejectionReason() { return Optional.ofNullable(rejectionReason); }
+
+    // ── Factory methods ─────────────────────────────────────────────────────────
+
+    /** Builds a successful result with fills. */
+    public static ExecutionResult filled(
             @NotNull String requestId,
-            @NotNull String routeId,
+            @NotNull ExecutionRoute route,
             @NotNull String orderId,
-            double filledQty,
-            double avgPrice,
-            double fees
+            @NotNull List<FillRecord> fills,
+            @Nullable BigDecimal fees
     ) {
-        Instant now = Instant.now();
         return new ExecutionResult(
-                UUID.randomUUID().toString(),
+                java.util.UUID.randomUUID().toString(),
                 requestId,
-                routeId,
                 ExecutionStatus.FILLED,
+                route.venue(),
+                route.exchangeName(),
                 orderId,
-                orderId,
-                filledQty,
-                avgPrice,
+                fills,
                 fees,
-                0.0,
                 null,
                 null,
-                200,
-                now,
-                now,
-                ExecutionVenue.CENTRALIZED,
-                "UNKNOWN"
+                Instant.now()
         );
     }
 
-    public static @NotNull ExecutionResult failure(
+    /** Builds a rejected result with a reason. */
+    public static ExecutionResult rejected(
             @NotNull String requestId,
-            @NotNull String routeId,
-            @Nullable String errorCode,
-            @Nullable String errorMessage,
-            int httpStatus
-    ) {
-        Instant now = Instant.now();
-        return new ExecutionResult(
-                UUID.randomUUID().toString(),
-                requestId,
-                routeId,
-                ExecutionStatus.ERROR,
-                null,
-                null,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                errorCode,
-                errorMessage,
-                httpStatus,
-                now,
-                now,
-                ExecutionVenue.CENTRALIZED,
-                "UNKNOWN"
-        );
-    }
-
-    public static @NotNull ExecutionResult pending(
-            @NotNull String requestId,
-            @NotNull String routeId,
-            @NotNull String orderId
+            @NotNull ExecutionVenue venue,
+            @NotNull String exchangeName,
+            @NotNull String reason
     ) {
         return new ExecutionResult(
-                UUID.randomUUID().toString(),
+                java.util.UUID.randomUUID().toString(),
                 requestId,
-                routeId,
-                ExecutionStatus.SUBMITTED,
-                orderId,
-                orderId,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
+                ExecutionStatus.REJECTED,
+                venue,
+                exchangeName,
+                null,
+                List.of(),
                 null,
                 null,
-                202,
-                Instant.now(),
-                null,
-                ExecutionVenue.CENTRALIZED,
-                "UNKNOWN"
+                reason,
+                Instant.now()
         );
-    }
-
-    // ── Instance query methods ────────────────────────────────────────────────
-
-    public boolean isSuccessful() {
-        return status == ExecutionStatus.FILLED || status == ExecutionStatus.PARTIAL_FILL;
-    }
-
-    public boolean isFailed() {
-        return status == ExecutionStatus.ERROR || status == ExecutionStatus.REJECTED;
-    }
-
-    public boolean isPending() {
-        return status == ExecutionStatus.PENDING
-                || status == ExecutionStatus.ROUTING
-                || status == ExecutionStatus.SUBMITTED;
-    }
-
-    public @NotNull String summary() {
-        return "ExecutionResult[%s status=%s orderId=%s filled=%.6f avgPx=%.4f fees=%.4f exchange=%s]"
-                .formatted(
-                        resultId.substring(0, 8),
-                        status,
-                        orderId != null ? orderId : "null",
-                        filledQuantity,
-                        averageFillPrice,
-                        totalFees,
-                        exchangeName
-                );
     }
 }

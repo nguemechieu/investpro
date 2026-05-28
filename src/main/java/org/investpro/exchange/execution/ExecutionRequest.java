@@ -1,143 +1,120 @@
 package org.investpro.exchange.execution;
 
-import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Immutable execution request describing a single order to be routed and executed.
+ * Immutable request to execute a trade across any supported venue.
  *
- * <p>Use the static factory methods {@link #marketOrder} and {@link #limitOrder}
- * for common order types, or construct the record directly for full control.
+ * <p>Build via {@link #builder(String, Side, BigDecimal)} and pass to
+ * {@link org.investpro.exchange.routing.SmartExecutionRouter}.
  *
- * <p>Side note: {@link Side} is defined as a local enum within this file until
- * {@code org.investpro.enums.Side} is available.
+ * <p>Note: if {@code org.investpro.enums.Side} exists in the codebase,
+ * replace the inner {@link Side} enum with that import.
  */
 public record ExecutionRequest(
         @NotNull String requestId,
-        @NotNull TradePair tradePair,
+        @NotNull String symbol,
         @NotNull Side side,
-        double quantity,
-        double limitPrice,
-        double stopPrice,
-        @NotNull String orderType,
+        @NotNull BigDecimal quantity,
+        @Nullable BigDecimal limitPrice,
         @NotNull ExecutionVenue preferredVenue,
-        @Nullable String exchangeName,
-        boolean allowVenueSwitch,
-        @NotNull Map<String, String> constraints,
+        boolean allowFallback,
+        @Nullable String preferredExchange,
+        @Nullable BigDecimal maxSlippageBps,
+        @Nullable BigDecimal maxFeeBps,
+        boolean paperMode,
         @NotNull Instant createdAt
 ) {
 
-    // ── Local Side enum — use org.investpro.enums.Side when available ─────────
+    /**
+     * Trade direction.
+     *
+     * <p>Swap for {@code org.investpro.enums.Side} if that type already exists.
+     */
     public enum Side {
         BUY, SELL
     }
 
-    // ── Compact constructor validation ────────────────────────────────────────
-
     public ExecutionRequest {
-        if (quantity <= 0) {
-            throw new IllegalArgumentException("quantity must be positive, got: " + quantity);
+        Objects.requireNonNull(requestId, "requestId");
+        Objects.requireNonNull(symbol, "symbol");
+        Objects.requireNonNull(side, "side");
+        Objects.requireNonNull(quantity, "quantity");
+        Objects.requireNonNull(preferredVenue, "preferredVenue");
+        Objects.requireNonNull(createdAt, "createdAt");
+        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("quantity must be positive");
         }
-        constraints = Map.copyOf(constraints);
     }
 
-    // ── Static factory methods ────────────────────────────────────────────────
+    /** Returns the limit price if this is a limit order. */
+    public Optional<BigDecimal> getLimitPrice() { return Optional.ofNullable(limitPrice); }
 
-    /**
-     * Creates a market order execution request.
-     *
-     * @param tradePair the instrument to trade
-     * @param side      BUY or SELL
-     * @param quantity  order size in base currency units
-     * @return a new {@link ExecutionRequest} for a market order
-     */
-    public static @NotNull ExecutionRequest marketOrder(
-            @NotNull TradePair tradePair,
+    /** Returns true if this is a market order. */
+    public boolean isMarketOrder() { return limitPrice == null; }
+
+    /** Returns the preferred exchange name if specified. */
+    public Optional<String> getPreferredExchange() { return Optional.ofNullable(preferredExchange); }
+
+    /** Returns the max slippage constraint if specified. */
+    public Optional<BigDecimal> getMaxSlippageBps() { return Optional.ofNullable(maxSlippageBps); }
+
+    /** Returns the max fee constraint if specified. */
+    public Optional<BigDecimal> getMaxFeeBps() { return Optional.ofNullable(maxFeeBps); }
+
+    // ── Builder ─────────────────────────────────────────────────────────────────
+
+    /** Creates a new builder with the three required fields. */
+    public static Builder builder(
+            @NotNull String symbol,
             @NotNull Side side,
-            double quantity
+            @NotNull BigDecimal quantity
     ) {
-        return new ExecutionRequest(
-                UUID.randomUUID().toString(),
-                tradePair,
-                side,
-                quantity,
-                Double.NaN,
-                Double.NaN,
-                "MARKET",
-                ExecutionVenue.CENTRALIZED,
-                null,
-                true,
-                Map.of(),
-                Instant.now()
-        );
+        return new Builder(symbol, side, quantity);
     }
 
-    /**
-     * Creates a limit order execution request.
-     *
-     * @param tradePair  the instrument to trade
-     * @param side       BUY or SELL
-     * @param quantity   order size in base currency units
-     * @param limitPrice the limit price; order will not fill above (BUY) or below (SELL) this value
-     * @return a new {@link ExecutionRequest} for a limit order
-     */
-    public static @NotNull ExecutionRequest limitOrder(
-            @NotNull TradePair tradePair,
-            @NotNull Side side,
-            double quantity,
-            double limitPrice
-    ) {
-        return new ExecutionRequest(
-                UUID.randomUUID().toString(),
-                tradePair,
-                side,
-                quantity,
-                limitPrice,
-                Double.NaN,
-                "LIMIT",
-                ExecutionVenue.CENTRALIZED,
-                null,
-                true,
-                Map.of(),
-                Instant.now()
-        );
-    }
+    /** Fluent builder for {@link ExecutionRequest}. */
+    public static final class Builder {
+        private final String symbol;
+        private final Side side;
+        private final BigDecimal quantity;
+        private BigDecimal limitPrice;
+        private ExecutionVenue preferredVenue = ExecutionVenue.CENTRALIZED;
+        private boolean allowFallback = true;
+        private String preferredExchange;
+        private BigDecimal maxSlippageBps;
+        private BigDecimal maxFeeBps;
+        private boolean paperMode = false;
 
-    // ── Instance query methods ────────────────────────────────────────────────
+        private Builder(String symbol, Side side, BigDecimal quantity) {
+            this.symbol = symbol;
+            this.side = side;
+            this.quantity = quantity;
+        }
 
-    /**
-     * Returns {@code true} if this is a market order (limitPrice is 0 or NaN).
-     */
-    public boolean isMarketOrder() {
-        return Double.isNaN(limitPrice) || limitPrice == 0.0;
-    }
+        public Builder limitPrice(BigDecimal price) { this.limitPrice = price; return this; }
+        public Builder venue(ExecutionVenue v) { this.preferredVenue = v; return this; }
+        public Builder allowFallback(boolean allow) { this.allowFallback = allow; return this; }
+        public Builder exchange(String name) { this.preferredExchange = name; return this; }
+        public Builder maxSlippageBps(BigDecimal bps) { this.maxSlippageBps = bps; return this; }
+        public Builder maxFeeBps(BigDecimal bps) { this.maxFeeBps = bps; return this; }
+        public Builder paperMode(boolean paper) { this.paperMode = paper; return this; }
 
-    /**
-     * Returns {@code true} if this is a limit or stop-limit order.
-     */
-    public boolean isLimitOrder() {
-        return !isMarketOrder();
-    }
-
-    /**
-     * Returns a brief human-readable summary of this request.
-     *
-     * @return formatted summary string
-     */
-    public @NotNull String summary() {
-        return "ExecutionRequest[%s %s %s %.6f @ %s venue=%s exchange=%s]".formatted(
-                requestId.substring(0, 8),
-                side,
-                tradePair,
-                quantity,
-                isMarketOrder() ? "MARKET" : String.valueOf(limitPrice),
-                preferredVenue.getDisplayName(),
-                exchangeName != null ? exchangeName : "(auto)"
-        );
+        public ExecutionRequest build() {
+            return new ExecutionRequest(
+                    UUID.randomUUID().toString(),
+                    symbol, side, quantity, limitPrice,
+                    preferredVenue, allowFallback, preferredExchange,
+                    maxSlippageBps, maxFeeBps, paperMode,
+                    Instant.now()
+            );
+        }
     }
 }

@@ -4,81 +4,68 @@ import org.investpro.core.agents.AgentEventBus;
 import org.investpro.exchange.resilience.ExchangeTelemetryEngine;
 import org.investpro.exchange.resilience.StaleCacheManager;
 import org.investpro.exchange.resilience.model.EndpointType;
-import org.investpro.models.trading.Order;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * Typed cache wrapper for order history snapshots.
+ * Typed stale-safe cache for order history snapshots.
+ *
+ * <p>Order history is the least time-sensitive endpoint; defaults to a
+ * 5-minute max-fresh age. The cache prevents order-history endpoint failures
+ * from impacting pricing or execution flows.
+ *
+ * <p>The snapshot is typed as {@code List<String>} (order IDs) for generic
+ * compatibility. In practice, adapt to a concrete order record type in the
+ * specific adapter.
  */
-public class OrderHistorySnapshotCache {
+public final class OrderHistorySnapshotCache {
 
-    private final ConcurrentHashMap<String, StaleCacheManager<List<Order>>> caches =
-            new ConcurrentHashMap<>();
+    private static final Duration DEFAULT_MAX_FRESH_AGE = Duration.ofMinutes(5);
 
-    @Nullable
-    private final AgentEventBus eventBus;
-    @Nullable
-    private final ExchangeTelemetryEngine telemetry;
-    private final Duration maxFreshAge;
+    private final StaleCacheManager<List<String>> delegate;
 
     public OrderHistorySnapshotCache(
+            @NotNull String exchangeName,
             @Nullable AgentEventBus eventBus,
-            @Nullable ExchangeTelemetryEngine telemetry,
-            @NotNull Duration maxFreshAge
+            @Nullable ExchangeTelemetryEngine telemetry
     ) {
-        this.eventBus = eventBus;
-        this.telemetry = telemetry;
-        this.maxFreshAge = maxFreshAge;
+        this(exchangeName, DEFAULT_MAX_FRESH_AGE, eventBus, telemetry);
     }
 
-    public @NotNull CompletableFuture<List<Order>> getOrFetch(
+    public OrderHistorySnapshotCache(
             @NotNull String exchangeName,
-            @NotNull Supplier<CompletableFuture<List<Order>>> fetcher
+            @NotNull Duration maxFreshAge,
+            @Nullable AgentEventBus eventBus,
+            @Nullable ExchangeTelemetryEngine telemetry
     ) {
-        return cacheFor(exchangeName).getOrServeStale(fetcher);
+        this.delegate = new StaleCacheManager<>(
+                exchangeName + "-order-history-snapshot",
+                EndpointType.ORDER_HISTORY,
+                maxFreshAge,
+                eventBus,
+                telemetry
+        );
     }
 
-    public void store(
-            @NotNull String exchangeName,
-            @NotNull List<Order> orders
+    /**
+     * Returns a fresh or stale order history list, scheduling a background refresh if stale.
+     *
+     * @param freshFetcher supplier that fetches order history from the exchange
+     * @return future resolving to the (possibly stale) order list
+     */
+    public CompletableFuture<List<String>> get(
+            @NotNull Supplier<CompletableFuture<List<String>>> freshFetcher
     ) {
-        cacheFor(exchangeName).store(orders);
+        return delegate.getOrServeStale(freshFetcher);
     }
 
-    public void markStale(@NotNull String exchangeName) {
-        cacheFor(exchangeName).markStale();
-    }
-
-    public boolean isStale(@NotNull String exchangeName) {
-        return cacheFor(exchangeName).isStale();
-    }
-
-    public boolean hasCachedValue(@NotNull String exchangeName) {
-        return cacheFor(exchangeName).hasCachedValue();
-    }
-
-    public void shutdown() {
-        caches.values().forEach(StaleCacheManager::shutdown);
-    }
-
-    private @NotNull StaleCacheManager<List<Order>> cacheFor(
-            @NotNull String exchangeName
-    ) {
-        String key = exchangeName.toUpperCase() + ":ORDER_HISTORY";
-        return caches.computeIfAbsent(key, k ->
-                new StaleCacheManager<>(
-                        k,
-                        EndpointType.ORDER_HISTORY,
-                        maxFreshAge,
-                        eventBus,
-                        telemetry
-                ));
+    /** Forces the cache to be invalidated on the next access. */
+    public void invalidate() {
+        delegate.invalidate();
     }
 }
