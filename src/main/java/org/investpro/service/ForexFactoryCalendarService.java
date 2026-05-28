@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.market.NewsEvent;
+import org.investpro.utils.NETWORK_RESPONSE;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.URI;
@@ -40,6 +41,8 @@ import java.util.concurrent.CompletableFuture;
  *   <li>{@code Low}     → {@link NewsEvent.Importance#LOW}</li>
  *   <li>{@code Holiday} → {@link NewsEvent.Importance#LOW}, blackout disabled</li>
  * </ul>
+ *
+ * <p>HTTP responses are classified using {@link NETWORK_RESPONSE}.
  */
 @Slf4j
 public final class ForexFactoryCalendarService {
@@ -68,7 +71,7 @@ public final class ForexFactoryCalendarService {
     }
 
     /**
-     * Fetches this week’s economic calendar asynchronously.
+     * Fetches this week's economic calendar asynchronously.
      *
      * @return a future that resolves to the list of parsed {@link NewsEvent}s,
      *         or an empty list if the request fails
@@ -84,8 +87,10 @@ public final class ForexFactoryCalendarService {
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
-                    if (response.statusCode() != 200) {
-                        log.warn("ForexFactory calendar returned HTTP {}", response.statusCode());
+                    int status = response.statusCode();
+                    if (!isOk(status)) {
+                        log.warn("ForexFactory calendar returned {} ({})",
+                                status, describeStatus(status));
                         return List.<NewsEvent>of();
                     }
                     return parseEvents(response.body());
@@ -96,7 +101,7 @@ public final class ForexFactoryCalendarService {
                 });
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private List<NewsEvent> parseEvents(String json) {
         List<NewsEvent> result = new ArrayList<>();
@@ -106,7 +111,6 @@ public final class ForexFactoryCalendarService {
                 log.warn("ForexFactory calendar: unexpected JSON structure");
                 return result;
             }
-
             for (JsonNode node : root) {
                 try {
                     result.add(parseEvent(node));
@@ -129,7 +133,7 @@ public final class ForexFactoryCalendarService {
         String forecast = node.path("forecast").asText("");
         String previous = node.path("previous").asText("");
 
-        Instant eventTime = Instant.now(); // fallback
+        Instant eventTime = Instant.now();
         if (!dateStr.isBlank()) {
             try {
                 eventTime = OffsetDateTime.parse(dateStr).toInstant();
@@ -141,8 +145,6 @@ public final class ForexFactoryCalendarService {
         NewsEvent.Importance importance = mapImpact(impact);
         boolean isHoliday = "Holiday".equalsIgnoreCase(impact);
 
-        String description = buildDescription(impact, forecast, previous);
-
         NewsEvent event = new NewsEvent(
                 title,
                 country,
@@ -150,9 +152,8 @@ public final class ForexFactoryCalendarService {
                 importance,
                 NewsEvent.Sentiment.NEUTRAL
         );
-        event.setDescription(description);
+        event.setDescription(buildDescription(impact, forecast, previous));
 
-        // Holidays don’t block trading
         if (isHoliday) {
             event.setBlackoutEnabled(false);
             event.setGenerateSignal(false);
@@ -163,18 +164,39 @@ public final class ForexFactoryCalendarService {
 
     private static NewsEvent.Importance mapImpact(String impact) {
         return switch (impact) {
-            case "High"    -> NewsEvent.Importance.HIGH;
-            case "Medium"  -> NewsEvent.Importance.MEDIUM;
-            case "Holiday" -> NewsEvent.Importance.LOW;
-            default        -> NewsEvent.Importance.LOW;
+            case "High"   -> NewsEvent.Importance.HIGH;
+            case "Medium" -> NewsEvent.Importance.MEDIUM;
+            default       -> NewsEvent.Importance.LOW;
         };
     }
 
     private static String buildDescription(String impact, String forecast, String previous) {
-        StringBuilder sb = new StringBuilder("[FF]");
-        sb.append(" Impact: ").append(impact);
+        StringBuilder sb = new StringBuilder("[FF] Impact: ").append(impact);
         if (!forecast.isBlank()) sb.append(" | Forecast: ").append(forecast);
         if (!previous.isBlank()) sb.append(" | Previous: ").append(previous);
         return sb.toString();
+    }
+
+    // ── NETWORK_RESPONSE helpers ──────────────────────────────────────────────
+
+    /** Returns {@code true} when the HTTP status indicates a successful 2xx response. */
+    private static boolean isOk(int status) {
+        return status == NETWORK_RESPONSE.SERVER_OK.getResponseCode()
+            || status == NETWORK_RESPONSE.CREATED.getResponseCode()
+            || status == NETWORK_RESPONSE.ACCEPTED.getResponseCode()
+            || status == NETWORK_RESPONSE.NO_CONTENT.getResponseCode();
+    }
+
+    /**
+     * Returns a human-readable description of a status code using the
+     * {@link NETWORK_RESPONSE} enum, falling back to the raw code when unknown.
+     */
+    private static String describeStatus(int status) {
+        for (NETWORK_RESPONSE r : NETWORK_RESPONSE.values()) {
+            if (r.getResponseCode() == status) {
+                return r.name();
+            }
+        }
+        return "UNKNOWN";
     }
 }
