@@ -34,7 +34,7 @@ import java.util.function.Supplier;
 @Slf4j
 public final class StaleCacheManager<T> {
 
-    private String cacheName = "";
+    private String cacheName;
     private final EndpointType endpoint;
     private final Duration maxFreshAge;
     @Nullable
@@ -118,6 +118,11 @@ public final class StaleCacheManager<T> {
         if (entry != null && !entry.stale) {
             cache.set(entry.markStale());
         }
+    }
+
+    /** Clears the cache entry entirely, forcing a fresh fetch on the next access. */
+    public void invalidate() {
+        cache.set(null);
     }
 
     /** Returns true if the cache has any entry (fresh or stale). */
