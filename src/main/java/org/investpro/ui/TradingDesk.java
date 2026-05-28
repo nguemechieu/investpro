@@ -367,6 +367,12 @@ public class TradingDesk extends BorderPane  {
     private record BotStartPlan(List<TradePair> selectedSymbols, List<TradePair> streamingSymbols) {
     }
 
+    private static final class BotStartBlockedException extends RuntimeException {
+        private BotStartBlockedException(String message) {
+            super(message);
+        }
+    }
+
     private OrderBook currentOrderBook = new OrderBook();
     private DepthChart depthChart;
     private NewsCalendarPanel newsCalendarPanel;
@@ -9909,6 +9915,14 @@ public class TradingDesk extends BorderPane  {
         return message == null || message.isBlank() ? current.getClass().getSimpleName() : message;
     }
 
+    private Throwable unwrapCompletionException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current == null ? new IllegalStateException("Unknown error") : current;
+    }
+
     private String safe(String value) {
         return value == null ? "" : value.trim();
     }
@@ -10329,9 +10343,9 @@ public class TradingDesk extends BorderPane  {
 
                     List<TradePair> assignedSymbols = prepareLiveStrategyAssignments(selectedSymbols);
                     if (assignedSymbols.isEmpty()) {
-                        throw new IllegalStateException(
+                        throw new BotStartBlockedException(
                                 "No selected symbols passed live strategy preparation. "
-                                        + "Lower the hard minimum score or choose symbols with stronger backtest results.");
+                                        + "Lower the minimum strategy score in Settings or choose symbols with stronger backtest results.");
                     }
 
                     List<TradePair> streamingSymbols = resolveStreamingSymbolsForEverythingMode(assignedSymbols);
@@ -10364,10 +10378,15 @@ public class TradingDesk extends BorderPane  {
                     saveAppState();
                 }))
                 .exceptionally(exception -> {
-                    log.error("Failed to toggle bot trading", exception);
+                    Throwable root = unwrapCompletionException(exception);
+                    if (root instanceof BotStartBlockedException) {
+                        log.warn("Bot trading was not started: {}", root.getMessage());
+                    } else {
+                        log.error("Failed to toggle bot trading", exception);
+                    }
                     runOnFx(() -> showWarning(
                             "Bot Trading",
-                            "Could not start bot trading: %s".formatted(rootMessage(exception))));
+                            "%s".formatted(rootMessage(exception))));
                     return null;
                 })
                 .whenComplete((unused, exception) -> runOnFx(() -> {

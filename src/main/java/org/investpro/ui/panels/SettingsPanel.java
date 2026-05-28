@@ -972,6 +972,9 @@ public class SettingsPanel extends StackPane {
         System.setProperty(SETTINGS_PREFIX + ".strategy.autoAssignBest", String.valueOf(settings.autoAssignBestStrategy()));
         System.setProperty(SETTINGS_PREFIX + ".strategy.minScore", String.valueOf(settings.minStrategyScore()));
         System.setProperty(SETTINGS_PREFIX + ".strategy.topCandidates", String.valueOf(settings.topStrategiesToPaperTrade()));
+        System.setProperty("tradeadviser.strategy.autoAssignBest", String.valueOf(settings.autoAssignBestStrategy()));
+        System.setProperty("tradeadviser.strategy.minScore", String.valueOf(settings.minStrategyScore()));
+        System.setProperty("tradeadviser.strategy.minStrategyScore", String.valueOf(settings.minStrategyScore()));
 
         System.setProperty(SETTINGS_PREFIX + ".execution.smallAccountMode", String.valueOf(settings.smallAccountModeEnabled()));
         System.setProperty(SETTINGS_PREFIX + ".execution.smallAccountThreshold", String.valueOf(settings.smallAccountThreshold()));

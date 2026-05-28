@@ -202,15 +202,20 @@ public class StrategyLabService {
                 return null;
             }
 
-            double minimumScore = readDoubleProperty("tradeadviser.strategy.minStrategyScore", 60.0);
+            double minimumScore = readFirstDoubleProperty(60.0,
+                    "tradeadviser.strategy.minStrategyScore",
+                    "tradeadviser.strategy.minScore",
+                    "investpro.strategy.minScore",
+                    "investpro.strategy.hardMinStrategyScore");
             if (selected.getScore() < minimumScore) {
                 log.warn("Best strategy for {}/{} did not meet minimum score: {} < {}",
                         symbol, timeframe.getCode(), selected.getScore(), minimumScore);
                 return null;
             }
 
-            boolean autoAssignBest = Boolean.parseBoolean(
-                    System.getProperty("tradeadviser.strategy.autoAssignBest", "true"));
+            boolean autoAssignBest = readFirstBooleanProperty(true,
+                    "tradeadviser.strategy.autoAssignBest",
+                    "investpro.strategy.autoAssignBest");
             if (!autoAssignBest) {
                 log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
                         symbol, timeframe.getCode(), selected.getStrategyName(), selected.getScore());
@@ -495,6 +500,39 @@ public class StrategyLabService {
             log.warn("Invalid numeric system property {}={}; using {}", propertyName, rawValue, fallback);
             return fallback;
         }
+    }
+
+    private double readFirstDoubleProperty(double fallback, String... propertyNames) {
+        if (propertyNames == null) {
+            return fallback;
+        }
+        for (String propertyName : propertyNames) {
+            String rawValue = System.getProperty(propertyName);
+            if (rawValue == null || rawValue.isBlank()) {
+                continue;
+            }
+            try {
+                return Double.parseDouble(rawValue.trim());
+            } catch (NumberFormatException exception) {
+                log.warn("Invalid numeric system property {}={}; checking next fallback",
+                        propertyName, rawValue);
+            }
+        }
+        return fallback;
+    }
+
+    private boolean readFirstBooleanProperty(boolean fallback, String... propertyNames) {
+        if (propertyNames == null) {
+            return fallback;
+        }
+        for (String propertyName : propertyNames) {
+            String rawValue = System.getProperty(propertyName);
+            if (rawValue == null || rawValue.isBlank()) {
+                continue;
+            }
+            return Boolean.parseBoolean(rawValue.trim());
+        }
+        return fallback;
     }
 
     /**
