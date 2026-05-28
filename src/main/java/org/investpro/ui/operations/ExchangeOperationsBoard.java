@@ -250,7 +250,8 @@ public final class ExchangeOperationsBoard extends VBox {
     }
 
     private void refreshData() {
-        ExchangeHealthReport report = connectivityManager.getHealthReport();
+        // fixed: was getHealthReport() — correct method is buildHealthReport()
+        ExchangeHealthReport report = connectivityManager.buildHealthReport();
 
         // Gather telemetry snapshot
         ExchangeTelemetryEngine.ExchangeTelemetrySnapshot telemetry =
@@ -264,7 +265,8 @@ public final class ExchangeOperationsBoard extends VBox {
 
         // Gather polling info
         boolean smartIdle = pollingEngine != null && pollingEngine.isSmartIdleMode();
-        String pollingLevel = pollingEngine != null ? pollingEngine.getActivityLevel().name() : "--";
+        // fixed: was getActivityLevel() — correct method is currentActivityLevel()
+        String pollingLevel = pollingEngine != null ? pollingEngine.currentActivityLevel().name() : "--";
 
         Platform.runLater(() -> updateUi(report, telemetry, wsActive, restFallback,
                 reconnects, wsMessages, smartIdle, pollingLevel));
@@ -277,9 +279,9 @@ public final class ExchangeOperationsBoard extends VBox {
             int reconnects, long wsMessages,
             boolean smartIdle, String pollingLevel) {
 
-        // Health grade banner
-        ExchangeHealthGrade grade = report.healthGrade();
-        healthGradeLabel.setText("Health: " + grade.name() + " (" + String.format("%.0f%%", report.overallScore() * 100) + ")");
+        // fixed: was report.healthGrade() / report.overallScore() — correct accessors are grade() / compositeScore()
+        ExchangeHealthGrade grade = report.grade();
+        healthGradeLabel.setText("Health: " + grade.name() + " (" + String.format("%.0f%%", report.compositeScore() * 100) + ")");
         healthGradeLabel.setTextFill(gradeColor(grade));
         healthGradeIndicator.setFill(gradeColor(grade));
 
@@ -299,13 +301,14 @@ public final class ExchangeOperationsBoard extends VBox {
         // Telemetry
         if (telemetry != null) {
             reqPerSecLabel.setText(String.format("%.1f", telemetry.requestsPerSecond()));
-            staleCacheHitsLabel.setText(String.format("%,d", telemetry.staleCacheHits()));
+            // fixed: was staleCacheHits() — correct accessor is staleCacheServed()
+            staleCacheHitsLabel.setText(String.format("%,d", telemetry.staleCacheServed()));
             circuitTripsLabel.setText(String.format("%,d", telemetry.circuitBreakerTrips()));
             circuitRecoveriesLabel.setText(String.format("%,d", telemetry.circuitBreakerRecoveries()));
         }
 
-        // Endpoint table
-        report.endpointHealth().forEach((ep, snapshot) -> {
+        // fixed: was report.endpointHealth() — correct accessor is endpointSnapshots()
+        report.endpointSnapshots().forEach((ep, snapshot) -> {
             EndpointRow row = endpointRows.get(ep);
             if (row == null) return;
             int idx = endpointTable.getItems().indexOf(row);
@@ -314,7 +317,8 @@ public final class ExchangeOperationsBoard extends VBox {
                     ep.name(),
                     ep.critical ? "CRITICAL" : "non-critical",
                     snapshot.circuitState().name(),
-                    snapshot.avgLatencyMs() < 0 ? "--" : String.format("%dms", (long) snapshot.avgLatencyMs()),
+                    // fixed: was snapshot.avgLatencyMs() — correct accessor is averageLatencyMs()
+                    snapshot.averageLatencyMs() < 0 ? "--" : String.format("%dms", (long) snapshot.averageLatencyMs()),
                     String.valueOf(snapshot.consecutiveFailures()),
                     String.format("%.0f%%", snapshot.successRatio() * 100)
             );
