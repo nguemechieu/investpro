@@ -68,7 +68,7 @@ public record AgentEvent(
 
     public static final String ERROR = "ERROR";
 
-    // ── Exchange resilience events ─────────────────────────────────────────────
+    // ── Exchange resilience events ──────────────────────────────────────────────────────
     /** Emitted when an exchange WebSocket or REST connection is established. */
     public static final String EXCHANGE_CONNECTED       = "EXCHANGE_CONNECTED";
     /** Emitted when an exchange connection is lost. */
@@ -85,6 +85,16 @@ public record AgentEvent(
     public static final String STALE_CACHE_SERVED       = "STALE_CACHE_SERVED";
     /** Emitted when a reconciliation cycle completes (balances, positions, orders). */
     public static final String RECONCILIATION_COMPLETED = "RECONCILIATION_COMPLETED";
+    /** Emitted when an exchange degrades but remains operational (non-critical endpoint failure). */
+    public static final String EXCHANGE_DEGRADED            = "EXCHANGE_DEGRADED";
+    /** Emitted when authentication fails for an exchange. */
+    public static final String EXCHANGE_AUTH_FAILED         = "EXCHANGE_AUTH_FAILED";
+    /** Emitted when WebSocket data exceeds the freshness threshold. */
+    public static final String WEBSOCKET_STALE              = "WEBSOCKET_STALE";
+    /** Emitted when the SmartExecutionRouter selects an execution route for an order. */
+    public static final String EXECUTION_ROUTE_SELECTED     = "EXECUTION_ROUTE_SELECTED";
+    /** Emitted when the reconciliation engine detects drift between local and live state. */
+    public static final String RECONCILIATION_DRIFT_DETECTED = "RECONCILIATION_DRIFT_DETECTED";
 
     public AgentEvent {
         type = Objects.requireNonNull(type, "type must not be null").trim();
