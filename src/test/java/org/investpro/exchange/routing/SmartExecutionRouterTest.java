@@ -2,7 +2,6 @@ package org.investpro.exchange.routing;
 
 import org.investpro.exchange.execution.ExecutionRequest;
 import org.investpro.exchange.execution.ExecutionRoute;
-import org.investpro.exchange.execution.ExecutionVenue;
 import org.investpro.exchange.normalization.NormalizedMarketSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,7 @@ class SmartExecutionRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new SmartExecutionRouter(null); // no event bus needed for unit tests
+        router = new SmartExecutionRouter(null);
     }
 
     @Test
@@ -39,13 +38,11 @@ class SmartExecutionRouterTest {
     void routeReturnsEmptyWhenNoFreshSnapshots() {
         ExecutionRequest req = ExecutionRequest.builder("BTC-USD", ExecutionRequest.Side.BUY, BigDecimal.ONE).build();
         Optional<ExecutionRoute> result = router.route(req, List.of("Coinbase", "Binance"));
-        // No snapshots registered, so nothing scorable
         assertThat(result).isEmpty();
     }
 
     @Test
     void routeSelectsBestSpreadExchange() {
-        // Coinbase has tighter spread; should be preferred
         router.updateSnapshot("Coinbase", tightSpreadSnapshot("Coinbase", "BTC-USD"));
         router.updateSnapshot("Binance", wideSpreadSnapshot("Binance", "BTC-USD"));
 
@@ -59,14 +56,12 @@ class SmartExecutionRouterTest {
     @Test
     void routeEnforcesPreferredExchangeWhenFallbackDisallowed() {
         router.updateSnapshot("Binance", tightSpreadSnapshot("Binance", "BTC-USD"));
-        // Coinbase not registered — no snapshot
         ExecutionRequest req = ExecutionRequest.builder("BTC-USD", ExecutionRequest.Side.BUY, BigDecimal.ONE)
                 .exchange("Coinbase")
                 .allowFallback(false)
                 .build();
 
         Optional<ExecutionRoute> result = router.route(req, List.of("Coinbase", "Binance"));
-        // Preferred exchange has no snapshot and fallback is disallowed
         assertThat(result).isEmpty();
     }
 
@@ -86,23 +81,17 @@ class SmartExecutionRouterTest {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private NormalizedMarketSnapshot tightSpreadSnapshot(String exchange, String symbol) {
-        return NormalizedMarketSnapshot.fromTicker(
+        return NormalizedMarketSnapshot.fromRawPrices(
                 exchange, symbol,
-                new BigDecimal("40000.00"),
-                new BigDecimal("40001.00"),
-                new BigDecimal("40000.50"),
-                new BigDecimal("5000000"),
+                40000.00, 40001.00, 40000.50, 5_000_000.0,
                 Instant.now()
         );
     }
 
     private NormalizedMarketSnapshot wideSpreadSnapshot(String exchange, String symbol) {
-        return NormalizedMarketSnapshot.fromTicker(
+        return NormalizedMarketSnapshot.fromRawPrices(
                 exchange, symbol,
-                new BigDecimal("39900.00"),
-                new BigDecimal("40100.00"),
-                new BigDecimal("40000.00"),
-                new BigDecimal("1000000"),
+                39900.00, 40100.00, 40000.00, 1_000_000.0,
                 Instant.now()
         );
     }

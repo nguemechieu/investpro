@@ -51,12 +51,9 @@ class CacheLayerTest {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private NormalizedMarketSnapshot freshSnapshot() {
-        return NormalizedMarketSnapshot.fromTicker(
+        return NormalizedMarketSnapshot.fromRawPrices(
                 "Coinbase", "BTC-USD",
-                new BigDecimal("40000"),
-                new BigDecimal("40001"),
-                new BigDecimal("40000.5"),
-                new BigDecimal("1000"),
+                40000.0, 40001.0, 40000.5, 1000.0,
                 Instant.now()
         );
     }
