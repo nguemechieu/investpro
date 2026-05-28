@@ -28,35 +28,22 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Liquidity — 25% weight (higher is better)</li>
  *   <li>Fees     — 15% weight (lower is better)</li>
  * </ul>
- *
- * <p>Scores are maintained as exponential moving averages (EMA) to ensure
- * recent observations are weighted more heavily than historical ones.
- *
- * <p>If no exchanges are available (list is empty) the router returns a
- * {@link ExecutionVenue#PAPER} route to allow safe graceful degradation.
- *
- * <p>Routing decisions are published to the {@link AgentEventBus} when one
- * is provided, enabling downstream monitoring and alerting.
  */
 @Slf4j
 public class SmartExecutionRouter {
 
-    // ── Scoring weights (must sum to 1.0) ─────────────────────────────────────
     private static final double WEIGHT_LATENCY   = 0.30;
     private static final double WEIGHT_SPREAD    = 0.30;
     private static final double WEIGHT_LIQUIDITY = 0.25;
     private static final double WEIGHT_FEES      = 0.15;
 
-    // ── EMA smoothing factor ──────────────────────────────────────────────────
     private static final double EMA_ALPHA = 0.2;
 
-    // ── Default values for unknown metrics ────────────────────────────────────
     private static final double DEFAULT_LATENCY_MS   = 100.0;
     private static final double DEFAULT_LIQUIDITY    = 0.5;
     private static final double DEFAULT_SPREAD_BPS   = 5.0;
-    private static final double DEFAULT_FEES_SCORE   = 0.5;  // neutral fee score
+    private static final double DEFAULT_FEES_SCORE   = 0.5;
 
-    // ── Internal state ────────────────────────────────────────────────────────
     private final ConcurrentHashMap<String, Double> exchangeLatencyMs      = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Double> exchangeLiquidityScores = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Double> exchangeSpreadBps       = new ConcurrentHashMap<>();
@@ -64,28 +51,10 @@ public class SmartExecutionRouter {
     @Nullable
     private final AgentEventBus eventBus;
 
-    /**
-     * Constructs the router with an optional event bus for telemetry.
-     *
-     * @param eventBus optional event bus; {@code null} disables telemetry publishing
-     */
     public SmartExecutionRouter(@Nullable AgentEventBus eventBus) {
         this.eventBus = eventBus;
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
-    /**
-     * Selects the best execution route for the given request from the list of
-     * available exchanges.
-     *
-     * <p>If {@code availableExchanges} is empty, returns a PAPER route to allow
-     * the calling system to fail gracefully.
-     *
-     * @param request            the execution request to route
-     * @param availableExchanges exchange names eligible for routing
-     * @return a future resolving to the selected {@link ExecutionRoute}
-     */
     public @NotNull CompletableFuture<ExecutionRoute> route(
             @NotNull ExecutionRequest request,
             @NotNull List<String> availableExchanges
@@ -119,45 +88,21 @@ public class SmartExecutionRouter {
         return CompletableFuture.completedFuture(route);
     }
 
-    /**
-     * Updates the EMA latency for the given exchange.
-     *
-     * @param exchangeName the exchange to update
-     * @param latencyMs    observed latency in milliseconds
-     */
     public void updateLatency(@NotNull String exchangeName, double latencyMs) {
         exchangeLatencyMs.merge(exchangeName, latencyMs,
                 (prev, next) -> prev * (1 - EMA_ALPHA) + next * EMA_ALPHA);
     }
 
-    /**
-     * Updates the liquidity score for the given exchange.
-     *
-     * @param exchangeName   the exchange to update
-     * @param liquidityScore observed liquidity score in [0.0, 1.0]
-     */
     public void updateLiquidity(@NotNull String exchangeName, double liquidityScore) {
         exchangeLiquidityScores.merge(exchangeName, liquidityScore,
                 (prev, next) -> prev * (1 - EMA_ALPHA) + next * EMA_ALPHA);
     }
 
-    /**
-     * Updates the spread estimate for the given exchange.
-     *
-     * @param exchangeName the exchange to update
-     * @param spreadBps    observed spread in basis points
-     */
     public void updateSpread(@NotNull String exchangeName, double spreadBps) {
         exchangeSpreadBps.merge(exchangeName, spreadBps,
                 (prev, next) -> prev * (1 - EMA_ALPHA) + next * EMA_ALPHA);
     }
 
-    /**
-     * Returns a snapshot of composite routing scores per exchange.
-     * Useful for dashboard display and diagnostics.
-     *
-     * @return map of exchange name → composite score in [0.0, 1.0]
-     */
     public @NotNull Map<String, Double> getRoutingScores() {
         Map<String, Double> scores = new HashMap<>();
         for (String exchange : exchangeLatencyMs.keySet()) {
@@ -166,24 +111,14 @@ public class SmartExecutionRouter {
         return Collections.unmodifiableMap(scores);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Computes a composite score for {@code exchangeName} in [0.0, 1.0].
-     * Higher is better.
-     */
     private double computeCompositeScore(@NotNull String exchangeName) {
         double latency   = exchangeLatencyMs.getOrDefault(exchangeName, DEFAULT_LATENCY_MS);
         double liquidity = exchangeLiquidityScores.getOrDefault(exchangeName, DEFAULT_LIQUIDITY);
         double spread    = exchangeSpreadBps.getOrDefault(exchangeName, DEFAULT_SPREAD_BPS);
 
-        // Normalise: lower latency → higher score (cap at 500ms for normalisation)
         double latencyScore   = Math.max(0.0, 1.0 - (latency / 500.0));
-        // Lower spread → higher score (cap at 20bps)
         double spreadScore    = Math.max(0.0, 1.0 - (spread / 20.0));
-        // Liquidity is already in [0,1] — higher is better
         double liquidityScore = Math.min(1.0, Math.max(0.0, liquidity));
-        // Fees score is constant for now; can be per-exchange in future
         double feesScore      = DEFAULT_FEES_SCORE;
 
         return WEIGHT_LATENCY   * latencyScore
@@ -192,13 +127,11 @@ public class SmartExecutionRouter {
              + WEIGHT_FEES      * feesScore;
     }
 
-    /** Selects the exchange with the highest composite score. */
     private @NotNull Optional<String> selectBestExchange(@NotNull List<String> available) {
         return available.stream()
                 .max((a, b) -> Double.compare(computeCompositeScore(a), computeCompositeScore(b)));
     }
 
-    /** Builds an {@link ExecutionRoute} for the selected exchange. */
     private @NotNull ExecutionRoute buildRoute(
             @NotNull ExecutionRequest request,
             @NotNull String exchangeName
@@ -208,9 +141,7 @@ public class SmartExecutionRouter {
         double liquidity = exchangeLiquidityScores.getOrDefault(exchangeName, DEFAULT_LIQUIDITY);
         double spread    = exchangeSpreadBps.getOrDefault(exchangeName, DEFAULT_SPREAD_BPS);
 
-        ExecutionVenue venue = request.allowVenueSwitch()
-                ? request.preferredVenue()
-                : request.preferredVenue();
+        ExecutionVenue venue = request.preferredVenue();
 
         return new ExecutionRoute(
                 UUID.randomUUID().toString(),
@@ -229,7 +160,6 @@ public class SmartExecutionRouter {
         );
     }
 
-    /** Publishes a route-selected event to the event bus if available. */
     private void publishRouteEvent(
             @NotNull ExecutionRoute route,
             @NotNull ExecutionRequest request
@@ -248,7 +178,6 @@ public class SmartExecutionRouter {
             eventBus.publishAsync(
                     AgentEvent.of("EXECUTION_ROUTE_SELECTED", "SmartExecutionRouter", route.routeId(), meta));
         } catch (Exception ignored) {
-            // event bus failures must not affect routing
         }
     }
 }

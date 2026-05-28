@@ -40,17 +40,6 @@ public record ExecutionResult(
 
     // ── Static factory methods ────────────────────────────────────────────────
 
-    /**
-     * Creates a successful (fully-filled) execution result.
-     *
-     * @param requestId   links back to the originating request
-     * @param routeId     links back to the route that was taken
-     * @param orderId     application-level order ID
-     * @param filledQty   quantity that was filled
-     * @param avgPrice    average fill price
-     * @param fees        total fees paid
-     * @return a new {@link ExecutionResult} with status {@link ExecutionStatus#FILLED}
-     */
     public static @NotNull ExecutionResult success(
             @NotNull String requestId,
             @NotNull String routeId,
@@ -81,16 +70,6 @@ public record ExecutionResult(
         );
     }
 
-    /**
-     * Creates a failed execution result.
-     *
-     * @param requestId    links back to the originating request
-     * @param routeId      links back to the route that was taken
-     * @param errorCode    machine-readable error code
-     * @param errorMessage human-readable error message
-     * @param httpStatus   HTTP status code (0 if not applicable)
-     * @return a new {@link ExecutionResult} with status {@link ExecutionStatus#ERROR}
-     */
     public static @NotNull ExecutionResult failure(
             @NotNull String requestId,
             @NotNull String routeId,
@@ -120,15 +99,6 @@ public record ExecutionResult(
         );
     }
 
-    /**
-     * Creates a pending execution result for an order that has been submitted
-     * but not yet confirmed by the exchange.
-     *
-     * @param requestId links back to the originating request
-     * @param routeId   links back to the route that was taken
-     * @param orderId   application-level order ID
-     * @return a new {@link ExecutionResult} with status {@link ExecutionStatus#SUBMITTED}
-     */
     public static @NotNull ExecutionResult pending(
             @NotNull String requestId,
             @NotNull String routeId,
@@ -157,34 +127,20 @@ public record ExecutionResult(
 
     // ── Instance query methods ────────────────────────────────────────────────
 
-    /**
-     * Returns {@code true} if the order is fully or partially filled.
-     */
     public boolean isSuccessful() {
         return status == ExecutionStatus.FILLED || status == ExecutionStatus.PARTIAL_FILL;
     }
 
-    /**
-     * Returns {@code true} if the order has failed (rejected or error).
-     */
     public boolean isFailed() {
         return status == ExecutionStatus.ERROR || status == ExecutionStatus.REJECTED;
     }
 
-    /**
-     * Returns {@code true} if the order has been submitted but is awaiting confirmation.
-     */
     public boolean isPending() {
         return status == ExecutionStatus.PENDING
                 || status == ExecutionStatus.ROUTING
                 || status == ExecutionStatus.SUBMITTED;
     }
 
-    /**
-     * Returns a brief human-readable summary of this result.
-     *
-     * @return formatted summary string
-     */
     public @NotNull String summary() {
         return "ExecutionResult[%s status=%s orderId=%s filled=%.6f avgPx=%.4f fees=%.4f exchange=%s]"
                 .formatted(

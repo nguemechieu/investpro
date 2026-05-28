@@ -6,21 +6,7 @@ import org.jetbrains.annotations.NotNull;
  * Immutable throttle and retry configuration for a specific exchange.
  *
  * <p>Pre-built profiles are provided via static factory methods for the
- * most commonly used exchanges.  All profiles expose:
- * <ul>
- *   <li>Rate limits ({@link #maxRequestsPerSecond}, {@link #burstLimit})</li>
- *   <li>Transport preference ({@link #websocketFirst})</li>
- *   <li>Exponential back-off parameters for REST retries</li>
- *   <li>WebSocket reconnect configuration</li>
- * </ul>
- *
- * <p>Back-off delay for attempt {@code n} (0-indexed) is computed as:
- * <pre>
- *   delay = min(retryBaseDelayMs * backoffMultiplier^n, retryMaxDelayMs)
- * </pre>
- *
- * <p>Use {@link #DEFAULT()} as a safe conservative baseline for any exchange
- * not listed here.
+ * most commonly used exchanges.
  */
 public record ExchangeThrottleProfile(
         @NotNull String exchangeName,
@@ -35,12 +21,6 @@ public record ExchangeThrottleProfile(
         long websocketReconnectDelayMs
 ) {
 
-    // ── Pre-built exchange profiles ───────────────────────────────────────────
-
-    /**
-     * Throttle profile for <b>Coinbase Advanced Trade</b>.
-     * WebSocket-first; 10 REST requests/s; burst of 30; exponential back-off capped at 30 s.
-     */
     public static @NotNull ExchangeThrottleProfile COINBASE() {
         return new ExchangeThrottleProfile(
                 "COINBASE",
@@ -51,10 +31,6 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    /**
-     * Throttle profile for <b>OANDA</b>.
-     * REST-first; conservative 2 requests/s due to rate limits; back-off capped at 60 s.
-     */
     public static @NotNull ExchangeThrottleProfile OANDA() {
         return new ExchangeThrottleProfile(
                 "OANDA",
@@ -65,10 +41,6 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    /**
-     * Throttle profile for <b>Binance</b>.
-     * WebSocket-first; high-frequency 20 requests/s; burst of 50; back-off capped at 15 s.
-     */
     public static @NotNull ExchangeThrottleProfile BINANCE() {
         return new ExchangeThrottleProfile(
                 "BINANCE",
@@ -79,10 +51,6 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    /**
-     * Throttle profile for <b>Alpaca</b>.
-     * WebSocket-first; 10 requests/s; burst of 20; back-off capped at 30 s.
-     */
     public static @NotNull ExchangeThrottleProfile ALPACA() {
         return new ExchangeThrottleProfile(
                 "ALPACA",
@@ -93,10 +61,6 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    /**
-     * Throttle profile for <b>Bitfinex</b>.
-     * WebSocket-first; 10 requests/s; burst of 30; back-off capped at 30 s.
-     */
     public static @NotNull ExchangeThrottleProfile BITFINEX() {
         return new ExchangeThrottleProfile(
                 "BITFINEX",
@@ -107,10 +71,6 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    /**
-     * Throttle profile for <b>DEX / on-chain</b> interactions.
-     * REST-first (no WebSocket); lower rates due to RPC constraints; aggressive back-off.
-     */
     public static @NotNull ExchangeThrottleProfile DEX() {
         return new ExchangeThrottleProfile(
                 "DEX",
@@ -121,10 +81,6 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    /**
-     * Conservative default profile for any exchange not explicitly configured.
-     * Safe for any REST-based exchange with unknown rate limits.
-     */
     public static @NotNull ExchangeThrottleProfile DEFAULT() {
         return new ExchangeThrottleProfile(
                 "DEFAULT",
@@ -135,32 +91,15 @@ public record ExchangeThrottleProfile(
         );
     }
 
-    // ── Instance methods ──────────────────────────────────────────────────────
-
-    /**
-     * Computes the exponential back-off delay for a given retry attempt number.
-     *
-     * @param attemptNumber zero-indexed attempt number (0 = first retry)
-     * @return delay in milliseconds, capped at {@link #retryMaxDelayMs}
-     */
     public long computeBackoffDelay(int attemptNumber) {
         double delay = retryBaseDelayMs * Math.pow(backoffMultiplier, attemptNumber);
         return Math.min((long) delay, retryMaxDelayMs);
     }
 
-    /**
-     * Returns {@code true} if WebSocket is the preferred transport for this exchange.
-     * When {@code true}, REST polling should be used only as a fallback.
-     */
     public boolean isWebSocketPriority() {
         return websocketFirst;
     }
 
-    /**
-     * Returns a brief human-readable summary of this throttle profile.
-     *
-     * @return formatted summary string
-     */
     public @NotNull String summary() {
         return "ThrottleProfile[%s rps=%d burst=%d ws=%b retry=%dx base=%dms max=%dms]"
                 .formatted(
