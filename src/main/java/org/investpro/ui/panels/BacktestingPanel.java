@@ -33,6 +33,8 @@ import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyRegistry;
+import org.investpro.strategy.StrategyAssignment;
+import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UnifiedStrategy;
@@ -106,8 +108,10 @@ public class BacktestingPanel extends StackPane {
     private Button runBacktestButton;
     private Button compareBtn;
     private Button exportBtn;
+    private Button assignResultButton;
 
     private InstitutionalBacktestMetrics currentMetrics;
+    private BacktestInput lastSuccessfulBacktestInput;
     private BacktestReportPanel reportPanel;
 
     private SymbolAgentManager symbolAgentManager;
@@ -193,7 +197,7 @@ public class BacktestingPanel extends StackPane {
         strategyCombo = new ComboBox<>();
         List<String> strategies = loadStrategyNames();
         strategyCombo.setItems(FXCollections.observableArrayList(strategies));
-        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.getFirst());
+        strategyCombo.setValue(defaultStrategySelection(strategies));
         strategyCombo.setPrefHeight(35);
         HBox strategyBox = createLabeledInput("Strategy:", strategyCombo);
 
@@ -334,6 +338,14 @@ public class BacktestingPanel extends StackPane {
         exportBtn.setDisable(true);
         exportBtn.setOnAction(event -> exportResults());
 
+        assignResultButton = new Button("Assign Strategy");
+        assignResultButton.setStyle(primaryButtonStyle("#10b981"));
+        assignResultButton.setDisable(true);
+        assignResultButton.setOnAction(event -> assignTestedStrategy());
+
+        HBox resultActions = new HBox(10, assignResultButton, exportBtn);
+        resultActions.setAlignment(Pos.CENTER_LEFT);
+
         Label equityLabel = new Label("Equity Curve");
         equityLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
 
@@ -361,7 +373,7 @@ public class BacktestingPanel extends StackPane {
         section.getChildren().addAll(
                 sectionTitle,
                 resultsTabPane,
-                exportBtn);
+                resultActions);
 
         VBox.setVgrow(resultsTabPane, Priority.ALWAYS);
 
@@ -550,8 +562,18 @@ public class BacktestingPanel extends StackPane {
         try {
             return new ArrayList<>(StrategyCatalog.CORE_STRATEGY_NAMES);
         } catch (Exception exception) {
-            return List.of("Trend Following", "Mean Reversion", "Breakout");
+            return List.of(StrategyCatalog.defaultStrategyName(), "Mean Reversion", "Breakout");
         }
+    }
+
+    private String defaultStrategySelection(List<String> strategies) {
+        if (strategies == null || strategies.isEmpty()) {
+            return StrategyCatalog.defaultStrategyName();
+        }
+        return strategies.stream()
+                .filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)
+                .findFirst()
+                .orElse(strategies.getFirst());
     }
 
     private List<Timeframe> loadSupportedTimeframes() {
@@ -831,6 +853,7 @@ public class BacktestingPanel extends StackPane {
         }
 
         backtestRunning.set(true);
+        lastSuccessfulBacktestInput = null;
         statusLabel.setText("Loading data...");
         progressBar.setProgress(-1);
         setRunningUi(true);
@@ -956,6 +979,7 @@ public class BacktestingPanel extends StackPane {
                 updatePriceActionChart(finalCandles, trades);
                 updateEquityChart(trades, initialBalance);
                 updateMetrics(metrics);
+                lastSuccessfulBacktestInput = input;
 
                 boolean hasTrades = !trades.isEmpty();
                 if (exportBtn != null) {
@@ -963,6 +987,9 @@ public class BacktestingPanel extends StackPane {
                 }
                 if (compareBtn != null) {
                     compareBtn.setDisable(!hasTrades);
+                }
+                if (assignResultButton != null) {
+                    assignResultButton.setDisable(false);
                 }
 
                 statusLabel.setText(
@@ -1096,6 +1123,9 @@ public class BacktestingPanel extends StackPane {
         }
         if (compareBtn != null && running) {
             compareBtn.setDisable(true);
+        }
+        if (assignResultButton != null) {
+            assignResultButton.setDisable(running || lastSuccessfulBacktestInput == null);
         }
     }
 
@@ -2087,6 +2117,73 @@ public class BacktestingPanel extends StackPane {
         }
 
         return value.replace(",", " ").replace("\n", " ").trim();
+    }
+
+    private void assignTestedStrategy() {
+        BacktestInput input = lastSuccessfulBacktestInput;
+        if (input == null || !input.isValid()) {
+            showAlert("No Backtest Selected", "Run a backtest before assigning a strategy.", Alert.AlertType.WARNING);
+            return;
+        }
+
+        String symbol = displayTradePair(input.selectedPair());
+        String strategyId = assignmentStrategyId(input.strategyName());
+        double score = currentMetrics == null ? 0.0 : currentMetrics.getConfidenceScore();
+        int trades = currentMetrics == null ? 0 : currentMetrics.getTotalTrades();
+        double totalReturn = currentMetrics == null ? 0.0 : currentMetrics.getTotalReturnPercent();
+        double winRate = currentMetrics == null ? 0.0 : currentMetrics.getWinRate();
+        double drawdown = currentMetrics == null ? 0.0 : currentMetrics.getMaxDrawdownPercent();
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Assign Backtested Strategy");
+        confirm.setHeaderText("Assign this strategy to " + symbol + " / " + input.selectedTimeframe().getCode() + "?");
+        confirm.setContentText(
+                "Strategy: " + strategyId + "\n" +
+                        "Trades: " + trades + "\n" +
+                        "Return: " + String.format(Locale.ROOT, "%.2f%%", totalReturn) + "\n" +
+                        "Win Rate: " + String.format(Locale.ROOT, "%.1f%%", winRate) + "\n" +
+                        "Max Drawdown: " + String.format(Locale.ROOT, "%.2f%%", drawdown) + "\n" +
+                        "Score: " + String.format(Locale.ROOT, "%.1f", score));
+
+        confirm.showAndWait().ifPresent(result -> {
+            if (result != ButtonType.OK) {
+                return;
+            }
+
+            try {
+                StrategyAssignment assignment = StrategySelectionService.getInstance()
+                        .manuallyAssign(
+                                symbol,
+                                input.selectedTimeframe(),
+                                strategyId,
+                                true,
+                                "Assigned from Backtesting panel after user-reviewed backtest: "
+                                        + String.format(Locale.ROOT,
+                                        "return %.2f%%, win rate %.1f%%, max drawdown %.2f%%, trades %d",
+                                        totalReturn, winRate, drawdown, trades),
+                                score);
+
+                statusLabel.setText("Assigned " + assignment.getStrategyId() + " to "
+                        + symbol + " " + input.selectedTimeframe().getCode());
+                showAlert("Strategy Assigned",
+                        assignment.getStrategyId() + " is now assigned to "
+                                + symbol + " / " + input.selectedTimeframe().getCode() + ".",
+                        Alert.AlertType.INFORMATION);
+            } catch (Exception exception) {
+                log.error("Failed to assign backtested strategy", exception);
+                showAlert("Assignment Failed", exception.getMessage(), Alert.AlertType.ERROR);
+            }
+        });
+    }
+
+    private String assignmentStrategyId(String strategyName) {
+        if (strategyName == null || strategyName.isBlank()) {
+            return StrategyCatalog.defaultStrategyName();
+        }
+        if (strategyName.startsWith("[User] ")) {
+            return strategyName.substring("[User] ".length()).trim();
+        }
+        return strategyName.trim();
     }
 
     private void compareResults() {

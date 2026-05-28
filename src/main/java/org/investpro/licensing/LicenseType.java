@@ -1,10 +1,13 @@
 package org.investpro.licensing;
 
+import lombok.Getter;
+
 /**
  * Types of licenses available for InvestPro.
  *
  * @author NOEL NGUEMECHIEU
  */
+@Getter
 public enum LicenseType {
     /**
      * Free trial license with limited features
@@ -39,18 +42,6 @@ public enum LicenseType {
         this.displayName = displayName;
         this.description = description;
         this.trialDays = trialDays;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public Integer getTrialDays() {
-        return trialDays;
     }
 
     public boolean isTrial() {

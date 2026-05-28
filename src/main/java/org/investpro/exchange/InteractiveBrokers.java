@@ -28,6 +28,8 @@ import org.java_websocket.drafts.Draft_6455;
 import org.jetbrains.annotations.NotNull;
 
 import javafx.beans.property.SimpleIntegerProperty;
+import org.jspecify.annotations.NonNull;
+
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -127,10 +129,7 @@ public class InteractiveBrokers extends Exchange {
         if (modeRequestsPaperNetwork()) {
             return true;
         }
-        if (modeRequestsLiveNetwork()) {
-            return false;
-        }
-        return true;
+        return !modeRequestsLiveNetwork();
     }
 
     @Override
@@ -564,7 +563,7 @@ public class InteractiveBrokers extends Exchange {
      * objects.
      * Handles both array format and single object format.
      */
-    private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
+    private @NonNull List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
         List<OpenOrder> openOrders = new ArrayList<>();
 
         if (rootNode == null || rootNode.isNull()) {
@@ -1542,7 +1541,7 @@ public class InteractiveBrokers extends Exchange {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
-    private static String decimal(double value) {
+    private static @NonNull String decimal(double value) {
         if (!Double.isFinite(value) || value <= 0) {
             throw new IllegalArgumentException("Order amount and price values must be positive.");
         }

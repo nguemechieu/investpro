@@ -21,7 +21,7 @@ public enum SetupSource {
     /**
      * No suitable setup found. Trade should be skipped.
      */
-    NONE("No suitable setup found");
+    NONE("No suitable setup found!");
 
     public final String description;
 

@@ -50,7 +50,7 @@ public class StrategyAssignment {
 
     /**
      * Strategy ID assigned to this symbol/timeframe.
-     *
+     * <p>
      * Examples:
      * - trend-following
      * - mean-reversion
@@ -73,7 +73,7 @@ public class StrategyAssignment {
 
     /**
      * Score at the time this strategy was assigned.
-     *
+     * <p>
      * Usually produced by backtesting, paper trading, voting, or consensus ranking.
      */
     @Builder.Default
@@ -87,10 +87,10 @@ public class StrategyAssignment {
 
     /**
      * Optional expiration time.
-     *
+     * <p>
      * null means the assignment does not expire.
      */
-    @Nullable
+
     private final Instant expiresAt;
 
     /**
@@ -102,8 +102,7 @@ public class StrategyAssignment {
     /**
      * Human-readable reason for this assignment.
      */
-    @Nullable
-    private final String reason;
+    private  String reason;
 
     /**
      * Warnings captured at assignment time.
@@ -113,7 +112,7 @@ public class StrategyAssignment {
 
     /**
      * Locked assignments cannot be automatically replaced.
-     *
+     * <p>
      * Manual assignments should normally be locked.
      */
     @Builder.Default
@@ -122,7 +121,6 @@ public class StrategyAssignment {
     /**
      * Optional reason why this assignment was disabled.
      */
-    @Nullable
     private final String disableReason;
 
     /**
@@ -409,7 +407,7 @@ public class StrategyAssignment {
             @NotNull String symbol,
             @NotNull Timeframe timeframe,
             @NotNull String strategyId,
-            @Nullable String reason
+            @NotNull String reason
     ) {
         return StrategyAssignment.builder()
                 .symbol(normalizeRequired(symbol, "symbol"))

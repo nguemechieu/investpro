@@ -18,19 +18,27 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Loads currency flag / icon images for display in market watch tables.
+ * Loads currency flag/icon images for display in market watch tables.
  * <p>
- * Lookup order:
- * 1. Bundled icons from {@code /currency} or {@code /icons/currencies}
- * 2. Locally cached downloaded icons
- * 3. CoinGecko API for crypto currencies (saved locally after download)
- * 4. java.util.Currency flag fallback for fiat currencies
- * 5. Generic fallback image
+ * Fiat and crypto images are fully separated in both storage and download logic:
+ * <ul>
+ *   <li><b>Crypto</b>: CoinGecko API → {@code ~/.investpro/currency-icons/crypto/}</li>
+ *   <li><b>Fiat</b>: flagcdn.com (country flags) → {@code ~/.investpro/currency-icons/fiat/}</li>
+ * </ul>
+ * <p>
+ * Lookup order for each type:
+ * <ol>
+ *   <li>Bundled classpath icons (type-specific paths)</li>
+ *   <li>Locally cached downloaded icons (type-specific subdirectory)</li>
+ *   <li>Remote download — flagcdn.com for fiat, CoinGecko for crypto</li>
+ *   <li>Generic fallback image</li>
+ * </ol>
  */
 @Slf4j
 public final class CurrencyIconLoader {
 
-    private static final Map<String, String> SYMBOL_ALIASES = Map.ofEntries(
+    // --- Crypto: symbol → CoinGecko ID ---
+    private static final Map<String, String> CRYPTO_COINGECKO_ALIASES = Map.ofEntries(
             Map.entry("BTC", "bitcoin"),
             Map.entry("XBT", "bitcoin"),
             Map.entry("ETH", "ethereum"),
@@ -68,13 +76,73 @@ public final class CurrencyIconLoader {
             Map.entry("TRX", "tron"),
             Map.entry("WBTC", "wrapped-bitcoin"));
 
+    /**
+     * Fiat ISO 4217 currency code → ISO 3166-1 alpha-2 country code for flagcdn.com.
+     * URL pattern: https://flagcdn.com/w80/{countryCode}.png
+     */
+    private static final Map<String, String> FIAT_TO_COUNTRY_CODE = Map.ofEntries(
+            Map.entry("USD", "us"),
+            Map.entry("EUR", "eu"),
+            Map.entry("GBP", "gb"),
+            Map.entry("JPY", "jp"),
+            Map.entry("CHF", "ch"),
+            Map.entry("CAD", "ca"),
+            Map.entry("AUD", "au"),
+            Map.entry("NZD", "nz"),
+            Map.entry("CNY", "cn"),
+            Map.entry("CNH", "cn"),
+            Map.entry("HKD", "hk"),
+            Map.entry("SGD", "sg"),
+            Map.entry("ZAR", "za"),
+            Map.entry("MXN", "mx"),
+            Map.entry("BRL", "br"),
+            Map.entry("INR", "in"),
+            Map.entry("KRW", "kr"),
+            Map.entry("TRY", "tr"),
+            Map.entry("SEK", "se"),
+            Map.entry("NOK", "no"),
+            Map.entry("DKK", "dk"),
+            Map.entry("PLN", "pl"),
+            Map.entry("HUF", "hu"),
+            Map.entry("CZK", "cz"),
+            Map.entry("ILS", "il"),
+            Map.entry("THB", "th"),
+            Map.entry("MYR", "my"),
+            Map.entry("IDR", "id"),
+            Map.entry("PHP", "ph"),
+            Map.entry("TWD", "tw"),
+            Map.entry("SAR", "sa"),
+            Map.entry("AED", "ae"),
+            Map.entry("KWD", "kw"),
+            Map.entry("QAR", "qa"),
+            Map.entry("EGP", "eg"),
+            Map.entry("NGN", "ng"),
+            Map.entry("CLP", "cl"),
+            Map.entry("COP", "co"),
+            Map.entry("PEN", "pe"),
+            Map.entry("ARS", "ar"),
+            Map.entry("VND", "vn"),
+            Map.entry("UAH", "ua"),
+            Map.entry("RON", "ro"),
+            Map.entry("BGN", "bg"),
+            Map.entry("HRK", "hr"),
+            Map.entry("RUB", "ru"),
+            Map.entry("PKR", "pk"),
+            Map.entry("MAD", "ma"),
+            Map.entry("DZD", "dz"),
+            Map.entry("KES", "ke"));
+
     private static final String FALLBACK_PATH = "/icons/currencies/unknown.png";
     private static final String COINGECKO_API = "https://api.coingecko.com/api/v3";
-    private static final long COINGECKO_TIMEOUT_SECONDS = 5;
-    private static final Path LOCAL_ICON_CACHE_DIR = Path.of(
-            System.getProperty("user.home", "."),
-            ".investpro",
-            "currency-icons");
+    /** flagcdn.com: free, no API key, 2-letter ISO 3166-1 alpha-2 country code, 80px wide PNG. */
+    private static final String FLAGCDN_URL = "https://flagcdn.com/w80/%s.png";
+    private static final long HTTP_TIMEOUT_SECONDS = 5;
+
+    /** Separate local disk cache subdirectories for fiat and crypto images. */
+    private static final Path LOCAL_CACHE_ROOT = Path.of(
+            System.getProperty("user.home", "."), ".investpro", "currency-icons");
+    private static final Path FIAT_CACHE_DIR = LOCAL_CACHE_ROOT.resolve("fiat");
+    private static final Path CRYPTO_CACHE_DIR = LOCAL_CACHE_ROOT.resolve("crypto");
 
     private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, String> COINGECKO_ID_CACHE = new ConcurrentHashMap<>();
@@ -86,10 +154,10 @@ public final class CurrencyIconLoader {
     }
 
     /**
-     * Load the icon for the given currency code (e.g. "BTC", "USD").
-     * Tries bundled icons first, then CoinGecko for crypto, then java.util.Currency for fiat.
+     * Load the icon for the given currency code (e.g. "BTC", "USD", "EUR").
+     * Fiat and crypto currencies are resolved via fully separate paths and providers.
      *
-     * @param currencyCode ISO or crypto currency code
+     * @param currencyCode ISO 4217 fiat code or crypto symbol
      * @return Image, or fallback if not found
      */
     public static Image loadCurrencyIcon(String currencyCode) {
@@ -99,186 +167,77 @@ public final class CurrencyIconLoader {
 
         String code = currencyCode.trim().toUpperCase();
         return CACHE.computeIfAbsent(code, key -> {
-            // Try 1: Load from bundled resources
-            Image icon = candidates(key).stream()
+            boolean fiat = isFiatCurrency(key);
+
+            // 1. Bundled classpath icons (type-specific paths)
+            Image icon = candidatesFor(key, fiat).stream()
                     .map(CurrencyIconLoader::tryLoadFromResources)
-                    .filter(image -> image != null && !image.isError())
+                    .filter(img -> img != null && !img.isError())
                     .findFirst()
                     .orElse(null);
-            if (icon != null) {
-                return icon;
-            }
+            if (icon != null) return icon;
 
-            // Try 2: Load previously downloaded icon from the local cache
-            icon = tryLoadFromLocalCache(key);
-            if (icon != null && !icon.isError()) {
-                return icon;
-            }
+            // 2. Locally cached downloaded icons (type-specific subdirectory)
+            icon = tryLoadFromLocalCache(key, fiat);
+            if (icon != null && !icon.isError()) return icon;
 
-            // Try 3: Fetch from CoinGecko if crypto, then save locally for future runs
-            icon = tryLoadFromCoinGecko(key);
-            if (icon != null && !icon.isError()) {
-                return icon;
+            // 3. Remote download — flagcdn.com for fiat, CoinGecko for crypto
+            if (fiat) {
+                icon = tryDownloadFiatFlag(key);
+            } else {
+                icon = tryLoadFromCoinGecko(key);
             }
+            if (icon != null && !icon.isError()) return icon;
 
-            // Try 4: Fetch fiat currency flag from java.util.Currency
-            icon = tryLoadFiatCurrencyIcon(key);
-            if (icon != null && !icon.isError()) {
-                return icon;
-            }
-
-            log.debug("Currency icon not found for {} from any source, using fallback.", key);
+            log.debug("Currency icon not found for {} ({}), using fallback.", key, fiat ? "fiat" : "crypto");
             return loadFallback();
         });
     }
 
+    // ---------- Fiat detection ----------
+
     /**
-     * Try to load icon from CoinGecko API for crypto currencies.
+     * Returns true if the code represents a fiat/forex currency.
+     * Checks the explicit fiat map first, then falls back to java.util.Currency recognition.
      */
-    private static Image tryLoadFromCoinGecko(String currencyCode) {
-        if (currencyCode == null || currencyCode.isBlank()) {
-            return null;
-        }
-
+    static boolean isFiatCurrency(String code) {
+        if (code == null || code.isBlank()) return false;
+        if (FIAT_TO_COUNTRY_CODE.containsKey(code)) return true;
         try {
-            String coinGeckoId = getCoinGeckoId(currencyCode);
-            if (coinGeckoId == null || coinGeckoId.isBlank()) {
-                return null;
-            }
-
-            String iconUrl = "%s/coins/%s?localization=false".formatted(COINGECKO_API, coinGeckoId);
-            String responseBody = fetchUrlContent(iconUrl);
-
-            if (responseBody == null) {
-                return null;
-            }
-
-            JsonNode root = getObjectMapper().readTree(responseBody);
-            String imageUrl = root.path("image").path("large").asText("");
-
-            if (imageUrl.isBlank()) {
-                return null;
-            }
-
-            return downloadAndCacheImage(currencyCode, imageUrl);
-
-        } catch (Exception e) {
-            log.debug("Failed to fetch icon from CoinGecko for {}: {}", currencyCode, e.getMessage());
-            return null;
+            java.util.Currency.getInstance(code);
+            return true;
+        } catch (IllegalArgumentException ignored) {
+            return false;
         }
     }
 
-    /**
-     * Try to load fiat currency icon using java.util.Currency locale display icons.
-     * Attempts to load country flag emoji or specialized fiat icon.
-     */
-    private static Image tryLoadFiatCurrencyIcon(String currencyCode) {
-        if (currencyCode == null || currencyCode.isBlank()) {
-            return null;
-        }
+    // ---------- Classpath candidate paths (type-specific) ----------
 
-        try {
-            // Check if java.util.Currency recognizes this code
-            java.util.Currency javaCurrency = java.util.Currency.getInstance(currencyCode);
-            if (javaCurrency == null) {
-                return null;
-            }
-
-            // Try to load from fiat currency icon directory
-            return tryLoadFromResources("/currency/fiat/" + currencyCode.toLowerCase() + ".png");
-
-        } catch (IllegalArgumentException e) {
-            // Code is not a valid ISO 4217 currency code
-            return null;
-        } catch (Exception e) {
-            log.debug("Failed to load fiat currency icon for {}: {}", currencyCode, e.getMessage());
-            return null;
+    private static List<String> candidatesFor(String key, boolean fiat) {
+        String lower = key.toLowerCase(Locale.ROOT);
+        if (fiat) {
+            return List.of(
+                    "/icons/fiat/" + lower + ".png",
+                    "/icons/fiat/" + lower + ".svg",
+                    "/icons/currencies/" + lower + ".png",
+                    "/currency/fiat/" + lower + ".png");
+        } else {
+            String alias = CRYPTO_COINGECKO_ALIASES.getOrDefault(key, lower);
+            return List.of(
+                    "/icons/crypto/" + lower + ".png",
+                    "/icons/crypto/" + alias + ".png",
+                    "/currency/" + alias + ".jpg",
+                    "/currency/" + lower + ".jpg",
+                    "/currency/" + prettify(key) + ".jpg",
+                    "/icons/currencies/" + lower + ".png");
         }
     }
 
-    /**
-     * Get CoinGecko coin ID for a given crypto symbol.
-     * Checks cache first, then queries API.
-     */
-    private static String getCoinGeckoId(String symbol) {
-        if (symbol == null || symbol.isBlank()) {
-            return null;
-        }
+    // ---------- Local disk cache (fiat/ vs crypto/ subdirectory) ----------
 
-        String cached = COINGECKO_ID_CACHE.get(symbol);
-        if (cached != null) {
-            return cached;
-        }
-
-        // Check if symbol is in our aliases
-        String alias = SYMBOL_ALIASES.get(symbol);
-        if (alias != null) {
-            COINGECKO_ID_CACHE.put(symbol, alias);
-            return alias;
-        }
-
-        // Query CoinGecko for the symbol
-        try {
-            String searchUrl = "%s/search?query=%s".formatted(COINGECKO_API, symbol.toLowerCase());
-            String responseBody = fetchUrlContent(searchUrl);
-
-            if (responseBody == null) {
-                return null;
-            }
-
-            JsonNode root = getObjectMapper().readTree(responseBody);
-            JsonNode coins = root.path("coins");
-
-            if (coins.isArray() && !coins.isEmpty()) {
-                String coinId = coins.get(0).path("id").asText("");
-                if (!coinId.isBlank()) {
-                    COINGECKO_ID_CACHE.put(symbol, coinId);
-                    return coinId;
-                }
-            }
-
-            return null;
-
-        } catch (Exception e) {
-            log.debug("Failed to find CoinGecko ID for {}: {}", symbol, e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Fetch URL content via HTTP using OkHttp.
-     */
-    private static String fetchUrlContent(String url) {
-        if (url == null || url.isBlank()) {
-            return null;
-        }
-
-        try {
-            OkHttpClient client = getHttpClient();
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("User-Agent", "InvestPro/1.0")
-                    .build();
-
-            try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null) {
-                    return null;
-                }
-                return response.body().string();
-            }
-
-        } catch (Exception e) {
-            log.debug("Failed to fetch URL {}: {}", url, e.getMessage());
-            return null;
-        }
-    }
-
-    private static Image tryLoadFromLocalCache(String currencyCode) {
-        Path path = localIconPath(currencyCode);
-        if (!Files.isRegularFile(path)) {
-            return null;
-        }
-
+    private static Image tryLoadFromLocalCache(String currencyCode, boolean fiat) {
+        Path path = localIconPath(currencyCode, fiat);
+        if (!Files.isRegularFile(path)) return null;
         try (InputStream stream = Files.newInputStream(path)) {
             Image image = new Image(stream, 100, 100, true, true);
             if (image.isError()) {
@@ -286,62 +245,157 @@ public final class CurrencyIconLoader {
                 return null;
             }
             return image;
-        } catch (IOException exception) {
+        } catch (IOException ex) {
             log.debug("Failed to load cached currency icon for {} from {}: {}",
-                    currencyCode, path, exception.getMessage());
+                    currencyCode, path, ex.getMessage());
             return null;
         }
     }
 
-    private static Image downloadAndCacheImage(String currencyCode, String imageUrl) {
-        if (imageUrl == null || imageUrl.isBlank()) {
+    private static void saveToLocalCache(String currencyCode, byte[] bytes, boolean fiat) {
+        try {
+            Path dir = fiat ? FIAT_CACHE_DIR : CRYPTO_CACHE_DIR;
+            Files.createDirectories(dir);
+            Files.write(localIconPath(currencyCode, fiat), bytes);
+            log.debug("Saved {} icon for {} to local cache", fiat ? "fiat" : "crypto", currencyCode);
+        } catch (IOException ex) {
+            log.debug("Failed to cache currency icon for {}: {}", currencyCode, ex.getMessage());
+        }
+    }
+
+    private static Path localIconPath(String currencyCode, boolean fiat) {
+        String safe = (currencyCode == null ? "unknown" : currencyCode.trim().toLowerCase(Locale.ROOT))
+                .replaceAll("[^a-z0-9._-]", "_");
+        return (fiat ? FIAT_CACHE_DIR : CRYPTO_CACHE_DIR).resolve(safe + ".png");
+    }
+
+    // ---------- Fiat download: flagcdn.com ----------
+
+    /**
+     * Downloads a country flag from flagcdn.com for the given fiat currency code.
+     * Uses the explicit {@link #FIAT_TO_COUNTRY_CODE} map to resolve ISO 3166-1 alpha-2 country code.
+     * Free service, no API key required.
+     */
+    private static Image tryDownloadFiatFlag(String currencyCode) {
+        String countryCode = FIAT_TO_COUNTRY_CODE.get(currencyCode);
+        if (countryCode == null || countryCode.length() != 2) {
+            log.debug("No country code mapping for fiat currency: {}; cannot download flag.", currencyCode);
             return null;
         }
+        String url = FLAGCDN_URL.formatted(countryCode);
+        log.debug("Downloading fiat flag for {} (country={}) from {}", currencyCode, countryCode, url);
+        return downloadAndCacheImage(currencyCode, url, true);
+    }
 
+    // ---------- Crypto download: CoinGecko ----------
+
+    private static Image tryLoadFromCoinGecko(String currencyCode) {
+        if (currencyCode == null || currencyCode.isBlank()) return null;
+        try {
+            String coinGeckoId = getCoinGeckoId(currencyCode);
+            if (coinGeckoId == null || coinGeckoId.isBlank()) return null;
+
+            String infoUrl = "%s/coins/%s?localization=false".formatted(COINGECKO_API, coinGeckoId);
+            String body = fetchUrlContent(infoUrl);
+            if (body == null) return null;
+
+            JsonNode root = getObjectMapper().readTree(body);
+            String imageUrl = root.path("image").path("large").asText("");
+            if (imageUrl.isBlank()) return null;
+
+            return downloadAndCacheImage(currencyCode, imageUrl, false);
+        } catch (Exception ex) {
+            log.debug("Failed to fetch icon from CoinGecko for {}: {}", currencyCode, ex.getMessage());
+            return null;
+        }
+    }
+
+    private static String getCoinGeckoId(String symbol) {
+        if (symbol == null || symbol.isBlank()) return null;
+
+        String cached = COINGECKO_ID_CACHE.get(symbol);
+        if (cached != null) return cached;
+
+        String alias = CRYPTO_COINGECKO_ALIASES.get(symbol);
+        if (alias != null) {
+            COINGECKO_ID_CACHE.put(symbol, alias);
+            return alias;
+        }
+
+        try {
+            String searchUrl = "%s/search?query=%s".formatted(COINGECKO_API, symbol.toLowerCase());
+            String body = fetchUrlContent(searchUrl);
+            if (body == null) return null;
+
+            JsonNode root = getObjectMapper().readTree(body);
+            JsonNode coins = root.path("coins");
+            if (coins.isArray() && !coins.isEmpty()) {
+                String coinId = coins.get(0).path("id").asText("");
+                if (!coinId.isBlank()) {
+                    COINGECKO_ID_CACHE.put(symbol, coinId);
+                    return coinId;
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("Failed to find CoinGecko ID for {}: {}", symbol, ex.getMessage());
+        }
+        return null;
+    }
+
+    // ---------- Shared HTTP helpers ----------
+
+    private static Image downloadAndCacheImage(String currencyCode, String imageUrl, boolean fiat) {
+        if (imageUrl == null || imageUrl.isBlank()) return null;
         try {
             OkHttpClient client = getHttpClient();
             Request request = new Request.Builder()
                     .url(imageUrl)
                     .header("User-Agent", "InvestPro/1.0")
                     .build();
-
             try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null) {
-                    return null;
-                }
-
-                byte[] imageBytes = response.body().bytes();
-                if (imageBytes.length == 0) {
-                    return null;
-                }
-
-                Image image = new Image(new ByteArrayInputStream(imageBytes), 100, 100, true, true);
-                if (image.isError()) {
-                    return null;
-                }
-
-                saveToLocalCache(currencyCode, imageBytes);
+                if (!response.isSuccessful() || response.body() == null) return null;
+                byte[] bytes = response.body().bytes();
+                if (bytes.length == 0) return null;
+                Image image = new Image(new ByteArrayInputStream(bytes), 100, 100, true, true);
+                if (image.isError()) return null;
+                saveToLocalCache(currencyCode, bytes, fiat);
                 return image;
             }
-        } catch (Exception exception) {
-            log.debug("Failed to download currency icon from URL {}: {}", imageUrl, exception.getMessage());
+        } catch (Exception ex) {
+            log.debug("Failed to download currency icon from {}: {}", imageUrl, ex.getMessage());
             return null;
         }
     }
 
-    private static void saveToLocalCache(String currencyCode, byte[] imageBytes) {
+    private static String fetchUrlContent(String url) {
+        if (url == null || url.isBlank()) return null;
         try {
-            Files.createDirectories(LOCAL_ICON_CACHE_DIR);
-            Files.write(localIconPath(currencyCode), imageBytes);
-        } catch (IOException exception) {
-            log.debug("Failed to cache currency icon for {}: {}", currencyCode, exception.getMessage());
+            OkHttpClient client = getHttpClient();
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "InvestPro/1.0")
+                    .build();
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful() || response.body() == null) return null;
+                return response.body().string();
+            }
+        } catch (Exception ex) {
+            log.debug("Failed to fetch URL {}: {}", url, ex.getMessage());
+            return null;
         }
     }
 
-    private static Path localIconPath(String currencyCode) {
-        String safeCode = currencyCode == null ? "unknown" : currencyCode.trim().toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9._-]", "_");
-        return LOCAL_ICON_CACHE_DIR.resolve(safeCode + ".png");
+    // ---------- Classpath resource loader and fallback ----------
+
+    private static Image tryLoadFromResources(String resourcePath) {
+        try (InputStream stream = CurrencyIconLoader.class.getResourceAsStream(resourcePath)) {
+            if (stream == null) return null;
+            Image image = new Image(stream);
+            return image.isError() ? null : image;
+        } catch (Exception ex) {
+            log.debug("Failed to load icon from {}: {}", resourcePath, ex.getMessage());
+            return null;
+        }
     }
 
     private static Image loadFallback() {
@@ -351,33 +405,6 @@ public final class CurrencyIconLoader {
             fallbackImage = image;
         }
         return image;
-    }
-
-    private static Image tryLoadFromResources(String resourcePath) {
-        try {
-            try (InputStream stream = CurrencyIconLoader.class.getResourceAsStream(resourcePath)) {
-            if (stream == null) {
-                return null;
-            }
-            return new Image(stream);
-            }
-        } catch (Exception e) {
-            log.debug("Failed to load icon from {}: {}", resourcePath, e.getMessage());
-            return null;
-        }
-    }
-
-    private static List<String> candidates(String key) {
-        String normalized = key.trim().toUpperCase(Locale.ROOT);
-        String lower = normalized.toLowerCase(Locale.ROOT);
-        String alias = SYMBOL_ALIASES.getOrDefault(normalized, lower);
-        return List.of(
-                "/currency/" + alias + ".jpg",
-                "/currency/" + normalized + ".jpg",
-                "/currency/" + lower + ".jpg",
-                "/currency/" + prettify(normalized) + ".jpg",
-                "/icons/currencies/" + normalized + ".png",
-                "/icons/currencies/" + lower + ".png");
     }
 
     private static String prettify(String key) {
@@ -396,6 +423,8 @@ public final class CurrencyIconLoader {
         };
     }
 
+    // ---------- Lazy singletons ----------
+
     private static OkHttpClient getHttpClient() {
         OkHttpClient client = httpClient;
         if (client == null) {
@@ -403,8 +432,8 @@ public final class CurrencyIconLoader {
                 client = httpClient;
                 if (client == null) {
                     client = new OkHttpClient.Builder()
-                            .connectTimeout(COINGECKO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                            .readTimeout(COINGECKO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                            .connectTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                            .readTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                             .build();
                     httpClient = client;
                 }

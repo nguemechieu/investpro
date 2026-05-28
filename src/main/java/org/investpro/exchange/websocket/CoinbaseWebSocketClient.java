@@ -350,13 +350,24 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
         Objects.requireNonNull(tradePair, "tradePair must not be null");
         Objects.requireNonNull(liveTradesConsumer, "liveTradesConsumer must not be null");
 
-        this.defaultTradePair = tradePair;
-        liveTradeConsumers.put(tradePair, liveTradesConsumer);
+        boolean alreadyRegistered;
 
-        if (!isOpen()) {
-            pendingSubscriptions.add(tradePair);
-            log.warn("Coinbase WebSocket not open yet; registered {} for subscription after connect.", tradePair);
-            return;
+        synchronized (liveTradeConsumers) {
+            alreadyRegistered = liveTradeConsumers.containsKey(tradePair);
+            this.defaultTradePair = tradePair;
+            liveTradeConsumers.put(tradePair, liveTradesConsumer);
+
+            if (alreadyRegistered) {
+                pendingSubscriptions.remove(tradePair);
+                log.debug("Coinbase market trades already registered for {}; updated local consumer only.", tradePair);
+                return;
+            }
+
+            if (!isOpen()) {
+                pendingSubscriptions.add(tradePair);
+                log.warn("Coinbase WebSocket not open yet; registered {} for subscription after connect.", tradePair);
+                return;
+            }
         }
 
         try {
@@ -381,14 +392,19 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
     }
 
     private void stopStreamLiveTrades(@NotNull TradePair tradePair, boolean sendUnsubscribe) {
-        liveTradeConsumers.remove(tradePair);
+        boolean removed;
+
+        synchronized (liveTradeConsumers) {
+            removed = liveTradeConsumers.remove(tradePair) != null;
+        }
+
         pendingSubscriptions.remove(tradePair);
 
         if (tradePair.equals(defaultTradePair)) {
             defaultTradePair = findAnyRegisteredPair();
         }
 
-        if (sendUnsubscribe && isOpen()) {
+        if (removed && sendUnsubscribe && isOpen()) {
             try {
                 sendUnsubscribe(tradePair, MARKET_TRADES_CHANNEL);
             } catch (Exception exception) {
@@ -426,21 +442,27 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        rawStreamHandlers.put(stream.key(), handler);
+        String streamKey = stream.key();
+        Consumer<String> previous = rawStreamHandlers.put(streamKey, handler);
         registerHandler(stream.key(), handler);
 
+        if (previous != null) {
+            log.debug("Coinbase raw stream already registered for {}; updated local handler only.", streamKey);
+            return;
+        }
+
         if (!isOpen()) {
-            log.warn("Coinbase WebSocket not open yet; registered raw stream {}", stream.key());
+            log.warn("Coinbase WebSocket not open yet; registered raw stream {}", streamKey);
             return;
         }
 
         try {
             sendSubscribe(stream.tradePair(), stream.channel());
-            log.info("Subscribed Coinbase raw stream {}", stream.key());
+            log.info("Subscribed Coinbase raw stream {}", streamKey);
         } catch (Exception exception) {
-            rawStreamHandlers.remove(stream.key());
-            removeHandler(stream.key());
-            log.error("Failed to subscribe Coinbase raw stream {}", stream.key(), exception);
+            rawStreamHandlers.remove(streamKey);
+            removeHandler(streamKey);
+            log.error("Failed to subscribe Coinbase raw stream {}", streamKey, exception);
         }
     }
 
@@ -453,18 +475,19 @@ public class CoinbaseWebSocketClient extends ExchangeWebSocketClient {
             return;
         }
 
-        rawStreamHandlers.remove(stream.key());
-        removeHandler(stream.key());
+        String streamKey = stream.key();
+        boolean removed = rawStreamHandlers.remove(streamKey) != null;
+        removeHandler(streamKey);
 
-        if (!isOpen()) {
+        if (!removed || !isOpen()) {
             return;
         }
 
         try {
             sendUnsubscribe(stream.tradePair(), stream.channel());
-            log.info("Unsubscribed Coinbase raw stream {}", stream.key());
+            log.info("Unsubscribed Coinbase raw stream {}", streamKey);
         } catch (Exception exception) {
-            log.warn("Failed to unsubscribe Coinbase raw stream {}", stream.key(), exception);
+            log.warn("Failed to unsubscribe Coinbase raw stream {}", streamKey, exception);
         }
     }
 

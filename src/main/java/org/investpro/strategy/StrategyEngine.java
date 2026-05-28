@@ -1,9 +1,10 @@
 package org.investpro.strategy;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.core.agents.execution.TradeExecutionCoordinator;
+import org.investpro.core.execution.TradeExecutionCoordinator;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
 import org.investpro.enums.TradingSessionStatus;
@@ -12,6 +13,7 @@ import org.investpro.research.StrategyRankingEngine;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.spi.PluginRegistry;
 import org.investpro.enums.timeframe.Timeframe;
+import org.investpro.strategy.provider.StrategyProviderRegistry;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -40,13 +42,13 @@ import static org.investpro.utils.Side.SELL;
  * - forward executable signals to the execution/risk pipeline
  */
 @Slf4j
-@Getter
-@Setter
+@Data
 public class StrategyEngine {
 
     private final TradeExecutionCoordinator tradeExecutionCoordinator;
     private final StrategyRegistry strategyRegistry;
     private final PluginRegistry pluginRegistry;
+    private final StrategyProviderRegistry providerRegistry;
 
     private final Map<String, StrategyContext> contextCache = new ConcurrentHashMap<>();
     private final Map<String, StrategySignal> lastSignalCache = new ConcurrentHashMap<>();
@@ -60,8 +62,10 @@ public class StrategyEngine {
                 "tradeExecutionCoordinator must not be null");
         this.strategyRegistry = StrategyRegistry.getInstance();
         this.pluginRegistry = PluginRegistry.loadDefault();
+        this.providerRegistry = StrategyProviderRegistry.getInstance();
         this.strategyRankingEngine = new StrategyRankingEngine();
-        log.info("StrategyEngine initialized with {} strategy providers", pluginRegistry.strategyProviders().size());
+        log.info("StrategyEngine initialized with {} lazy strategy descriptors and {} plugin strategy providers",
+                providerRegistry.size(), pluginRegistry.strategyProviders().size());
     }
 
     // ============================================================================
@@ -108,6 +112,9 @@ public class StrategyEngine {
         Objects.requireNonNull(context, "context must not be null");
 
         TradingStrategy strategy = strategyRegistry.getStrategy(strategyId);
+        if (strategy == null) {
+            strategy = providerRegistry.resolve(strategyId).orElse(null);
+        }
 
         if (strategy == null) {
             log.warn("StrategyEngine: Strategy not found: {}", strategyId);

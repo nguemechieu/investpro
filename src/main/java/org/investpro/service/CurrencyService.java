@@ -12,22 +12,19 @@ import java.util.Optional;
  * Service for Currency domain operations.
  * Provides business logic and validation for currency-related operations.
  */
-public class CurrencyService implements CrudService<Currency, String> {
-    
-    private final CurrencyRepository repository;
-    
+public record CurrencyService(CurrencyRepository repository) implements CrudService<Currency, String> {
+
     /**
      * Initialize the service with a currency repository.
      *
      * @param repository the currency repository
      */
-    public CurrencyService(CurrencyRepository repository) {
+    public CurrencyService {
         if (repository == null) {
             throw new IllegalArgumentException("repository must not be null");
         }
-        this.repository = repository;
     }
-    
+
     @Override
     public Currency save(Currency currency) throws SQLException, ClassNotFoundException {
         if (currency == null) {
@@ -35,7 +32,7 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.save(currency);
     }
-    
+
     @Override
     public List<Currency> saveAll(List<Currency> currencies) throws SQLException {
         if (currencies == null || currencies.isEmpty()) {
@@ -43,7 +40,7 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.saveAll(currencies);
     }
-    
+
     @Override
     public Optional<Currency> findById(String code) throws SQLException {
         if (code == null || code.isEmpty()) {
@@ -51,12 +48,12 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.findByCode(code);
     }
-    
+
     @Override
     public List<Currency> findAll() throws SQLException {
         return repository.findAll();
     }
-    
+
     @Override
     public boolean delete(String code) throws SQLException {
         if (code == null || code.isEmpty()) {
@@ -64,7 +61,7 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.deleteById(code);
     }
-    
+
     @Override
     public boolean exists(String code) throws SQLException {
         if (code == null || code.isEmpty()) {
@@ -72,12 +69,12 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.existsByCode(code);
     }
-    
+
     @Override
     public long count() throws SQLException {
         return repository.count();
     }
-    
+
     /**
      * Find all currencies of a specific type.
      *
@@ -91,7 +88,7 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.findByCurrencyType(currencyType);
     }
-    
+
     /**
      * Find currencies by display name.
      *
@@ -105,7 +102,7 @@ public class CurrencyService implements CrudService<Currency, String> {
         }
         return repository.findByDisplayName(displayName);
     }
-    
+
     /**
      * Get all fiat currencies.
      *
@@ -115,7 +112,7 @@ public class CurrencyService implements CrudService<Currency, String> {
     public List<Currency> getAllFiatCurrencies() throws SQLException {
         return repository.findByCurrencyType(CurrencyType.FIAT);
     }
-    
+
     /**
      * Get all cryptocurrencies.
      *

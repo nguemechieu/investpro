@@ -1,5 +1,6 @@
 package org.investpro.market;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.enums.timeframe.Timeframe;
@@ -28,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Support efficient lookups by TradePair
  */
 @Slf4j
+@Getter
 public class MarketDataCache {
 
     /**

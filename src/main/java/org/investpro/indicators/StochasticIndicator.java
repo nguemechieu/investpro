@@ -31,7 +31,13 @@ public class StochasticIndicator extends BaseIndicator {
     
     @Override
     public void calculate(List<CandleData> candles) {
-        if (candles == null || candles.size() < kPeriod) {
+        if (candles == null || candles.isEmpty()) {
+            return;
+        }
+        if (kPeriod <= 0 || kSlowPeriod <= 0 || dPeriod <= 0 || candles.size() < kPeriod) {
+            values.put("K", new double[candles.size()]);
+            values.put("D", new double[candles.size()]);
+            calculated = true;
             return;
         }
         

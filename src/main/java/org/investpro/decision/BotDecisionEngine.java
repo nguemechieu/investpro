@@ -8,10 +8,17 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
+/**
+ * Phase-1 deterministic bot decision reviewer.
+ *
+ * <p>Validates signal actionability, confidence threshold, market data freshness,
+ * spread limits, pending order conflicts, and exchange connectivity. Produces a
+ * {@link BotTradeDecision} using the new typed {@link DecisionContext}.</p>
+ */
 public class BotDecisionEngine {
-    private static final BigDecimal MIN_CONFIDENCE = new BigDecimal("0.65");
+
+    private static final double MIN_CONFIDENCE = 0.65;
     private static final BigDecimal MAX_SPREAD = new BigDecimal("0.02");
 
     public BotTradeDecision review(SignalDecision signalDecision, MarketContext context) {
@@ -21,7 +28,8 @@ public class BotDecisionEngine {
         if (signalDecision == null || !signalDecision.actionable()) {
             blockers.add("Aggregated signal is not actionable.");
         }
-        if (signalDecision != null && signalDecision.finalConfidence().compareTo(MIN_CONFIDENCE) < 0) {
+        if (signalDecision != null
+                && signalDecision.finalConfidence().doubleValue() < MIN_CONFIDENCE) {
             blockers.add("Signal confidence is below bot threshold.");
         }
         if (context == null) {
@@ -36,7 +44,8 @@ public class BotDecisionEngine {
             if (context.hasPendingOrder()) {
                 blockers.add("A pending order already exists for this symbol.");
             }
-            if (context.exchangeCapabilities().degraded() || !context.exchangeCapabilities().connected()) {
+            if (context.exchangeCapabilities().degraded()
+                    || !context.exchangeCapabilities().connected()) {
                 blockers.add("Exchange is disconnected or degraded.");
             }
             if (context.hasOpenPosition()) {
@@ -45,16 +54,25 @@ public class BotDecisionEngine {
         }
 
         boolean allowed = blockers.isEmpty();
-        DecisionAction action = allowed && signalDecision != null && signalDecision.finalAction() != TradingAction.HOLD
-                ? DecisionAction.TRADE
-                : DecisionAction.HOLD;
+        DecisionAction action = allowed
+                && signalDecision != null
+                && signalDecision.finalAction() != TradingAction.HOLD
+                ? DecisionAction.TRADE : DecisionAction.HOLD;
         if (!allowed) {
             action = DecisionAction.SKIP;
         }
 
-        return new BotTradeDecision(null, action, allowed,
-                signalDecision == null ? BigDecimal.ZERO : signalDecision.finalConfidence(),
-                allowed ? "Bot deterministic review approved the setup." : String.join("; ", blockers),
-                signalDecision, blockers, warnings, Instant.now(), Map.of("review", "deterministic-phase1"));
+        double confidence = signalDecision == null
+                ? 0.0 : signalDecision.finalConfidence().doubleValue();
+        String explanation = allowed
+                ? "Bot deterministic review approved the setup."
+                : String.join("; ", blockers);
+
+        DecisionContext ctx = DecisionContext.empty();
+
+        return new BotTradeDecision(
+                null, action, allowed,
+                confidence, explanation,
+                signalDecision, blockers, warnings, Instant.now(), ctx);
     }
 }

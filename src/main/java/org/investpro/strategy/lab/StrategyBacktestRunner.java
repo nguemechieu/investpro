@@ -4,7 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.data.CandleData;
 import org.investpro.enums.MarketBehavior;
 import org.investpro.enums.TradingSessionStatus;
+import org.investpro.models.trading.TradePair;
 import org.investpro.strategy.*;
+import org.investpro.strategy.provider.StrategyComplexity;
+import org.investpro.strategy.provider.StrategyProviderRegistry;
+import org.investpro.telemetry.StrategyProfiler;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 
@@ -30,10 +34,15 @@ public class StrategyBacktestRunner {
 
     /**
      * Run a backtest for one strategy on one symbol/timeframe.
+     *
+     * <p>The simulation loop checks {@link Thread#isInterrupted()} at every
+     * candle so that the owning {@link BacktestJob} can be cancelled gracefully.
+     * When interrupted, a {@link BacktestJobStatus#CANCELLED} report is returned.
      */
     public StrategyPerformanceReport run(@NotNull StrategyBacktestRequest request) {
         try {
-            log.info(
+            // DEBUG-level only – aggregate status is logged by the scheduler every 30s
+            log.debug(
                     "Starting backtest: {} on {}/{} with {} candles",
                     request.getStrategyName(),
                     request.getSymbol(),
@@ -106,7 +115,6 @@ public class StrategyBacktestRunner {
         List<String> warnings = new ArrayList<>();
         double equity = request.getInitialCapital();
         double peakEquity = equity;
-        double totalLoss = 0.0;
         int tradeCount = 0;
 
         // Simulation state
@@ -116,6 +124,13 @@ public class StrategyBacktestRunner {
 
         // Loop through candles starting from sufficient lookback
         for (int i = MIN_LOOKBACK_BARS; i < candles.size() && tradeCount < request.getMaxTrades(); i++) {
+
+            // Cooperative cancellation – check before each candle
+            if (Thread.currentThread().isInterrupted()) {
+                log.debug("Backtest cancelled: {}", request.getStrategyName());
+                return createCancelledReport(request);
+            }
+
             CandleData candle = candles.get(i);
             CandleData previousCandle = i > 0 ? candles.get(i - 1) : candle;
 
@@ -143,10 +158,6 @@ public class StrategyBacktestRunner {
 
                     trades.add(closedTrade);
                     equity += closedTrade.getProfitLoss();
-
-                    if (closedTrade.isLoss()) {
-                        totalLoss += Math.abs(closedTrade.getProfitLoss());
-                    }
 
                     if (equity > peakEquity) {
                         peakEquity = equity;
@@ -214,9 +225,10 @@ public class StrategyBacktestRunner {
             TradingStrategy strategy,
             StrategyBacktestRequest request,
             List<CandleData> window) {
+        long started = System.nanoTime();
         try {
             StrategyContext context = StrategyContext.builder()
-                    .symbol(null) // Not needed for backtest
+                    .symbol(parsePair(request.getSymbol()))
                     .timeframe(request.getTimeframe())
                     .candles(window)
                     .currentPrice(window.isEmpty() ? 0 : window.get(window.size() - 1).closePrice())
@@ -232,6 +244,32 @@ public class StrategyBacktestRunner {
             return strategy.generateSignal(context);
         } catch (Exception e) {
             log.debug("Signal generation failed", e);
+            return null;
+        } finally {
+            StrategyComplexity complexity = StrategyProviderRegistry.getInstance()
+                    .descriptor(request.getStrategyName())
+                    .map(descriptor -> descriptor.cpuComplexity())
+                    .orElse(StrategyComplexity.MEDIUM);
+            StrategyProfiler.getInstance().record(
+                    request.getStrategyName(),
+                    Math.max(1, window.size()),
+                    System.nanoTime() - started,
+                    complexity);
+        }
+    }
+
+    private TradePair parsePair(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+        String[] parts = symbol.replace('_', '/').replace('-', '/').split("/");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            return new TradePair(parts[0], parts[1]);
+        } catch (Exception exception) {
+            log.debug("Unable to parse backtest symbol {}", symbol, exception);
             return null;
         }
     }
@@ -490,6 +528,13 @@ public class StrategyBacktestRunner {
         }
 
         return Math.max(0, Math.min(100, score));
+    }
+
+    /**
+     * Creates a cancelled report when the backtest is interrupted.
+     */
+    private StrategyPerformanceReport createCancelledReport(StrategyBacktestRequest request) {
+        return createFailureReport(request, "Backtest cancelled");
     }
 
     /**

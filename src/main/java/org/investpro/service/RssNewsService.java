@@ -1,5 +1,6 @@
 package org.investpro.service;
 
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -27,7 +28,7 @@ import java.util.regex.Pattern;
 
 /**
  * RSS News Service for InvestPro.
- *
+ * <p>
  * Responsibilities:
  * - Fetch RSS news for symbols/assets
  * - Build symbol-aware search queries (crypto, forex, stocks, futures)
@@ -41,10 +42,23 @@ import java.util.regex.Pattern;
  * - Fail-safe: if news fails, return neutral/empty instead of crashing
  */
 @Slf4j
+@Data
 public class RssNewsService {
 
     private static final String DEFAULT_FEED_URL = "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en";
     private static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; InvestProNewsService/1.0; +https://investpro.local)";
+
+    // Top-tier financial RSS feeds for general market news (no API key required)
+    private static final List<String> FINANCIAL_RSS_FEEDS = List.of(
+            "https://feeds.reuters.com/reuters/businessNews",
+            "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+            """
+                    http://feeds.marketwatch.com/marketwatch/topstories/""",
+            "https://www.forexlive.com/feed/news",
+            "https://www.fxstreet.com/rss/news",
+            "https://feeds.bbci.co.uk/news/business/rss.xml",
+            "https://news.google.com/rss/search?q=forex+market+trading&hl=en-US&gl=US&ceid=US:en",
+            "https://news.google.com/rss/search?q=currency+market+central+bank&hl=en-US&gl=US&ceid=US:en");
 
     private static final Set<String> POSITIVE_KEYWORDS = Set.of(
             "surge", "surges", "growth", "beat", "beats", "bullish", "approval", "approved",
@@ -132,11 +146,11 @@ public class RssNewsService {
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
     private record CacheEntry(long createdAt, List<Map<String, Object>> events) {
-            private CacheEntry(long createdAt, List<Map<String, Object>> events) {
-                this.createdAt = createdAt;
-                this.events = new ArrayList<>(events);
-            }
+        private CacheEntry(long createdAt, List<Map<String, Object>> events) {
+            this.createdAt = createdAt;
+            this.events = new ArrayList<>(events);
         }
+    }
 
     public RssNewsService() {
         this(true, DEFAULT_FEED_URL, 15, 300, DEFAULT_USER_AGENT);
@@ -495,7 +509,6 @@ public class RssNewsService {
                 double ageHours = Math.max(0,
                         Duration.between(timestamp.toInstant(), now.toInstant()).toSeconds() / 3600.0);
 
-                @SuppressWarnings("unchecked")
                 Map<String, Object> scoreResult = scoreHeadline(title, description, source);
                 double sentimentScore = ((Number) scoreResult.get("sentiment")).doubleValue();
                 double impact = ((Number) scoreResult.get("impact")).doubleValue();
@@ -749,5 +762,100 @@ public class RssNewsService {
 
     public void clearCache() {
         cache.clear();
+    }
+
+    /**
+     * Fetch general market news from multiple top-tier financial RSS feeds.
+     * Aggregates, deduplicates, scores sentiment, and returns the top results.
+     *
+     * @param limit Maximum number of news articles to return (1-100)
+     * @return Merged, deduplicated, scored list of news articles
+     */
+    public List<Map<String, Object>> fetchGeneralMarketNews(int limit) {
+        if (!enabled)
+            return new ArrayList<>();
+        limit = Math.max(1, Math.min(limit, 100));
+
+        String cacheKey = "general_market_news|" + limit;
+        List<Map<String, Object>> cached = getCached(cacheKey);
+        if (cached != null)
+            return new ArrayList<>(cached);
+
+        List<Map<String, Object>> aggregated = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+
+        for (String feedUrl : FINANCIAL_RSS_FEEDS) {
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(feedUrl))
+                        .timeout(Duration.ofSeconds(requestTimeoutSeconds))
+                        .header("User-Agent", userAgent)
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() >= 400)
+                    continue;
+
+                Document doc = documentBuilder.parse(new org.xml.sax.InputSource(
+                        new java.io.StringReader(response.body())));
+
+                NodeList items = doc.getElementsByTagName("item");
+                for (int i = 0; i < items.getLength(); i++) {
+                    Element item = (Element) items.item(i);
+                    String rawTitle = getElementText(item, "title");
+                    String title = normalizeTitle(rawTitle);
+                    if (title.isEmpty())
+                        continue;
+
+                    String link = stripHtml(getElementText(item, "link"));
+                    String dedupeKey = dedupeKey(title, link);
+                    if (seen.contains(dedupeKey))
+                        continue;
+                    seen.add(dedupeKey);
+
+                    String description = stripHtml(getElementText(item, "description"));
+                    String source = getSource(item, rawTitle);
+                    ZonedDateTime timestamp = parseTimestamp(getElementText(item, "pubDate"));
+                    double ageHours = Math.max(0,
+                            Duration.between(timestamp.toInstant(), now.toInstant()).toSeconds() / 3600.0);
+
+                    Map<String, Object> scoreResult = scoreHeadline(title, description, source);
+                    double sentimentScore = ((Number) scoreResult.get("sentiment")).doubleValue();
+                    double impact = ((Number) scoreResult.get("impact")).doubleValue();
+
+                    Map<String, Object> eventMap = new LinkedHashMap<>();
+                    eventMap.put("symbol", "MARKET");
+                    eventMap.put("title", title);
+                    eventMap.put("summary", description);
+                    eventMap.put("url", link);
+                    eventMap.put("source", !source.isEmpty() ? source : "Financial News");
+                    eventMap.put("timestamp", timestamp.toInstant().toString());
+                    eventMap.put("sentiment_score", sentimentScore);
+                    eventMap.put("impact", impact);
+                    eventMap.put("age_hours", Math.round(ageHours * 10000.0) / 10000.0);
+                    eventMap.put("feed_url", feedUrl);
+                    aggregated.add(eventMap);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.debug("General news fetch interrupted for feed {}", feedUrl);
+            } catch (Exception e) {
+                log.debug("General news fetch failed for feed {}: {}", feedUrl, e.getMessage());
+            }
+        }
+
+        // Sort by timestamp (newest first), then score by impact
+        aggregated.sort((a, b) -> {
+            String ts1 = (String) a.getOrDefault("timestamp", "");
+            String ts2 = (String) b.getOrDefault("timestamp", "");
+            return ts2.compareTo(ts1);
+        });
+
+        List<Map<String, Object>> result = aggregated.size() > limit ? aggregated.subList(0, limit) : aggregated;
+        setCached(cacheKey, result);
+        log.info("Fetched {} general market news articles from {} feeds", result.size(), FINANCIAL_RSS_FEEDS.size());
+        return new ArrayList<>(result);
     }
 }

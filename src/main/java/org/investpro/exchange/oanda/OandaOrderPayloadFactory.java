@@ -39,12 +39,9 @@ public class OandaOrderPayloadFactory {
                 orderNode.put("price", formatPrice(order.getLimitPrice()));
                 orderNode.put("timeinforce", formatTimeInForce(order.getTimeInForce()));
                 break;
-            case STOP:
-                orderNode.put("type", "STOP");
-                orderNode.put("priceBound", formatPrice(order.getStopPrice()));
-                break;
+
             case STOP_LIMIT:
-                orderNode.put("type", "LIMIT");
+                orderNode.put("type", "STOP");
                 orderNode.put("price", formatPrice(order.getLimitPrice()));
                 orderNode.put("priceBound", formatPrice(order.getStopPrice()));
                 break;

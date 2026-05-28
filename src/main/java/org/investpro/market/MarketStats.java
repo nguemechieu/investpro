@@ -3,6 +3,7 @@ package org.investpro.market;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Data
 @Builder
+@Getter
 @AllArgsConstructor
 public class MarketStats {
 

@@ -1,7 +1,6 @@
 package org.investpro.enums;
 
 import lombok.Getter;
-import lombok.Setter;
 
 /**
  * Enum for capital protection strategies - defines how to preserve capital.

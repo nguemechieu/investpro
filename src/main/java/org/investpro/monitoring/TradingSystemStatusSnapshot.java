@@ -1,5 +1,6 @@
 package org.investpro.monitoring;
 
+import lombok.Builder;
 import org.investpro.enums.RiskStatus;
 import org.investpro.enums.SystemState;
 
@@ -10,6 +11,7 @@ import java.util.List;
  * Immutable snapshot of the trading system status at a point in time.
  * Used by the status monitoring panel to display real-time system health.
  */
+@Builder
 public record TradingSystemStatusSnapshot(
         // System Overview
         SystemState systemState,

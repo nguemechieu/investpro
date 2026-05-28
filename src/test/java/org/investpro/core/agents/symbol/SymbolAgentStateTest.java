@@ -2,6 +2,9 @@ package org.investpro.core.agents.symbol;
 
 import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.trading.TradePair;
+import org.investpro.symbol.SymbolAgentState;
+import org.investpro.symbol.SymbolEvaluationState;
+import org.investpro.symbol.SymbolTradingMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

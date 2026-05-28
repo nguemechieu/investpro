@@ -2,7 +2,7 @@
 
 **Last Updated**: May 2026  
 **Version**: 1.0  
-**Target**: Java 17+, Maven 3.8+
+**Target**: Java 21+, Maven 3.6+
 
 ---
 
@@ -11,11 +11,11 @@
 ### 1.1 Prerequisites
 
 ```bash
-# Check Java version (must be 17+)
+# Check Java version (must be 21+)
 java -version
 # openjdk version "21.0.1" 2023-10-17 LTS
 
-# Check Maven version (must be 3.8+)
+# Check Maven version (must be 3.6+)
 mvn --version
 # Apache Maven 3.9.5
 
@@ -28,7 +28,7 @@ git --version
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/investpro.git
+git clone https://github.com/nguemechieu/investpro.git
 cd investpro
 
 # Create .env file for local development
@@ -53,7 +53,7 @@ nano .env
 #### IntelliJ IDEA
 ```
 1. File → Open → Select investpro folder
-2. Configure SDK: File → Project Structure → SDK → Select JDK 17+
+2. Configure SDK: File → Project Structure → SDK → Select JDK 21+
 3. Configure JavaFX:
    - Download JavaFX SDK from openjfx.io
    - Preferences → Java → JavaFX
@@ -1081,8 +1081,8 @@ Fixes #890
 ## 13. Resources
 
 - **Documentation**: [docs/](./docs/)
-- **Issue Tracker**: [GitHub Issues](https://github.com/yourusername/investpro/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/investpro/discussions)
+- **Issue Tracker**: [GitHub Issues](https://github.com/nguemechieu/investpro/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/nguemechieu/investpro/discussions)
 - **Javadoc**: `./mvnw javadoc:javadoc` → `target/site/apidocs/index.html`
 - **Architecture**: [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
 - **Production**: [PRODUCTION_READY.md](./PRODUCTION_READY.md)

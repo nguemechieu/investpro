@@ -2,6 +2,7 @@ package org.investpro.service;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.config.AppConfig;
 import org.investpro.data.CandleData;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
@@ -96,6 +97,14 @@ public class StrategyDecisionService {
 
             // ===== Validation: Strategy Assignment =====
             StrategyAssignment assignment = selectionService.getCurrentAssignment(symbol, parsedTimeframe);
+            if (assignment == null) {
+                assignment = bestSymbolAssignment(symbol);
+                if (assignment != null) {
+                    parsedTimeframe = assignment.getTimeframe();
+                    warnings.add("Using best evaluated assignment for " + symbol + " on "
+                            + parsedTimeframe.getCode());
+                }
+            }
 
             if (assignment == null) {
                 assignment = isCompatibilityFallbackEnabled()
@@ -212,6 +221,20 @@ public class StrategyDecisionService {
         }
     }
 
+    private StrategyAssignment bestSymbolAssignment(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+        return org.investpro.persistence.repository.StrategyAssignmentRepository.getInstance()
+                .getForSymbolAllTimeframes(symbol)
+                .stream()
+                .filter(StrategyAssignment::isValid)
+                .filter(assignment -> !assignment.isExpired())
+                .filter(assignment -> !assignment.isDisabled())
+                .max(java.util.Comparator.comparingDouble(StrategyAssignment::getScoreAtAssignment))
+                .orElse(null);
+    }
+
     private TradePair resolveTradePair(String symbol, TradePair tradePair) {
         if (tradePair != null) {
             return tradePair;
@@ -274,9 +297,7 @@ public class StrategyDecisionService {
     }
 
     private boolean isCompatibilityFallbackEnabled() {
-        return Boolean.parseBoolean(System.getProperty(
-                "tradeadviser.strategy.allowCompatibilityFallback",
-                "false"));
+        return AppConfig.getBoolean("investpro.strategy.allowCompatibilityFallback", true);
     }
 
     private Timeframe parseTimeframe(String timeframe) {

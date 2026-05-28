@@ -1,5 +1,6 @@
 package org.investpro.market;
 
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.TradingSessionStatus;
@@ -21,9 +22,7 @@ import java.time.ZonedDateTime;
  * Integrates with InstrumentMetadata.tradingSession for detailed rules.
  */
 @Slf4j
-public class TradingSessionService {
-
-    private final InstrumentRegistry registry;
+public record TradingSessionService(InstrumentRegistry registry) {
 
     public TradingSessionService(@NotNull InstrumentRegistry registry) {
         this.registry = registry;

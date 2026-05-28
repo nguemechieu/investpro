@@ -8,14 +8,14 @@ import java.util.List;
 
 /**
  * Result of a strategy decision evaluation.
- *
- * Wraps the output of StrategyDecisionService.generateDecision() including:
+ * <p>
+ * Wraps the output of Strategy DecisionService.generateDecision() including:
  * - Decision success/failure status
  * - Generated StrategySignal (if successful)
  * - Assignment used (if any)
  * - Rejection reasons (if failed)
  * - Warnings for downstream processing
- *
+ * <p>
  * Use factory methods for construction:
  * 
  * <pre>

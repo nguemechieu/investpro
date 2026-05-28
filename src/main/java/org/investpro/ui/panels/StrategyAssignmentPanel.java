@@ -1,9 +1,12 @@
 package org.investpro.ui.panels;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.application.Platform;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -62,9 +65,12 @@ public class StrategyAssignmentPanel extends VBox{
         private  StrategyAssignment strategyAssignment;
         private final StrategyAssignmentRepository repository = StrategyAssignmentRepository.getInstance();
         private final StrategyLabService labService = StrategyLabService.getInstance();
+        private final Timeline autoRefreshTimeline = new Timeline(
+                        new KeyFrame(Duration.seconds(5), ignored -> refreshCurrentAssignmentLabel()));
 
         public StrategyAssignmentPanel(@NotNull SystemCore systemCore) throws SQLException, ClassNotFoundException {
                 this.setStyle("-fx-background-color: #1a1a2e; -fx-padding: 16;");
+                autoRefreshTimeline.setCycleCount(Timeline.INDEFINITE);
 
                 this.systemCore=systemCore;
                 this.strategyAssignment=systemCore.getStrategyAssignment();
@@ -118,6 +124,15 @@ public class StrategyAssignmentPanel extends VBox{
                 initializeDefaults();
                 refreshCurrentAssignmentLabel();
                 LocalizationService.applyTranslations(this);
+                sceneProperty().addListener((obs, oldScene, newScene) -> {
+                        if (newScene == null) {
+                                autoRefreshTimeline.stop();
+                        } else {
+                                refreshStrategyChoices();
+                                refreshCurrentAssignmentLabel();
+                                autoRefreshTimeline.play();
+                        }
+                });
         }
 
         private void initializeDefaults() {
@@ -185,6 +200,13 @@ public class StrategyAssignmentPanel extends VBox{
                 strategyLabel.setStyle("-fx-text-fill: #a0aec0;");
                 strategyCombo = new ComboBox<>();
                 strategyCombo.getItems().addAll(StrategyCatalog.availableStrategyNames());
+                if (strategyCombo.getItems().isEmpty()) {
+                        strategyCombo.getItems().add(StrategyCatalog.defaultStrategyName());
+                }
+                strategyCombo.setValue(strategyCombo.getItems().stream()
+                                .filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)
+                                .findFirst()
+                                .orElse(strategyCombo.getItems().getFirst()));
                 strategyCombo.setPrefWidth(250);
                 strategyCombo.setStyle("-fx-control-inner-background: #0f3460; -fx-text-fill: #ffffff;");
                 grid.add(strategyLabel, 0, 1);
@@ -674,6 +696,28 @@ public class StrategyAssignmentPanel extends VBox{
                                 active.getScoreAtAssignment(),
                                 active.getMode(),
                                 active.isLocked()));
+        }
+
+        private void refreshStrategyChoices() {
+                if (strategyCombo == null) {
+                        return;
+                }
+                String selected = strategyCombo.getValue();
+                List<String> names = new ArrayList<>(StrategyCatalog.availableStrategyNames());
+                if (names.isEmpty()) {
+                        names.add(StrategyCatalog.defaultStrategyName());
+                }
+                if (!names.equals(strategyCombo.getItems())) {
+                        strategyCombo.getItems().setAll(names);
+                }
+                if (selected != null && names.contains(selected)) {
+                        strategyCombo.setValue(selected);
+                } else if (!names.isEmpty() && strategyCombo.getValue() == null) {
+                        strategyCombo.setValue(names.stream()
+                                        .filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)
+                                        .findFirst()
+                                        .orElse(names.getFirst()));
+                }
         }
 
         private double displayScore(double score) {

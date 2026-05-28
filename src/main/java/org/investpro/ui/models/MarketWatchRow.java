@@ -1,31 +1,35 @@
 package org.investpro.ui.models;
 
 import javafx.beans.property.*;
-import javafx.beans.value.ObservableValue;
 import javafx.scene.control.TableRow;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.TradingSessionStatus;
-import org.investpro.core.agents.symbol.SymbolAgentState;
-import org.investpro.core.agents.symbol.SymbolTradingMode;
+import org.investpro.symbol.SymbolAgentState;
+import org.investpro.symbol.SymbolTradingMode;
 import org.investpro.models.currency.CurrencyRegistry;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Model for a single row in the MarketWatch table.
- * 
+ * <p>
  * Contains JavaFX properties for:
  * - Basic market data (symbol, bid, ask, spread)
  * - Agent/strategy state (agentState, tradingMode, activeStrategy,
- * activeTimeframe, strategyScore)
+ * activeTimeframe, strategy Score)
  * - Live readiness (liveReady, issue)
+ *
+ * <p>Property accessor methods (e.g. {@code symbolProperty()}, {@code spreadProperty()})
+ * are intentionally public — they are bound by JavaFX {@code PropertyValueFactory}
+ * via reflection for table column cell values and must not be removed.
  */
 @Getter
 @Setter
 @Slf4j
+@SuppressWarnings("unused") // property/badge methods used via JavaFX reflection & cell factories
 public class MarketWatchRow extends TableRow<MarketWatchRow> {
 
     // Basic market data
@@ -249,7 +253,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
             return;
         }
 
-        // Guard against uninitialised state field (Lombok @Builder does not enforce @NotNull)
+        // Guard against uninitialized state field (Lombok @Builder does not enforce @NotNull)
         if (state.getState() != null) {
             agentState.set(state.getState().getDisplayName());
         } else {
@@ -260,13 +264,11 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         double resolvedAsk = state.getAskPrice() > 0 ? state.getAskPrice() : getAsk();
 
         TradePair pair = state.getSymbol();
-        if (pair != null) {
-            if (resolvedBid <= 0 && pair.getBid() > 0) {
-                resolvedBid = pair.getBid();
-            }
-            if (resolvedAsk <= 0 && pair.getAsk() > 0) {
-                resolvedAsk = pair.getAsk();
-            }
+        if (resolvedBid <= 0 && pair.getBid() > 0) {
+            resolvedBid = pair.getBid();
+        }
+        if (resolvedAsk <= 0 && pair.getAsk() > 0) {
+            resolvedAsk = pair.getAsk();
         }
 
         // Last-resort fallback keeps UI values non-null/non-empty.
@@ -301,7 +303,7 @@ public class MarketWatchRow extends TableRow<MarketWatchRow> {
         strategyScore.set(state.getStrategyScore());
         liveReady.set(state.isLiveAllowed());
 
-        // Show signal text (\u25b2 BUY 0.82 / \u25bc SELL 0.65)
+        // Show signal text (▲ BUY 0.82 / ▼ SELL 0.65)
         lastSignal.set(state.getSignalText());
 
         if (state.isLiveAllowed()) {

@@ -17,6 +17,7 @@ import java.util.*;
 @Setter
 public class CorrelationRiskAnalyzer {
     // Default correlation assumptions when no matrix provided
+    @SuppressWarnings("unused")
     private static final double SAME_ASSET_CLASS_CORRELATION = 0.7;
     private static final double SAME_SECTOR_CORRELATION = 0.6;
     private static final double SAME_QUOTE_CURRENCY_CORRELATION = 0.5;

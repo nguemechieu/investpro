@@ -15,6 +15,7 @@ import java.util.Objects;
 @Getter
 @Setter
 public class InstrumentMetadata {
+    // Getters
     private final String brokerId;
     private final String productId;
     private final String displayName;
@@ -68,31 +69,7 @@ public class InstrumentMetadata {
         
         this.metadata = new HashMap<>();
     }
-    
-    // Getters
-    public String getBrokerId() { return brokerId; }
-    public String getProductId() { return productId; }
-    public String getDisplayName() { return displayName; }
-    public BrokerVenue getVenue() { return venue; }
-    public AssetClass getAssetClass() { return assetClass; }
-    public MarketType getMarketType() { return marketType; }
-    public InstrumentType getInstrumentType() { return instrumentType; }
-    
-    public String getBaseAsset() { return baseAsset; }
-    public String getQuoteAsset() { return quoteAsset; }
-    public String getSettlementAsset() { return settlementAsset; }
-    
-    public BigDecimal getPriceIncrement() { return priceIncrement; }
-    public BigDecimal getQuantityIncrement() { return quantityIncrement; }
-    public BigDecimal getMinQuantity() { return minQuantity; }
-    public BigDecimal getMinNotional() { return minNotional; }
-    public BigDecimal getMaxLeverage() { return maxLeverage; }
-    
-    public boolean isTradable() { return tradable; }
-    public boolean isExpired() { return expired; }
-    
-    public Map<String, Object> getMetadata() { return metadata; }
-    
+
     public void putMetadata(String key, Object value) {
         metadata.put(key, value);
     }

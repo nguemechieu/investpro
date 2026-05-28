@@ -1,5 +1,6 @@
 package org.investpro.ai;
 
+import lombok.Builder;
 import org.investpro.enums.ExecutionStrategy;
 import org.investpro.models.trading.Position;
 
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
  * Final gate for open-position actions.
  */
 @Slf4j
+@Builder
 public class PositionActionFinalGate {
 
     /**

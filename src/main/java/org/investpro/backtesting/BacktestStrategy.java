@@ -9,12 +9,13 @@ import java.util.*;
 /**
  * Abstract base class for trading strategies used in backtesting
  */
+@Getter
 public abstract class BacktestStrategy {
     /**
      * -- GETTER --
      *  Get strategy name
      */
-    @Getter
+
     protected String strategyName;
     protected BacktestConfig config;
     protected List<CandleData> candleHistory;
@@ -33,7 +34,8 @@ public abstract class BacktestStrategy {
      * Initialize the strategy with candle data
      */
     public void initialize(List<CandleData> candleData) {
-        this.candleHistory = new ArrayList<>(candleData);
+        this.candleHistory = candleData == null ? List.of() : candleData;
+        this.signals.clear();
     }
 
     /**
@@ -80,6 +82,20 @@ public abstract class BacktestStrategy {
      */
     public List<SignalEvent> getSignals() {
         return new ArrayList<>(signals);
+    }
+
+    /**
+     * Lightweight signal access for event-driven simulation loops.
+     */
+    public int signalCount() {
+        return signals.size();
+    }
+
+    /**
+     * Returns a generated signal without copying the signal list.
+     */
+    public SignalEvent signalAt(int index) {
+        return index >= 0 && index < signals.size() ? signals.get(index) : null;
     }
 
     /**

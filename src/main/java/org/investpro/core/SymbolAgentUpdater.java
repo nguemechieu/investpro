@@ -1,13 +1,12 @@
 package org.investpro.core;
 
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
-import org.investpro.core.agents.symbol.SymbolAgentManager;
-import org.investpro.core.agents.symbol.SymbolAgentState;
-import org.investpro.core.agents.symbol.SymbolEvaluationState;
+import org.investpro.symbol.SymbolAgentManager;
+import org.investpro.symbol.SymbolAgentState;
+import org.investpro.symbol.SymbolEvaluationState;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
 import org.jetbrains.annotations.NotNull;
@@ -67,6 +66,7 @@ public class SymbolAgentUpdater implements Consumer<AgentEvent> {
             return;
         }
 
+        eventBus.unsubscribeAll(this);
         listening = false;
         log.info("SymbolAgentUpdater stopped");
     }

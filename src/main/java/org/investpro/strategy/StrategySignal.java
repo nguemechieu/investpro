@@ -21,7 +21,7 @@ import java.util.Map;
  * - Confidence and expected value metrics
  * - Win/loss probabilities
  * - Suggested trade amount/quantity
- *
+ * <p>
  * Side = direction only.
  * StrategySignal = full signal context with all trading parameters.
  */
@@ -84,10 +84,10 @@ public class StrategySignal {
 
     /**
      * Suggested amount/quantity/units for the trade.
-     *
+     * <p>
      * For OANDA forex, this can represent units.
      * For crypto/stocks, this can represent base quantity.
-     *
+     * <p>
      * RiskManagementSystem or TradeExecutionCoordinator may override this.
      */
     @Builder.Default
@@ -162,7 +162,7 @@ public class StrategySignal {
 
     /**
      * Tags for classification.
-     *
+     * <p>
      * Examples:
      * breakout, trend, reversal, scalping, high-volatility.
      */

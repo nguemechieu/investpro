@@ -229,7 +229,7 @@ public final class LicenseManager {
         }
     }
 
-    private License loadLicenseFromPreferences() {
+    private  License loadLicenseFromPreferences() {
         try {
             String savedLicense = preferences.get(preferencesKey, null);
             return parseSavedLicense(savedLicense);
@@ -302,9 +302,9 @@ public final class LicenseManager {
     }
 
     private License normalizeLicense(@NotNull License license) {
-        LicenseType type = license.getLicenseType() == null ? LicenseType.TRIAL : license.getLicenseType();
+        LicenseType type = license.getLicenseType();
         LicenseEntitlement entitlement = ENTITLEMENTS.get(type);
-        Set<String> features = license.getFeatures() == null || license.getFeatures().isEmpty()
+        Set<String> features = license.getFeatures().isEmpty()
                 ? entitlement.features()
                 : normalizeFeatures(license.getFeatures());
 
@@ -313,7 +313,7 @@ public final class LicenseManager {
                 .licenseeName(requireText(license.getLicenseeName(), "licenseeName"))
                 .licenseeEmail(requireText(license.getLicenseeEmail(), "licenseeEmail"))
                 .licenseType(type)
-                .issuedDate(license.getIssuedDate() == null ? Instant.now() : license.getIssuedDate())
+                .issuedDate(license.getIssuedDate())
                 .expirationDate(license.getExpirationDate())
                 .features(features)
                 .maxConnections(Math.max(1, license.getMaxConnections()))

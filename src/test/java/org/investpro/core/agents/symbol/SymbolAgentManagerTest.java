@@ -1,6 +1,8 @@
 package org.investpro.core.agents.symbol;
 
 import org.investpro.models.trading.TradePair;
+import org.investpro.symbol.SymbolAgentManager;
+import org.investpro.symbol.SymbolAgentState;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

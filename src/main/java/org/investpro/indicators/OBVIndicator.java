@@ -3,7 +3,6 @@ package org.investpro.indicators;
 import lombok.Getter;
 import lombok.Setter;
 import org.investpro.data.CandleData;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -26,32 +25,25 @@ public class OBVIndicator extends BaseIndicator {
             return;
         }
 
-        List<Double> obvValues = new ArrayList<>();
+        double[] obvValues = new double[candles.size()];
         double obv = 0;
 
-        for (CandleData candle : candles) {
-            if (candles.indexOf(candle) == 0) {
-                // First candle: use volume as starting point
+        for (int i = 0; i < candles.size(); i++) {
+            CandleData candle = candles.get(i);
+            if (i == 0) {
                 obv = candle.volume();
             } else {
-                CandleData prevCandle = candles.get(candles.indexOf(candle) - 1);
-                // Add volume if price went up, subtract if it went down
+                CandleData prevCandle = candles.get(i - 1);
                 if (candle.closePrice() > prevCandle.closePrice()) {
                     obv += candle.volume();
                 } else if (candle.closePrice() < prevCandle.closePrice()) {
                     obv -= candle.volume();
                 }
-                // If close equals previous close, OBV stays the same
             }
-            obvValues.add(obv);
+            obvValues[i] = obv;
         }
 
-        double[] obvArray = new double[obvValues.size()];
-        for (int i = 0; i < obvValues.size(); i++) {
-            obvArray[i] = obvValues.get(i);
-        }
-
-        values.put("OBV", obvArray);
+        values.put("OBV", obvValues);
         calculated = true;
     }
 }

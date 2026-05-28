@@ -52,7 +52,6 @@ public class PortfolioHeatCalculator {
      */
     private double calculatePositionRisk(@NotNull Position position) {
         double entryPrice = position.getEntryPrice();
-        double currentPrice = position.getCurrentPrice();
         double quantity = Math.abs(position.getQuantity());
 
         // If stop loss is set, use it for risk calculation

@@ -29,7 +29,7 @@ import java.util.*;
  */
 
 //
-// Instead of TradeAdviser only asking:
+// Instead of investpro only asking:
 //
 // “Should I buy or sell?”
 //

@@ -1,10 +1,6 @@
 package org.investpro.risk;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +14,7 @@ import java.time.LocalDateTime;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class PositionHealthScore {
 
     // =========================================================================
@@ -193,7 +190,7 @@ public class PositionHealthScore {
     /**
      * Get a summary of position health.
      */
-    @SuppressWarnings("unused")
+
     public String getHealthSummary() {
         return String.format("Status: %s, Score: %.2f, Stop Distance: %.0f bps, Risk: %.2f%%, Portfolio Heat: %.2f%%",
                 status.getLabel(),

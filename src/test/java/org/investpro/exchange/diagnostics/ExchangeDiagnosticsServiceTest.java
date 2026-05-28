@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for ExchangeDiagnosticsService.

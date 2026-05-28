@@ -2,6 +2,7 @@ package org.investpro.strategy;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -11,6 +12,7 @@ import org.jetbrains.annotations.NotNull;
  * features.
  */
 @Getter
+@Setter
 @Builder
 public class FeaturePipelineConfig {
     private final int rsiPeriod;

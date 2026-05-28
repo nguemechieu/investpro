@@ -1,7 +1,7 @@
 package org.investpro.trading;
 
-import lombok.Getter;
 
+import lombok.Getter;
 
 /**
  * Enumeration of all pre-trade validation checks.
@@ -151,14 +151,6 @@ public enum PreTradeCheck {
     PreTradeCheck(String displayName, String description) {
         this.displayName = displayName;
         this.description = description;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     /**

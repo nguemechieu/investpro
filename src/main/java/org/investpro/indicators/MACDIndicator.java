@@ -34,6 +34,13 @@ public class MACDIndicator extends BaseIndicator {
         if (candles == null || candles.isEmpty()) {
             return;
         }
+        if (fastPeriod <= 0 || slowPeriod <= 0 || signalPeriod <= 0) {
+            values.put("MACD", new double[candles.size()]);
+            values.put("Signal", new double[candles.size()]);
+            values.put("Histogram", new double[candles.size()]);
+            calculated = true;
+            return;
+        }
         
         List<Double> closePrices = new ArrayList<>();
         for (CandleData candle : candles) {
@@ -46,26 +53,27 @@ public class MACDIndicator extends BaseIndicator {
         
         // Calculate MACD line
         double[] macdLine = new double[closePrices.size()];
-        for (int i = slowPeriod - 1; i < closePrices.size(); i++) {
+        int start = Math.max(fastPeriod, slowPeriod) - 1;
+        for (int i = start; i < closePrices.size(); i++) {
             macdLine[i] = emaFast[i] - emaSlow[i];
         }
         
         // Calculate signal line (EMA of MACD)
         List<Double> macdValues = new ArrayList<>();
-        for (int i = slowPeriod - 1; i < closePrices.size(); i++) {
+        for (int i = start; i < closePrices.size(); i++) {
             macdValues.add(macdLine[i]);
         }
         double[] signalLine = new double[closePrices.size()];
         if (macdValues.size() >= signalPeriod) {
             double[] tmpSignal = calculateEMA(macdValues, signalPeriod);
-            for (int i = 0; i < tmpSignal.length && (slowPeriod - 1 + i) < closePrices.size(); i++) {
-                signalLine[slowPeriod - 1 + i] = tmpSignal[i];
+            for (int i = 0; i < tmpSignal.length && (start + i) < closePrices.size(); i++) {
+                signalLine[start + i] = tmpSignal[i];
             }
         }
         
         // Calculate histogram
         double[] histogram = new double[closePrices.size()];
-        for (int i = 0; i < closePrices.size(); i++) {
+        for (int i = start; i < closePrices.size(); i++) {
             histogram[i] = macdLine[i] - signalLine[i];
         }
         

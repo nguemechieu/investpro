@@ -1,5 +1,8 @@
 package org.investpro.ui.theme;
 
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.NonNull;
+
 public record MarketConfiguration(
         String username,
         String marketType,
@@ -28,7 +31,8 @@ public record MarketConfiguration(
 
 
 
-    public String tradingMode() {
+    @Contract(pure = true)
+    public @NonNull String tradingMode() {
         return tradingMode != null ? "PAPER" : "LIVE";
     }
 

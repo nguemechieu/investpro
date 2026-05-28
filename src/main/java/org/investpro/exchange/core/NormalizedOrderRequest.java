@@ -14,11 +14,11 @@ import java.util.Objects;
 @Setter
 public class NormalizedOrderRequest {
     public enum OrderType {
-        MARKET, LIMIT, STOP, STOP_LIMIT
+        MARKET, LIMIT, STOP_LIMIT
     }
     
     public enum Side {
-        BUY, SELL
+        BUY, SELL,HOLD
     }
     
     public enum TimeInForce {
@@ -27,7 +27,8 @@ public class NormalizedOrderRequest {
         GTC,  // Good Till Cancel
         GTD   // Good Till Date
     }
-    
+
+    // Getters
     private final String productId;
     private final Side side;
     private final OrderType orderType;
@@ -129,20 +130,7 @@ public class NormalizedOrderRequest {
                     timeInForce, postOnly, leverage);
         }
     }
-    
-    // Getters
-    public String getProductId() { return productId; }
-    public Side getSide() { return side; }
-    public OrderType getOrderType() { return orderType; }
-    public BigDecimal getQuantity() { return quantity; }
-    public BigDecimal getLimitPrice() { return limitPrice; }
-    public BigDecimal getStopPrice() { return stopPrice; }
-    public BigDecimal getStopLossPrice() { return stopLossPrice; }
-    public BigDecimal getTakeProfitPrice() { return takeProfitPrice; }
-    public TimeInForce getTimeInForce() { return timeInForce; }
-    public boolean isPostOnly() { return postOnly; }
-    public BigDecimal getLeverage() { return leverage; }
-    
+
     public boolean hasStopLoss() { return stopLossPrice != null && stopLossPrice.signum() > 0; }
     public boolean hasTakeProfit() { return takeProfitPrice != null && takeProfitPrice.signum() > 0; }
     public boolean isBracketOrder() { return hasStopLoss() || hasTakeProfit(); }

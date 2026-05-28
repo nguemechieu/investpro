@@ -3,9 +3,9 @@ package org.investpro.exchange.consumers;
 import javafx.application.Platform;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
@@ -16,11 +16,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -28,17 +29,21 @@ import java.util.function.Consumer;
 /**
  * JavaFX-safe UI stream consumer for InvestPro.
  *
- * Responsibilities:
- * - Receives live exchange stream events.
- * - Caches latest ticker/order book/candle/account/position/order/trade data.
- * - Dispatches updates to JavaFX UI safely.
- * - Tracks stream health/event counters.
+ * <p>Responsibilities:</p>
+ * <ul>
+ *     <li>Receives live exchange stream events.</li>
+ *     <li>Caches latest ticker/order book/candle/account/position/order/trade data.</li>
+ *     <li>Dispatches updates to JavaFX UI safely.</li>
+ *     <li>Tracks stream health/event counters.</li>
+ * </ul>
  *
- * This class should not:
- * - Place orders.
- * - Run strategies.
- * - Execute risk checks.
- * - Call REST polling repeatedly.
+ * <p>This class should not:</p>
+ * <ul>
+ *     <li>Place orders.</li>
+ *     <li>Run strategies.</li>
+ *     <li>Execute risk checks.</li>
+ *     <li>Call REST polling repeatedly.</li>
+ * </ul>
  */
 @Slf4j
 @Getter
@@ -53,10 +58,10 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     private final Map<String, OrderBook> latestOrderBooks = new ConcurrentHashMap<>();
     private final Map<String, CandleData> latestCandles = new ConcurrentHashMap<>();
 
-    private final CopyOnWriteArrayList<Trade> recentTrades = new CopyOnWriteArrayList<>();
-    private final CopyOnWriteArrayList<Trade> recentFills = new CopyOnWriteArrayList<>();
-    private final CopyOnWriteArrayList<OpenOrder> openOrders = new CopyOnWriteArrayList<>();
-    private final CopyOnWriteArrayList<Position> positions = new CopyOnWriteArrayList<>();
+    private final ConcurrentLinkedDeque<Trade> recentTrades = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Trade> recentFills = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<OpenOrder> openOrders = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Position> positions = new ConcurrentLinkedDeque<>();
 
     private final AtomicLong tickerEvents = new AtomicLong();
     private final AtomicLong tradeEvents = new AtomicLong();
@@ -78,19 +83,19 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     private volatile String lastRawChannel = "";
     private volatile TradePair lastTradePair;
 
-    private Consumer<Ticker> tickerHandler;
-    private Consumer<Trade> tradeHandler;
-    private Consumer<CandleData> candleHandler;
-    private Consumer<OrderBook> orderBookHandler;
-    private Consumer<Account> accountHandler;
-    private Consumer<OpenOrder> openOrderHandler;
-    private Consumer<List<OpenOrder>> openOrdersHandler;
-    private Consumer<Trade> fillHandler;
-    private Consumer<Position> positionHandler;
-    private Consumer<List<Position>> positionsHandler;
-    private BiConsumer<String, Throwable> errorHandler;
-    private Consumer<String> statusHandler;
-    private Consumer<String> rawMessageHandler;
+    private volatile Consumer<Ticker> tickerHandler;
+    private volatile Consumer<Trade> tradeHandler;
+    private volatile Consumer<CandleData> candleHandler;
+    private volatile Consumer<OrderBook> orderBookHandler;
+    private volatile Consumer<Account> accountHandler;
+    private volatile Consumer<OpenOrder> openOrderHandler;
+    private volatile Consumer<List<OpenOrder>> openOrdersHandler;
+    private volatile Consumer<Trade> fillHandler;
+    private volatile Consumer<Position> positionHandler;
+    private volatile Consumer<List<Position>> positionsHandler;
+    private volatile BiConsumer<String, Throwable> errorHandler;
+    private volatile Consumer<String> statusHandler;
+    private volatile Consumer<String> rawMessageHandler;
 
     public UiExchangeStreamConsumer onTickerUpdate(@Nullable Consumer<Ticker> handler) {
         this.tickerHandler = handler;
@@ -124,11 +129,14 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     public UiExchangeStreamConsumer onOpenOrdersUpdate(@Nullable Consumer<List<OpenOrder>> handler) {
         this.openOrdersHandler = handler;
+        publishOpenOrdersSnapshot();
         return this;
     }
 
+    @Override
     public UiExchangeStreamConsumer onOrdersUpdate(@Nullable Consumer<List<OpenOrder>> handler) {
         this.openOrdersHandler = handler;
+        publishOpenOrdersSnapshot();
         return this;
     }
 
@@ -137,7 +145,6 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         return this;
     }
 
-
     public UiExchangeStreamConsumer onPositionUpdate(@Nullable Consumer<Position> handler) {
         this.positionHandler = handler;
         return this;
@@ -145,6 +152,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     public UiExchangeStreamConsumer onPositionsUpdate(@Nullable Consumer<List<Position>> handler) {
         this.positionsHandler = handler;
+        publishPositionsSnapshot();
         return this;
     }
 
@@ -155,6 +163,11 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
     public UiExchangeStreamConsumer onStatus(@Nullable Consumer<String> handler) {
         this.statusHandler = handler;
+
+        if (handler != null && lastStatusMessage != null && !lastStatusMessage.isBlank()) {
+            runOnFx(() -> handler.accept(lastStatusMessage));
+        }
+
         return this;
     }
 
@@ -174,8 +187,9 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         latestTickers.put(key(exchangeName, tradePair), ticker);
 
         runOnFx(() -> {
-            if (tickerHandler != null) {
-                tickerHandler.accept(ticker);
+            Consumer<Ticker> handler = tickerHandler;
+            if (handler != null) {
+                handler.accept(ticker);
             }
         });
     }
@@ -193,8 +207,9 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         trim(recentTrades, MAX_RECENT_TRADES);
 
         runOnFx(() -> {
-            if (tradeHandler != null) {
-                tradeHandler.accept(trade);
+            Consumer<Trade> handler = tradeHandler;
+            if (handler != null) {
+                handler.accept(trade);
             }
         });
     }
@@ -210,8 +225,9 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         latestCandles.put(key(exchangeName, tradePair), candle);
 
         runOnFx(() -> {
-            if (candleHandler != null) {
-                candleHandler.accept(candle);
+            Consumer<CandleData> handler = candleHandler;
+            if (handler != null) {
+                handler.accept(candle);
             }
         });
     }
@@ -227,8 +243,9 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         latestOrderBooks.put(key(exchangeName, tradePair), orderBook);
 
         runOnFx(() -> {
-            if (orderBookHandler != null) {
-                orderBookHandler.accept(orderBook);
+            Consumer<OrderBook> handler = orderBookHandler;
+            if (handler != null) {
+                handler.accept(orderBook);
             }
         });
     }
@@ -244,8 +261,9 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         latestAccount = account;
 
         runOnFx(() -> {
-            if (accountHandler != null) {
-                accountHandler.accept(account);
+            Consumer<Account> handler = accountHandler;
+            if (handler != null) {
+                handler.accept(account);
             }
         });
     }
@@ -255,15 +273,17 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         onAccount(exchangeName, account);
     }
 
-    public void onBalance(String exchangeName, Account account) {
+    @Override
+    public void onBalance(@Nullable String exchangeName, @Nullable Account account) {
         onAccount(exchangeName, account);
     }
 
-    public void onOrder(String exchangeName, OpenOrder order) {
+    @Override
+    public void onOrder(@Nullable String exchangeName, @Nullable OpenOrder order) {
         onOpenOrder(exchangeName, order);
     }
 
-    public void onOpenOrder(String exchangeName, OpenOrder order) {
+    public void onOpenOrder(@Nullable String exchangeName, @Nullable OpenOrder order) {
         if (order == null) {
             return;
         }
@@ -275,12 +295,14 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         trim(openOrders, MAX_RECENT_ORDERS);
 
         runOnFx(() -> {
-            if (openOrderHandler != null) {
-                openOrderHandler.accept(order);
+            Consumer<OpenOrder> singleHandler = openOrderHandler;
+            if (singleHandler != null) {
+                singleHandler.accept(order);
             }
 
-            if (openOrdersHandler != null) {
-                openOrdersHandler.accept(List.copyOf(openOrders));
+            Consumer<List<OpenOrder>> listHandler = openOrdersHandler;
+            if (listHandler != null) {
+                listHandler.accept(getOpenOrdersSnapshot());
             }
         });
     }
@@ -290,26 +312,29 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         onOrders(exchangeName, orders);
     }
 
-    public void onOrders(String exchangeName, List<OpenOrder> orders) {
+    @Override
+    public void onOrders(@Nullable String exchangeName, @Nullable List<OpenOrder> orders) {
         markUpdated(exchangeName, null);
 
         openOrders.clear();
 
         if (orders != null) {
-            openOrders.addAll(orders);
+            for (OpenOrder order : orders) {
+                if (order != null) {
+                    openOrders.addLast(order);
+                }
+
+                if (openOrders.size() >= MAX_RECENT_ORDERS) {
+                    break;
+                }
+            }
         }
 
-        trim(openOrders, MAX_RECENT_ORDERS);
         orderEvents.addAndGet(openOrders.size());
-
-        runOnFx(() -> {
-            if (openOrdersHandler != null) {
-                openOrdersHandler.accept(List.copyOf(openOrders));
-            }
-        });
+        publishOpenOrdersSnapshot();
     }
 
-    public void onFill(String exchangeName, TradePair tradePair, Trade fill) {
+    public void onFill(@Nullable String exchangeName, @Nullable TradePair tradePair, @Nullable Trade fill) {
         if (fill == null) {
             return;
         }
@@ -324,17 +349,19 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         trim(recentTrades, MAX_RECENT_TRADES);
 
         runOnFx(() -> {
-            if (fillHandler != null) {
-                fillHandler.accept(fill);
+            Consumer<Trade> fillUpdate = fillHandler;
+            if (fillUpdate != null) {
+                fillUpdate.accept(fill);
             }
 
-            if (tradeHandler != null) {
-                tradeHandler.accept(fill);
+            Consumer<Trade> tradeUpdate = tradeHandler;
+            if (tradeUpdate != null) {
+                tradeUpdate.accept(fill);
             }
         });
     }
 
-    public void onPosition(String exchangeName, Position position) {
+    public void onPosition(@Nullable String exchangeName, @Nullable Position position) {
         if (position == null) {
             return;
         }
@@ -346,39 +373,49 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         trim(positions, MAX_RECENT_POSITIONS);
 
         runOnFx(() -> {
-            if (positionHandler != null) {
-                positionHandler.accept(position);
+            Consumer<Position> singleHandler = positionHandler;
+            if (singleHandler != null) {
+                singleHandler.accept(position);
             }
 
-            if (positionsHandler != null) {
-                positionsHandler.accept(List.copyOf(positions));
+            Consumer<List<Position>> listHandler = positionsHandler;
+            if (listHandler != null) {
+                listHandler.accept(getPositionsSnapshot());
             }
         });
     }
 
-    public void onPositions(String exchangeName, List<Position> newPositions) {
+    public void onPositions(@Nullable String exchangeName, @Nullable List<Position> newPositions) {
         markUpdated(exchangeName, null);
 
         positions.clear();
 
         if (newPositions != null) {
-            positions.addAll(newPositions);
+            for (Position position : newPositions) {
+                if (position != null) {
+                    positions.addLast(position);
+                }
+
+                if (positions.size() >= MAX_RECENT_POSITIONS) {
+                    break;
+                }
+            }
         }
 
-        trim(positions, MAX_RECENT_POSITIONS);
         positionEvents.addAndGet(positions.size());
-
-        runOnFx(() -> {
-            if (positionsHandler != null) {
-                positionsHandler.accept(List.copyOf(positions));
-            }
-        });
+        publishPositionsSnapshot();
     }
 
     @Override
     public boolean containsKey(TradePair tradePair) {
-        return tradePair != null
-                && latestTickers.keySet().stream().anyMatch(key -> key.endsWith(":" + safePair(tradePair)));
+        if (tradePair == null) {
+            return false;
+        }
+
+        String suffix = ":" + safePair(tradePair);
+        return latestTickers.keySet().stream().anyMatch(key -> key.endsWith(suffix))
+                || latestOrderBooks.keySet().stream().anyMatch(key -> key.endsWith(suffix))
+                || latestCandles.keySet().stream().anyMatch(key -> key.endsWith(suffix));
     }
 
     @Override
@@ -492,9 +529,11 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
 
         markUpdated(safeExchangeName, null);
         rawMessageEvents.incrementAndGet();
+        lastRawChannel = safeChannel;
 
-        if (rawMessageHandler != null) {
-            runOnFx(() -> rawMessageHandler.accept(rawJson));
+        Consumer<String> handler = rawMessageHandler;
+        if (handler != null) {
+            runOnFx(() -> handler.accept(rawJson));
         }
 
         log.debug(
@@ -505,7 +544,8 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         );
     }
 
-    public void onStatus(String exchangeName, String message) {
+    @Override
+    public void onStatus(@Nullable String exchangeName, @Nullable String message) {
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String safeMessage = message == null || message.isBlank() ? "status update" : message.trim();
 
@@ -513,13 +553,15 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         lastStatusMessage = "%s: %s".formatted(safeExchangeName, safeMessage);
 
         runOnFx(() -> {
-            if (statusHandler != null) {
-                statusHandler.accept(lastStatusMessage);
+            Consumer<String> handler = statusHandler;
+            if (handler != null) {
+                handler.accept(lastStatusMessage);
             }
         });
     }
 
-    public void onError(String exchangeName, Throwable throwable) {
+    @Override
+    public void onError(@Nullable String exchangeName, @Nullable Throwable throwable) {
         String safeExchangeName = normalizeExchangeName(exchangeName);
         String message = rootMessage(throwable);
 
@@ -535,12 +577,14 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         );
 
         runOnFx(() -> {
-            if (errorHandler != null) {
-                errorHandler.accept(safeExchangeName, throwable);
+            BiConsumer<String, Throwable> handler = errorHandler;
+            if (handler != null) {
+                handler.accept(safeExchangeName, throwable);
             }
 
-            if (statusHandler != null) {
-                statusHandler.accept("%s error: %s".formatted(safeExchangeName, message));
+            Consumer<String> status = statusHandler;
+            if (status != null) {
+                status.accept("%s error: %s".formatted(safeExchangeName, message));
             }
         });
     }
@@ -595,19 +639,19 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
     }
 
     public List<Trade> getRecentTradesSnapshot() {
-        return List.copyOf(recentTrades);
+        return snapshot(recentTrades);
     }
 
     public List<Trade> getRecentFillsSnapshot() {
-        return List.copyOf(recentFills);
+        return snapshot(recentFills);
     }
 
     public List<OpenOrder> getOpenOrdersSnapshot() {
-        return List.copyOf(openOrders);
+        return snapshot(openOrders);
     }
 
     public List<Position> getPositionsSnapshot() {
-        return List.copyOf(positions);
+        return snapshot(positions);
     }
 
     public void clear() {
@@ -618,12 +662,33 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         recentFills.clear();
         openOrders.clear();
         positions.clear();
+
         latestAccount = null;
         lastUpdateAt = null;
         lastErrorAt = null;
         lastStatusMessage = "";
         lastRawChannel = "";
         lastTradePair = null;
+    }
+
+    private void publishOpenOrdersSnapshot() {
+        Consumer<List<OpenOrder>> handler = openOrdersHandler;
+
+        if (handler == null) {
+            return;
+        }
+
+        runOnFx(() -> handler.accept(getOpenOrdersSnapshot()));
+    }
+
+    private void publishPositionsSnapshot() {
+        Consumer<List<Position>> handler = positionsHandler;
+
+        if (handler == null) {
+            return;
+        }
+
+        runOnFx(() -> handler.accept(getPositionsSnapshot()));
     }
 
     private void markUpdated(@Nullable String exchangeName, @Nullable TradePair tradePair) {
@@ -659,17 +724,21 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
                 : exchangeName.trim();
     }
 
-    private String safeId(String value) {
+    private String safeId(@Nullable String value) {
         return value == null || value.isBlank() ? "unknown" : value.trim();
     }
 
-    private <T> void trim(CopyOnWriteArrayList<T> list, int maxSize) {
-        while (list.size() > maxSize) {
-            list.removeLast();
+    private <T> void trim(ConcurrentLinkedDeque<T> deque, int maxSize) {
+        while (deque.size() > maxSize) {
+            deque.pollLast();
         }
     }
 
-    private void runOnFx(Runnable runnable) {
+    private <T> List<T> snapshot(ConcurrentLinkedDeque<T> deque) {
+        return List.copyOf(new ArrayList<>(deque));
+    }
+
+    private void runOnFx(@Nullable Runnable runnable) {
         if (runnable == null) {
             return;
         }
@@ -685,7 +754,7 @@ public class UiExchangeStreamConsumer implements ExchangeStreamConsumer {
         }
     }
 
-    private void safeRun(Runnable runnable) {
+    private void safeRun(@NotNull Runnable runnable) {
         try {
             runnable.run();
         } catch (Exception exception) {

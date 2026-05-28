@@ -2,8 +2,8 @@
 
 **Last Updated**: May 2026  
 **Version**: 1.0 - Production Ready  
-**Java Version**: Java 17+  
-**Build System**: Maven 3.8+
+**Java Version**: Java 21+  
+**Build System**: Maven 3.6+
 
 ---
 
@@ -450,8 +450,8 @@ BotTradeDecisionEngine.evaluateSignal()
 ### 6.1 Development Environment
 ```
 Local Machine
-├── JDK 17+
-├── Maven 3.8+
+├── JDK 21+
+├── Maven 3.6+
 ├── SQLite (local.db)
 ├── JavaFX UI
 └── Telegram Bot Token (optional)
@@ -460,7 +460,7 @@ Local Machine
 ### 6.2 Docker Deployment
 ```
 Docker Container
-├── OpenJDK 17 Base Image
+├── OpenJDK 21 Base Image
 ├── Maven build cached layers
 ├── PostgreSQL (external database)
 ├── Telegram Bot API (external)
@@ -498,8 +498,8 @@ Kubernetes Cluster (Optional)
 
 | Layer | Technology | Version | Purpose |
 |-------|-----------|---------|---------|
-| **Language** | Java | 17+ | Primary development language |
-| **Build** | Maven | 3.8+ | Dependency management & build |
+| **Language** | Java | 21+ | Primary development language |
+| **Build** | Maven | 3.6+ | Dependency management & build |
 | **UI Framework** | JavaFX | 21+ | Desktop user interface |
 | **ORM** | JPA/Hibernate | 5.6+ | Database abstraction |
 | **Database** | SQLite / PostgreSQL | 3.40+ / 14+ | Data persistence |

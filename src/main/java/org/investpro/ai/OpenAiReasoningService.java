@@ -1,6 +1,7 @@
 package org.investpro.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
@@ -24,6 +25,7 @@ import java.util.Map;
  * - Logs all API calls and responses for debugging
  */
 @Slf4j
+@Data
 public class OpenAiReasoningService implements AiReasoningService {
     private static final String SERVICE_NAME = "OpenAI GPT-4 Turbo";
     private static final String API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
@@ -39,7 +41,7 @@ public class OpenAiReasoningService implements AiReasoningService {
      * Create OpenAI service.
      * Uses the supplied key first and falls back to OPENAI_API_KEY.
      */
-    @SuppressWarnings("unused")
+
     public OpenAiReasoningService(String apiKey) {
         this.apiKey = (apiKey != null && !apiKey.isBlank()) ? apiKey : System.getenv("OPENAI_API_KEY");
         this.httpClient = HttpClient.newBuilder()
@@ -133,6 +135,7 @@ public class OpenAiReasoningService implements AiReasoningService {
      * Parse OpenAI API response and extract AI decision.
      */
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private AiTradeReviewResponse parseOpenAiResponse(String responseBody, long processingTime) {
         try {
             Map response = objectMapper.readValue(responseBody, Map.class);

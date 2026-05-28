@@ -56,7 +56,7 @@ public record TradingService(SystemCore systemCore,TradeService tradeService, Or
 
         // Create and save the trade with appropriate constructor
         Trade trade = new Trade(tradePair, price, amount, side, System.currentTimeMillis(), Instant.now());
-        Order order = exchange.createOrder(UUID.randomUUID().hashCode(), tradePair, type, price, amount, side, sl, tp, slippage);
+        exchange.createOrder(UUID.randomUUID().hashCode(), tradePair, type, price, amount, side, sl, tp, slippage);
 
         return tradeService.save(trade);
     }

@@ -7,12 +7,13 @@ import java.time.Instant;
 /**
  * Represents a system alert or notification.
  */
+
 public record SystemAlert(
         AlertSeverity severity,
         String source,
         String message,
         Instant timestamp) {
-    @Getter
+
     public enum AlertSeverity {
         DEBUG("#94a3b8"), // Gray
         INFO("#38bdf8"), // Blue

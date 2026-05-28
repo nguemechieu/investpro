@@ -73,7 +73,6 @@ public class FeaturePipeline {
             double[] bollingerBands = computeBollingerBands(candles, 20, 2.0);
             double upperBand = bollingerBands[0];
             double lowerBand = bollingerBands[1];
-            double sma20 = bollingerBands[2];
 
             // Band position: 0 = at lower band, 1 = at upper band
             double bandPosition = (close - lowerBand) / Math.max(upperBand - lowerBand, 0.0001);
@@ -342,7 +341,6 @@ public class FeaturePipeline {
             int fastPeriod,
             int slowPeriod) {
 
-        double emaFast = computeEMA(candles, fastPeriod);
         double emaSlow = computeEMA(candles, slowPeriod);
         double close = candles.get(candles.size() - 1).closePrice();
 

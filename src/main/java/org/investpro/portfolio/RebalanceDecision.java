@@ -2,7 +2,6 @@ package org.investpro.portfolio;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;

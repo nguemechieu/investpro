@@ -7,6 +7,7 @@ import org.investpro.reconciliation.ReconciliationStatus;
 import java.time.Instant;
 import java.util.List;
 
+
 public record SystemOperationsSnapshot(
         PipelineComponentStatus marketDataStatus,
         PipelineComponentStatus strategyEngineStatus,

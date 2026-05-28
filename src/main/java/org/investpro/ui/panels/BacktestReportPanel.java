@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.backtesting.InstitutionalBacktestMetrics;
 import org.investpro.i18n.LocalizationService;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Professional backtesting report panel displaying institutional-grade metrics.
@@ -219,7 +220,7 @@ public class BacktestReportPanel extends ScrollPane {
         return section;
     }
 
-    private VBox createConfidenceScoreSection() {
+    private @NonNull VBox createConfidenceScoreSection() {
         VBox section = new VBox(12);
         section.setStyle("-fx-border-color: #475569; -fx-border-width: 1; -fx-padding: 12;");
 

@@ -1,5 +1,7 @@
 package org.investpro.risk;
 
+import lombok.Data;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -13,6 +15,8 @@ import java.util.prefs.Preferences;
  * Uses Java Preferences API for system-independent storage.
  */
 @Slf4j
+@ToString
+@Data
 public class BehaviourGuardService {
 
     private static final String PREFS_NODE = "org/investpro/behaviour_guard";

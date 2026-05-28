@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * StrategyBootstrapper ensures strategies are initialized exactly once at
@@ -319,7 +320,7 @@ public final class StrategyBootstrapper {
         return strategy.getClass().getName();
     }
 
-    private static String invokeString(Object target, String methodName) {
+    private static @NonNull String invokeString(Object target, String methodName) {
         try {
             Object value = target.getClass().getMethod(methodName).invoke(target);
             return value == null ? "" : String.valueOf(value).trim();

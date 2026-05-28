@@ -1,5 +1,6 @@
 package org.investpro.risk;
 
+import lombok.Data;
 import org.investpro.enums.ExecutionStrategy;
 import org.investpro.enums.LiquidityProfile;
 
@@ -7,6 +8,7 @@ import org.investpro.enums.LiquidityProfile;
  * Models slippage impact on trade execution.
  * Combines execution strategy, liquidity, and volatility factors.
  */
+@Data
 public class SlippageModel {
 
     /**

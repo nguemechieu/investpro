@@ -1,14 +1,14 @@
 # InvestPro Status Report
 
-**Last Updated**: May 11, 2026  
-**Status**: Production Ready with Docker Deployment  
-**Overall Progress**: ~85% - Core architecture complete, Docker containerization complete, ready for trading operations
+**Last Updated**: May 27, 2026  
+**Status**: Active Development — Core architecture and decision pipeline complete  
+**Overall Progress**: ~90% — Institutional decision pipeline implemented, MarketWatch data flow fixed, UI cleaned up
 
 ---
 
 ## Executive Summary
 
-InvestPro is now **production-ready** with full Docker containerization and deployment support. Core systems are fully functional:
+InvestPro now features a **full 9-phase institutional decision orchestration pipeline** alongside its original agent runtime and strategy engine. The MarketWatch panel was fixed to ensure live bid/ask/spread data flows on every 3-second refresh cycle. The TradingDesk UI had IDE warnings cleaned up. Docker deployment remains operational.
 
 ✅ **Complete & Verified**:
 - Core system (SystemCore), Bot runtime (SmartBot), Execution pipeline
@@ -20,8 +20,69 @@ InvestPro is now **production-ready** with full Docker containerization and depl
 - Paper trading and live trading modes
 - Strategy engine and backtesting framework
 - Complete UI with charting and technical analysis
+- **Institutional 9-phase decision pipeline** (`decision/` package)
+- **Immutable domain model** for all decision objects
+- **Execution routing framework** (venue-aware, DEX/blockchain-ready)
+- **Position sizing engine** (fixed-risk, ATR, Kelly, volatility, drawdown-scaled)
+- **MarketWatch real-time data flow** (bid/ask/spread now update on every 3-second tick)
+- **Lightweight simulation mode** (no UUID, minimal allocation, optimized for backtesting)
 
 ✅ **Ready for Deployment**: Production-grade container orchestration with health checks, persistent storage, and accessibility via web-based VNC
+
+---
+
+## Recent Changes (May 2026)
+
+### Institutional Decision Pipeline (`decision/` package)
+
+A full 9-phase institutional-grade decision orchestration pipeline was designed and implemented:
+
+```
+Market Signal → TradeIntent → PortfolioImpact → RiskEvaluation
+  → PositionSizingDecision → DecisionReasoning → ExecutionPlan
+  → ExecutionRoute → InstitutionalExecutionDecision
+```
+
+Key new classes:
+- `TradeIntent` — desired direction + exposure, no execution info
+- `RiskEvaluation` — full multi-dimensional risk check (APPROVED/REDUCED/REJECTED/WAIT)
+- `PositionSizingDecision` — fixed-risk, ATR, Kelly, volatility, drawdown-scaled sizing
+- `DecisionReasoning` — AI model confidence, veto chain, reasoning summary (with `NONE` null-object)
+- `ExecutionPlan` — entry, stop-loss, take-profit, leverage, time-in-force (with `EMPTY` null-object)
+- `ExecutionRoute` — venue routing with slippage, fee, latency, and quality score
+- `InstitutionalExecutionDecision` — top-level immutable composition record
+- `DecisionPipelineOrchestrator` — coordinates all 9 phases
+- `BotTradeDecisionAssembler` — bridges new pipeline → legacy `BotTradeDecision` adapter
+- `DecisionSnapshot` — compact FULL/LIGHTWEIGHT/REPLAY/ARCHIVE serialization
+- `DecisionIdGenerator` — AtomicLong IDs for simulation; UUID for live
+- `BlockchainExecutionContext` — Solana/Stellar/EVM on-chain routing placeholder
+- `ExecutionRouter`, `LiquidityAnalyzer`, `VenueScorer` — functional interfaces for routing
+
+**Simulation optimizations:**
+- `DecisionMode.LIGHTWEIGHT` and `SIMULATION` skip UUID allocation and heavy maps
+- Null-object constants (`NONE`, `EMPTY`, `NEUTRAL`) avoid deep nullable chains
+- `double confidenceValue` replaces `BigDecimal` for scoring (BigDecimal only for money/fees)
+
+**Backward compatibility:** `BotTradeDecision` now acts as a legacy adapter. Existing callers of `BotDecisionEngine`, `SignalToDecisionFilter`, and `RiskEngine` are unaffected.
+
+### MarketWatch Live Data Fix
+
+**Bug fixed:** `MarketWatchPanel.refreshMarketWatchData()` had an early-return optimization:
+```java
+// OLD — broken: skipped row.updateSymbolState() once symbol count stabilized
+if (allStates.size() == lastRowCount && lastRowCount > 0) {
+    table.refresh();
+    return;  // ← data was frozen!
+}
+```
+**Fix:** Removed the early return. Now `updateSymbolState()` is called on every 3-second tick for all rows, so live bid/ask/spread/signal data always flows from `SymbolAgentManager` → `MarketWatchRow` → JavaFX TableView.
+
+### TradingDesk IDE Warning Cleanup
+
+- Added `@SuppressWarnings("unchecked")` at class level (12 unchecked varargs warnings from JavaFX API calls)
+- Renamed `instanceof Stage stage` pattern variables → `windowStage` in 2 lambda bodies (they shadowed the `Stage stage` class field used by `showError()`)
+- Fixed `CountDownLatch.await(long, TimeUnit)` ignored return value → logs timeout warning
+- Removed unused private methods `createAccountHistoryPlaceholder()` and `buildOrderManagementPane()`
 
 ---
 
@@ -248,7 +309,7 @@ mvn clean compile -X
    - Verify no blocking I/O on FX thread
 
 3. [src/main/java/org/investpro/core/agents/market/MarketDataAgent.java](src/main/java/org/investpro/core/agents/market/MarketDataAgent.java)
-4. [src/main/java/org/investpro/core/agents/signal/SignalAgent.java](src/main/java/org/investpro/core/agents/signal/SignalAgent.java)
+4. [src/main/java/org/investpro/core/agents/signal/SignalAgent.java](src/main/java/org/investpro/signal/SignalAgent.java)
 5. [src/main/java/org/investpro/core/agents/risk/RiskAgent.java](src/main/java/org/investpro/core/agents/risk/RiskAgent.java)
 
 **Medium Priority**

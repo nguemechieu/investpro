@@ -17,6 +17,7 @@ import java.util.Optional;
 public class OrderRepositoryImpl implements OrderRepository {
     
     private final Db1 db1;
+    @SuppressWarnings("unused")
     private static final String OPEN_STATUS = "OPEN";
     private static final String FILLED_STATUS = "FILLED";
     private static final String CANCELLED_STATUS = "CANCELLED";

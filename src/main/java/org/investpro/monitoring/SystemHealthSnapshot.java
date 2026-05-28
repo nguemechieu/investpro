@@ -3,6 +3,7 @@ package org.investpro.monitoring;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.util.Map;
 @Getter
 @Builder
 @Setter
+@ToString
 public class SystemHealthSnapshot {
     /**
      * Overall system status (aggregate of all components).

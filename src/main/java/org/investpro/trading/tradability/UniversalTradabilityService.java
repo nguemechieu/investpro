@@ -5,6 +5,7 @@ import org.investpro.exchange.Exchange;
 import org.investpro.market.MarketDataEngine;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.TradePair;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
+@SuppressWarnings("unused") // public API surface — methods called externally or reserved for callers
 public final class UniversalTradabilityService {
     private final Exchange exchange;
     private final MarketDataEngine marketDataEngine;
@@ -47,7 +49,7 @@ public final class UniversalTradabilityService {
 
     public CompletableFuture<SymbolTradability> getTradability(TradePair pair, TradabilityScope scope, boolean forceRefresh) {
         if (pair == null) {
-            return CompletableFuture.completedFuture(unknownStatus(null, TradabilityStatus.UNKNOWN, "Trade pair is null"));
+            return CompletableFuture.completedFuture(unknownStatus(null, "Trade pair is null"));
         }
 
         SymbolTradability cached = cached(pair, scope);
@@ -61,11 +63,11 @@ public final class UniversalTradabilityService {
                             pair,
                             exchange.getName(),
                             exception.getMessage());
-                    return unknownStatus(pair, TradabilityStatus.UNKNOWN, "Tradability lookup failed");
+                    return unknownStatus(pair, "Tradability lookup failed");
                 })
                 .thenApply(status -> {
                     SymbolTradability resolved = status == null
-                            ? unknownStatus(pair, TradabilityStatus.UNKNOWN, "Tradability not provided by adapter")
+                            ? unknownStatus(pair, "Tradability not provided by adapter")
                             : status;
                     put(pair, scope, resolved);
                     if (!resolved.isFullyTradable()) {
@@ -110,7 +112,7 @@ public final class UniversalTradabilityService {
                     for (TradePair pair : sanitized) {
                         SymbolTradability status = bySymbol.getOrDefault(
                                 symbolOf(pair),
-                                unknownStatus(pair, TradabilityStatus.UNKNOWN, "Tradability missing in batch response"));
+                                unknownStatus(pair, "Tradability missing in batch response"));
                         put(pair, TradabilityScope.WATCHLIST, status);
                         put(pair, TradabilityScope.LIVE_TRADING, status);
                         resolved.add(status);
@@ -128,7 +130,7 @@ public final class UniversalTradabilityService {
                 .filter(Objects::nonNull)
                 .filter(pair -> {
                     SymbolTradability status = snapshot(pair, TradabilityScope.WATCHLIST);
-                    return status != null ? status.canBeDisplayedInMarketWatch() : true;
+                    return status == null || status.canBeDisplayedInMarketWatch();
                 })
                 .toList();
     }
@@ -177,7 +179,7 @@ public final class UniversalTradabilityService {
         return supportsOrderType(status, orderType);
     }
 
-    public CompletableFuture<Boolean> canSubmitOrderAsync(TradePair pair, OpenOrder.OrderType orderType) {
+    public @NonNull CompletableFuture<Boolean> canSubmitOrderAsync(TradePair pair, OpenOrder.OrderType orderType) {
         return getTradability(pair, TradabilityScope.ORDER_SUBMISSION, true)
                 .thenApply(status -> status != null
                         && status.orderSubmissionAllowed()
@@ -248,9 +250,9 @@ public final class UniversalTradabilityService {
         };
     }
 
-    private SymbolTradability unknownStatus(TradePair pair, TradabilityStatus status, String reason) {
+    private SymbolTradability unknownStatus(TradePair pair, String reason) {
         boolean marketOpen = pair == null || marketDataEngine == null || marketDataEngine.isTradableNow(pair);
-        TradabilityStatus resolvedStatus = marketOpen ? status : TradabilityStatus.MARKET_CLOSED;
+        TradabilityStatus resolvedStatus = marketOpen ? TradabilityStatus.UNKNOWN : TradabilityStatus.MARKET_CLOSED;
         String resolvedReason = marketOpen
                 ? reason
                 : "Market/session currently closed for " + symbolOf(pair);

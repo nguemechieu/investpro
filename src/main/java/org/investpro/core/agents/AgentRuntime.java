@@ -1,24 +1,23 @@
 package org.investpro.core.agents;
 
-import lombok.extern.slf4j.Slf4j;
-
 import lombok.Getter;
 import lombok.Setter;
-import org.investpro.core.agents.execution.ExecutionAgent;
-import org.investpro.core.agents.learning.LearningAgent;
-import org.investpro.core.agents.market.MarketDataAgent;
-import org.investpro.core.agents.portfolio.PortfolioAgent;
-import org.investpro.core.agents.reasoning.ReasoningAgent;
-import org.investpro.core.agents.modules.SignalAgent;
-import org.investpro.core.agents.strategy.StrategyAgent;
-import org.investpro.core.agents.symbol.SymbolAgent;
-import org.investpro.core.agents.symbol.SymbolAgentManager;
+import lombok.extern.slf4j.Slf4j;
+import org.investpro.ai.learning.LearningAgent;
+import org.investpro.core.execution.ExecutionAgent;
+import org.investpro.market.MarketDataAgent;
 import org.investpro.models.trading.TradePair;
+import org.investpro.portfolio.PortfolioAgent;
+import org.investpro.reasoning.ReasoningAgent;
+import org.investpro.signal.SignalAgent;
+import org.investpro.strategy.StrategyAgent;
+import org.investpro.symbol.SymbolAgent;
+import org.investpro.symbol.SymbolAgentManager;
 import org.jetbrains.annotations.NotNull;
-import java.util.ArrayList;
-import java.util.Collections;
+
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Starts, stops, and coordinates all InvestPro agents.
@@ -27,11 +26,9 @@ import java.util.Objects;
 @Setter
 @Slf4j
 public class AgentRuntime {
-    private final List<Agent> agents = new ArrayList<>();
+    private final List<Agent> agents = new CopyOnWriteArrayList<>();
     private AgentContext context;
-
-    private boolean running;
-    private SymbolAgent agent;
+    private volatile boolean running;
 
     public static @NotNull AgentRuntime createDefault() {
         AgentRuntime runtime = new AgentRuntime();
@@ -45,19 +42,18 @@ public class AgentRuntime {
         return runtime;
     }
 
-    public void register(Agent agent) {
-        agents.add(Objects.requireNonNull(agent, "agent must not be null"));
-    }
-
-    /**
-     * Bulk-import agents from an AgentRegistry into this runtime.
-     * Call before start() to load agents configured by a module.
-     */
-    public void importFrom(@NotNull AgentRegistry registry) {
-        Objects.requireNonNull(registry, "registry must not be null");
-        for (Agent agent : registry.getAgents()) {
-            agents.add(Objects.requireNonNull(agent));
+    public boolean register(Agent agent) {
+        Agent newAgent = Objects.requireNonNull(agent, "agent must not be null");
+        String newAgentName = safeName(newAgent);
+        boolean alreadyRegistered = agents.stream()
+                .anyMatch(existing -> newAgentName.equals(safeName(existing)));
+        if (alreadyRegistered) {
+            log.debug("Agent already registered: {}", newAgentName);
+            return false;
         }
+
+        agents.add(newAgent);
+        return true;
     }
 
     /**
@@ -65,25 +61,32 @@ public class AgentRuntime {
      * If the runtime is already running the agent is started immediately;
      * otherwise it will be started with the rest of the agents when start() is called.
      */
-    public void registerSymbol(@NotNull TradePair symbol, @NotNull SymbolAgentManager symbolAgentManager) {
+    public boolean registerSymbol(@NotNull TradePair symbol, @NotNull SymbolAgentManager symbolAgentManager) {
         Objects.requireNonNull(symbol, "symbol must not be null");
         Objects.requireNonNull(symbolAgentManager, "symbolAgentManager must not be null");
+
         String agentName = "SymbolAgent[" + symbol.toString('/') + "]";
-        // Null-safe name check — avoids NPE if any agent returns null from name()
         boolean alreadyRegistered = agents.stream()
-                .anyMatch(a -> agentName.equals(a.name()));
-        if (alreadyRegistered) return;
-        agent = new SymbolAgent(symbol, symbolAgentManager);
-        agents.add(agent);
+                .anyMatch(agent -> agentName.equals(safeName(agent)));
+        if (alreadyRegistered) {
+            return false;
+        }
+
+        SymbolAgent symbolAgent = new SymbolAgent(symbol, symbolAgentManager);
+        agents.add(symbolAgent);
+
         if (running && context != null) {
-            context.getEventBus().subscribe(AgentEvent.MARKET_TICK, agent::onEvent);
+            context.getEventBus().subscribeAll(symbolAgent::onEvent);
             try {
-                agent.start(context);
-                log.info("SymbolAgent started: {}", agent.name());
-            } catch (Exception e) {
-                throw  new RuntimeException("Failed to start SymbolAgent {}"+ agent.name(), e);
+                symbolAgent.start(context);
+                log.info("SymbolAgent started: {}", symbolAgent.name());
+            } catch (Exception exception) {
+                agents.remove(symbolAgent);
+                throw new RuntimeException("Failed to start SymbolAgent " + symbolAgent.name(), exception);
             }
         }
+
+        return true;
     }
 
     public void start(AgentContext context) {
@@ -91,23 +94,19 @@ public class AgentRuntime {
         if (context.getEventBus() == null) {
             context.setEventBus(new AgentEventBus());
         }
+
         context.getEventBus().start();
+        running = true;
 
         for (Agent agent : agents) {
-
             try {
                 context.getEventBus().subscribeAll(agent::onEvent);
-
                 agent.start(context);
                 log.info("Agent started: {}", agent.name());
-                running = true;
             } catch (Exception exception) {
                 log.error("Failed to start agent {}", agent.name(), exception);
-
-            running = false;
             }
         }
-
     }
 
     public void stop() {
@@ -142,4 +141,12 @@ public class AgentRuntime {
         }
     }
 
+    private String safeName(Agent agent) {
+        if (agent == null) {
+            return "";
+        }
+
+        String name = agent.name();
+        return name == null ? "" : name.trim();
+    }
 }

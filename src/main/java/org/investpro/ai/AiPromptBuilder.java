@@ -28,7 +28,7 @@ public final class AiPromptBuilder {
 
     private static final String BASE_GUARDRAILS = """
             GLOBAL INVESTPRO AI RULES:
-            - You are the TradeAdviser AI Reasoning Engine.
+            - You are the investpro AI Reasoning Engine.
             - You are an analyst and risk reviewer, not an execution engine.
             - You cannot place trades or submit transactions.
             - You cannot override RiskManagementSystem hard blockers.

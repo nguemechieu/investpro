@@ -1,7 +1,5 @@
 package org.investpro.decision;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.math.BigDecimal;
 
 /**

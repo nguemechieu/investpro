@@ -28,7 +28,7 @@ public class SystemOperationsService {
     private static volatile SystemOperationsService instance;
 
     /**
-     * -- GETTER --
+     * - - GETTER - -
      *  Get the SystemActivityBus for activity logging
      */
 

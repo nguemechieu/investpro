@@ -2,12 +2,13 @@ package org.investpro.models.currency;
 
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.currency.spi.CurrencyProvider;
+import org.jetbrains.annotations.UnmodifiableView;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -117,7 +118,7 @@ public final class CurrencyRegistry {
         return unknown;
     }
 
-    public Collection<Currency> getAllCurrencies() {
+    public @NonNull @UnmodifiableView Collection<Currency> getAllCurrencies() {
         return Collections.unmodifiableCollection(currenciesByCode.values());
     }
 
@@ -201,6 +202,7 @@ public final class CurrencyRegistry {
             case CRYPTO -> "/icons/crypto/";
             case METAL -> "/icons/metals/";
             case INDEX -> "/icons/indices/";
+            case FIAT, FOREX -> "/icons/fiat/";
             default -> "/icons/currencies/";
         };
 

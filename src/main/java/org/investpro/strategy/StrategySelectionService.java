@@ -15,7 +15,7 @@ import java.util.concurrent.*;
 
 /**
  * Tiered strategy selection service for startup optimization.
- *
+ * <p>
  * Pipeline:
  * 1. Generate 3000 candidate strategies from catalog
  * 2. Backtest filter → top 100 by profit factor
@@ -51,6 +51,10 @@ public  class StrategySelectionService {
     private final Set<String> liveEligible = ConcurrentHashMap.newKeySet();
 
     private volatile boolean selectionInProgress = false;
+    /**
+     * -- GETTER --
+     *  Get time of last selection run.
+     */
     private volatile Instant lastSelectionTime;
     private volatile String lastSelectionStatus = "Not started";
 
@@ -102,6 +106,16 @@ public  class StrategySelectionService {
             @NotNull String strategyId,
             boolean locked,
             @Nullable String reason) {
+        return manuallyAssign(symbol, timeframe, strategyId, locked, reason, 0.0);
+    }
+
+    public StrategyAssignment manuallyAssign(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            boolean locked,
+            @Nullable String reason,
+            double scoreAtAssignment) {
         StrategyAssignment assignment = StrategyAssignment.builder()
                 .symbol(symbol)
                 .timeframe(timeframe)
@@ -110,6 +124,7 @@ public  class StrategySelectionService {
                 .assignedBy(StrategyAssignment.AssignedBy.USER)
                 .active(true)
                 .locked(locked)
+                .scoreAtAssignment(Double.isFinite(scoreAtAssignment) ? scoreAtAssignment : 0.0)
                 .reason(reason == null || reason.isBlank() ? "Manual strategy assignment" : reason)
                 .build();
         StrategyAssignmentRepository.getInstance().save(assignment);
@@ -139,7 +154,7 @@ public  class StrategySelectionService {
 
     /**
      * Start the tiered selection process asynchronously.
-     *
+     * <p>
      * Returns immediately; selection happens in background.
      * Monitor progress with getSelectionStatus().
      */
@@ -409,21 +424,6 @@ public  class StrategySelectionService {
         }
 
         return lastSelectionStatus != null ? lastSelectionStatus : "Not started";
-    }
-
-    /**
-     * Check if selection is in progress.
-     */
-    public boolean isSelectionInProgress() {
-        return selectionInProgress;
-    }
-
-    /**
-     * Get time of last selection run.
-     */
-    @Nullable
-    public Instant getLastSelectionTime() {
-        return lastSelectionTime;
     }
 
     /**

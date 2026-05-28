@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Central notification service for InvestPro / TradeAdviser.
+ * Central notification service for InvestPro / investpro.
  *
  * Converts important agent/runtime events into user-facing notifications.
  *

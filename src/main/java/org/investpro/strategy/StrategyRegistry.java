@@ -57,7 +57,7 @@ public final class StrategyRegistry {
     /**
      * Fallback strategy if nothing else can be resolved.
      */
-    private final UnifiedStrategy defaultStrategy = new UnifiedStrategy("Trend Following");
+    private final UnifiedStrategy defaultStrategy = new UnifiedStrategy(StrategyCatalog.defaultStrategyName());
 
     public StrategyRegistry() {
         registerBuiltInStrategies();

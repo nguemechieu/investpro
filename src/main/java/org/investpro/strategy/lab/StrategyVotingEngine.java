@@ -154,14 +154,12 @@ public class StrategyVotingEngine {
         // Determine consensus side
         Side consensusSide = Side.HOLD;
         double consensusConfidence = 0.5;
-        double consensusScore = 0.0;
         boolean consensusReached = false;
         String reason = "";
 
         // Find strongest side
         if (buyScore > sellScore && buyScore > holdScore) {
             consensusSide = Side.BUY;
-            consensusScore = buyScore;
             consensusConfidence = buyVotes > 0 ? buyScore / buyVotes : 0.5;
 
             // Check for minimum margin
@@ -174,7 +172,6 @@ public class StrategyVotingEngine {
             }
         } else if (sellScore > buyScore && sellScore > holdScore) {
             consensusSide = Side.SELL;
-            consensusScore = sellScore;
             consensusConfidence = sellVotes > 0 ? sellScore / sellVotes : 0.5;
 
             double margin = (sellScore - Math.max(buyScore, holdScore)) / Math.max(sellScore, 1.0);
@@ -187,7 +184,6 @@ public class StrategyVotingEngine {
         } else {
             consensusSide = Side.HOLD;
             consensusConfidence = 0.5;
-            consensusScore = holdScore;
             reason = String.format(
                     "HOLD (no clear consensus: BUY=%d/%.1f, SELL=%d/%.1f, HOLD=%d/%.1f)",
                     buyVotes, buyScore,

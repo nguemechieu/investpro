@@ -903,7 +903,7 @@ public class BinanceUs extends Exchange {
 
                 // Validate symbol before building URL
                 String symbol = binanceSymbol(tradePair);
-                if (symbol == null || symbol.isBlank()) {
+                if (symbol.isBlank()) {
                     throw new IllegalArgumentException("Failed to generate valid Binance symbol for " + tradePair);
                 }
 
@@ -920,7 +920,7 @@ public class BinanceUs extends Exchange {
                 }
 
                 String url = BINANCE_US_REST_URL + "/api/v3/trades?" + query;
-                if (url == null || url.isBlank()) {
+                if (url.isBlank()) {
                     throw new IllegalArgumentException("Failed to construct valid URL: " + url);
                 }
 
@@ -1834,7 +1834,7 @@ public class BinanceUs extends Exchange {
 
                 // Validate symbol before building URL
                 String symbol = binanceSymbol(tradePair);
-                if (symbol == null || symbol.isBlank()) {
+                if (symbol.isBlank()) {
                     throw new IllegalArgumentException("Failed to generate valid Binance symbol for " + tradePair);
                 }
 
@@ -1849,7 +1849,7 @@ public class BinanceUs extends Exchange {
                 }
 
                 String url = BINANCE_US_REST_URL + "/api/v3/depth?" + query;
-                if (url == null || url.isBlank()) {
+                if (url.isBlank()) {
                     throw new IllegalArgumentException("Failed to construct valid URL: " + url);
                 }
 
@@ -2454,7 +2454,6 @@ public class BinanceUs extends Exchange {
         }
 
         long delayMs = INITIAL_RETRY_DELAY_MS;
-        Exception lastException = null;
 
         for (int attempt = 0; true; attempt++) {
             try {
@@ -2490,7 +2489,6 @@ public class BinanceUs extends Exchange {
 
                 return response;
             } catch (java.nio.channels.UnresolvedAddressException e) {
-                lastException = e;
                 logger.error("DNS resolution failed for URI: {}. Attempt {}/{}: {}",
                         request.uri(), attempt + 1, MAX_RETRIES + 1, e.getMessage());
 
@@ -2508,7 +2506,6 @@ public class BinanceUs extends Exchange {
                             e);
                 }
             } catch (java.io.IOException e) {
-                lastException = e;
 
                 // Only retry on connection-level errors
                 if (attempt < MAX_RETRIES) {

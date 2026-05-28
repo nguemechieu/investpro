@@ -1,13 +1,18 @@
 package org.investpro.exchange.infrastructure;
 
 import org.investpro.models.trading.TradePair;
+import org.investpro.models.trading.Trade;
 import org.investpro.exchange.Exchange;
 import org.investpro.exchange.Coinbase;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -37,7 +42,9 @@ public class PollingExchangeStreamer {
     private final Map<TradePair, ScheduledFuture<?>> orderBookTasks = new ConcurrentHashMap<>();
     private ScheduledFuture<?> accountTask;
     private ScheduledFuture<?> ordersTask;
+    private ScheduledFuture<?> fillsTask;
     private ScheduledFuture<?> positionsTask;
+    private final Set<String> seenFillKeys = ConcurrentHashMap.newKeySet();
 
     public PollingExchangeStreamer(Exchange exchange) {
         this.exchange = Objects.requireNonNull(exchange, "exchange must not be null");
@@ -166,6 +173,59 @@ public class PollingExchangeStreamer {
         }, DEFAULT_PRIVATE_PERIOD_SECONDS);
     }
 
+    public void streamFills(Set<TradePair> tradePairs, ExchangeStreamConsumer consumer) {
+        if (fillsTask != null && !fillsTask.isCancelled()) {
+            return;
+        }
+
+        Set<TradePair> pairs = tradePairs == null ? Set.of() : new HashSet<>(tradePairs);
+        if (pairs.isEmpty()) {
+            return;
+        }
+
+        fillsTask = scheduleAtFixedRate(() -> {
+            for (TradePair pair : pairs) {
+                if (pair == null) {
+                    continue;
+                }
+
+                try {
+                    exchange.fetchAccountTrades(pair)
+                            .thenAccept(trades -> publishNewFills(pair, trades, consumer))
+                            .exceptionally(throwable -> {
+                                consumer.onError(exchange.getName(), unwrap(throwable));
+                                return null;
+                            });
+                } catch (Exception exception) {
+                    consumer.onError(exchange.getName(), exception);
+                }
+            }
+        }, DEFAULT_PRIVATE_PERIOD_SECONDS);
+    }
+
+    public void streamFills(ExchangeStreamConsumer consumer) {
+        streamFills(Set.of(), consumer);
+    }
+
+    private void publishNewFills(TradePair pair, List<Trade> trades, ExchangeStreamConsumer consumer) {
+        if (trades == null || trades.isEmpty()) {
+            return;
+        }
+
+        trades.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(trade -> {
+                    Instant timestamp = trade.getTimestamp();
+                    return timestamp == null ? Instant.EPOCH : timestamp;
+                }))
+                .forEach(trade -> {
+                    String key = fillKey(pair, trade);
+                    if (seenFillKeys.add(key)) {
+                        consumer.onFill(exchange.getName(), pair, trade);
+                    }
+                });
+    }
+
     public void streamPositions(ExchangeStreamConsumer consumer) {
         if (positionsTask != null && !positionsTask.isCancelled()) {
             return;
@@ -205,6 +265,12 @@ public class PollingExchangeStreamer {
         ordersTask = null;
     }
 
+    public void stopFills() {
+        cancel(fillsTask);
+        fillsTask = null;
+        seenFillKeys.clear();
+    }
+
     public void stopPositions() {
         cancel(positionsTask);
         positionsTask = null;
@@ -219,6 +285,7 @@ public class PollingExchangeStreamer {
         orderBookCycles.clear();
         stopAccount();
         stopOrders();
+        stopFills();
         stopPositions();
     }
 
@@ -241,5 +308,15 @@ public class PollingExchangeStreamer {
 
     private Throwable unwrap(@NotNull Throwable throwable) {
         return throwable.getCause() == null ? throwable : throwable.getCause();
+    }
+
+    private String fillKey(TradePair pair, Trade trade) {
+        return "%s::%d::%s::%.12f::%.12f::%s".formatted(
+                pair == null ? "unknown" : pair.toString('/'),
+                trade.getLocalTradeId(),
+                trade.getTimestamp(),
+                trade.getPrice(),
+                trade.getAmount(),
+                trade.getTransactionType());
     }
 }

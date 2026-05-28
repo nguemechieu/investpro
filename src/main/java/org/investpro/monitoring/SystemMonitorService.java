@@ -1,5 +1,8 @@
 package org.investpro.monitoring;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.investpro.core.SystemCore;
@@ -11,7 +14,7 @@ import java.util.*;
  * System Monitor Service: The control tower for monitoring all trading
  * subsystems.
  * Uses only public APIs from SystemCore to determine health status.
- *
+ * <p>
  * Subsystems monitored:
  * 1. Exchange - accessibility via public diagnostics
  * 2. Market Data - subscription status via getSubscriptionSummary()
@@ -24,9 +27,8 @@ import java.util.*;
  * 9. Notifications - status via getSystemDiagnostics()
  */
 @Slf4j
-public class SystemMonitorService {
-    private final SystemCore systemCore;
 
+public record SystemMonitorService(SystemCore systemCore) {
     public SystemMonitorService(@NotNull SystemCore systemCore) {
         this.systemCore = Objects.requireNonNull(systemCore, "systemCore cannot be null");
         log.info("SystemMonitorService initialized - monitoring via public API only");

@@ -10,6 +10,7 @@ import java.util.*;
 
 public final class StrategyCatalog {
 
+    public static final String DEFAULT_STRATEGY_NAME = "Trend Following";
 
 
     public static final List<String> CORE_STRATEGY_NAMES = List.of(
@@ -633,10 +634,14 @@ public final class StrategyCatalog {
 
     public static String normalizeStrategyName(String strategyName) {
         String label = strategyName == null || strategyName.isBlank()
-                ? "Trend Following"
+                ? DEFAULT_STRATEGY_NAME
                 : strategyName.trim();
 
         return STRATEGY_ALIASES.getOrDefault(label.toUpperCase(), label);
+    }
+
+    public static @NotNull String defaultStrategyName() {
+        return DEFAULT_STRATEGY_NAME;
     }
 
     public static StrategyDefinition definition(String strategyName) {
@@ -700,6 +705,9 @@ public final class StrategyCatalog {
     public static @NotNull List<String> availableStrategyNames() {
         LinkedHashSet<String> names = new LinkedHashSet<>(STRATEGY_DEFINITIONS.keySet());
         names.addAll(providerStrategyNames());
+        if (names.isEmpty()) {
+            names.add(DEFAULT_STRATEGY_NAME);
+        }
         return new ArrayList<>(names);
     }
 

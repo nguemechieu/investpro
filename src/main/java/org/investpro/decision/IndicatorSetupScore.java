@@ -33,4 +33,16 @@ public record IndicatorSetupScore(
     public boolean isPoorFit() {
         return finalFitnessScore < 0.50;
     }
+
+    /**
+     * Creates a neutral indicator score with only the final fitness score set.
+     * Used by {@link BotTradeDecisionAssembler} when bridging from the institutional pipeline.
+     */
+    public static IndicatorSetupScore of(double finalFitnessScore) {
+        return new IndicatorSetupScore(
+                IndicatorSetupType.MOMENTUM,
+                finalFitnessScore, finalFitnessScore, finalFitnessScore,
+                finalFitnessScore, finalFitnessScore,
+                "Derived from pipeline score", null, Instant.now());
+    }
 }

@@ -37,6 +37,7 @@ import java.util.function.Consumer;
 @Setter
 @Slf4j
 public class OandaWebSocketClient extends ExchangeWebSocketClient {
+    @SuppressWarnings("unused")
     private static final String HEARTBEATS_CHANNEL ="" ;
     private static final @NotNull String MARKET_TRADES_CHANNEL ="" ;
     protected final Map<TradePair, ExchangeStreamConsumer> liveTradeConsumers =
@@ -204,6 +205,7 @@ public class OandaWebSocketClient extends ExchangeWebSocketClient {
 //        }
     }
 
+    @SuppressWarnings("unused")
     private OandaWebSocketClient.OandaStream parseOandaStream(String streamKey) {
         
         return  null;

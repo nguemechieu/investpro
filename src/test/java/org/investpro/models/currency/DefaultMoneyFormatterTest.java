@@ -23,6 +23,7 @@ class DefaultMoneyFormatterTest {
     private MockCurrency usd;
     private MockCurrency btc;
     private MockCurrency eur;
+    @SuppressWarnings("unused")
     private MockCurrency aud;
 
     @BeforeEach
@@ -476,6 +477,23 @@ class DefaultMoneyFormatterTest {
         String result = formatter.format(money);
 
         assertTrue(result.contains("$"), "Should contain USD symbol");
+    }
+
+    @Test
+    void testCurrencySymbolWithDecimalPointIsLiteral() throws Exception {
+        Currency swissFranc = new MockCurrency("CHF", "Swiss Franc", CurrencyType.FIAT, 2, "Fr.");
+        DefaultMoneyFormatter formatter = new DefaultMoneyFormatter.Builder()
+                .withCurrencySymbol(CurrencyPosition.BEFORE_AMOUNT)
+                .useDigitGroupingSeparator(false)
+                .useASpaceBetweenCurrencyAndAmount(false)
+                .forceDecimalPoint(WholeNumberFractionalDigitAmount.MAX)
+                .displayAtLeastAllFractionalDigits(true)
+                .build();
+
+        String result = formatter.format(new DefaultMoney(new BigDecimal("12.34"), swissFranc));
+
+        assertTrue(result.startsWith("Fr."), "Currency symbol should be emitted as a literal prefix");
+        assertTrue(result.contains("12.34"), "Amount should still be formatted with one decimal separator");
     }
 
     /**

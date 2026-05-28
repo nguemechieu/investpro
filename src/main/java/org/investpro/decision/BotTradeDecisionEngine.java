@@ -1,5 +1,6 @@
 package org.investpro.decision;
 
+import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.Account;
 import org.investpro.models.trading.TradePair;
@@ -8,16 +9,16 @@ import org.investpro.strategy.StrategyCatalog;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
 /**
  * Institutional-grade pre-trade decision engine.
- * 
+ * <p>
  * Converts every signal into a rigorous BotTradeDecision through:
  * 1. Signal strength validation (0.3-1.0 range)
  * 2. Ticker data validation (bid/ask/last consistency)
@@ -33,6 +34,7 @@ import java.util.*;
  * 12. Conservative skip-if-uncertain approach
  */
 @Slf4j
+@Builder
 public class BotTradeDecisionEngine {
 
     // === Configuration Thresholds ===
@@ -56,7 +58,7 @@ public class BotTradeDecisionEngine {
 
     /**
      * Main entry point: evaluate a signal and generate institutional decision.
-     * 
+     * <p>
      * Requirement: "If uncertain, skip the trade"
      * → Every validation failure results in either a blocker or warning
      */
@@ -142,7 +144,6 @@ public class BotTradeDecisionEngine {
                         indicatorSetupScore.setupType().description,
                         indicatorSetupScore.finalFitnessScore()));
             } else {
-                setupSource = SetupSource.NONE;
                 blockers.add(String.format(
                         "No setup reached minimum fitness (strategy: %.2f, indicator: %.2f vs threshold: %.2f)",
                         bestStrategyScore.finalFitnessScore(),
@@ -155,7 +156,7 @@ public class BotTradeDecisionEngine {
 
         // === REQUIREMENT 7 & 8: Generate TradePlan with entry/stops/sizing ===
         TradePlan tradePlan = generateTradePlan(tradePair, side, ticker, assetType);
-        if (tradePlan == null || !tradePlan.isValid()) {
+        if (!tradePlan.isValid()) {
             blockers.add("Failed to generate valid trade plan");
             return createSkipDecision(tradePair, side, blockers, reasons, warnings,
                     regime, assetType, bestStrategyScore, indicatorSetupScore, decidedAt);
@@ -214,7 +215,7 @@ public class BotTradeDecisionEngine {
 
         return new BotTradeDecision(
                 tradePair, side, regime, assetType, setupSource, selectedStrategyName,
-                indicatorSetupScore != null ? indicatorSetupScore.setupType() : null,
+                indicatorSetupScore != null ? indicatorSetupScore.setupType().name(): null,
                 bestStrategyScore, indicatorSetupScore, costEstimate, expectation,
                 createHoldingPeriodEstimate(regime, assetType),
                 finalAction, reasons, warnings, blockers, fullAnalysisSummary, decidedAt);
@@ -312,8 +313,6 @@ public class BotTradeDecisionEngine {
     @NotNull
     private AssetMarketType detectAssetMarketTypeImproved(@NotNull TradePair tradePair) {
         String symbol = tradePair.getSymbol().toUpperCase();
-        String baseCode = tradePair.getBaseCode();
-        String counterCode = tradePair.getCounterCode();
 
         // Step 1: Check currency types (CryptoCurrency vs FiatCurrency)
         var baseCurrency = tradePair.getKey();
@@ -431,7 +430,7 @@ public class BotTradeDecisionEngine {
                         regimeFit, assetFit, timeframeFit, recentPerf, signalStrength,
                         avgScore,
                         "Scored against market regime and asset type",
-                        null, Instant.now());
+                        tradePair.toString('/')+bestScore.warningMessage(), Instant.now());
             }
         }
 
@@ -476,15 +475,13 @@ public class BotTradeDecisionEngine {
     /**
      * REQUIREMENT 7 & 8: Generate TradePlan with entry, stops, position sizing
      */
-    @Nullable
-    private TradePlan generateTradePlan(
+    private @NonNull TradePlan generateTradePlan(
             @NotNull TradePair tradePair,
             @NotNull Side side,
             @NotNull Ticker ticker,
             @NotNull AssetMarketType assetType) {
 
         BigDecimal entryPrice = BigDecimal.valueOf(side == Side.BUY ? ticker.getAskPrice() : ticker.getBidPrice());
-        BigDecimal mid = BigDecimal.valueOf((ticker.getBidPrice() + ticker.getAskPrice()) / 2.0);
 
         // Calculate stop loss (1% below entry for buys, 1% above for sells)
         BigDecimal stopLoss = side == Side.BUY
@@ -702,7 +699,7 @@ public class BotTradeDecisionEngine {
     }
 
     /**
-     * Create a SKIP decision with comprehensive blockers
+     * Create  SKIP decision with comprehensive blockers
      */
     @NotNull
     private BotTradeDecision createSkipDecision(
@@ -741,7 +738,7 @@ public class BotTradeDecisionEngine {
 
         return new BotTradeDecision(
                 tradePair, side, regime, assetType, SetupSource.NONE, null,
-                indicatorScore != null ? indicatorScore.setupType() : null,
+                indicatorScore != null ? indicatorScore.setupType().name() : null,
                 bestStrategy, indicatorScore, defaultCost, defaultExpectation, defaultHolding,
                 BotTradeDecision.FinalAction.SKIP, reasons, warnings, blockers, summary, decidedAt);
     }

@@ -63,14 +63,6 @@ public class UserStrategyAdapter implements TradingStrategy {
             StrategySignal signal = userStrategy.generateSignal(context);
 
             // Safety: if user returns null, use HOLD
-            if (signal == null) {
-                log.warn("User strategy {} returned null signal, using HOLD", getId());
-                return StrategySignal.hold(
-                        context.getSymbol() != null ? context.getSymbol().toString() : "UNKNOWN",
-                        context.getTimeframe() != null ? context.getTimeframe().toString() : "UNKNOWN",
-                        String.valueOf(getId()),
-                        "User strategy returned null signal");
-            }
 
             // Normalize the signal
             StrategySignal normalized = signal.normalized();

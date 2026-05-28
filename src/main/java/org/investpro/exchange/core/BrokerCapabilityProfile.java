@@ -1,5 +1,7 @@
 package org.investpro.exchange.core;
 
+import lombok.Getter;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -10,7 +12,9 @@ import java.util.Set;
  * Used for capability-based routing and UI presentation.
  */
 public class BrokerCapabilityProfile {
+    @Getter
     private final String brokerId;
+    @Getter
     private final BrokerVenue venue;
     private final Set<BrokerCapability> capabilities;
     
@@ -60,18 +64,14 @@ public class BrokerCapabilityProfile {
             case STOCK_SPOT -> supports(BrokerCapability.STOCKS);
             case STOCK_FUTURE -> supports(BrokerCapability.STOCKS) && 
                                 supports(BrokerCapability.FUTURES);
-            case STOCK_PERPETUAL -> supports(BrokerCapability.PERPETUALS) && 
+            case STOCK_PERPETUAL, INDEX_PERPETUAL -> supports(BrokerCapability.PERPETUALS) &&
                                    supports(BrokerCapability.INDEX_DERIVATIVES);
-            case STOCK_CFD -> supports(BrokerCapability.CFD) && 
+            case STOCK_CFD, INDEX_CFD -> supports(BrokerCapability.CFD) &&
                              supports(BrokerCapability.INDEX_DERIVATIVES);
             
             case INDEX_FUTURE -> supports(BrokerCapability.FUTURES) && 
                                 supports(BrokerCapability.INDEX_DERIVATIVES);
-            case INDEX_PERPETUAL -> supports(BrokerCapability.PERPETUALS) && 
-                                   supports(BrokerCapability.INDEX_DERIVATIVES);
-            case INDEX_CFD -> supports(BrokerCapability.CFD) && 
-                             supports(BrokerCapability.INDEX_DERIVATIVES);
-            
+
             case FOREX_SPOT -> supports(BrokerCapability.FOREX);
             case FOREX_SPOT_MARGIN -> supports(BrokerCapability.FOREX) && 
                                       supports(BrokerCapability.MARGIN);
@@ -100,15 +100,7 @@ public class BrokerCapabilityProfile {
     public Set<BrokerCapability> getCapabilities() {
         return Collections.unmodifiableSet(capabilities);
     }
-    
-    public String getBrokerId() {
-        return brokerId;
-    }
-    
-    public BrokerVenue getVenue() {
-        return venue;
-    }
-    
+
     @Override
     public String toString() {
         return "BrokerCapabilityProfile{" +

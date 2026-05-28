@@ -728,6 +728,16 @@ public class Coinbase extends Exchange {
         return !isPaperTrading() && (jwtSigner != null || !bearerToken().isBlank());
     }
 
+    @Override
+    public boolean canSubmitLiveOrders() {
+        return !isPaperTrading() && hasPrivateEndpointAuth();
+    }
+
+    @Override
+    public boolean canSubmitOrders() {
+        return isPaperTrading() || canSubmitLiveOrders();
+    }
+
     private @NotNull String buildCredentialErrorMessage() {
         boolean keyFormatOk = apiKey != null && apiKey.contains("organizations/") && apiKey.contains("/apiKeys/");
         boolean secretFormatOk = apiSecret != null && apiSecret.contains("BEGIN") && apiSecret.contains("PRIVATE KEY");
@@ -1390,9 +1400,15 @@ public class Coinbase extends Exchange {
         boolean productTypeSupported = productType.contains("SPOT") || productType.contains("FUTURE")
                 || productType.contains("PERPETUAL") || productType.contains("DERIVATIVE");
 
-        BigDecimal baseMinSize = safeDecimal(product.path("base_min_size").asText("0"));
-        BigDecimal quoteMinSize = safeDecimal(product.path("quote_min_size").asText("0"));
-        boolean minSizeValid = baseMinSize.signum() > 0 && quoteMinSize.signum() > 0;
+        BigDecimal baseMinSize = firstPositiveDecimal(product,
+                "base_min_size",
+                "base_increment",
+                "base_min_market_funds");
+        BigDecimal quoteMinSize = firstPositiveDecimal(product,
+                "quote_min_size",
+                "quote_increment",
+                "quote_min_market_funds");
+        boolean minSizeValid = baseMinSize.signum() > 0 || quoteMinSize.signum() > 0;
 
         TradabilityStatus status;
         String reason;
@@ -1483,6 +1499,19 @@ public class Coinbase extends Exchange {
         } catch (Exception ignored) {
             return BigDecimal.ZERO;
         }
+    }
+
+    private BigDecimal firstPositiveDecimal(JsonNode node, String... fieldNames) {
+        if (node == null || fieldNames == null) {
+            return BigDecimal.ZERO;
+        }
+        for (String fieldName : fieldNames) {
+            BigDecimal value = safeDecimal(node.path(fieldName).asText("0"));
+            if (value.signum() > 0) {
+                return value;
+            }
+        }
+        return BigDecimal.ZERO;
     }
 
     @Override
@@ -3248,7 +3277,7 @@ public class Coinbase extends Exchange {
         }
 
         if (subscription.isFills()) {
-            streamFills(consumer);
+            pollingStreamer.streamFills(subscription.getTradePairs(), consumer);
         }
 
         if (subscription.isPositions()) {
@@ -3378,7 +3407,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public void streamFills(ExchangeStreamConsumer consumer) {
-        pollingStreamer.streamOrders(consumer);
+        log.debug("Coinbase streamFills requires subscription trade pairs; use stream(subscription, consumer).");
     }
 
     @Override
@@ -3425,7 +3454,7 @@ public class Coinbase extends Exchange {
 
     @Override
     public void stopFillsStream() {
-        pollingStreamer.stopOrders();
+        pollingStreamer.stopFills();
     }
 
     @Override
@@ -3572,6 +3601,7 @@ public class Coinbase extends Exchange {
         }
     }
 
+    @SuppressWarnings("unused")
     private List<OpenOrder> parseOpenOrders(String jsonResponse) {
         List<OpenOrder> orders = new ArrayList<>();
         try {

@@ -83,4 +83,8 @@ public class StrategyContext {
     public boolean isHighVolume() {
         return averageVolume > 1000000; // Adjust threshold
     }
+
+    public CandleData getCurrentCandle() {
+        return getLatestCandle();
+    }
 }

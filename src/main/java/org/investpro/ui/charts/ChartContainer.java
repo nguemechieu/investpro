@@ -15,7 +15,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.SystemCore;
 import org.investpro.data.CandleData;
@@ -38,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -57,10 +57,7 @@ public class ChartContainer extends Region {
     private final ChartToolbar toolbar;
 
     private CandleStickChart candleStickChart;
-    @Setter
     private Consumer<String> onChartError;
-    @Setter
-    private Runnable onAutoTradeAction;
     private Consumer<CandleData> candleSelectionCallback;
 
     public ChartContainer(Exchange exchange, TradePair tradePair, String telegramToken) {
@@ -92,7 +89,10 @@ public class ChartContainer extends Region {
                 """);
 
         CandleDataSupplier initialSupplier = exchange.getCandleDataSupplier(secondsPerCandle.get(), tradePair);
-        toolbar = new ChartToolbar(widthProperty(), heightProperty(), initialSupplier.getSupportedGranularities());
+        Set<Integer> granularities = (initialSupplier != null)
+                ? initialSupplier.getSupportedGranularities()
+                : Set.of(60, 300, 900, 3600, 14400, 86400);  // sensible defaults when exchange has no candle data
+        toolbar = new ChartToolbar(widthProperty(), heightProperty(), granularities);
 
         VBox toolbarContainer = getVBox();
         AnchorPane.setTopAnchor(toolbarContainer, 0.0);
@@ -124,14 +124,7 @@ public class ChartContainer extends Region {
         HBox actionBar = new HBox(6);
         actionBar.setAlignment(Pos.CENTER_RIGHT);
         actionBar.getChildren().setAll(
-                chartActionButton("Refresh", "/img/refresh-solid.png", () -> withChart(CandleStickChart::refreshChart)),
-                chartActionButton("Auto Trade", "/img/auto-trade-solid.png", () -> {
-                    if (onAutoTradeAction != null) {
-                        onAutoTradeAction.run();
-                    } else {
-                        withChart(CandleStickChart::autoTrade);
-                    }
-                }));
+                chartActionButton("Refresh", "/img/refresh-solid.png", () -> withChart(CandleStickChart::refreshChart)));
 
         HBox header = new HBox(10, toolbar, actionBar);
         header.setAlignment(Pos.CENTER_LEFT);
@@ -219,17 +212,15 @@ public class ChartContainer extends Region {
         return secondsPerCandle;
     }
 
-    public void runAutoTradeAction() {
-        if (onAutoTradeAction != null) {
-            onAutoTradeAction.run();
-        }
-    }
-
     public void setCandleSelectionCallback(Consumer<CandleData> callback) {
         this.candleSelectionCallback = callback;
         if (candleStickChart != null) {
             candleStickChart.setCandleSelectionCallback(callback);
         }
+    }
+
+    public void setOnChartError(Consumer<String> onChartError) {
+        this.onChartError = onChartError;
     }
 
     public void dispose() {
@@ -256,6 +247,11 @@ public class ChartContainer extends Region {
 
     private CandleStickChart createChart(int durationSeconds) {
         CandleDataSupplier supplier = exchange.getCandleDataSupplier(durationSeconds, tradePair);
+        if (supplier == null) {
+            throw new IllegalStateException(
+                    "Exchange '%s' does not support candle data for %s"
+                            .formatted(exchange.getName(), tradePair));
+        }
         CandleStickChart chart = new CandleStickChart(
                 exchange,
                 supplier,

@@ -51,6 +51,10 @@ public class StrategyLabService {
      */
     private final Map<String, StrategyConsensusResult> consensusCache = new ConcurrentHashMap<>();
 
+    private static final int DEFAULT_ASSIGNMENT_CANDIDATE_LIMIT = 64;
+    private static final int DEFAULT_ASSIGNMENT_TIMEOUT_SECONDS = 90;
+    private static final int DEFAULT_MAX_TRADES_PER_ASSIGNMENT_BACKTEST = 250;
+
     public StrategyLabService() {
         this.backtestRunner = new StrategyBacktestRunner();
         this.rankingEngine = new StrategyRankingEngine();
@@ -148,7 +152,7 @@ public class StrategyLabService {
         }
 
         // Launch all timeframe evaluations CONCURRENTLY — no serial blocking.
-        List<CompletableFuture<StrategyAssignment>> timeframeFutures = new ArrayList<>();
+        List<CompletableFuture<TimeframeEvaluation>> timeframeFutures = new ArrayList<>();
         for (Map.Entry<Timeframe, List<CandleData>> entry : candlesByTimeframe.entrySet()) {
             Timeframe timeframe = entry.getKey();
             List<CandleData> candles = sanitizeCandles(entry.getValue());
@@ -158,11 +162,11 @@ public class StrategyLabService {
                 continue;
             }
             // evaluateAndAssignBest already returns a CompletableFuture — compose, don't block
-            CompletableFuture<StrategyAssignment> tf = evaluateAndAssignBest(symbol, timeframe, candles, strategyNames)
+            CompletableFuture<TimeframeEvaluation> tf = evaluateTimeframe(symbol, timeframe, candles, strategyNames)
                     .exceptionally(ex -> {
                         log.warn("Strategy evaluation failed for {}/{}: {}",
                                 symbol, timeframe.getCode(), ex.getMessage());
-                        return null;
+                        return TimeframeEvaluation.empty(symbol, timeframe, candles);
                     });
             timeframeFutures.add(tf);
         }
@@ -172,28 +176,38 @@ public class StrategyLabService {
             return CompletableFuture.completedFuture(null);
         }
 
-        // Wait for all timeframes, then pick the best assignment by score.
+        // Wait for all timeframes, then assign only the best-scoring timeframe.
         return CompletableFuture.allOf(timeframeFutures.toArray(new CompletableFuture[0]))
                 .thenApply(ignored -> {
-                    StrategyAssignment bestAssignment = null;
-                    for (CompletableFuture<StrategyAssignment> f : timeframeFutures) {
-                        StrategyAssignment assignment = f.getNow(null);
-                        if (assignment != null
-                                && (bestAssignment == null
-                                || assignment.getScoreAtAssignment() > bestAssignment.getScoreAtAssignment())) {
-                            bestAssignment = assignment;
+                    TimeframeEvaluation bestEvaluation = null;
+                    for (CompletableFuture<TimeframeEvaluation> f : timeframeFutures) {
+                        TimeframeEvaluation evaluation = f.getNow(null);
+                        if (evaluation != null
+                                && evaluation.selected() != null
+                                && (bestEvaluation == null
+                                || evaluation.selected().getScore() > bestEvaluation.selected().getScore())) {
+                            bestEvaluation = evaluation;
                         }
                     }
-                    if (bestAssignment == null) {
-                        log.warn("No strategy assignment created for {} after all timeframe backtests", symbol);
-                    } else {
-                        log.info("Best symbol-level assignment for {}: {} {} score={}",
+                    if (bestEvaluation == null) {
+                        log.warn("No scored timeframe winner for {}; assigning fallback on first eligible timeframe", symbol);
+                        TimeframeEvaluation fallbackTarget = timeframeFutures.stream()
+                                .map(future -> future.getNow(null))
+                                .filter(Objects::nonNull)
+                                .findFirst()
+                                .orElse(null);
+                        return fallbackTarget == null ? null : assignFallbackStrategy(
                                 symbol,
-                                bestAssignment.getStrategyId(),
-                                bestAssignment.getTimeframe().getCode(),
-                                bestAssignment.getScoreAtAssignment());
+                                fallbackTarget.timeframe(),
+                                "No timeframe produced a scored strategy candidate");
                     }
-                    return bestAssignment;
+                    StrategyAssignment assignment = assignFromEvaluation(bestEvaluation, true);
+                    log.info("Best timeframe selected for {} assignment: {} strategy={} score={}",
+                            symbol,
+                            bestEvaluation.timeframe().getCode(),
+                            bestEvaluation.selected().getStrategyName(),
+                            bestEvaluation.selected().getScore());
+                    return assignment;
                 });
     }
 
@@ -205,111 +219,81 @@ public class StrategyLabService {
             @NotNull Timeframe timeframe,
             @NotNull List<CandleData> candles,
             @NotNull List<String> strategyNames) {
-        return CompletableFuture.supplyAsync(() -> {
-            List<CandleData> cleanCandles = sanitizeCandles(candles);
-            if (cleanCandles.size() < 50) {
-                log.warn("Cannot evaluate strategies for {}/{}: only {} candles available",
-                        symbol, timeframe.getCode(), cleanCandles.size());
-                return null;
+        return evaluateTimeframe(symbol, timeframe, candles, strategyNames)
+                .thenApply(evaluation -> assignFromEvaluation(evaluation, true));
+    }
+
+    private CompletableFuture<TimeframeEvaluation> evaluateTimeframe(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull List<CandleData> candles,
+            @NotNull List<String> strategyNames) {
+        List<CandleData> cleanCandles = sanitizeCandles(candles);
+        if (cleanCandles.size() < 50) {
+            log.warn("Cannot evaluate strategies for {}/{}: only {} candles available",
+                    symbol, timeframe.getCode(), cleanCandles.size());
+            return CompletableFuture.completedFuture(TimeframeEvaluation.empty(symbol, timeframe, cleanCandles));
+        }
+
+        List<String> candidates = assignmentCandidates(strategyNames);
+        if (candidates.isEmpty()) {
+            log.warn("Cannot evaluate strategies for {}/{}: no candidates available", symbol, timeframe.getCode());
+            return CompletableFuture.completedFuture(TimeframeEvaluation.empty(symbol, timeframe, cleanCandles));
+        }
+        log.info("Evaluating {} strategy candidate(s) for {}/{} assignment using {} candles",
+                candidates.size(), symbol, timeframe.getCode(), cleanCandles.size());
+
+        BacktestScheduler scheduler = BacktestScheduler.getInstance();
+        List<CompletableFuture<StrategyPerformanceReport>> futures = new ArrayList<>(candidates.size());
+        int maxTrades = AppConfig.getInt(
+                "strategy.lab.assignment.maxTradesPerBacktest",
+                DEFAULT_MAX_TRADES_PER_ASSIGNMENT_BACKTEST);
+        int timeoutSeconds = AppConfig.getInt(
+                "strategy.lab.assignment.timeoutSeconds",
+                DEFAULT_ASSIGNMENT_TIMEOUT_SECONDS);
+
+        for (String strategyName : candidates) {
+            try {
+                StrategyBacktestRequest request = StrategyBacktestRequest.builder()
+                        .symbol(symbol)
+                        .timeframe(timeframe)
+                        .strategyName(strategyName)
+                        .candles(cleanCandles)
+                        .initialCapital(10000.0)
+                        .commissionRate(0.001)
+                        .slippageRate(0.0002)
+                        .maxTrades(maxTrades)
+                        .allowShorts(true)
+                        .useRiskManagement(true)
+                        .build();
+                BacktestJob job = scheduler.submit(request, BacktestJobPriority.VISIBLE);
+                futures.add(withTimeout(job, timeoutSeconds)
+                        .exceptionally(exception -> {
+                            log.debug("Backtest future error for {}/{} strategy={}: {}",
+                                    symbol, timeframe.getCode(), strategyName, exception.getMessage());
+                            return null;
+                        }));
+            } catch (Exception exception) {
+                log.debug("Strategy submission failed for {}/{} strategy={}: {}",
+                        symbol, timeframe.getCode(), strategyName, exception.getMessage());
             }
+        }
 
-            List<StrategyPerformanceReport> results = new ArrayList<>();
-            BacktestScheduler scheduler = BacktestScheduler.getInstance();
-            List<CompletableFuture<StrategyPerformanceReport>> futures = new ArrayList<>();
+        if (futures.isEmpty()) {
+            return CompletableFuture.completedFuture(TimeframeEvaluation.empty(symbol, timeframe, cleanCandles));
+        }
 
-            for (String strategyName : strategyNames) {
-                try {
-                    StrategyBacktestRequest request = StrategyBacktestRequest.builder()
-                            .symbol(symbol)
-                            .timeframe(timeframe)
-                            .strategyName(strategyName)
-                            .candles(cleanCandles)
-                            .initialCapital(10000.0)
-                            .commissionRate(0.001)
-                            .slippageRate(0.0002)
-                            .maxTrades(Integer.MAX_VALUE)
-                            .allowShorts(true)
-                            .useRiskManagement(true)
-                            .build();
-                    BacktestJob job = scheduler.submit(request, BacktestJobPriority.BACKGROUND);
-                    futures.add(job.getFuture());
-                } catch (Exception exception) {
-                    log.debug("Strategy submission failed for {}/{} strategy={}: {}",
-                            symbol, timeframe.getCode(), strategyName, exception.getMessage());
-                }
-            }
-
-            for (CompletableFuture<StrategyPerformanceReport> future : futures) {
-                try {
-                    StrategyPerformanceReport r = future.get(2, TimeUnit.MINUTES);
-                    if (r != null) {
-                        results.add(r);
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApplyAsync(ignored -> {
+                    List<StrategyPerformanceReport> results = new ArrayList<>(futures.size());
+                    for (CompletableFuture<StrategyPerformanceReport> future : futures) {
+                        StrategyPerformanceReport report = future.getNow(null);
+                        if (report != null) {
+                            results.add(report);
+                        }
                     }
-                } catch (Exception e) {
-                    log.debug("Backtest future error: {}", e.getMessage());
-                }
-            }
-
-            List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
-            String cacheKey = makeKey(symbol, timeframe);
-            rankingsCache.put(cacheKey, ranked);
-
-            StrategyContext context = buildVotingContext(symbol, timeframe, cleanCandles);
-            StrategyConsensusResult consensus = votingEngine.vote(symbol, timeframe, context, ranked, 5);
-            consensusCache.put(cacheKey, consensus);
-
-            StrategyPerformanceReport selected = selectAssignmentCandidate(ranked, consensus);
-            if (selected == null) {
-                log.warn("No assignable strategy found for {}/{}", symbol, timeframe.getCode());
-                return null;
-            }
-
-            double preferredScore = readDoubleProperty("investpro.strategy.minStrategyScore", 60.0);
-            double hardMinimumScore = readDoubleProperty("investpro.strategy.hardMinStrategyScore", 40.0);
-            if (selected.getScore() < hardMinimumScore) {
-                boolean allowResearchAssignment = AppConfig.getBoolean(
-                        "investpro.strategy.allowResearchAssignmentBelowHardMin",
-                        true);
-                if (!allowResearchAssignment || selected.getTotalTrades() <= 0) {
-                    log.warn("Best strategy for {}/{} did not meet hard minimum score: {} < {}",
-                            symbol, timeframe.getCode(), selected.getScore(), hardMinimumScore);
-                    return null;
-                }
-                log.warn("Assigning best research strategy for {}/{} below hard minimum: {} < {} strategy={}",
-                        symbol, timeframe.getCode(), selected.getScore(), hardMinimumScore, selected.getStrategyName());
-            }
-
-            boolean autoAssignBest = AppConfig.getBoolean("investpro.strategy.autoAssignBest", true);
-            if (!autoAssignBest) {
-                log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
-                        symbol, timeframe.getCode(), selected.getStrategyName(), selected.getScore());
-                return null;
-            }
-
-            String reason = "Auto-assigned from real-candle backtest";
-            if (consensus != null && consensus.isConsensusReached()
-                    && !"NONE".equalsIgnoreCase(consensus.getSelectedStrategyName())) {
-                reason = "Consensus assignment: " + consensus.getReason();
-            }
-            if (selected.getScore() < preferredScore) {
-                reason = reason + " (below preferred score %.1f; hard minimum %.1f)"
-                        .formatted(preferredScore, hardMinimumScore);
-                log.warn("Best strategy for {}/{} is below preferred score but above hard minimum: {} < {}; assigning {}",
-                        symbol, timeframe.getCode(), selected.getScore(), preferredScore, selected.getStrategyName());
-            }
-            if (selected.getScore() < hardMinimumScore) {
-                reason = "Research assignment below hard minimum: %.1f < %.1f; paper/backtest only until reviewed. %s"
-                        .formatted(selected.getScore(), hardMinimumScore, reason);
-            }
-
-            StrategyAssignment assignment = StrategySelectionService.getInstance()
-                    .autoAssign(symbol, timeframe, selected.getStrategyName(), selected.getScore(), reason);
-
-            log.info("Canonical strategy assignment created: {}/{} -> {} score={}",
-                    symbol, timeframe.getCode(), assignment == null ? "NONE" : assignment.getStrategyId(),
-                    selected.getScore());
-            return assignment;
-        }, executorService);
+                    return evaluateFromResults(symbol, timeframe, cleanCandles, results);
+                }, executorService);
     }
 
     /**
@@ -553,6 +537,180 @@ public class StrategyLabService {
         }
 
         return ranked == null || ranked.isEmpty() ? null : ranked.getFirst();
+    }
+
+    private TimeframeEvaluation evaluateFromResults(
+            String symbol,
+            Timeframe timeframe,
+            List<CandleData> cleanCandles,
+            List<StrategyPerformanceReport> results) {
+        List<StrategyPerformanceReport> ranked = rankingEngine.rank(results);
+        String cacheKey = makeKey(symbol, timeframe);
+        rankingsCache.put(cacheKey, ranked);
+
+        StrategyContext context = buildVotingContext(symbol, timeframe, cleanCandles);
+        StrategyConsensusResult consensus = votingEngine.vote(symbol, timeframe, context, ranked, 5);
+        consensusCache.put(cacheKey, consensus);
+
+        StrategyPerformanceReport selected = selectAssignmentCandidate(ranked, consensus);
+        if (selected == null) {
+            log.warn("No assignable strategy found for {}/{} after {} completed backtests",
+                    symbol, timeframe.getCode(), results.size());
+        }
+        return new TimeframeEvaluation(symbol, timeframe, cleanCandles, ranked, consensus, selected);
+    }
+
+    private StrategyAssignment assignFromEvaluation(TimeframeEvaluation evaluation, boolean allowFallback) {
+        if (evaluation == null) {
+            return null;
+        }
+        String symbol = evaluation.symbol();
+        Timeframe timeframe = evaluation.timeframe();
+        StrategyPerformanceReport selected = evaluation.selected();
+        if (selected == null) {
+            return allowFallback
+                    ? assignFallbackStrategy(symbol, timeframe, "No ranked strategy produced an assignment candidate")
+                    : null;
+        }
+        double preferredScore = readDoubleProperty("investpro.strategy.minStrategyScore", 60.0);
+        double hardMinimumScore = readDoubleProperty("investpro.strategy.hardMinStrategyScore", 40.0);
+        boolean allowResearchAssignment = AppConfig.getBoolean(
+                "investpro.strategy.allowResearchAssignmentBelowHardMin",
+                true);
+        if (selected.getScore() < hardMinimumScore && !allowResearchAssignment) {
+            log.warn("Best strategy for {}/{} did not meet hard minimum score: {} < {}; assigning fallback",
+                    symbol, timeframe.getCode(), selected.getScore(), hardMinimumScore);
+            return allowFallback
+                    ? assignFallbackStrategy(symbol, timeframe,
+                    "Best ranked strategy was below hard minimum and research assignment is disabled")
+                    : null;
+        }
+
+        boolean autoAssignBest = AppConfig.getBoolean("investpro.strategy.autoAssignBest", true);
+        if (!autoAssignBest) {
+            log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
+                    symbol, timeframe.getCode(), selected.getStrategyName(), selected.getScore());
+            return null;
+        }
+
+        String reason = "Auto-assigned from real-candle backtest";
+        StrategyConsensusResult consensus = evaluation.consensus();
+        if (consensus != null && consensus.isConsensusReached()
+                && !"NONE".equalsIgnoreCase(consensus.getSelectedStrategyName())) {
+            reason = "Consensus assignment: " + consensus.getReason();
+        }
+        if (selected.getScore() < preferredScore) {
+            reason = reason + " (below preferred score %.1f; hard minimum %.1f)"
+                    .formatted(preferredScore, hardMinimumScore);
+            log.warn("Best strategy for {}/{} is below preferred score: {} < {}; assigning {}",
+                    symbol, timeframe.getCode(), selected.getScore(), preferredScore, selected.getStrategyName());
+        }
+        if (selected.getScore() < hardMinimumScore) {
+            reason = "Research assignment below hard minimum: %.1f < %.1f; paper/backtest review recommended. %s"
+                    .formatted(selected.getScore(), hardMinimumScore, reason);
+        }
+
+        StrategyAssignment assignment = StrategySelectionService.getInstance()
+                .autoAssign(symbol, timeframe, selected.getStrategyName(), selected.getScore(), reason);
+
+        log.info("Canonical strategy assignment created: {}/{} -> {} score={} results={}",
+                symbol, timeframe.getCode(), assignment == null ? "NONE" : assignment.getStrategyId(),
+                selected.getScore(), evaluation.ranked().size());
+        return assignment;
+    }
+
+    private List<String> assignmentCandidates(List<String> strategyNames) {
+        int limit = Math.max(1, AppConfig.getInt(
+                "strategy.lab.assignment.maxStrategies",
+                DEFAULT_ASSIGNMENT_CANDIDATE_LIMIT));
+        LinkedHashSet<String> selected = new LinkedHashSet<>();
+        String defaultName = StrategyCatalog.defaultStrategyName();
+        if (defaultName != null && !defaultName.isBlank()) {
+            selected.add(defaultName);
+        }
+        if (strategyNames != null) {
+            for (String name : strategyNames) {
+                if (name == null || name.isBlank()) {
+                    continue;
+                }
+                selected.add(name.trim());
+                if (selected.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        if (selected.size() < limit) {
+            for (String name : StrategyCatalog.availableStrategyNames()) {
+                if (name == null || name.isBlank()) {
+                    continue;
+                }
+                selected.add(name.trim());
+                if (selected.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        int requested = strategyNames == null ? 0 : strategyNames.size();
+        if (requested > selected.size()) {
+            log.info("Strategy assignment evaluation limited candidates: requested={} selected={} limit={}",
+                    requested, selected.size(), limit);
+        }
+        return List.copyOf(selected);
+    }
+
+    private StrategyAssignment assignFallbackStrategy(String symbol, Timeframe timeframe, String reason) {
+        if (!AppConfig.getBoolean("investpro.strategy.autoAssignFallback", true)) {
+            return null;
+        }
+        String strategyName = StrategyCatalog.defaultStrategyName();
+        if (strategyName == null || strategyName.isBlank()) {
+            List<String> available = StrategyCatalog.availableStrategyNames();
+            if (available.isEmpty()) {
+                log.warn("Cannot assign fallback strategy for {}/{}: strategy catalog is empty",
+                        symbol, timeframe.getCode());
+                return null;
+            }
+            strategyName = available.getFirst();
+        }
+        StrategyAssignment assignment = StrategySelectionService.getInstance()
+                .autoAssign(symbol, timeframe, strategyName, 0.0,
+                        "Fallback assignment: " + (reason == null ? "Strategy Lab produced no winner" : reason));
+        log.info("Fallback strategy assignment created: {}/{} -> {}",
+                symbol, timeframe.getCode(), assignment == null ? "NONE" : assignment.getStrategyId());
+        return assignment;
+    }
+
+    private CompletableFuture<StrategyPerformanceReport> withTimeout(
+            BacktestJob job,
+            int timeoutSeconds) {
+        CompletableFuture<StrategyPerformanceReport> source = job.getFuture();
+        CompletableFuture<StrategyPerformanceReport> timeout = CompletableFuture.supplyAsync(
+                () -> {
+                    if (!source.isDone()) {
+                        job.cancel();
+                    }
+                    return null;
+                },
+                CompletableFuture.delayedExecutor(Math.max(1, timeoutSeconds), TimeUnit.SECONDS));
+        return source.applyToEither(timeout, report -> report);
+    }
+
+    private record TimeframeEvaluation(
+            String symbol,
+            Timeframe timeframe,
+            List<CandleData> candles,
+            List<StrategyPerformanceReport> ranked,
+            StrategyConsensusResult consensus,
+            StrategyPerformanceReport selected) {
+
+        private TimeframeEvaluation {
+            candles = candles == null ? List.of() : List.copyOf(candles);
+            ranked = ranked == null ? List.of() : List.copyOf(ranked);
+        }
+
+        static TimeframeEvaluation empty(String symbol, Timeframe timeframe, List<CandleData> candles) {
+            return new TimeframeEvaluation(symbol, timeframe, candles, List.of(), null, null);
+        }
     }
 
     private TradePair parsePair(String symbol) {

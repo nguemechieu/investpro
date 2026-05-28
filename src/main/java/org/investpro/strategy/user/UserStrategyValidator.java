@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.api.UserStrategy;
-import org.investpro.strategy.impl.UserStrategyAdapter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

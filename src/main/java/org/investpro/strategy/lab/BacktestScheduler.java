@@ -96,6 +96,7 @@ public final class BacktestScheduler {
      */
     @Getter
     private final int maxWorkers;
+    private volatile int currentMaxWorkers;
     private final int maxQueueSize;
     private final boolean resourceProtection;
     private final boolean logEachBacktest;
@@ -151,6 +152,7 @@ public final class BacktestScheduler {
     private BacktestScheduler() {
         int cores = Runtime.getRuntime().availableProcessors();
         this.maxWorkers       = AppConfig.getInt(CFG_MAX_WORKERS, Math.max(1, cores / 2));
+        this.currentMaxWorkers = this.maxWorkers;
         this.maxQueueSize     = AppConfig.getInt(CFG_MAX_QUEUE,   1000);
         this.resourceProtection = AppConfig.getBoolean(CFG_RESOURCE_GUARD, true);
         this.logEachBacktest  = AppConfig.getBoolean(CFG_LOG_EACH, false);
@@ -260,10 +262,8 @@ public final class BacktestScheduler {
 
     /**
      * Cancels all queued (not-yet-running) jobs.
-     *
-     * @return number of jobs cancelled
      */
-    public int cancelAllQueued() {
+    public void cancelAllQueued() {
         int count = 0;
         List<BacktestJob> queued = new ArrayList<>(workQueue);
         for (BacktestJob job : queued) {
@@ -274,7 +274,6 @@ public final class BacktestScheduler {
             }
         }
         log.info("BacktestScheduler: cancelled {} queued jobs", count);
-        return count;
     }
 
     /**
@@ -306,8 +305,15 @@ public final class BacktestScheduler {
             throw new IllegalArgumentException("maxWorkers must be >= 1");
         }
         int clamped = Math.min(newMax, Runtime.getRuntime().availableProcessors() * 2);
-        executor.setMaximumPoolSize(clamped);
-        executor.setCorePoolSize(clamped);
+        int currentCore = executor.getCorePoolSize();
+        if (clamped < currentCore) {
+            executor.setCorePoolSize(clamped);
+            executor.setMaximumPoolSize(clamped);
+        } else {
+            executor.setMaximumPoolSize(clamped);
+            executor.setCorePoolSize(clamped);
+        }
+        currentMaxWorkers = clamped;
         log.info("BacktestScheduler: maxWorkers adjusted to {}", clamped);
     }
 
@@ -332,7 +338,7 @@ public final class BacktestScheduler {
                 failedCount.get(),
                 cancelledCount.get(),
                 executor.getActiveCount(),
-                maxWorkers,
+                currentMaxWorkers,
                 avg,
                 rollingThroughput(),
                 heap[0], heap[1], cpu,

@@ -230,11 +230,8 @@ public class StrategyLabPanel extends BorderPane {
         strategyCombo = new ComboBox<>();
         strategyCombo.setPrefWidth(210);
         styleCombo(strategyCombo);
-        strategyCombo.getItems().setAll(new ArrayList<>(StrategyCatalog.availableStrategyNames()));
-
-        if (!strategyCombo.getItems().isEmpty()) {
-            strategyCombo.getSelectionModel().selectFirst();
-        }
+        strategyCombo.getItems().setAll(loadStrategyChoices());
+        selectDefaultStrategy(strategyCombo);
 
         Label filterLabel = styledLabel("Filter:");
         strategyFilterField = new TextField();
@@ -362,10 +359,35 @@ public class StrategyLabPanel extends BorderPane {
         }
 
         strategyCombo.getItems().setAll(all);
+        selectDefaultStrategy(strategyCombo);
+    }
 
-        if (!strategyCombo.getItems().isEmpty()) {
-            strategyCombo.getSelectionModel().selectFirst();
+    private List<String> loadStrategyChoices() {
+        List<String> names = new ArrayList<>(StrategyCatalog.availableStrategyNames());
+        if (names.stream().noneMatch(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)) {
+            names.add(0, StrategyCatalog.defaultStrategyName());
         }
+        if (names.isEmpty()) {
+            names.add(StrategyCatalog.defaultStrategyName());
+        }
+        return names;
+    }
+
+    private void selectDefaultStrategy(ComboBox<String> combo) {
+        if (combo == null) {
+            return;
+        }
+        if (combo.getItems().isEmpty()) {
+            combo.getItems().add(StrategyCatalog.defaultStrategyName());
+        }
+        String current = combo.getValue();
+        if (current != null && !current.isBlank() && combo.getItems().contains(current)) {
+            return;
+        }
+        combo.getItems().stream()
+                .filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)
+                .findFirst()
+                .ifPresentOrElse(combo::setValue, () -> combo.getSelectionModel().selectFirst());
     }
 
     private TabPane createContentTabs() {
@@ -903,11 +925,18 @@ public class StrategyLabPanel extends BorderPane {
         String strategyName = strategyCombo == null ? null : strategyCombo.getValue();
 
         if (strategyName == null || strategyName.isBlank()) {
-            appendLog("No strategy selected.");
-            return;
+            strategyName = StrategyCatalog.defaultStrategyName();
+            if (strategyCombo != null) {
+                if (!strategyCombo.getItems().contains(strategyName)) {
+                    strategyCombo.getItems().add(0, strategyName);
+                }
+                strategyCombo.setValue(strategyName);
+            }
+            appendLog("No strategy was selected; using default strategy: " + strategyName + ".");
         }
+        String selectedStrategyName = strategyName;
 
-        appendLog("Testing strategy '" + strategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode()
+        appendLog("Testing strategy '" + selectedStrategyName + "' on " + selectedSymbol + "/" + selectedTimeframe.getCode()
                 + "...");
         setRunning(true, "Testing selected strategy with real candles...");
 
@@ -916,7 +945,7 @@ public class StrategyLabPanel extends BorderPane {
                         selectedSymbol,
                         selectedTimeframe,
                         candles,
-                        List.of(strategyName)))
+                        List.of(selectedStrategyName)))
                 .whenComplete((assignment, throwable) -> runOnFx(() -> {
                     if (throwable != null) {
                         appendLog("Test failed: " + rootMessage(throwable));

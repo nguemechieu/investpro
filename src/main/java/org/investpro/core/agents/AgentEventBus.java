@@ -1,6 +1,7 @@
 package org.investpro.core.agents;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.telemetry.EventBusMetricsEngine;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import java.util.function.Consumer;
 public class AgentEventBus {
     private final Map<String, List<Consumer<AgentEvent>>> subscribers = new ConcurrentHashMap<>();
     private final List<Consumer<AgentEvent>> allSubscribers = new CopyOnWriteArrayList<>();
+    private final EventBusMetricsEngine metrics = EventBusMetricsEngine.getInstance();
     private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
         Thread thread = new Thread(runnable, "investpro-agent-event-bus");
         thread.setDaemon(true);
@@ -43,7 +45,10 @@ public class AgentEventBus {
         if (eventType == null || handler == null) {
             return;
         }
-        subscribers.computeIfAbsent(eventType, ignored -> new CopyOnWriteArrayList<>()).add(handler);
+        List<Consumer<AgentEvent>> handlers = subscribers.computeIfAbsent(eventType, ignored -> new CopyOnWriteArrayList<>());
+        if (!handlers.contains(handler)) {
+            handlers.add(handler);
+        }
     }
 
     public void unsubscribe(String eventType, Consumer<AgentEvent> handler) {
@@ -60,7 +65,7 @@ public class AgentEventBus {
     }
 
     public void subscribeAll(Consumer<AgentEvent> handler) {
-        if (handler != null) {
+        if (handler != null && !allSubscribers.contains(handler)) {
             allSubscribers.add(handler);
         }
     }
@@ -76,6 +81,8 @@ public class AgentEventBus {
             return;
         }
 
+        long started = System.nanoTime();
+        metrics.recordPublished(event.type());
         List<Consumer<AgentEvent>> typedHandlers = subscribers.getOrDefault(event.type(), List.of());
 
         for (Consumer<AgentEvent> handler : typedHandlers) {
@@ -85,6 +92,7 @@ public class AgentEventBus {
         for (Consumer<AgentEvent> handler : allSubscribers) {
             safeAccept(handler, event);
         }
+        metrics.recordConsumerLatency(event.type(), System.nanoTime() - started);
     }
 
     public void publishAsync(AgentEvent event) {
@@ -98,6 +106,7 @@ public class AgentEventBus {
         try {
             handler.accept(event);
         } catch (Exception exception) {
+            metrics.recordDropped();
             log.error("Agent event handler failed for {}", event, exception);
         }
     }

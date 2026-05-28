@@ -9,11 +9,11 @@ import java.util.Map;
  * Summarizes news events into a directional bias (buy/sell/neutral).
  */
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
+
 @Builder
 @Getter
 @Setter
+@ToString
 public class NewsBias {
     private String direction;
     private double score;

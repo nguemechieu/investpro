@@ -1,8 +1,10 @@
 package org.investpro.decision;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.core.agents.execution.TradeExecutionCoordinator;
+import org.investpro.core.execution.TradeExecutionCoordinator;
 import org.investpro.models.trading.Ticker;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.strategy.StrategySignal;
@@ -21,12 +23,21 @@ import java.util.Objects;
  * This class sits between the strategy engine and the trade execution
  * coordinator.
  */
+@Getter
+@Setter
 @Slf4j
 @RequiredArgsConstructor
 public class SignalToDecisionFilter {
 
-    private final BotTradeDecisionEngine decisionEngine;
-    private final TradeExecutionCoordinator executionCoordinator;
+    private  BotTradeDecisionEngine decisionEngine;
+    private  TradeExecutionCoordinator executionCoordinator;
+
+    public SignalToDecisionFilter(
+            BotTradeDecisionEngine decisionEngine,
+            TradeExecutionCoordinator executionCoordinator) {
+        this.decisionEngine = decisionEngine;
+        this.executionCoordinator = executionCoordinator;
+    }
 
     /**
      * Evaluate signal and determine if trading should proceed.

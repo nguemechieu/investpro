@@ -16,12 +16,17 @@ public class ATRIndicator extends BaseIndicator {
     
     @Override
     public void calculate(List<CandleData> candles) {
-        if (candles == null || candles.size() < 2) {
+        if (candles == null || candles.isEmpty()) {
             return;
         }
         
         double[] trueRange = calculateTrueRange(candles);
         double[] atrValues = new double[candles.size()];
+        if (period <= 0 || candles.size() < period) {
+            values.put("ATR", atrValues);
+            calculated = true;
+            return;
+        }
         
         // Calculate initial ATR (simple average of first period)
         double sum = 0;

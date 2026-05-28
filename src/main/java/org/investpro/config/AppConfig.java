@@ -6,8 +6,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Properties;
 
 /**
  * Central configuration reader for InvestPro.
@@ -16,7 +20,8 @@ import java.util.Objects;
  * 1. JVM system property: -DKEY=value
  * 2. OS environment variable: KEY=value
  * 3. .env file in project/app working directory
- * 4. Provided default value
+ * 4. config.properties in project/app working directory or classpath
+ * 5. Provided default value
  */
 @Slf4j
 public final class AppConfig {
@@ -25,6 +30,7 @@ public final class AppConfig {
             .ignoreIfMissing()
             .ignoreIfMalformed()
             .load();
+    private static final Properties CONFIG_PROPERTIES = loadConfigProperties();
 
     private AppConfig() {
     }
@@ -49,6 +55,16 @@ public final class AppConfig {
         String dotenvValue = DOTENV.get(key);
         if (hasText(dotenvValue)) {
             return stripQuotes(dotenvValue.trim());
+        }
+
+        String propertiesValue = CONFIG_PROPERTIES.getProperty(key);
+        if (hasText(propertiesValue)) {
+            return stripQuotes(propertiesValue.trim());
+        }
+
+        String legacyValue = getLegacyInvestProValue(key);
+        if (hasText(legacyValue)) {
+            return stripQuotes(legacyValue.trim());
         }
 
         return defaultValue == null ? "" : defaultValue.trim();
@@ -211,5 +227,53 @@ public final class AppConfig {
         }
 
         return value;
+    }
+
+    private static @NotNull Properties loadConfigProperties() {
+        Properties properties = new Properties();
+        Path workingDirectoryConfig = Path.of("config.properties");
+
+        if (Files.isRegularFile(workingDirectoryConfig)) {
+            try (InputStream inputStream = Files.newInputStream(workingDirectoryConfig)) {
+                properties.load(inputStream);
+                return properties;
+            } catch (IOException exception) {
+                log.warn("Unable to load config.properties from working directory: {}", exception.getMessage());
+            }
+        }
+
+        try (InputStream inputStream = AppConfig.class.getClassLoader().getResourceAsStream("config.properties")) {
+            if (inputStream != null) {
+                properties.load(inputStream);
+            }
+        } catch (IOException exception) {
+            log.warn("Unable to load config.properties from classpath: {}", exception.getMessage());
+        }
+
+        return properties;
+    }
+
+    private static @Nullable String getLegacyInvestProValue(@NotNull String key) {
+        if (!key.startsWith("investpro.")) {
+            return null;
+        }
+
+        String legacyKey = "trade" + "adviser" + key.substring("investpro".length());
+        String systemPropertyValue = System.getProperty(legacyKey);
+        if (hasText(systemPropertyValue)) {
+            return systemPropertyValue;
+        }
+
+        String environmentValue = System.getenv(legacyKey);
+        if (hasText(environmentValue)) {
+            return environmentValue;
+        }
+
+        String dotenvValue = DOTENV.get(legacyKey);
+        if (hasText(dotenvValue)) {
+            return dotenvValue;
+        }
+
+        return CONFIG_PROPERTIES.getProperty(legacyKey);
     }
 }

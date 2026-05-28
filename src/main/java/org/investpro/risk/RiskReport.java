@@ -1,6 +1,7 @@
 package org.investpro.risk;
 
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Value;
 
@@ -10,7 +11,7 @@ import lombok.Value;
  */
 @Value
 @Builder
-@Getter
+@Data
 public class RiskReport {
     // Header
     String symbol;

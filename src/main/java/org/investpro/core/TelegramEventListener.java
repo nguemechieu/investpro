@@ -86,7 +86,7 @@ public class TelegramEventListener implements Consumer<AgentEvent> {
             String eventType = event.type();
             Map<String, Object> metadata = event.metadata();
             String severity = (String) metadata.getOrDefault("severity", "INFO");
-            String message = event.payload() instanceof String ? (String) event.payload() : "";
+            // payload available if needed: event.payload()
 
             // Check rate limiting
             if (!shouldSendNotification(severity)) {

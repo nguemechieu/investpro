@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -80,6 +81,36 @@ class CoinbaseWebSocketClientTest {
         assertNull(client.getTradePair());
         assertEquals(2, client.sentPayloads.size());
         assertTrue(client.sentPayloads.stream().allMatch(payload -> payload.contains("\"type\":\"unsubscribe\"")));
+    }
+
+    @Test
+    void duplicateTradeSubscriptionsDoNotSendDuplicateSubscribeFrames() {
+        TestableCoinbaseWebSocketClient client = new TestableCoinbaseWebSocketClient();
+        TradePair btcUsd = null;
+        try {
+            btcUsd = TradePair.of("BTC", "USD");
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        ExchangeStreamConsumer consumer = new NoopExchangeStreamConsumer();
+
+        client.streamLiveTrades(btcUsd, consumer);
+        client.streamLiveTrades(btcUsd, consumer);
+
+        assertEquals(1, client.sentPayloads.size());
+        assertTrue(client.sentPayloads.getFirst().contains("\"type\":\"subscribe\""));
+    }
+
+    @Test
+    void duplicateRawStreamSubscriptionsDoNotSendDuplicateSubscribeFrames() {
+        TestableCoinbaseWebSocketClient client = new TestableCoinbaseWebSocketClient();
+
+        client.subscribeStream("level2:BTC-USD", payload -> { });
+        client.subscribeStream("level2:BTC-USD", payload -> { });
+
+        assertEquals(1, client.sentPayloads.size());
+        assertTrue(client.sentPayloads.getFirst().contains("\"type\":\"subscribe\""));
     }
 
     private static final class TestableCoinbaseWebSocketClient extends CoinbaseWebSocketClient {

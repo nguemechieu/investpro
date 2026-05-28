@@ -11,14 +11,17 @@ import org.investpro.indicators.FibonacciRetracementIndicator;
 import org.investpro.indicators.FractalIndicator;
 import org.investpro.indicators.IchimokuIndicator;
 import org.investpro.indicators.MACDIndicator;
+import org.investpro.indicators.MoneyFlowIndexIndicator;
 import org.investpro.indicators.OBVIndicator;
 import org.investpro.indicators.ParabolicSARIndicator;
+import org.investpro.indicators.RateOfChangeIndicator;
 import org.investpro.indicators.RSIIndicator;
 import org.investpro.indicators.SimpleMovingAverageIndicator;
 import org.investpro.indicators.StochasticIndicator;
 import org.investpro.indicators.VolatilityIndicator;
 import org.investpro.indicators.VolumeIndicator;
 import org.investpro.indicators.VWAPIndicator;
+import org.investpro.indicators.WilliamsRIndicator;
 import org.investpro.indicators.ZigzagIndicator;
 
 import java.util.LinkedHashMap;
@@ -41,10 +44,13 @@ public final class PluginIndicatorFactory {
             "RSI 14",
             "Stochastic",
             "CCI 20",
+            "ROC 12",
+            "Williams %R 14",
             "MACD",
             "Bollinger Bands",
             "ATR 14",
             "VWAP",
+            "MFI 14",
             "OBV",
             "Volume",
             "ADX 14",
@@ -65,7 +71,7 @@ public final class PluginIndicatorFactory {
 
     public static List<IndicatorParameter> parametersFor(String choice) {
         return switch (normalize(choice)) {
-            case "SMA 20", "SMA 50", "SMA 200", "EMA 12", "EMA 26", "RSI 14", "CCI 20", "ATR 14", "ADX 14" -> List.of(
+            case "SMA 20", "SMA 50", "SMA 200", "EMA 12", "EMA 26", "RSI 14", "CCI 20", "ROC 12", "WILLIAMS %R 14", "MFI 14", "ATR 14", "ADX 14" -> List.of(
                     new IndicatorParameter("period", "Period", IndicatorValueType.INTEGER, String.valueOf(defaultPeriodValue(choice)), "Lookback period")
             );
             case "STOCHASTIC" -> List.of(
@@ -172,6 +178,8 @@ public final class PluginIndicatorFactory {
                         intConfig(config, "kSlowPeriod", 3),
                         intConfig(config, "dPeriod", 3));
                 case "CCI 20" -> new CCIIndicator(intConfig(config, "period", 20));
+                case "ROC 12" -> new RateOfChangeIndicator(intConfig(config, "period", 12));
+                case "WILLIAMS %R 14" -> new WilliamsRIndicator(intConfig(config, "period", 14));
                 case "MACD" -> new MACDIndicator(
                         intConfig(config, "fastPeriod", 12),
                         intConfig(config, "slowPeriod", 26),
@@ -181,6 +189,7 @@ public final class PluginIndicatorFactory {
                         doubleConfig(config, "stdDevMultiplier", 2.0));
                 case "ATR 14" -> new ATRIndicator(intConfig(config, "period", 14));
                 case "VWAP" -> new VWAPIndicator();
+                case "MFI 14" -> new MoneyFlowIndexIndicator(intConfig(config, "period", 14));
                 case "OBV" -> new OBVIndicator();
                 case "VOLUME" -> new VolumeIndicator();
                 case "ADX 14" -> new ADXIndicator(intConfig(config, "period", 14));
@@ -256,6 +265,9 @@ public final class PluginIndicatorFactory {
             case "EMA 12", "EMA 26" -> "EMA";
             case "RSI 14" -> "RSI";
             case "CCI 20" -> "CCI";
+            case "ROC 12" -> "ROC";
+            case "WILLIAMS %R 14" -> "WILLIAMS_R";
+            case "MFI 14" -> "MFI";
             case "ATR 14" -> "ATR";
             case "BOLLINGER BANDS" -> "BOLLINGER_BANDS";
             case "MACD" -> "MACD";

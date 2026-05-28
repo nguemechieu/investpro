@@ -12,21 +12,23 @@ import java.util.List;
 
 /**
  * Adapter pattern: bridges exchange adapter output → MarketDataEngine input.
- * 
+ * <p>
  * Exchange adapters (Binance, OANDA, Alpaca, etc.) implement
  * MarketDataProvider.
  * This adapter takes their output (Tickers, OrderBooks, CandleData) and feeds
  * it
  * into the central MarketDataEngine.
- * 
+ * <p>
  * This decouples exchange-specific logic from market data caching/state
  * management.
+ *
+ * @param engine     -- GETTER --
+ *                   Get the underlying engine (for advanced operations).
+ * @param brokerName -- GETTER --
+ *                   Get the broker name this adapter represents.
  */
 @Slf4j
-public class ExchangeMarketDataAdapter {
-
-    private final MarketDataEngine engine;
-    private final String brokerName;
+public record ExchangeMarketDataAdapter(MarketDataEngine engine, String brokerName) {
 
     public ExchangeMarketDataAdapter(
             @NotNull MarketDataEngine engine,
@@ -93,17 +95,4 @@ public class ExchangeMarketDataAdapter {
                 brokerName, candles.size(), tradePair, timeframe);
     }
 
-    /**
-     * Get the broker name this adapter represents.
-     */
-    public String getBrokerName() {
-        return brokerName;
-    }
-
-    /**
-     * Get the underlying engine (for advanced operations).
-     */
-    public MarketDataEngine getEngine() {
-        return engine;
-    }
 }

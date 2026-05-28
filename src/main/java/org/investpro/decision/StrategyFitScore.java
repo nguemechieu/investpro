@@ -35,4 +35,16 @@ public record StrategyFitScore(
     public boolean isPoorFit() {
         return finalFitnessScore < 0.50;
     }
+
+    /**
+     * Creates a neutral/unknown strategy fit score with only the final fitness score set.
+     * Used by {@link BotTradeDecisionAssembler} when bridging from the institutional pipeline.
+     */
+    public static StrategyFitScore of(double finalFitnessScore) {
+        return new StrategyFitScore(
+                "unknown", "unknown",
+                finalFitnessScore, finalFitnessScore, finalFitnessScore,
+                finalFitnessScore, finalFitnessScore, finalFitnessScore,
+                "Derived from pipeline score", null, Instant.now());
+    }
 }

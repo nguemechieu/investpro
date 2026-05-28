@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.LiquidityProfile;
 import org.investpro.enums.AssetClass;
 import org.investpro.enums.ContractType;
-import org.investpro.enums.timeframe.Timeframe;
 import org.investpro.models.currency.CryptoCurrency;
 import org.investpro.models.currency.Currency;
 import org.investpro.models.currency.CurrencyRegistry;

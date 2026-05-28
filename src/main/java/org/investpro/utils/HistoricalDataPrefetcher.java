@@ -29,36 +29,33 @@ import java.util.function.Consumer;
 
 /**
  * Utility to pre-fetch and cache historical candle data from exchanges before backtesting.
- *
+ * <p>
  * Supported default exchanges:
  * - Binance
  * - Coinbase
  * - Bitfinex
- *
+ * <p>
  * Important:
  * The current CandleDataSupplier contract only exposes get().
  * It does not accept start/end range parameters directly.
  * Because of that, this class fetches from the supplier once, validates the result,
  * removes duplicates when possible, and saves the candles to HistoricalDataRepository.
- *
+ * <p>
  * Usage:
- *
+ * <p>
  * HistoricalDataPrefetcher prefetcher =
- *         HistoricalDataPrefetcher.forCurrentExchange(exchange, repository);
- *
+ * HistoricalDataPrefetcher.forCurrentExchange(exchange, repository);
+ * <p>
  * List<CandleData> candles = prefetcher.fetchAndCacheDataSync(
- *         tradePair,
- *         LocalDateTime.now().minusDays(60),
- *         LocalDateTime.now(),
- *         "1h",
- *         progress -> System.out.println("Progress: " + progress + "%")
+ * tradePair,
+ * LocalDateTime.now().minusDays(60),
+ * LocalDateTime.now(),
+ * "1h",
+ * progress -> System.out.println("Progress: " + progress + "%")
  * );
  */
 @Slf4j
-public class HistoricalDataPrefetcher {
-
-    private final HistoricalDataRepository repository;
-    private final DataSupplierFactory supplierFactory;
+public record HistoricalDataPrefetcher(HistoricalDataRepository repository, DataSupplierFactory supplierFactory) {
 
     /**
      * Minimum candles usually needed before a backtest becomes useful.

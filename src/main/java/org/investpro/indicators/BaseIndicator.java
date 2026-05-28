@@ -55,11 +55,13 @@ public abstract class BaseIndicator implements ChartIndicator {
      * Calculate simple moving average
      */
     protected double[] calculateSMA(List<Double> data, int period) {
-        if (data == null || data.size() < period) {
+        if (data == null) {
             return new double[0];
         }
-        
         double[] sma = new double[data.size()];
+        if (period <= 0 || data.size() < period) {
+            return sma;
+        }
         
         for (int i = period - 1; i < data.size(); i++) {
             double sum = 0;
@@ -76,11 +78,13 @@ public abstract class BaseIndicator implements ChartIndicator {
      * Calculate exponential moving average
      */
     protected double[] calculateEMA(List<Double> data, int period) {
-        if (data == null || data.size() < period) {
+        if (data == null) {
             return new double[0];
         }
-        
         double[] ema = new double[data.size()];
+        if (period <= 0 || data.size() < period) {
+            return ema;
+        }
         double multiplier = 2.0 / (period + 1);
         
         // Initial SMA
@@ -102,11 +106,13 @@ public abstract class BaseIndicator implements ChartIndicator {
      * Calculate RSI (Relative Strength Index)
      */
     protected double[] calculateRSI(List<Double> closeData, int period) {
-        if (closeData == null || closeData.size() < period + 1) {
+        if (closeData == null) {
             return new double[0];
         }
-        
         double[] rsi = new double[closeData.size()];
+        if (period <= 0 || closeData.size() < period + 1) {
+            return rsi;
+        }
         double[] gains = new double[closeData.size()];
         double[] losses = new double[closeData.size()];
         

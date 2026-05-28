@@ -19,6 +19,7 @@ import org.investpro.research.LiveTradingMetricsTracker;
 import org.investpro.strategy.StrategyCatalog;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
  * Covered analytics:
  * - institutional scorecard
  * - performance and risk metrics
- * - drawdown and recovery profile
+ * - draw down and recovery profile
  * - equity curve
  * - return distribution
  * - rolling risk
@@ -855,6 +856,10 @@ public class AnalysisPanel extends StackPane{
             start = 10_000.0;
         }
 
+        return getLists(cleanReturns, start);
+    }
+
+    private @NonNull List<List<Double>> getLists(@NonNull List<Double> cleanReturns, double start) {
         Random random = new Random(42);
         List<List<Double>> paths = new ArrayList<>();
         int pathCount = 10;

@@ -1,5 +1,6 @@
 package org.investpro.risk;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,6 +9,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
+@Data
 public class TradeRiskParameters {
     private final double positionSize;
     private final double entryPrice;

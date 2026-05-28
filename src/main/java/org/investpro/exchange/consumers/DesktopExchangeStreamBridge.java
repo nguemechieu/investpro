@@ -4,9 +4,9 @@ import javafx.application.Platform;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.models.Account;
 import org.investpro.data.CandleData;
 import org.investpro.exchange.infrastructure.ExchangeStreamConsumer;
+import org.investpro.models.Account;
 import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Position;
@@ -17,6 +17,8 @@ import org.investpro.ui.TradingDesk;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
+import java.net.SocketException;
 import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
@@ -26,14 +28,16 @@ import java.util.function.Consumer;
 
 /**
  * JavaFX-safe bridge between exchange streaming callbacks and TradingDesk.
- * <p>
- * This class keeps WebSocket/exchange threads clean by pushing all UI work
- * onto the JavaFX Application Thread and protecting the stream from UI errors.
+ *
+ * <p>This class keeps WebSocket/exchange threads clean by pushing all UI work
+ * onto the JavaFX Application Thread and protecting the stream from UI errors.</p>
  */
 @Slf4j
 @Getter
 @Setter
 public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
+
+    private static final int MAX_RECENT_ORDERS = 1_000;
 
     private final TradingDesk tradingDesk;
 
@@ -48,6 +52,10 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     private final AtomicLong rawMessageEvents = new AtomicLong();
     private final AtomicLong connectionEvents = new AtomicLong();
     private final AtomicLong errorEvents = new AtomicLong();
+
+    private final LinkedList<OpenOrder> openOrders = new LinkedList<>();
+
+    private volatile Consumer<List<OpenOrder>> ordersUpdateConsumer;
 
     private volatile Instant lastEventAt;
     private volatile Instant lastTickerAt;
@@ -107,6 +115,12 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         candleEvents.incrementAndGet();
         lastCandleAt = Instant.now();
 
+        /*
+         * If your TradingDesk method accepts CandleData, use:
+         * tradingDesk.updateCandleFromStream(candle)
+         *
+         * The current call preserves your uploaded method usage.
+         */
         runOnFx("candle update", tradingDesk::updateCandleFromStream);
     }
 
@@ -156,15 +170,20 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         orderEvents.incrementAndGet();
         lastOrderAt = Instant.now();
 
-        runOnFx("order update", () -> tradingDesk.updateOpenOrderFromStream(order));
-    }
+        rememberOpenOrder(order);
 
+        runOnFx("order update", () -> {
+            tradingDesk.updateOpenOrderFromStream(order);
+            publishOpenOrdersSnapshot();
+        });
+    }
 
     @Override
     public void onOpenOrders(String exchangeName, List<OpenOrder> orders) {
         onOrders(exchangeName, orders);
     }
-@Override
+
+    @Override
     public void onOrders(@Nullable String exchangeName, @Nullable List<OpenOrder> orders) {
         if (orders == null || orders.isEmpty()) {
             return;
@@ -174,12 +193,16 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         orderEvents.addAndGet(orders.size());
         lastOrderAt = Instant.now();
 
+        replaceOpenOrders(orders);
+
         runOnFx("orders snapshot", () -> {
             for (OpenOrder order : orders) {
                 if (order != null) {
                     tradingDesk.updateOpenOrderFromStream(order);
                 }
             }
+
+            publishOpenOrdersSnapshot();
         });
     }
 
@@ -232,14 +255,12 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
 
     @Override
     public void put(@NotNull TradePair tradePair, ExchangeStreamConsumer liveTradesConsumer) {
-        // No-op.
-        // This bridge is a UI dispatch consumer, not a map-backed registry.
+        // No-op. This bridge is a UI dispatch consumer, not a map-backed registry.
     }
 
     @Override
     public void remove(TradePair tradePair) {
-        // No-op.
-        // Stream lifecycle is owned by Exchange/TradingDesk.
+        // No-op. Stream lifecycle is owned by Exchange/TradingDesk.
     }
 
     @Override
@@ -283,7 +304,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onOrderAccepted(String exchangeName, String orderId) {
         String safeExchangeName = normalizeExchangeName(exchangeName);
-        String safeOrderId = orderId == null || orderId.isBlank() ? "unknown" : orderId.trim();
+        String safeOrderId = safeId(orderId);
 
         markEvent(safeExchangeName, null);
         orderEvents.incrementAndGet();
@@ -298,7 +319,7 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onOrderRejected(String exchangeName, String clientOrderId, String reason) {
         String safeExchangeName = normalizeExchangeName(exchangeName);
-        String safeOrderId = clientOrderId == null || clientOrderId.isBlank() ? "unknown" : clientOrderId.trim();
+        String safeOrderId = safeId(clientOrderId);
         String safeReason = reason == null || reason.isBlank() ? "Rejected" : reason.trim();
 
         markEvent(safeExchangeName, null);
@@ -318,13 +339,15 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
     @Override
     public void onOrderFilled(String exchangeName, String orderId, Trade fill) {
         String safeExchangeName = normalizeExchangeName(exchangeName);
-        String safeOrderId = orderId == null || orderId.isBlank() ? "unknown" : orderId.trim();
+        String safeOrderId = safeId(orderId);
 
         markEvent(safeExchangeName, null);
         fillEvents.incrementAndGet();
         orderEvents.incrementAndGet();
         lastFillAt = Instant.now();
         lastOrderAt = Instant.now();
+
+        removeOpenOrderById(safeOrderId);
 
         runOnFx("order filled", () -> {
             tradingDesk.updateStreamingStatus("%s order filled".formatted(safeExchangeName));
@@ -333,21 +356,26 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
             if (fill != null) {
                 tradingDesk.updateTradeFromStream(fill);
             }
+
+            publishOpenOrdersSnapshot();
         });
     }
 
     @Override
     public void onOrderCancelled(String exchangeName, String orderId) {
         String safeExchangeName = normalizeExchangeName(exchangeName);
-        String safeOrderId = orderId == null || orderId.isBlank() ? "unknown" : orderId.trim();
+        String safeOrderId = safeId(orderId);
 
         markEvent(safeExchangeName, null);
         orderEvents.incrementAndGet();
         lastOrderAt = Instant.now();
 
+        removeOpenOrderById(safeOrderId);
+
         runOnFx("order cancelled", () -> {
             tradingDesk.updateStreamingStatus("%s order cancelled".formatted(safeExchangeName));
             tradingDesk.appendJournal("%s order cancelled: %s".formatted(safeExchangeName, safeOrderId));
+            publishOpenOrdersSnapshot();
         });
     }
 
@@ -389,17 +417,38 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         lastErrorAt = Instant.now();
         markEvent(safeExchangeName, null);
 
-        log.warn(
-                "Desktop exchange stream error. exchange={} error={}",
-                safeExchangeName,
-                message,
-                throwable
-        );
+        if (isRecoverableNetworkError(throwable)) {
+            log.warn("Desktop exchange stream recoverable network error. exchange={} error={}",
+                    safeExchangeName, message);
+        } else {
+            log.warn(
+                    "Desktop exchange stream error. exchange={} error={}",
+                    safeExchangeName,
+                    message,
+                    throwable
+            );
+        }
 
         runOnFx("stream error", () -> {
             tradingDesk.updateStreamingStatus("%s stream error".formatted(safeExchangeName));
             tradingDesk.appendJournal("Stream error from %s: %s".formatted(safeExchangeName, message));
         });
+    }
+
+    @Override
+    public UiExchangeStreamConsumer onOrdersUpdate(@Nullable Consumer<List<OpenOrder>> setAll) {
+        this.ordersUpdateConsumer = setAll;
+
+        if (setAll != null) {
+            runOnFx("orders update registration", this::publishOpenOrdersSnapshot);
+        }
+
+        /*
+         * ExchangeStreamConsumer appears to require this return type.
+         * The bridge stores the callback locally and returns a configured
+         * UiExchangeStreamConsumer for compatibility with fluent code.
+         */
+        return new UiExchangeStreamConsumer().onOrdersUpdate(setAll);
     }
 
     public void resetCounters() {
@@ -414,6 +463,20 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         rawMessageEvents.set(0);
         connectionEvents.set(0);
         errorEvents.set(0);
+    }
+
+    public void clearOpenOrdersSnapshot() {
+        synchronized (openOrders) {
+            openOrders.clear();
+        }
+
+        runOnFx("clear open orders snapshot", this::publishOpenOrdersSnapshot);
+    }
+
+    public List<OpenOrder> getOpenOrdersSnapshot() {
+        synchronized (openOrders) {
+            return List.copyOf(openOrders);
+        }
     }
 
     public long getTotalEvents() {
@@ -439,17 +502,70 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         return errorEvents.get() > 0;
     }
 
-    @Override
-    public UiExchangeStreamConsumer onOrdersUpdate(@Nullable Consumer<List<OpenOrder>> setAll) {
-        return null;
+    private void rememberOpenOrder(@NotNull OpenOrder order) {
+        synchronized (openOrders) {
+            String orderId = extractOrderId(order);
+
+            if (!orderId.isBlank()) {
+                openOrders.removeIf(existing -> orderId.equals(extractOrderId(existing)));
+            }
+
+            openOrders.addFirst(order);
+
+            while (openOrders.size() > MAX_RECENT_ORDERS) {
+                openOrders.removeLast();
+            }
+        }
     }
 
+    private void replaceOpenOrders(@NotNull List<OpenOrder> orders) {
+        synchronized (openOrders) {
+            openOrders.clear();
 
-    private static final int  MAX_RECENT_ORDERS=1000;
-  private final LinkedList<OpenOrder> openOrders=new LinkedList<>();
+            for (OpenOrder order : orders) {
+                if (order != null) {
+                    openOrders.add(order);
+                }
 
+                if (openOrders.size() >= MAX_RECENT_ORDERS) {
+                    break;
+                }
+            }
+        }
+    }
 
-    private void markUpdated(String exchangeName, Object o) {
+    private void removeOpenOrderById(@Nullable String orderId) {
+        if (orderId == null || orderId.isBlank() || "unknown".equalsIgnoreCase(orderId)) {
+            return;
+        }
+
+        synchronized (openOrders) {
+            openOrders.removeIf(order -> orderId.equals(extractOrderId(order)));
+        }
+    }
+
+    private void publishOpenOrdersSnapshot() {
+        Consumer<List<OpenOrder>> consumer = ordersUpdateConsumer;
+
+        if (consumer == null) {
+            return;
+        }
+
+        List<OpenOrder> snapshot = getOpenOrdersSnapshot();
+
+        try {
+            consumer.accept(snapshot);
+        } catch (Exception exception) {
+            errorEvents.incrementAndGet();
+            lastErrorAt = Instant.now();
+
+            log.warn(
+                    "Failed to publish open orders snapshot. size={} error={}",
+                    snapshot.size(),
+                    exception.getMessage(),
+                    exception
+            );
+        }
     }
 
     private void markEvent(@Nullable String exchangeName, @Nullable TradePair tradePair) {
@@ -468,6 +584,10 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         return exchangeName == null || exchangeName.isBlank()
                 ? "Exchange"
                 : exchangeName.trim();
+    }
+
+    private String safeId(@Nullable String value) {
+        return value == null || value.isBlank() ? "unknown" : value.trim();
     }
 
     private void runOnFx(@NotNull String operationName, @NotNull Runnable task) {
@@ -517,5 +637,53 @@ public class DesktopExchangeStreamBridge implements ExchangeStreamConsumer {
         return message == null || message.isBlank()
                 ? current.getClass().getSimpleName()
                 : message;
+    }
+
+    private boolean isRecoverableNetworkError(@Nullable Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof SocketException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("connection reset")
+                        || normalized.contains("broken pipe")
+                        || normalized.contains("timed out")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Extracts an order id without depending on one exact OpenOrder API shape.
+     *
+     * <p>This keeps the bridge compatible if OpenOrder uses getOrderId(),
+     * getId(), orderId(), or id().</p>
+     */
+    private String extractOrderId(@Nullable OpenOrder order) {
+        if (order == null) {
+            return "";
+        }
+
+        for (String methodName : List.of("getOrderId", "getId", "orderId", "id")) {
+            try {
+                Method method = order.getClass().getMethod(methodName);
+                Object value = method.invoke(order);
+
+                if (value != null && !value.toString().isBlank()) {
+                    return value.toString().trim();
+                }
+
+            } catch (ReflectiveOperationException ignored) {
+                // Try the next common method name.
+            }
+        }
+
+        return "";
     }
 }

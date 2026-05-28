@@ -1278,6 +1278,7 @@ public class Binance extends Exchange {
      * Parses order book data from API response or WebSocket stream.
      * Handles both array format [price, quantity] and object format.
      */
+    @SuppressWarnings("unused")
     private OrderBook parseOrderBook(String data, TradePair tradePair) {
         try {
             JsonNode node = OBJECT_MAPPER.readTree(data);
@@ -1328,6 +1329,7 @@ public class Binance extends Exchange {
      * Parses Binance open orders response into a list of OpenOrder objects.
      * Handles both array format and single object format.
      */
+    @SuppressWarnings("unused")
     private List<OpenOrder> parseOpenOrders(JsonNode rootNode) {
         List<OpenOrder> openOrders = new ArrayList<>();
 

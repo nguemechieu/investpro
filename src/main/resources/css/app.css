@@ -105,12 +105,12 @@ GridPane {
 }
 
 .split-pane {
-    -fx-background-color: -dark-bg;
+    -fx-background-color: #070b12;
     -fx-padding: 0;
 }
 
 .split-pane-divider {
-    -fx-background-color: -border-strong;
+    -fx-background-color: #475569;
     -fx-padding: 0 1 0 1;
 }
 

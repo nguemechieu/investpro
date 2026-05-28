@@ -44,6 +44,29 @@ public class AppConfigKeys {
     public static final String DEFAULT_TRADE_PAIR = "DEFAULT_TRADE_PAIR";
 
     // ============================================================
+    // Broker Activity Sync
+    // ============================================================
+
+    public static final String ACTIVITY_SYNC_ENABLED = "activity.sync.enabled";
+    public static final String ACTIVITY_SYNC_STARTUP_ENABLED = "activity.sync.startup.enabled";
+    public static final String ACTIVITY_SYNC_REALTIME_ENABLED = "activity.sync.realtime.enabled";
+    public static final String ACTIVITY_SYNC_LOOKBACK_DAYS = "activity.sync.lookbackDays";
+    public static final String ACTIVITY_SYNC_POLL_INTERVAL_SECONDS = "activity.sync.pollIntervalSeconds";
+    public static final String ACTIVITY_SYNC_CURSOR_REQUIRED = "activity.sync.cursor.required";
+    public static final String ACTIVITY_SYNC_FAIL_ON_PROJECTION_ERROR = "activity.sync.failOnProjectionError";
+    public static final String ACTIVITY_SYNC_RAW_JSON_ENABLED = "activity.sync.rawJson.enabled";
+    public static final String ACTIVITY_SYNC_RECONCILIATION_ENABLED = "activity.sync.reconciliation.enabled";
+    public static final String OANDA_ACTIVITY_SYNC_ENABLED = "oanda.activity.sync.enabled";
+    public static final String OANDA_ACTIVITY_ENDPOINT_TRANSACTIONS = "oanda.activity.endpoint.transactions";
+    public static final String OANDA_ACTIVITY_ENDPOINT_SINCE_ID = "oanda.activity.endpoint.sinceId";
+    public static final String COINBASE_ACTIVITY_SYNC_ENABLED = "coinbase.activity.sync.enabled";
+    public static final String BINANCEUS_ACTIVITY_SYNC_ENABLED = "binanceus.activity.sync.enabled";
+    public static final String STRATEGY_MIN_SCORE = "investpro.strategy.minStrategyScore";
+    public static final String STRATEGY_HARD_MIN_SCORE = "investpro.strategy.hardMinStrategyScore";
+    public static final String STRATEGY_REASSIGN_BELOW_SCORE = "investpro.strategy.reassignBelowScore";
+    public static final String STRATEGY_AUTO_ASSIGN_BEST = "investpro.strategy.autoAssignBest";
+
+    // ============================================================
     // OANDA
     // ============================================================
 

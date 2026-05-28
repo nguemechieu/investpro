@@ -1,10 +1,16 @@
 package org.investpro.decision;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+
 /**
  * Market regime classification based on price action, volatility, and trend
  * characteristics.
  * Used to select appropriate strategies and adjust risk parameters.
  */
+@Getter
+@ToString
 public enum MarketRegime {
     /**
      * Strong uptrend with minimal pullbacks. Price making higher highs and higher
@@ -93,4 +99,6 @@ public enum MarketRegime {
     public boolean isVolatilityRegime() {
         return this == HIGH_VOLATILITY || this == LOW_VOLATILITY;
     }
+
+
 }

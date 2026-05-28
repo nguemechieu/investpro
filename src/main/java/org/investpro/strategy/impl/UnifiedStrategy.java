@@ -107,7 +107,493 @@ public class UnifiedStrategy extends BaseStrategy {
     // =========================================================================
     // Signal Generation
     // =========================================================================
+    private @NotNull StrategySignal smaCross(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return emaCross(context, features);
+    }
 
+    private @NotNull StrategySignal tripleEmaTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        boolean bullish = features.getClose() > features.getEmaFast()
+                && features.getEmaFast() > features.getEmaSlow()
+                && features.getRsi() > 50;
+
+        boolean bearish = features.getClose() < features.getEmaFast()
+                && features.getEmaFast() < features.getEmaSlow()
+                && features.getRsi() < 50;
+
+        if (bullish) {
+            return signal(context, BUY, 0.64, "Triple EMA bullish trend alignment", features);
+        }
+
+        if (bearish) {
+            return signal(context, SELL, 0.64, "Triple EMA bearish trend alignment", features);
+        }
+
+        return noSignal(context, "No triple EMA alignment");
+    }
+
+    private @NotNull StrategySignal adaptiveMovingAverage(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.isTrending()) {
+            return trendFollowing(context, features);
+        }
+
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal keltnerTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        double upper = features.getEmaFast() + features.getAtr() * 1.5;
+        double lower = features.getEmaFast() - features.getAtr() * 1.5;
+
+        if (features.getClose() > upper && features.trendUp()) {
+            return signal(context, BUY, 0.63, "Close above Keltner upper channel in uptrend", features);
+        }
+
+        if (features.getClose() < lower && features.trendDown()) {
+            return signal(context, SELL, 0.63, "Close below Keltner lower channel in downtrend", features);
+        }
+
+        return noSignal(context, "No Keltner trend breakout");
+    }
+
+    private @NotNull StrategySignal superTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return features.getClose() > features.getEmaSlow() && features.trendUp()
+                ? signal(context, BUY, 0.63, "SuperTrend proxy bullish", features)
+                : features.getClose() < features.getEmaSlow() && features.trendDown()
+                ? signal(context, SELL, 0.63, "SuperTrend proxy bearish", features)
+                : noSignal(context, "No SuperTrend direction");
+    }
+
+    private @NotNull StrategySignal parabolicSarTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return pullbackTrend(context, features);
+    }
+
+    private @NotNull StrategySignal ichimokuCloudTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        boolean bullishCloud = features.getClose() > features.getEmaFast()
+                && features.getEmaFast() > features.getEmaSlow()
+                && features.getMomentum() > 0;
+
+        boolean bearishCloud = features.getClose() < features.getEmaFast()
+                && features.getEmaFast() < features.getEmaSlow()
+                && features.getMomentum() < 0;
+
+        if (bullishCloud) {
+            return signal(context, BUY, 0.65, "Ichimoku proxy bullish cloud breakout", features);
+        }
+
+        if (bearishCloud) {
+            return signal(context, SELL, 0.65, "Ichimoku proxy bearish cloud breakdown", features);
+        }
+
+        return noSignal(context, "No Ichimoku cloud confirmation");
+    }
+
+    private @NotNull StrategySignal adxTrendStrength(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getTrendStrength() < 0.45) {
+            return noSignal(context, "Trend strength too weak");
+        }
+
+        return trendFollowing(context, features);
+    }
+
+    private @NotNull StrategySignal rsiMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getRsi() > 58 && features.trendUp()) {
+            return signal(context, BUY, 0.62, "RSI momentum bullish", features);
+        }
+
+        if (features.getRsi() < 42 && features.trendDown()) {
+            return signal(context, SELL, 0.62, "RSI momentum bearish", features);
+        }
+
+        return noSignal(context, "No RSI momentum");
+    }
+
+    private @NotNull StrategySignal stochasticMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rsiMomentum(context, features);
+    }
+
+    private @NotNull StrategySignal rateOfChangeMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getMomentum() > 0.025 && features.getVolumeRatio() > 1.05) {
+            return signal(context, BUY, 0.63, "Positive rate-of-change momentum", features);
+        }
+
+        if (features.getMomentum() < -0.025 && features.getVolumeRatio() > 1.05) {
+            return signal(context, SELL, 0.63, "Negative rate-of-change momentum", features);
+        }
+
+        return noSignal(context, "Rate of change not strong enough");
+    }
+
+    private @NotNull StrategySignal cciMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rateOfChangeMomentum(context, features);
+    }
+
+    private @NotNull StrategySignal williamsRMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rsiMomentum(context, features);
+    }
+
+    private @NotNull StrategySignal emaPullback(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return pullbackTrend(context, features);
+    }
+
+    private @NotNull StrategySignal vwapPullback(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return pullbackTrend(context, features);
+    }
+
+    private @NotNull StrategySignal fibonacciPullback(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return pullbackTrend(context, features);
+    }
+
+    private @NotNull StrategySignal supportResistancePullback(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return pullbackTrend(context, features);
+    }
+
+    private @NotNull StrategySignal trendlinePullback(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return pullbackTrend(context, features);
+    }
+
+    private @NotNull StrategySignal keltnerSqueeze(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return bollingerSqueeze(context, features);
+    }
+
+    private @NotNull StrategySignal openingRangeBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal sessionRangeBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal highLowBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal volatilityExpansion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return volatilityBreakout(context, features);
+    }
+
+    private @NotNull StrategySignal atrChannelBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return volatilityBreakout(context, features);
+    }
+
+    private @NotNull StrategySignal bollingerMeanReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal rsiMeanReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return meanReversion(context, features);
+    }
+
+    private @NotNull StrategySignal stochasticMeanReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return meanReversion(context, features);
+    }
+
+    private @NotNull StrategySignal vwapMeanReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal zScoreReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal supportResistanceFade(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal liquiditySweepReversal(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getVolumeRatio() > 1.8 && features.getBandPosition() < 0.20) {
+            return signal(context, BUY, 0.62, "Liquidity sweep below range with reversal pressure", features);
+        }
+
+        if (features.getVolumeRatio() > 1.8 && features.getBandPosition() > 0.80) {
+            return signal(context, SELL, 0.62, "Liquidity sweep above range with reversal pressure", features);
+        }
+
+        return noSignal(context, "No liquidity sweep reversal");
+    }
+
+    private @NotNull StrategySignal volumeBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal obvTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getVolumeRatio() > 1.1) {
+            return trendFollowing(context, features);
+        }
+
+        return noSignal(context, "Volume confirmation too weak");
+    }
+
+    private @NotNull StrategySignal moneyFlowIndex(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return meanReversion(context, features);
+    }
+
+    private @NotNull StrategySignal accumulationDistribution(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return obvTrend(context, features);
+    }
+
+    private @NotNull StrategySignal vwapTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return trendFollowing(context, features);
+    }
+
+    private @NotNull StrategySignal volumeWeightedMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getVolumeRatio() > 1.2) {
+            return momentumContinuation(context, features);
+        }
+
+        return noSignal(context, "Volume-weighted momentum not confirmed");
+    }
+
+    private @NotNull StrategySignal insideBarBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        CandleData current = context.getCurrentCandle();
+        CandleData previous = context.getPreviousCandle(1);
+
+        if (current == null || previous == null) {
+            return noSignal(context, "Need current and previous candle");
+        }
+
+        boolean inside = current.highPrice() < previous.highPrice()
+                && current.lowPrice() > previous.lowPrice();
+
+        if (!inside) {
+            return noSignal(context, "No inside bar compression");
+        }
+
+        if (features.trendUp()) {
+            return signal(context, BUY, 0.59, "Inside bar in bullish trend", features);
+        }
+
+        if (features.trendDown()) {
+            return signal(context, SELL, 0.59, "Inside bar in bearish trend", features);
+        }
+
+        return noSignal(context, "Inside bar without trend bias");
+    }
+
+    private @NotNull StrategySignal outsideBarReversal(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        CandleData current = context.getCurrentCandle();
+        CandleData previous = context.getPreviousCandle(1);
+
+        if (current == null || previous == null) {
+            return noSignal(context, "Need current and previous candle");
+        }
+
+        boolean outside = current.highPrice() > previous.highPrice()
+                && current.lowPrice() < previous.lowPrice();
+
+        if (!outside) {
+            return noSignal(context, "No outside bar");
+        }
+
+        if (current.closePrice() > previous.closePrice()) {
+            return signal(context, BUY, 0.60, "Bullish outside bar reversal", features);
+        }
+
+        if (current.closePrice() < previous.closePrice()) {
+            return signal(context, SELL, 0.60, "Bearish outside bar reversal", features);
+        }
+
+        return noSignal(context, "Outside bar neutral close");
+    }
+
+    private @NotNull StrategySignal pinBarReversal(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        CandleData candle = context.getCurrentCandle();
+
+        if (candle == null) {
+            return noSignal(context, "No current candle");
+        }
+
+        double range = Math.max(candle.highPrice() - candle.lowPrice(), 0.0001);
+        double upperWick = candle.highPrice() - Math.max(candle.openPrice(), candle.closePrice());
+        double lowerWick = Math.min(candle.openPrice(), candle.closePrice()) - candle.lowPrice();
+
+        if (lowerWick / range > 0.55 && features.getBandPosition() < 0.35) {
+            return signal(context, BUY, 0.60, "Bullish pin bar near lower zone", features);
+        }
+
+        if (upperWick / range > 0.55 && features.getBandPosition() > 0.65) {
+            return signal(context, SELL, 0.60, "Bearish pin bar near upper zone", features);
+        }
+
+        return noSignal(context, "No pin bar reversal");
+    }
+
+    private @NotNull StrategySignal engulfingCandleReversal(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        CandleData current = context.getCurrentCandle();
+        CandleData previous = context.getPreviousCandle(1);
+
+        if (current == null || previous == null) {
+            return noSignal(context, "Need current and previous candle");
+        }
+
+        boolean bullishEngulfing = current.openPrice() < previous.closePrice()
+                && current.closePrice() > previous.openPrice();
+
+        boolean bearishEngulfing = current.openPrice() > previous.closePrice()
+                && current.closePrice() < previous.openPrice();
+
+        if (bullishEngulfing && features.getRsi() < 55) {
+            return signal(context, BUY, 0.61, "Bullish engulfing candle", features);
+        }
+
+        if (bearishEngulfing && features.getRsi() > 45) {
+            return signal(context, SELL, 0.61, "Bearish engulfing candle", features);
+        }
+
+        return noSignal(context, "No engulfing reversal");
+    }
+
+    private @NotNull StrategySignal higherHighHigherLowTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return features.trendUp()
+                ? signal(context, BUY, 0.62, "Higher-high higher-low trend proxy", features)
+                : noSignal(context, "No bullish market structure");
+    }
+
+    private @NotNull StrategySignal lowerHighLowerLowTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return features.trendDown()
+                ? signal(context, SELL, 0.62, "Lower-high lower-low trend proxy", features)
+                : noSignal(context, "No bearish market structure");
+    }
+
+    private @NotNull StrategySignal marketStructureBreak(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal fairValueGapContinuation(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
+
+    private @NotNull StrategySignal supplyDemandBounce(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+    private @NotNull StrategySignal londonBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal newYorkReversal(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal asianRangeBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal londonNewYorkContinuation(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
+
+    private @NotNull StrategySignal sessionVwapReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return rangeFade(context, features);
+    }
+
+    private @NotNull StrategySignal carryTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return trendFollowing(context, features);
+    }
+
+    private @NotNull StrategySignal cryptoMomentumExpansion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getAtrPct() > 0.02 && features.getVolumeRatio() > 1.2) {
+            return momentumContinuation(context, features);
+        }
+
+        return noSignal(context, "Crypto expansion not confirmed");
+    }
+
+    private @NotNull StrategySignal cryptoVolatilityScalper(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.isHighVolatility()) {
+            return rangeFade(context, features);
+        }
+
+        return noSignal(context, "Crypto volatility too low");
+    }
+
+    private @NotNull StrategySignal perpetualTrendFollowing(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return trendFollowing(context, features);
+    }
+
+    private @NotNull StrategySignal altcoinRotation(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
+
+    private @NotNull StrategySignal gapFill(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return meanReversion(context, features);
+    }
+
+    private @NotNull StrategySignal gapAndGo(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal indexMomentumRotation(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
+
+    private @NotNull StrategySignal sectorRotation(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
+
+    private @NotNull StrategySignal openingDrive(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal powerHourContinuation(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
+
+    private @NotNull StrategySignal lowVolatilityTrend(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.getAtrPct() < 0.02) {
+            return trendFollowing(context, features);
+        }
+
+        return noSignal(context, "Volatility too high for low-volatility trend");
+    }
+
+    private @NotNull StrategySignal correlationBreakout(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return breakout(context, features);
+    }
+
+    private @NotNull StrategySignal regimeAdaptiveStrategy(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return adaptiveMomentumPullback(context, features);
+    }
+
+    private @NotNull StrategySignal consensusMultiSignal(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        StrategySignal trend = trendFollowing(context, features);
+        StrategySignal momentum = momentumContinuation(context, features);
+        StrategySignal breakoutSignal = breakout(context, features);
+
+        int buyVotes = 0;
+        int sellVotes = 0;
+
+        for (StrategySignal signal : List.of(trend, momentum, breakoutSignal)) {
+            if (signal.getSide() == BUY) {
+                buyVotes++;
+            } else if (signal.getSide() == SELL) {
+                sellVotes++;
+            }
+        }
+
+        if (buyVotes >= 2) {
+            return signal(context, BUY, 0.68, "Consensus bullish signal", features);
+        }
+
+        if (sellVotes >= 2) {
+            return signal(context, SELL, 0.68, "Consensus bearish signal", features);
+        }
+
+        return noSignal(context, "No consensus signal");
+    }
+
+    private @NotNull StrategySignal ensembleStrategy(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return consensusMultiSignal(context, features);
+    }
+
+    private @NotNull StrategySignal hybridTrendReversion(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        if (features.isTrending()) {
+            return trendFollowing(context, features);
+        }
+
+        return meanReversion(context, features);
+    }
+
+    private @NotNull StrategySignal macroMomentum(@NotNull StrategyContext context, @NotNull FeatureRow features) {
+        return momentumContinuation(context, features);
+    }
     @Override
     public @NotNull StrategySignal generateSignal(@NotNull StrategyContext context) {
         // Validate sufficient data
@@ -129,6 +615,7 @@ public class UnifiedStrategy extends BaseStrategy {
 
         // Execute appropriate strategy logic
         StrategySignal signal = switch (baseName) {
+            // Existing core strategies
             case "Trend Following" -> trendFollowing(context, features);
             case "Mean Reversion" -> meanReversion(context, features);
             case "Breakout" -> breakout(context, features);
@@ -144,7 +631,108 @@ public class UnifiedStrategy extends BaseStrategy {
             case "RSI Failure Swing" -> rsiFailureSwing(context, features);
             case "Volume Spike Reversal" -> volumeSpikeReversal(context, features);
             case "Adaptive Momentum Pullback" -> adaptiveMomentumPullback(context, features);
-            case "AI Hybrid", "ML Model" -> noSignal(context, baseName + " requires AI service (not attached)");
+
+            // Moving average / trend systems
+            case "SMA Cross" -> smaCross(context, features);
+            case "Triple EMA Trend" -> tripleEmaTrend(context, features);
+            case "Adaptive Moving Average" -> adaptiveMovingAverage(context, features);
+            case "Keltner Trend" -> keltnerTrend(context, features);
+            case "SuperTrend" -> superTrend(context, features);
+            case "Parabolic SAR Trend" -> parabolicSarTrend(context, features);
+            case "Ichimoku Cloud Trend" -> ichimokuCloudTrend(context, features);
+            case "ADX Trend Strength" -> adxTrendStrength(context, features);
+
+            // Momentum systems
+            case "RSI Momentum" -> rsiMomentum(context, features);
+            case "Stochastic Momentum" -> stochasticMomentum(context, features);
+            case "Rate Of Change Momentum" -> rateOfChangeMomentum(context, features);
+            case "CCI Momentum" -> cciMomentum(context, features);
+            case "Williams R Momentum" -> williamsRMomentum(context, features);
+
+            // Pullback systems
+            case "EMA Pullback" -> emaPullback(context, features);
+            case "VWAP Pullback" -> vwapPullback(context, features);
+            case "Fibonacci Pullback" -> fibonacciPullback(context, features);
+            case "Support Resistance Pullback" -> supportResistancePullback(context, features);
+            case "Trendline Pullback" -> trendlinePullback(context, features);
+
+            // Volatility systems
+            case "Keltner Squeeze" -> keltnerSqueeze(context, features);
+            case "Opening Range Breakout" -> openingRangeBreakout(context, features);
+            case "Session Range Breakout" -> sessionRangeBreakout(context, features);
+            case "High Low Breakout" -> highLowBreakout(context, features);
+            case "Volatility Expansion" -> volatilityExpansion(context, features);
+            case "ATR Channel Breakout" -> atrChannelBreakout(context, features);
+
+            // Reversion / range systems
+            case "Bollinger Mean Reversion" -> bollingerMeanReversion(context, features);
+            case "RSI Mean Reversion" -> rsiMeanReversion(context, features);
+            case "Stochastic Mean Reversion" -> stochasticMeanReversion(context, features);
+            case "VWAP Mean Reversion" -> vwapMeanReversion(context, features);
+            case "Z Score Reversion" -> zScoreReversion(context, features);
+            case "Support Resistance Fade" -> supportResistanceFade(context, features);
+            case "Liquidity Sweep Reversal" -> liquiditySweepReversal(context, features);
+
+            // Volume / order-flow inspired
+            case "Volume Breakout" -> volumeBreakout(context, features);
+            case "OBV Trend" -> obvTrend(context, features);
+            case "Money Flow Index" -> moneyFlowIndex(context, features);
+            case "Accumulation Distribution" -> accumulationDistribution(context, features);
+            case "VWAP Trend" -> vwapTrend(context, features);
+            case "Volume Weighted Momentum" -> volumeWeightedMomentum(context, features);
+
+            // Price action
+            case "Inside Bar Breakout" -> insideBarBreakout(context, features);
+            case "Outside Bar Reversal" -> outsideBarReversal(context, features);
+            case "Pin Bar Reversal" -> pinBarReversal(context, features);
+            case "Engulfing Candle Reversal" -> engulfingCandleReversal(context, features);
+            case "Higher High Higher Low Trend" -> higherHighHigherLowTrend(context, features);
+            case "Lower High Lower Low Trend" -> lowerHighLowerLowTrend(context, features);
+            case "Market Structure Break" -> marketStructureBreak(context, features);
+            case "Fair Value Gap Continuation" -> fairValueGapContinuation(context, features);
+            case "Supply Demand Bounce" -> supplyDemandBounce(context, features);
+
+            // Session / market-specific strategies
+            case "London Breakout" -> londonBreakout(context, features);
+            case "New York Reversal" -> newYorkReversal(context, features);
+            case "Asian Range Breakout" -> asianRangeBreakout(context, features);
+            case "London New York Continuation" -> londonNewYorkContinuation(context, features);
+            case "Session VWAP Reversion" -> sessionVwapReversion(context, features);
+            case "Carry Trend" -> carryTrend(context, features);
+
+            // Crypto / equities / risk-aware / AI hybrid
+            case "Crypto Momentum Expansion" -> cryptoMomentumExpansion(context, features);
+            case "Crypto Volatility Scalper" -> cryptoVolatilityScalper(context, features);
+            case "Perpetual Trend Following" -> perpetualTrendFollowing(context, features);
+            case "Altcoin Rotation" -> altcoinRotation(context, features);
+            case "Gap Fill" -> gapFill(context, features);
+            case "Gap And Go" -> gapAndGo(context, features);
+            case "Index Momentum Rotation" -> indexMomentumRotation(context, features);
+            case "Sector Rotation" -> sectorRotation(context, features);
+            case "Opening Drive" -> openingDrive(context, features);
+            case "Power Hour Continuation" -> powerHourContinuation(context, features);
+            case "Low Volatility Trend" -> lowVolatilityTrend(context, features);
+            case "Correlation Breakout" -> correlationBreakout(context, features);
+            case "Regime Adaptive Strategy" -> regimeAdaptiveStrategy(context, features);
+            case "Consensus Multi Signal" -> consensusMultiSignal(context, features);
+            case "Ensemble Strategy" -> ensembleStrategy(context, features);
+            case "Hybrid Trend Reversion" -> hybridTrendReversion(context, features);
+            case "Macro Momentum" -> macroMomentum(context, features);
+
+            // Requires external/non-price data
+            case "AI Hybrid",
+                 "ML Model",
+                 "Funding Rate Bias",
+                 "Bitcoin Dominance Rotation",
+                 "Earnings Momentum",
+                 "Risk Parity Rotation",
+                 "Drawdown Recovery",
+                 "Defensive Rotation",
+                 "AI Risk Filtered Momentum",
+                 "AI Volatility Regime",
+                 "News Sentiment Momentum" ->
+                    noSignal(context, baseName + " requires external model/data service");
+
             default -> noSignal(context, "Unknown base strategy: " + baseName);
         };
 

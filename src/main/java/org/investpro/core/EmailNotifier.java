@@ -10,6 +10,7 @@ import jakarta.mail.Session;
 import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import org.investpro.config.AppConfig;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import java.util.Properties;
@@ -46,13 +47,13 @@ public record EmailNotifier(
 
     public EmailNotifier(String fromEmail, String toEmail) {
         this(
-                fromEmail,
-                toEmail,
-                getenv("INVESTPRO_SMTP_HOST"),
-                parsePort(getenv("INVESTPRO_SMTP_PORT")),
-                getenv("INVESTPRO_SMTP_USERNAME"),
-                getenv("INVESTPRO_SMTP_PASSWORD"),
-                parseBoolean(getenv("INVESTPRO_SMTP_STARTTLS"))
+                firstNonBlank(fromEmail, config("EMAIL_FROM", "from_email")),
+                firstNonBlank(toEmail, config("EMAIL_TO", "to_email")),
+                firstNonBlank(getenv("INVESTPRO_SMTP_HOST"), config("EMAIL_SMTP_HOST", "email.smtp.host")),
+                parsePort(firstNonBlank(getenv("INVESTPRO_SMTP_PORT"), config("EMAIL_SMTP_PORT", "email.smtp.port"))),
+                firstNonBlank(getenv("INVESTPRO_SMTP_USERNAME"), config("EMAIL_SMTP_USERNAME", "email.smtp.username")),
+                firstNonBlank(getenv("INVESTPRO_SMTP_PASSWORD"), config("EMAIL_SMTP_PASSWORD", "email.smtp.password")),
+                parseBoolean(firstNonBlank(getenv("INVESTPRO_SMTP_STARTTLS"), config("EMAIL_SMTP_STARTTLS", "email.smtp.starttls")))
         );
     }
 
@@ -169,12 +170,17 @@ public record EmailNotifier(
 
     private Session createSession() {
         Properties properties = new Properties();
+        boolean implicitSsl = smtpPort == 465;
+        boolean effectiveStartTls = startTls && !implicitSsl;
 
         properties.put("mail.smtp.host", smtpHost);
         properties.put("mail.smtp.port", String.valueOf(smtpPort));
         properties.put("mail.smtp.auth", String.valueOf(hasAuthentication()));
-        properties.put("mail.smtp.starttls.enable", String.valueOf(startTls));
-        properties.put("mail.smtp.starttls.required", String.valueOf(startTls));
+        properties.put("mail.smtp.ssl.enable", String.valueOf(implicitSsl));
+        properties.put("mail.smtp.starttls.enable", String.valueOf(effectiveStartTls));
+        properties.put("mail.smtp.starttls.required", String.valueOf(effectiveStartTls));
+        properties.put("mail.smtp.ssl.trust", smtpHost);
+        properties.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
         properties.put("mail.smtp.connectiontimeout", "15000");
         properties.put("mail.smtp.timeout", "15000");
         properties.put("mail.smtp.writetimeout", "15000");
@@ -218,6 +224,10 @@ public record EmailNotifier(
 
     private static String getenv(String key) {
         return safe(System.getenv(key));
+    }
+
+    private static String config(String primaryKey, String fallbackKey) {
+        return firstNonBlank(AppConfig.get(primaryKey), AppConfig.get(fallbackKey));
     }
 
     public static String safe(String value) {

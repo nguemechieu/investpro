@@ -25,9 +25,9 @@ This document provides step-by-step guidance for refactoring InvestPro into a cl
 
 ## Architecture Layers
 
-### Layer 1: Application (`org.investpro.app`)
+### Layer 1: Application (`org.investpro`)
 
-**InvestProApplication.java**
+**InvestPro.java / InvestProLauncher.java**
 ```
 Responsibilities:
 - JavaFX Application entry point
@@ -678,14 +678,8 @@ Must use:
 
 ## Java Compatibility
 
-- **Use Java 17**
-- **Avoid Java 21-only methods**:
-  - ❌ list.getFirst()
-  - ✅ list.get(0)
-  - ❌ list.addFirst(item)
-  - ✅ list.add(0, item)
-  - ❌ list.removeLast()
-  - ✅ list.remove(list.size() - 1)
+- **Targets Java 21** (LTS)
+- **Use modern Java 21 idioms** where appropriate, but ensure compatibility with the build environment
 
 ---
 

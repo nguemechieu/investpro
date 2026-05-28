@@ -74,13 +74,13 @@ public class StochasticBacktestStrategy extends BacktestStrategy {
                 double prevD = dValues.length > 1 ? dValues[dValues.length - 2] : d;
 
                 // Oversold condition: both K and D below 20
-                if (k > d && prevK <= prevD && k < 30 && d < 30) {
+                if (k > d && prevK <= prevD && k < 30) {
                     signals.add(new SignalEvent(i, SignalEvent.Type.BUY,
                             String.format("K(%.2f) > D(%.2f) oversold", k, d), 0.8));
                 }
 
                 // Overbought condition: both K and D above 80
-                if (k < d && prevK >= prevD && k > 70 && d > 70) {
+                if (k < d && prevK >= prevD && k > 70) {
                     signals.add(new SignalEvent(i, SignalEvent.Type.SELL,
                             String.format("K(%.2f) < D(%.2f) overbought", k, d), 0.8));
                 }

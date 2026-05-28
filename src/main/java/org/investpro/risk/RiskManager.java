@@ -1,5 +1,6 @@
 package org.investpro.risk;
 
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import lombok.Getter;
@@ -13,8 +14,7 @@ import org.investpro.models.trading.Ticker;
  * Institutional Risk Management System
  * Calculates position size, stop loss, and take profit based on account risk parameters
  */
-@Getter
-@Setter
+@Data
 @Slf4j
 
 public class RiskManager {

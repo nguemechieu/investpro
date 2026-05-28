@@ -1,5 +1,5 @@
 /*
- * Copyright [2024] [TradeAdviser .LLC]
+ * Copyright [2024] [investpro .LLC]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  */
@@ -124,6 +124,9 @@ public class StableTicksAxis extends ValueAxis<Number> {
     private List<Number> minorTicks = Collections.emptyList();
     private double cachedLabelSize = -1.0;
     private double cachedLabelRotation = Double.NaN;
+
+    /** Display precision (decimal places) driven by instrument metadata (e.g. OANDA displayPrecision). -1 = auto. */
+    private int displayPrecision = -1;
 
     private final WritableValue<Double> scaleValue = new WritableValue<>() {
         @Override
@@ -452,7 +455,8 @@ public class StableTicksAxis extends ValueAxis<Number> {
             return getTickLabelFormatter().toString(number);
         }
 
-        return String.valueOf(number);
+        // Fallback: format with displayPrecision if set, otherwise auto-detect
+        return formatWithPrecision(number.doubleValue(), displayPrecision, "");
     }
 
     protected double getLength() {
@@ -465,6 +469,7 @@ public class StableTicksAxis extends ValueAxis<Number> {
                 : Math.max(1.0, getHeight());
     }
 
+    @SuppressWarnings("unused")
     private double getLabelSize() {
         double rotation = getTickLabelRotation();
 
@@ -576,57 +581,110 @@ public class StableTicksAxis extends ValueAxis<Number> {
         return Math.min(value, 2.0);
     }
 
+    /**
+     * Set the display precision (decimal places) for tick labels.
+     * Should match the instrument's {@code displayPrecision} from OANDA or equivalent.
+     * Pass -1 to use automatic precision detection.
+     */
+    public void setPrecision(int precision) {
+        this.displayPrecision = precision < 0 ? -1 : Math.min(precision, 12);
+        // Reapply label formatter if one was set (preserves symbol)
+        if (getTickLabelFormatter() instanceof PrecisionStringConverter psc) {
+            setTickLabelFormatter(psc.symbol, this.displayPrecision);
+        }
+    }
+
+    public int getDisplayPrecision() {
+        return displayPrecision;
+    }
+
+    /**
+     * Installs a tick label formatter using the given currency/pair symbol and current display precision.
+     */
     public void setTickLabelFormatter(String symbol) {
+        setTickLabelFormatter(symbol, displayPrecision);
+    }
+
+    /**
+     * Installs a tick label formatter using the given currency/pair symbol and explicit precision.
+     * Precision should come from instrument metadata (e.g. OANDA {@code displayPrecision}).
+     */
+    public void setTickLabelFormatter(String symbol, int precision) {
+        this.displayPrecision = precision < 0 ? -1 : Math.min(precision, 12);
         String safeSymbol = symbol == null ? "" : symbol.trim();
+        super.setTickLabelFormatter(new PrecisionStringConverter(safeSymbol, this.displayPrecision));
+    }
 
-        super.setTickLabelFormatter(new StringConverter<>() {
-            @Override
-            public String toString(Number number) {
-                if (number == null) {
-                    return "";
-                }
+    /**
+     * Formats a raw double tick value to the given precision with an optional symbol prefix.
+     * If {@code precision} is -1, the precision is inferred from the magnitude of the value.
+     */
+    static String formatWithPrecision(double value, int precision, String symbol) {
+        if (!Double.isFinite(value)) {
+            return "";
+        }
 
-                double value = number.doubleValue();
+        int p = precision >= 0 ? precision : inferPrecision(value);
+        String formatted = String.format("%,." + p + "f", value);
+        return symbol == null || symbol.isEmpty() ? formatted : symbol + formatted;
+    }
 
-                if (!Double.isFinite(value)) {
-                    return "";
-                }
+    /**
+     * Infer a sensible display precision from the magnitude of the value when no explicit precision is set.
+     * This is a fallback — prefer setting precision from instrument metadata.
+     */
+    private static int inferPrecision(double value) {
+        double abs = Math.abs(value);
+        if (abs == 0.0)        return 2;
+        if (abs >= 10_000.0)   return 0;
+        if (abs >= 1_000.0)    return 1;
+        if (abs >= 100.0)      return 2;
+        if (abs >= 10.0)       return 3;
+        if (abs >= 1.0)        return 4;
+        if (abs >= 0.01)       return 5;
+        if (abs >= 0.001)      return 6;
+        return 8;
+    }
 
-                if (Math.abs(value) >= 1_000) {
-                    return safeSymbol + "%,.2f".formatted(value);
-                }
+    /** Named converter so {@link #setPrecision} can detect and re-apply it. */
+    private static final class PrecisionStringConverter extends StringConverter<Number> {
+        final String symbol;
+        final int precision;
 
-                if (Math.abs(value) >= 1) {
-                    return safeSymbol + "%.4f".formatted(value);
-                }
+        PrecisionStringConverter(String symbol, int precision) {
+            this.symbol = symbol;
+            this.precision = precision;
+        }
 
-                return safeSymbol + "%.8f".formatted(value);
+        @Override
+        public String toString(Number number) {
+            if (number == null) {
+                return "";
+            }
+            return formatWithPrecision(number.doubleValue(), precision, symbol);
+        }
+
+        @Override
+        public Number fromString(String text) {
+            if (text == null || text.isBlank()) {
+                return 0.0;
             }
 
-            @Override
-            public Number fromString(String text) {
-                if (text == null || text.isBlank()) {
-                    return 0.0;
-                }
+            String cleaned = text
+                    .replace(symbol, "")
+                    .replace(",", "")
+                    .trim();
 
-                String cleaned = text
-                        .replace(safeSymbol, "")
-                        .replace(",", "")
-                        .trim();
-
-                try {
-                    return Double.parseDouble(cleaned);
-                } catch (NumberFormatException exception) {
-                    return 0.0;
-                }
+            try {
+                return Double.parseDouble(cleaned);
+            } catch (NumberFormatException exception) {
+                return 0.0;
             }
-        });
+        }
     }
     private record Range(double low, double high, double tickSpacing, double scale) {
 
-
-
-
+        @SuppressWarnings("unused")
         public double getDelta() {
             return high - low;
         }

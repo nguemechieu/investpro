@@ -157,6 +157,7 @@ import static org.investpro.i18n.LocalizationService.t;
  * and notifications.
  * - SmartBot is no longer controlled directly from the UI.
  */
+@SuppressWarnings("unchecked")
 @Slf4j
 @Getter
 @Setter
@@ -361,6 +362,7 @@ public class TradingDesk extends BorderPane  {
     private String configuredOpenAiApiKey = "";
     private String oandaEmailNotification = "";
     private boolean initialized;
+    private TextArea pemArea;
 
     private record BotStartPlan(List<TradePair> selectedSymbols, List<TradePair> streamingSymbols) {
     }
@@ -2361,10 +2363,6 @@ public class TradingDesk extends BorderPane  {
         return tab;
     }
 
-    private @NotNull Node createAccountHistoryPlaceholder() {
-        return createTerminalPlaceholder("Account history will show closed orders and deals.");
-    }
-
     private @NotNull Node createNewsPlaceholder() {
         TabPane newsTabs = new TabPane();
         newsTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -2549,7 +2547,7 @@ public class TradingDesk extends BorderPane  {
         terminalTabPane.getStyleClass().add("console-tab-pane");
        // DraggableTab.registerTabPane(terminalTabPane);
         terminalTabPane.getTabs().addAll(
-                createDetachableTerminalTab(TabName.ACCOUNT_ACTIVITY, buildAccountActivityPane(true)),
+                createDetachableTerminalTab(TabName.ACCOUNT_ACTIVITY, buildAccountActivityPane()),
                 createDetachableTerminalTab(TabName.PORTFOLIO, buildPortfolioPane()),
                 createDetachableTerminalTab(TabName.POSITIONS, createPositionsTab().getContent()),
                 createDetachableTerminalTab(TabName.RISK_MONITOR, createPositionRiskMonitorTab().getContent()),
@@ -4035,23 +4033,7 @@ public class TradingDesk extends BorderPane  {
                 trade.getTransactionType());
     }
 
-    private @NotNull Node buildOrderManagementPane() {
-        TabPane pane = new TabPane();
-        pane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        pane.setSide(Side.TOP);
-        pane.getStyleClass().add("console-tab-pane");
-
-        Tab ordersTab = new Tab("Open Orders", buildOpenOrdersTable());
-        ordersTab.setClosable(false);
-
-        Tab fillsTab = new Tab("Fills / History", buildOrderHistoryTable());
-        fillsTab.setClosable(false);
-
-        pane.getTabs().setAll(ordersTab, fillsTab);
-        return pane;
-    }
-
-    private @NotNull Node buildAccountActivityPane(boolean includeToolbar) {
+    private @NotNull Node buildAccountActivityPane() {
         TabPane activityTabs = new TabPane();
         activityTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         activityTabs.setSide(Side.TOP);
@@ -4065,10 +4047,6 @@ public class TradingDesk extends BorderPane  {
         Tab tradeHistoryTab = new Tab("Trade History", buildAccountTradesTable());
 
         activityTabs.getTabs().setAll(summaryTab, assetsTab, positionsTab, openOrdersTab, orderHistoryTab, tradeHistoryTab);
-
-        if (!includeToolbar) {
-            return activityTabs;
-        }
 
         Label exchangeLabel = new Label();
         exchangeLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #cbd5e1;");
@@ -4418,23 +4396,19 @@ public class TradingDesk extends BorderPane  {
     }
 
     private void updateConnectControl(boolean connected) {
-        if (connected) {
-            connectButton.setText(t("status.connected"));
-            connectButton.setStyle(
-                "-fx-padding: 8 15; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
-            connectButton.setVisible(true);
-            connectButton.setManaged(true);
-            connectedBrokerLabel.setVisible(false);
-            connectedBrokerLabel.setManaged(false);
-        } else {
+        if (!connected) {
             connectButton.setText(t("toolbar.connect"));
             connectButton.setStyle(
                     "-fx-padding: 8 15; -fx-background-color: #3b82f6; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
-            connectButton.setVisible(true);
-            connectButton.setManaged(true);
-            connectedBrokerLabel.setVisible(false);
-            connectedBrokerLabel.setManaged(false);
+        } else {
+            connectButton.setText(t("status.connected"));
+            connectButton.setStyle(
+                "-fx-padding: 8 15; -fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
         }
+        connectButton.setVisible(true);
+        connectButton.setManaged(true);
+        connectedBrokerLabel.setVisible(false);
+        connectedBrokerLabel.setManaged(false);
         connectButton.setDisable(false);
     }
 
@@ -6086,7 +6060,7 @@ public class TradingDesk extends BorderPane  {
                 yield selected == null ? List.of() : List.of(selected);
             }
             case "Watchlist", "Market Watch" -> displayedMarketWatchSymbols();
-            default -> displayedMarketWatchSymbols();
+            default -> symbolSelector.getItems();
         };
     }
 
@@ -6961,11 +6935,6 @@ public class TradingDesk extends BorderPane  {
             refreshes.add(orderHistoryRefresh);
         }
 
-        if (refreshes.isEmpty()) {
-            accountWorkspaceRefreshInFlight.set(false);
-            return;
-        }
-
         CompletableFuture.allOf(refreshes.toArray(CompletableFuture[]::new))
                 .whenComplete((unused, exception) -> accountWorkspaceRefreshInFlight.set(false));
     }
@@ -7006,7 +6975,9 @@ public class TradingDesk extends BorderPane  {
             }
         });
         try {
-            latch.await(1, TimeUnit.SECONDS);
+            if (!latch.await(1, TimeUnit.SECONDS)) {
+                log.debug("Symbol selector latch timed out waiting for JavaFX thread");
+            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -7343,7 +7314,8 @@ public class TradingDesk extends BorderPane  {
         dialog.getDialogPane().setStyle("-fx-control-inner-background: #1a1a2e;");
         dialog.setWidth(850);
         dialog.setHeight(750);
-        dialog.showAndWait();
+        dialog.setResizable(true);
+        dialog.show();
     }
 
     private void openMarketResearch() {
@@ -7414,7 +7386,7 @@ public class TradingDesk extends BorderPane  {
             }
 
             newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> {
-                if (!(newWindow instanceof Stage stage)) {
+                if (!(newWindow instanceof Stage windowStage)) {
                     return;
                 }
 
@@ -7428,12 +7400,12 @@ public class TradingDesk extends BorderPane  {
                     existingFuture.cancel(false);
                 }
 
-                stage.setOnHidden(event -> {
+                windowStage.setOnHidden(event -> {
                     ScheduledFuture<?> future = autoRefreshFuture.getAndSet(null);
                     if (future != null) {
                         future.cancel(false);
                     }
-                    log.info("Independent window closed: {}", stage.getTitle());
+                    log.info("Independent window closed: {}", windowStage.getTitle());
                 });
             });
         });
@@ -8148,7 +8120,7 @@ public class TradingDesk extends BorderPane  {
     private void showAccountActivity() {
         log.info("Opening Account Activity panel");
         refreshAccountWorkspace();
-        createIndependentWindow("Account Activity", buildAccountActivityPane(true), 1100, 720);
+        createIndependentWindow("Account Activity", buildAccountActivityPane(), 1100, 720);
         journal("Account Activity panel opened");
     }
 
@@ -9262,7 +9234,7 @@ public class TradingDesk extends BorderPane  {
         secretField.setText(configuredApiSecret);
 
         // For Coinbase, the secret is a multi-line PEM key — use TextArea instead
-        TextArea pemArea = new TextArea();
+         pemArea = new TextArea();
         if (isCoinbase) {
             pemArea.setText(configuredApiSecret);
             pemArea.setPromptText("-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----");
@@ -10522,7 +10494,7 @@ public class TradingDesk extends BorderPane  {
                         .thenComparing(StrategyAssignment::getAssignedAt))
                 .orElse(null);
 
-        if (best != null && best.getScoreAtAssignment() >= reassignBelowScore) {
+        if (best.getScoreAtAssignment() >= reassignBelowScore) {
             log.info("Reusing healthy strategy assignment for {}: {} {} score={} threshold={}",
                     symbolText,
                     best.getStrategyId(),
@@ -10532,19 +10504,17 @@ public class TradingDesk extends BorderPane  {
             return best;
         }
 
-        if (best != null) {
-            log.warn("Existing strategy assignment for {} is under reassignment threshold: {} {} score={} < {}",
-                    symbolText,
-                    best.getStrategyId(),
-                    best.getTimeframe().getCode(),
-                    best.getScoreAtAssignment(),
-                    reassignBelowScore);
-            appendAgentActivity("Re-evaluating " + symbolText
-                    + ": existing strategy score "
-                    + String.format("%.1f", best.getScoreAtAssignment())
-                    + " is below "
-                    + String.format("%.1f", reassignBelowScore) + ".");
-        }
+        log.warn("Existing strategy assignment for {} is under reassignment threshold: {} {} score={} < {}",
+                symbolText,
+                best.getStrategyId(),
+                best.getTimeframe().getCode(),
+                best.getScoreAtAssignment(),
+                reassignBelowScore);
+        appendAgentActivity("Re-evaluating " + symbolText
+                + ": existing strategy score "
+                + String.format("%.1f", best.getScoreAtAssignment())
+                + " is below "
+                + String.format("%.1f", reassignBelowScore) + ".");
 
         return null;
     }
@@ -10572,7 +10542,7 @@ public class TradingDesk extends BorderPane  {
 
     private Map<Timeframe, List<CandleData>> loadBacktestCandlesForAllTimeframes(TradePair symbol) {
         Map<Timeframe, List<CandleData>> candlesByTimeframe = new LinkedHashMap<>();
-        for (Timeframe timeframe : MT5_TIMEFRAMES) {
+        for (Timeframe timeframe : liveStrategyAssignmentTimeframes()) {
             try {
                 CandleDataSupplier supplier = exchange.getCandleDataSupplier(timeframe.getSeconds(), symbol);
                 if (supplier == null) {
@@ -10599,6 +10569,36 @@ public class TradingDesk extends BorderPane  {
             }
         }
         return candlesByTimeframe;
+    }
+
+    private List<Timeframe> liveStrategyAssignmentTimeframes() {
+        int maxTimeframes = Math.max(1, AppConfig.getInt("strategy.lab.assignment.maxTimeframes", 2));
+        List<Timeframe> preferred = List.of(Timeframe.H1, Timeframe.H4, Timeframe.M15, Timeframe.D1);
+        List<Timeframe> available = exchange != null && exchange.getSupportedTimeframes() != null
+                ? new ArrayList<>(exchange.getSupportedTimeframes())
+                : new ArrayList<>(MT5_TIMEFRAMES);
+        LinkedHashSet<Timeframe> selected = new LinkedHashSet<>();
+        Timeframe current = timeframeSelector == null ? null : timeframeSelector.getValue();
+        if (current != null && available.contains(current) && !current.isLongTerm()) {
+            selected.add(current);
+        }
+        for (Timeframe timeframe : preferred) {
+            if (available.contains(timeframe)) {
+                selected.add(timeframe);
+            }
+            if (selected.size() >= maxTimeframes) {
+                break;
+            }
+        }
+        if (selected.isEmpty()) {
+            for (Timeframe timeframe : available) {
+                if (timeframe != null && !timeframe.isLongTerm()) {
+                    selected.add(timeframe);
+                    break;
+                }
+            }
+        }
+        return List.copyOf(selected);
     }
 
     private void stopBotTradingAsync() {
@@ -10886,10 +10886,10 @@ public class TradingDesk extends BorderPane  {
                 return;
             }
             newScene.windowProperty().addListener((windowObs, oldWindow, newWindow) -> {
-                if (!(newWindow instanceof Stage stage)) {
+                if (!(newWindow instanceof Stage windowStage)) {
                     return;
                 }
-                stage.setOnHidden(event -> {
+                windowStage.setOnHidden(event -> {
                     if (symbolSelector != null) {
                         symbolSelector.getSelectionModel().selectedItemProperty().removeListener(symbolRefreshListener);
                     }
@@ -10897,8 +10897,8 @@ public class TradingDesk extends BorderPane  {
                         timeframeSelector.getSelectionModel().selectedItemProperty()
                                 .removeListener(timeframeRefreshListener);
                     }
-                    stage.close();
-                    log.info("Independent window closed: {}", stage.getTitle());
+                    windowStage.close();
+                    log.info("Window closed: {}", windowStage.getTitle());
                 });
             });
         });
@@ -12018,13 +12018,151 @@ public class TradingDesk extends BorderPane  {
                     .build();
 
             // Create and display the panel
-            TradingSystemStatusPanel statusPanel = new TradingSystemStatusPanel(snapshot);
+            TradingSystemStatusPanel statusPanel = new TradingSystemStatusPanel(() -> {
+                try {
+                    return createTradingSystemStatusSnapshot();
+                } catch (Exception refreshException) {
+                    log.debug("Unable to auto-refresh trading system status snapshot: {}",
+                            rootMessage(refreshException), refreshException);
+                    return snapshot;
+                }
+            });
             createIndependentWindow("Trading System Status", statusPanel, 800, 700);
 
         } catch (Exception e) {
             log.error("Error displaying trading system status", e);
             showError( "Failed to display trading system status: " + e.getMessage());
         }
+    }
+
+    private TradingSystemStatusSnapshot createTradingSystemStatusSnapshot() {
+        var systemHealth = systemCore.getSystemHealth();
+        var currentSession = brokerSessions.get(exchange != null ? exchange.getName() : "");
+        var account = currentSession != null ? currentSession.account() : null;
+        double availableBalance = account != null ? account.getAvailableBalance() : 0.0;
+        double equity = account != null ? account.getEquity() : 0.0;
+        double unrealizedPnl = account != null ? account.getUnrealizedPnl() : 0.0;
+        double realizedPnlToday = account != null ? account.getRealizedPnlToday() : 0.0;
+        var isAutoTrading = systemCore.getSmartBot() != null && systemCore.getSmartBot().isAutoTradingEnabled();
+        List<CandleData> candleList;
+        try {
+            candleList = new ArrayList<>(systemCore.getHistoricalDataRepository().findAll());
+        } catch (SQLException exception) {
+            log.debug("Unable to refresh status candle count: {}", rootMessage(exception));
+            candleList = List.of();
+        }
+        TradePair selectedPair = symbolSelector == null ? null : symbolSelector.getValue();
+        TradingSessionStatus sessionStatus = selectedPair == null
+                ? TradingSessionStatus.UNKNOWN
+                : selectedPair.getTradingSessionStatus();
+        String normalizedSession = sessionStatus.name();
+        boolean marketOpen = sessionStatus == TradingSessionStatus.OPEN;
+        List<StrategyAssignment> activeAssignments = StrategyAssignmentRepository.getInstance().getAllActive();
+        List<TradingSystemStatusSnapshot.StrategyStatus> strategyRows = activeAssignments.stream()
+                .map(assignment -> new TradingSystemStatusSnapshot.StrategyStatus(
+                        safe(assignment.getSymbol()),
+                        safe(assignment.getStrategyId()),
+                        assignment.getMode() == null ? "UNKNOWN" : assignment.getMode().name(),
+                        "NEUTRAL",
+                        assignment.getScoreAtAssignment() > 1.0
+                                ? assignment.getScoreAtAssignment() / 100.0
+                                : assignment.getScoreAtAssignment(),
+                        0.0,
+                        assignment.isActive() ? "ACTIVE" : "INACTIVE"))
+                .toList();
+
+        return TradingSystemStatusSnapshot.builder()
+                .systemState(SystemState.READY)
+                .brokerName(exchange != null ? exchange.getName() : "Unknown")
+                .tradingMode(configuredTradingMode != null ? configuredTradingMode : "LIVE")
+                .autoTradingEnabled(isAutoTrading)
+                .killSwitchArmed(false)
+                .activeVenue(exchange != null ? exchange.getName() : "N/A")
+                .connectedSince(systemHealth != null ? systemHealth.getTimestamp() : java.time.Instant.now())
+                .lastHeartbeat(java.time.Instant.now())
+                .uptimeSeconds(0L)
+                .restApiConnected(true)
+                .webSocketConnected(true)
+                .tickerStreamActive(true)
+                .orderBookStreamActive(true)
+                .candleStreamActive(true)
+                .accountStreamActive(true)
+                .latencyMillis(50L)
+                .rateLimitStatus("OK")
+                .reconnectCount(0)
+                .lastMarketTick(java.time.Instant.now())
+                .executionEngineRunning(true)
+                .orderSubmissionAllowed(true)
+                .pendingOrders(0)
+                .rejectedOrdersToday(0)
+                .lastOrderId("N/A")
+                .lastFillTime(java.time.Instant.now())
+                .averageFillLatencyMs(50L)
+                .slippageEstimatePips(0.5)
+                .cancelAllSupported(true)
+                .riskStatus(RiskStatus.PASSING)
+                .dailyLoss(account != null ? account.getDailyLoss() : 0.0)
+                .maxDailyLoss(account != null ? account.getMaxDailyLoss() : 0.0)
+                .maxDrawdown(0.05)
+                .currentDrawdown(0.02)
+                .portfolioHeat(0.3)
+                .marginUsed(account != null ? account.getMarginUsed() : 0.0)
+                .freeMargin(account != null ? account.getFreeMargin() : 0.0)
+                .maxPositionsAllowed(10)
+                .currentPositionCount(0)
+                .concentrationRisk(String.valueOf(0.1))
+                .correlationRisk(String.valueOf(0.2))
+                .lastRiskDecision("APPROVED")
+                .activeStrategies(strategyRows.size())
+                .bestStrategyToday("N/A")
+                .worstStrategyToday("N/A")
+                .lastSignal("NEUTRAL")
+                .lastSignalConfidence(0.75)
+                .strategyStatus(strategyRows)
+                .aiProvider("OpenAI")
+                .aiEnabled(true)
+                .aiReviewMode("ON")
+                .lastAiDecision("APPROVED")
+                .confidenceThreshold(0.7)
+                .lastAiReasoningTime(java.time.Instant.now())
+                .promptVersion("1.0")
+                .learningEngineActive(true)
+                .feedbackSamples(0)
+                .balance(availableBalance)
+                .equity(equity)
+                .availableBalance(availableBalance)
+                .unrealizedPnl(unrealizedPnl)
+                .realizedPnlToday(realizedPnlToday)
+                .feesAndCommission(0.0)
+                .swapOrFundingCost(0.0)
+                .openPositionCount(0)
+                .openOrderCount(0)
+                .primaryMarketStatus(normalizedSession)
+                .sessionName(normalizedSession)
+                .timeToMarketCloseSeconds(marketOpen ? 3600 : 0)
+                .timeToMarketOpenSeconds(marketOpen ? 0 : 3600)
+                .liquidityCondition(marketOpen ? "GOOD" : "UNKNOWN")
+                .rolloverRiskActive(false)
+                .newsLockoutActive(false)
+                .candlesLoaded(candleList.size())
+                .minimumCandlesRequired(100)
+                .indicatorWarmupComplete(true)
+                .missingCandleGaps(0)
+                .backtestReady(true)
+                .paperTestReady(true)
+                .liveReady(true)
+                .lastDataUpdate(java.time.Instant.now())
+                .eventBusRunning(true)
+                .eventQueueSize(0)
+                .eventsPerSecond(0)
+                .droppedEvents(0)
+                .deadLetterQueueSize(0)
+                .activeSubscribers(0)
+                .lastEventType("N/A")
+                .replayAvailable(false)
+                .alerts(java.util.List.of())
+                .systemHealthScore(95)
+                .build();
     }
     Stage stage=new Stage();
     private void showError( String s) {

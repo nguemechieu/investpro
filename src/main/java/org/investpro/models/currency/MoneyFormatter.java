@@ -1,7 +1,5 @@
 package org.investpro.models.currency;
 
-import javax.swing.*;
-
 /**
  * @author NOEL NGUEMECHIEU
  */

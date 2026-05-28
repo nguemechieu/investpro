@@ -1,6 +1,7 @@
 package org.investpro.strategy;
 
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.enums.StrategyCategory;
@@ -15,7 +16,7 @@ import java.util.Set;
  * Metadata describing a trading strategy.
  * Defines capabilities, compatibility, and classification.
  */
-@Getter
+@Data
 @Builder
 @Slf4j
 public class StrategyMetadata {

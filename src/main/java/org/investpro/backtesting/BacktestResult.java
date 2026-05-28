@@ -35,11 +35,22 @@ public class BacktestResult {
     private double expectedValue;
     // Execution metrics
     private long backTestDuration; // in milliseconds
+    private long candlesProcessed;
+    private double candlesPerSecond;
+    private long strategyExecutionNanos;
+    private long indicatorCalculationNanos;
+    private long executionSimulationNanos;
+    private long startMemoryBytes;
+    private long endMemoryBytes;
+    private long peakMemoryBytes;
+    private long gcPressureEstimateBytes;
     private final List<TradeRecord> trades;
+    private final List<Double> equityCurve;
     private final Map<String, Object> additionalMetrics;
 
     public BacktestResult() {
         this.trades = new ArrayList<>();
+        this.equityCurve = new ArrayList<>();
         this.additionalMetrics = new HashMap<>();
     }
 
@@ -48,9 +59,16 @@ public class BacktestResult {
         this.additionalMetrics.put(key, value);
     }
 
-    public void setTrades(ArrayList<TradeRecord> tradeRecords) {
+    public void setTrades(List<TradeRecord> tradeRecords) {
         this.trades.clear();
         this.trades.addAll(tradeRecords);
+    }
+
+    public void setEquityCurve(List<Double> values) {
+        this.equityCurve.clear();
+        if (values != null) {
+            this.equityCurve.addAll(values);
+        }
     }
 
     /**

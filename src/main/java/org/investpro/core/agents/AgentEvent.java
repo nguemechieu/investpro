@@ -37,6 +37,14 @@ public record AgentEvent(
     public static final String STRATEGY_SIGNAL_APPROVED = "STRATEGY_SIGNAL_APPROVED";
     public static final String STRATEGY_SIGNAL_REJECTED = "STRATEGY_SIGNAL_REJECTED";
 
+    // ── Decision pipeline events ──────────────────────────────────────────────
+    public static final String TRADE_INTENT_CREATED          = "TRADE_INTENT_CREATED";
+    public static final String RISK_EVALUATION_COMPLETED     = "RISK_EVALUATION_COMPLETED";
+    public static final String EXECUTION_PLAN_CREATED        = "EXECUTION_PLAN_CREATED";
+    public static final String DECISION_APPROVED             = "DECISION_APPROVED";
+    public static final String DECISION_REJECTED             = "DECISION_REJECTED";
+    public static final String DECISION_EXECUTED             = "DECISION_EXECUTED";
+
     public static final String RISK_APPROVED = "RISK_APPROVED";
     public static final String RISK_REJECTED = "RISK_REJECTED";
     public static final String RISK_REVIEWED = "RISK_REVIEWED";
@@ -67,6 +75,14 @@ public record AgentEvent(
     public static final String AI_REASONING_DISABLED = "AI_REASONING_DISABLED";
 
     public static final String ERROR = "ERROR";
+
+    // ── Solana blockchain network events ──────────────────────────────────────
+    public static final String SOLANA_CONNECTED              = "SOLANA_CONNECTED";
+    public static final String SOLANA_BALANCE_UPDATED        = "SOLANA_BALANCE_UPDATED";
+    public static final String SOLANA_TRANSACTION_DETECTED   = "SOLANA_TRANSACTION_DETECTED";
+    public static final String SOLANA_TRANSACTION_SUBMITTED  = "SOLANA_TRANSACTION_SUBMITTED";
+    public static final String SOLANA_TRANSACTION_CONFIRMED  = "SOLANA_TRANSACTION_CONFIRMED";
+    public static final String SOLANA_TRANSACTION_FAILED     = "SOLANA_TRANSACTION_FAILED";
 
     public AgentEvent {
         type = Objects.requireNonNull(type, "type must not be null").trim();

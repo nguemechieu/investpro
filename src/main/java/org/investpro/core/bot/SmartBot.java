@@ -1,7 +1,6 @@
 package org.investpro.core.bot;
 
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentContext;
 import org.investpro.core.agents.AgentEvent;
@@ -21,36 +20,42 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * SmartBot is the focused bot runtime controller.
- * <p>
- * Responsibilities:
- * - create and manage AgentContext
- * - start/stop AgentRuntime
- * - start/stop AgentEventBus
- * - control auto-trading flag
- * - control AI reasoning flag
- * - publish bot/agent events
- * <p>
- * SmartBot does NOT:
- * - manage exchange streaming modes
- * - send Telegram/email directly
- * - place trades directly
- * - own application wiring
- * - own UI/app lifecycle
- * <p>
- * SystemCore owns app-level responsibilities.
- * TradingWindow owns desktop UI-only streaming.
+ *
+ * <p>Responsibilities:</p>
+ * <ul>
+ *     <li>Create and manage AgentContext.</li>
+ *     <li>Start/stop AgentRuntime.</li>
+ *     <li>Start/stop AgentEventBus where supported by the current implementation.</li>
+ *     <li>Control auto-trading flag.</li>
+ *     <li>Control AI reasoning flag.</li>
+ *     <li>Publish bot/agent events.</li>
+ * </ul>
+ *
+ * <p>SmartBot does not:</p>
+ * <ul>
+ *     <li>Manage exchange streaming modes.</li>
+ *     <li>Send Telegram/email directly.</li>
+ *     <li>Place trades directly.</li>
+ *     <li>Own application wiring.</li>
+ *     <li>Own UI/application lifecycle.</li>
+ * </ul>
+ *
+ * <p>SystemCore owns app-level responsibilities.
+ * TradingDesk owns desktop UI-only streaming.</p>
  */
 @Slf4j
 @Getter
-@Setter
 public class SmartBot {
+
+    public static final String SOURCE = "SmartBot";
+
     private final AgentEventBus eventBus;
     private final AgentRuntime runtime;
     private final BotTradingConfig botTradingConfig;
 
     private final AtomicBoolean started = new AtomicBoolean(false);
 
-    private AgentContext context;
+    private volatile AgentContext context;
 
     public SmartBot() {
         this(AgentRuntime.createDefault(), new AgentEventBus(), loadBotTradingConfig());
@@ -58,31 +63,32 @@ public class SmartBot {
 
     public SmartBot(
             @NotNull AgentRuntime runtime,
-            @NotNull AgentEventBus eventBus) {
+            @NotNull AgentEventBus eventBus
+    ) {
         this(runtime, eventBus, loadBotTradingConfig());
     }
 
     public SmartBot(
             @NotNull AgentRuntime runtime,
             @NotNull AgentEventBus eventBus,
-            @NotNull BotTradingConfig botTradingConfig) {
+            @NotNull BotTradingConfig botTradingConfig
+    ) {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
         this.botTradingConfig = Objects.requireNonNull(botTradingConfig, "botTradingConfig must not be null");
     }
 
     /**
-     * Start the bot runtime.
-     * <p>
-     * Auto-trading starts OFF by default.
-     * SystemCore must explicitly enable auto-trading after startup.
-     * <p>
-     * Starts registered agents after event bus and runtime are ready.
+     * Starts the bot runtime.
+     *
+     * <p>Auto-trading uses the persisted {@link BotTradingConfig} value.
+     * SystemCore/UI can still explicitly enable or disable it after startup.</p>
      */
     public void start(
             @NotNull Exchange exchange,
             @NotNull TradingService tradingService,
-            @Nullable TradePair selectedTradePair) {
+            @Nullable TradePair selectedTradePair
+    ) {
         Objects.requireNonNull(exchange, "exchange must not be null");
         Objects.requireNonNull(tradingService, "tradingService must not be null");
 
@@ -91,43 +97,33 @@ public class SmartBot {
             return;
         }
 
-        AgentContext newContext = new AgentContext();
-        newContext.setExchange(exchange);
-        newContext.setTradingService(tradingService);
-        newContext.setEventBus(eventBus);
-        newContext.setSelectedTradePair(selectedTradePair);
-        newContext.setSelectedSymbol(tradePairText(selectedTradePair));
-        newContext.setBotTradingConfig(botTradingConfig);
-
-        /*
-         * Persisted bot settings feed runtime risk limits. AI reasoning can be
-         * enabled, but execution still goes through the normal risk gate.
-         */
-        newContext.setAutoTradingEnabled(botTradingConfig.isEnabled());
-        newContext.setAiReasoningEnabled(true);
-        newContext.setMaxRiskPerTrade(percentToRatio(botTradingConfig.getMaxPortfolioRiskPercent(), 0.01));
-        newContext.setMaxDailyLoss(percentToRatio(botTradingConfig.getMaxDailyLosses(), 0.03));
-
-        this.context = newContext;
+        AgentContext newContext = createContext(exchange, tradingService, selectedTradePair);
+        context = newContext;
 
         try {
-            runtime.start(context);
-            runtime.setAutoTradingEnabled(botTradingConfig.isEnabled());
+            safeStartEventBus();
+
+            runtime.start(newContext);
+            runtime.setAutoTradingEnabled(newContext.isAutoTradingEnabled());
+            runtime.setAiReasoningEnabled(newContext.isAiReasoningEnabled());
 
             publishSystemEvent("SMART_BOT_STARTED", "SmartBot started.");
 
             log.info(
-                    "SmartBot started. exchange={} pair={} agents={}",
+                    "SmartBot started. exchange={} pair={} autoTrading={} aiReasoning={} agents={}",
                     safeExchangeName(exchange),
-                    selectedTradePair,
-                    runtime.getAgents().size());
+                    tradePairText(selectedTradePair),
+                    newContext.isAutoTradingEnabled(),
+                    newContext.isAiReasoningEnabled(),
+                    safeAgentCount()
+            );
 
         } catch (Exception exception) {
-            safeStopRuntime();
-            safeStopEventBus();
-
             context = null;
             started.set(false);
+
+            safeStopRuntime();
+            safeStopEventBus();
 
             log.error("Failed to start SmartBot", exception);
             throw new IllegalStateException("Failed to start SmartBot", exception);
@@ -135,14 +131,14 @@ public class SmartBot {
     }
 
     /**
-     * Stop bot runtime and event bus.
-     * <p>
-     * Stops all registered agents first, then stops runtime and event bus.
+     * Stops bot runtime and event bus.
      */
     public void stop() {
         if (!started.compareAndSet(true, false)) {
             return;
         }
+
+        publishSystemEvent("SMART_BOT_STOPPING", "SmartBot stopping.");
 
         safeStopRuntime();
         safeStopEventBus();
@@ -153,66 +149,119 @@ public class SmartBot {
     }
 
     /**
-     * Restart the bot runtime with a new exchange/context.
+     * Restarts the bot runtime with a new exchange/context.
      */
     public void restart(
             @NotNull Exchange exchange,
             @NotNull TradingService tradingService,
-            @Nullable TradePair selectedTradePair) {
+            @Nullable TradePair selectedTradePair
+    ) {
         stop();
         start(exchange, tradingService, selectedTradePair);
     }
 
     /**
-     * Enable or disable autonomous execution.
-     * <p>
-     * When disabled:
-     * - agents can still analyze
-     * - signals can still be produced
-     * - risk can still evaluate
-     * - execution must not send orders
+     * Enables or disables autonomous execution.
+     *
+     * <p>When disabled, agents may still analyze, generate signals, and evaluate risk,
+     * but execution must not send orders.</p>
      */
     public void setAutoTradingEnabled(boolean enabled) {
-        ensureStarted();
+        AgentContext activeContext = requireContext();
 
-        context.setAutoTradingEnabled(enabled);
+        activeContext.setAutoTradingEnabled(enabled);
         runtime.setAutoTradingEnabled(enabled);
 
         publishSystemEvent(
                 enabled ? "AUTO_TRADING_ENABLED" : "AUTO_TRADING_DISABLED",
-                enabled ? "Auto trading enabled." : "Auto trading disabled.");
+                enabled ? "Auto trading enabled." : "Auto trading disabled."
+        );
 
-        log.info("SmartBot auto trading enabled={}", enabled);
+        log.info("SmartBot autoTrading={}", enabled);
     }
 
     /**
-     * Enable or disable AI reasoning.
+     * Enables or disables AI reasoning.
      */
     public void setAiReasoningEnabled(boolean enabled) {
-        ensureStarted();
+        AgentContext activeContext = requireContext();
 
-        context.setAiReasoningEnabled(enabled);
+        activeContext.setAiReasoningEnabled(enabled);
         runtime.setAiReasoningEnabled(enabled);
 
         publishSystemEvent(
                 enabled ? "AI_REASONING_ENABLED" : "AI_REASONING_DISABLED",
-                enabled ? "AI reasoning enabled." : "AI reasoning disabled.");
+                enabled ? "AI reasoning enabled." : "AI reasoning disabled."
+        );
 
-        log.info("SmartBot AI reasoning enabled={}", enabled);
+        log.info("SmartBot aiReasoning={}", enabled);
     }
 
     /**
-     * Update the selected trade pair in the running bot context.
+     * Updates the selected trade pair in the running bot context.
      */
     public void setSelectedTradePair(@Nullable TradePair selectedTradePair) {
-        ensureStarted();
+        AgentContext activeContext = requireContext();
 
-        context.setSelectedTradePair(selectedTradePair);
-        context.setSelectedSymbol(tradePairText(selectedTradePair));
+        activeContext.setSelectedTradePair(selectedTradePair);
+        activeContext.setSelectedSymbol(tradePairText(selectedTradePair));
 
         publishSystemEvent(
                 "SMART_BOT_SYMBOL_CHANGED",
-                "Selected symbol changed to " + tradePairText(selectedTradePair));
+                "Selected symbol changed to " + tradePairText(selectedTradePair)
+        );
+
+        log.info("SmartBot selected pair changed to {}", tradePairText(selectedTradePair));
+    }
+
+    /**
+     * Updates the bot exchange reference while keeping the bot runtime alive.
+     *
+     * <p>For safety, auto-trading is temporarily disabled during the switch and then
+     * restored to its previous state if the switch succeeds.</p>
+     */
+    public void updateExchange(@NotNull Exchange newExchange) {
+        Objects.requireNonNull(newExchange, "newExchange must not be null");
+
+        AgentContext activeContext = requireContext();
+
+        Exchange oldExchange = activeContext.getExchange();
+        boolean wasAutoTradingEnabled = activeContext.isAutoTradingEnabled();
+
+        try {
+            activeContext.setAutoTradingEnabled(false);
+            runtime.setAutoTradingEnabled(false);
+
+            activeContext.setExchange(newExchange);
+
+            activeContext.setAutoTradingEnabled(wasAutoTradingEnabled);
+            runtime.setAutoTradingEnabled(wasAutoTradingEnabled);
+
+            String oldName = oldExchange == null ? "NONE" : safeDisplayName(oldExchange);
+            String newName = safeDisplayName(newExchange);
+
+            publishSystemEvent(
+                    "SMART_BOT_EXCHANGE_CHANGED",
+                    "Exchange changed from %s to %s.".formatted(oldName, newName)
+            );
+
+            log.info(
+                    "SmartBot exchange updated. oldExchange={} newExchange={} autoTradingRestored={}",
+                    oldName,
+                    newName,
+                    wasAutoTradingEnabled
+            );
+
+        } catch (Exception exception) {
+            activeContext.setExchange(oldExchange);
+            activeContext.setAutoTradingEnabled(wasAutoTradingEnabled);
+            runtime.setAutoTradingEnabled(wasAutoTradingEnabled);
+
+            publishErrorEvent("SmartBot", exception, "Failed to update bot exchange.");
+
+            log.error("Failed to update SmartBot exchange", exception);
+            throw new IllegalStateException("Failed to update SmartBot exchange: " + rootMessage(exception), exception);
+        }
     }
 
     public boolean isStarted() {
@@ -227,73 +276,22 @@ public class SmartBot {
         return !started.get();
     }
 
-    /**
-     * Update the bot's exchange connection without stopping trading.
-     * <p>
-     * This allows switching between exchanges while keeping the bot running
-     * and continuing to trade across different markets.
-     * <p>
-     * 
-     * @param newExchange the new exchange to use for trading
-     */
-    public void updateExchange(@NotNull Exchange newExchange) {
-        Objects.requireNonNull(newExchange, "newExchange must not be null");
-
-        if (!started.get()) {
-            log.warn("Cannot update exchange - SmartBot is not started");
-            return;
-        }
-
-        if (context == null) {
-            log.warn("Cannot update exchange - bot context is null");
-            return;
-        }
-
-        Exchange oldExchange = context.getExchange();
-        try {
-            context.setExchange(newExchange);
-            log.info("SmartBot exchange updated from {} to {}",
-                    oldExchange != null ? oldExchange.getDisplayName() : "NONE",
-                    newExchange.getDisplayName());
-
-            publishSystemEvent(
-                    "SMART_BOT_EXCHANGE_CHANGED",
-                    "Exchange changed to " + newExchange.getDisplayName() +
-                            " - bot continues trading");
-        } catch (Exception e) {
-            log.error("Error updating bot exchange", e);
-            // Restore old exchange on failure
-            if (oldExchange != null) {
-                context.setExchange(oldExchange);
-            }
-            throw new RuntimeException("Failed to update bot exchange: " + e.getMessage(), e);
-        }
-    }
-
     public boolean isAutoTradingEnabled() {
-        return context != null && context.isAutoTradingEnabled();
+        AgentContext activeContext = context;
+        return activeContext != null && activeContext.isAutoTradingEnabled();
     }
 
     public boolean isAiReasoningEnabled() {
-        return context != null && context.isAiReasoningEnabled();
+        AgentContext activeContext = context;
+        return activeContext != null && activeContext.isAiReasoningEnabled();
     }
 
-    /**
-     * Publish a market event into the agent system.
-     */
-    public void publishMarketEvent(String type, Object payload) {
-        ensureStarted();
 
-        eventBus.publish(AgentEvent.market(
-                safeEventType(type),
-                "SmartBot",
-                payload));
-    }
 
     /**
-     * Publish a custom event into the agent system.
+     * Publishes a custom event into the agent system.
      */
-    public void publish(AgentEvent event) {
+    public void publish(@Nullable AgentEvent event) {
         ensureStarted();
 
         if (event != null) {
@@ -302,54 +300,115 @@ public class SmartBot {
     }
 
     public void publishSystemEvent(String type, String message) {
-        if (!eventBusIsReady()) {
-            log.debug("Skipping system event because event bus is not ready. type={}", type);
-            return;
-        }
+
 
         eventBus.publish(event(
                 safeEventType(type),
-                "SmartBot",
-                message,
-                Map.of()));
+                SOURCE,
+                safe(message),
+                Map.of()
+        ));
     }
 
-    public void publishErrorEvent(String source, Throwable throwable, String message) {
-        if (!eventBusIsReady()) {
-            log.debug("Skipping error event because event bus is not ready. source={}", source);
-            return;
-        }
 
-        eventBus.publish(event(
-                AgentEvent.ERROR,
-                safe(source).isBlank() ? "SmartBot" : safe(source),
-                throwable,
-                Map.of(
-                        "message", safe(message),
-                        "error", rootMessage(throwable))));
+
+    private AgentContext createContext(
+            @NotNull Exchange exchange,
+            @NotNull TradingService tradingService,
+            @Nullable TradePair selectedTradePair
+    ) {
+        AgentContext newContext = new AgentContext();
+
+        newContext.setExchange(exchange);
+        newContext.setTradingService(tradingService);
+        newContext.setEventBus(eventBus);
+        newContext.setSelectedTradePair(selectedTradePair);
+        newContext.setSelectedSymbol(tradePairText(selectedTradePair));
+        newContext.setBotTradingConfig(botTradingConfig);
+
+        /*
+         * Persisted bot settings feed runtime risk limits.
+         * Execution must still go through the normal risk gate.
+         */
+        newContext.setAutoTradingEnabled(botTradingConfig.isEnabled());
+        newContext.setAiReasoningEnabled(true);
+        newContext.setMaxRiskPerTrade(percentToRatio(
+                botTradingConfig.getMaxPortfolioRiskPercent(),
+                0.01
+        ));
+
+        /*
+         * NOTE:
+         * If BotTradingConfig later exposes getMaxDailyLossPercent(),
+         * prefer that here. getMaxDailyLosses() sounds like a count, but the
+         * existing code treats it as a percent-like value.
+         */
+        newContext.setMaxDailyLoss(percentToRatio(
+                botTradingConfig.getMaxDailyLosses(),
+                0.03
+        ));
+
+        return newContext;
     }
 
     private @NotNull AgentEvent event(
             String type,
             String source,
             Object payload,
-            Map<String, Object> metadata) {
+            Map<String, Object> metadata
+    ) {
         return new AgentEvent(
                 safeEventType(type),
-                safe(source).isBlank() ? "SmartBot" : safe(source),
+                safe(source).isBlank() ? SOURCE : safe(source),
                 payload,
                 Instant.now(),
-                metadata == null ? Map.of() : metadata);
+                metadata == null ? Map.of() : metadata
+        );
+    }
+
+    private AgentContext requireContext() {
+        ensureStarted();
+        AgentContext activeContext = context;
+
+        if (activeContext == null) {
+            throw new IllegalStateException("SmartBot context is not available.");
+        }
+
+        return activeContext;
     }
 
     private void ensureStarted() {
-        if (!started.get() || context == null) {
+        if (!started.get()) {
             throw new IllegalStateException("SmartBot has not been started.");
         }
     }
+    public void publishErrorEvent(String source, Throwable throwable, String message) {
+        eventBus.publish(event(
+                AgentEvent.ERROR,
+                safe(source).isBlank() ? SOURCE : safe(source),
+                throwable,
+                Map.of(
+                        "message", safe(message),
+                        "error", rootMessage(throwable)
+                )
+        ));
+    }
 
-    private boolean eventBusIsReady() {
-        return eventBus != null;
+    /**
+     * Starts the event bus if the implementation supports start().
+     *
+     * <p>This method assumes AgentEventBus has a start method. If your actual
+     * AgentEventBus does not expose start(), delete this helper and remove the
+     * safeStartEventBus() call from start().</p>
+     */
+    private void safeStartEventBus() {
+        try {
+            eventBus.start();
+        } catch (UnsupportedOperationException exception) {
+            log.debug("AgentEventBus start is not supported by this implementation.");
+        } catch (Exception exception) {
+            log.warn("Failed to start AgentEventBus cleanly", exception);
+        }
     }
 
     private void safeStopRuntime() {
@@ -363,12 +422,22 @@ public class SmartBot {
     private void safeStopEventBus() {
         try {
             eventBus.stop();
+        } catch (UnsupportedOperationException exception) {
+            log.debug("AgentEventBus stop is not supported by this implementation.");
         } catch (Exception exception) {
             log.warn("Failed to stop AgentEventBus cleanly", exception);
         }
     }
 
-    private String tradePairText(TradePair tradePair) {
+    private int safeAgentCount() {
+        try {
+            return runtime.getAgents() == null ? 0 : runtime.getAgents().size();
+        } catch (Exception exception) {
+            return 0;
+        }
+    }
+
+    private String tradePairText(@Nullable TradePair tradePair) {
         return tradePair == null ? "" : tradePair.toString('/');
     }
 
@@ -382,10 +451,11 @@ public class SmartBot {
         if (!Double.isFinite(percent) || percent <= 0) {
             return fallback;
         }
+
         return percent / 100.0;
     }
 
-    private String safeExchangeName(Exchange exchange) {
+    private String safeExchangeName(@Nullable Exchange exchange) {
         try {
             return exchange == null ? "UNKNOWN_EXCHANGE" : safe(exchange.getName());
         } catch (Exception exception) {
@@ -393,16 +463,35 @@ public class SmartBot {
         }
     }
 
-    private @NotNull String safeEventType(String value) {
+    private String safeDisplayName(@Nullable Exchange exchange) {
+        try {
+            if (exchange == null) {
+                return "UNKNOWN_EXCHANGE";
+            }
+
+            String displayName = safe(exchange.getDisplayName());
+
+            if (!displayName.isBlank()) {
+                return displayName;
+            }
+
+            return safeExchangeName(exchange);
+
+        } catch (Exception exception) {
+            return "UNKNOWN_EXCHANGE";
+        }
+    }
+
+    private @NotNull String safeEventType(@Nullable String value) {
         String text = safe(value);
         return text.isBlank() ? "UNKNOWN_EVENT" : text;
     }
 
-    private @NotNull String safe(String value) {
+    private @NotNull String safe(@Nullable String value) {
         return value == null ? "" : value.trim();
     }
 
-    private @NotNull String rootMessage(Throwable throwable) {
+    private @NotNull String rootMessage(@Nullable Throwable throwable) {
         if (throwable == null) {
             return "Unknown error";
         }

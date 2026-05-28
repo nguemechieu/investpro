@@ -29,6 +29,7 @@ public class CoinbaseHttpClient {
 
     private final HttpClient httpClient;
     private final CoinbaseJwtSigner jwtSigner;
+    @SuppressWarnings("unused")
     private final String apiKey;
     private final String apiSecret;
     private final ExecutorService httpExecutor;

@@ -26,7 +26,9 @@ public abstract class CandleDataSupplier implements Supplier<Future<List<CandleD
     protected IntegerProperty endTime;
 
     private static final Set<Integer> GRANULARITY = Set.of(60, 180, 300, 900, 1800, 3600, 7200, 14400,
-            21600, 43200, 86400);
+            21600, 43200, 86400,
+            3600*24*7,3600*24*7*4
+            );
 
     public CandleDataSupplier(int numCandles, int secondsPerCandle, TradePair tradePair, IntegerProperty endTime) {
         Objects.requireNonNull(tradePair);

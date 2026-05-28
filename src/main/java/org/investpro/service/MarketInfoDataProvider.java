@@ -19,13 +19,7 @@ import java.util.concurrent.CompletableFuture;
  * 3. Currency and trading-session metadata.
  * 4. News calendar context.
  */
-public class MarketInfoDataProvider {
-
-    private final NewsDataProvider newsDataProvider;
-
-    public MarketInfoDataProvider(NewsDataProvider newsDataProvider) {
-        this.newsDataProvider = newsDataProvider;
-    }
+public record MarketInfoDataProvider(NewsDataProvider newsDataProvider) {
 
     public CompletableFuture<MarketStats> getMarketInfo(Exchange exchange, TradePair pair) {
         if (pair == null) {

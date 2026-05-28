@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.pipeline.TradeDecisionPipeline;
 import org.investpro.core.pipeline.TradeRiskContextBuilder;
 import org.investpro.exchange.Exchange;
-import org.investpro.models.trading.OpenOrder;
 import org.investpro.models.trading.Trade;
 import org.investpro.risk.TradeRiskContext;
 import org.investpro.risk.RiskDecision;
@@ -19,14 +18,14 @@ import java.util.concurrent.CompletableFuture;
 /**
  * ManualTradeController handles BUY/SELL/CLOSE requests from the TradingWindow
  * UI.
- *
+ * <p>
  * This controller enforces that ALL manual trades go through:
  * 1. Risk evaluation (TradeDecisionPipeline)
  * 2. Risk approval (RiskDecision)
  * 3. Execution engine (only if approved)
- *
+ * <p>
  * Users cannot bypass risk management even for manual trades.
- *
+ * <p>
  * This controller does NOT:
  * - Create exchanges (SystemCore does)
  * - Execute without risk approval
@@ -34,27 +33,23 @@ import java.util.concurrent.CompletableFuture;
  * - Display UI (TradingWindow does)
  */
 @Slf4j
-public class ManualTradeController {
-
-    private final TradeDecisionPipeline tradeDecisionPipeline;
-    private final TradingService orderExecutionService;
-    private final Exchange exchange;
-    private final TradingService tradingService;
+public record ManualTradeController(TradeDecisionPipeline tradeDecisionPipeline, Exchange exchange,
+                                    TradingService tradingService) {
 
     public ManualTradeController(
             @NotNull TradeDecisionPipeline tradeDecisionPipeline,
-            @NotNull TradingService orderExecutionService,
+
             @NotNull Exchange exchange,
             @NotNull TradingService tradingService) {
         this.tradeDecisionPipeline = Objects.requireNonNull(tradeDecisionPipeline);
-        this.orderExecutionService = Objects.requireNonNull(orderExecutionService);
+
         this.exchange = Objects.requireNonNull(exchange);
         this.tradingService = Objects.requireNonNull(tradingService);
     }
 
     /**
      * Execute a BUY order from the UI.
-     *
+     * <p>
      * Flow:
      * 1. Build TradeRiskContext from symbol + quantity
      * 2. Evaluate through RiskDecisionPipeline
@@ -142,7 +137,7 @@ public class ManualTradeController {
                 log.info("ManualTradeController: Trade approved. Executing with size={}",
                         riskDecision.getFinalPositionSize());
 
-                Trade order = orderExecutionService.executeTrade(
+                Trade order = tradingService.executeTrade(
                         exchange,
                         riskContext.getTradePair(),
                         riskContext.getCurrentPrice(),

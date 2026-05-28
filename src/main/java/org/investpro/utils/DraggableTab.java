@@ -19,6 +19,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,7 +35,7 @@ import java.util.Set;
  * - Drag tab to reorder inside the same TabPane.
  * - Drag tab to another registered TabPane.
  * - Drag tab outside any registered TabPane to detach into a new window.
- *
+ * <p>
  * Notes:
  * - Works best when all tabs in the target pane are DraggableTab instances.
  * - Non-DraggableTab tabs are handled defensively and ignored for insertion
@@ -42,6 +43,7 @@ import java.util.Set;
  */
 @Getter
 @Setter
+@Slf4j
 public class DraggableTab extends Tab {
 
     private static final Set<TabPane> TAB_PANES = new HashSet<>();
@@ -69,6 +71,7 @@ public class DraggableTab extends Tab {
         setClosable(true);
 
         installDragHandlers();
+        log.info(this.getClass().getSimpleName() + " created");
     }
 
     public DraggableTab(String text, Node content) {

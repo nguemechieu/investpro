@@ -1,5 +1,7 @@
 package org.investpro.risk;
 
+import lombok.Data;
+import lombok.ToString;
 import org.investpro.data.CandleData;
 
 import java.util.ArrayList;
@@ -9,6 +11,8 @@ import java.util.List;
  * Calculates market volatility using ATR (Average True Range)
  * ATR is an institutional standard for volatility measurement
  */
+@ToString
+@Data
 public class VolatilityCalculator {
 
     private static final int DEFAULT_PERIOD = 14;

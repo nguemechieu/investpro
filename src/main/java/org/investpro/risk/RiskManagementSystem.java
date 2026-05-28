@@ -3,6 +3,7 @@ package org.investpro.risk;
 import lombok.extern.slf4j.Slf4j;
 
 import org.investpro.enums.*;
+import org.investpro.market.BisMarketStructureService;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -266,6 +267,17 @@ public record RiskManagementSystem(double defaultMaxRiskPerTrade, double default
 
         // Capital protection adjustment
         multiplier *= Math.min(1.0, context.getCapitalProtection().getCapitalRetention());
+
+        // Market structure (BIS liquidity tier) adjustment
+        if (context.getSymbol() != null) {
+            double structureMultiplier = BisMarketStructureService.getInstance()
+                    .getLiquidityRiskMultiplier(context.getSymbol());
+            if (structureMultiplier < 1.0) {
+                log.debug("MarketStructure risk multiplier applied: {} for {}",
+                        structureMultiplier, context.getSymbol());
+                multiplier *= structureMultiplier;
+            }
+        }
 
         return multiplier;
     }

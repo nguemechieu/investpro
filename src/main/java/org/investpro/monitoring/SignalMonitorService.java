@@ -1,6 +1,8 @@
 package org.investpro.monitoring;
 
 import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
@@ -21,6 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * </ul>
  */
 @Getter
+@Setter
+@ToString
 @Slf4j
 public class SignalMonitorService {
 

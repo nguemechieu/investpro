@@ -357,13 +357,20 @@ public final class DefaultMoneyFormatter implements MoneyFormatter<Money> {
             return number;
         } else if (prefix.isEmpty()) {
             return putSpaceBetweenCurrencyAndAmount
-                    ? number + ' ' + suffix
-                    : number + suffix;
+                    ? number + ' ' + quotePatternLiteral(suffix)
+                    : number + quotePatternLiteral(suffix);
         } else {
             return putSpaceBetweenCurrencyAndAmount
-                    ? prefix + ' ' + number
-                    : prefix + number;
+                    ? quotePatternLiteral(prefix) + ' ' + number
+                    : quotePatternLiteral(prefix) + number;
         }
+    }
+
+    private String quotePatternLiteral(String text) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        return "'" + text.replace("'", "''") + "'";
     }
 
     /**

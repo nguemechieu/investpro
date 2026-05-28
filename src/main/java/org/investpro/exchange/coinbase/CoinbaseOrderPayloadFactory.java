@@ -40,11 +40,7 @@ public class CoinbaseOrderPayloadFactory {
                     payload.put("post_only", true);
                 }
                 break;
-            case STOP:
-                payload.put("order_type", "stop");
-                payload.put("price", formatPrice(order.getStopPrice()));
-                payload.put("size", formatQuantity(order.getQuantity()));
-                break;
+
             case STOP_LIMIT:
                 payload.put("order_type", "stop_limit");
                 payload.put("stop_price", formatPrice(order.getStopPrice()));

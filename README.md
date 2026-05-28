@@ -173,8 +173,11 @@ InvestPro provides:
 
 - `AgentRuntime` manages trading agent lifecycle.
 - `AgentEventBus` decouples system components through events.
-- `SymbolAgent` evaluates market state per symbol.
-- `SymbolAgentManager` controls active symbol agents.
+- `SymbolAgent` evaluates market state per symbol (in `symbol/` package) — collects 50 ticks before triggering real-candle backtesting.
+- `SymbolAgentManager` controls active symbol agents and state (thread-safe `ConcurrentHashMap`).
+- `SymbolAgentUpdater` bridges exchange tick events → `SymbolAgentManager` bid/ask/spread/signal state for the MarketWatch panel.
+- `MarketWatchPanel` polls `SymbolAgentManager.getAllStates()` every 3 seconds and calls `MarketWatchRow.updateSymbolState()` on every row at each refresh cycle — live bid/ask/spread data always flows.
+- `PortfolioAgent` manages capital allocation and exposure (in `portfolio/` package).
 - Auto-trading starts **OFF** by default and must be explicitly enabled.
 
 ### Risk Management
@@ -189,9 +192,11 @@ InvestPro provides:
 
 ### AI-Assisted Analysis
 
-- `AiReasoningService` interface for pluggable AI providers.
+- `AiReasoningService` interface for pluggable AI providers (in `ai/` package).
 - `OpenAiReasoningService` for optional GPT-assisted trade review.
 - `LocalAiReasoningService` fallback for offline operation.
+- `ReasoningAgent` in `reasoning/` for structured decision reasoning.
+- `AiAuditLogger` records AI decisions for auditability.
 - AI can approve, reject, or explain signals.
 - AI **does not execute trades directly**.
 
@@ -199,7 +204,7 @@ InvestPro provides:
 
 - Interactive candlestick charts.
 - Multi-timeframe analysis.
-- Indicators such as MA, EMA, RSI, MACD, Bollinger Bands, ATR, and more.
+- Rich `indicators/` package: MA, EMA, RSI, MACD, Bollinger Bands, ATR, ADX, CCI, VWAP, Ichimoku, Stochastic, OBV, Parabolic SAR, Zigzag, Fibonacci, and more.
 - Zoom and pan support.
 - Support/resistance and annotation-ready chart structure.
 
@@ -209,6 +214,7 @@ InvestPro provides:
 - Telegram commands such as `/status` and `/setapikey` when enabled.
 - Email notifications through SMTP.
 - Signal monitoring logs for every stage of the signal pipeline.
+- See [USER_GUIDE.md](USER_GUIDE.md) for SMTP setup, app passwords, and troubleshooting.
 
 ### Deployment
 
@@ -217,6 +223,7 @@ InvestPro provides:
 - Browser access to the desktop UI.
 - PostgreSQL support for production-style deployments.
 - SQLite support for local development and event logs.
+- Plugin architecture via Java `ServiceLoader` SPI for extensions (exchanges, strategies, indicators, risk modules).
 
 ---
 
@@ -249,22 +256,76 @@ InvestPro provides:
 
 ```text
 src/main/java/org/investpro/
-├── ai/                     # AI reasoning services
-├── core/                   # SystemCore, SmartBot, agents, runtime
-│   ├── agents/             # AgentRuntime, AgentEventBus, SymbolAgent
+├── ai/                     # AI trade review interface, OpenAI/local providers, audit logging
+│   ├── learning/           # Machine learning helpers
+│   └── ml/                 # ML model integration
+├── backtesting/            # BacktestingService, BacktestConfig, BacktestResult, simulators
+├── config/                 # Application and environment configuration
+├── core/                   # SystemCore, notification services, Telegram handlers
+│   ├── agents/             # AgentRuntime, AgentEventBus, Agent, AgentRegistry
 │   ├── bot/                # SmartBot controller
-│   └── agents/execution/   # ExecutionEngine, TradeExecutionCoordinator
-├── data/                   # CandleData, Db1, local data helpers
-├── decision/               # BotTradeDecisionEngine, signal filters
+│   ├── controller/         # Application controllers
+│   ├── execution/          # ExecutionEngine, TradeExecutionCoordinator
+│   └── pipeline/           # TradeDecisionPipeline, risk context builders
+├── credential/             # API credential management
+├── data/                   # CandleData and local data helpers
+├── decision/               # Institutional decision pipeline (see below)
+├── dependency/             # Dependency wiring utilities
+├── enums/                  # Application-wide enumerations
 ├── event/                  # EventBusManager, event persistence
-├── exchange/               # Exchange adapters and factory
+├── exchange/               # Exchange adapters (Binance, Coinbase, OANDA, Alpaca, IB, etc.)
+├── i18n/                   # Internationalization and translations
+├── indicators/             # Technical indicators: MA, EMA, RSI, MACD, Bollinger, ATR, etc.
+├── licensing/              # License management
+├── market/                 # Market data models and services
 ├── models/                 # TradePair, Order, Account, Ticker, Trade
 ├── monitoring/             # SystemMonitorService, SignalMonitorService
-├── repository/             # SQLite/PostgreSQL repositories
+├── operations/             # Operational support utilities
+├── persistence/            # SQLite/PostgreSQL repositories and event log persistence
+├── portfolio/              # PortfolioAgent, capital allocator, exposure and heat management
+├── reasoning/              # OpenAIReasoningClient, ReasoningAgent, ReasoningDecision
+├── research/               # Market research helpers
 ├── risk/                   # RiskManagementSystem and risk decisions
-├── strategy/               # StrategyEngine, StrategyCatalog, StrategyLab
-├── trading/tradability/    # Universal symbol tradability model and filters
-└── ui/                     # JavaFX windows, panels, charts, controls
+├── service/                # Domain services: OrderService, TradeService, CurrencyService, etc.
+├── signal/                 # Signal, SignalAgent
+├── spi/                    # Service provider interfaces for plugins
+├── strategy/               # StrategyEngine, StrategyCatalog, StrategyLab, user strategies
+├── symbol/                 # SymbolAgent, SymbolAgentManager, SymbolAgentUpdater, symbol state
+├── trading/                # PreTradeValidation, pre-trade checklist
+│   └── tradability/        # Universal symbol tradability model and filters
+├── ui/                     # JavaFX windows, panels, charts, controls
+└── utils/                  # Shared utility classes
+```
+
+#### `decision/` package — Institutional Decision Pipeline
+
+```text
+decision/
+├── TradeIntent.java                # Market opportunity + desired exposure
+├── PortfolioImpact.java            # Exposure, concentration, correlation analysis
+├── RiskEvaluation.java             # Full risk check with APPROVED/REDUCED/REJECTED/WAIT verdict
+├── PositionSizingDecision.java     # Fixed-risk / ATR / Kelly / volatility sizing
+├── DecisionReasoning.java          # AI model confidence, veto chain, reasoning summary
+├── ExecutionPlan.java              # Entry, stop-loss, take-profit, leverage, time-in-force
+├── ExecutionRoute.java             # Venue routing with slippage, fee, latency estimates
+├── ExecutionDecision.java          # Approved/rejected outcome with lifecycle
+├── InstitutionalExecutionDecision  # Top-level immutable composition record
+├── DecisionPipelineOrchestrator    # 9-phase pipeline coordinator
+├── BotTradeDecisionAssembler       # Bridges pipeline → legacy BotTradeDecision adapter
+├── BotTradeDecision.java           # Legacy-compat adapter (immutable, 5 constructors)
+├── DecisionContext.java            # Typed metadata (exchange, timeframe, session, spread…)
+├── DecisionScoreBreakdown.java     # Per-dimension scoring (trend, vol, liquidity, AI, risk…)
+├── DecisionSnapshot.java           # Compact FULL/LIGHTWEIGHT/REPLAY/ARCHIVE serialization
+├── DecisionIdGenerator.java        # AtomicLong IDs for simulation; UUID for live
+├── DecisionStatus.java             # Lifecycle enum: CREATED → EXECUTED / FAILED / EXPIRED
+├── DecisionMode.java               # LIVE / PAPER / SIMULATION / LIGHTWEIGHT
+├── ExecutionVenueType.java         # CENTRALIZED_EXCHANGE / BROKER / DEX / BLOCKCHAIN / …
+├── ExecutionLifecycle.java         # Full lifecycle timestamp tracking
+├── DecisionPerformanceMetrics.java # Nanosecond phase timing
+├── BlockchainExecutionContext.java # On-chain context (Solana, Stellar, EVM)
+├── ExecutionRouter.java            # @FunctionalInterface with simulated()/direct() defaults
+├── LiquidityAnalyzer.java          # @FunctionalInterface for liquidity estimation
+└── VenueScorer.java                # @FunctionalInterface for venue quality scoring
 ```
 
 ---
@@ -274,26 +335,70 @@ src/main/java/org/investpro/
 InvestPro is designed so that a raw strategy signal cannot directly place a trade. Every signal must pass through a controlled pipeline.
 
 ```text
-StrategySignal
-  └─→ SignalToDecisionFilter
-        └─→ BotTradeDecisionEngine
-              └─→ RiskManagementSystem
-                    └─→ AiReasoningService optional review
-                          └─→ TradeExecutionCoordinator
-                                └─→ ExecutionEngine
-                                      └─→ Exchange API
+Market Signal
+  └─→ TradeIntent          (desired direction + exposure)
+        └─→ PortfolioImpact (exposure, concentration, correlation)
+              └─→ RiskEvaluation (APPROVED / REDUCED / REJECTED / WAIT)
+                    └─→ PositionSizingDecision (fixed-risk, ATR, Kelly, volatility)
+                          └─→ DecisionReasoning (AI model confidence + veto chain)
+                                └─→ ExecutionPlan (entry, stop, take-profit, sizing)
+                                      └─→ ExecutionRoute (venue, slippage, fee, latency)
+                                            └─→ InstitutionalExecutionDecision
+                                                  └─→ ExecutionEngine → Exchange API
 ```
+
+### Decision Pipeline Classes (`decision/` package)
+
+| Class | Role |
+|---|---|
+| `TradeIntent` | Market opportunity + desired exposure, no execution info |
+| `PortfolioImpact` | Exposure increase, concentration, correlation, hedge effect |
+| `RiskEvaluation` | Full risk check → `APPROVED / REDUCED / REJECTED / WAIT` |
+| `PositionSizingDecision` | Fixed-risk, ATR, Kelly, volatility, or drawdown-scaled sizing |
+| `DecisionReasoning` | AI model confidence, veto reason, reasoning chain |
+| `ExecutionPlan` | Entry, stop-loss, take-profit, leverage, time-in-force |
+| `ExecutionRoute` | Venue routing with slippage, fee, latency, and quality score |
+| `ExecutionDecision` | Approved / rejected outcome with lifecycle tracking |
+| `InstitutionalExecutionDecision` | Top-level immutable composition of all phases |
+| `DecisionSnapshot` | Compact serializable snapshot for replay / audit |
+| `DecisionIdGenerator` | Atomic-long IDs for simulation; UUID for live |
+| `DecisionPipelineOrchestrator` | 9-phase pipeline coordinator |
+| `BotTradeDecisionAssembler` | Bridges new pipeline → legacy `BotTradeDecision` adapter |
+
+### Decision Lifecycle
+
+```text
+CREATED → VALIDATED → RISK_REJECTED / AI_REJECTED
+       → EXECUTION_PENDING → EXECUTED / FAILED / CANCELLED / EXPIRED
+```
+
+### Execution Venue Routing
+
+| Venue | Type |
+|---|---|
+| Binance, Coinbase | CENTRALIZED_EXCHANGE |
+| OANDA, Interactive Brokers | BROKER |
+| Stellar, Solana (future) | BLOCKCHAIN / DEX |
+| Strategy Lab | SIMULATED |
+| Paper mode | PAPER |
+
+### Simulation Optimizations
+
+- `DecisionMode.LIGHTWEIGHT` skips UUID allocation, metadata maps, and heavy reasoning storage.
+- `DecisionMode.SIMULATION` uses atomic-long sequence IDs instead of `UUID.randomUUID()`.
+- `ExecutionPlan.EMPTY`, `PortfolioImpact.NEUTRAL`, `DecisionReasoning.NONE` are null-object constants that avoid deep nullable chains.
+- `double confidenceValue` replaces `BigDecimal confidence` for scoring (BigDecimal retained only for money and fees).
 
 ### Execution Safety Gates
 
 | Gate | Purpose |
 |---|---|
-| `SignalToDecisionFilter` | Converts raw signals into reviewed trade candidates. |
-| `BotTradeDecisionEngine` | Scores the trade idea and decides whether it deserves review. |
-| `RiskManagementSystem` | Enforces risk limits, exposure, sizing, and daily loss controls. |
-| `AiReasoningService` | Optional second review layer for reasoning and explanation. |
-| `TradeExecutionCoordinator` | Final authority before any order reaches the exchange. |
-| `ExecutionEngine` | Places, tracks, and manages orders. |
+| `SignalToDecisionFilter` | Converts raw signals into reviewed trade candidates |
+| `BotTradeDecisionEngine` | Scores the trade idea and decides whether it deserves review |
+| `RiskEvaluation` | Enforces risk limits, exposure, sizing, and daily loss controls |
+| `DecisionReasoning` | Optional AI second-review layer for reasoning and explanation |
+| `TradeExecutionCoordinator` | Final authority before any order reaches the exchange |
+| `ExecutionEngine` | Places, tracks, and manages orders |
 
 ---
 
@@ -565,6 +670,14 @@ telegram_token=YOUR_BOT_TOKEN
 # --- Email notifications optional ---
 from_email=you@example.com
 to_email=alerts@example.com
+EMAIL_NOTIFICATIONS_ENABLED=false
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USERNAME=you@example.com
+EMAIL_SMTP_PASSWORD=YOUR_APP_PASSWORD
+EMAIL_SMTP_STARTTLS=true
+EMAIL_FROM=you@example.com
+EMAIL_TO=alerts@example.com
 
 # --- OpenAI optional ---
 openai.api_key=YOUR_OPENAI_KEY
@@ -825,6 +938,12 @@ Important system events are persisted for review and debugging. Logs should help
 - [x] AI reasoning integration
 - [x] Telegram integration
 - [x] Docker/noVNC deployment
+- [x] Institutional decision pipeline (`decision/` package — 9-phase orchestrator)
+- [x] Immutable domain model for all decision objects
+- [x] Execution routing framework (CENTRALIZED_EXCHANGE / BROKER / DEX / BLOCKCHAIN)
+- [x] Position sizing engine (fixed-risk, ATR, Kelly, volatility, drawdown-scaled)
+- [x] MarketWatch real-time bid/ask/spread live data flow
+- [x] Lightweight simulation mode (no UUID allocation, minimal heap pressure)
 - [ ] StrategyLab stabilization
 - [ ] Better automated tests
 - [ ] Production installer packaging
@@ -843,12 +962,17 @@ Important system events are persisted for review and debugging. Logs should help
 ### v2.0 — Future
 
 - [ ] REST API server for remote control
-- [ ] TradeAdviser.org web companion
+- [ ] investpro.org web companion
 - [ ] Cloud sync
 - [ ] Multi-machine agent coordination
 - [ ] Mobile companion app
 - [ ] Advanced AI strategy assistant
 - [ ] Plugin marketplace for user strategies
+- [ ] Solana on-chain execution routing
+- [ ] Stellar network DEX integration
+- [ ] Smart order routing across venues
+- [ ] Distributed Strategy Lab workers
+- [ ] Event-sourced audit replay engine
 
 ---
 
