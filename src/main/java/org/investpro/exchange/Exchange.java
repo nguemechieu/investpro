@@ -160,6 +160,17 @@ public abstract class Exchange implements
                 && (canSubmitLiveOrders() || (supportsPaperTradingMode() && isPaperTrading()));
     }
 
+    public int getDisplayPrecision(TradePair pair) {
+        if (pair == null) {
+            return 5;
+        }
+        String symbol = pair.toString('/');
+        if (symbol.matches("(?i).*[A-Z]{3}/[A-Z]{3}.*")) {
+            return 5;
+        }
+        return 2;
+    }
+
     public CompletableFuture<List<SymbolTradability>> fetchTradabilityStatus(List<TradePair> pairs) {
         if (pairs == null || pairs.isEmpty()) {
             return CompletableFuture.completedFuture(List.of());

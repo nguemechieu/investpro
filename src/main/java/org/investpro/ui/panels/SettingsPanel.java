@@ -470,8 +470,7 @@ public class SettingsPanel extends StackPane {
                     mailProps.put("mail.smtp.host", smtpServer);
                     mailProps.put("mail.smtp.port", String.valueOf(smtpPort));
                     mailProps.put("mail.smtp.auth", "true");
-                    mailProps.put("mail.smtp.starttls.enable", String.valueOf(useTls));
-                    mailProps.put("mail.smtp.starttls.required", String.valueOf(useTls));
+                    configureSmtpTls(mailProps, smtpServer, smtpPort, useTls);
                     mailProps.put("mail.smtp.connectiontimeout", "5000");
                     mailProps.put("mail.smtp.timeout", "5000");
                     mailProps.put("mail.smtp.writetimeout", "5000");
@@ -509,10 +508,25 @@ public class SettingsPanel extends StackPane {
                         errorMsg = "Cannot connect to SMTP server. Check server address and port.";
                     } else if (errorMsg.toLowerCase().contains("timeout")) {
                         errorMsg = "Connection timeout. SMTP server is not responding.";
+                    } else if (errorMsg.toLowerCase().contains("could not convert socket to tls")
+                            || errorMsg.toLowerCase().contains("starttls")) {
+                        errorMsg = "SMTP TLS negotiation failed. Use port 587 for STARTTLS, or port 465 for SSL/TLS. "
+                                + "Also verify the SMTP server supports TLS and that your app password is correct.";
                     }
                     showAlert(Alert.AlertType.ERROR, t("common.connectionFailed"), "Email connection failed:\n" + errorMsg);
                     setStatusError("Email test failed: " + errorMsg);
                 });
+    }
+
+    private void configureSmtpTls(Properties mailProps, String smtpServer, int smtpPort, boolean useTls) {
+        boolean implicitSsl = smtpPort == 465;
+        boolean startTls = useTls && !implicitSsl;
+
+        mailProps.put("mail.smtp.ssl.enable", String.valueOf(implicitSsl));
+        mailProps.put("mail.smtp.starttls.enable", String.valueOf(startTls));
+        mailProps.put("mail.smtp.starttls.required", String.valueOf(startTls));
+        mailProps.put("mail.smtp.ssl.trust", smtpServer);
+        mailProps.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
     }
 
     private void testOpenAIConnection() {

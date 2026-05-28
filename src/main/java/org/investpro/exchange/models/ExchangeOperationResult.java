@@ -24,6 +24,7 @@ public final class ExchangeOperationResult<T> {
     private final String errorCode;
     @Nullable
     private final String errorMessage;
+    private final int httpStatus;
     @NotNull
     private final String operation;
     @NotNull
@@ -34,6 +35,7 @@ public final class ExchangeOperationResult<T> {
             @Nullable T payload,
             @Nullable String errorCode,
             @Nullable String errorMessage,
+            int httpStatus,
             @NotNull String operation,
             @NotNull String exchangeId
     ) {
@@ -41,6 +43,7 @@ public final class ExchangeOperationResult<T> {
         this.payload = payload;
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
+        this.httpStatus = httpStatus;
         this.operation = operation;
         this.exchangeId = exchangeId;
     }
@@ -51,7 +54,7 @@ public final class ExchangeOperationResult<T> {
             @NotNull String exchangeId,
             @NotNull T payload
     ) {
-        return new ExchangeOperationResult<>(true, payload, null, null, operation, exchangeId);
+        return new ExchangeOperationResult<>(true, payload, null, null, 200, operation, exchangeId);
     }
 
     /** Creates a failure result with the given error code and message. */
@@ -61,7 +64,7 @@ public final class ExchangeOperationResult<T> {
             @NotNull String errorCode,
             @NotNull String errorMessage
     ) {
-        return new ExchangeOperationResult<>(false, null, errorCode, errorMessage, operation, exchangeId);
+        return new ExchangeOperationResult<>(false, null, errorCode, errorMessage, 0, operation, exchangeId);
     }
 
     /** Creates a failure result indicating the operation is not supported by this exchange. */
@@ -95,6 +98,7 @@ public final class ExchangeOperationResult<T> {
     public boolean isFailure()            { return !success; }
     public @NotNull String getOperation() { return operation; }
     public @NotNull String getExchangeId() { return exchangeId; }
+    public int getHttpStatus() { return httpStatus; }
 
     /**
      * Returns the operation payload on success.
@@ -109,6 +113,11 @@ public final class ExchangeOperationResult<T> {
         return payload;
     }
 
+    /** Backward-compatible alias for {@link #getPayload()}. */
+    public @NotNull T getData() {
+        return getPayload();
+    }
+
     /** Returns the payload as Optional — empty if this is a failure result. */
     public @NotNull Optional<T> getPayloadOptional() {
         return Optional.ofNullable(payload);
@@ -116,6 +125,69 @@ public final class ExchangeOperationResult<T> {
 
     public @NotNull Optional<String> getErrorCode()    { return Optional.ofNullable(errorCode); }
     public @NotNull Optional<String> getErrorMessage() { return Optional.ofNullable(errorMessage); }
+
+    public static <T> Builder<T> builder() {
+        return new Builder<>();
+    }
+
+    public static final class Builder<T> {
+        private boolean success;
+        @Nullable
+        private T data;
+        @Nullable
+        private String errorCode;
+        @Nullable
+        private String message;
+        private int httpStatus;
+        private String operation = "generic";
+        private String exchangeId = "unknown";
+
+        public Builder<T> success(boolean success) {
+            this.success = success;
+            return this;
+        }
+
+        public Builder<T> data(@Nullable T data) {
+            this.data = data;
+            return this;
+        }
+
+        public Builder<T> errorCode(@Nullable String errorCode) {
+            this.errorCode = errorCode;
+            return this;
+        }
+
+        public Builder<T> message(@Nullable String message) {
+            this.message = message;
+            return this;
+        }
+
+        public Builder<T> httpStatus(int httpStatus) {
+            this.httpStatus = httpStatus;
+            return this;
+        }
+
+        public Builder<T> operation(@NotNull String operation) {
+            this.operation = operation;
+            return this;
+        }
+
+        public Builder<T> exchangeId(@NotNull String exchangeId) {
+            this.exchangeId = exchangeId;
+            return this;
+        }
+
+        public ExchangeOperationResult<T> build() {
+            return new ExchangeOperationResult<>(
+                    success,
+                    data,
+                    errorCode,
+                    message,
+                    httpStatus,
+                    operation,
+                    exchangeId);
+        }
+    }
 
     @Override
     public String toString() {

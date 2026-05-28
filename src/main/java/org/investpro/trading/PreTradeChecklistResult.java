@@ -1,5 +1,6 @@
 package org.investpro.trading;
 
+import com.fasterxml.jackson.annotation.JsonGetter;
 import org.investpro.models.trading.TradePair;
 import org.investpro.utils.Side;
 import org.jetbrains.annotations.NotNull;
@@ -28,6 +29,7 @@ import java.util.Locale;
  *
  * @author InvestPro Trading System
  */
+
 public record PreTradeChecklistResult(
         // Decision & Identity
         boolean approved,

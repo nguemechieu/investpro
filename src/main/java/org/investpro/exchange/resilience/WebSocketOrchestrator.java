@@ -9,7 +9,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -18,7 +17,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
  * WebSocket-first orchestrator that manages the lifecycle of exchange
@@ -159,7 +157,9 @@ public final class WebSocketOrchestrator {
     public boolean shouldUseRest(@NotNull EndpointType endpoint) {
         return switch (endpoint) {
             case PRICING -> !wsActive.get(); // REST only when WebSocket down
-            default -> true;                  // All others always use REST
+
+            case EXECUTION, BALANCES, POSITIONS, ACCOUNT, TRADE_HISTORY, ORDER_HISTORY, TRANSACTIONS, ANALYTICS -> false;
+            // All others always use REST
         };
     }
 

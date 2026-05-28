@@ -1,16 +1,19 @@
 package org.investpro.ui.panels;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.monitoring.SystemAlert;
 import org.investpro.monitoring.TradingSystemStatusSnapshot;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.function.Supplier;
 
 /**
  * Trading System Status Panel - displays comprehensive system health and
@@ -20,16 +23,39 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 public class TradingSystemStatusPanel extends VBox {
 
-    private final TradingSystemStatusSnapshot snapshot;
+    private TradingSystemStatusSnapshot snapshot;
+    private final Supplier<TradingSystemStatusSnapshot> snapshotSupplier;
     private final TabPane tabPane;
     private final Label systemHealthLabel;
+    private final Timeline autoRefreshTimeline;
+
+    private Label activeStrategiesValue;
+    private Label bestStrategyValue;
+    private Label worstStrategyValue;
+    private Label lastSignalValue;
+    private TableView<TradingSystemStatusSnapshot.StrategyStatus> strategyTable;
 
     public TradingSystemStatusPanel(TradingSystemStatusSnapshot snapshot) {
-        this.snapshot = snapshot;
+        this(() -> snapshot);
+    }
+
+    public TradingSystemStatusPanel(Supplier<TradingSystemStatusSnapshot> snapshotSupplier) {
+        this.snapshotSupplier = snapshotSupplier;
+        this.snapshot = snapshotSupplier.get();
         this.tabPane = new TabPane();
         this.systemHealthLabel = new Label();
+        this.autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(5), ignored -> refreshSnapshot()));
+        this.autoRefreshTimeline.setCycleCount(Timeline.INDEFINITE);
 
         initializePanel();
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                autoRefreshTimeline.stop();
+            } else {
+                refreshSnapshot();
+                autoRefreshTimeline.play();
+            }
+        });
     }
 
     private void initializePanel() {
@@ -131,7 +157,7 @@ public class TradingSystemStatusPanel extends VBox {
                 -fx-font-weight: bold;
                 -fx-text-fill:\s""" + getHealthColor(snapshot.systemHealthScore()) + ";");
 
-        String heartbeatAge = formatDuration(Duration.between(snapshot.lastHeartbeat(), Instant.now()).getSeconds());
+        String heartbeatAge = formatDuration(java.time.Duration.between(snapshot.lastHeartbeat(), Instant.now()).getSeconds());
         Label heartbeatLabel = createInfoLabel("Last Heartbeat: " + heartbeatAge + " ago", "#38bdf8");
 
         bottomRow.getChildren().addAll(systemHealthLabel, new Separator(), heartbeatLabel);
@@ -322,20 +348,25 @@ public class TradingSystemStatusPanel extends VBox {
         summaryGrid.setVgap(12);
         summaryGrid.setStyle("-fx-background-color: #1e293b; -fx-padding: 12; -fx-border-radius: 6;");
 
+        activeStrategiesValue = createLabel(String.valueOf(snapshot.activeStrategies()), false);
+        bestStrategyValue = createLabel(snapshot.bestStrategyToday(), false);
+        worstStrategyValue = createLabel(snapshot.worstStrategyToday(), false);
+        lastSignalValue = createLabel(snapshot.lastSignal(), false);
+
         summaryGrid.add(createLabel("Active Strategies:", true), 0, 0);
-        summaryGrid.add(createLabel(String.valueOf(snapshot.activeStrategies()), false), 1, 0);
+        summaryGrid.add(activeStrategiesValue, 1, 0);
 
         summaryGrid.add(createLabel("Best Today:", true), 2, 0);
-        summaryGrid.add(createLabel(snapshot.bestStrategyToday(), false), 3, 0);
+        summaryGrid.add(bestStrategyValue, 3, 0);
 
         summaryGrid.add(createLabel("Worst Today:", true), 0, 1);
-        summaryGrid.add(createLabel(snapshot.worstStrategyToday(), false), 1, 1);
+        summaryGrid.add(worstStrategyValue, 1, 1);
 
         summaryGrid.add(createLabel("Last Signal:", true), 2, 1);
-        summaryGrid.add(createLabel(snapshot.lastSignal(), false), 3, 1);
+        summaryGrid.add(lastSignalValue, 3, 1);
 
         // Strategy table
-        TableView<TradingSystemStatusSnapshot.StrategyStatus> strategyTable = new TableView<>();
+        strategyTable = new TableView<>();
         strategyTable.setStyle("""
                 -fx-control-inner-background: #1e293b;
                 -fx-background-color: #0f172a;
@@ -643,6 +674,42 @@ public class TradingSystemStatusPanel extends VBox {
         alert.setContentText(message);
         if (alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
             log.info(successMessage);
+        }
+    }
+
+    private void refreshSnapshot() {
+        try {
+            TradingSystemStatusSnapshot refreshed = snapshotSupplier.get();
+            if (refreshed == null) {
+                return;
+            }
+            snapshot = refreshed;
+            updateStrategiesTab();
+            systemHealthLabel.setText(String.format("System Health: %.1f%%", snapshot.systemHealthScore()));
+            systemHealthLabel.setStyle("""
+                    -fx-font-size: 12pt;
+                    -fx-font-weight: bold;
+                    -fx-text-fill:\s""" + getHealthColor(snapshot.systemHealthScore()) + ";");
+        } catch (Exception exception) {
+            log.debug("Unable to auto-refresh trading system status snapshot: {}", exception.getMessage(), exception);
+        }
+    }
+
+    private void updateStrategiesTab() {
+        if (activeStrategiesValue != null) {
+            activeStrategiesValue.setText(String.valueOf(snapshot.activeStrategies()));
+        }
+        if (bestStrategyValue != null) {
+            bestStrategyValue.setText(snapshot.bestStrategyToday());
+        }
+        if (worstStrategyValue != null) {
+            worstStrategyValue.setText(snapshot.worstStrategyToday());
+        }
+        if (lastSignalValue != null) {
+            lastSignalValue.setText(snapshot.lastSignal());
+        }
+        if (strategyTable != null) {
+            strategyTable.getItems().setAll(snapshot.strategyStatus());
         }
     }
 

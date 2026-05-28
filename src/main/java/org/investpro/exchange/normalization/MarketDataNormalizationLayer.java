@@ -4,7 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.investpro.models.trading.OrderBook;
 import org.investpro.models.trading.Ticker;
 import org.investpro.models.trading.TradePair;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -235,7 +237,8 @@ public class MarketDataNormalizationLayer {
         NormalizedMarketSnapshotBuilder dataFresh(boolean v) { this.dataFresh = v; return this; }
         NormalizedMarketSnapshotBuilder dataSource(String v) { this.dataSource = v; return this; }
 
-        NormalizedMarketSnapshot build() {
+        @Contract(" -> new")
+        @NonNull NormalizedMarketSnapshot build() {
             return new NormalizedMarketSnapshot(
                     exchangeName, venueId, tradePair, capturedAt,
                     bidPrice, askPrice, midPrice, spreadBps,

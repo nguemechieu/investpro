@@ -586,7 +586,9 @@ public class OnboardingDesk extends StackPane {
 
         TextField accountIdField = new TextField();
         styleInputField(accountIdField, selectedExchange == SupportedExchange.OANDA ? "OANDA Account ID" : "Account ID (optional)");
-        boolean showAccountId = selectedExchange == SupportedExchange.OANDA || selectedExchange == SupportedExchange.STELLAR_NETWORK;
+        boolean showAccountId = selectedExchange == SupportedExchange.OANDA
+                || selectedExchange == SupportedExchange.STELLAR_NETWORK
+                || selectedExchange == SupportedExchange.SOLANA_NETWORK;
         accountIdField.setVisible(showAccountId);
         accountIdField.setManaged(showAccountId);
 
@@ -600,11 +602,14 @@ public class OnboardingDesk extends StackPane {
         credGrid.addRow(0, createLabel(apiKeyLabel(selectedExchange)), apiKeyField);
 
         int row = 1;
-        if (selectedExchange != SupportedExchange.OANDA) {
+        if (selectedExchange != SupportedExchange.OANDA && selectedExchange != SupportedExchange.SOLANA_NETWORK) {
             credGrid.addRow(row++, createLabel(selectedExchange == SupportedExchange.STELLAR_NETWORK ? "Secret Seed" : "API Secret"), apiSecretField);
         }
         if (showAccountId) {
-            credGrid.addRow(row++, createLabel(selectedExchange == SupportedExchange.STELLAR_NETWORK ? "Public Account" : "Account ID"), accountIdField);
+            String accountLabel = selectedExchange == SupportedExchange.STELLAR_NETWORK || selectedExchange == SupportedExchange.SOLANA_NETWORK
+                    ? "Public Account"
+                    : "Account ID";
+            credGrid.addRow(row++, createLabel(accountLabel), accountIdField);
         }
 
         credGrid.addRow(row++, createLabel("Telegram"), telegramToken);
@@ -663,6 +668,9 @@ public class OnboardingDesk extends StackPane {
         if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             return "Stellar public account ID (G...)";
         }
+        if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+            return "Solana wallet address";
+        }
         return "API Key";
     }
 
@@ -672,6 +680,9 @@ public class OnboardingDesk extends StackPane {
         }
         if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             return "Public Account";
+        }
+        if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+            return "Wallet Address";
         }
         return "API Key";
     }
@@ -701,6 +712,12 @@ public class OnboardingDesk extends StackPane {
         } else if (selectedExchange == SupportedExchange.STELLAR_NETWORK) {
             if (apiKey.isBlank() || apiSecret.isBlank()) {
                 validation.setText("Stellar public account and secret seed are required.");
+                return;
+            }
+            accountId = apiKey;
+        } else if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+            if (apiKey.isBlank()) {
+                validation.setText("Solana wallet address is required.");
                 return;
             }
             accountId = apiKey;
@@ -802,6 +819,13 @@ public class OnboardingDesk extends StackPane {
                     Secret Seed: S... secret seed
                     Tip: XLM is native and issued assets require trusted issuers.""";
         }
+        if (selectedExchange == SupportedExchange.SOLANA_NETWORK) {
+            return """
+                    Solana Network
+                    Wallet Address: public base-58 wallet address
+                    RPC: defaults to mainnet unless solana.network or solana.rpcUrl is configured
+                    Tip: this adapter supports RPC connectivity and balances; swap trading remains disabled.""";
+        }
         return "Enter your API credentials for " + selectedExchange.getDisplayName();
     }
 
@@ -816,8 +840,9 @@ public class OnboardingDesk extends StackPane {
     private @NotNull PasswordField getPasswordField(SupportedExchange selectedExchange) {
         PasswordField apiSecretField = new PasswordField();
         styleInputField(apiSecretField, selectedExchange == SupportedExchange.STELLAR_NETWORK ? "Secret Seed (S...)" : "API Secret");
-        apiSecretField.setVisible(selectedExchange != SupportedExchange.OANDA);
-        apiSecretField.setManaged(selectedExchange != SupportedExchange.OANDA);
+        boolean visible = selectedExchange != SupportedExchange.OANDA && selectedExchange != SupportedExchange.SOLANA_NETWORK;
+        apiSecretField.setVisible(visible);
+        apiSecretField.setManaged(visible);
         return apiSecretField;
     }
 
@@ -827,7 +852,6 @@ public class OnboardingDesk extends StackPane {
         progressBar.setProgress(0);
         progressBar.setPrefWidth(430);
         progressBar.setStyle("-fx-accent: " + ACCENT + ";");
-
         Label title = new Label("Preparing Terminal");
         title.setStyle("-fx-text-fill: " + TEXT + "; -fx-font-size: 18px; -fx-font-weight: 900;");
 
@@ -1145,7 +1169,8 @@ public class OnboardingDesk extends StackPane {
         return switch (normalized) {
             case "binance" -> "binance";
             case "binanceus", "binance_us", "binance_us_spot" -> "binance-us";
-            case "coinbase", "coinbaseadvanced", "coinbase_advanced", "coinbaseadvancedtrade",
+            case "coinbase", "coinbaseadvanced", "coinbase_advanced",
+                 "coinbaseadvancedtrade",
                  "coinbase_advanced_trade", "coinbasepro", "coinbase_pro" -> "coinbase";
             case "oanda", "oanda_fx", "oanda_forex" -> "oanda";
             case "alpaca", "alpaca_stocks", "alpaca_equities" -> "alpaca";
@@ -1156,6 +1181,7 @@ public class OnboardingDesk extends StackPane {
             case "ig", "bittrex", "bitmex", "kucoin", "kucoinus", "kucoin_us", "bitstamp", "poloniex" ->
                     normalized.replace("_", "-");
             case "stellar", "stellar_network", "stellarnetwork" -> "stellar-network";
+            case "solana", "solana_network", "solananetwork", "sol" -> "solana-network";
             default -> throw new IllegalArgumentException("Unsupported exchange: " + value);
         };
 

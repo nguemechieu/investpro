@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +14,6 @@ import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Signature;
-import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPrivateKeySpec;
@@ -29,14 +29,14 @@ import java.util.regex.Pattern;
 
 /**
  * Normalizes Coinbase Advanced Trade credentials and generates Coinbase JWT tokens.
- *
+ * <p>
  * Supports:
  * - Coinbase Advanced Trade key names: organizations/.../apiKeys/...
  * - Newer UUID-style Coinbase key ids
  * - Full Coinbase JSON payloads
  * - EC PRIVATE KEY PEM format
  * - PRIVATE KEY PKCS8 PEM format
- *
+ * <p>
  * This class intentionally avoids external JWT dependencies.
  */
 @Getter
@@ -69,6 +69,8 @@ public final class CoinbaseAuthProvider {
     private static final String[] SECRET_FIELDS = {
             "privateKey", "private_key", "privatePem", "private_pem", "secret"
     };
+    private static byte[] derSignature;
+    private static int outputLength;
 
     private final @Nullable String apiKeyName;
     private final @Nullable String apiSecret;
@@ -87,7 +89,7 @@ public final class CoinbaseAuthProvider {
 
     /**
      * Creates a Coinbase auth provider using an optional auxiliary input.
-     *
+     * <p>
      * Useful when the UI has a third field where users may paste the full Coinbase JSON.
      */
     public CoinbaseAuthProvider(String apiKeyName, String apiSecret, String auxiliaryInput) {
@@ -228,7 +230,7 @@ public final class CoinbaseAuthProvider {
                 String trimmed = line.trim();
 
                 if (!trimmed.isBlank()) {
-                    if (middle.length() > 0) {
+                    if (!middle.isEmpty()) {
                         middle.append('\n');
                     }
 
@@ -257,7 +259,7 @@ public final class CoinbaseAuthProvider {
 
     /**
      * Generates a Coinbase WebSocket JWT.
-     *
+     * <p>
      * WebSocket tokens usually do not require a request URI claim.
      */
     public String generateWebSocketToken() {
@@ -266,7 +268,7 @@ public final class CoinbaseAuthProvider {
 
     /**
      * Generates a Coinbase REST JWT with a URI claim.
-     *
+     * <p>
      * Example:
      * generateRestToken("GET", "api.coinbase.com", "/api/v3/brokerage/accounts")
      */
@@ -512,7 +514,7 @@ public final class CoinbaseAuthProvider {
 
     /**
      * Parses the private scalar from SEC1 EC PRIVATE KEY:
-     *
+     * <p>
      * ECPrivateKey ::= SEQUENCE {
      *   version        INTEGER,
      *   privateKey     OCTET STRING,
@@ -548,7 +550,8 @@ public final class CoinbaseAuthProvider {
         return parameters.getParameterSpec(ECParameterSpec.class);
     }
 
-    private static byte[] derToJoseSignature(byte[] derSignature, int outputLength) {
+    private static byte @NonNull [] derToJoseSignature(byte[] derSignature, int outputLength) {
+
         Asn1Reader reader = new Asn1Reader(derSignature);
 
         reader.expectTag(0x30);

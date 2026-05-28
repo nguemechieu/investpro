@@ -6,3 +6,4 @@ org.investpro.exchange.providers.BitfinexExchangeProvider
 org.investpro.exchange.providers.AlpacaExchangeProvider
 org.investpro.exchange.providers.InteractiveBrokersExchangeProvider
 org.investpro.exchange.providers.StellarNetworkExchangeProvider
+org.investpro.exchange.providers.SolanaNetworkExchangeProvider

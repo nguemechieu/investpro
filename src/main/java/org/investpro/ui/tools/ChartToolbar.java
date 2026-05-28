@@ -73,7 +73,7 @@ public class ChartToolbar extends Region {
     private final ChartOptions chartOptions;
     private ChartOptions activeChartOptions;
 
-    private MouseExitedPopOverFilter mouseExitedPopOverFilter;
+    private EventHandler<MouseEvent> mouseExitedPopOverFilter;
     private volatile boolean mouseInsideOptionsButton;
 
     private ToolbarButton activeDrawingToolButton;
@@ -199,7 +199,7 @@ public class ChartToolbar extends Region {
             showOptionsPopOver(toolbarButton);
         });
 
-        toolbarButton.setOnMouseExited(event -> {
+        toolbarButton.setOnMouseExited(events -> {
             mouseInsideOptionsButton = false;
 
             Scene scene = getScene();
@@ -209,7 +209,24 @@ public class ChartToolbar extends Region {
             }
 
             if (mouseExitedPopOverFilter == null) {
-                mouseExitedPopOverFilter = new MouseExitedPopOverFilter(scene);
+                final Scene capturedScene = scene;
+                mouseExitedPopOverFilter = event -> {
+                    if (capturedScene.getWindow() == null) {
+                        optionsPopOver.hide(Duration.seconds(0.20));
+                        mouseExitedPopOverFilter = null;
+                        return;
+                    }
+                    boolean insidePopover =
+                            event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
+                                    && event.getScreenX() >= optionsPopOver.getX()
+                                    && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
+                                    && event.getScreenY() >= optionsPopOver.getY();
+                    if (!insidePopover && !mouseInsideOptionsButton) {
+                        optionsPopOver.hide(Duration.seconds(0.20));
+                        capturedScene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, mouseExitedPopOverFilter);
+                        mouseExitedPopOverFilter = null;
+                    }
+                };
                 scene.getWindow().addEventFilter(MouseEvent.MOUSE_MOVED, mouseExitedPopOverFilter);
             }
         });
@@ -492,35 +509,6 @@ public class ChartToolbar extends Region {
             }
 
             requestLayout();
-        }
-    }
-
-    private class MouseExitedPopOverFilter implements EventHandler<MouseEvent> {
-        private final Scene scene;
-
-        MouseExitedPopOverFilter(Scene scene) {
-            this.scene = scene;
-        }
-
-        @Override
-        public void handle(MouseEvent event) {
-            if (scene == null || scene.getWindow() == null) {
-                optionsPopOver.hide(Duration.seconds(0.20));
-                mouseExitedPopOverFilter = null;
-                return;
-            }
-
-            boolean insidePopover =
-                    event.getScreenX() <= optionsPopOver.getX() + optionsPopOver.getWidth()
-                            && event.getScreenX() >= optionsPopOver.getX()
-                            && event.getScreenY() <= optionsPopOver.getY() + optionsPopOver.getHeight()
-                            && event.getScreenY() >= optionsPopOver.getY();
-
-            if (!insidePopover && !mouseInsideOptionsButton) {
-                optionsPopOver.hide(Duration.seconds(0.20));
-                scene.getWindow().removeEventFilter(MouseEvent.MOUSE_MOVED, this);
-                mouseExitedPopOverFilter = null;
-            }
         }
     }
 

@@ -153,14 +153,6 @@ public enum PreTradeCheck {
         this.description = description;
     }
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
     /**
      * Returns true if this check is a gate (parent category).
      */

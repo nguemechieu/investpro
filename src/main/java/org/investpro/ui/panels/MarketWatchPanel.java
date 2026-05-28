@@ -307,7 +307,7 @@ public class MarketWatchPanel extends StackPane {
                     setText("");
                     setStyle("");
                 } else {
-                    setText(item ? "\u2713 Yes" : "\u2717 No");
+                    setText(item ? "✓ Yes" : "✗ No");
                     String style = item ? "-fx-text-fill: #22c55e; -fx-font-weight: bold;" : "-fx-text-fill: #ef4444;";
                     setStyle(style);
                 }
@@ -430,7 +430,7 @@ public class MarketWatchPanel extends StackPane {
 
     /**
      * Refresh market watch data from SymbolAgentManager.
-     * 
+     * <p>
      * This pulls the latest symbol states and updates the table.
      * Only updates if the data has actually changed.
      */
@@ -451,20 +451,16 @@ public class MarketWatchPanel extends StackPane {
 
                 log.debug("Refreshing market watch with {} states", allStates.size());
 
-                // Only update if row count changed
-                if (allStates.size() == lastRowCount && lastRowCount > 0) {
-                    // Data count hasn't changed, just refresh the values
-                    table.refresh();
-                    return;
-                }
-
                 // Remove rows for symbols no longer in the manager
                 rowCache.keySet().retainAll(
                         allStates.stream()
                                 .map(SymbolAgentState::getSymbol)
                                 .toList());
 
-                // Update or create rows
+                // Always update all rows — MarketWatchRow uses JavaFX Property types
+                // so property changes auto-notify the table cells without table.refresh().
+                // Skipping this loop when row count is stable was the bug: bid/ask/spread/
+                // signal data would never update after initial population.
                 for (SymbolAgentState state : allStates) {
                     if (state != null) {
                         TradePair symbol = state.getSymbol();
@@ -473,21 +469,16 @@ public class MarketWatchPanel extends StackPane {
                                 key -> MarketWatchRow.builder()
                                         .symbol(symbol)
                                         .build());
-
-                        // Update the row with symbol state
                         row.updateSymbolState(state);
                     }
                 }
 
-                // Only update table items if count changed
+                // Re-populate table items list only when the set of symbols changes
                 int newRowCount = rowCache.size();
                 if (newRowCount != lastRowCount) {
                     table.getItems().setAll(new java.util.ArrayList<>(rowCache.values()));
                     lastRowCount = newRowCount;
                     log.debug("Refreshed MarketWatch with {} symbols", newRowCount);
-                } else {
-                    // Just refresh the displayed data
-                    table.refresh();
                 }
             } catch (Exception e) {
                 log.error("Error refreshing market watch data", e);

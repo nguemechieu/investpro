@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * Modern Economic Calendar Panel with professional visualization.
- *
+ * <p>
  * Features:
  * - Timeline view showing events chronologically
  * - Event cards with impact indicators
@@ -28,7 +28,7 @@ import java.util.List;
  * - Blackout period management
  * - Search functionality
  * - Responsive design
- *
+ * <p>
  * Design: Modern card-based layout with visual hierarchy and color coding
  */
 @Slf4j
@@ -321,7 +321,6 @@ public class NewsCalendarPanel extends StackPane{
             noEventsLabel.setStyle("-fx-text-fill: #64748b; -fx-font-size: 12; -fx-padding: 40;");
             eventsList.getChildren().add(noEventsLabel);
         } else {
-            LocalDateTime now = LocalDateTime.now();
             String currentDate = "";
 
             for (NewsEvent event : events) {
@@ -416,7 +415,6 @@ public class NewsCalendarPanel extends StackPane{
     }
 
     private void updateStatus() {
-        int totalEvents = newsDataProvider.getUpcomingNewsEvents().size();
         int blackoutCount = newsDataProvider.getActiveBlackoutCount();
         int upcomingSoon = newsDataProvider.getImmediateUpcomingEvents().size();
 

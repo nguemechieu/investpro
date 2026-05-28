@@ -7,11 +7,9 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.geometry.VPos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.layout.Priority;
-import javafx.util.Duration;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +19,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Professional Operations Center board for InvestPro.
@@ -50,7 +44,6 @@ public class SystemOperationsBoard extends BorderPane {
     private Label exchangeStatusLabel;
     private TableView<SystemSnapshot.ExchangeStatusSnapshot> exchangeTableView;
 
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_TIME;
     private static final int REFRESH_INTERVAL_MS = 2000; // 2 seconds
         private static final ObjectMapper SNAPSHOT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -133,7 +126,7 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Overview tab - System health cards
      */
-    private Tab createOverviewTab() {
+    Tab createOverviewTab() {
         Tab tab = new Tab("Overview", null);
         tab.setClosable(false);
 
@@ -284,7 +277,7 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Agents & AI tab
      */
-    private Tab createAgentsTab() {
+     Tab createAgentsTab() {
         Tab tab = new Tab("Agents & AI", null);
         tab.setClosable(false);
 
@@ -332,6 +325,7 @@ public class SystemOperationsBoard extends BorderPane {
     /**
      * Snapshots tab
      */
+    @SuppressWarnings("unused")
     private Tab createSnapshotsTab() {
         Tab tab = new Tab("Snapshots", null);
         tab.setClosable(false);

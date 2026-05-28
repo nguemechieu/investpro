@@ -95,6 +95,16 @@ public record AgentEvent(
     public static final String EXECUTION_ROUTE_SELECTED     = "EXECUTION_ROUTE_SELECTED";
     /** Emitted when the reconciliation engine detects drift between local and live state. */
     public static final String RECONCILIATION_DRIFT_DETECTED = "RECONCILIATION_DRIFT_DETECTED";
+    /** Emitted when the Solana RPC adapter connects successfully. */
+    public static final String SOLANA_CONNECTED = "SOLANA_CONNECTED";
+    /** Emitted when Solana wallet balance data is refreshed. */
+    public static final String SOLANA_BALANCE_UPDATED = "SOLANA_BALANCE_UPDATED";
+    /** Emitted when a Solana wallet transaction is detected. */
+    public static final String SOLANA_TRANSACTION_DETECTED = "SOLANA_TRANSACTION_DETECTED";
+    /** Emitted when a Solana transaction submission succeeds. */
+    public static final String SOLANA_TRANSACTION_SUBMITTED = "SOLANA_TRANSACTION_SUBMITTED";
+    /** Emitted when a Solana transaction submission fails. */
+    public static final String SOLANA_TRANSACTION_FAILED = "SOLANA_TRANSACTION_FAILED";
 
     public AgentEvent {
         type = Objects.requireNonNull(type, "type must not be null").trim();

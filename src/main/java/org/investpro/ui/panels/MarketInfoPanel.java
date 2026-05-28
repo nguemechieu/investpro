@@ -30,7 +30,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Multi-asset market information panel for InvestPro / TradeAdviser.
+ * Multi-asset market information panel for InvestPro / investpro.
  * <p>
  * This panel is intentionally asset-class aware, not crypto-only. It can display
  * crypto, stocks, ETFs, forex, indices, commodities, and derivative-style market

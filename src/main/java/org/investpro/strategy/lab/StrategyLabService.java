@@ -121,6 +121,35 @@ public class StrategyLabService {
         return evaluateAndAssignBest(symbol, timeframe, candles, allStrategyNames);
     }
 
+    public CompletableFuture<StrategyAssignment> evaluateAndAssignBestAcrossTimeframes(
+            @NotNull String symbol,
+            @NotNull Map<Timeframe, List<CandleData>> candlesByTimeframe) {
+        if (candlesByTimeframe.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        List<CompletableFuture<StrategyAssignment>> evaluations = candlesByTimeframe.entrySet().stream()
+                .filter(entry -> entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty())
+                .map(entry -> evaluateAndAssignBest(symbol, entry.getKey(), entry.getValue())
+                        .exceptionally(exception -> {
+                            log.warn("Strategy evaluation failed for {}/{}: {}",
+                                    symbol, entry.getKey().getCode(), exception.getMessage());
+                            return null;
+                        }))
+                .toList();
+
+        if (evaluations.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return CompletableFuture.allOf(evaluations.toArray(CompletableFuture[]::new))
+                .thenApply(ignored -> evaluations.stream()
+                        .map(CompletableFuture::join)
+                        .filter(Objects::nonNull)
+                        .max(Comparator.comparingDouble(StrategyAssignment::getScoreAtAssignment))
+                        .orElse(null));
+    }
+
     /**
      * Same as evaluateAndAssignBest, scoped to a strategy subset.
      */

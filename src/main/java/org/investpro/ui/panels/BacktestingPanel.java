@@ -15,6 +15,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -32,6 +33,8 @@ import org.investpro.persistence.repository.HistoricalDataRepositoryImpl;
 import org.investpro.strategy.StrategyCatalog;
 import org.investpro.strategy.StrategyContext;
 import org.investpro.strategy.StrategyRegistry;
+import org.investpro.strategy.StrategyAssignment;
+import org.investpro.strategy.StrategySelectionService;
 import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.TradingStrategy;
 import org.investpro.strategy.impl.UnifiedStrategy;
@@ -48,6 +51,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -58,7 +62,7 @@ import static org.investpro.utils.Side.SELL;
 
 /**
  * Backtesting Panel.
- *
+ * <p>
  * Executes historical strategy backtests using:
  * - selected TradePair
  * - selected strategy
@@ -104,8 +108,10 @@ public class BacktestingPanel extends StackPane {
     private Button runBacktestButton;
     private Button compareBtn;
     private Button exportBtn;
+    private Button assignResultButton;
 
     private InstitutionalBacktestMetrics currentMetrics;
+    private BacktestInput lastSuccessfulBacktestInput;
     private BacktestReportPanel reportPanel;
 
     private SymbolAgentManager symbolAgentManager;
@@ -116,6 +122,8 @@ public class BacktestingPanel extends StackPane {
     private static final double DEFAULT_INITIAL_EQUITY = 10_000.0;
     private static final double DEFAULT_QUANTITY = 1.0;
     private static final int MAX_BARS_HELD = 50;
+    private static final DateTimeFormatter PRICE_CHART_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /**
      * Extra bars needed after strategy warmup so the strategy has enough room
@@ -189,7 +197,7 @@ public class BacktestingPanel extends StackPane {
         strategyCombo = new ComboBox<>();
         List<String> strategies = loadStrategyNames();
         strategyCombo.setItems(FXCollections.observableArrayList(strategies));
-        strategyCombo.setValue(strategies.isEmpty() ? "Trend Following" : strategies.getFirst());
+        strategyCombo.setValue(defaultStrategySelection(strategies));
         strategyCombo.setPrefHeight(35);
         HBox strategyBox = createLabeledInput("Strategy:", strategyCombo);
 
@@ -330,6 +338,14 @@ public class BacktestingPanel extends StackPane {
         exportBtn.setDisable(true);
         exportBtn.setOnAction(event -> exportResults());
 
+        assignResultButton = new Button("Assign Strategy");
+        assignResultButton.setStyle(primaryButtonStyle("#10b981"));
+        assignResultButton.setDisable(true);
+        assignResultButton.setOnAction(event -> assignTestedStrategy());
+
+        HBox resultActions = new HBox(10, assignResultButton, exportBtn);
+        resultActions.setAlignment(Pos.CENTER_LEFT);
+
         Label equityLabel = new Label("Equity Curve");
         equityLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold;");
 
@@ -357,7 +373,7 @@ public class BacktestingPanel extends StackPane {
         section.getChildren().addAll(
                 sectionTitle,
                 resultsTabPane,
-                exportBtn);
+                resultActions);
 
         VBox.setVgrow(resultsTabPane, Priority.ALWAYS);
 
@@ -425,12 +441,15 @@ public class BacktestingPanel extends StackPane {
 
     private LineChart<Number, Number> createPriceActionChart() {
         NumberAxis xAxis = new NumberAxis();
-        xAxis.setLabel("Candle #");
+        xAxis.setLabel("Timestamp");
         xAxis.setForceZeroInRange(false);
+        xAxis.setTickLabelRotation(-30);
+        xAxis.setTickLabelFormatter(new GregorianTimestampAxisFormatter());
         xAxis.setStyle("-fx-text-fill: #a0aec0; -fx-tick-label-fill: #a0aec0;");
 
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel("Price");
+        yAxis.setSide(javafx.geometry.Side.RIGHT);
         yAxis.setForceZeroInRange(false);
         yAxis.setStyle("-fx-text-fill: #a0aec0; -fx-tick-label-fill: #a0aec0;");
 
@@ -514,7 +533,8 @@ public class BacktestingPanel extends StackPane {
 
     private @NotNull List<String> loadStrategyNames() {
         try {
-            List<String> strategies = new ArrayList<>(StrategyCatalog.availableStrategyNames());
+            LinkedHashSet<String> strategies = new LinkedHashSet<>(StrategyCatalog.availableStrategyNames());
+            strategies.addAll(StrategyRegistry.getInstance().listStrategyNames());
 
             // Add user-developed strategies if any are registered
             try {
@@ -533,7 +553,7 @@ public class BacktestingPanel extends StackPane {
             }
 
             if (!strategies.isEmpty()) {
-                return strategies;
+                return new ArrayList<>(strategies);
             }
         } catch (Exception exception) {
             log.debug("StrategyCatalog.availableStrategyNames() unavailable: {}", exception.getMessage());
@@ -542,8 +562,18 @@ public class BacktestingPanel extends StackPane {
         try {
             return new ArrayList<>(StrategyCatalog.CORE_STRATEGY_NAMES);
         } catch (Exception exception) {
-            return List.of("Trend Following", "Mean Reversion", "Breakout");
+            return List.of(StrategyCatalog.defaultStrategyName(), "Mean Reversion", "Breakout");
         }
+    }
+
+    private String defaultStrategySelection(List<String> strategies) {
+        if (strategies == null || strategies.isEmpty()) {
+            return StrategyCatalog.defaultStrategyName();
+        }
+        return strategies.stream()
+                .filter(StrategyCatalog.defaultStrategyName()::equalsIgnoreCase)
+                .findFirst()
+                .orElse(strategies.getFirst());
     }
 
     private List<Timeframe> loadSupportedTimeframes() {
@@ -823,6 +853,7 @@ public class BacktestingPanel extends StackPane {
         }
 
         backtestRunning.set(true);
+        lastSuccessfulBacktestInput = null;
         statusLabel.setText("Loading data...");
         progressBar.setProgress(-1);
         setRunningUi(true);
@@ -948,6 +979,7 @@ public class BacktestingPanel extends StackPane {
                 updatePriceActionChart(finalCandles, trades);
                 updateEquityChart(trades, initialBalance);
                 updateMetrics(metrics);
+                lastSuccessfulBacktestInput = input;
 
                 boolean hasTrades = !trades.isEmpty();
                 if (exportBtn != null) {
@@ -955,6 +987,9 @@ public class BacktestingPanel extends StackPane {
                 }
                 if (compareBtn != null) {
                     compareBtn.setDisable(!hasTrades);
+                }
+                if (assignResultButton != null) {
+                    assignResultButton.setDisable(false);
                 }
 
                 statusLabel.setText(
@@ -1088,6 +1123,9 @@ public class BacktestingPanel extends StackPane {
         }
         if (compareBtn != null && running) {
             compareBtn.setDisable(true);
+        }
+        if (assignResultButton != null) {
+            assignResultButton.setDisable(running || lastSuccessfulBacktestInput == null);
         }
     }
 
@@ -1664,6 +1702,52 @@ public class BacktestingPanel extends StackPane {
         }
     }
 
+    private double candleXValue(List<CandleData> candles, int index) {
+        if (candles == null || index < 0 || index >= candles.size()) {
+            return -1.0;
+        }
+        return candleEpochMillis(candles.get(index));
+    }
+
+    private double candleEpochMillis(CandleData candle) {
+        long timestamp = candleTimestamp(candle);
+        if (timestamp <= 0L) {
+            return -1.0;
+        }
+        if (timestamp < 10_000_000_000L) {
+            timestamp *= 1000L;
+        }
+        return timestamp;
+    }
+
+    private static final class GregorianTimestampAxisFormatter extends StringConverter<Number> {
+        @Override
+        public String toString(Number value) {
+            if (value == null) {
+                return "";
+            }
+            long epochMillis = value.longValue();
+            if (epochMillis <= 0L) {
+                return "";
+            }
+            if (epochMillis < 10_000_000_000L) {
+                epochMillis *= 1000L;
+            }
+            try {
+                return Instant.ofEpochMilli(epochMillis)
+                        .atZone(ZoneId.systemDefault())
+                        .format(PRICE_CHART_TIME_FORMAT);
+            } catch (Exception ignored) {
+                return "";
+            }
+        }
+
+        @Override
+        public Number fromString(String value) {
+            return 0L;
+        }
+    }
+
     private String displayTradePair(TradePair pair) {
         if (pair == null) {
             return "";
@@ -1784,7 +1868,7 @@ public class BacktestingPanel extends StackPane {
             if (candle == null || candle.closePrice() <= 0.0) {
                 continue;
             }
-            priceSeries.getData().add(new XYChart.Data<>(i, candle.closePrice()));
+            priceSeries.getData().add(new XYChart.Data<>(candleEpochMillis(candle), candle.closePrice()));
         }
 
         priceActionChart.getData().add(priceSeries);
@@ -1795,30 +1879,33 @@ public class BacktestingPanel extends StackPane {
                     continue;
                 }
 
-                addTradeMarker(trade.getEntryIndex(), trade.getPrice(), trade.getSide() == BUY ? "BUY" : "SELL",
+                double entryX = candleXValue(candles, trade.getEntryIndex());
+                double exitX = candleXValue(candles, trade.getExitIndex());
+
+                addTradeMarker(entryX, trade.getPrice(), trade.getSide() == BUY ? "BUY" : "SELL",
                         trade.getSide() == BUY ? "#22c55e" : "#ef4444",
                         "%s entry @ %.5f".formatted(trade.getSide(), trade.getPrice()));
 
-                addTradeMarker(trade.getExitIndex(), trade.getExitPrice(), "EXIT",
+                addTradeMarker(exitX, trade.getExitPrice(), "EXIT",
                         trade.getProfit() >= 0.0 ? "#38bdf8" : "#f59e0b",
                         "Exit @ %.5f | P&L %.2f | %s".formatted(trade.getExitPrice(), trade.getProfit(),
                                 trade.getReason()));
 
-                addTradeConnector(trade);
+                addTradeConnector(trade, entryX, exitX);
             }
         }
 
         Platform.runLater(() -> stylePriceActionChart(priceSeries));
     }
 
-    private void addTradeMarker(int index, double price, String name, String color, String tooltipText) {
-        if (index < 0 || price <= 0.0) {
+    private void addTradeMarker(double xValue, double price, String name, String color, String tooltipText) {
+        if (xValue <= 0.0 || price <= 0.0) {
             return;
         }
 
         XYChart.Series<Number, Number> marker = new XYChart.Series<>();
         marker.setName(name);
-        XYChart.Data<Number, Number> point = new XYChart.Data<>(index, price);
+        XYChart.Data<Number, Number> point = new XYChart.Data<>(xValue, price);
         marker.getData().add(point);
         priceActionChart.getData().add(marker);
 
@@ -1837,15 +1924,15 @@ public class BacktestingPanel extends StackPane {
         });
     }
 
-    private void addTradeConnector(BacktestTrade trade) {
-        if (trade.getEntryIndex() < 0 || trade.getExitIndex() < 0) {
+    private void addTradeConnector(BacktestTrade trade, double entryX, double exitX) {
+        if (trade.getEntryIndex() < 0 || trade.getExitIndex() < 0 || entryX <= 0.0 || exitX <= 0.0) {
             return;
         }
 
         XYChart.Series<Number, Number> connector = new XYChart.Series<>();
         connector.setName("Trade");
-        connector.getData().add(new XYChart.Data<>(trade.getEntryIndex(), trade.getPrice()));
-        connector.getData().add(new XYChart.Data<>(trade.getExitIndex(), trade.getExitPrice()));
+        connector.getData().add(new XYChart.Data<>(entryX, trade.getPrice()));
+        connector.getData().add(new XYChart.Data<>(exitX, trade.getExitPrice()));
         priceActionChart.getData().add(connector);
 
         Platform.runLater(() -> {
@@ -2030,6 +2117,73 @@ public class BacktestingPanel extends StackPane {
         }
 
         return value.replace(",", " ").replace("\n", " ").trim();
+    }
+
+    private void assignTestedStrategy() {
+        BacktestInput input = lastSuccessfulBacktestInput;
+        if (input == null || !input.isValid()) {
+            showAlert("No Backtest Selected", "Run a backtest before assigning a strategy.", Alert.AlertType.WARNING);
+            return;
+        }
+
+        String symbol = displayTradePair(input.selectedPair());
+        String strategyId = assignmentStrategyId(input.strategyName());
+        double score = currentMetrics == null ? 0.0 : currentMetrics.getConfidenceScore();
+        int trades = currentMetrics == null ? 0 : currentMetrics.getTotalTrades();
+        double totalReturn = currentMetrics == null ? 0.0 : currentMetrics.getTotalReturnPercent();
+        double winRate = currentMetrics == null ? 0.0 : currentMetrics.getWinRate();
+        double drawdown = currentMetrics == null ? 0.0 : currentMetrics.getMaxDrawdownPercent();
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Assign Backtested Strategy");
+        confirm.setHeaderText("Assign this strategy to " + symbol + " / " + input.selectedTimeframe().getCode() + "?");
+        confirm.setContentText(
+                "Strategy: " + strategyId + "\n" +
+                        "Trades: " + trades + "\n" +
+                        "Return: " + String.format(Locale.ROOT, "%.2f%%", totalReturn) + "\n" +
+                        "Win Rate: " + String.format(Locale.ROOT, "%.1f%%", winRate) + "\n" +
+                        "Max Drawdown: " + String.format(Locale.ROOT, "%.2f%%", drawdown) + "\n" +
+                        "Score: " + String.format(Locale.ROOT, "%.1f", score));
+
+        confirm.showAndWait().ifPresent(result -> {
+            if (result != ButtonType.OK) {
+                return;
+            }
+
+            try {
+                StrategyAssignment assignment = StrategySelectionService.getInstance()
+                        .manuallyAssign(
+                                symbol,
+                                input.selectedTimeframe(),
+                                strategyId,
+                                true,
+                                "Assigned from Backtesting panel after user-reviewed backtest: "
+                                        + String.format(Locale.ROOT,
+                                        "return %.2f%%, win rate %.1f%%, max drawdown %.2f%%, trades %d",
+                                        totalReturn, winRate, drawdown, trades),
+                                score);
+
+                statusLabel.setText("Assigned " + assignment.getStrategyId() + " to "
+                        + symbol + " " + input.selectedTimeframe().getCode());
+                showAlert("Strategy Assigned",
+                        assignment.getStrategyId() + " is now assigned to "
+                                + symbol + " / " + input.selectedTimeframe().getCode() + ".",
+                        Alert.AlertType.INFORMATION);
+            } catch (Exception exception) {
+                log.error("Failed to assign backtested strategy", exception);
+                showAlert("Assignment Failed", exception.getMessage(), Alert.AlertType.ERROR);
+            }
+        });
+    }
+
+    private String assignmentStrategyId(String strategyName) {
+        if (strategyName == null || strategyName.isBlank()) {
+            return StrategyCatalog.defaultStrategyName();
+        }
+        if (strategyName.startsWith("[User] ")) {
+            return strategyName.substring("[User] ".length()).trim();
+        }
+        return strategyName.trim();
     }
 
     private void compareResults() {

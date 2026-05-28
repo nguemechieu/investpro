@@ -17,7 +17,7 @@ import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Collection;
-import java.util.stream.Collectors;
+
 
 public class PluginManagerPanel extends BorderPane {
 
@@ -121,7 +121,7 @@ public class PluginManagerPanel extends BorderPane {
                 .map(provider -> row(
                         provider,
                         "Market Data",
-                        provider.supportedAssetClasses().stream().collect(Collectors.joining(", "))))
+                        String.join(", ", provider.supportedAssetClasses())))
                 .toList();
     }
 

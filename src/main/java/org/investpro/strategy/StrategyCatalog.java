@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class StrategyCatalog {
 
@@ -37,6 +38,7 @@ public final class StrategyCatalog {
     );
 
     public static final Map<String, StrategyDefinition> STRATEGY_DEFINITIONS = buildCatalog();
+    private static final Map<String, StrategyDefinition> RUNTIME_DEFINITIONS = new ConcurrentHashMap<>();
 
     public static final Map<String, String> STRATEGY_VARIANT_BASE_MAP = buildVariantBaseMap();
 
@@ -453,6 +455,11 @@ public final class StrategyCatalog {
     public static StrategyDefinition definition(String strategyName) {
         String normalized = normalizeStrategyName(strategyName);
 
+        StrategyDefinition runtimeDefinition = RUNTIME_DEFINITIONS.get(normalized);
+        if (runtimeDefinition != null) {
+            return runtimeDefinition;
+        }
+
         StrategyDefinition definition = STRATEGY_DEFINITIONS.get(normalized);
 
         if (definition != null) {
@@ -481,8 +488,21 @@ public final class StrategyCatalog {
     @Contract(" -> new")
     public static @NotNull List<String> availableStrategyNames() {
         LinkedHashSet<String> names = new LinkedHashSet<>(STRATEGY_DEFINITIONS.keySet());
+        names.addAll(RUNTIME_DEFINITIONS.keySet());
         names.addAll(providerStrategyNames());
         return new ArrayList<>(names);
+    }
+
+    public static @NotNull String defaultStrategyName() {
+        List<String> names = availableStrategyNames();
+        return names.isEmpty() ? "Trend Following" : names.getFirst();
+    }
+
+    public static void registerRuntimeDefinition(@NotNull StrategyDefinition definition) {
+        if (definition.getName() == null || definition.getName().isBlank()) {
+            return;
+        }
+        RUNTIME_DEFINITIONS.put(definition.getName(), definition);
     }
 
     public static @NotNull List<String> providerStrategyNames() {
@@ -498,7 +518,7 @@ public final class StrategyCatalog {
     }
 
     public static int definitionCount() {
-        return STRATEGY_DEFINITIONS.size();
+        return STRATEGY_DEFINITIONS.size() + RUNTIME_DEFINITIONS.size();
     }
 
     private record VariantProfile(String label, StrategyParameters parameters) {

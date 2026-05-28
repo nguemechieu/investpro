@@ -1,6 +1,5 @@
 package org.investpro.ui.tools;
 
-import java.util.List;
 import java.util.Objects;
 
 import javafx.beans.property.BooleanProperty;

@@ -61,7 +61,7 @@ public final class NormalizedMarketSnapshot {
     private final String dataSource;
 
     /** Full constructor used by the builder-style static factories. */
-    private NormalizedMarketSnapshot(
+    public NormalizedMarketSnapshot(
             String exchangeName, String venueId, TradePair tradePair, Instant capturedAt,
             double bidPrice, double askPrice, double midPrice, double spreadBps,
             double lastTradePrice, double lastTradeSize,

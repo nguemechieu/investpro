@@ -82,6 +82,13 @@ public final class ExchangeRuntimeManager {
         log.info("Registered exchange '{}' with runtime manager", exchangeName);
     }
 
+    public synchronized void register(
+            @NotNull String exchangeName,
+            @NotNull org.investpro.exchange.models.ExchangeCapability capability
+    ) {
+        register(exchangeName);
+    }
+
     /** Unregisters an exchange from the runtime manager. */
     public synchronized void unregister(@NotNull String exchangeName) {
         states.remove(exchangeName);
@@ -127,12 +134,16 @@ public final class ExchangeRuntimeManager {
     }
 
     /** Records a successful heartbeat for the given exchange. */
+    public void recordHeartbeat(@NotNull String exchangeName) {
+        recordHeartbeat(exchangeName, 0L);
+    }
+
+    /** Records a successful heartbeat for the given exchange. */
     public void recordHeartbeat(@NotNull String exchangeName, long latencyMs) {
         AtomicReference<ExchangeRuntimeMetadata> metaRef = metadata.get(exchangeName);
         if (metaRef == null) return;
         ExchangeRuntimeMetadata current = metaRef.get();
-        ExchangeRuntimeState currentState = getState(exchangeName)
-                .orElse(ExchangeRuntimeState.DISCONNECTED);
+        ExchangeRuntimeState currentState = getState(exchangeName);
         Instant now = Instant.now();
         metaRef.set(new ExchangeRuntimeMetadata(
                 exchangeName, currentState, now, current.websocketConnected(),
@@ -153,6 +164,9 @@ public final class ExchangeRuntimeManager {
         if (!connected) {
             long count = reconnectCounts.getOrDefault(exchangeName, new AtomicLong(0)).incrementAndGet();
             log.debug("Exchange '{}' WebSocket disconnected (reconnect count: {})", exchangeName, count);
+            if (current.state() == ExchangeRuntimeState.CONNECTED) {
+                transitionState(exchangeName, ExchangeRuntimeState.DEGRADED);
+            }
         }
     }
 
@@ -168,17 +182,29 @@ public final class ExchangeRuntimeManager {
                 current.lastStateChange(), now, successful, now));
         if (!successful) {
             transitionState(exchangeName, ExchangeRuntimeState.AUTH_FAILED);
+        } else if (getState(exchangeName) == ExchangeRuntimeState.AUTH_FAILED) {
+            transitionState(exchangeName, ExchangeRuntimeState.DISCONNECTED);
         }
     }
 
     /** Returns the current runtime state for the given exchange. */
-    public @NotNull Optional<ExchangeRuntimeState> getState(@NotNull String exchangeName) {
+    public @NotNull ExchangeRuntimeState getState(@NotNull String exchangeName) {
+        AtomicReference<ExchangeRuntimeState> ref = states.get(exchangeName);
+        return ref == null ? ExchangeRuntimeState.DISCONNECTED : ref.get();
+    }
+
+    public @NotNull Optional<ExchangeRuntimeState> getStateOptional(@NotNull String exchangeName) {
         AtomicReference<ExchangeRuntimeState> ref = states.get(exchangeName);
         return ref == null ? Optional.empty() : Optional.of(ref.get());
     }
 
     /** Returns the latest runtime metadata snapshot for the given exchange. */
-    public @NotNull Optional<ExchangeRuntimeMetadata> getMetadata(@NotNull String exchangeName) {
+    public @Nullable ExchangeRuntimeMetadata getMetadata(@NotNull String exchangeName) {
+        AtomicReference<ExchangeRuntimeMetadata> ref = metadata.get(exchangeName);
+        return ref == null ? null : ref.get();
+    }
+
+    public @NotNull Optional<ExchangeRuntimeMetadata> getMetadataOptional(@NotNull String exchangeName) {
         AtomicReference<ExchangeRuntimeMetadata> ref = metadata.get(exchangeName);
         return ref == null ? Optional.empty() : Optional.of(ref.get());
     }

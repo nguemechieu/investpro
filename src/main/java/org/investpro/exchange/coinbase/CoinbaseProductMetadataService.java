@@ -1,5 +1,6 @@
 package org.investpro.exchange.coinbase;
 
+import lombok.Data;
 import lombok.Getter;
 import org.investpro.exchange.core.*;
 
@@ -9,7 +10,7 @@ import java.util.*;
 /**
  * CoinbaseProductMetadataService - Fetches and caches Coinbase product metadata.
  */
-@Getter
+@Data
 public class CoinbaseProductMetadataService {
     private final CoinbaseAuthProvider authProvider;
     private final Map<String, InstrumentMetadata> metadataCache;

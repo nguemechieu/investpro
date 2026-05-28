@@ -4,7 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -45,6 +47,20 @@ public class RssNewsService {
 
     private static final String DEFAULT_FEED_URL = "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en";
     private static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; InvestProNewsService/1.0; +https://investpro.local)";
+    private static final ErrorHandler QUIET_XML_ERROR_HANDLER = new ErrorHandler() {
+        @Override
+        public void warning(SAXParseException exception) {
+        }
+
+        @Override
+        public void error(SAXParseException exception) {
+        }
+
+        @Override
+        public void fatalError(SAXParseException exception) throws SAXException {
+            throw exception;
+        }
+    };
 
     // Top-tier financial RSS feeds for general market news (no API key required)
     private static final List<String> FINANCIAL_RSS_FEEDS = List.of(
@@ -172,9 +188,17 @@ public class RssNewsService {
             factory.setXIncludeAware(false);
             factory.setExpandEntityReferences(false);
             this.documentBuilder = factory.newDocumentBuilder();
+            this.documentBuilder.setErrorHandler(QUIET_XML_ERROR_HANDLER);
         } catch (ParserConfigurationException e) {
             log.error("Failed to create DocumentBuilder", e);
             throw new RuntimeException(e);
+        }
+    }
+
+    private Document parseXml(String xml) throws IOException, SAXException {
+        synchronized (documentBuilder) {
+            documentBuilder.setErrorHandler(QUIET_XML_ERROR_HANDLER);
+            return documentBuilder.parse(new org.xml.sax.InputSource(new java.io.StringReader(xml)));
         }
     }
 
@@ -474,8 +498,7 @@ public class RssNewsService {
                 return new ArrayList<>();
             }
 
-            Document doc = documentBuilder.parse(new org.xml.sax.InputSource(
-                    new java.io.StringReader(response.body())));
+            Document doc = parseXml(response.body());
 
             List<Map<String, Object>> events = new ArrayList<>();
             Set<String> seen = new HashSet<>();
@@ -794,8 +817,7 @@ public class RssNewsService {
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() >= 400) continue;
 
-                Document doc = documentBuilder.parse(new org.xml.sax.InputSource(
-                        new java.io.StringReader(response.body())));
+                Document doc = parseXml(response.body());
 
                 NodeList items = doc.getElementsByTagName("item");
                 for (int i = 0; i < items.getLength(); i++) {

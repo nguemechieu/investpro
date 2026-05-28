@@ -1295,6 +1295,8 @@ public class Oanda extends Exchange {
         String account = resolveAccountId();
 
         if (account.isBlank()) {
+            log.warn("OANDA account id is blank — cannot fetch account details. "
+                    + "Ensure accountId is provided in credentials.");
             return null;
         }
 
@@ -1308,7 +1310,8 @@ public class Oanda extends Exchange {
         String url = oandaRoute(ACCOUNT_SUMMARY_ROUTE, account);
 
         if (isAccountConnectivityBackoffActive()) {
-            log.debug("Skipping OANDA account details fetch during connectivity backoff: {}", extractEndpoint(url));
+            log.warn("OANDA account details fetch skipped — connectivity backoff active until {}ms. "
+                    + "Will retry automatically.", accountConnectivityUnavailableUntilMs);
             return null;
         }
 
@@ -1320,7 +1323,16 @@ public class Oanda extends Exchange {
             HttpResponse<String> response = sendCritical(request);
 
             if (!isSuccess(response)) {
-                log.warn("OANDA account summary failed HTTP {}: {}", response.statusCode(), response.body());
+                log.warn("OANDA account summary failed HTTP {} at [{}]: {}",
+                        response.statusCode(), url, truncate(response.body(), 300));
+
+                // On 401: the token may belong to the alternate OANDA environment
+                // (practice vs live). Automatically retry with the opposite base URL
+                // so users who have practice credentials but select Live trading mode
+                // are still connected, and a clear suggestion is logged.
+                if (response.statusCode() == 401) {
+                    return retryWithAlternateEnvironment(account, cacheKey);
+                }
                 return null;
             }
 
@@ -3425,6 +3437,111 @@ public class Oanda extends Exchange {
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
+
+    /**
+     * When a 401 is received from the primary OANDA environment, tries the alternate
+     * environment (practice ↔ live). If the alternate succeeds, the adapter's
+     * internal base URL switches accordingly so all subsequent calls work.
+     */
+    private Account retryWithAlternateEnvironment(String account, String cacheKey) {
+        boolean currentlyLive = !isPaperTrading();
+        String alternateBaseUrl = currentlyLive ? OANDA_PRACTICE_API_URL : OANDA_LIVE_API_URL;
+        String alternateUrl = alternateBaseUrl + ACCOUNT_SUMMARY_ROUTE.formatted(account);
+
+        log.warn("OANDA 401 on {} environment. Retrying with {} environment: {}",
+                currentlyLive ? "LIVE" : "PRACTICE",
+                currentlyLive ? "PRACTICE" : "LIVE",
+                alternateUrl);
+
+        HttpRequest retryRequest = requestBuilder(alternateUrl).GET().build();
+        try {
+            HttpResponse<String> retryResponse = sendCritical(retryRequest);
+            if (!isSuccess(retryResponse)) {
+                log.error("OANDA account auth failed on both environments (HTTP {}). "
+                        + "Check that your API token is valid and matches the {} environment. "
+                        + "Live API: api-fxtrade.oanda.com  |  Practice API: api-fxpractice.oanda.com",
+                        retryResponse.statusCode(),
+                        currentlyLive ? "LIVE" : "PRACTICE");
+                return null;
+            }
+
+            // Success on alternate environment — adapt internal mode and notify
+            String suggestedMode = currentlyLive ? "PAPER" : "LIVE";
+            log.warn("OANDA credentials validated against {} environment. "
+                    + "Consider changing 'Trading Mode' to '{}' in the connection dialog "
+                    + "to avoid this auto-detection on every connection.",
+                    currentlyLive ? "PRACTICE" : "LIVE", suggestedMode);
+
+            // Override the trading mode so all subsequent calls use the correct URL
+            setUserSelectedTradingMode(suggestedMode);
+
+            return parseAndCacheAccount(retryResponse, account, cacheKey);
+
+        } catch (Exception ex) {
+            log.error("OANDA alternate-environment retry failed", ex);
+            return null;
+        }
+    }
+
+    /**
+     * Parses an OANDA /summary response body into an {@link Account} and caches it.
+     */
+    private Account parseAndCacheAccount(HttpResponse<String> response, String account, String cacheKey) {
+        try {
+            JsonNode accountNode = OBJECT_MAPPER.readTree(response.body()).path("account");
+            Account userAccount = new Account();
+            userAccount.setExchange(this);
+            userAccount.setEmail(accountNode.path("id").asText(account));
+            userAccount.setUsername(accountNode.path("id").asText(account));
+            userAccount.setAccountId(accountNode.path("id").asText(account));
+            userAccount.setBrokerName("OANDA");
+            userAccount.setExchangeId("oanda");
+            userAccount.setBaseCurrency(accountNode.path("currency").asText("USD"));
+            userAccount.setTotalBalance(accountNode.path("balance").asDouble(0.0));
+            userAccount.setAvailableBalance(accountNode.path("availableMarginClosingOnly").asDouble(0.0));
+            userAccount.setEquity(accountNode.path("NAV").asDouble(0.0));
+            userAccount.setNav(accountNode.path("NAV").asDouble(0.0));
+            userAccount.setMarginUsed(accountNode.path("marginUsed").asDouble(0.0));
+            userAccount.setFreeMargin(accountNode.path("marginAvailable").asDouble(0.0));
+            userAccount.setMarginAvailable(accountNode.path("marginAvailable").asDouble(0.0));
+            userAccount.setUnrealizedPnl(accountNode.path("unrealizedPL").asDouble(0.0));
+            userAccount.setRealizedPnl(accountNode.path("realizedPL").asDouble(0.0));
+            userAccount.setOpenPositionCount(accountNode.path("openPositionCount").asInt(0));
+            userAccount.setOpenOrderCount(accountNode.path("openTradeCount").asInt(0));
+            if (accountNode.has("hedgingEnabled")) {
+                userAccount.getMetadata().put("hedgingEnabled", accountNode.path("hedgingEnabled").asBoolean());
+            }
+            if (accountNode.has("marginRate")) {
+                userAccount.getMetadata().put("marginRate", accountNode.path("marginRate").asText());
+            }
+            if (accountNode.has("positionAggregationMode")) {
+                userAccount.getMetadata().put("positionAggregationMode",
+                        accountNode.path("positionAggregationMode").asText());
+            }
+            String lastTransactionIDStr = accountNode.path("lastTransactionID").asText("");
+            if (!lastTransactionIDStr.isEmpty()) {
+                userAccount.getMetadata().put("lastTransactionID", lastTransactionIDStr);
+            }
+            userAccount.setUpdatedAt(Instant.now());
+            userAccount.setConnected(true);
+            String resolvedId = accountNode.path("id").asText("");
+            userAccount.setSandbox(resolvedId.startsWith("101-"));
+            userAccount.setPaperTrading(userAccount.isSandbox());
+            setAccountCached(cacheKey, userAccount);
+            log.info("OANDA account loaded via alternate-environment fallback: {} ({})",
+                    userAccount.getUsername(), userAccount.getAccountId());
+            return userAccount;
+        } catch (Exception ex) {
+            log.error("Failed to parse OANDA account from alternate-environment response", ex);
+            return null;
+        }
+    }
+
+    /** Truncates a string to at most {@code maxLen} chars for safe log output. */
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "";
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "…";
+    }
 
     private String resolveAccountId() {
         if (!safe(accountId).isBlank()) {

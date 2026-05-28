@@ -1,5 +1,6 @@
 package org.investpro.exchange.resilience;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
 import org.investpro.core.agents.AgentEventBus;
@@ -9,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
-import java.time.Instant;
+
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,8 +45,8 @@ public final class ExchangeCircuitBreaker {
     private static final int DEFAULT_FAILURE_THRESHOLD = 3;
     private static final int DEFAULT_PROBE_TIMEOUT_SECONDS = 10;
 
-    private String exchangeName = "OANDA";
-    private EndpointType endpoint = EndpointType.ORDER_HISTORY;
+    private String exchangeName ;
+    private EndpointType endpoint;
     private final int failureThreshold;
     @Nullable
     private final AgentEventBus eventBus;
@@ -247,6 +248,7 @@ public final class ExchangeCircuitBreaker {
             eventBus.publishAsync(AgentEvent.of(eventType, "ExchangeCircuitBreaker", endpoint, meta));
         } catch (Exception ignored) {
             // Event bus failures must not affect circuit breaker operation
+            log.error( "Circuit publish event for {}/{}", exchangeName, endpoint);
         }
     }
 
@@ -256,6 +258,8 @@ public final class ExchangeCircuitBreaker {
      * Thrown when a request is blocked by an open circuit.
      * Callers should catch this to activate stale-cache fallback.
      */
+    @Getter
+    @Slf4j
     public static final class CircuitOpenException extends RuntimeException {
 
         private final EndpointType endpoint;
@@ -270,9 +274,9 @@ public final class ExchangeCircuitBreaker {
                     .formatted(exchange, endpoint.name(), remainingCooldown.toSeconds()));
             this.endpoint = endpoint;
             this.remainingCooldown = remainingCooldown;
+
+            log.info( exchange, endpoint, remainingCooldown);
         }
 
-        public EndpointType getEndpoint() { return endpoint; }
-        public Duration getRemainingCooldown() { return remainingCooldown; }
     }
 }

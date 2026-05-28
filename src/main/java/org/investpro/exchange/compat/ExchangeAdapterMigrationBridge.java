@@ -89,7 +89,7 @@ public final class ExchangeAdapterMigrationBridge {
      * @param registry the target registry
      */
     public void registerWith(@NotNull ExchangeCapabilityRegistry registry) {
-        registry.register(capability);
+        registry.register(capability.getExchangeName(), capability);
         log.info("[MigrationBridge] Registered legacy exchange '{}' with capability registry",
                 capability.getExchangeName());
     }

@@ -1,5 +1,6 @@
 package org.investpro.strategy;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +27,7 @@ import java.util.concurrent.*;
  * Strategies are progressively instantiated only as they pass each filter
  * stage.
  */
-@Getter
-@Setter
+@Data
 @Slf4j
 public  class StrategySelectionService {
 
@@ -111,6 +111,21 @@ public  class StrategySelectionService {
                 .active(true)
                 .locked(locked)
                 .reason(reason == null || reason.isBlank() ? "Manual strategy assignment" : reason)
+                .build();
+        StrategyAssignmentRepository.getInstance().save(assignment);
+        return assignment;
+    }
+
+    public StrategyAssignment manuallyAssign(
+            @NotNull String symbol,
+            @NotNull Timeframe timeframe,
+            @NotNull String strategyId,
+            boolean locked,
+            @Nullable String reason,
+            double score) {
+        StrategyAssignment assignment = manuallyAssign(symbol, timeframe, strategyId, locked, reason)
+                .toBuilder()
+                .scoreAtAssignment(score)
                 .build();
         StrategyAssignmentRepository.getInstance().save(assignment);
         return assignment;

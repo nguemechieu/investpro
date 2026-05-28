@@ -230,6 +230,7 @@ public final class ExchangeFactory {
             case INTERACTIVE_BROKERS -> new InteractiveBrokers(credentials);
             case OANDA -> new Oanda(credentials);
             case STELLAR_NETWORK -> new StellarNetwork(credentials);
+            case SOLANA_NETWORK -> new SolanaNetwork(credentials);
             case POLONIEX -> throw new IllegalArgumentException("Poloniex adapter not implemented yet");
             case IG -> throw new IllegalArgumentException("IG adapter not implemented yet");
             case KRAKEN -> throw new IllegalArgumentException("Kraken adapter not implemented yet");
@@ -292,6 +293,7 @@ public final class ExchangeFactory {
                 "ibk", "ibkr", "schwab", "charlesschwab");
         addAliases(aliases, "oanda", "oanda", "oandafx", "oandaforex", "oandacfd", "oandafxcfd");
         addAliases(aliases, "stellar_network", "stellar", "stellarnetwork", "stellarx", "xlm");
+        addAliases(aliases, "solana_network", "solana", "solananetwork", "sol", "solanaweb3");
 
         addAliases(aliases, "bittrex", "bittrex");
         addAliases(aliases, "bitmex", "bitmex");

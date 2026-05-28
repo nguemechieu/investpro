@@ -31,6 +31,9 @@ public enum ENUM_EXCHANGE_LIST {
     ),
     STELLAR_NETWORK(
             "STELLAR NETWORK", 17
+    ),
+    SOLANA_NETWORK(
+            "SOLANA NETWORK", 18
     );
 
 

@@ -1,20 +1,14 @@
 package org.investpro.ui.menu;
 
-import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.investpro.ui.TradingDesk;
 
 import java.util.*;
-import java.util.function.Consumer;
-
-import static org.investpro.i18n.LocalizationService.t;
 
 /**
  * Central registry and builder for all UI panels and windows in the system.
@@ -24,11 +18,9 @@ import static org.investpro.i18n.LocalizationService.t;
 @Slf4j
 public class PanelRegistry {
 
-    private final TradingDesk tradingDesk;
     private final Map<String, PanelDescriptor> panels = new LinkedHashMap<>();
 
-    public PanelRegistry(TradingDesk tradingDesk) {
-        this.tradingDesk = tradingDesk;
+    public PanelRegistry() {
         registerAllPanels();
     }
 

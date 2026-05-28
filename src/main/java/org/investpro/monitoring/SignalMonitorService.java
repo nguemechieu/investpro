@@ -1,5 +1,6 @@
 package org.investpro.monitoring;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.investpro.core.agents.AgentEvent;
@@ -20,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>Order life cycle (submitted, accepted, rejected, filled, cancelled)</li>
  * </ul>
  */
-@Getter
+@Data
 @Slf4j
 public class SignalMonitorService {
 
@@ -43,7 +44,7 @@ public class SignalMonitorService {
     );
 
     private final AtomicBoolean running = new AtomicBoolean(false);
-    AgentEventBus eventBus;
+    private AgentEventBus eventBus;
 
     public SignalMonitorService() {
     }

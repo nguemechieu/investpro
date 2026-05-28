@@ -527,36 +527,23 @@ public class CandleStickChart extends Region {
 
         Font axisFont = Font.font(FXUtils.getMonospacedFont(), 12);
 
+        // Resolve instrument-level precision (OANDA displayPrecision or equivalent).
+        // This ensures price axis tick labels match the quoted decimal places exactly.
+        int pricePrecision = exchange.getDisplayPrecision(tradePair);
+
         xAxis.setManaged(false);
         yAxis.setManaged(false);
-        yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
         extraAxis.setManaged(false);
         extraAxisExtension.setManaged(false);
-
 
         xAxis.setAnimated(false);
         yAxis.setAnimated(false);
         extraAxis.setAnimated(false);
 
-
         extraAxis.setSide(Side.LEFT);
         xAxis.setForceZeroInRange(false);
         yAxis.setForceZeroInRange(false);
-        xAxis.setTickLabelFormatter(InstantAxisFormatter.of(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        xAxis.setForceZeroInRange(true);
-        yAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getCounterCurrency()));
-        yAxis.setForceZeroInRange(true);
 
-        extraAxis.setTickLabelFormatter(new MoneyAxisFormatter(tradePair.getBaseCurrency()));
-        yAxis.setTickLabelFont(axisFont);
-        xAxis.setTickLabelFont(axisFont);
-        extraAxis.setTickLabelFont(axisFont);
-
-        /*
-         * This chart uses manual bounds because it is canvas-based.
-         * The StableTicksAxis profiles still help with cleaner tick spacing,
-         * padding defaults, and financial-chart behavior.
-         */
         xAxis.setAutoRanging(false);
         yAxis.setAutoRanging(false);
         extraAxis.setAutoRanging(false);
@@ -590,10 +577,13 @@ public class CandleStickChart extends Region {
                 InstantAxisFormatter.of(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
         );
 
+        // Price axis: use instrument display precision so labels always match quoted decimals.
         yAxis.setTickLabelFormatter(
-                new MoneyAxisFormatter(tradePair.getCounterCurrency())
+                new MoneyAxisFormatter(tradePair.getCounterCurrency(), pricePrecision)
         );
+        yAxis.setPrecision(pricePrecision);
 
+        // Extra (volume/base) axis: use base currency fractional digits.
         extraAxis.setTickLabelFormatter(
                 new MoneyAxisFormatter(tradePair.getCounterCurrency())
         );

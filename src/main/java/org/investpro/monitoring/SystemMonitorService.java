@@ -169,7 +169,7 @@ public class SystemMonitorService {
     private ComponentHealth checkAccountHealth() {
         try {
             String diagnostics = systemCore.getSystemDiagnostics();
-            boolean hasAccountInfo = diagnostics != null && diagnostics.length() > 0;
+            boolean hasAccountInfo = diagnostics != null && !diagnostics.isEmpty();
 
             return ComponentHealth.builder()
                     .componentName("Account")
@@ -218,7 +218,7 @@ public class SystemMonitorService {
     private ComponentHealth checkExecutionHealth() {
         try {
             String diag = systemCore.getSystemDiagnostics();
-            boolean hasExecution = diag != null && diag.length() > 0;
+            boolean hasExecution = diag != null && !diag.isEmpty();
 
             return ComponentHealth.builder()
                     .componentName("Execution")

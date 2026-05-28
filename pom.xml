@@ -13,7 +13,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.12.1</junit.version>
-        <javafx.version>21.0.6</javafx.version>
+        <javafx.version>21.0.8</javafx.version>
     </properties>
 
     <dependencies>
@@ -24,12 +24,6 @@
             <artifactId>javafx-swing</artifactId>
             <version>${javafx.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-web</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-
         <!-- Database -->
         <dependency>
             <groupId>org.xerial</groupId>
@@ -273,7 +267,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>org.investpro.InvestPro</mainClass>
+                    <mainClass>org.investpro.InvestProLauncher</mainClass>
                 </configuration>
             </plugin>
             <plugin>
@@ -281,7 +275,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>org.investpro.InvestPro</mainClass>
+                    <mainClass>org.investpro.InvestProLauncher</mainClass>
                     <arguments/>
                     <systemProperties>
                         <systemProperty>
@@ -306,7 +300,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.investpro.InvestPro</mainClass>
+                            <mainClass>org.investpro.InvestProLauncher</mainClass>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
                         </manifest>
