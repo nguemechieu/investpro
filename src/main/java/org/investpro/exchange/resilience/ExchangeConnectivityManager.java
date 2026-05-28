@@ -43,11 +43,8 @@ public final class ExchangeConnectivityManager {
     private final AtomicReference<ExchangeConnectivityState> connectivityState =
             new AtomicReference<>(ExchangeConnectivityState.DISCONNECTED);
 
-    private final ScheduledExecutorService healthEvaluator = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "exchange-health-evaluator-" + exchangeName);
-        t.setDaemon(true);
-        return t;
-    });
+    // Initialized in constructor after exchangeName is assigned
+    private final ScheduledExecutorService healthEvaluator;
 
     public ExchangeConnectivityManager(
             @NotNull String exchangeName,
@@ -57,6 +54,13 @@ public final class ExchangeConnectivityManager {
         this.eventBus = eventBus;
         this.healthMonitor = new EndpointHealthMonitor(exchangeName);
         this.telemetry = new ExchangeTelemetryEngine(exchangeName);
+
+        // Initialize after exchangeName is set so the thread name can reference it
+        this.healthEvaluator = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "exchange-health-evaluator-" + exchangeName);
+            t.setDaemon(true);
+            return t;
+        });
 
         // Create one circuit breaker per endpoint
         for (EndpointType type : EndpointType.values()) {
