@@ -392,38 +392,38 @@ public class SystemCore {
         }
 
         System.setProperty(
-                "tradeadviser.strategy.requireBacktestBeforeLive",
+                "investpro.strategy.requireBacktestBeforeLive",
                 String.valueOf(settings.requireBacktestBeforeLive()));
         System.setProperty(
-                "tradeadviser.strategy.requirePaperTradingBeforeLive",
+                "investpro.strategy.requirePaperTradingBeforeLive",
                 String.valueOf(settings.requirePaperTradingBeforeLive()));
         System.setProperty(
-                "tradeadviser.strategy.autoAssignBest",
+                "investpro.strategy.autoAssignBest",
                 String.valueOf(settings.autoAssignBestStrategy()));
         System.setProperty(
-                "tradeadviser.strategy.minScore",
+                "investpro.strategy.minScore",
                 String.valueOf(settings.minStrategyScore()));
         System.setProperty(
-                "tradeadviser.strategy.topCandidates",
+                "investpro.strategy.topCandidates",
                 String.valueOf(settings.topStrategiesToPaperTrade()));
 
         System.setProperty(
-                "tradeadviser.execution.smallAccountMode",
+                "investpro.execution.smallAccountMode",
                 String.valueOf(settings.smallAccountModeEnabled()));
         System.setProperty(
-                "tradeadviser.execution.smallAccountThreshold",
+                "investpro.execution.smallAccountThreshold",
                 String.valueOf(settings.smallAccountThreshold()));
         System.setProperty(
-                "tradeadviser.execution.smallAccountTradeUnits",
+                "investpro.execution.smallAccountTradeUnits",
                 String.valueOf(settings.smallAccountUnits()));
         System.setProperty(
-                "tradeadviser.execution.preventOpenCloseSameCycle",
+                "investpro.execution.preventOpenCloseSameCycle",
                 String.valueOf(settings.preventOpenCloseSameCycle()));
         System.setProperty(
-                "tradeadviser.execution.preventInstantReverse",
+                "investpro.execution.preventInstantReverse",
                 String.valueOf(settings.preventInstantReverse()));
         System.setProperty(
-                "tradeadviser.execution.symbolCooldownSeconds",
+                "investpro.execution.symbolCooldownSeconds",
                 String.valueOf(settings.symbolCooldownSeconds()));
 
         log.info(

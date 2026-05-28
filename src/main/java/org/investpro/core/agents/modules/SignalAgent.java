@@ -227,7 +227,7 @@ public class SignalAgent implements Agent {
 
     private boolean requiresPaperValidation() {
         return Boolean.parseBoolean(System.getProperty(
-                "tradeadviser.strategy.requirePaperTradingBeforeLive",
+                "investpro.strategy.requirePaperTradingBeforeLive",
                 "true"));
     }
 

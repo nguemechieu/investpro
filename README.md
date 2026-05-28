@@ -870,7 +870,7 @@ Important system events are persisted for review and debugging. Logs should help
 ### v2.0 — Future
 
 - [ ] REST API server for remote control
-- [ ] TradeAdviser.org web companion
+- [ ] InvestPro.org web companion
 - [ ] Cloud sync
 - [ ] Multi-machine agent coordination
 - [ ] Mobile companion app

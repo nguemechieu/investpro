@@ -182,7 +182,7 @@ public class SymbolAgent implements Agent {
         SymbolAgentState state = manager.ensureSymbol(symbol);
         SymbolEvaluationState previous = state.getState();
         boolean requirePaperTrading = Boolean.parseBoolean(
-                System.getProperty("tradeadviser.strategy.requirePaperTradingBeforeLive", "true"));
+                System.getProperty("investpro.strategy.requirePaperTradingBeforeLive", "true"));
 
         state.setState(requirePaperTrading ? SymbolEvaluationState.PAPER_TRADING : SymbolEvaluationState.LIVE_READY);
         state.setActiveStrategyName(assignment.getStrategyId());

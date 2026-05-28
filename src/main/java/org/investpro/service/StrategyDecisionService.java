@@ -275,7 +275,7 @@ public class StrategyDecisionService {
 
     private boolean isCompatibilityFallbackEnabled() {
         return Boolean.parseBoolean(System.getProperty(
-                "tradeadviser.strategy.allowCompatibilityFallback",
+                "investpro.strategy.allowCompatibilityFallback",
                 "false"));
     }
 

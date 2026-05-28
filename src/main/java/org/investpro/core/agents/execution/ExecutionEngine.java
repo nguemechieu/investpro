@@ -38,7 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * ExecutionEngine - operator layer of TradeAdviser / InvestPro.
+ * ExecutionEngine - operator layer of InvestPro / InvestPro.
  *
  * Responsibilities:
  * - Execute only approved new-order decisions from FinalRiskGate.

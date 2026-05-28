@@ -203,8 +203,8 @@ public class StrategyLabService {
             }
 
             double minimumScore = readFirstDoubleProperty(60.0,
-                    "tradeadviser.strategy.minStrategyScore",
-                    "tradeadviser.strategy.minScore",
+                    "investpro.strategy.minStrategyScore",
+                    "investpro.strategy.minScore",
                     "investpro.strategy.minScore",
                     "investpro.strategy.hardMinStrategyScore");
             if (selected.getScore() < minimumScore) {
@@ -214,7 +214,7 @@ public class StrategyLabService {
             }
 
             boolean autoAssignBest = readFirstBooleanProperty(true,
-                    "tradeadviser.strategy.autoAssignBest",
+                    "investpro.strategy.autoAssignBest",
                     "investpro.strategy.autoAssignBest");
             if (!autoAssignBest) {
                 log.info("Auto assignment disabled; ranked best strategy for {}/{} is {} score={}",
