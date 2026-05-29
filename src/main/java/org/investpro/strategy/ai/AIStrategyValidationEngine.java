@@ -186,7 +186,7 @@ public class AIStrategyValidationEngine {
                 record.getAssignmentId(), decision, approvedForLive);
 
         EventBusManager.getInstance().publish(
-                AgentEvent.of(AgentEvent.AI_STRATEGY_VALIDATION_COMPLETED, SOURCE, report));
+                AgentEvent.of(AgentEvent.AI_STRATEGY_VALIDATION_REVIEWED, SOURCE, report));
 
         return report;
     }

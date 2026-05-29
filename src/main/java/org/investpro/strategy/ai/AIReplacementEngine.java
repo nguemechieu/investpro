@@ -144,7 +144,7 @@ public class AIReplacementEngine {
                 degradedRecord.getAssignmentId(), recommendation, String.format("%.2f", aiConfidence));
 
         EventBusManager.getInstance().publish(
-                AgentEvent.of(AgentEvent.AI_REPLACEMENT_EVALUATED, SOURCE, report));
+                AgentEvent.of(AgentEvent.AI_REPLACEMENT_RECOMMENDED, SOURCE, report));
 
         return report;
     }

@@ -184,7 +184,7 @@ public class AIStrategyHealthEngine {
                     AgentEvent.of(AgentEvent.STRATEGY_HEALTH_CHANGED, SOURCE, report));
             if (level == StrategyHealthLevel.CRITICAL || level == StrategyHealthLevel.DEGRADED) {
                 EventBusManager.getInstance().publish(
-                        AgentEvent.of(AgentEvent.STRATEGY_HEALTH_DEGRADED, SOURCE, report));
+                        AgentEvent.of(AgentEvent.STRATEGY_DEGRADED, SOURCE, report));
             }
         }
 
