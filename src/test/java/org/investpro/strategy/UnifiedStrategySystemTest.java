@@ -413,6 +413,7 @@ class UnifiedStrategySystemTest {
             @Override public void validateConfiguration() {}
             @Override public Object getName() { return "Mock Plugin"; }
             @Override public Object getId() { return id; }
+            @Override public String getLastSignalDescription() { return "mock"; }
         };
     }
 
