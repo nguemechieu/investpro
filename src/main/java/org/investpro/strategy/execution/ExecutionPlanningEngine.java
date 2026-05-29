@@ -1,18 +1,21 @@
 package org.investpro.strategy.execution;
 
 import lombok.extern.slf4j.Slf4j;
+import org.investpro.strategy.StrategySignal;
 import org.investpro.strategy.lifecycle.AISignalReview;
 import org.investpro.strategy.lifecycle.StrategyLifecycleRecord;
 import org.investpro.strategy.position.PositionSizeResult;
-import org.investpro.model.StrategySignal;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Creates ExecutionPlans from signals, position sizing results, and AI reviews.
+ * Creates {@link ExecutionPlan} objects from signals, position sizing results, and AI reviews.
  * Plans are valid for 5 minutes from creation to prevent stale execution.
+ *
+ * <p><strong>CRITICAL:</strong> This engine plans but NEVER executes.
+ * It NEVER places, submits, or routes orders to any exchange.</p>
  */
 @Slf4j
 public class ExecutionPlanningEngine {
@@ -49,9 +52,10 @@ public class ExecutionPlanningEngine {
      *
      * @param signal       the trading signal
      * @param sizeResult   the position sizing result
-     * @param signalReview the AI signal review
+     * @param signalReview the AI signal review (may be null)
      * @param record       the strategy lifecycle record
      * @return a fully populated ExecutionPlan (not yet submitted or executed)
+     * @throws IllegalArgumentException if signal, sizeResult, or record is null
      */
     public ExecutionPlan createPlan(StrategySignal signal,
                                     PositionSizeResult sizeResult,
@@ -63,25 +67,32 @@ public class ExecutionPlanningEngine {
 
         String side = signal.isBuy() ? "BUY" : signal.isSell() ? "SELL" : "HOLD";
         double entryPrice = signal.getEntryPrice();
-        double stopLoss = signal.getStopLoss() > 0 ? signal.getStopLoss()
-                : side.equals("BUY") ? entryPrice * 0.99 : entryPrice * 1.01;
-        double takeProfit = signal.getTakeProfit() > 0 ? signal.getTakeProfit()
-                : side.equals("BUY") ? entryPrice * 1.02 : entryPrice * 0.98;
+
+        double stopLoss = signal.getStopLossPrice() > 0 ? signal.getStopLossPrice()
+                : "BUY".equals(side) ? entryPrice * 0.99 : entryPrice * 1.01;
+        double takeProfit = signal.getTakeProfitPrice() > 0 ? signal.getTakeProfitPrice()
+                : "BUY".equals(side) ? entryPrice * 1.02 : entryPrice * 0.98;
 
         double riskRewardRatio = Math.abs(takeProfit - entryPrice)
                 / Math.max(Math.abs(entryPrice - stopLoss), 0.0001);
 
-        // Infer order type
-        String orderType = inferOrderType(signal);
-
         // Build validation notes
         List<String> validationNotes = new ArrayList<>();
-        validationNotes.add("AI confidence: " + String.format("%.2f", signalReview != null ? signalReview.getConfidence() : 0.0));
+        if (signalReview != null) {
+            validationNotes.add("AI confidence: " + String.format("%.2f", signalReview.getAiConfidence()));
+        }
         validationNotes.add("Position units: " + String.format("%.4f", sizeResult.getPositionUnits()));
         validationNotes.add("Risk/reward: " + String.format("%.2f", riskRewardRatio));
-        if (sizeResult.isCappedByMax()) validationNotes.add("Position capped at maximum");
+        if (sizeResult.isCappedByMax()) {
+            validationNotes.add("Position capped at maximum allowed size");
+        }
 
-        boolean isValid = sizeResult.isValid()
+        boolean aiApprovedFlag = signalReview != null
+                && signalReview.getDecision().allowsExecution();
+        double aiConfidenceValue = signalReview != null ? signalReview.getAiConfidence() : 0.0;
+        String aiSummary = signalReview != null ? signalReview.getReasoningSummary() : "";
+
+        boolean planIsValid = sizeResult.isValid()
                 && sizeResult.getPositionUnits() > 0
                 && !"HOLD".equals(side)
                 && riskRewardRatio >= 1.0;
@@ -91,14 +102,15 @@ public class ExecutionPlanningEngine {
 
         log.debug("Execution plan created: assignment={} side={} units={} R/R={}",
                 record.getAssignmentId(), side,
-                sizeResult.getPositionUnits(), riskRewardRatio);
+                sizeResult.getPositionUnits(), String.format("%.2f", riskRewardRatio));
 
-        return ExecutionPlan.builder()
+        ExecutionPlan.ExecutionPlanBuilder builder = ExecutionPlan.builder()
                 .assignmentId(record.getAssignmentId())
                 .strategyId(record.getStrategyId())
                 .symbol(signal.getSymbol())
+                .timeframe(signal.getTimeframe())
                 .side(side)
-                .orderType(orderType)
+                .orderType("MARKET")
                 .units(sizeResult.getPositionUnits())
                 .notionalValue(sizeResult.getNotionalValue())
                 .entryPrice(entryPrice)
@@ -107,20 +119,18 @@ public class ExecutionPlanningEngine {
                 .riskRewardRatio(riskRewardRatio)
                 .riskAmount(sizeResult.getRiskAmount())
                 .riskPercent(sizeResult.getRiskPercent())
-                .venue(ExecutionVenue.OANDA_REST) // default; router may override
-                .aiApproved(signalReview != null && signalReview.isApproved())
-                .aiConfidence(signalReview != null ? signalReview.getConfidence() : 0.0)
-                .aiReasoningSummary(signalReview != null ? signalReview.getReasoningSummary() : "")
-                .validationNotes(validationNotes)
-                .isValid(isValid)
+                .venue(ExecutionVenue.PAPER_TRADE) // default; router will override
+                .aiApproved(aiApprovedFlag)
+                .aiConfidence(aiConfidenceValue)
+                .aiReasoningSummary(aiSummary)
+                .isValid(planIsValid)
                 .createdAt(now)
-                .planValidUntil(planValidUntil)
-                .build();
-    }
+                .planValidUntil(planValidUntil);
 
-    private String inferOrderType(StrategySignal signal) {
-        if (signal.getEntryPrice() <= 0) return "MARKET";
-        // If signal has explicit limit price use LIMIT, else MARKET
-        return signal.getLimitPrice() > 0 ? "LIMIT" : "MARKET";
+        for (String note : validationNotes) {
+            builder.validationNote(note);
+        }
+
+        return builder.build();
     }
 }
